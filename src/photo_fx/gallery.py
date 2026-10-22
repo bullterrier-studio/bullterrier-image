@@ -22,6 +22,7 @@ from typing import NamedTuple
 from . import fx, imageio
 from .core import registry
 from .matte import subject_matte
+from .ops.resample import resize
 from .recipe import load_recipe, render
 
 CHECKOUT = Path(__file__).resolve().parents[2]  # src/photo_fx/gallery.py -> the source checkout photo-fx runs from
@@ -98,7 +99,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
             matte = subject_matte(photo)  # once for all the recipes that need it
         picture = render(photo, recipe, matte, at=_ANIMATION_MOMENT)
         files.picture.parent.mkdir(parents=True, exist_ok=True)
-        imageio.save(imageio.resize(picture, _SIDE), files.picture, quality=_QUALITY)
+        imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo
 
 

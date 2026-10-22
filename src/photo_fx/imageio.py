@@ -3,7 +3,6 @@
 Every other module works on a single image representation: a float32 array of shape (height, width, 3),
 RGB, values 0..1, sRGB-encoded (display-referred, not linear). This module is the only place that knows
 about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of that leaks into effects.
-`resize` is `photo_fx.ops.resample.resize`, kept here because `imageio.resize` was public before it moved.
 """
 
 import io
@@ -17,9 +16,9 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.ops.resample import resize  # also re-exported: `imageio.resize` was public before it moved to ops (M1)
+from photo_fx.ops import resample
 
-__all__ = ["from_pil", "load", "load_matte", "resize", "resize_video", "save", "save_video", "to_pil"]
+__all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 _EIGHT_BIT = 255.0  # the largest 8-bit value
@@ -102,7 +101,7 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
     suffix = path.suffix.lower()
     if suffix == ".gif":
         images = [
-            to_pil(frame if max_side is None or max(frame.shape[:2]) <= max_side else resize(frame, max_side))
+            to_pil(frame if max_side is None or max(frame.shape[:2]) <= max_side else resample.resize(frame, max_side))
             for frame in frames
         ]
         if not images:

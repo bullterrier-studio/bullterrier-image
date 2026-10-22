@@ -37,5 +37,5 @@ from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, r
 __all__ = [
     "Animation", "BackendUnavailableError", "ImageReadError", "PhotoFxError", "Project", "Recipe", "RecipeError",
     "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "fx", "imageio", "load_project", "load_recipe",
-    "ramp", "render", "render_all", "render_frames", "run", "subject_matte", "trace",
+    "ramp", "recipe", "render", "render_all", "render_frames", "run", "subject_matte", "trace",
 ]  # fmt: skip

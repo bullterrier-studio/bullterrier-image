@@ -4,9 +4,7 @@ A recipe is an ordered list of effects (written in Python or in a small TOML fil
 animated. The machinery lives in `photo_fx.core` (`timing`, `steps`, `loader`, `runner`); this module re-exports its
 public names and binds the one thing the core leaves open: how the subject is found. `render`, `render_frames`,
 `trace` and `render_all` take the same arguments as the core's, but when a masked step needs the subject and no
-`matte` or `find_subject` is given, they find it with `photo_fx.matte.subject_matte` (Apple Vision).
-
-`from photo_fx.recipe import ...` keeps working as before the split.
+`matte` or `find_subject` is given, they find it with `photo_fx.matte.subject_matte`.
 """
 
 from collections.abc import Iterator
@@ -21,8 +19,8 @@ from .core.steps import Recipe, Step
 from .core.timing import Animated, Animation, ramp
 
 __all__ = [
-    "Animated", "Animation", "Recipe", "Stage", "Step", "load_recipe", "ramp", "render", "render_all", "render_frames",
-    "trace",
+    "Animated", "Animation", "Recipe", "Stage", "Step", "SubjectFinder", "load_recipe", "ramp", "render", "render_all",
+    "render_frames", "trace",
 ]  # fmt: skip
 
 

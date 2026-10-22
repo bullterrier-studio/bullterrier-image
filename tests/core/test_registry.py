@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 from pydantic import BaseModel
 
-from photo_fx import effects
 from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import INPUTS, effect
@@ -44,7 +43,7 @@ def test_a_modelled_effect_can_be_called_with_keywords_a_model_or_nothing(gain):
     np.testing.assert_allclose(gain(GREY, gain=2.0, offset=0.1), 0.6, atol=1e-6)  # 0.25 * 2 + 0.1
     np.testing.assert_allclose(gain(GREY, GainParams(gain=2.0, offset=0.1)), 0.6, atol=1e-6)
     np.testing.assert_array_equal(gain(GREY), GREY)  # the defaults: gain 1, offset 0
-    np.testing.assert_allclose(effects.apply("gain_probe", GREY, gain=3.0), 0.75, atol=1e-6)
+    np.testing.assert_allclose(registry.apply("gain_probe", GREY, gain=3.0), 0.75, atol=1e-6)
 
 
 def test_giving_both_a_model_and_keywords_is_an_error(gain):
@@ -83,7 +82,7 @@ def test_the_wrapper_keeps_the_name_and_documentation_and_tells_its_model_catego
     assert gain.params_model is GainParams
     assert gain.category == "light"
     assert gain.inputs == ()
-    assert effects.get("gain_probe") is gain
+    assert registry.get("gain_probe") is gain
     assert "gain_probe" in registry.categories()["light"]
 
 
@@ -133,14 +132,14 @@ def test_an_effect_function_of_the_wrong_shape_is_refused(signature, complaint, 
     with pytest.raises(ValueError, match="shape_probe") as raised:
         effect(category="light", params=GainParams)(_probe_with(signature))
     assert complaint in str(raised.value)
-    assert "shape_probe" not in effects.describe()
+    assert "shape_probe" not in registry.describe()
 
 
 @pytest.mark.parametrize("model", [dict, GainParams(), BaseModel], ids=["dict", "instance", "basemodel"])
 def test_params_must_be_an_effect_params_model(model, throwaway_effects):
     with pytest.raises(ValueError, match=r"gain_probe.*EffectParams"):
         effect(category="light", params=model)(gain_probe)
-    assert "gain_probe" not in effects.describe()
+    assert "gain_probe" not in registry.describe()
 
 
 def test_a_parameter_may_not_be_named_like_an_input(throwaway_effects):
@@ -154,25 +153,25 @@ def test_a_parameter_may_not_be_named_like_an_input(throwaway_effects):
 
     with pytest.raises(ValueError, match=r"clash_probe.*`matte`"):
         effect(category="light", params=MatteParams)(clash_probe)
-    assert "clash_probe" not in effects.describe()
+    assert "clash_probe" not in registry.describe()
 
 
 @pytest.mark.parametrize("category", ["lights", "Light", ""], ids=["misspelt", "capitalised", "empty"])
 def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(category, throwaway_effects):
     with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, animation"):
         effect(category=category, params=GainParams)(gain_probe)
-    assert "gain_probe" not in effects.describe()
+    assert "gain_probe" not in registry.describe()
 
 
 def test_registering_an_effect_again_keeps_the_very_same_effect(gain):
     assert effect(category="light", params=GainParams)(gain) is gain
-    assert effects.get("gain_probe") is gain
+    assert registry.get("gain_probe") is gain
 
 
 def test_registering_the_same_function_twice_is_allowed(throwaway_effects):
     effect(category="utilities", params=GainParams)(gain_probe)
     again = effect(category="utilities", params=GainParams)(gain_probe)
-    assert effects.get("gain_probe") is again
+    assert registry.get("gain_probe") is again
 
 
 def test_a_second_function_under_an_existing_name_is_an_error_naming_both_modules(throwaway_effects):
@@ -191,8 +190,8 @@ def test_a_second_function_under_an_existing_name_is_an_error_naming_both_module
     registered = effect(category="utilities", params=GainParams)(first)
     with pytest.raises(ValueError, match=r"twin.*first_module.*second_module"):
         effect(category="utilities", params=GainParams)(twin)
-    assert effects.get("twin") is registered  # the first one stays
-    np.testing.assert_array_equal(effects.apply("twin", GREY), GREY)
+    assert registry.get("twin") is registered  # the first one stays
+    np.testing.assert_array_equal(registry.apply("twin", GREY), GREY)
 
 
 def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, throwaway_effects):
@@ -210,7 +209,7 @@ def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, t
     reloaded = importlib.reload(sys.modules["reload_probe_module"]).reload_probe
     # replaced, not rejected
     assert reloaded is not first
-    assert effects.get("reload_probe") is reloaded
+    assert registry.get("reload_probe") is reloaded
 
 
 def test_registering_an_effect_again_with_another_model_is_refused(gain):
@@ -219,7 +218,7 @@ def test_registering_an_effect_again_with_another_model_is_refused(gain):
 
     with pytest.raises(ValueError, match=r"gain_probe.*OtherParams"):
         effect(category="light", params=OtherParams)(gain)
-    assert effects.get("gain_probe").params_model is GainParams
+    assert registry.get("gain_probe").params_model is GainParams
 
 
 def test_an_effect_without_a_model_is_refused(throwaway_effects):
@@ -276,12 +275,12 @@ def test_summary_is_the_first_sentence_of_the_docstring_on_one_line(docstring, f
 
 
 def test_describe_gives_the_documentation_and_every_parameter(gain):
-    text = effects.describe()["gain_probe"]
+    text = registry.describe()["gain_probe"]
     assert text.startswith("Brightens by a gain, then shifts by an offset. More text.")
     assert "Parameters" in text
     assert "Multiplies every value. Raising it brightens." in text
     assert "Added after the gain." in text
-    assert effects.summary("gain_probe") == "Brightens by a gain, then shifts by an offset."
+    assert registry.summary("gain_probe") == "Brightens by a gain, then shifts by an offset."
 
 
 def test_queries_about_an_unknown_effect_list_the_known_ones(gain):

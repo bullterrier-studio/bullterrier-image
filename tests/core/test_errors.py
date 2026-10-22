@@ -12,9 +12,9 @@ from photo_fx import (
     RecipeError,
     SubjectNotFoundError,
     UnknownEffectError,
-    effects,
     fx,
 )
+from photo_fx.core import registry
 from photo_fx.core.loader import load_recipe
 from photo_fx.core.steps import Step
 
@@ -27,7 +27,7 @@ def test_a_misspelt_parameter_is_a_recipe_error_from_fx_a_direct_call_and_a_reci
     with pytest.raises(RecipeError, match="typo"):
         fx.grade(typo=1)
     with pytest.raises(RecipeError, match="typo"):
-        effects.get("grade")(GREY, typo=1)
+        registry.get("grade")(GREY, typo=1)
     with pytest.raises(RecipeError, match="typo"):
         load_recipe(path)
 
@@ -35,7 +35,7 @@ def test_a_misspelt_parameter_is_a_recipe_error_from_fx_a_direct_call_and_a_reci
 def test_an_unknown_effect_is_an_unknown_effect_error_with_a_clean_message_wherever_it_is_named(tmp_path):
     path = tmp_path / "unknown.toml"
     path.write_text("[[step]]\neffect = 'no_such_effect'\n", encoding="utf-8")
-    for attempt in (lambda: effects.get("no_such_effect"), lambda: Step("no_such_effect"), lambda: load_recipe(path)):
+    for attempt in (lambda: registry.get("no_such_effect"), lambda: Step("no_such_effect"), lambda: load_recipe(path)):
         with pytest.raises(UnknownEffectError) as raised:
             attempt()
         message = str(raised.value)

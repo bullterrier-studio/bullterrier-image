@@ -3,19 +3,19 @@
 import numpy as np
 import pytest
 
-from photo_fx import effects
+from photo_fx.core import registry
 from photo_fx.ops.color import parse_color
 
 
 def test_fill_ignores_the_picture(photo: np.ndarray) -> None:
-    out = effects.apply("fill", photo, color="#102030")
+    out = registry.apply("fill", photo, color="#102030")
     assert np.allclose(out, parse_color("#102030"))
 
 
 def test_fill_refuses_a_colour_it_cannot_read(photo: np.ndarray) -> None:
     with pytest.raises(ValueError, match=r"fill.*`color`.*'#12345'"):
-        effects.apply("fill", photo, color="#12345")
+        registry.apply("fill", photo, color="#12345")
 
 
 def test_fill_is_a_subject_effect() -> None:
-    assert effects.category("fill") == "subject"
+    assert registry.category("fill") == "subject"

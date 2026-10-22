@@ -11,48 +11,11 @@
     runner      running a recipe on a photo; the subject is given to it (a matte or a `find_subject` function)
 
 `core` imports only `ops` from the rest of photo_fx (import-linter enforces it), so it stays small and stable while
-effects, adapters and the app change around it.
+effects, adapters and the app change around it. Its names are imported from their modules
+(`from photo_fx.core.registry import effect`); the package itself re-exports nothing, so each name has one home.
 Users import from `photo_fx` / `photo_fx.recipe`, whose `render` & co. also know how to find the subject.
 """
 
-from .errors import (
-    BackendUnavailableError,
-    ImageReadError,
-    PhotoFxError,
-    RecipeError,
-    SubjectNotFoundError,
-    UnknownEffectError,
-)
-from .loader import load_recipe
-from .params import UNITS, Color, EffectParams, param
-from .registry import (
-    CATEGORIES,
-    INPUTS,
-    ModelledEffect,
-    all_effects,
-    apply,
-    categories,
-    category,
-    describe,
-    documentation,
-    effect,
-    get,
-    inputs,
-    parameters,
-    schema,
-    summary,
-    unregister,
-)
-from .runner import Stage, SubjectFinder, render, render_all, render_frames, trace
-from .steps import Recipe, Step
-from .timing import Animated, Animation, ramp
-from .vocabulary import DISCOURAGED
+from . import errors, loader, params, registry, runner, steps, timing, types, vocabulary
 
-__all__ = [
-    "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "BackendUnavailableError", "Color",
-    "EffectParams", "ImageReadError", "ModelledEffect", "PhotoFxError", "Recipe", "RecipeError", "Stage",
-    "Step", "SubjectFinder", "SubjectNotFoundError", "UnknownEffectError", "all_effects", "apply", "categories",
-    "category",
-    "describe", "documentation", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render",
-    "render_all", "render_frames", "schema", "summary", "trace", "unregister",
-]  # fmt: skip
+__all__ = ["errors", "loader", "params", "registry", "runner", "steps", "timing", "types", "vocabulary"]

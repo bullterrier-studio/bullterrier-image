@@ -15,6 +15,7 @@ import pytest
 
 from photo_fx import BackendUnavailableError, SubjectNotFoundError, imageio
 from photo_fx.matte import onnx_model_path, refine_edge, subject_matte
+from photo_fx.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -116,7 +117,7 @@ def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(
 @pytest.mark.skipif(sys.platform != "darwin", reason="the automatic choice is Apple Vision only where Vision exists")
 def test_on_macos_the_automatic_choice_is_apple_vision(echo_red, monkeypatch):
     monkeypatch.setenv("PHOTO_FX_SEGMENTER", "")  # empty means unset
-    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
+    photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
     np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="vision"))
     assert not np.allclose(subject_matte(photo), subject_matte(photo, segmenter="onnx"), atol=0.05)
 
@@ -183,7 +184,7 @@ def test_the_real_model_finds_the_dog(monkeypatch):
     if sha256_of(cached) != ISNET_SHA256:
         pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
     monkeypatch.setenv("PHOTO_FX_MODEL", str(cached))
-    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 320)
+    photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
     alpha = subject_matte(photo, segmenter="onnx")
     height, width = alpha.shape
     assert alpha[height // 2, width // 2] > 0.9  # the dog's chest, in the middle of the picture

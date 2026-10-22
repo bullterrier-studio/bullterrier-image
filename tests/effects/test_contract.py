@@ -4,17 +4,16 @@ categories, and every parameter across its documented range."""
 import numpy as np
 import pytest
 
-from photo_fx import effects
 from photo_fx.core import registry
 from photo_fx.core.params import UNITS, EffectParams, param
 from photo_fx.core.registry import effect
 
-ALL = sorted(effects.describe())
+ALL = sorted(registry.describe())
 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_keeps_shape_dtype_and_range(name, photo):
-    out = effects.apply(name, photo)
+    out = registry.apply(name, photo)
     assert out.shape == photo.shape
     assert out.dtype == np.float32
     assert np.isfinite(out).all()
@@ -25,7 +24,7 @@ def test_every_effect_keeps_shape_dtype_and_range(name, photo):
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_is_deterministic_and_leaves_its_input_alone(name, photo):
     before = photo.copy()
-    first, second = effects.apply(name, photo), effects.apply(name, photo)
+    first, second = registry.apply(name, photo), registry.apply(name, photo)
     np.testing.assert_array_equal(first, second)
     np.testing.assert_array_equal(photo, before)
 
@@ -40,7 +39,7 @@ def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, 
     rgb = np.ascontiguousarray(photo[: size[0], : size[1]])
     before = rgb.copy()
     inputs = _inputs(name, rgb)
-    out = effects.apply(name, rgb, **inputs)
+    out = registry.apply(name, rgb, **inputs)
     assert out.shape == rgb.shape
     assert out.dtype == np.float32
     assert np.isfinite(out).all()
@@ -51,13 +50,13 @@ def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_documents_itself(name):
-    assert effects.describe()[name]
+    assert registry.describe()[name]
 
 
 def test_unknown_effect_lists_choices(photo, throwaway_effects, register_probe):
     register_probe("listed_probe")
     with pytest.raises(KeyError) as raised:
-        effects.apply("nope", photo)
+        registry.apply("nope", photo)
     message = str(raised.value)
     # the given name and the choices
     assert "'nope'" in message
@@ -69,20 +68,20 @@ def test_an_emptied_registry_holds_only_what_the_test_registers_and_gets_the_rea
     registry_emptied, register_probe
 ):
     """The helper behind `fresh_registry`: real effects come back, in their order, even when the block fails."""
-    real = effects.all_effects()
-    real_categories = {name: effects.category(name) for name in real}
+    real = registry.all_effects()
+    real_categories = {name: registry.category(name) for name in real}
 
     def use_the_emptied_registry_then_fail():
         with registry_emptied():
-            assert effects.all_effects() == {}
+            assert registry.all_effects() == {}
             register_probe("only_probe", "light")
-            assert list(effects.all_effects()) == ["only_probe"]
+            assert list(registry.all_effects()) == ["only_probe"]
             raise RuntimeError("test failed")
 
     with pytest.raises(RuntimeError, match="test failed"):
         use_the_emptied_registry_then_fail()
-    assert list(effects.all_effects().items()) == list(real.items())
-    assert {name: effects.category(name) for name in real} == real_categories
+    assert list(registry.all_effects().items()) == list(real.items())
+    assert {name: registry.category(name) for name in real} == real_categories
 
 
 # --- parameter vocabulary ----------------------------------------------------------------------------------------
@@ -154,7 +153,7 @@ AGREED_CATEGORIES = (
 
 
 def test_the_categories_are_exactly_the_agreed_slugs_in_order():
-    assert effects.CATEGORIES == AGREED_CATEGORIES  # the published list effect authors choose from
+    assert registry.CATEGORIES == AGREED_CATEGORIES  # the published list effect authors choose from
 
 
 def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_registry, register_probe):
@@ -162,19 +161,19 @@ def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_reg
         register_probe(name, category)  # registered out of order, on purpose
     expected: dict[str, list[str]] = {category: [] for category in AGREED_CATEGORIES}
     expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
-    assert effects.categories() == expected
-    assert list(effects.categories()) == list(AGREED_CATEGORIES)  # dict order is the catalogue order
+    assert registry.categories() == expected
+    assert list(registry.categories()) == list(AGREED_CATEGORIES)  # dict order is the catalogue order
 
 
 def test_categories_lists_a_category_with_no_effects_as_empty(fresh_registry, register_probe):
     register_probe("lamp", "light")
-    assert effects.categories()["distortion"] == []  # listed, although it has nothing yet
+    assert registry.categories()["distortion"] == []  # listed, although it has nothing yet
     register_probe("swirl", "distortion")
-    assert effects.categories()["distortion"] == ["swirl"]
+    assert registry.categories()["distortion"] == ["swirl"]
 
 
 def test_the_real_effects_are_each_in_exactly_one_category():
-    grouped = effects.categories()
+    grouped = registry.categories()
     assert list(grouped) == list(AGREED_CATEGORIES)
     assert sorted(name for names in grouped.values() for name in names) == ALL
     assert all(names == sorted(names) for names in grouped.values())
@@ -227,7 +226,7 @@ def test_every_parameter_is_described_and_has_a_unit_entry(name):
 @pytest.mark.parametrize(("name", "field", "side"), _bounds())
 def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
     small = _small(photo)
-    out = effects.apply(name, small, **{field: _bound_value(name, field, side)}, **_inputs(name, small))
+    out = registry.apply(name, small, **{field: _bound_value(name, field, side)}, **_inputs(name, small))
     assert out.shape == small.shape
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6
@@ -253,7 +252,7 @@ def _interior_values() -> list[tuple[str, str, float]]:
 @pytest.mark.parametrize(("name", "field", "value"), _interior_values())
 def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, field, value, photo):
     small = _small(photo)
-    out = effects.apply(name, small, **{field: value}, **_inputs(name, small))
+    out = registry.apply(name, small, **{field: value}, **_inputs(name, small))
     assert out.shape == small.shape
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6
@@ -263,13 +262,13 @@ def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, fie
 @pytest.mark.parametrize(("name", "field", "side"), _bounds())
 def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, photo):
     with pytest.raises(ValueError, match=f"`{field}`"):
-        effects.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
+        registry.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_refuses_an_unknown_parameter(name, photo):
     with pytest.raises(ValueError, match="not_a_parameter"):
-        effects.apply(name, _small(photo), not_a_parameter=1)
+        registry.apply(name, _small(photo), not_a_parameter=1)
 
 
 @pytest.mark.parametrize("name", ALL)
@@ -277,6 +276,6 @@ def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     small, model = _small(photo), registry.parameters(name)
     inputs = _inputs(name, small)
     defaults = {field: info.default for field, info in model.model_fields.items()}
-    by_model = effects.get(name)(small, model(), **inputs)
-    np.testing.assert_array_equal(effects.get(name)(small, **inputs), by_model)
-    np.testing.assert_array_equal(effects.get(name)(small, **defaults, **inputs), by_model)
+    by_model = registry.get(name)(small, model(), **inputs)
+    np.testing.assert_array_equal(registry.get(name)(small, **inputs), by_model)
+    np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)

@@ -4,8 +4,9 @@ import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image
 
-from photo_fx import effects, imageio
+from photo_fx import imageio
 from photo_fx.cli import main
+from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.matte import subject_matte
@@ -25,7 +26,7 @@ def files(photo, tmp_path):
 def test_effects_lists_every_effect(capsys):
     assert main(["effects"]) == 0
     listed = {line for line in capsys.readouterr().out.splitlines() if line and not line.startswith(" ")}
-    assert listed == set(effects.describe())  # one unindented heading per effect, its documentation indented below
+    assert listed == set(registry.describe())  # one unindented heading per effect, its documentation indented below
 
 
 class WickParams(EffectParams):

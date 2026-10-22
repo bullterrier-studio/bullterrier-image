@@ -19,7 +19,8 @@ from pathlib import Path
 import pytest
 
 import photo_fx
-from photo_fx import effects, gallery
+from photo_fx import gallery
+from photo_fx.core import registry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -86,9 +87,9 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
     code = (
         "import json, sys\n"
         "import numpy as np\n"
-        "from photo_fx import effects\n"
-        "out = effects.apply('lamp_probe', np.full((4, 4, 3), 0.25, np.float32), amount=1.0)\n"
-        "json.dump([effects.category('lamp_probe'), float(out.max())], sys.stdout)\n"
+        "from photo_fx.core import registry\n"
+        "out = registry.apply('lamp_probe', np.full((4, 4, 3), 0.25, np.float32), amount=1.0)\n"
+        "json.dump([registry.category('lamp_probe'), float(out.max())], sys.stdout)\n"
     )
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
     done = subprocess.run([sys.executable, "-c", code], env=environment, capture_output=True, text=True, check=False)
@@ -160,7 +161,7 @@ def test_an_unknown_category_is_refused_listing_the_categories(checkout):
     before = _tree(checkout)
     with pytest.raises(ValueError, match="'lights'") as raised:
         gallery.new_effect("lamp_probe", "lights", checkout=checkout)
-    assert ", ".join(effects.CATEGORIES) in str(raised.value)
+    assert ", ".join(registry.CATEGORIES) in str(raised.value)
     assert _tree(checkout) == before
 
 

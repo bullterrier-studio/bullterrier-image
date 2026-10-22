@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from . import imageio
+from .ops.resample import resize
 from .recipe import Stage
 
 
@@ -21,7 +22,7 @@ def contact_sheet(tiles: list[tuple[str, np.ndarray]], columns: int = 3, tile: i
     for i, (label, image) in enumerate(tiles):
         x = gap + (i % columns) * (tile + gap)
         y = gap + (i // columns) * (tile + label_h + gap)
-        small = imageio.to_pil(imageio.resize(image, tile))
+        small = imageio.to_pil(resize(image, tile))
         sheet.paste(small, (x + (tile - small.width) // 2, y + (tile - small.height) // 2))
         draw.text((x, y + tile + 6), label, fill="#d8d8d8", font=font)
     return imageio.from_pil(sheet)

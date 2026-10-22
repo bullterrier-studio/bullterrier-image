@@ -14,10 +14,8 @@ gallery picture live outside the package under the same name (`tests/effects/<na
 imports every folder whose name does not start with `_`, in sorted order. A folder that registers no effect, or
 another number, or an effect named otherwise or registered outside `effect.py`, a folder without `__init__.py`, and a
 loose module (`effects/<name>.py`) are each a `ValueError` at import, naming the folder or file.
-Effects never import each other: shared code lives in `photo_fx.ops`. Look effects up in `photo_fx.core.registry`.
-
-The query names below (`get`, `apply`, `describe`...) are the registry's, re-exported so that `photo_fx.effects.get`
-and friends keep working.
+Effects never import each other: shared code lives in `photo_fx.ops`. This package only finds the effects; look them
+up in `photo_fx.core.registry` (`get`, `apply`, `describe`...).
 """
 
 import importlib
@@ -74,20 +72,4 @@ def _check_folder(folder: str) -> None:
         raise ValueError(f"effects/{folder}/: the effect is registered in {module}; register it in effect.py")
 
 
-# Before the public names below are bound, so that a folder named like one of them cannot replace it.
 _discover()
-
-
-# Re-exported for compatibility: these lived in this package before the registry moved to `core` (M1).
-from photo_fx.core.registry import (  # noqa: E402  (must follow the discovery)
-    CATEGORIES,
-    all_effects,
-    apply,
-    categories,
-    category,
-    describe,
-    get,
-    summary,
-)
-
-__all__ = ["CATEGORIES", "all_effects", "apply", "categories", "category", "describe", "get", "summary"]

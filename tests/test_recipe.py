@@ -10,6 +10,7 @@ from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
 from photo_fx.matte import subject_matte
+from photo_fx.ops.resample import resize
 from photo_fx.recipe import render_frames
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
@@ -317,7 +318,7 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     external boundary, see `echo_model`) is chosen through the environment, so the test is the same on every OS."""
     monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
     monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
-    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
+    photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     animated = Recipe("a", (*masked.steps, Step("grade", {"exposure": Animated(0.0, 1.0)})), None, Animation(2, 1))
     alpha = subject_matte(photo)

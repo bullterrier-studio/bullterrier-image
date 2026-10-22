@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 import photo_fx
-from photo_fx import effects
+from photo_fx.core import registry
 
 
 def _effect_module(name: str, category: str = "utilities") -> str:
@@ -43,6 +43,7 @@ TRIGGER = "from . import effect  # registers the effect\n"
 _REPORT = """
     import contextlib, io, json, sys
     from photo_fx import effects, fx
+    from photo_fx.core import registry
     from photo_fx.cli import main
     from photo_fx.recipe import Step
 
@@ -51,9 +52,9 @@ _REPORT = """
         main(["effects"])
     json.dump({
         "package": effects.__file__,
-        "registered": sorted(effects.describe()),
-        "module": effects.get("zz_folder").__module__,
-        "category": effects.category("zz_folder"),
+        "registered": sorted(registry.describe()),
+        "module": registry.get("zz_folder").__module__,
+        "category": registry.category("zz_folder"),
         "fx": fx.zz_folder(amount=0.2).effect,
         "recipe_step": Step("zz_folder", {"amount": 0.2}).effect,
         "cli_lists_it": "zz_folder" in listing.getvalue(),
@@ -95,7 +96,7 @@ def test_a_new_folder_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
     assert done.returncode == 0, done.stderr
     report = json.loads(done.stdout)
     assert Path(report["package"]).is_relative_to(tmp_path)  # it really looked at the copy
-    assert set(report["registered"]) == set(effects.describe()) | {"zz_folder"}
+    assert set(report["registered"]) == set(registry.describe()) | {"zz_folder"}
     assert report["module"] == "photo_fx.effects.zz_folder.effect"
     assert report["category"] == "texture"
     assert report["fx"] == report["recipe_step"] == "zz_folder"

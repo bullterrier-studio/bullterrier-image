@@ -214,6 +214,9 @@ ignore_names = [
     "__dir__",
     "writeable",  # numpy's array flag: setting it makes a shared, cached array read-only
     "blend",  # `Step.blend`: public API (README, `fx`), called by users' scripts and never inside the package
+    "schema",  # `registry.schema`: an effect's parameters as JSON schema, for tools outside the package
+    "unregister",  # `registry.unregister`: for tests that register throwaway effects (tests/conftest.py)
+    "DISCOURAGED",  # the parameter vocabulary, read by the contract test over every registered effect
 ]
 
 # Every import is declared, and only once in the right place (`uv run deptry .`, in `poe check`): a missing, unused,

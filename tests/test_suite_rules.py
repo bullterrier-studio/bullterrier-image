@@ -173,7 +173,7 @@ def test_the_checker_passes_public_use_and_the_tests_own_private_names():
 import sys
 import numpy as np
 import photo_fx
-from photo_fx import effects
+from photo_fx.core import registry
 from photo_fx.matte import refine_edge
 
 def _probe(rgb, amount: float = 0.5):
@@ -184,7 +184,7 @@ class _Helper:
     _value = 1
 
 def test(monkeypatch, tmp_path):
-    effects.describe()
+    registry.describe()
     photo_fx.__file__  # a dunder is public
     _Helper()._value  # the test's own private attribute
     monkeypatch.setattr(sys, "argv", ["photo-fx"])  # not photo_fx

@@ -49,6 +49,7 @@ from . import imageio
 from .checks import MotionMeter, matte_warnings, still_warnings
 from .core.runner import subject_from
 from .matte import subject_matte
+from .ops.resample import resize
 from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
 from .sheet import contact_sheet, write_stages
 
@@ -359,7 +360,7 @@ def _sizes(project: Project, native: int) -> list[int | None]:
 def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) -> list[Path]:
     outputs = []
     for size in _sizes(project, max(image.shape[:2])):
-        picture = image if size is None else imageio.resize(image, size)
+        picture = image if size is None else resize(image, size)
         for fmt in project.formats:
             target = folder / (f"{name}.{fmt}" if size is None else f"{name}_{size}.{fmt}")
             imageio.save(picture, target, quality=project.quality)

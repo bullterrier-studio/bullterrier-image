@@ -7,7 +7,7 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
-from photo_fx import effects
+from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect, unregister
 
@@ -17,13 +17,13 @@ def empty_registry() -> Iterator[None]:
     """Inside the block the effect registry is empty; afterwards, even if the block raised, whatever was registered in
     it is removed and the real effects are back, in their original order. Uses only the registry's public interface:
     `unregister`, and registering the same function again, which the registry allows."""
-    real = [(name, fn, effects.category(name)) for name, fn in effects.all_effects().items()]
+    real = [(name, fn, registry.category(name)) for name, fn in registry.all_effects().items()]
     for name, _, _ in real:
         unregister(name)
     try:
         yield
     finally:
-        for name in effects.all_effects():
+        for name in registry.all_effects():
             unregister(name)
         for _, fn, category in real:
             effect(category=category, params=fn.params_model)(fn)
@@ -69,9 +69,9 @@ def register_probe():
 def throwaway_effects():
     """Lets a test register effects of its own: whatever it registered is removed again afterwards, even if the test
     fails, so no other test ever sees it."""
-    before = set(effects.all_effects())
+    before = set(registry.all_effects())
     yield
-    for name in set(effects.all_effects()) - before:
+    for name in set(registry.all_effects()) - before:
         unregister(name)
 
 

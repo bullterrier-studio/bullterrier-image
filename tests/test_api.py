@@ -7,12 +7,42 @@ from typing import Literal
 import numpy as np
 import pytest
 
+import photo_fx
+import photo_fx.core.runner
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
 from photo_fx.core import registry
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
+
+# --- the public surface: explicit, one home per name ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "module", [photo_fx, photo_fx.fx, photo_fx.imageio, photo_fx.recipe, photo_fx.core], ids=lambda m: m.__name__
+)
+def test_every_public_module_lists_what_it_exports_and_has_it(module):
+    assert isinstance(module.__all__, list)
+    assert module.__all__, f"{module.__name__} exports nothing"
+    missing = [name for name in module.__all__ if not hasattr(module, name)]
+    assert missing == []
+
+
+@pytest.mark.parametrize("name", ["render", "render_frames", "trace", "render_all"])
+def test_the_render_family_has_one_public_home_and_core_does_not_offer_its_own(name):
+    """`photo_fx.render` is `photo_fx.recipe.render` (with the default subject finder); the core's version, which
+    finds no subject by itself, is reachable only by its module path."""
+    assert getattr(photo_fx, name) is getattr(photo_fx.recipe, name)
+    assert getattr(photo_fx, name) is not getattr(photo_fx.core.runner, name)
+    assert not hasattr(photo_fx.core, name)
+
+
+@pytest.mark.parametrize("name", ["get", "apply", "describe", "categories", "summary", "CATEGORIES"])
+def test_effect_queries_live_only_in_the_registry(name):
+    assert hasattr(registry, name)
+    assert not hasattr(photo_fx.effects, name)
+
 
 # --- steps are checked when they are made, wherever they come from ------------------------------------------------
 
@@ -85,9 +115,7 @@ def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
 
 
 def test_every_effect_is_available_as_a_step_builder():
-    from photo_fx import effects
-
-    for name in effects.describe():
+    for name in registry.describe():
         assert getattr(fx, name)().effect == name
 
 

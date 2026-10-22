@@ -18,9 +18,11 @@ import pytest
 from PIL import Image, JpegImagePlugin
 
 import photo_fx
-from photo_fx import effects, fx, gallery, imageio
+from photo_fx import fx, gallery, imageio
+from photo_fx.core import registry
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.resample import resize
 
 
 class AmountParams(EffectParams):
@@ -62,9 +64,9 @@ def test_a_category_appears_on_the_page_once_it_has_an_effect(fresh_registry, re
 
 def test_every_real_effect_is_listed_once_in_its_own_category_section():
     sections = _sections(gallery.render_effects_page())
-    for name in effects.describe():
+    for name in registry.describe():
         homes = [heading for heading, text in sections.items() if f"`{name}`" in text]
-        assert homes == [effects.category(name).capitalize()], name
+        assert homes == [registry.category(name).capitalize()], name
 
 
 class RowParams(EffectParams):
@@ -201,7 +203,7 @@ def test_an_effects_files_are_found_by_its_name_in_the_layout_that_mirrors_the_p
 
 def test_every_row_of_the_real_page_links_to_its_effects_own_picture_and_recipe():
     page, docs = gallery.render_effects_page(), gallery.CHECKOUT / "docs"
-    for name in effects.describe():
+    for name in registry.describe():
         files, row = gallery.effect_files(name), _row(page, name)
         (picture,) = re.findall(r'src="([^"]+)"', row)
         (recipe,) = re.findall(r"\]\(([^)]+)\)", row)
@@ -236,7 +238,7 @@ def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(che
 def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_recipe(checkout, probe, photo):
     gallery.render_gallery(only=[probe], checkout=checkout)
     picture = imageio.load(gallery.effect_files(probe, checkout=checkout).picture)
-    expected = imageio.resize(photo * 0.5, 480)  # the probe halves the brightness; the demo photo is `photo`
+    expected = resize(photo * 0.5, 480)  # the probe halves the brightness; the demo photo is `photo`
     # JPEG and resampling only
     assert picture.shape == expected.shape
     assert np.abs(picture - expected).mean() < 0.02
@@ -287,7 +289,7 @@ def test_gallery_outside_a_source_checkout_says_it_needs_one(tmp_path):
 @pytest.fixture
 def docs(checkout):
     """The scratch checkout with every effect's gallery picture already there (so none renders)."""
-    for name in effects.describe():
+    for name in registry.describe():
         gallery.effect_files(name, checkout=checkout).picture.write_bytes(b"existing")
     return checkout
 
@@ -307,7 +309,7 @@ def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(doc
     assert done.stdout.split() == [str(stub), str(page)]  # written into the scratch checkout, nowhere else
     assert stub.read_text() == fx.stub_text()
     assert page.read_text() == gallery.render_effects_page()
-    pictures = [gallery.effect_files(name, checkout=docs).picture for name in effects.describe()]
+    pictures = [gallery.effect_files(name, checkout=docs).picture for name in registry.describe()]
     assert {picture.read_bytes() for picture in pictures} == {b"existing"}
 
 

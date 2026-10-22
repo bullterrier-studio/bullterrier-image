@@ -13,7 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
-from . import effects, gallery, imageio
+from . import gallery, imageio
+from .core import registry
 from .imageio import save_video
 from .matte import SEGMENTERS, refine_edge, subject_matte
 from .pipeline import init_project, load_project, run
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         "new-effect", help="create a new effect's files from the template: its code, its tests and its example recipe"
     )
     p.add_argument("name", help="the effect's name: lowercase letters, digits and _, starting with a letter")
-    p.add_argument("--category", required=True, choices=effects.CATEGORIES, help="its section of the catalogue")
+    p.add_argument("--category", required=True, choices=registry.CATEGORIES, help="its section of the catalogue")
 
     args = parser.parse_args(argv)
     try:
@@ -289,7 +290,7 @@ def _print_paths(paths: list[Path]) -> int:
 
 
 def _effects(args: argparse.Namespace) -> int:
-    for name, doc in effects.describe().items():  # line by line, so the parameter list stays a list
+    for name, doc in registry.describe().items():  # line by line, so the parameter list stays a list
         print(f"{name}\n{textwrap.indent(doc, '    ')}\n")
     return 0
 
