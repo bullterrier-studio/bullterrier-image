@@ -1,6 +1,6 @@
 """The build gate can fail: `poe build-check` builds the sdist and the wheel and rejects a distribution PyPI would
-refuse to render (twine) or a wheel with a file that cannot be imported (check-wheel-contents), and passes the project
-as it is.
+refuse to render (twine), and a wheel with a file that cannot be imported or with anything but the library's code (the
+scaffold template, a picture, a test: check-wheel-contents), and passes the project as it is.
 
 An architecture test of the tooling: its subject is the `build-check` task in pyproject.toml, so it runs that task, the
 way `uv run poe check` does, in a copy of the project into which one fault at a time is written.
@@ -64,3 +64,30 @@ def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project):
     report = result.stdout + result.stderr
     assert "W004" in report  # check-wheel-contents: module is not located at importable path
     assert "not-importable.py" in report
+
+
+def _without_the_template_exclusion(project: Path) -> None:
+    pyproject = project / "pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+    assert 'wheel-exclude = ["photo_fx/effects/_template"]' in text
+    pyproject.write_text(text.replace('wheel-exclude = ["photo_fx/effects/_template"]', ""), encoding="utf-8")
+
+
+def _picture_in_the_package(project: Path) -> None:
+    (project / "src" / "photo_fx" / "effects" / "grade" / "grade.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+
+
+def _test_in_the_package(project: Path) -> None:
+    (project / "src" / "photo_fx" / "effects" / "grade" / "test_grade.py").write_text("def test_x(): ...\n")
+
+
+def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project):
+    # one build for the three faults (a build takes seconds); each shipped file must be named
+    for fault in (_without_the_template_exclusion, _picture_in_the_package, _test_in_the_package):
+        fault(project)
+    result = build_check(project)
+    report = result.stdout + result.stderr
+    assert result.returncode != 0
+    assert "W102" in report  # check-wheel-contents: wheel library contains files not in the package tree
+    for shipped in ("photo_fx/effects/_template/effect.py.tmpl", "photo_fx/effects/grade/grade.jpg", "test_grade.py"):
+        assert shipped in report

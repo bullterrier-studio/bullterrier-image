@@ -30,6 +30,12 @@ build-backend = "uv_build"
 # the files `photo-fx new-effect` copies are for a source checkout, not part of the installed library
 wheel-exclude = ["photo_fx/effects/_template"]
 
+# Read by `check-wheel-contents` in `poe build-check`: the wheel holds exactly src/photo_fx minus these, so a shipped
+# template, picture or test fails (W102), and so does library code left out of the wheel (W101).
+[tool.check-wheel-contents]
+package = "src/photo_fx"
+package_omit = ["__pycache__", "*.pyc", ".*", "_template", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.mp4", "test_*.py"]
+
 [dependency-groups]
 dev = [
     "check-wheel-contents>=0.6.3",
