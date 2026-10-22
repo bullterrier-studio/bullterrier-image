@@ -4,7 +4,10 @@ The network is a real boundary served on the loopback interface: a test-owned HT
 handler counts the requests it answers. Expected digests are computed here with hashlib from the served bytes."""
 
 import hashlib
+import os
 import socket
+import stat
+import sys
 import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -69,6 +72,17 @@ def test_a_verified_download_lands_at_the_target_with_the_served_bytes(server, t
     assert fetch(server.url, sha256(PAYLOAD), target) == target
     assert target.read_bytes() == PAYLOAD
     assert files_in(target.parent) == ["model.onnx"]  # no temporary file left beside it
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits; Windows has no group or other bits")
+def test_the_kept_file_is_readable_like_any_file_the_user_saves(server, tmp_path):
+    """Not only by its owner, as a private temporary file would be: the usual 0o666 less the user's umask."""
+    umask = os.umask(0o022)
+    try:
+        target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+    finally:
+        os.umask(umask)
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
 
 
 def test_a_second_fetch_uses_the_cached_file_without_asking_the_server(server, tmp_path):

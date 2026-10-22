@@ -20,6 +20,7 @@ from pathlib import Path
 APP = "photo-fx"
 _CHUNK = 1 << 20  # bytes read at a time: memory use only, the result does not depend on it
 _TIMEOUT = 60.0  # seconds a stalled connection may stay silent before the download fails
+_NEW_FILE = 0o666  # the permissions a new file asks for before the umask (POSIX open())
 
 # (path, size, modification time, digest) of files already verified in this process: a 180 MB model is hashed once,
 # not on every call
@@ -66,6 +67,10 @@ def fetch(url: str, sha256: str, target: Path) -> Path:
                 f"the file downloaded from {url} has SHA-256 {digest.hexdigest()}, but {sha256} was expected, so it "
                 f"was not saved; {by_hand} (and check that it is the right file)"
             )
+        # mkstemp makes the file private to its owner; a kept file gets what open() would have given it
+        umask = os.umask(0)  # reading the umask means setting it, so it is set back at once
+        os.umask(umask)
+        Path(temporary).chmod(_NEW_FILE & ~umask)
         os.replace(temporary, target)
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
