@@ -6,6 +6,7 @@ import re
 import numpy as np
 import pytest
 
+from photo_fx.core.errors import RecipeError
 from photo_fx.core.loader import load_recipe
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
@@ -243,6 +244,31 @@ def test_a_recipe_needs_a_positive_size_or_none():
     assert Recipe("r", [Step("grade")], size=None).size is None
     with pytest.raises(ValueError, match="size"):
         Recipe("r", [Step("grade")], size=0)
+
+
+# A recipe's name becomes an output file name, and recipes are shared as data: a name that could leave the output folder
+# (or hide a file there) is refused when the recipe is made (CWE-22, path traversal).
+@pytest.mark.parametrize(
+    "name", ["../../x", "/abs/x", "a/b", "", ".hidden", "a" * 65, "a\\b", "look\n", "..", "-rf", "my look"]
+)
+def test_a_recipe_name_that_is_not_a_safe_file_name_is_refused_naming_it_and_the_allowed_pattern(name):
+    with pytest.raises(RecipeError) as raised:
+        Recipe(name, [Step("grade")])
+    message = str(raised.value)
+    assert repr(name)[:20] in message  # the value given
+    assert "A-Za-z0-9" in message  # the pattern a name must match
+
+
+@pytest.mark.parametrize("name", ["my-look", "look_2.v1", "a" * 64, "7", "Neon.Pulse-2"])
+def test_a_safe_file_name_is_kept_as_the_recipe_name(name):
+    assert Recipe(name, [Step("grade")]).name == name
+
+
+def test_a_file_named_with_an_unsafe_stem_and_no_name_is_refused_naming_the_file(tmp_path):
+    path = tmp_path / "my look.toml"
+    path.write_text("[[step]]\neffect = 'grade'\n", encoding="utf-8")
+    with pytest.raises(RecipeError, match=r"^my look\.toml: .*'my look'"):
+        load_recipe(path)
 
 
 def test_a_step_needs_a_known_mask_and_an_opacity_from_0_to_1():

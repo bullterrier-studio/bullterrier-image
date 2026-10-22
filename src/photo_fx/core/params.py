@@ -466,6 +466,7 @@ def _problem(detail: Any, valid: list[str]) -> str:
         "finite_number": f"{name} must be a finite number{got}",
         "literal_error": f"{name} must be one of {ctx.get('expected')}{got}",
         "too_short": f"{name} needs at least {ctx.get('min_length')} items{got}",
+        "string_pattern_mismatch": f"{name} must match the pattern {ctx.get('pattern')}{got}",
         "value_error": f"{name}: {ctx.get('error')}",
     }
     return wording.get(kind, f"{name}: {detail['msg']}{got}")

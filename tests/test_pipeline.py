@@ -238,12 +238,13 @@ def test_only_limits_the_run_to_some_photos_without_forgetting_the_others(folder
         run(project, only="nothing*")
 
 
-def test_the_report_escapes_what_it_shows(folder):
-    (folder / "recipes" / "x.toml").write_text('name = "<b>x</b>"\nsize = 64\n[[step]]\neffect = "grain"\n')
+def test_the_report_escapes_what_it_shows(folder, photo):
+    # a photo's file name may hold markup (a recipe name may not: it must be a safe file name)
+    imageio.save(photo, folder / "photos" / "<i>x&y.png")
     run(load_project(folder / "photo-fx.toml"))
     page = (folder / "out" / "index.html").read_text()
-    assert "<b>x</b>" not in page
-    assert "&lt;b&gt;x&lt;/b&gt;" in page
+    assert "<i>x&y" not in page
+    assert "&lt;i&gt;x&amp;y" in page
 
 
 @pytest.mark.parametrize(

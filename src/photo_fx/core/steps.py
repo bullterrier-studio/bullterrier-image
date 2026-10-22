@@ -136,12 +136,18 @@ def _short(value: object) -> str:
 class Recipe(ValidatedModel):
     """A named look: ordered steps, the size the photo is scaled to, and an optional animation.
 
-    name: used for output file names. steps: at least one `Step`, run in order (a list is accepted and kept as a tuple).
+    name: used for output file names, so it must be a safe one: 1 to 64 letters, digits, `.`, `_` or `-`, starting with
+        a letter or digit (no folders, no hidden files); anything else is a RecipeError.
+    steps: at least one `Step`, run in order (a list is accepted and kept as a tuple).
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. animation: an `Animation`; required if any step has an animated parameter.
     """
 
-    name: str = Field(description="Used for output file names.")
+    # Recipes are shared as data and the name becomes a file name: nothing that could leave the output folder (CWE-22).
+    name: str = Field(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+        description="Used for output file names: 1 to 64 of A-Z a-z 0-9 . _ -, starting with a letter or digit.",
+    )
     steps: tuple[Step, ...] = Field(description="The steps, run in order, each on the previous one's output.")
     size: int | None = Field(
         1024, ge=1, strict=True, description="Longest side of the working image in px; None keeps the photo's size."
