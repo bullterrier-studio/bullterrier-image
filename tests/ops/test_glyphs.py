@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from photo_fx.ops import glyphs
 from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
 
 CELLS = [5, 8, 13, 20]
@@ -140,7 +139,7 @@ def _is_monospaced_text_font(path: Path) -> bool:
 
 
 def _host_monospaced_fonts(limit: int = 6) -> list[str]:
-    candidates = [Path(p) for p in glyphs._FONTS]
+    candidates: list[Path] = []
     for folder in _FONT_DIRS:
         root = Path(folder).expanduser()
         if root.is_dir():
@@ -178,8 +177,9 @@ def test_a_font_that_does_not_exist_raises_oserror():
 @pytest.mark.skipif(len(HOST_FONTS) < 2, reason="needs two different monospaced font files installed on the host")
 def test_different_font_files_give_different_cells_or_glyphs():
     first, second = HOST_FONTS[:2]
-    if cell_size(13, first) == cell_size(13, second):
-        assert not np.array_equal(glyph_atlas("M@g", 13, first), glyph_atlas("M@g", 13, second))
+    assert cell_size(13, first) != cell_size(13, second) or not np.array_equal(
+        glyph_atlas("M@g", 13, first), glyph_atlas("M@g", 13, second)
+    )
 
 
 @host_fonts
