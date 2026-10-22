@@ -36,6 +36,27 @@ def test_on_light_paper_the_ramp_flips_so_a_white_picture_is_blank_paper():
     np.testing.assert_array_equal(out, np.ones_like(out))
 
 
+def _glyph_drawn_for_grey(level: float, gamma: float) -> np.ndarray:
+    """What `text_art` draws for one character cell of flat grey `level`, white ink on black paper (one channel)."""
+    width, height = cell_size(8)
+    return draw(np.full((height, width, 3), level, np.float32), gamma=gamma)[..., 0]
+
+
+def test_a_cell_gets_the_glyph_nearest_its_ink_amount():
+    atlas = glyph_atlas(CHARS, 8, None)  # 10 glyphs, index 0 = least ink
+    # grey 0.3 on black paper wants 0.3 of full ink: 0.3 * 9 = 2.7 glyph steps, nearest is glyph 3 (not 2)
+    np.testing.assert_allclose(_glyph_drawn_for_grey(0.3, gamma=1.0), atlas[3], atol=1e-6)
+    assert not np.allclose(atlas[3], atlas[2])  # the two candidates really differ
+
+
+def test_gamma_is_applied_to_the_ink_amount():
+    atlas = glyph_atlas(CHARS, 8, None)
+    # grey 0.6: gamma 1 gives 0.6 * 9 = 5.4 -> glyph 5; gamma 2 gives 0.6**2 = 0.36, 0.36 * 9 = 3.24 -> glyph 3
+    np.testing.assert_allclose(_glyph_drawn_for_grey(0.6, gamma=1.0), atlas[5], atol=1e-6)
+    np.testing.assert_allclose(_glyph_drawn_for_grey(0.6, gamma=2.0), atlas[3], atol=1e-6)
+    assert not np.allclose(atlas[5], atlas[3])
+
+
 def test_with_one_ink_colour_every_pixel_is_a_mix_of_ink_and_paper(photo):
     red, blue = np.array([1, 0, 0], np.float32), np.array([0, 0, 1], np.float32)
     out = draw(photo, fg=red, background=blue)
