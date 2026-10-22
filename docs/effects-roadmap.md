@@ -181,7 +181,7 @@ separate code.
 | `smart_crop` | Crop around the subject or the salient region. | `fx.smart_crop(aspect="4:5", margin=0.1)` |
 | `resize` | Scale, with a fit mode. | `fx.resize(width=1080, fit="cover")` |
 | `pad` | Extend the canvas with a colour. | `fx.pad(top=80, color="#000")` |
-| `rotate` | Rotate, with fill or crop to fit. | `fx.rotate(degrees=3, fit="crop")` |
+| `rotate` | Rotate, with fill or crop to fit. | `fx.rotate(angle=3, fit="crop")` |
 | `flip` | Mirror the whole picture. | `fx.flip(axis="x")` |
 | `circle_crop` | Circular avatar with transparency. | `fx.circle_crop()` |
 | `rounded_corners` | Rounded rectangle with transparency. | `fx.rounded_corners(radius=40)` |
