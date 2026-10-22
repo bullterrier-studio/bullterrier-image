@@ -104,7 +104,7 @@ Once per clone: `uv run poe setup` (installs the hooks and the commit template).
 The target above is being introduced in small steps; until a step lands, the old layout still holds. New code follows the target.
 
 - [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
-- [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites (some still in review)
+- [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites
 - [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
 - [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
 - [ ] F1a: Pydantic params model pattern in `core/`; Step/Recipe/Animation as Pydantic models
