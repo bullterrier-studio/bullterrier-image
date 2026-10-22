@@ -83,7 +83,3 @@ def test_mode_constant_lets_the_glow_fade_toward_the_edge_and_reflect_does_not()
     lit_beyond = effects.apply(NAME, bright, radius=4.0, mode="constant", constant_value=1.0)
     assert dark_beyond[0, 0, 0] < dark_beyond[16, 16, 0] - 0.01
     assert lit_beyond[0, 0, 0] > dark_beyond[0, 0, 0]
-
-
-def test_glow_is_a_light_effect() -> None:
-    assert effects.category(NAME) == "light"

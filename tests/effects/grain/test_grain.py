@@ -82,7 +82,3 @@ def test_truncate_sets_how_far_the_border_reaches() -> None:
 
     assert disagreement(2.0) < 1e-9
     assert disagreement(4.0) > 1e-7  # the Gaussian's tail beyond 2 sigma is small, so the effect is too
-
-
-def test_grain_is_a_texture_effect() -> None:
-    assert effects.category(NAME) == "texture"

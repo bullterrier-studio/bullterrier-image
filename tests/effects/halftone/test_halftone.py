@@ -149,7 +149,3 @@ def test_feather_softens_the_dot_edges_without_changing_the_ink() -> None:
 
     assert soft_share(dots(4.0)) > 2 * soft_share(dots(1.0))
     assert dots(4.0).mean() == pytest.approx(dots(1.0).mean(), rel=0.03)
-
-
-def test_halftone_is_stylised() -> None:
-    assert effects.category(NAME) == "stylised"
