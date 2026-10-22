@@ -9,10 +9,26 @@ authors = [
     { name = "jcakstins", email = "janis.cakstins@gmail.com" }
 ]
 requires-python = ">=3.13"
+keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "animation", "recipe"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    "Typing :: Typed",
+]
 dependencies = [
     "annotated-types>=0.8.0",
     "numpy>=2.5.4",
-    "onnxruntime>=1.31.0 ; platform_machine != 'x86_64' or sys_platform != 'darwin'",
+    # the portable subject finder; 1.23 is the last release with wheels for Intel Macs and macOS 13, so the floor
+    # stays there and those machines get it too
+    "onnxruntime>=1.23.2",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pyobjc-framework-quartz>=12.2.2 ; sys_platform == 'darwin'",
@@ -20,10 +36,15 @@ dependencies = [
     "scipy>=1.18.1",
 ]
 
+[project.urls]
+Repository = "https://github.com/jcakstins/photo-fx"
+Issues = "https://github.com/jcakstins/photo-fx/issues"
+
 [project.scripts]
 photo-fx = "photo_fx.cli:main"
 
 [project.optional-dependencies]
+# a static ffmpeg for macOS, Linux and Windows, used when no ffmpeg is on the PATH (only .mp4 / .mov need it)
 video = [
     "imageio-ffmpeg>=0.6.0",
 ]
@@ -266,5 +287,6 @@ type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
 forbidden_modules = ["photo_fx.*", "photo_fx.core.*"]  # overlaps (core itself, timing itself) are skipped
 
+# the dev group installs this project's own `video` extra (so the bundled-ffmpeg fallback is tested)
 [tool.uv.sources]
 photo-fx = { workspace = true }
