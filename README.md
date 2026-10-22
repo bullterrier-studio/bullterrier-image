@@ -11,6 +11,7 @@
   <img alt="uv" src="https://img.shields.io/badge/built%20with-uv-de5fe9">
   <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-2ea44f">
   <img alt="Code style" src="https://img.shields.io/badge/lint-ruff-261230">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Platform" src="https://img.shields.io/badge/subject%20cut--out-macOS-lightgrey?logo=apple">
 </p>
 
@@ -322,3 +323,7 @@ uv run python -m photo_fx.fx > src/photo_fx/fx.pyi   # after adding or changing 
 ```
 
 Tests that need Apple Vision are skipped elsewhere, and tests that need `ffmpeg` are skipped when it is missing.
+
+## License
+
+[MIT](LICENSE) © 2026 Janis Cakstins
