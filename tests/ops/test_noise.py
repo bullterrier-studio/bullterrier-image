@@ -5,8 +5,9 @@ import time
 import numpy as np
 import pytest
 from scipy import ndimage
+from scipy.spatial import cKDTree
 
-from photo_fx.ops.noise import fractal_noise
+from photo_fx.ops.noise import fractal_noise, worley
 
 KINDS = ["gradient", "value"]
 
@@ -135,3 +136,109 @@ def test_four_octaves_at_1600_square_take_under_two_seconds():
     elapsed = time.perf_counter() - start
     assert field.shape == (1600, 1600)
     assert elapsed < 2.0, f"took {elapsed:.2f}s"
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# worley
+# ---------------------------------------------------------------------------------------------------------------------
+
+METRICS = ["f1", "f2-f1"]
+
+
+def _feature_points(f1: np.ndarray, cell_pixels: float) -> np.ndarray:
+    """Pixel positions (row, column) of the feature points, found as the local minima of an f1 field.
+
+    This reads the points back out of the picture alone, so tests of the cell structure do not depend on how
+    `worley` places or stores them. f1 is measured in cell widths, and at a feature point it is 0 up to the half
+    pixel (0.71 pixels diagonally) its position is rounded to; a larger minimum is a point just off the canvas.
+    """
+    is_minimum = (f1 == ndimage.minimum_filter(f1, size=3)) & (f1 < 0.75 / cell_pixels)
+    return np.argwhere(is_minimum)
+
+
+class TestWorleyContract:
+    @pytest.mark.parametrize("metric", METRICS)
+    def test_same_arguments_give_identical_arrays(self, metric):
+        assert np.array_equal(worley((50, 70), 5, 9, metric=metric), worley((50, 70), 5, 9, metric=metric))
+
+    @pytest.mark.parametrize("metric", METRICS)
+    def test_different_seed_gives_an_unrelated_field(self, metric):
+        a, b = worley((128, 128), 8, 1, metric=metric), worley((128, 128), 8, 2, metric=metric)
+        assert abs(_correlation(a, b)) < 0.2
+
+    @pytest.mark.parametrize("metric", METRICS)
+    def test_float32_requested_shape_and_range_for_non_square(self, metric):
+        field = worley((40, 90), 5, 3, metric=metric)
+        assert field.dtype == np.float32
+        assert field.shape == (40, 90)
+        assert field.min() >= 0.0
+        assert field.max() <= 1.0
+
+    @pytest.mark.parametrize("metric", METRICS)
+    def test_field_uses_a_good_part_of_the_range(self, metric):
+        field = worley((256, 256), 8, 1, metric=metric)
+        assert np.percentile(field, 99) > 0.5
+
+
+class TestWorleyCells:
+    def test_f1_is_zero_at_every_feature_point_and_grows_away_from_it(self):
+        field = worley((256, 256), 8, 4)
+        points = _feature_points(field, 32)
+        assert len(points) > 50
+        interior = [p for p in points if 8 <= p[0] < 248 and 8 <= p[1] < 248]
+        assert len(interior) > 30
+        for y, x in interior:
+            near = np.mean([field[y + dy, x + dx] for dy, dx in ((2, 0), (-2, 0), (0, 2), (0, -2))])
+            far = np.mean([field[y + dy, x + dx] for dy, dx in ((5, 0), (-5, 0), (0, 5), (0, -5))])
+            assert field[y, x] < near < far
+        assert np.median(field) > 5 * field[tuple(points.T)].max()
+
+    def test_there_is_one_feature_point_per_cell(self):
+        # 8 cells across a 256 pixel canvas: an 8 x 8 grid of 32 pixel cells, so 64 feature points.
+        points = _feature_points(worley((256, 256), 8, 4), 32)
+        # Within 2: a point just off the canvas edge can look like a minimum on the edge pixel.
+        assert abs(len(points) - 64) <= 2
+
+    def test_more_cells_means_more_and_smaller_cells(self):
+        counts = [len(_feature_points(worley((256, 256), cells, 2), 256 / cells)) for cells in (4, 8, 16)]
+        areas = [256 * 256 / count for count in counts]
+        assert areas[0] > areas[1] > areas[2]
+        for cells, count in zip((4, 8, 16), counts, strict=True):
+            assert abs(count - cells**2) <= 2
+
+    def test_cells_are_counted_across_the_longer_side(self):
+        # 6 cells across 192 pixels: 32 pixel cells, so a 2 x 6 grid on a 64 x 192 canvas.
+        points = _feature_points(worley((64, 192), 6, 5), 32)
+        assert abs(len(points) - 12) <= 2
+        tall = _feature_points(worley((192, 64), 6, 5), 32)
+        assert abs(len(tall) - 12) <= 2
+
+    def test_f2_minus_f1_is_small_on_cell_borders_and_large_at_centres(self):
+        size, cells = 320, 10  # 32 pixel cells
+        points = _feature_points(worley((size, size), cells, 6), 32)
+        gap = worley((size, size), cells, 6, metric="f2-f1")
+
+        # Independent Voronoi cells, from the feature points read back out of the f1 picture.
+        rows, columns = np.mgrid[0:size, 0:size]
+        pixels = np.stack([rows.ravel(), columns.ravel()], axis=1)
+        owner = cKDTree(points).query(pixels)[1].reshape(size, size)
+        border = np.zeros((size, size), dtype=bool)
+        border[:, :-1] |= owner[:, :-1] != owner[:, 1:]
+        border[:-1, :] |= owner[:-1, :] != owner[1:, :]
+        # Away from the canvas edge, where cells whose point lies off the canvas are not in `points`.
+        inside = np.zeros((size, size), dtype=bool)
+        inside[64:-64, 64:-64] = True
+        border &= inside
+
+        centres = gap[tuple(points.T)]
+        centres = centres[(points >= 64).all(axis=1) & (points < size - 64).all(axis=1)]
+        assert border.sum() > 500
+        assert len(centres) > 20
+        assert np.median(centres) > 5 * np.median(gap[border])
+        assert np.max(gap[border]) < np.min(centres)
+
+    def test_f2_minus_f1_is_never_negative_and_is_not_f1(self):
+        f1 = worley((128, 128), 6, 3)
+        gap = worley((128, 128), 6, 3, metric="f2-f1")
+        assert gap.min() >= 0.0
+        assert not np.allclose(f1, gap)

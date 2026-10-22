@@ -7,9 +7,11 @@ left corner, equals `fractal_noise` of the small shape, so the same seed and sca
 output size. (`worley` sizes its cells relative to the canvas and so does not promise this.)
 """
 
+import math
 from typing import Literal
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 _GOLDEN = 0x9E3779B97F4A7C15
 _MASK_64 = 0xFFFFFFFFFFFFFFFF
@@ -139,3 +141,51 @@ def fractal_noise(
     else:
         total = total * np.float32(1.0 / weight_sum)
     return np.clip(total, 0.0, 1.0, out=total)
+
+
+def worley(
+    shape: tuple[int, int],
+    cells: float,
+    seed: int,
+    *,
+    metric: Literal["f1", "f2-f1"] = "f1",
+) -> np.ndarray:
+    """Cellular noise: distance to the nearest of a scatter of random feature points.
+
+    The canvas is divided into square cells, each holding one feature point at a random position, so the points
+    are evenly spread but irregular. Unlike `fractal_noise`, the cell size is relative to the canvas (the longer side
+    holds `cells` cells), so the same seed on a different shape gives different cells, not a crop.
+
+    Args:
+        shape: `(height, width)` of the result in pixels, both positive.
+        cells: approximate number of cells across the longer side, a positive number (below 1 means a cell larger
+            than the canvas). The canvas holds about `cells` squared feature points when it is square.
+        seed: any integer; each seed gives a different scatter of points.
+        metric: "f1" is the distance to the nearest feature point: 0 at every point, brightening away from it
+            (cells look like round blobs). "f2-f1" is the distance to the second nearest minus that to the nearest:
+            0 along the borders between cells, bright at their centres (cells look like tiles with dark seams).
+
+    Returns:
+        float32 array of `shape` with values in [0, 1]. Distances are measured in cell widths, so 1.0 is one cell
+        and the few larger values (about 1 pixel in 1000) are clipped. The scale does not depend on the data.
+    """
+    height, width = shape
+    cell = max(height, width) / cells
+    rows, columns = math.ceil(height / cell), math.ceil(width / cell)
+
+    # One point per grid cell, for a ring of two extra cells around the canvas so that points just outside it
+    # still count as neighbours of the pixels near the edge.
+    margin = 2
+    hashes = _lattice_hash(rows + 2 * margin, columns + 2 * margin, _key(seed, 0))
+    jitter_y = _unit_interval(hashes)
+    jitter_x = _unit_interval(_mix(hashes + np.uint64(_GOLDEN)))
+    grid_y, grid_x = np.mgrid[-margin : rows + margin, -margin : columns + margin]
+    points = np.stack([(grid_y + jitter_y).ravel(), (grid_x + jitter_x).ravel()], axis=1) * cell
+
+    # Exact nearest neighbours (a fixed 3 x 3 neighbourhood scan can miss the true second nearest point).
+    pixel_y, pixel_x = np.mgrid[0:height, 0:width]
+    pixels = np.stack([pixel_y.ravel() + 0.5, pixel_x.ravel() + 0.5], axis=1)
+    distance = cKDTree(points).query(pixels, k=2, workers=-1)[0] / cell
+
+    field = distance[:, 0] if metric == "f1" else distance[:, 1] - distance[:, 0]
+    return np.clip(field, 0.0, 1.0).astype(np.float32).reshape(height, width)
