@@ -59,6 +59,7 @@ def test_anisotropic_sampling_doubles_vertical_distances_only():
     assert tall[19, LEFT + 3] == plain[19, LEFT + 3] == 4.0
 
 
+@pytest.mark.parametrize("sampling", [(1.0, 1.0), (2.0, 1.0), (7.0, 5.0)])
 @pytest.mark.parametrize(
     ("row", "col", "expected_x", "expected_y"),
     [
@@ -68,8 +69,9 @@ def test_anisotropic_sampling_doubles_vertical_distances_only():
         (BOTTOM - 2, 30, 0.0, 1.0),  # bottom side: points down
     ],
 )
-def test_normals_point_out_of_the_shape_on_each_side(row, col, expected_x, expected_y):
-    field = edge_distance(rectangle())
+def test_normals_point_out_of_the_shape_on_each_side(row, col, expected_x, expected_y, sampling):
+    # Stretched elements (the disperse/evaporate case: characters are taller than wide) must not turn the normals.
+    field = edge_distance(rectangle(), sampling)
     assert field.normal_x[row, col] == pytest.approx(expected_x, abs=0.1)
     assert field.normal_y[row, col] == pytest.approx(expected_y, abs=0.1)
 
@@ -104,6 +106,54 @@ def test_bottom_border_is_an_edge_only_when_open_bottom_is_false():
     assert closed_bottom[HEIGHT - 1, 30] == 1.0
     assert open_bottom[30, 30] == 11.0
     assert closed_bottom[30, 30] == 10.0  # now the bottom border (row 40) is nearer than the top side
+
+
+@pytest.mark.parametrize("open_bottom", [True, False])
+def test_a_shape_that_ends_above_the_last_row_keeps_its_bottom_edge(open_bottom):
+    shape = np.zeros((HEIGHT, WIDTH), dtype=bool)
+    shape[10:38, 10:50] = True  # rows 38 and 39 are empty
+    distance = edge_distance(shape, open_bottom=open_bottom).distance
+    assert distance[37, 30] == 1.0  # its own bottom side, whatever the array's bottom border does
+    assert distance[24, 30] == 14.0  # 14 from the top side (row 9) and from the bottom side (row 38)
+    assert distance[38, 30] == distance[39, 30] == 0.0
+
+
+def test_open_bottom_depends_on_the_last_row_even_when_it_differs_from_the_row_above():
+    shape = np.zeros((HEIGHT, WIDTH), dtype=bool)
+    shape[20:, 10:50] = True
+    shape[38, 20:30] = False  # a slit in the row above the last one
+    open_bottom = edge_distance(shape).distance
+    closed_bottom = edge_distance(shape, open_bottom=False).distance
+    assert open_bottom[HEIGHT - 1, 25] == 1.0  # right under the slit, in both cases
+    assert closed_bottom[HEIGHT - 1, 25] == 1.0
+    assert open_bottom[HEIGHT - 1, 35] == pytest.approx(np.hypot(1, 6))  # the slit's corner (38, 29) is nearest
+    assert closed_bottom[HEIGHT - 1, 35] == 1.0  # the bottom border is nearer
+
+
+@pytest.mark.parametrize(
+    ("sampling", "expected_x", "expected_y"),
+    [((1.0, 1.0), 0.951306, 0.308249), ((2.0, 1.0), 0.987129, 0.159928), ((1.0, 3.0), 0.717045, 0.697026)],
+)
+def test_smoothing_and_sampling_decide_the_direction_beside_a_lone_element(sampling, expected_x, expected_y):
+    # One element inside: after smoothing with a Gaussian of sigma 1 (radius 4, in elements) the distance is
+    # G(dy) * G(dx), with G the normalised kernel exp(-k^2 / 2) / 2.5066. At 1 down and 2 right of the element the
+    # slope per element is gx = (G(1)G(3) - G(1)G(1)) / 2, gy = (G(2)G(2) - G(0)G(2)) / 2; per px it is gx / col
+    # width and gy / row height. The normal is that, negated and made unit length. The numbers are worked out from it.
+    shape = np.zeros((15, 15), dtype=bool)
+    shape[7, 7] = True
+    field = edge_distance(shape, sampling)
+    assert field.normal_x[8, 9] == pytest.approx(expected_x, abs=1e-5)
+    assert field.normal_y[8, 9] == pytest.approx(expected_y, abs=1e-5)
+
+
+def test_normals_follow_the_faintest_slope_but_are_flat_beyond_the_reach_of_smoothing():
+    shape = np.zeros((15, 15), dtype=bool)
+    shape[7, 7] = True
+    field = edge_distance(shape)
+    # 5 to the right the smoothed distance is still 0 but rises 5e-5 per 2 elements to the left: a real direction.
+    assert (field.normal_x[7, 12], field.normal_y[7, 12]) == pytest.approx((1.0, 0.0), abs=1e-9)
+    # 6 to the right nothing reaches: flat, so up.
+    assert (field.normal_x[7, 13], field.normal_y[7, 13]) == (0.0, -1.0)
 
 
 def test_a_shape_that_is_all_true_has_edges_at_its_borders_but_not_below():

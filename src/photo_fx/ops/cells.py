@@ -1,9 +1,8 @@
 """Cut a picture into a grid of equal pieces (for example character-sized ones) and put it back together.
 
-Pieces are sized in pixels, so this module knows nothing about fonts: callers that want pieces the size of an `ascii`
-character get the size from `effects.ascii.cell_size`. A piece grid is an array of shape
-(rows, cols, cell_h, cell_w, 3). `cut` and `join` are exact inverses; `lit` and `figure` summarise a grid as one
-boolean per piece.
+Pieces are sized in pixels, so this module knows nothing about fonts or characters: callers pass the cell size in px.
+A piece grid is an array of shape (rows, cols, cell_h, cell_w, 3). `cut` and `join` are exact inverses; `lit` and
+`figure` summarise a grid as one boolean per piece.
 """
 
 import numpy as np

@@ -105,6 +105,18 @@ def test_figure_with_a_matte_ignores_which_pieces_are_lit():
     np.testing.assert_array_equal(result, [[True, False], [False, False]])
 
 
+def test_figure_with_a_matte_uses_cell_width_across_and_cell_height_down():
+    # A 5 x 9 picture cut into pieces 4 px wide and 3 px tall: 2 x 3 pieces, padded to 6 x 12.
+    cell_w, cell_h, height, width = 4, 3, 5, 9
+    matte = np.zeros((height, width), dtype=np.float32)
+    matte[0:3, 0:4] = 1.0  # piece (0, 0): all 12 pixels
+    matte[0:2, 4:8] = 1.0  # piece (0, 1): 8 of 12
+    matte[3:5, 0:4] = 1.0  # piece (1, 0): 8 real pixels of 12 (its third row is padding)
+    matte[0:3, 8] = 1.0  # piece (0, 2): 3 of 12; its other 9 pixels are padding
+    result = figure(np.zeros((2, 3), dtype=bool), matte, cell_w, cell_h, height, width)
+    np.testing.assert_array_equal(result, [[True, True, False], [True, False, False]])
+
+
 def test_figure_without_a_matte_fills_the_hole_of_a_lit_ring():
     ring = np.zeros((7, 7), dtype=bool)
     ring[1:6, 1:6] = True

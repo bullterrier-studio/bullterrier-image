@@ -46,13 +46,13 @@ def edge_distance(
         raise ValueError(f"sampling must be two positive numbers (row height, column width), got {sampling!r}")
     row_height, col_width = sampling
 
-    grid = np.pad(shape, ((1, 0), (1, 1)), constant_values=False)
-    if open_bottom:
-        grid = np.pad(grid, ((0, 1), (0, 0)), mode="edge")
-    else:
-        grid = np.pad(grid, ((0, 1), (0, 0)), constant_values=False)
-    distance = ndimage.distance_transform_edt(grid, sampling=sampling)[1:-1, 1:-1]
+    # A border is an edge by putting a row/column of "outside" next to it. Leaving the bottom unpadded is what makes it
+    # open: nothing outside the array can be nearer than what is already in it.
+    grid = np.pad(shape, ((1, 0 if open_bottom else 1), (1, 1)), constant_values=False)
+    distance = ndimage.distance_transform_edt(grid, sampling=sampling)[1 : 1 + shape.shape[0], 1:-1]
 
+    # Smoothing is over 1 element (not px), the same for every sampling. A gradient under 1e-6 per px is float noise or
+    # beyond the reach of the smoothing (4 elements from the nearest inside element): there is no direction there.
     smooth = ndimage.gaussian_filter(distance, 1.0)
     grad_y = np.gradient(smooth, row_height, axis=0) if shape.shape[0] > 1 else np.zeros_like(smooth)
     grad_x = np.gradient(smooth, col_width, axis=1) if shape.shape[1] > 1 else np.zeros_like(smooth)
