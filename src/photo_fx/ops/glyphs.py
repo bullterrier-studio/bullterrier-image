@@ -27,7 +27,8 @@ def cell_size(cell: int, font: str | None = None) -> tuple[int, int]:
 
     `cell` = character width in px (a positive int). `font` = path to a monospaced .ttf/.ttc, or None for the first
     system font found. The width is always exactly `cell`; the height comes from the font and grows with `cell`.
-    Effects that move whole characters around (evaporate) use this to stay on the same grid as the ascii step.
+    This is the grid every glyph drawn by `glyph_atlas` and `paint` lives on, so callers can lay out whole characters.
+    Raises OSError if `font` is given but cannot be opened as a font file.
     """
     ascent, descent = _load_font(cell, font).getmetrics()
     return cell, ascent + descent
@@ -41,7 +42,8 @@ def glyph_atlas(chars: str, cell: int, font: str | None = None) -> np.ndarray:
     as in `cell_size`. Returns a float32 array of shape (n_glyphs, cell_h, cell_w) with coverage in 0..1 (0 = no ink,
     1 = fully inked), where (cell_w, cell_h) == `cell_size(cell, font)`. Index 0 is the lightest glyph, the last index
     the densest. The result is cached and shared between callers, so it is read-only: copy it before editing.
-    Raises ValueError if `chars` has fewer than two distinct characters (there is nothing to choose between).
+    Raises ValueError if `chars` has fewer than two distinct characters (there is nothing to choose between) and
+    OSError if `font` is given but cannot be opened as a font file.
     """
     glyph_font = _load_font(cell, font)
     cell_w, cell_h = cell_size(cell, font)
@@ -64,10 +66,15 @@ def paint(indices: np.ndarray, atlas: np.ndarray) -> np.ndarray:
     `indices` = (rows, cols) integers, each in 0..n_glyphs-1 (negative values are rejected, not wrapped).
     `atlas` = (n_glyphs, cell_h, cell_w) coverage as returned by `glyph_atlas`.
     Returns a float32 (rows * cell_h, cols * cell_w) coverage array in 0..1.
-    Raises ValueError if `indices` is not 2-D and IndexError if any index lies outside the atlas.
+    Raises ValueError if `indices` is not a 2-D integer array or `atlas` is not 3-D, and IndexError if any index lies
+    outside the atlas.
     """
     if indices.ndim != 2:
         raise ValueError(f"paint needs a 2-D grid of indices, got {indices.ndim}-D")
+    if not np.issubdtype(indices.dtype, np.integer):
+        raise ValueError(f"paint needs integer indices, got {indices.dtype}")
+    if atlas.ndim != 3:
+        raise ValueError(f"paint needs an atlas of shape (n_glyphs, cell_h, cell_w), got {atlas.ndim}-D")
     if indices.size and (indices.min() < 0 or indices.max() >= len(atlas)):
         raise IndexError(f"glyph index outside the atlas of {len(atlas)} glyphs")
     rows, cols = indices.shape
