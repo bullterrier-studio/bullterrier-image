@@ -46,10 +46,7 @@ def text_art(
     glyph = np.rint(ink * (n - 1)).astype(int)
 
     coverage = paint(glyph, atlas)[..., None]
-    if fg is None:
-        text = np.repeat(np.repeat(vivid(cells), cell_h, axis=0), cell_w, axis=1)
-    else:
-        text = fg
+    text = np.repeat(np.repeat(vivid(cells), cell_h, axis=0), cell_w, axis=1) if fg is None else fg
     base = background * (1.0 - photo) + padded * photo
     out = base * (1.0 - coverage) + text * coverage
     return out[:height, :width].astype(np.float32)

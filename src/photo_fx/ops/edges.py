@@ -44,7 +44,12 @@ BorderMode = Literal["nearest", "reflect", "mirror", "wrap"]
 
 # scipy.ndimage's names for the border behaviours (keys) and numpy.pad's names for the same ones (values). The blur and
 # the Sobel derivative must extend the picture the same way, so both are driven from the one `border_mode` argument.
-_NUMPY_PAD_MODE = {"nearest": "edge", "reflect": "symmetric", "mirror": "reflect", "wrap": "wrap"}
+_NUMPY_PAD_MODE: dict[BorderMode, Literal["edge", "symmetric", "reflect", "wrap"]] = {
+    "nearest": "edge",
+    "reflect": "symmetric",
+    "mirror": "reflect",
+    "wrap": "wrap",
+}
 
 
 @dataclass(frozen=True)

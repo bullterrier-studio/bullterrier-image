@@ -87,7 +87,11 @@ def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
     """A monospaced font sized so one character is `cell` px wide."""
     path = font_path or next((p for p in _FONTS if Path(p).exists()), None)
     if path is None:
-        return ImageFont.load_default(size=round(cell / 0.6))
+        default = ImageFont.load_default(size=round(cell / 0.6))
+        # Pillow falls back to a fixed-size bitmap font, which cannot be measured or scaled, only without FreeType
+        if not isinstance(default, ImageFont.FreeTypeFont):
+            raise RuntimeError("no system font was found and this Pillow has no FreeType to draw its own; pass `font`")
+        return default
     reference = ImageFont.truetype(path, 100)
     em_per_advance = 100.0 / reference.getlength("M")
     return ImageFont.truetype(path, max(4, round(cell * em_per_advance)))

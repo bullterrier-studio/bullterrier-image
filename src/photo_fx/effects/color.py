@@ -1,5 +1,7 @@
 """Effects that change colour and tone but not shapes."""
 
+from collections.abc import Sequence
+
 import numpy as np
 from scipy import ndimage
 
@@ -35,7 +37,7 @@ def clarity(rgb: np.ndarray, radius: float = 30.0, amount: float = 1.0) -> np.nd
 
 
 @effect(category="colour")
-def gradient_map(rgb: np.ndarray, stops: list[Color] = ("#000000", "#ffffff")) -> np.ndarray:
+def gradient_map(rgb: np.ndarray, stops: Sequence[Color] = ("#000000", "#ffffff")) -> np.ndarray:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
 
     Two stops make a duotone, three a tritone; e.g. stops = ["#0b0020", "#ff2bd6", "#00f0ff"] is a neon scheme.

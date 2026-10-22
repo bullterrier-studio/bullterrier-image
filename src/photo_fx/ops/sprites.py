@@ -10,7 +10,7 @@ when both are `col + 0.5` and `row + 0.5`; "the picture" is `0 <= x < width`, `0
 RGB `(h, w, 3)` in 0..1. Nothing here depends on the effects package.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Literal
 
@@ -92,31 +92,35 @@ _PLACEMENT_FIELDS = ("x", "y", "size", "depth", "phase")
 # outcome independent of sprite order, and for one colour it is exactly what drawing the sprites one after the other
 # would give (screen: factors 1 - a*c multiply; over: factors 1 - a multiply), so a whole batch of sprites can be
 # accumulated without a loop over sprites.
-def _add(color: np.ndarray):
-    def terms(alpha):
+_Terms = Callable[[np.ndarray], np.ndarray]  # sprite alphas (n, k) -> what each pixel adds to the sum
+_Resolve = Callable[[np.ndarray, np.ndarray], np.ndarray]  # canvas pixels, summed terms -> final pixels
+
+
+def _add(color: np.ndarray) -> tuple[_Terms, _Resolve]:
+    def terms(alpha: np.ndarray) -> np.ndarray:
         return alpha[:, None] * color
 
-    def resolve(canvas, acc):
+    def resolve(canvas: np.ndarray, acc: np.ndarray) -> np.ndarray:
         return canvas + acc
 
     return terms, resolve
 
 
-def _screen(color: np.ndarray):
-    def terms(alpha):
+def _screen(color: np.ndarray) -> tuple[_Terms, _Resolve]:
+    def terms(alpha: np.ndarray) -> np.ndarray:
         return -np.log1p(-np.minimum(alpha[:, None] * color, _ALMOST_ONE))
 
-    def resolve(canvas, acc):
+    def resolve(canvas: np.ndarray, acc: np.ndarray) -> np.ndarray:
         return 1.0 - (1.0 - canvas) * np.exp(-acc)
 
     return terms, resolve
 
 
-def _over(color: np.ndarray):
-    def terms(alpha):
+def _over(color: np.ndarray) -> tuple[_Terms, _Resolve]:
+    def terms(alpha: np.ndarray) -> np.ndarray:
         return -np.log1p(-np.minimum(alpha, _ALMOST_ONE))[:, None]
 
-    def resolve(canvas, acc):
+    def resolve(canvas: np.ndarray, acc: np.ndarray) -> np.ndarray:
         keep = np.exp(-acc)
         return canvas * keep + color * (1.0 - keep)
 
@@ -131,7 +135,20 @@ def _unit_interval(value: float, name: str) -> None:
         raise ValueError(f"{name} must be in 0..1, got {value}")
 
 
-def _checked(canvas, placement, color, opacity, shape, angle, length, blend, feather, softness, far, near):
+def _checked(
+    canvas: np.ndarray,
+    placement: Placement,
+    color: tuple[float, float, float],
+    opacity: float,
+    shape: str,
+    angle: float,
+    length: float,
+    blend: str,
+    feather: float,
+    softness: float,
+    far: float,
+    near: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Validate `stamp`'s arguments; return the sprite fields x, y, size, depth and the colour as float64 arrays."""
     canvas = np.asarray(canvas)
     if canvas.ndim != 3 or canvas.shape[2] != 3:
@@ -330,7 +347,7 @@ def stamp(
     # (capped: a patch never needs more than the picture's size, and a huge float must not overflow the integer)
     patch_class = np.ceil(np.minimum(reach, 1e9)).astype(np.int64)
 
-    def drawn_batches():
+    def drawn_batches() -> Iterator[tuple[np.ndarray, np.ndarray]]:
         for cls in np.unique(patch_class[visible]):
             ids = np.flatnonzero(visible & (patch_class == cls))
             kx = int(min(np.ceil(cls * spread_x) + 1, w - 1))
