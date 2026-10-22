@@ -190,7 +190,7 @@ exhaustive = true  # a new core module must be placed in a layer here
 layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types | errors"]
 
 [[tool.importlinter.contracts]]
-name = "loader imports only steps and timing from core"
+name = "loader imports only steps, timing and errors from core"
 type = "forbidden"
 source_modules = ["photo_fx.core.loader"]
 forbidden_modules = ["photo_fx.core.registry", "photo_fx.core.types", "photo_fx.core.vocabulary"]

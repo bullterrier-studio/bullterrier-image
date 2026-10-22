@@ -32,7 +32,7 @@ LAYERS = "Layers: app > adapters > effects > core > ops"
 OPS_ALONE = "ops imports nothing else from photo_fx"
 EFFECTS_APART = "Effects never import each other"
 CORE_ORDER = "Core order: loader | runner > steps > registry > params | timing > types"
-LOADER_DIRECT = "loader imports only steps and timing from core"
+LOADER_DIRECT = "loader imports only steps, timing and errors from core"
 TIMING_ALONE = "timing imports nothing else from photo_fx"
 CONTRACTS = [LAYERS, OPS_ALONE, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
 
