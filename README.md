@@ -12,7 +12,7 @@
   <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-2ea44f">
   <img alt="Code style" src="https://img.shields.io/badge/lint-ruff-261230">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
-  <img alt="Platform" src="https://img.shields.io/badge/subject%20cut--out-macOS-lightgrey?logo=apple">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey">
 </p>
 
 <p align="center">
@@ -60,24 +60,54 @@ The sixth demo recipe is an [animation](#animation).
 
 ## Contents
 
-[Gallery](#gallery) | [Install](#install) | [Quick start](#quick-start) | [The pipeline](#the-pipeline) | [Recipes](#recipes) |
+[Gallery](#gallery) | [Install](#install) | [Platforms](#platforms) | [Quick start](#quick-start) | [The pipeline](#the-pipeline) | [Recipes](#recipes) |
 [Python API](#python-api) | [Seeing what each step does](#seeing-what-each-step-does) | [Animation](#animation) |
 [Effects](#effects) | [Automatic checks](#automatic-checks) | [Project layout](#project-layout) | [Development](#development)
 
 ## Install
 
-Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/). `ffmpeg` is needed only for video output.
+Requires Python 3.13+. As a package:
+
+```bash
+pip install photo-fx               # everything but .mp4 / .mov export (unless ffmpeg is already installed)
+pip install "photo-fx[video]"      # also a bundled ffmpeg, for video on any OS
+photo-fx effects                   # lists every effect and its parameters
+```
+
+From a checkout, with [uv](https://docs.astral.sh/uv/) (installs the `video` extra too):
 
 ```bash
 git clone https://github.com/jcakstins/photo-fx.git
 cd photo-fx
 uv sync
-uv run photo-fx effects        # lists every effect and its parameters
+uv run photo-fx effects
 ```
 
-**Platform.** Finding the subject uses Apple Vision's subject segmentation, so cut-outs, `mask = "background"` and
-anything that needs a silhouette work on **macOS**. Every other effect runs anywhere. Subject finding is isolated in
-[`matte.py`](src/photo_fx/matte.py), so another backend can be added without touching the rest.
+## Platforms
+
+photo-fx runs on macOS, Linux and Windows. Every effect works everywhere; two things depend on the machine.
+
+**Finding the subject** (cut-outs, `mask = "background"`, anything that needs a silhouette) has two backends:
+
+| Backend | Where | Notes |
+|---|---|---|
+| `vision`: Apple Vision subject segmentation | macOS | Built in: no download, runs on the Neural Engine. The default on macOS. |
+| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default elsewhere. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
+
+The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
+folder (`~/Library/Caches/photo-fx` on macOS, `~/.cache/photo-fx` on Linux, `%LOCALAPPDATA%\photo-fx\Cache` on
+Windows), checks its SHA-256 and keeps it; nothing is downloaded when photo-fx is imported. Offline, or where the download
+is blocked, download the file the error message names by hand and save it where it says, or point `PHOTO_FX_MODEL` at a
+copy (`PHOTO_FX_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
+
+Choose the backend with `--segmenter vision|onnx` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
+with `PHOTO_FX_SEGMENTER=onnx`; the option wins over the variable. No model is needed at all if you have the subject's
+matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
+the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
+in [`matte/`](src/photo_fx/matte), so a further backend is added there without touching the rest.
+
+**Video** (`.mp4`, `.mov`) needs ffmpeg: the one on your `PATH` if there is one, otherwise the one
+`pip install "photo-fx[video]"` brings along. GIF export needs neither.
 
 ## Quick start
 
@@ -308,7 +338,8 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
   imageio.py     adapters  file formats, EXIF and colour profiles, video; defines the one in-memory image type
-  matte.py                 subject_matte(rgb) -> alpha. Which model finds the subject is hidden here
+  matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (Apple Vision, or IS-Net on
+                           ONNX Runtime, downloaded on first use) is hidden here
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `photo-fx new-effect` copies
   core/          core      registry.py (effects register here), types.py, vocabulary.py, and the recipe engine:
@@ -324,7 +355,7 @@ tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each 
 ```
 
 Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
-`matte` the only place that knows about Vision, and effects know nothing about files, mattes or recipes. The layers are
+`matte` the only place that knows about Vision or the portable model, and effects know nothing about files, mattes or recipes. The layers are
 import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone).
 
 ## Development
@@ -349,7 +380,9 @@ commit. Pictures that exist are kept (`photo-fx gallery --force` renders them ag
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); the pre-push hook runs mypy, vulture and the tests.
 
-Tests that need Apple Vision are skipped elsewhere, and tests that need `ffmpeg` are skipped when it is missing.
+Tests that need Apple Vision are skipped off macOS, and tests that read videos back with a system `ffprobe` are skipped
+when it is missing. The portable backend is tested with tiny stand-in models built in the tests: the suite never
+downloads the real model, and its one test of the real model runs only when the model is already in the cache.
 
 ## License
 
