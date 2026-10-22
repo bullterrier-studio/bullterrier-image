@@ -2,12 +2,16 @@
 
     timing <- steps <- loader, runner          (and `recipe`, the public namespace, imports all four)
 
-These tests read the modules' source with `ast`, so a cycle or an import that points the wrong way fails here, not
-later as an ImportError on some other import order.
+`ALLOWED` is that direction as a table: for each module, every package module it may import (anywhere in its text,
+function-level imports included). The tests read the modules' source with `ast`, so an import that points the wrong
+way, or a cycle, fails here, not later as an ImportError on some other import order. `loader` and `runner` must not know
+each other: that is the seam later changes to the file format or to running a recipe are made on separately.
 """
 
 import ast
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,7 +19,6 @@ import pytest
 import photo_fx
 
 PACKAGE = Path(photo_fx.__file__).parent
-MODULES = ("timing", "steps", "loader", "runner", "recipe")
 
 
 def internal_imports(source: str) -> set[str]:
@@ -39,12 +42,24 @@ def internal_imports(source: str) -> set[str]:
     return found
 
 
+# Who may import whom. Keep in step with the "Dependency direction" paragraph of each module's docstring.
+ALLOWED = {
+    "timing": set(),  # imports nothing from photo_fx
+    "steps": {"timing", "effects"},
+    "loader": {"steps", "timing"},
+    "runner": {"steps", "effects", "imageio", "matte"},
+    "recipe": {"timing", "steps", "loader", "runner"},
+}
+
+
 def violations(graph: dict[str, set[str]]) -> list[str]:
-    """What is wrong with a module dependency graph (module -> modules it imports): a cycle, or `timing` importing any
-    other module of the set. Empty when the graph is fine."""
-    problems = (
-        [f"timing imports {sorted(graph['timing'] & set(graph))}"] if graph.get("timing", set()) & set(graph) else []
-    )
+    """What is wrong with a module dependency graph (module -> package modules it imports): an import `ALLOWED` does
+    not list, or a cycle among the modules of the graph. Empty when the graph is fine."""
+    problems = [
+        f"{module} imports {dependency}, which {module} may not (allowed: {sorted(ALLOWED[module]) or 'nothing'})"
+        for module in sorted(graph)
+        for dependency in sorted(graph[module] - ALLOWED[module])
+    ]
     done, active = set(), []
 
     def visit(module: str) -> None:
@@ -60,6 +75,10 @@ def violations(graph: dict[str, set[str]]) -> list[str]:
     for module in sorted(graph):
         visit(module)
     return problems
+
+
+def graph_of(sources: dict[str, str]) -> dict[str, set[str]]:
+    return {module: internal_imports(source) for module, source in sources.items()}
 
 
 @pytest.mark.parametrize(
@@ -79,41 +98,72 @@ def test_internal_imports_finds_every_way_of_importing_a_package_module(source, 
     assert internal_imports(source) == expected
 
 
-def test_a_sound_graph_has_no_violations():
-    graph = {
-        "timing": set(),
-        "steps": {"timing"},
-        "loader": {"steps", "timing"},
-        "runner": {"steps"},
-        "recipe": {"loader", "runner"},
-    }
-    assert violations(graph) == []
+GOOD = {
+    "timing": "from dataclasses import dataclass",
+    "steps": "from . import effects\nfrom .timing import Animated",
+    "loader": "from .steps import Recipe\nfrom .timing import Animation",
+    "runner": "from . import effects, imageio\nfrom .matte import subject_matte\nfrom .steps import Recipe",
+    "recipe": "from .loader import load_recipe\nfrom .runner import render"
+    "\nfrom .steps import Step\nfrom .timing import ramp",
+}
+
+
+def test_a_sound_set_of_modules_has_no_violations():
+    assert violations(graph_of(GOOD)) == []
+
+
+@pytest.mark.parametrize(
+    "module, source, expect",
+    [
+        ("runner", "from .loader import load_recipe", "runner imports loader"),
+        ("runner", "def render():\n    from . import loader\n", "runner imports loader"),  # lazy
+        ("loader", "from .runner import render", "loader imports runner"),
+        ("loader", "def load():\n    import photo_fx.runner\n", "loader imports runner"),  # lazy
+        ("timing", "from .steps import Step", "timing imports steps"),
+        ("timing", "def f():\n    from .steps import Step\n", "timing imports steps"),  # lazy
+        ("timing", "from . import effects", "timing imports effects"),  # not one of the five, still not allowed
+        ("steps", "from .runner import render", "steps imports runner"),
+        ("steps", "from .loader import load_recipe", "steps imports loader"),
+        ("runner", "from .recipe import Recipe", "runner imports recipe"),
+    ],
+)
+def test_an_import_against_the_direction_is_reported(module, source, expect):
+    problems = violations(graph_of({**GOOD, module: GOOD[module] + "\n" + source}))
+    assert any(re.search(expect, problem) for problem in problems), problems
 
 
 @pytest.mark.parametrize(
     "graph, expect",
     [
+        ({"steps": {"loader"}, "loader": {"steps"}}, "cycle: loader -> steps -> loader"),
         (
-            {"timing": set(), "steps": {"loader"}, "loader": {"steps"}, "runner": set()},
-            "cycle: loader -> steps -> loader",
-        ),
-        (
-            {"timing": set(), "steps": {"runner"}, "runner": {"loader"}, "loader": {"steps"}},
+            {"steps": {"runner"}, "runner": {"loader"}, "loader": {"steps"}},
             "cycle: loader -> steps -> runner -> loader",
         ),
-        ({"timing": set(), "steps": {"steps"}}, "cycle: steps -> steps"),
-        (
-            {"timing": {"steps"}, "steps": set()},
-            "timing imports \\['steps'\\]",
-        ),  # not a cycle, but timing must be a leaf
-        ({"timing": {"recipe"}, "recipe": {"timing"}}, "timing imports"),
     ],
 )
-def test_a_cycle_or_a_timing_import_is_reported(graph, expect):
-    assert any(re.search(expect, problem) for problem in violations(graph)), violations(graph)
+def test_a_cycle_is_reported_even_when_the_table_is_edited_to_allow_its_edges(graph, expect, monkeypatch):
+    monkeypatch.setitem(ALLOWED, "steps", {"runner", "loader"})
+    monkeypatch.setitem(ALLOWED, "loader", {"steps", "runner"})
+    monkeypatch.setitem(ALLOWED, "runner", {"loader", "steps"})
+    assert expect in violations(graph)
 
 
-def test_the_real_modules_depend_on_each_other_in_one_direction_only():
-    graph = {name: internal_imports((PACKAGE / f"{name}.py").read_text()) & set(MODULES) for name in MODULES}
+def test_the_real_modules_depend_on_each_other_in_the_stated_direction_only():
+    graph = {name: internal_imports((PACKAGE / f"{name}.py").read_text()) for name in ALLOWED}
     assert violations(graph) == []
     assert graph["steps"] >= {"timing"} and graph["runner"] >= {"steps"} and graph["loader"] >= {"steps"}  # not vacuous
+
+
+def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
+    """`import photo_fx; photo_fx.recipe` worked before the split, with every public name of the old module."""
+    names = "Animated Animation Recipe Stage Step load_recipe ramp render render_all render_frames trace".split()
+    code = (
+        "import photo_fx\n"
+        f"names = {names!r}\n"
+        "missing = [n for n in names if not hasattr(photo_fx.recipe, n)]\n"
+        "assert not missing, missing\n"
+        "assert photo_fx.recipe.render is photo_fx.render and photo_fx.recipe.load_recipe is photo_fx.load_recipe\n"
+    )
+    result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr

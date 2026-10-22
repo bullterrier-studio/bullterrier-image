@@ -8,9 +8,9 @@ animated. The work is split by what changes together, and this module only re-ex
     loader   `load_recipe`: the TOML format
     runner   `render`, `render_frames`, `render_all`, `trace`, `Stage`: running a recipe on a photo
 
-Dependency direction (acyclic): timing <- steps <- loader, runner; this module imports all four and nothing inside the
-package imports it. `from photo_fx.recipe import ...` keeps working; code in the package imports from the module that
-owns the name.
+Dependency direction (acyclic): timing <- steps <- loader, runner; this module imports all four, and only the
+package's `__init__` imports it (so that `photo_fx.recipe` exists after a plain `import photo_fx`).
+`from photo_fx.recipe import ...` keeps working; code in the package imports from the module that owns the name.
 """
 
 from .loader import load_recipe

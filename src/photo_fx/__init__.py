@@ -31,7 +31,7 @@ Modules, each owning one decision:
     cli        the `photo-fx` command
 """
 
-from . import fx, imageio
+from . import fx, imageio, recipe  # noqa: F401  (binds `photo_fx.recipe`, which callers use as a namespace)
 from .loader import load_recipe
 from .matte import subject_matte
 from .pipeline import Project, load_project, run

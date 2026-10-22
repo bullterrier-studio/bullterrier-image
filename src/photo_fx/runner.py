@@ -5,8 +5,8 @@ Promises: the input photo is never modified; the same photo, recipe and matte al
 last stage is exactly what `render` returns, because both run the same code; an effect that changes the image shape is
 an error. The subject is found at most once per photo (`render_all`) and only if some step needs it.
 
-Dependency direction: imports `steps` (and `timing` through it) and never `loader`, so recipes built in Python run
-without the TOML reader.
+Dependency direction: imports `steps`, the effect registry, `imageio` and `matte`; never `loader`, so recipes built in
+Python run without the TOML reader. (`tests/test_module_graph.py` holds the allowed imports of every module.)
 """
 
 from collections import deque
