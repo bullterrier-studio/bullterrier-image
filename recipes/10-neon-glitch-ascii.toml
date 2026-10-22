@@ -23,5 +23,5 @@ seed = 4
 [[step]]
 effect = "glow"
 radius = 24
-strength = 0.7
+amount = 0.7
 threshold = 0.45

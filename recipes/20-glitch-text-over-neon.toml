@@ -26,5 +26,5 @@ amount = 0.4
 [[step]]
 effect = "glow"
 radius = 20
-strength = 0.25
+amount = 0.25
 threshold = 0.6

@@ -24,7 +24,7 @@ TOXIC_NEON = Recipe(
         fx.gradient_map(stops=["#021a0b", "#00ff88", "#d8ffe8"]),
         fx.fill("#000000").where("background"),  # only the background; the subject is found automatically
         fx.glitch(split=8, bands=6, seed=3),
-        fx.glow(radius=24, strength=0.7).blend(0.9),  # mixed in at 90%
+        fx.glow(radius=24, amount=0.7).blend(0.9),  # mixed in at 90%
     ],
 )
 

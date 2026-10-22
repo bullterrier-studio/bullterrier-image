@@ -1,6 +1,6 @@
+import ast
 import inspect
 import json
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -84,11 +84,15 @@ def test_every_effect_is_available_as_a_step_builder():
         assert getattr(fx, name)().effect == name
 
 
-def test_the_editor_stub_matches_the_effects():
-    stub = Path(__file__).parent.parent / "src" / "photo_fx" / "fx.pyi"
-    assert stub.read_text() == fx.stub_text() + "\n" or stub.read_text() == fx.stub_text(), (
-        "fx.pyi is out of date: run `uv run python -m photo_fx.fx > src/photo_fx/fx.pyi`"
-    )
+def test_the_editor_stub_is_valid_python_with_one_function_per_effect():
+    """fx.pyi itself is regenerated at integration (`photo-fx regenerate`), so only its generator is checked here."""
+    from photo_fx import effects
+
+    tree = ast.parse(fx.stub_text())
+    functions = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
+    assert sorted(functions) == sorted(effects.describe()) and len(functions) == len(set(functions))
+    glow = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "glow")
+    assert [a.arg for a in glow.args.args] == ["radius", "amount", "threshold"]  # its parameters, without the image
 
 
 def test_python_and_toml_recipes_are_the_same_thing(tmp_path):

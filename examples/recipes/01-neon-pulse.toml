@@ -24,5 +24,5 @@ split = 9
 [[step]]
 effect = "glow"
 radius = 28
-strength = 0.8
+amount = 0.8
 threshold = 0.45

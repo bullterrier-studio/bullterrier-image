@@ -9,6 +9,15 @@ def test_glow_only_ever_brightens(photo):
     assert (effects.apply("glow", photo) >= photo - 1e-6).all()
 
 
+def test_glow_amount_zero_leaves_the_picture_unchanged(photo):
+    np.testing.assert_allclose(effects.apply("glow", photo, amount=0.0), photo, atol=1e-6)
+
+
+def test_glow_amount_sets_how_much_it_brightens(photo):
+    added = [float((effects.apply("glow", photo, amount=a, radius=6.0) - photo).mean()) for a in (0.3, 0.9)]
+    assert 0 < added[0] < added[1]
+
+
 def test_grain_seed_controls_noise(photo):
     a, b = effects.apply("grain", photo, seed=1), effects.apply("grain", photo, seed=2)
     assert not np.allclose(a, b)

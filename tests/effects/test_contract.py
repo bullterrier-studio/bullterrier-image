@@ -53,6 +53,52 @@ def test_every_effect_can_run_on_the_image_alone(name):
     assert [p.name for p in params if p.default is inspect.Parameter.empty] == []
 
 
+# --- parameter vocabulary ----------------------------------------------------------------------------------------
+
+
+def _naming_problems(name: str) -> list[str]:
+    """Every parameter of the effect `name` that uses a discouraged name, with the name to use instead."""
+    from photo_fx.effects._vocabulary import DISCOURAGED
+
+    return [
+        f"effect {name!r}: parameter `{parameter}` should be called `{DISCOURAGED[parameter]}`"
+        for parameter in inspect.signature(effects.get(name)).parameters
+        if parameter in DISCOURAGED
+    ]
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_no_effect_uses_a_discouraged_parameter_name(name):
+    assert _naming_problems(name) == []
+
+
+def test_the_vocabulary_check_flags_discouraged_names_and_passes_preferred_ones(throwaway_effects):
+    @effect(category="light")
+    def bad_probe(rgb, strength: float = 0.5, radius: float = 3.0, rng: int = 0):
+        """Uses two discouraged names."""
+        return rgb
+
+    @effect(category="light")
+    def good_probe(rgb, amount: float = 0.5, radius: float = 3.0, seed: int = 0):
+        """Uses the preferred names."""
+        return rgb
+
+    assert _naming_problems("bad_probe") == [
+        "effect 'bad_probe': parameter `strength` should be called `amount`",
+        "effect 'bad_probe': parameter `rng` should be called `seed`",
+    ]
+    assert _naming_problems("good_probe") == []
+
+
+def test_the_vocabulary_is_the_agreed_one():
+    from photo_fx.effects._vocabulary import DISCOURAGED
+
+    assert DISCOURAGED == {
+        "strength": "amount", "intensity": "amount", "factor": "amount", "colour": "color", "rotation": "angle",
+        "random_state": "seed", "rng": "seed",
+    }  # fmt: skip
+
+
 # --- discovery ---------------------------------------------------------------------------------------------------
 
 _NEW_MODULES = {

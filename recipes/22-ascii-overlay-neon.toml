@@ -22,5 +22,5 @@ mask = "background"
 [[step]]
 effect = "glow"
 radius = 18
-strength = 0.3
+amount = 0.3
 threshold = 0.6
