@@ -1,8 +1,10 @@
 import time
+import tracemalloc
 
 import numpy as np
 import pytest
 
+from photo_fx.ops import sprites as sprites_module
 from photo_fx.ops.sprites import Placement, scatter, stamp
 
 FIELDS = ("x", "y", "size", "depth", "phase")
@@ -431,15 +433,17 @@ def test_invalid_blend_is_rejected_even_when_there_is_nothing_to_draw():
         stamp(black(), scatter((10, 10), 0, seed=0), blend="nope")
 
 
-def test_batches_of_large_sprites_equal_drawing_each_alone():
-    # 80 sprites of ~300 px on a 400x400 picture (about 6 million drawn pixels) need many internal batches and
-    # several merges of equal pixels; the result must not depend on either
-    p = scatter((400, 400), 80, seed=5, size=(200.0, 320.0), depth_layers=2)
-    zero = np.zeros((400, 400, 3), np.float32)
-    together = stamp(zero, p, blend="add", opacity=0.01)
+def test_batches_of_large_sprites_equal_drawing_each_alone(monkeypatch):
+    # Large sprites on a small picture, with the batch and merge limits lowered so that the drawing is split into many
+    # batches and merges: the result must not depend on how the work is split.
+    monkeypatch.setattr(sprites_module, "_MAX_PATCH_ELEMENTS", 40_000)
+    monkeypatch.setattr(sprites_module, "_MAX_PENDING_ENTRIES", 30_000)
+    p = scatter((160, 160), 40, seed=5, size=(60.0, 140.0), depth_layers=2)
+    zero = np.zeros((160, 160, 3), np.float32)
+    together = stamp(zero, p, blend="add", opacity=0.02)
     one_by_one = sum(
-        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.01)
-        for i in range(80)
+        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.02)
+        for i in range(40)
     )
     assert together.max() < 1.0
     np.testing.assert_allclose(together, one_by_one, atol=1e-5)
@@ -512,8 +516,6 @@ def test_a_streak_pointing_away_from_the_picture_does_not_reach_it():
 
 
 def test_memory_follows_what_is_drawn_not_the_size_of_the_picture():
-    import tracemalloc
-
     canvas = np.zeros((2000, 3000, 3), np.float32)  # 72 MB
     placement = scatter((2000, 3000), 20, seed=1)
     tracemalloc.start()
@@ -589,3 +591,132 @@ def test_a_black_sprite_under_add_changes_nothing_not_even_an_out_of_range_pixel
     canvas = np.full((101, 101, 3), 1.5, dtype=np.float32)  # out of range on purpose: any clipping would show
     out = stamp(canvas, sprite(CENTRE, CENTRE), color=(0.0, 0.0, 0.0), blend="add")
     np.testing.assert_array_equal(out, canvas)
+
+
+# ---------------------------------------------------------------- the documented profile
+
+
+def documented_profile(distance: np.ndarray, size: float, feather: float = 1.0, softness: float = 0.5) -> np.ndarray:
+    """The brightness profile the `stamp` docstring promises, written out from its formula (radius r = size / 2,
+    edge width w = max(feather, softness * r), alpha = clip((r + w / 2 - d) / w, 0, 1))."""
+    radius = size / 2
+    width = max(feather, softness * radius)
+    return np.clip((radius + width / 2 - distance) / width, 0.0, 1.0)
+
+
+@pytest.mark.parametrize(
+    ("size", "kwargs"),
+    [
+        (20.0, {}),  # width 5: core to d = 7.5, ramp to d = 12.5
+        (20.0, {"softness": 0.2}),  # width 2
+        (20.0, {"feather": 6.0}),  # width 6 beats softness * r = 5
+        (20.0, {"softness": 2.0}),  # width 20 = size: no flat core, the peak is exactly 1
+        (20.0, {"softness": 3.0}),  # width 30: the peak is dimmed to (r + w / 2) / w = 25 / 30
+        (3.0, {}),  # feather decides: width 1
+        (4.0, {"feather": 4.0}),  # a sprite as wide as the feather still peaks at 1
+        (4.0, {"feather": 8.0}),  # wider than the sprite: a dim blob
+    ],
+)
+def test_the_profile_along_a_row_through_the_centre_is_the_documented_flat_core_and_linear_ramp(size, kwargs):
+    out = stamp(black(), sprite(CENTRE, CENTRE, size), blend="add", **kwargs)[50, :, 0]
+    distance = np.abs(np.arange(101) - 50.0)  # pixel centres are at col + 0.5, the sprite at 50.5
+    np.testing.assert_allclose(out, documented_profile(distance, size, **kwargs), atol=1e-6)
+
+
+def test_a_streaks_profile_is_the_same_curve_with_distances_along_its_axis_divided_by_length():
+    out = stamp(black(), sprite(CENTRE, CENTRE, 8.0), shape="streak", angle=0.0, length=4.0, blend="add")[50, :, 0]
+    distance = np.abs(np.arange(101) - 50.0) / 4.0
+    np.testing.assert_allclose(out, documented_profile(distance, 8.0), atol=1e-6)
+    across = stamp(black(), sprite(CENTRE, CENTRE, 8.0), shape="streak", angle=0.0, length=4.0, blend="add")[:, 50, 0]
+    np.testing.assert_allclose(across, documented_profile(np.abs(np.arange(101) - 50.0), 8.0), atol=1e-6)
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"softness": 1.0}, {"feather": 6.0}, {"softness": 0.1, "feather": 2.0}])
+def test_total_light_of_a_sprite_is_pi_times_radius_squared_plus_a_twelfth_of_the_edge_width_squared(kwargs):
+    size = 20.0
+    radius = size / 2
+    width = max(kwargs.get("feather", 1.0), kwargs.get("softness", 0.5) * radius)
+    out = stamp(black(), sprite(CENTRE, CENTRE, size), blend="add", **kwargs)
+    assert out[..., 0].sum() == pytest.approx(np.pi * (radius**2 + width**2 / 12), rel=2e-3)
+
+
+@pytest.mark.parametrize(("size", "tolerance"), [(12.0, 0.05), (6.0, 0.05), (3.0, 0.05), (2.5, 0.10), (2.0, 0.13)])
+@pytest.mark.parametrize("offset", [(0.5, 0.5), (0.0, 0.0), (0.5, 0.0)])  # centred, on a pixel corner, on an edge
+def test_light_stays_within_the_documented_distance_of_the_disc_area_at_default_settings(size, tolerance, offset):
+    out = stamp(black(), sprite(50.0 + offset[0], 50.0 + offset[1], size), blend="add")
+    assert out[..., 0].sum() == pytest.approx(np.pi * size**2 / 4, rel=tolerance)
+
+
+def test_scatter_sizes_of_middle_layers_are_interpolated_linearly_in_depth():
+    p = scatter((50, 50), 300, seed=4, size=(2.0, 8.0), depth_layers=3)
+    assert sorted(set(p.size.tolist())) == [2.0, 5.0, 8.0]
+    q = scatter((50, 50), 300, seed=4, size=(2.0, 12.0), depth_layers=5)
+    assert sorted(set(q.size.tolist())) == [2.0, 4.5, 7.0, 9.5, 12.0]
+
+
+# ---------------------------------------------------------------- the accumulation strategy is invisible
+
+
+@pytest.mark.parametrize("blend", ["add", "screen", "over"])
+@pytest.mark.parametrize(
+    ("shape", "count", "size", "extra"),
+    [
+        ((60, 90), 300, (2.0, 8.0), {}),
+        ((61, 47), 40, (5.0, 60.0), {"opacity": 0.6, "color": (0.9, 0.4, 0.1)}),
+        ((70, 50), 120, (3.0, 20.0), {"shape": "streak", "angle": 37.0, "length": 5.0}),
+        ((120, 150), 40, (40.0, 90.0), {"opacity": 0.03}),  # overlapping big sprites; the sparse path merges (below)
+    ],
+)
+def test_sparse_and_dense_accumulation_give_byte_identical_pictures(monkeypatch, blend, shape, count, size, extra):
+    rng = np.random.default_rng(count)
+    canvas = rng.random((*shape, 3), dtype=np.float32)
+    placement = scatter(shape, count, seed=count, size=size)
+    monkeypatch.setattr(sprites_module, "_MAX_PENDING_ENTRIES", 3000)  # so that the sparse path merges repeatedly
+    results = []
+    for block in (
+        sprites_module._BLOCK,
+        513,
+    ):  # 513: many small blocks, to exercise the block-wise compaction and resolve
+        monkeypatch.setattr(sprites_module, "_BLOCK", block)
+        for dense in (False, True):
+            monkeypatch.setattr(sprites_module, "_prefers_dense", lambda drawn, pixels, dense=dense: dense)
+            results.append(stamp(canvas, placement, blend=blend, **extra))
+    assert not np.array_equal(results[0], canvas)
+    for other in results[1:]:
+        np.testing.assert_array_equal(other, results[0])
+
+
+@pytest.mark.parametrize("dense", [False, True])
+def test_pixels_no_sprite_touches_come_back_unchanged_to_the_last_bit_under_either_accumulation(monkeypatch, dense):
+    monkeypatch.setattr(sprites_module, "_prefers_dense", lambda drawn, pixels: dense)
+    canvas = np.full((101, 101, 3), 1.5, dtype=np.float32)  # out of range on purpose: any clipping would show
+    out = stamp(canvas, sprite(CENTRE, CENTRE, size=10), blend="add", opacity=0.5)
+    assert np.all(out[:30] == 1.5) and np.all(out[:, :30] == 1.5)
+    assert out[50, 50, 0] == 1.0  # touched pixels are clipped
+
+
+def test_the_accumulation_strategy_follows_how_much_of_the_picture_is_drawn_on(monkeypatch):
+    # A guard for speed without a stopwatch: few small sprites are summed sparsely (memory follows the area drawn),
+    # sprites covering the picture many times over are summed per pixel (sorting millions of entries is far slower).
+    used = []
+    for name in ("_accumulate_sparse", "_accumulate_dense"):
+        original = getattr(sprites_module, name)
+        monkeypatch.setattr(
+            sprites_module, name, lambda *a, original=original, name=name: used.append(name) or original(*a)
+        )
+    stamp(black(200, 300), scatter((200, 300), 30, seed=1))
+    stamp(black(200, 300), scatter((200, 300), 30, seed=1, size=(60.0, 90.0)))
+    assert used == ["_accumulate_sparse", "_accumulate_dense"]
+
+
+def test_a_sprite_larger_than_the_picture_costs_about_the_picture_not_several_times_it():
+    canvas = np.zeros((1000, 1000, 3), np.float32)  # 12 MB
+    tracemalloc.start()
+    try:
+        out = stamp(canvas, sprite(500.0, 500.0, size=1e5), color=(0.5, 0.5, 0.5), blend="add")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    np.testing.assert_allclose(out, 0.5, atol=1e-6)
+    # measured: about 8x with one shared window, about 14x with a window four times the picture per sprite
+    assert peak < 11 * canvas.nbytes, f"peak {peak / canvas.nbytes:.1f}x the picture"
