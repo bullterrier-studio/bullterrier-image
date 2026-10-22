@@ -331,6 +331,13 @@ def test_field_names_are_the_fields_in_declaration_order():
     assert Probe.field_names() == ("radius", "count", "mode", "tint", "label")
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_a_nan_or_infinite_list_item_is_reported_as_not_a_finite_number_not_as_out_of_range(value):
+    with pytest.raises(ValueError, match=r"`offsets\[1\]`.*finite") as raised:
+        Kinds.parse({"offsets": [0.5, value]}, "effect 'kinds'")
+    assert "<=" not in str(raised.value)
+
+
 def test_a_nan_is_reported_as_not_a_finite_number_not_as_out_of_range():
     with pytest.raises(ValueError, match="finite") as raised:
         Probe.parse({"radius": float("nan")}, "effect 'probe'")

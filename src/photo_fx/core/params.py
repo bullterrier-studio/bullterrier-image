@@ -33,7 +33,7 @@ from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_orig
 
 import annotated_types
 import numpy as np
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, Strict, ValidationError, WithJsonSchema
+from pydantic import AllowInfNan, BaseModel, BeforeValidator, ConfigDict, Field, Strict, ValidationError, WithJsonSchema
 
 from photo_fx.ops.color import parse_color
 
@@ -357,7 +357,7 @@ def _ranged_tuple(annotation: Any, low: float, high: float) -> Any:
     def ranged(item: Any) -> Any:
         if item is Ellipsis:
             return item
-        finite = (annotated_types.Predicate(math.isfinite),) if item is float else ()
+        finite = (AllowInfNan(False),) if item is float else ()  # checked before the range, so a nan is named as such
         return Annotated[item, Strict(), annotated_types.Ge(low), annotated_types.Le(high), *finite]
 
     return tuple[tuple(ranged(arg) for arg in get_args(annotation))]  # type: ignore[misc]  # built at run time
@@ -446,7 +446,6 @@ def _problem(detail: Any, valid: list[str]) -> str:
         "string_type": f"{name} must be text{got}",
         "tuple_type": f"{name} must be a list{got}",
         "finite_number": f"{name} must be a finite number{got}",
-        "predicate_failed": f"{name} must be a finite number{got}",
         "literal_error": f"{name} must be one of {ctx.get('expected')}{got}",
         "too_short": f"{name} needs at least {ctx.get('min_length')} items{got}",
         "value_error": f"{name}: {ctx.get('error')}",
