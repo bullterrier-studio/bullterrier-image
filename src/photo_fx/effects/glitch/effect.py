@@ -109,7 +109,8 @@ class GlitchParams(EffectParams):
     ascii_ink: Color | None = param(
         None,
         doc="The ink colour of the text strips ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
-        "character from the strip under it.",
+        "character from the average colour of the strip under it, brightened as in the ascii effect (strongest "
+        "channel scaled to full, or by 1 / 0.35 if below 0.35).",
     )
     ascii_paper: Color = param(
         "#000000",

@@ -33,7 +33,8 @@ class AsciiParams(EffectParams):
     ink: Color | None = param(
         None,
         doc="The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
-        "character from the photo under it, brightened so thin strokes stay readable.",
+        "character from the average colour of the photo under it, brightened so thin strokes stay readable: scaled "
+        "until its strongest channel is full, or by 1 / 0.35 if that channel is below 0.35 (never darkened).",
     )
     paper: Color = param(
         "#000000",
