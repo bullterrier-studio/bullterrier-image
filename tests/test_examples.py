@@ -35,11 +35,14 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
 
 def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the_text_they_move():
     """disperse/evaporate move whole characters, so their cell must equal the ascii step's cell."""
+    checked = []
     for path in [*(EXAMPLES / "recipes").glob("*.toml"), *(EXAMPLES / "effects").glob("*.toml")]:
         steps = {s.effect: s.params for s in load_recipe(path).steps}
         for mover in ("disperse", "evaporate"):
             if mover in steps and "ascii" in steps:
                 assert steps[mover]["cell"] == steps["ascii"]["cell"], path.name
+                checked.append(path.name)
+    assert checked, "no demo recipe moves ascii text, so nothing was checked"
 
 
 def test_the_demo_pictures_the_readme_shows_exist():
@@ -78,5 +81,6 @@ def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists(
     for path in local:
         assert (EXAMPLES.parent / path).is_file(), f"README shows {path}, which does not exist"
     links = re.findall(r'href="((?:examples|docs|src)/[^"]+)"', readme)
+    assert links, "the README links to no local file, so the link check checks nothing"
     for path in links:
         assert (EXAMPLES.parent / path).exists(), f"README links to {path}, which does not exist"

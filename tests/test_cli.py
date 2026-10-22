@@ -3,7 +3,7 @@ import sys
 import pytest
 from PIL import Image
 
-from photo_fx import imageio
+from photo_fx import effects, imageio
 from photo_fx.cli import main
 
 
@@ -19,7 +19,8 @@ def files(photo, tmp_path):
 
 def test_effects_lists_every_effect(capsys):
     assert main(["effects"]) == 0
-    assert "halftone" in capsys.readouterr().out
+    listed = {line for line in capsys.readouterr().out.splitlines() if line and not line.startswith(" ")}
+    assert listed == set(effects.describe())  # one unindented heading per effect, its documentation indented below
 
 
 def test_render_writes_one_file_per_recipe_in_a_folder(files):
