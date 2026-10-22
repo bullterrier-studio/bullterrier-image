@@ -86,13 +86,14 @@ def test_a_verified_download_lands_at_the_target_with_the_served_bytes(server, t
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits; Windows has no group or other bits")
 def test_the_kept_file_is_readable_like_any_file_the_user_saves(server, tmp_path):
-    """Not only by its owner, as a private temporary file would be: the usual 0o666 less the user's umask."""
-    umask = os.umask(0o022)
+    """Not only by its owner, as a private temporary file would be: the usual 0o666 less the user's umask (an
+    unusual umask here, so a fixed mode would show)."""
+    umask = os.umask(0o027)
     try:
         target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     finally:
         os.umask(umask)
-    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
 
 
 def test_a_second_fetch_uses_the_cached_file_without_asking_the_server(server, tmp_path):
