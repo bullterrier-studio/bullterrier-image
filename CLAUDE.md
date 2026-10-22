@@ -27,7 +27,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 
 ## The rules
 
-1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before.
+1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before. An `ops` module is added together with its first consumer, never ahead of it (`vulture` fails the gate on code nothing uses; earlier modules wait in git history). `photo_fx.ops` is internal, not API.
 2. **Presets are data, not code**: a preset is a recipe fragment (TOML), so it never needs to import effects.
 3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects.md`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects.md`, stop: something is wrong.
@@ -135,7 +135,8 @@ Once per clone: `uv run poe setup` (installs the hooks and the commit template).
 The target above is being introduced in small steps; until a step lands, the old layout still holds. New code follows the target.
 
 - [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
-- [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites
+- [x] `ops/` primitives: glyphs, cells, distance (colorspace, noise, edges, warp, voronoi and sprites wait in git history
+  until an effect needs them: `git show 3b9b2ed:src/photo_fx/ops/<module>.py`)
 - [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
 - [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
 - [x] F1a: Pydantic params model pattern in `core/params.py` (`EffectParams`, `param`, `Color`); Step/Recipe/Animated/Animation as Pydantic models; `color.py` migrated
