@@ -1,6 +1,7 @@
 """The parameter-model pattern every effect follows: `EffectParams`, `param`, `Color`, and the wording of errors."""
 
 import inspect
+import re
 from typing import Literal
 
 import numpy as np
@@ -192,13 +193,148 @@ def test_the_signature_lists_every_field_in_order_with_its_default_and_a_readabl
     assert "Annotated" not in text
 
 
+def _entry(text: str, name: str) -> str:
+    """The documentation entry of field `name`: its heading line and the indented lines under it."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"{name} : "))
+    end = next((i for i in range(start + 1, len(lines)) if not lines[i].startswith(" ")), len(lines))
+    return " ".join(" ".join(lines[start:end]).split())
+
+
 def test_the_documentation_has_each_fields_type_unit_range_default_and_description():
     text = Probe.documentation()
-    assert text.startswith("Parameters\n----------\n")
-    assert "radius : number, px, 0 to 500, default 24.0\n    Size of the probe's halo. Larger = wider." in text
-    assert "count : whole number, count, 1 to 9, default 3\n" in text
-    assert "mode : one of 'soft', 'hard', default 'soft'\n    Edge: 'soft' blends, 'hard' cuts." in text
-    assert "tint : colour, default '#ff8000'\n" in text
+    assert text.startswith("Parameters")
+    radius = _entry(text, "radius")
+    for part in ("number", "px", "0 to 500", "24.0", "Size of the probe's halo. Larger = wider."):
+        assert part in radius, part
+    count = _entry(text, "count")
+    for part in ("whole number", "count", "1 to 9", "3", "How many probes."):
+        assert part in count, part
+    assert "'soft', 'hard'" in _entry(text, "mode")
+    assert "colour" in _entry(text, "tint")
+    assert "#ff8000" in _entry(text, "tint")
+
+
+def test_the_documentation_says_an_animated_whole_number_moves_in_whole_steps():
+    assert "whole steps" in _entry(Probe.documentation(), "count")
+    assert "whole steps" not in _entry(Probe.documentation(), "radius")
+
+
+# --- strictness for every kind of field (known-good and known-bad per kind) -----------------------------------------
+
+
+class Kinds(EffectParams):
+    """One field of each kind an effect may declare."""
+
+    invert: bool = param(False, doc="Swap dark and light.")
+    count: int = param(3, unit="count", min=1, max=9, doc="How many.")
+    radius: float = param(2.0, unit="px", min=0, max=10, doc="How far.")
+    mode: Literal["soft", "hard"] = param("soft", doc="Edge: 'soft' or 'hard'.")
+    tint: Color = param("#000000", doc="A colour.")
+    offsets: tuple[float, ...] = param((0.25, 0.75), unit="fraction", min=0, max=1, doc="Where the bands sit.")
+    names: tuple[str, ...] = param(("a",), doc="Labels.")
+
+
+@pytest.mark.parametrize(
+    ("values", "field", "expected"),
+    [
+        ({"invert": True}, "invert", True),
+        ({"count": 9}, "count", 9),
+        ({"radius": 3}, "radius", 3.0),
+        ({"radius": np.float32(2.5)}, "radius", 2.5),
+        ({"mode": "hard"}, "mode", "hard"),
+        ({"tint": "#fff"}, "tint", (1.0, 1.0, 1.0)),
+        ({"tint": np.array([0.25, 0.5, 1.0])}, "tint", (0.25, 0.5, 1.0)),  # as parse_color accepted
+        ({"tint": (np.float32(0.5), 0, 1)}, "tint", (0.5, 0.0, 1.0)),
+        ({"offsets": [0.1, 1]}, "offsets", (0.1, 1.0)),  # a list, as TOML writes it
+        ({"offsets": (0, 1)}, "offsets", (0.0, 1.0)),
+        ({"offsets": np.array([0.2, 0.3])}, "offsets", (0.2, 0.3)),
+        ({"names": ["x", "y"]}, "names", ("x", "y")),
+    ],
+)
+def test_every_kind_of_field_accepts_its_own_kind_of_value(values, field, expected):
+    assert getattr(Kinds(**values), field) == expected  # every expected value is exact in float32 and float64
+
+
+@pytest.mark.parametrize(
+    ("values", "field"),
+    [
+        ({"invert": "yes"}, "invert"),
+        ({"invert": 1}, "invert"),
+        ({"count": True}, "count"),
+        ({"radius": "3"}, "radius"),
+        ({"mode": 1}, "mode"),
+        ({"tint": np.array([0.1, 0.2, 0.3, 0.4])}, "tint"),
+        ({"tint": [0.5, 0.5, True]}, "tint"),
+        ({"offsets": ("3", True)}, "offsets"),
+        ({"offsets": [1.5]}, "offsets"),  # each item has the field's range
+        ({"offsets": [float("nan")]}, "offsets"),
+        ({"offsets": "0.5"}, "offsets"),
+        ({"names": [1, 2]}, "names"),
+    ],
+)
+def test_every_kind_of_field_refuses_values_of_another_kind(values, field):
+    with pytest.raises(ValidationError, match=field):
+        Kinds(**values)
+
+
+@pytest.mark.parametrize(
+    ("annotation", "make", "complaint"),
+    [
+        (tuple[float, ...], lambda: param((0.5,), doc="d"), "unit"),
+        (tuple[float, ...], lambda: param((0.5,), unit="px", min=0, doc="d"), "max"),
+        (tuple[float, ...], lambda: param((0.5, 3.0), unit="px", min=0, max=1, doc="d"), "default"),
+        (tuple[str, ...], lambda: param(("a",), min=0, max=1, doc="d"), "min"),
+        (bool, lambda: param(False, unit="count", doc="d"), "unit"),
+    ],
+)
+def test_a_badly_declared_list_or_switch_fails_when_the_class_is_made(annotation, make, complaint):
+    with pytest.raises(ValueError, match=r"Broken.*`x`") as raised:
+        _declare(annotation, make())
+    assert complaint in str(raised.value)
+
+
+def test_a_list_of_numbers_documents_and_publishes_its_range_per_item():
+    (offsets,) = [doc for doc in Kinds.fields_doc() if doc.name == "offsets"]
+    assert (offsets.unit, offsets.range) == ("fraction", "0 to 1")
+    items = Kinds.json_schema()["properties"]["offsets"]["items"]
+    assert (items["minimum"], items["maximum"]) == (0, 1)
+
+
+def test_whole_number_fields_are_the_int_fields():
+    assert Kinds.whole_number_fields() == frozenset({"count"})
+    assert Probe.whole_number_fields() == frozenset({"count"})
+
+
+def test_the_published_colour_pattern_matches_a_whole_value_only():
+    pattern = Probe.json_schema()["properties"]["tint"]["anyOf"][0]["pattern"]
+    assert re.search(pattern, "#fff")
+    assert re.search(pattern, "#a1B2c3")
+    assert not re.search(pattern, "xx#fff00")  # JSON Schema patterns search, so they must be anchored
+    assert not re.search(pattern, "#fff0")
+
+
+# --- parse and field_names: the one way callers validate ------------------------------------------------------------
+
+
+def test_parse_builds_the_model_from_a_mapping():
+    assert Probe.parse({"radius": 3, "mode": "hard"}, "effect 'probe'") == Probe(radius=3.0, mode="hard")
+
+
+def test_parse_reports_every_problem_as_one_value_error_naming_the_owner():
+    with pytest.raises(ValueError, match=r"effect 'probe': `radius` must be >= 0, got -1.*`raduis`") as raised:
+        Probe.parse({"radius": -1, "raduis": 2}, "effect 'probe'")
+    assert not isinstance(raised.value, ValidationError)  # callers see a plain ValueError, never pydantic's type
+
+
+def test_field_names_are_the_fields_in_declaration_order():
+    assert Probe.field_names() == ("radius", "count", "mode", "tint", "label")
+
+
+def test_a_nan_is_reported_as_not_a_finite_number_not_as_out_of_range():
+    with pytest.raises(ValueError, match="finite") as raised:
+        Probe.parse({"radius": float("nan")}, "effect 'probe'")
+    assert "<=" not in str(raised.value)
 
 
 def test_field_docs_give_the_parts_separately():
