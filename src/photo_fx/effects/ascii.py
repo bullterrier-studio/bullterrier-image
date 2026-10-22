@@ -1,22 +1,15 @@
 """ASCII art: the picture redrawn as a grid of text characters."""
 
-from functools import lru_cache
-from pathlib import Path
-
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+
+from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
 
 from ._common import Color, ink_amount, luminance, parse_color, vivid
 from ._registry import effect
 
-# Tried in order; the first that exists wins. All are monospaced.
-_FONTS = [
-    "/System/Library/Fonts/Menlo.ttc",
-    "/System/Library/Fonts/Monaco.ttf",
-    "/System/Library/Fonts/Courier.ttc",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-    "C:/Windows/Fonts/consola.ttf",
-]
+# Other effects and tests still import these names from here.
+_glyph_atlas = glyph_atlas
+__all__ = ["_glyph_atlas", "ascii", "cell_size"]
 
 
 @effect(category="text")
@@ -41,7 +34,7 @@ def ascii(
     `font` = path to a monospaced .ttf/.ttc if you do not want the system one.
     """
     bg_color = parse_color(bg)
-    atlas = _glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
+    atlas = glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
     n, cell_h, cell_w = atlas.shape
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)
@@ -52,7 +45,7 @@ def ascii(
     ink = np.clip(ink_amount(luminance(cells), bg_color), 0.0, 1.0) ** gamma
     glyph = np.rint(ink * (n - 1)).astype(int)
 
-    coverage = atlas[glyph].transpose(0, 2, 1, 3).reshape(rows * cell_h, cols * cell_w, 1)
+    coverage = paint(glyph, atlas)[..., None]
     if fg is None:
         text = np.repeat(np.repeat(vivid(cells), cell_h, axis=0), cell_w, axis=1)
     else:
@@ -60,39 +53,3 @@ def ascii(
     base = bg_color * (1.0 - photo) + padded * photo
     out = base * (1.0 - coverage) + text * coverage
     return out[:height, :width].astype(np.float32)
-
-
-def cell_size(cell: int, font: str | None = None) -> tuple[int, int]:
-    """(width, height) in px of one character cell for `ascii(cell=cell, font=font)`.
-
-    Effects that move whole characters around (evaporate) use this to stay on the same grid as the ascii step.
-    """
-    ascent, descent = _load_font(cell, font).getmetrics()
-    return cell, ascent + descent
-
-
-@lru_cache(maxsize=16)
-def _glyph_atlas(chars: str, cell: int, font_path: str | None) -> np.ndarray:
-    """Render each distinct character once into a (cell_h, cell_w) coverage bitmap, ordered from least to most ink."""
-    glyph_font = _load_font(cell, font_path)
-    cell_w, cell_h = cell_size(cell, font_path)
-    bitmaps = []
-    for ch in dict.fromkeys(chars):  # unique, order kept
-        canvas = Image.new("L", (cell_w, cell_h), 0)
-        ImageDraw.Draw(canvas).text((cell_w / 2, cell_h / 2), ch, fill=255, font=glyph_font, anchor="mm")
-        bitmaps.append(np.asarray(canvas, dtype=np.float32) / 255.0)
-    if len(bitmaps) < 2:
-        raise ValueError("ascii needs at least two different characters in `chars`")
-    bitmaps.sort(key=lambda b: float(b.mean()))
-    return np.stack(bitmaps)
-
-
-@lru_cache(maxsize=16)
-def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
-    """A monospaced font sized so one character is `cell` px wide."""
-    path = font_path or next((p for p in _FONTS if Path(p).exists()), None)
-    if path is None:
-        return ImageFont.load_default(size=round(cell / 0.6))
-    reference = ImageFont.truetype(path, 100)
-    em_per_advance = 100.0 / reference.getlength("M")
-    return ImageFont.truetype(path, max(4, round(cell * em_per_advance)))
