@@ -166,8 +166,9 @@ def test_a_new_module_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
 # --- categories --------------------------------------------------------------------------------------------------
 
 
-def test_every_existing_effect_has_its_category():
-    assert {name: effects.category(name) for name in ALL} == {
+def test_the_original_effects_keep_their_categories():
+    """The 13 effects that existed before categories; effects added later are free to join any category."""
+    migrated = {
         "grade": "colour",
         "gradient_map": "colour",
         "split_tone": "colour",
@@ -182,6 +183,7 @@ def test_every_existing_effect_has_its_category():
         "evaporate": "animation",
         "disperse": "animation",
     }
+    assert {name: effects.category(name) for name in migrated} == migrated
 
 
 def test_the_categories_are_exactly_the_agreed_slugs_in_order():
@@ -193,11 +195,26 @@ def test_the_categories_are_exactly_the_agreed_slugs_in_order():
 
 def test_categories_maps_every_category_in_order_to_its_sorted_effects():
     grouped = effects.categories()
-    assert list(grouped) == list(effects.CATEGORIES)
-    assert grouped["colour"] == ["grade", "gradient_map", "hue_shift", "split_tone"]
-    assert grouped["animation"] == ["disperse", "evaporate"]
-    assert grouped["distortion"] == []  # no effect yet, but the category is listed
-    assert sorted(name for names in grouped.values() for name in names) == ALL
+    assert list(grouped) == list(effects.CATEGORIES)  # every category, even one with no effect yet
+    assert all(names == sorted(names) for names in grouped.values())
+    assert sorted(name for names in grouped.values() for name in names) == ALL  # each effect exactly once
+    colour = grouped["colour"]
+    assert {"grade", "gradient_map", "hue_shift", "split_tone"} <= set(colour)
+    assert colour.index("grade") < colour.index("gradient_map") < colour.index("hue_shift")  # sorted by name
+
+
+def test_categories_lists_a_category_with_no_effects_as_empty(throwaway_effects):
+    empty = next((c for c, names in effects.categories().items() if not names), None)
+    if empty is None:
+        pytest.skip("every category has an effect")
+    assert effects.categories()[empty] == []
+
+    @effect(category=empty)
+    def newcomer(rgb, amount: float = 0.5):
+        """The first effect of its category."""
+        return rgb
+
+    assert effects.categories()[empty] == ["newcomer"]
 
 
 def _probe(rgb, amount: float = 0.5):

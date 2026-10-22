@@ -29,7 +29,24 @@ def _unescaped_pipes(row: str) -> int:
 
 def test_the_effects_page_has_one_section_per_used_category_in_catalogue_order():
     headings = list(_sections(gallery.render_effects_page()))
-    assert headings == ["Colour", "Light", "Texture", "Stylised", "Text", "Glitch", "Subject", "Animation"]
+    used = {effects.category(name).capitalize() for name in effects.describe()}
+    assert set(headings) == used  # a category without effects gets no empty table
+    assert headings == [c.capitalize() for c in effects.CATEGORIES if c.capitalize() in used]
+    assert headings.index("Colour") < headings.index("Light") < headings.index("Animation")
+
+
+def test_a_category_appears_on_the_page_once_it_has_an_effect(throwaway_effects):
+    empty = next((c for c, names in effects.categories().items() if not names), None)
+    if empty is None:
+        pytest.skip("every category has an effect")
+    assert empty.capitalize() not in _sections(gallery.render_effects_page())
+
+    @effect(category=empty)
+    def newcomer(rgb, amount: float = 0.5):
+        """The first effect of its category."""
+        return rgb
+
+    assert "`newcomer`" in _sections(gallery.render_effects_page())[empty.capitalize()]
 
 
 def test_every_effect_is_listed_once_in_its_own_category_section():
