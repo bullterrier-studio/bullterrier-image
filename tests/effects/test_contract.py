@@ -2,10 +2,18 @@
 
 import importlib
 import inspect
+import json
+import os
+import shutil
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+import photo_fx
 from photo_fx import effects
 from photo_fx.effects._registry import effect
 
@@ -43,6 +51,70 @@ def test_unknown_effect_lists_choices(photo):
 def test_every_effect_can_run_on_the_image_alone(name):
     image, *params = inspect.signature(effects.get(name)).parameters.values()
     assert [p.name for p in params if p.default is inspect.Parameter.empty] == []
+
+
+# --- discovery ---------------------------------------------------------------------------------------------------
+
+_NEW_MODULES = {
+    "zz_probe.py": '''
+        from ._registry import effect
+
+        @effect(category="utilities")
+        def probe_effect(rgb, amount: float = 0.5):
+            """A brand-new effect in a brand-new module."""
+            return rgb
+    ''',
+    "_hidden.py": '''
+        from ._registry import effect
+
+        @effect(category="utilities")
+        def hidden_probe(rgb, amount: float = 0.5):
+            """Lives in a private module, which is not imported automatically."""
+            return rgb
+    ''',
+    "_order_log.py": "seen = []",
+    "b_order.py": "from . import _order_log\n_order_log.seen.append(__name__)",
+    "a_order.py": "from . import _order_log\n_order_log.seen.append(__name__)",
+}
+
+_REPORT = """
+    import contextlib, io, json, sys
+    import photo_fx
+    from photo_fx import effects, fx
+    from photo_fx.cli import main
+    from photo_fx.effects import _order_log
+    from photo_fx.recipe import Step
+
+    listing = io.StringIO()
+    with contextlib.redirect_stdout(listing):
+        main(["effects"])
+    json.dump({
+        "package": photo_fx.__file__,
+        "registered": sorted(effects.describe()),
+        "fx": fx.probe_effect(amount=0.2).effect,
+        "recipe_step": Step("probe_effect", {"amount": 0.2}).effect,
+        "cli_lists_it": "probe_effect" in listing.getvalue(),
+        "import_order": _order_log.seen,
+    }, sys.stdout)
+"""
+
+
+def test_a_new_module_in_the_effects_package_is_found_with_no_other_edit(tmp_path):
+    """On a copy of the package: drop modules into effects/ and nothing else, then look from a fresh interpreter."""
+    package = tmp_path / "photo_fx"
+    shutil.copytree(Path(photo_fx.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
+    for name, source in _NEW_MODULES.items():
+        (package / "effects" / name).write_text(textwrap.dedent(source))
+    environment = {**os.environ, "PYTHONPATH": str(tmp_path)}
+    done = subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(_REPORT)], env=environment, capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert Path(report["package"]).is_relative_to(tmp_path)  # it really looked at the copy
+    assert set(report["registered"]) == set(ALL) | {"probe_effect"}  # found; the private module's effect is not
+    assert report["fx"] == report["recipe_step"] == "probe_effect" and report["cli_lists_it"]
+    assert report["import_order"] == ["photo_fx.effects.a_order", "photo_fx.effects.b_order"]  # sorted, not as found
 
 
 # --- categories --------------------------------------------------------------------------------------------------
