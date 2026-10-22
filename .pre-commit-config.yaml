@@ -52,3 +52,10 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+      - id: vulture
+        name: vulture, dead code (reproduce with `uv run vulture`)
+        entry: uv run vulture
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

@@ -39,13 +39,14 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.17.1",
     "types-pyyaml>=6.0.12.20260906",
+    "vulture>=2.16",
 ]
 
 # One command for agents and humans: `uv run poe check` before every push, `uv run poe fix` when it complains.
 [tool.poe.tasks]
 test = { cmd = "pytest -q", help = "Run the test suite" }
 fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
-check = { sequence = ["ruff format --check .", "ruff check .", "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, types, tests); stops at the first failure" }
+check = { sequence = ["ruff format --check .", "ruff check .", "vulture", "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, dead code, types, tests); stops at the first failure" }
 # `default_install_hook_types` in .pre-commit-config.yaml names the three hook types, so a bare `install` covers them
 setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"], default_item_type = "cmd", help = "Install the git hooks and the commit-message template (once per clone)" }
 
@@ -142,6 +143,27 @@ ignore_missing_imports = true
 module = ["tests.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+# Dead code fails the gate (`uv run vulture`, in `poe check` and the pre-push hook). Only src is scanned: code that only
+# tests use is dead, unless a public `__all__` lists it. 60 % is vulture's lowest level: it reports unused functions,
+# classes and attributes, not just unreachable lines. Each exemption below is a name or decorator that a framework calls.
+[tool.vulture]
+paths = ["src"]
+min_confidence = 60
+ignore_decorators = [
+    "@effect",  # the registry finds an effect function through its decorator; recipes and `fx` call it by name
+    "@model_validator",  # pydantic runs validators when a model is built
+    "@field_validator",
+]
+ignore_names = [
+    "model_config",  # pydantic reads each model's settings from this class attribute
+    "__signature__",  # `inspect.signature` reads it (the documented way to give a callable a signature)
+    "__call__",  # Python calls it when a registered effect object is called
+    "__getattr__",  # module-level hooks (PEP 562): `fx.<effect>` and `dir(fx)`
+    "__dir__",
+    "writeable",  # numpy's array flag: setting it makes a shared, cached array read-only
+    "blend",  # `Step.blend`: public API (README, `fx`), called by users' scripts and never inside the package
+]
 
 # The layering rules of CLAUDE.md, checked by `uv run lint-imports` (tests/test_layering.py runs it, and proves each
 # contract fails on a forbidden import). Imports flow downward only. Wildcards keep the rules free of effect names, so
