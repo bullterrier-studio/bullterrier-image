@@ -266,8 +266,9 @@ one-line description, its parameters and defaults, and the example recipe that m
 Adding an effect adds three files and edits none:
 
 - `src/photo_fx/effects/<module>.py`: a pure function `def my_effect(rgb, ...) -> rgb` with the decorator
-  `@effect(category="...")`, every parameter with a default. Its docstring becomes its documentation. Any module in
-  [`src/photo_fx/effects/`](src/photo_fx/effects) is found automatically.
+  `@effect(category="...")` (from `photo_fx.core.registry`), every parameter with a default. Its docstring becomes its
+  documentation. Any module in [`src/photo_fx/effects/`](src/photo_fx/effects) is found automatically. Effects never
+  import each other: what two of them share goes to `src/photo_fx/ops/`.
 - `tests/effects/test_<module>.py`: tests of the property that defines it.
 - `examples/effects/<effect>.toml`: a short example recipe (size 480), which also makes its picture in the catalogue.
 
@@ -289,21 +290,22 @@ never block an export, and `--strict` turns them into a failing exit code:
 ## Project layout
 
 ```
-src/photo_fx/
-  imageio.py     file formats, EXIF and colour profiles, resizing, video; defines the one in-memory image type
-  matte.py       subject_matte(rgb) -> alpha. Which model finds the subject is hidden here
-  effects/       the effect library: pure functions (rgb, **params) -> rgb
-  fx.py          the effects as validated step builders for Python (+ generated fx.pyi)
-  timing.py      easing, `ramp` / `Animated`, `Animation`: values changing over a clip
-  steps.py       `Step` and `Recipe`: the data model of a look and its validation
-  loader.py      `load_recipe`: the TOML format
-  runner.py      render, render_frames, render_all, trace: running a recipe on a photo
-  recipe.py      the public namespace re-exporting the four above
-  pipeline.py    many photos x many recipes: cache, checks, export, report
-  checks.py      automatic quality checks
-  sheet.py       contact sheets and step sheets
-  gallery.py     what is generated from the effects: the catalogue page, its pictures, fx.pyi
-  cli.py         the `photo-fx` command (no logic of its own)
+src/photo_fx/                  layers, top to bottom; each imports only from the layers below it
+  cli.py         app       the `photo-fx` command (no logic of its own)
+  pipeline.py              many photos x many recipes: cache, checks, export, report
+  gallery.py               what is generated from the effects: the catalogue page, its pictures, fx.pyi
+  sheet.py                 contact sheets and step sheets
+  checks.py                automatic quality checks
+  fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
+  recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
+  imageio.py     adapters  file formats, EXIF and colour profiles, video; defines the one in-memory image type
+  matte.py                 subject_matte(rgb) -> alpha. Which model finds the subject is hidden here
+  effects/       effects   the effect library: pure functions (rgb, **params) -> rgb, found automatically
+  core/          core      registry.py (effects register here), types.py, vocabulary.py, and the recipe engine:
+                           timing.py (easing, `ramp`, `Animation`), steps.py (`Step`, `Recipe`), loader.py (TOML),
+                           runner.py (render, render_frames, render_all, trace; given the photo and the subject)
+  ops/           ops       shared numeric primitives named by concept: colorspace, color, resample, textart, glyphs,
+                           cells, distance, warp, voronoi... (core and ops are siblings: neither imports the other)
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect
 docs/            the effect catalogue (effects.md, generated) and its pictures, the roadmap and build order
@@ -312,7 +314,8 @@ tests/
 ```
 
 Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
-`matte` the only place that knows about Vision, and effects know nothing about files, mattes or recipes.
+`matte` the only place that knows about Vision, and effects know nothing about files, mattes or recipes. The layers are
+import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone).
 
 ## Development
 

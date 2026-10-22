@@ -21,7 +21,7 @@ every new effect would collide, (1) settle the shared contract and build the sha
 | `tests/test_effects.py` held the per-effect tests | One shared file. | One test file per module, `tests/effects/test_<module>.py`; the generic contract tests are in `tests/effects/test_contract.py` and apply to every effect automatically. |
 | Example pictures regenerated whenever any code changed | Binary merge conflicts. | One gallery picture per effect, `docs/gallery/<effect>.jpg`, rendered from its example recipe; only missing pictures are rendered unless forced. |
 | An effect declared nothing about itself | Docs, gallery and checks cannot be generated. | `@effect(category="...")`, one of the categories in `effects.CATEGORIES`; every parameter must have a default; the example recipe is found by name. All checked when the effect registers, or by a test. |
-| Parameter names were free-form | Independent authors drift: `strength`, `amount`, `intensity`. | `effects/_vocabulary.py` lists discouraged names and the name to use instead (`strength` -> `amount`, `rng` -> `seed`, ...); a contract test flags them. `glow(strength=)` became `glow(amount=)`. |
+| Parameter names were free-form | Independent authors drift: `strength`, `amount`, `intensity`. | `effects/_vocabulary.py` (now `core/vocabulary.py`) lists discouraged names and the name to use instead (`strength` -> `amount`, `rng` -> `seed`, ...); a contract test flags them. `glow(strength=)` became `glow(amount=)`. |
 
 **The one integration command** is `photo-fx regenerate`: it writes `src/photo_fx/fx.pyi` and `docs/effects.md` and
 renders any missing gallery pictures. Feature branches do not run it or commit those files; whoever merges runs it once
@@ -31,9 +31,10 @@ without the stub; rendering needs the subject cut-out, so macOS.)
 ## 1. The shared contract
 
 These change how recipes run, and all of them pass through the recipe modules. `recipe.py` (396 lines mixing easing, the
-step model, TOML loading and running) has been split (**done**) into `timing.py`, `steps.py`, `loader.py` and `runner.py`
-(`recipe.py` stays as the public namespace), so that each step below touches different files. **Do them one at a time.**
-`tests/test_module_graph.py` enforces which of these modules may import which.
+step model, TOML loading and running) has been split (**done**) into `timing`, `steps`, `loader` and `runner`, which now
+live in `src/photo_fx/core/` (**done**, M1; `photo_fx/recipe.py` stays as the public namespace and binds the default subject
+finder), so that each step below touches different files. **Do them one at a time.** The import-linter contracts in
+`pyproject.toml` (run by `tests/test_layering.py`) enforce which of these modules may import which, and the package's layers.
 
 1. **Inputs beyond the image.** Generalise today's `matte` into declared inputs injected by name: `matte`, then `edges`, `depth`, `saliency`, assets. One protocol; later effects only declare what they need.
 2. **Masks and blend modes on the step.** `blend = "multiply"`; masks beyond subject and background (luminance, highlights, shadows, edges, gradient), invertible and feathered. Effects stay unaware of both.

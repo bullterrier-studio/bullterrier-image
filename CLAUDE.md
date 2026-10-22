@@ -16,7 +16,10 @@ effects    one folder per effect                                      (may impor
 core | ops core: Params base, registry, recipe engine   ops: pure numeric primitives     (siblings; neither imports the other;
                                                                                          core/ops import nothing else from photo_fx)
 ```
-Imports flow **downward only**. `import-linter` enforces this in the test suite. If you want an import the rules forbid, the code is in the wrong layer: move it.
+Imports flow **downward only**. `import-linter` enforces this in the test suite (contracts in `pyproject.toml`, run by `tests/test_layering.py`; `uv run lint-imports`).
+If you want an import the rules forbid, the code is in the wrong layer: move it. One recorded exception: `core.runner` scales the photo with `ops.resample`.
+The app layer (`photo_fx/__init__`) imports `effects`, so importing any `photo_fx` module registers every effect; `core` never imports `effects`.
+The runner is given the subject (a `matte`, or a `find_subject` function); the public `photo_fx.recipe` binds `matte.subject_matte` as the default.
 
 ## The rules
 
@@ -103,7 +106,7 @@ The target above is being introduced in small steps; until a step lands, the old
 - [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
 - [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites (some still in review)
 - [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
-- [ ] M1: `core/` package (registry, params, steps, timing, loader, runner); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/`; import-linter contracts
+- [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/` (`color`, `resample`, `textart`); import-linter contracts
 - [ ] F1a: Pydantic params model pattern in `core/`; Step/Recipe/Animation as Pydantic models
 - [ ] F1b: each existing effect becomes a folder with params, tests and example (`ascii`, `texture`, `glitch`, `evaporate`, `disperse`, `color`)
 - [ ] T1b: lint rules, mypy and fixes
