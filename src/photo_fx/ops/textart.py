@@ -11,6 +11,15 @@ from photo_fx.ops.color import ink_amount, luminance, vivid
 from photo_fx.ops.glyphs import glyph_atlas, paint
 
 
+def check_palette(chars: str) -> str:
+    """`chars` unchanged if it can be a `text_art` palette: at least two distinct characters, so that brightness has
+    something to choose between. Raises ValueError naming the palette otherwise; parameter models use it to refuse a bad
+    palette when it is written, not when it is drawn."""
+    if len(set(chars)) < 2:
+        raise ValueError(f"a palette needs at least two different characters, got {chars!r}")
+    return chars
+
+
 def text_art(
     rgb: np.ndarray,
     *,

@@ -4,9 +4,10 @@ Expected pictures come from `ops.glyphs` (the glyph shapes) and from the colours
 """
 
 import numpy as np
+import pytest
 
 from photo_fx.ops.glyphs import cell_size, glyph_atlas
-from photo_fx.ops.textart import text_art
+from photo_fx.ops.textart import check_palette, text_art
 
 CHARS = " .:-=+*#%@"
 BLACK, WHITE = np.zeros(3, np.float32), np.ones(3, np.float32)
@@ -92,3 +93,14 @@ def test_sizes_off_the_character_grid_keep_their_shape_and_type():
     out = draw(odd)
     assert out.shape == odd.shape
     assert out.dtype == np.float32
+
+
+@pytest.mark.parametrize("chars", ["01", " @", "aab", " ░▒▓█"])
+def test_a_palette_of_two_or_more_distinct_characters_is_accepted_unchanged(chars):
+    assert check_palette(chars) == chars
+
+
+@pytest.mark.parametrize("chars", ["", "a", "aaaa", "  "])
+def test_a_palette_without_two_distinct_characters_is_refused_naming_it(chars):
+    with pytest.raises(ValueError, match="two different characters"):
+        check_palette(chars)
