@@ -7,8 +7,8 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 
 A **microkernel**: a small stable `core` (contracts, registry, recipe engine) and many **plugins** (effects) that register themselves and are found by
 **auto-discovery**. The engine is a **pipes-and-filters pipeline**: a recipe is an ordered list of steps, each step is a pure filter `image -> image`.
-Code is organised as **vertical slices**: everything about an effect lives together (today a module in `effects/` with its test and example recipe;
-F1b moves each into one folder). Shared numeric code lives in `ops/`, named by concept.
+Code is organised as **vertical slices**, one per effect. Today an effect is a module in `src/photo_fx/effects/`, its test in `tests/effects/` and its example
+recipe in `examples/effects/`; F1b moves each effect's files into one folder. Shared numeric code lives in `ops/`, named by concept.
 
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
