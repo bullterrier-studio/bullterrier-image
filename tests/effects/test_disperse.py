@@ -187,7 +187,9 @@ def _share_in_flight(frame: np.ndarray) -> float:
 
 
 @pytest.mark.parametrize("reach, goes", [(0.5, 0.5), (1.0, 1.0)])
-def test_disperse_spreads_the_pieces_over_the_clip_so_fewer_than_half_are_in_flight_at_once(reach, goes):
+def test_disperse_sweeping_across_keeps_fewer_than_half_of_the_pieces_in_flight_and_uses_the_whole_clip(reach, goes):
+    """With the order set by a side-to-side sweep alone. The share depends on the order: other mixes of `top`, `edge`
+    and `sweep` on a fragmented picture reach more than half, so this is not a promise for every setting."""
     img = _isolated_pieces()
     moments = np.linspace(0.0, 1.0, 51)
     frames = [
