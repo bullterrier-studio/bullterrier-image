@@ -1,7 +1,8 @@
 # CLAUDE.md: photo-fx
 
 Python library and CLI that styles photos with composable effects (ASCII, glitch, halftone, colour grades, particle animations). A look is a **recipe**
-(TOML or Python): an ordered list of effects. Read `README.md` for usage and `docs/effects-roadmap.md` for what is planned.
+(TOML or Python): an ordered list of effects. Read `README.md` for usage, `docs/design-decisions.md` for why it is built this way and
+`docs/effects-roadmap.md` for what is planned.
 
 ## Architecture in one paragraph
 
@@ -10,8 +11,7 @@ A **microkernel**: a small stable `core` (contracts, registry, recipe engine) an
 Code is organised as **vertical slices**, one per effect, held together by its name and a `tests/` tree that mirrors `src/`: its code is the package
 `src/photo_fx/effects/<name>/` (`effect.py`, `__init__.py`; code only), its tests `tests/effects/<name>/test_<name>.py`, its example recipe
 `examples/effects/<name>.toml` and its gallery picture `docs/gallery/<name>.jpg` (artifacts stay out of `src/`); `gallery.effect_files(name)` is the one
-place that knows these paths. TRANSITIONAL: effects not migrated yet are loose modules, tested in `tests/effects/test_<module>.py`. Shared numeric code lives
-in `ops/`, named by concept.
+place that knows these paths. Shared numeric code lives in `ops/`, named by concept.
 
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
@@ -35,6 +35,20 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
 8. **Errors:** callers catch `PhotoFxError` (`photo_fx.core.errors`, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
+
+## Standards
+
+- `src/` holds only code. Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
+- The public API is explicit: `photo_fx`, `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio`, each with `__all__`. Everything else is internal;
+  `photo_fx.core` and `photo_fx.ops` are not API.
+- No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.
+- The library raises `PhotoFxError` subclasses; the CLI catches them and never prints a traceback for a user's mistake.
+- The library never prints and never configures logging; only the CLI writes to the terminal.
+- Output files carry no EXIF or GPS data from the input.
+- Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
+- The gates (`uv run poe check`) are the review: reviewers check behaviour and the rules in this file, nothing else. A defect a review finds twice
+  becomes a gate.
+- Design decisions and their reasons are in `docs/design-decisions.md`; a new one goes there, not in this file.
 
 ## The effect contract
 
@@ -60,8 +74,8 @@ A Pydantic model per effect: a subclass of `EffectParams` (`photo_fx.core.params
 
 Names are the field's own terms (radius, sigma, amount, threshold, feather, falloff, gamma, gain, lift, exposure, contrast, saturation, hue, temperature, tint,
 angle, spacing, opacity, blend, octaves, persistence, lacunarity, seed), never `strength`, `intensity`, `factor`, `val`, `k`, nor the name of the unit. A misspelt
-or out-of-range value fails at construction or load, naming effect, field, constraint and value. TRANSITIONAL: effect modules not yet migrated still use the
-older keyword-argument style through a marked legacy path in the registry; F1b migrates them and deletes it.
+or out-of-range value fails at construction or load, naming effect, field, constraint and value. `@effect` requires `params=`: there is no other way
+to declare parameters.
 
 ## Adding an effect (the recipe)
 
@@ -132,20 +146,3 @@ Once per clone: `uv run poe setup` (installs the hooks and the commit template).
 - The `commit-msg` hook (`tools/check_commit_message.py`, limits in `[tool.commit-message]`) rejects a malformed message and says which rule failed. Merge, revert and fixup commits git writes itself pass unchanged.
 - **Never `--no-verify`, never skip, silence or loosen a hook** to get a commit through: fix the cause. If a rule is wrong, change it in `pyproject.toml` in its own commit and say why.
 - All Python tooling is configured in pyproject.toml (ruff, mypy, pytest, import-linter, poe, commit-message limits). Do not add ruff.toml, mypy.ini, setup.cfg, pytest.ini, .coveragerc or similar; a test fails if you do. The only other config files are .pre-commit-config.yaml (hook wiring only), .editorconfig and .gitmessage.
-
-## Migration status (delete this section when finished)
-
-The target above is being introduced in small steps; until a step lands, the old layout still holds. New code follows the target.
-
-- [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
-- [x] `ops/` primitives: glyphs, cells, distance (colorspace, noise, edges, warp, voronoi and sprites wait in git history
-  until an effect needs them: `git show 3b9b2ed:src/photo_fx/ops/<module>.py`)
-- [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
-- [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
-- [x] F1a: Pydantic params model pattern in `core/params.py` (`EffectParams`, `param`, `Color`); Step/Recipe/Animated/Animation as Pydantic models; `color.py` migrated
-- [x] F1b-0: one package per effect, found by discovery (and, TRANSITIONAL, loose modules); tests in `tests/effects/<name>/`, recipes and pictures by name
-  (`gallery.effect_files`); the colour effects as six packages; `photo-fx new-effect` from `effects/_template/`; the rule-4 tests
-- [ ] F1b: migrates `ascii`, `texture`, `glitch`, `evaporate`, `disperse` to packages with parameter models, and deletes the TRANSITIONAL legacy path and
-  loose-module discovery
-- [x] T1b: lint rules, mypy and fixes (ruff rule set and mypy in `pyproject.toml`, run by `poe check` and the pre-push hook)
-- [ ] CI workflow (macOS and Linux)

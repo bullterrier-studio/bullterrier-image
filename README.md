@@ -342,21 +342,23 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
                            ONNX Runtime, downloaded on first use) is hidden here
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `photo-fx new-effect` copies
-  core/          core      registry.py (effects register here), types.py, vocabulary.py, and the recipe engine:
-                           timing.py (easing, `ramp`, `Animation`), steps.py (`Step`, `Recipe`), loader.py (TOML),
-                           runner.py (render, render_frames, render_all, trace; given the photo and the subject)
+  core/          core      registry.py (effects register here), params.py (parameter models), errors.py, types.py,
+                           vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
+                           (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;
+                           given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: color, resample, textart, glyphs, cells,
                            distance (internal; core may import ops; ops imports nothing above it)
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect, <effect>.toml
-docs/            the effect catalogue (effects.md, generated) and its pictures (gallery/<effect>.jpg), roadmap, build order
+docs/            the effect catalogue (effects.md, generated) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
 recipes/         a larger set of experiments
 tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
 ```
 
 Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
 `matte` the only place that knows about Vision or the portable model, and effects know nothing about files, mattes or recipes. The layers are
-import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone).
+import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone). Why it is
+built this way, decision by decision: [docs/design-decisions.md](docs/design-decisions.md).
 
 ## Development
 
