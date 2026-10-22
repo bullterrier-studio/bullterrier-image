@@ -11,6 +11,7 @@ RGB `(h, w, 3)` in 0..1. Nothing here depends on the effects package.
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 
@@ -79,6 +80,7 @@ def scatter(
 _NEAR_BRIGHTNESS = (0.4, 0.6)  # brightness of a sprite = 0.4 + 0.6 * depth: far ones are dim but never invisible
 _MAX_PATCH_ELEMENTS = 2_000_000  # bounds the memory of one batch of sprites
 _ALMOST_ONE = 1.0 - 1e-7  # keeps log(1 - a) finite for a fully opaque sprite
+_PLACEMENT_FIELDS = ("x", "y", "size", "depth", "phase")
 
 
 def _add_terms(alpha: np.ndarray, color: np.ndarray) -> np.ndarray:
@@ -117,16 +119,43 @@ _BLENDS = {
 }
 
 
+def _checked(canvas, placement, color, opacity, shape, angle, length, blend):
+    """Validate `stamp`'s arguments; return the sprite fields x, y, size, depth and the colour as float64 arrays."""
+    canvas = np.asarray(canvas)
+    if canvas.ndim != 3 or canvas.shape[2] != 3:
+        raise ValueError(f"canvas must have shape (height, width, 3), got {canvas.shape}")
+    if blend not in _BLENDS:
+        raise ValueError(f"blend must be one of {sorted(_BLENDS)}, got {blend!r}")
+    if shape not in ("disc", "streak"):
+        raise ValueError(f"shape must be 'disc' or 'streak', got {shape!r}")
+    if not 0.0 <= opacity <= 1.0:  # also false for NaN
+        raise ValueError(f"opacity must be in 0..1, got {opacity}")
+    color_arr = np.asarray(color, dtype=np.float64)
+    if color_arr.shape != (3,) or not np.isfinite(color_arr).all():
+        raise ValueError(f"color must be three finite numbers (r, g, b), got {color}")
+    if not length >= 1.0:
+        raise ValueError(f"length must be >= 1, got {length}")
+    if not np.isfinite(angle):
+        raise ValueError(f"angle must be finite, got {angle}")
+    fields = [np.asarray(getattr(placement, name), dtype=np.float64) for name in _PLACEMENT_FIELDS]
+    if any(f.ndim != 1 or f.shape != fields[0].shape for f in fields):
+        raise ValueError("placement fields must be 1-D arrays of the same length")
+    x, y, size, depth, _ = fields
+    if not all(np.isfinite(f).all() for f in (x, y, size, depth)):
+        raise ValueError("placement has NaN or infinite values")
+    return x, y, size, depth, color_arr
+
+
 def stamp(
     canvas: np.ndarray,
     placement: Placement,
     *,
     color: tuple[float, float, float] = (1.0, 1.0, 1.0),
     opacity: float = 1.0,
-    shape: str = "disc",
+    shape: Literal["disc", "streak"] = "disc",
     angle: float = 0.0,
     length: float = 4.0,
-    blend: str = "screen",
+    blend: Literal["add", "screen", "over"] = "screen",
 ) -> np.ndarray:
     """Draw soft sprites on a picture and return the result as a new array; `canvas` is not modified.
 
@@ -146,17 +175,12 @@ def stamp(
     spread over roughly a pixel and so come out brighter than their area). Pixels no sprite touches are returned
     unchanged to the last bit; touched pixels are clipped to 0..1.
     """
-    n = len(placement.x)
+    x, y, size, depth, color_arr = _checked(canvas, placement, color, opacity, shape, angle, length, blend)
     out = np.array(canvas, dtype=np.float32, copy=True)
-    fields = {name: np.asarray(getattr(placement, name), dtype=np.float64) for name in ("x", "y", "size", "depth")}
-    if not all(np.isfinite(v).all() for v in fields.values()):
-        raise ValueError("placement has NaN or infinite values")
-    if n == 0:
+    if len(x) == 0:
         return out
 
     h, w = out.shape[:2]
-    x, y, size, depth = (fields[k] for k in ("x", "y", "size", "depth"))
-    color_arr = np.asarray(color, dtype=np.float64)
     terms, resolve = _BLENDS[blend]
 
     radius = size / 2.0
@@ -178,7 +202,8 @@ def stamp(
     acc = None
     # Sprites are batched by the whole-pixel width of their patch, so a patch is a small dense array and one numpy
     # expression evaluates the profile of every sprite in the batch.
-    patch_class = np.ceil(reach).astype(np.int64)
+    # (capped: a patch never needs more than the picture's size, and a huge float must not overflow the integer)
+    patch_class = np.ceil(np.minimum(reach, 1e9)).astype(np.int64)
     for cls in np.unique(patch_class[visible]):
         ids = np.flatnonzero(visible & (patch_class == cls))
         kx = int(min(np.ceil(cls * spread_x) + 1, w - 1))

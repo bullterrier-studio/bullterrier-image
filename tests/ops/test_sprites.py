@@ -1,9 +1,14 @@
+import time
+
 import numpy as np
 import pytest
 
 from photo_fx.ops.sprites import Placement, scatter, stamp
 
 FIELDS = ("x", "y", "size", "depth", "phase")
+
+# numpy reports overflow, invalid casts and divisions as warnings; none may happen, whatever the input
+pytestmark = pytest.mark.filterwarnings("error")
 
 
 # ---------------------------------------------------------------- scatter
@@ -274,6 +279,12 @@ def test_a_sprite_much_larger_than_the_picture_covers_all_of_it_without_blowing_
     np.testing.assert_allclose(off_centre, 0.5, atol=1e-6)  # centred far outside, yet its body still covers the picture
 
 
+def test_astronomically_large_sprites_and_streaks_still_just_cover_the_picture():
+    for shape in ("disc", "streak"):
+        out = stamp(black(20, 30), sprite(10.0, 5.0, size=1e30), color=(0.5, 0.5, 0.5), shape=shape, blend="add")
+        np.testing.assert_allclose(out, 0.5, atol=1e-6)
+
+
 def test_stamp_copes_with_tiny_pictures():
     out = stamp(black(1, 1), sprite(0.5, 0.5, size=4), blend="add")
     assert out.shape == (1, 1, 3) and out[0, 0, 0] > 0.99
@@ -351,3 +362,71 @@ def test_streaks_are_clipped_at_the_edges_like_discs():
     out = stamp(black(), many([0.0, 101.0], [50.5, 50.5], size=8), shape="streak", angle=0.0, length=6.0, blend="add")
     assert out[50, 0, 0] > 0.9 and out[50, 100, 0] > 0.9
     assert np.all(out[:, 40:60] == 0)  # nothing wrapped to the middle
+
+
+# ---------------------------------------------------------------- arguments and speed
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "name"),
+    [
+        ({"blend": "multiply"}, "blend"),
+        ({"shape": "star"}, "shape"),
+        ({"opacity": -0.1}, "opacity"),
+        ({"opacity": 1.5}, "opacity"),
+        ({"opacity": float("nan")}, "opacity"),
+        ({"color": (1.0, 1.0)}, "color"),
+        ({"color": (1.0, float("nan"), 1.0)}, "color"),
+        ({"shape": "streak", "length": 0.5}, "length"),
+        ({"shape": "streak", "angle": float("inf")}, "angle"),
+    ],
+)
+def test_stamp_rejects_invalid_arguments_naming_them(kwargs, name):
+    with pytest.raises(ValueError, match=name):
+        stamp(black(), sprite(CENTRE, CENTRE), **kwargs)
+
+
+@pytest.mark.parametrize("canvas", [np.zeros((10, 10)), np.zeros((10, 10, 4)), np.zeros((10, 10, 3, 1)), np.zeros(3)])
+def test_stamp_rejects_a_canvas_that_is_not_hw3_naming_it(canvas):
+    with pytest.raises(ValueError, match="canvas"):
+        stamp(canvas, sprite(5.0, 5.0))
+
+
+def test_stamp_rejects_a_placement_whose_fields_differ_in_length_or_are_not_1d():
+    good = sprite(5.0, 5.0)
+    with pytest.raises(ValueError, match="placement"):
+        stamp(black(), Placement(good.x, np.zeros(2, np.float32), good.size, good.depth, good.phase))
+    with pytest.raises(ValueError, match="placement"):
+        stamp(black(), Placement(good.x[None], good.y[None], good.size[None], good.depth[None], good.phase[None]))
+
+
+def test_invalid_blend_is_rejected_even_when_there_is_nothing_to_draw():
+    with pytest.raises(ValueError, match="blend"):
+        stamp(black(), scatter((10, 10), 0, seed=0), blend="nope")
+
+
+def test_batches_of_large_sprites_equal_drawing_each_alone():
+    # 30 sprites of ~300 px on a 400x400 picture need many internal batches; the result must not depend on batching
+    p = scatter((400, 400), 30, seed=5, size=(200.0, 320.0), depth_layers=2)
+    zero = np.zeros((400, 400, 3), np.float32)
+    together = stamp(zero, p, blend="add", opacity=0.03)
+    one_by_one = sum(
+        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.03)
+        for i in range(30)
+    )
+    assert together.max() < 1.0
+    np.testing.assert_allclose(together, one_by_one, atol=1e-5)
+
+
+def test_five_thousand_sprites_on_a_1600_square_picture_take_well_under_two_seconds():
+    canvas = np.zeros((1600, 1600, 3), np.float32)
+    placement = scatter((1600, 1600), 5000, seed=1)
+    best = min(_timed(lambda: stamp(canvas, placement)) for _ in range(3))
+    assert best < 1.5, f"{best:.2f} s"
+    assert stamp(canvas, placement).max() > 0.5  # it really drew them
+
+
+def _timed(fn) -> float:
+    start = time.perf_counter()
+    fn()
+    return time.perf_counter() - start
