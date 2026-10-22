@@ -40,6 +40,7 @@ def test_a_file_that_is_not_utf8_names_the_file(tmp_path):
         ("my look.toml", "my-look"),
         ("  --Holiday  (2024)!!.toml", "Holiday-2024"),
         ("v1.2 final.toml", "v1.2-final"),
+        ("rock - roll.toml", "rock-roll"),  # the `-` already there joins the two replaced spaces: one `-`
         ("café au lait.toml", "caf-au-lait"),
         ("_draft_.toml", "draft_"),
         ("plain.toml", "plain"),
