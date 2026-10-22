@@ -194,8 +194,16 @@ def apply(name: str, rgb: np.ndarray, **params: Any) -> np.ndarray:
 
 
 def describe() -> dict[str, str]:
-    """Effect name -> its documentation (the docstring, then a "Parameters" section from its model), sorted by name."""
-    return {name: _documentation(entry) for name, entry in sorted(_EFFECTS.items())}
+    """Effect name -> its documentation (see `documentation`), sorted by name."""
+    return {name: documentation(name) for name in sorted(_EFFECTS)}
+
+
+def documentation(name: str) -> str:
+    """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every field's
+    type, unit, range, default and description (none for a TRANSITIONAL legacy effect). KeyError like `get`."""
+    entry = _entry(name)
+    doc = inspect.cleandoc(entry.function.__doc__ or "")
+    return doc if entry.model is None else f"{doc}\n\n{entry.model.documentation()}"
 
 
 def summary(name: str) -> str:
@@ -210,11 +218,6 @@ def _entry(name: str) -> _Entry:
         return _EFFECTS[name]
     except KeyError:
         raise KeyError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
-
-
-def _documentation(entry: _Entry) -> str:
-    doc = inspect.cleandoc(entry.function.__doc__ or "")
-    return doc if entry.model is None else f"{doc}\n\n{entry.model.documentation()}"
 
 
 def _register(fn: Any, category: str | None, params: Any) -> Any:

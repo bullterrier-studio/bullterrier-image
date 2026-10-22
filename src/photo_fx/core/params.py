@@ -120,6 +120,13 @@ class FieldDoc(NamedTuple):
     default: Any
     doc: str
 
+    @property
+    def range(self) -> str:
+        """The documented range in words, e.g. "0 to 500"; empty for a field that is not a number."""
+        if self.minimum is None or self.maximum is None:
+            return ""
+        return f"{_number(self.minimum)} to {_number(self.maximum)}"
+
 
 class EffectParams(BaseModel):
     """Base class of every effect's parameter model: subclass it and declare each field with `param`."""
@@ -192,8 +199,8 @@ class EffectParams(BaseModel):
             parts = [doc.type]
             if doc.unit:
                 parts.append(doc.unit)
-            if doc.minimum is not None and doc.maximum is not None:
-                parts.append(f"{_number(doc.minimum)} to {_number(doc.maximum)}")
+            if doc.range:
+                parts.append(doc.range)
             parts.append(f"default {doc.default!r}")
             description = textwrap.fill(" ".join(doc.doc.split()), 88, initial_indent="    ", subsequent_indent="    ")
             entries.append(f"{doc.name} : {', '.join(parts)}\n{description}")

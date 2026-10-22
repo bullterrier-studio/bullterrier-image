@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -18,6 +19,7 @@ from PIL import Image, JpegImagePlugin
 
 import photo_fx
 from photo_fx import effects, fx, gallery, imageio
+from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 
 
@@ -74,6 +76,32 @@ def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_regi
     assert "matte" not in row
     assert "[row_probe.toml](../examples/effects/row_probe.toml)" in row
     assert _unescaped_pipes(row) == 6  # five columns
+
+
+class HaloParams(EffectParams):
+    """The halo probe's settings."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, doc="Width of the halo | in px. Larger = softer.")
+    mode: Literal["screen", "add"] = param("screen", doc="How the halo meets the picture: 'screen' or 'add'.")
+
+
+def test_a_modelled_effect_gets_a_table_of_its_parameters(fresh_registry):
+    @effect(category="light", params=HaloParams)
+    def halo_probe(rgb, params):
+        """Puts a halo around the bright parts."""
+        return rgb
+
+    page = gallery.render_effects_page()
+    section = _sections(page)["Light"]
+    assert "`radius=24.0` `mode='screen'`" in _row(page, "halo_probe")  # the short form in the effect's row
+    table = section[section.index("### `halo_probe`") :]
+    lines = [line for line in table.splitlines() if line.startswith("|")]
+    assert lines[0] == "| Parameter | Type | Unit | Range | Default | Description |"
+    assert lines[2] == "| `radius` | number | px | 0 to 500 | `24.0` | Width of the halo \\| in px. Larger = softer. |"
+    assert (
+        lines[3]
+        == "| `mode` | one of 'screen', 'add' |  |  | `'screen'` | How the halo meets the picture: 'screen' or 'add'. |"
+    )
 
 
 def test_effects_page_escapes_table_breaking_characters(throwaway_effects):

@@ -226,8 +226,8 @@ def _print_paths(paths: list[Path]) -> int:
 
 
 def _effects(args: argparse.Namespace) -> int:
-    for name, doc in effects.describe().items():
-        print(f"{name}\n{textwrap.indent(textwrap.fill(' '.join(doc.split()), 96), '    ')}\n")
+    for name, doc in effects.describe().items():  # line by line, so the parameter list stays a list
+        print(f"{name}\n{textwrap.indent(doc, '    ')}\n")
     return 0
 
 

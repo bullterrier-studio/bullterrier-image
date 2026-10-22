@@ -5,6 +5,8 @@ from PIL import GifImagePlugin, Image
 
 from photo_fx import effects, imageio
 from photo_fx.cli import main
+from photo_fx.core.params import EffectParams, param
+from photo_fx.core.registry import effect
 
 
 @pytest.fixture
@@ -21,6 +23,26 @@ def test_effects_lists_every_effect(capsys):
     assert main(["effects"]) == 0
     listed = {line for line in capsys.readouterr().out.splitlines() if line and not line.startswith(" ")}
     assert listed == set(effects.describe())  # one unindented heading per effect, its documentation indented below
+
+
+class WickParams(EffectParams):
+    """The wick probe's settings."""
+
+    length: float = param(2.0, unit="px", min=0, max=9, doc="Length of the candle wick, a rather distinctive phrase.")
+
+
+def test_effects_prints_every_parameter_of_a_modelled_effect(capsys, throwaway_effects):
+    @effect(category="light", params=WickParams)
+    def wick_probe(rgb, params):
+        """Lights a candle."""
+        return rgb
+
+    assert main(["effects"]) == 0
+    out = capsys.readouterr().out
+    entry = out[out.index("wick_probe\n") :]
+    assert "    Lights a candle." in entry
+    assert "    length : number, px, 0 to 9, default 2.0" in entry
+    assert "Length of the candle wick, a rather distinctive phrase." in entry
 
 
 def test_render_writes_one_file_per_recipe_in_a_folder(files):

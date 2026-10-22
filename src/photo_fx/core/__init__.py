@@ -26,6 +26,7 @@ from .registry import (
     categories,
     category,
     describe,
+    documentation,
     effect,
     get,
     inputs,
@@ -42,6 +43,6 @@ from .vocabulary import DISCOURAGED
 __all__ = [
     "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "Color", "Effect", "EffectParams",
     "ModelledEffect", "Recipe", "Stage", "Step", "SubjectFinder", "all_effects", "apply", "categories", "category",
-    "describe", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render", "render_all",
-    "render_frames", "schema", "summary", "trace", "unregister",
+    "describe", "documentation", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render",
+    "render_all", "render_frames", "schema", "summary", "trace", "unregister",
 ]  # fmt: skip

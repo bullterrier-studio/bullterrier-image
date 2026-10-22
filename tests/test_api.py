@@ -1,12 +1,16 @@
 import ast
 import inspect
 import json
+import pydoc
+from typing import Literal
 
 import numpy as np
 import pytest
 
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
+from photo_fx.core.params import Color, EffectParams, param
+from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
 
 # --- steps are checked when they are made, wherever they come from ------------------------------------------------
@@ -84,6 +88,70 @@ def test_every_effect_is_available_as_a_step_builder():
 
     for name in effects.describe():
         assert getattr(fx, name)().effect == name
+
+
+class LanternParams(EffectParams):
+    """The lantern probe's settings."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, doc="Glow radius of the paper lantern, quite distinctive.")
+    style: Literal["paper", "silk"] = param("paper", doc="Shade: 'paper' is matte, 'silk' shines like a moth wing.")
+    tint: Color = param("#ffaa00", doc="Lantern tint, the colour of candle light through rice paper.")
+
+
+@pytest.fixture
+def lantern(throwaway_effects):
+    def lantern_probe(rgb: np.ndarray, params: LanternParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+        """Hangs a lantern over the picture. Then more words."""
+        return rgb
+
+    return effect(category="light", params=LanternParams)(lantern_probe)
+
+
+def test_help_on_a_modelled_effects_builder_shows_every_parameters_description(lantern):
+    text = pydoc.plain(pydoc.render_doc(fx.lantern_probe))  # what help() prints, without the bold overstrikes
+    assert "Hangs a lantern over the picture." in text
+    for description in (
+        "Glow radius of the paper lantern, quite distinctive.",
+        "Shade: 'paper' is matte, 'silk' shines like a moth wing.",
+        "Lantern tint, the colour of candle light through rice paper.",
+    ):
+        assert description in " ".join(text.split()), description  # help() may wrap long lines
+
+
+def test_a_modelled_effects_builder_has_the_models_signature(lantern):
+    signature = inspect.signature(fx.lantern_probe)
+    assert list(signature.parameters) == ["radius", "style", "tint"]  # no image, no matte
+    assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00"]
+    assert "tint: str | list[float] | tuple[float, float, float]" in str(signature)
+
+
+def test_a_modelled_effects_builder_takes_positional_and_keyword_values(lantern):
+    assert fx.lantern_probe(30, style="silk") == Step("lantern_probe", {"radius": 30, "style": "silk"})
+    assert fx.lantern_probe() == Step("lantern_probe")
+    with pytest.raises(TypeError, match="at most 3"):
+        fx.lantern_probe(1, "silk", "#000", 4)
+    with pytest.raises(TypeError, match="radius"):
+        fx.lantern_probe(30, radius=31)
+
+
+def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lantern):
+    with pytest.raises(ValueError, match=r"lantern_probe.*`raduis`.*radius, style, tint"):
+        fx.lantern_probe(raduis=3)
+    with pytest.raises(ValueError, match=r"lantern_probe.*`radius`.*>= 0.*-1"):
+        fx.lantern_probe(radius=-1)
+    with pytest.raises(ValueError, match=r"`tint`.*'#zz0000'"):
+        fx.lantern_probe(tint="#zz0000")
+
+
+def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lantern):
+    tree = ast.parse(fx.stub_text())
+    (function,) = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "lantern_probe"]
+    assert [a.arg for a in function.args.args] == ["radius", "style", "tint"]
+    assert ast.unparse(function.args.args[1].annotation) == "Literal['paper', 'silk']"  # type: ignore[arg-type]
+    doc = ast.get_docstring(function)
+    assert doc is not None
+    assert "Glow radius of the paper lantern, quite distinctive." in doc
+    assert "pydantic" not in fx.stub_text()
 
 
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(throwaway_effects):
