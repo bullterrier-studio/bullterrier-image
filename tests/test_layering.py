@@ -3,7 +3,7 @@ import sees. Each layer may import only the layers below it:
 
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte
-    effects    one folder per effect (TRANSITIONAL: or a loose module); never import each other
+    effects    one folder per effect; never import each other
     core       loader | runner > steps > registry > params | timing | vocabulary > types; may import ops
     ops        imports nothing from photo_fx outside ops
 
@@ -123,11 +123,11 @@ def test_core_may_import_ops(tmp_path):
 
 def _effects_declared_in_the_source() -> set[str]:
     """Names of the functions decorated with `effect(...)` in the effect modules that discovery imports (the
-    `effect.py` of every folder of `effects/`, and every TRANSITIONAL loose module, not starting with `_`), read from
+    `effect.py` of every folder of `effects/` not starting with `_`), read from
     the source with `ast`: an oracle independent of the registry."""
     names = set()
     effects = PACKAGE / "effects"
-    for path in sorted([*effects.glob("*.py"), *effects.glob("*/effect.py")]):
+    for path in sorted(effects.glob("*/effect.py")):
         if path.relative_to(effects).parts[0].startswith("_"):
             continue
         for node in ast.walk(ast.parse(path.read_text())):

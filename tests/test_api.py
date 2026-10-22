@@ -9,6 +9,7 @@ import pytest
 
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
+from photo_fx.core import registry
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
@@ -154,28 +155,31 @@ def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lante
     assert "pydantic" not in fx.stub_text()
 
 
-def test_the_editor_stub_is_valid_python_with_one_function_per_effect(throwaway_effects):
+def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
     """fx.pyi itself is regenerated at integration (`photo-fx regenerate`), so only its generator is checked here."""
-    from photo_fx import effects
-    from photo_fx.core.registry import effect
-
-    @effect(category="utilities")
-    def stub_probe(rgb, radius: float = 2.0, amount: float = 0.5, matte=None):
-        """Probe for the stub."""
-        return rgb
-
     tree = ast.parse(fx.stub_text())
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
-    assert sorted(functions) == sorted(effects.describe())  # one per effect, no more, no less
-    assert [a.arg for a in functions["stub_probe"].args.args] == ["radius", "amount"]  # no image, no matte
-    assert ast.get_docstring(functions["stub_probe"]) == "Probe for the stub."
+    assert "lantern_probe" in functions
+    assert sorted(functions) == sorted(registry.describe())  # one per effect, no more, no less
+
+
+class OldParams(EffectParams):
+    """The first version's settings."""
+
+    old: float = param(1.0, unit="ratio", min=0, max=2, doc="Unused.")
+
+
+class NewParams(EffectParams):
+    """The second version's settings."""
+
+    new: float = param(1.0, unit="ratio", min=0, max=2, doc="Unused.")
 
 
 def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
     from photo_fx.core.registry import effect, unregister
 
-    @effect(category="utilities")
-    def renamed_probe(rgb, old: float = 1.0):
+    @effect(category="utilities", params=OldParams)
+    def renamed_probe(rgb, params):
         """First version."""
         return rgb
 
@@ -183,8 +187,8 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
     unregister("renamed_probe")
 
     # a different effect under the same name, on purpose (mypy reports a redefinition at the decorator)
-    @effect(category="utilities")  # type: ignore[no-redef]  # the point of the test
-    def renamed_probe(rgb, new: float = 1.0):  # noqa: F811  (the point of the test)
+    @effect(category="utilities", params=NewParams)  # type: ignore[no-redef]  # the point of the test
+    def renamed_probe(rgb, params):  # noqa: F811  (the point of the test)
         """Second version."""
         return rgb
 

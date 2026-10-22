@@ -19,8 +19,14 @@ from PIL import Image, JpegImagePlugin
 
 import photo_fx
 from photo_fx import effects, fx, gallery, imageio
-from photo_fx.core.params import EffectParams, param
+from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+
+
+class AmountParams(EffectParams):
+    """The one parameter of a probe effect."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of the picture a probe keeps.")
 
 
 def _sections(page: str) -> dict[str, str]:
@@ -61,16 +67,24 @@ def test_every_real_effect_is_listed_once_in_its_own_category_section():
         assert homes == [effects.category(name).capitalize()], name
 
 
+class RowParams(EffectParams):
+    """The row probe's settings."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, doc="Unused.")
+    chars: str = param(" .:", doc="Unused.")
+    ink: Color | None = param(None, doc="Unused.")
+
+
 def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_registry):
-    @effect(category="light")
-    def row_probe(rgb, radius: float = 24.0, chars: str = " .:", fg: str | None = None, matte=None):
+    @effect(category="light", params=RowParams)
+    def row_probe(rgb, params, *, matte=None):
         """Softly probes the bright parts. Then says more."""
         return rgb
 
     row = _row(gallery.render_effects_page(), "row_probe")
     assert 'src="gallery/row_probe.jpg"' in row
     assert "| Softly probes the bright parts. |" in row  # the first sentence only
-    assert "`radius=24.0` `chars=' .:'` `fg=None`" in row  # what a recipe sets, in order, with defaults
+    assert "`radius=24.0` `chars=' .:'` `ink=None`" in row  # what a recipe sets, in order, with defaults
     # the recipe supplies the image and the cut-out itself
     assert "rgb" not in row
     assert "matte" not in row
@@ -104,9 +118,16 @@ def test_a_modelled_effect_gets_a_table_of_its_parameters(fresh_registry):
     )
 
 
+class PipeParams(EffectParams):
+    """The pipe probe's settings."""
+
+    chars: str = param("a|b", doc="Unused.")
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused.")
+
+
 def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
-    @effect(category="utilities")
-    def pipe_probe(rgb, chars: str = "a|b", amount: float = 0.5):
+    @effect(category="utilities", params=PipeParams)
+    def pipe_probe(rgb, params):
         """Draws a | b
         across two lines. More."""
         return rgb
@@ -143,10 +164,10 @@ def probe(checkout, throwaway_effects):
     """A throwaway effect with an example recipe of its own in the scratch checkout. It needs no cut-out, so it
     renders anywhere. Its recipe renders at 300 px, to show the gallery picture is 480 px whatever the recipe says."""
 
-    @effect(category="utilities")
-    def gallery_probe(rgb, amount: float = 0.5):
+    @effect(category="utilities", params=AmountParams)
+    def gallery_probe(rgb, params):
         """Darkens the picture."""
-        return (rgb * amount).astype(np.float32)
+        return (rgb * params.amount).astype(np.float32)
 
     (checkout / "examples" / "effects" / "gallery_probe.toml").write_text(
         'name = "gallery_probe"\nsize = 300\n[[step]]\neffect = "gallery_probe"\n'
@@ -231,8 +252,8 @@ def test_gallery_rejects_an_unknown_effect_before_rendering(checkout, probe):
 
 
 def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(checkout, probe):
-    @effect(category="utilities")
-    def recipe_less(rgb, amount: float = 0.5):
+    @effect(category="utilities", params=AmountParams)
+    def recipe_less(rgb, params):
         """Has no example recipe."""
         return rgb
 

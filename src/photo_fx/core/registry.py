@@ -7,8 +7,7 @@ effect registers, so a broken effect fails at import, naming itself, instead of 
 
 An effect is written `def glow(rgb, params: GlowParams, *, matte=None) -> rgb` and registered with its parameter model
 (see `photo_fx.core.params`); the decorator returns a `ModelledEffect`, which validates its values through the model
-whichever way it is called. TRANSITIONAL: an effect written in the older style, `fn(rgb, **params)` with every parameter
-defaulted and no model, still registers (`@effect(category=...)`) until every effect module has been migrated.
+whichever way it is called.
 """
 
 import functools
@@ -16,14 +15,12 @@ import inspect
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any
 
 import numpy as np
 
-from .errors import RecipeError, UnknownEffectError
+from .errors import UnknownEffectError
 from .params import EffectParams
-
-Effect = Callable[..., np.ndarray]
 
 # The sections of the effect catalogue (docs/effects.md is laid out in this order). Every effect is in exactly one.
 CATEGORIES = (
@@ -51,6 +48,7 @@ class ModelledEffect[P: EffectParams]:
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
+    __qualname__: str  # copied too: with the module, where the effect was defined
     params_model: type[P]  # the effect's parameter model
     category: str  # its section of the catalogue, one of `CATEGORIES`
     inputs: tuple[str, ...]  # the injected inputs it declares, from `INPUTS`
@@ -92,39 +90,28 @@ class ModelledEffect[P: EffectParams]:
 
 @dataclass(frozen=True)
 class _Entry:
-    function: Effect  # what callers run: a ModelledEffect, or a TRANSITIONAL legacy function itself
+    function: ModelledEffect  # what callers run
     category: str
-    model: type[EffectParams] | None  # None only for a TRANSITIONAL legacy effect
+    model: type[EffectParams]
     inputs: tuple[str, ...]
 
 
 _EFFECTS: dict[str, _Entry] = {}
 
 
-@overload
-def effect[F: Effect](fn: F, *, category: str | None = None) -> F: ...
-@overload
-def effect[F: Effect](fn: None = None, *, category: str | None = None, params: None = None) -> Callable[[F], F]: ...
-@overload
 def effect[P: EffectParams](
-    fn: None = None, *, category: str | None = None, params: type[P]
-) -> Callable[[Callable[[np.ndarray, P], np.ndarray]], ModelledEffect[P]]: ...
-def effect(fn: Any = None, *, category: str | None = None, params: Any = None) -> Any:
+    *, category: str, params: type[P]
+) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
     """Decorator: `@effect(category="light", params=GlowParams)` makes `glow(rgb, params, *, matte=None) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
     as its second argument. Keyword-only parameters after it are injected inputs, each named in `INPUTS` and defaulted.
-    Raises `ValueError`, and registers nothing, when the category is missing or unknown, `params` is not an
-    `EffectParams` subclass, the function has another shape, an input is unknown, a field is named like an input, or a
-    different function already has the same name. Registering the same function again, as reloading its module does,
-    replaces the old one; registering a `ModelledEffect` again keeps that very object.
-
-    TRANSITIONAL: without `params`, `fn(rgb, **params)` registers in the older style and is returned unchanged; every
-    parameter after the image needs a default and none may collect arbitrary arguments.
+    Raises `ValueError`, and registers nothing, when the category is unknown, `params` is not an `EffectParams`
+    subclass, the function has another shape, an input is unknown, a field is named like an input, or a different
+    function already has the same name. Registering the same function again, as reloading its module does, replaces
+    the old one; registering a `ModelledEffect` again keeps that very object.
     """
-    if fn is not None:  # used bare, as `@effect`: there is no category, so this raises and says how to give one
-        return _register(fn, category, None)
     return lambda fn: _register(fn, category, params)
 
 
@@ -135,12 +122,12 @@ def unregister(name: str) -> None:
     del _EFFECTS[name]
 
 
-def get(name: str) -> Effect:
+def get(name: str) -> ModelledEffect:
     """The effect called `name`; UnknownEffectError (a KeyError) listing the available ones if there is none."""
     return _entry(name).function
 
 
-def all_effects() -> dict[str, Effect]:
+def all_effects() -> dict[str, ModelledEffect]:
     """Every registered effect by name (a copy)."""
     return {name: entry.function for name, entry in _EFFECTS.items()}
 
@@ -155,16 +142,14 @@ def categories() -> dict[str, list[str]]:
     return {c: sorted(name for name, entry in _EFFECTS.items() if entry.category == c) for c in CATEGORIES}
 
 
-def parameters(name: str) -> type[EffectParams] | None:
-    """The parameter model of the effect called `name` (KeyError like `get`); None only for a TRANSITIONAL legacy
-    effect, which has none yet."""
+def parameters(name: str) -> type[EffectParams]:
+    """The parameter model of the effect called `name` (KeyError like `get`)."""
     return _entry(name).model
 
 
-def schema(name: str) -> dict[str, Any] | None:
-    """The JSON schema of the effect's parameter model, with a `unit` on every property (None like `parameters`)."""
-    model = parameters(name)
-    return None if model is None else model.json_schema()
+def schema(name: str) -> dict[str, Any]:
+    """The JSON schema of the effect's parameter model, with a `unit` on every property (KeyError like `get`)."""
+    return parameters(name).json_schema()
 
 
 def inputs(name: str) -> tuple[str, ...]:
@@ -172,18 +157,10 @@ def inputs(name: str) -> tuple[str, ...]:
     return _entry(name).inputs
 
 
-def validate(name: str, values: Mapping[str, object]) -> EffectParams | None:
+def validate(name: str, values: Mapping[str, object]) -> EffectParams:
     """Check `values` (parameter name -> value) for the effect called `name`: its model, or RecipeError naming the
-    effect, each field, the constraint and the value. TRANSITIONAL: for a legacy effect only the names are checked
-    against its signature, and the result is None."""
-    entry = _entry(name)
-    if isinstance(entry.function, ModelledEffect):
-        return entry.function.validate(values)
-    try:  # TRANSITIONAL: the legacy check, by binding the names to the function's signature
-        inspect.signature(entry.function).bind(None, **values)
-    except TypeError as error:
-        raise RecipeError(f"effect {name!r}: {error}") from None
-    return None
+    effect, each field, the constraint and the value."""
+    return _entry(name).function.validate(values)
 
 
 def apply(name: str, rgb: np.ndarray, **params: Any) -> np.ndarray:
@@ -199,10 +176,9 @@ def describe() -> dict[str, str]:
 
 def documentation(name: str) -> str:
     """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every field's
-    type, unit, range, default and description (none for a TRANSITIONAL legacy effect). KeyError like `get`."""
+    type, unit, range, default and description. KeyError like `get`."""
     entry = _entry(name)
-    doc = inspect.cleandoc(entry.function.__doc__ or "")
-    return doc if entry.model is None else f"{doc}\n\n{entry.model.documentation()}"
+    return f"{inspect.cleandoc(entry.function.__doc__ or '')}\n\n{entry.model.documentation()}"
 
 
 def summary(name: str) -> str:
@@ -219,20 +195,20 @@ def _entry(name: str) -> _Entry:
         raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
 
 
-def _register(fn: Any, category: str | None, params: Any) -> Any:
+def _register(fn: Any, category: str, params: Any) -> ModelledEffect:
     name = fn.__name__
     if category not in CATEGORIES:
-        given = "has no category" if category is None else f"has the unknown category {category!r}"
-        raise ValueError(f"effect {name!r} {given}: write @effect(category=...) with one of: {', '.join(CATEGORIES)}")
+        raise ValueError(
+            f"effect {name!r} has the unknown category {category!r}: write @effect(category=...) with one of: "
+            f"{', '.join(CATEGORIES)}"
+        )
     if isinstance(fn, ModelledEffect):  # registered again (a module reloaded, a test restoring the registry)
-        if params is not None and params is not fn.params_model:
-            raise ValueError(f"effect {name!r} has the model {fn.params_model.__name__}, not {params.__name__}")
+        if params is not fn.params_model:
+            raise ValueError(
+                f"effect {name!r} has the model {fn.params_model.__name__}, not {getattr(params, '__name__', params)}"
+            )
         fn.category = category
         entry = _Entry(fn, category, fn.params_model, fn.inputs)
-    elif params is None:  # TRANSITIONAL: the legacy keyword-argument style
-        signature = inspect.signature(fn)
-        _check_legacy_parameters(name, signature)
-        entry = _Entry(fn, category, None, tuple(i for i in INPUTS if i in signature.parameters))
     else:
         found = _check_shape(name, fn, params)
         entry = _Entry(ModelledEffect(fn, params, category, found), category, params, found)
@@ -272,23 +248,6 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     return tuple(declared)
 
 
-def _check_legacy_parameters(name: str, signature: inspect.Signature) -> None:
-    """TRANSITIONAL: the rules of a legacy keyword-argument effect."""
-    positional = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-    parameters = list(signature.parameters.values())
-    if not parameters or parameters[0].kind not in positional:
-        raise ValueError(f"effect {name!r} must take the image as its first parameter")
-    for parameter in parameters[1:]:
-        if parameter.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-            # recipes and `fx` check parameter names against the signature; a catch-all would let typos through
-            raise ValueError(f"effect {name!r}: `{parameter.name}` takes any arguments; name every parameter instead")
-        if parameter.default is inspect.Parameter.empty:
-            raise ValueError(
-                f"effect {name!r}: parameter `{parameter.name}` has no default; every parameter after the image "
-                f"needs one, so that {name}(image) works"
-            )
-
-
-def _origin(fn: Effect) -> tuple[str, str]:
-    """Where a function was defined. Reloading a module makes new function objects with the same origin."""
+def _origin(fn: ModelledEffect) -> tuple[str, str]:
+    """Where an effect was defined. Reloading a module makes new function objects with the same origin."""
     return fn.__module__, fn.__qualname__

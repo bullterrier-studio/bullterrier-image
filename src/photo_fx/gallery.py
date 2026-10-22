@@ -19,7 +19,7 @@ from pathlib import Path
 from string import Template
 from typing import NamedTuple
 
-from . import effects, fx, imageio
+from . import fx, imageio
 from .core import registry
 from .matte import subject_matte
 from .recipe import load_recipe, render
@@ -32,11 +32,11 @@ _ANIMATION_MOMENT = 0.5  # an animated example is shown mid-clip: its first fram
 
 
 def render_effects_page() -> str:
-    """The text of `docs/effects.md`: one table per category (in the order of `effects.CATEGORIES`, empty ones left
+    """The text of `docs/effects.md`: one table per category (in the order of `registry.CATEGORIES`, empty ones left
     out) with each effect's gallery picture, name, one-sentence summary, parameters with their defaults, and a link to
     its example recipe; below it, a table per effect of every parameter's type, unit, range, default and description,
     read from its parameter model. Reads only the effects, so the same effects always give the same page."""
-    grouped = {category: names for category, names in effects.categories().items() if names}
+    grouped = {category: names for category, names in registry.categories().items() if names}
     lines = [
         "# Effects",
         "",
@@ -67,9 +67,7 @@ class EffectFiles(NamedTuple):
 
 
 def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
-    """Where the files of an effect called `name` live in `checkout`, whether or not they exist (yet). TRANSITIONAL: an
-    effect still in a loose module has its code in that module and its tests in `tests/effects/test_<module>.py`; its
-    example recipe and picture are where this says."""
+    """Where the files of an effect called `name` live in `checkout`, whether or not they exist (yet)."""
     return EffectFiles(
         package=_layout(checkout).effects / name,
         tests=checkout / "tests" / "effects" / name / f"test_{name}.py",
@@ -126,8 +124,8 @@ def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
 
 
 def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
-    """Write the files of a new effect called `name`, in `category` (one of `effects.CATEGORIES`), into `checkout`, each
-    made from the template in `src/photo_fx/effects/_template/` and placed where `effect_files` says: its package
+    """Write the files of a new effect called `name`, in `category` (one of `registry.CATEGORIES`), into `checkout`,
+    each made from the template in `src/photo_fx/effects/_template/` and placed where `effect_files` says: its package
     (`__init__.py`, and `effect.py` with a parameter model with one documented example field and a working effect),
     its tests (`test_<name>.py`) and its example recipe. Returns the files written, sorted.
 
@@ -137,19 +135,19 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
     `name` is not a lowercase Python identifier (a letter, then letters, digits and _) or is a Python keyword, is a
     name the template's `effect.py` already uses (its imports) or one `fx` defines for itself (so `fx.<name>` would not
     be the effect), or the category is unknown; `FileExistsError` when an effect of that name exists, or any of its
-    files (or a module `effects/<name>.py`); and `FileNotFoundError` when `checkout` holds no template.
+    files; and `FileNotFoundError` when `checkout` holds no template.
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or keyword.iskeyword(name):
         raise ValueError(
             f"{name!r} cannot name an effect: use lowercase letters, digits and _, starting with a letter, and no "
             f"Python keyword"
         )
-    if category not in effects.CATEGORIES:
-        raise ValueError(f"unknown category {category!r}; choose one of: {', '.join(effects.CATEGORIES)}")
-    if name in effects.describe():
+    if category not in registry.CATEGORIES:
+        raise ValueError(f"unknown category {category!r}; choose one of: {', '.join(registry.CATEGORIES)}")
+    if name in registry.describe():
         raise FileExistsError(f"there is already an effect called {name!r}")
     layout, files = _layout(checkout), effect_files(name, checkout=checkout)
-    for taken in (*files, layout.effects / f"{name}.py"):
+    for taken in files:
         if taken.exists():
             raise FileExistsError(f"{taken} already exists: choose another name")
     if not (layout.template / "effect.py.tmpl").is_file():
@@ -185,7 +183,7 @@ def _names_in_the_template_effect(template: Path) -> set[str]:
     so the list follows the template: an effect of one of these names would replace it or be replaced by it."""
     placeholder = "zzplaceholder"  # stands in for the name, so the names made from it can be told apart
     source = Template((template / "effect.py.tmpl").read_text(encoding="utf-8")).substitute(
-        _words(placeholder, effects.CATEGORIES[0])
+        _words(placeholder, registry.CATEGORIES[0])
     )
     names: set[str] = set()
     for node in ast.parse(source).body:
@@ -226,10 +224,10 @@ def _layout(checkout: Path) -> _Layout:
 
 def _chosen(only: Sequence[str], checkout: Path) -> list[str]:
     """The effects to work on, checked: each is a known effect with its example recipe in `checkout`."""
-    names = list(only) or sorted(effects.describe())
+    names = list(only) or sorted(registry.describe())
     for name in names:
         try:
-            effects.get(name)
+            registry.get(name)
         except KeyError as error:
             raise ValueError(error.args[0]) from None
     if not _layout(checkout).effects.is_dir():
@@ -252,7 +250,7 @@ def _row(name: str) -> str:
     cells = [
         f'<img src="{picture}" width="160" alt="{name}">',
         f"`{name}`",
-        effects.summary(name),
+        registry.summary(name),
         " ".join(f"`{p.name}={p.default!r}`" for p in parameters) or "none",
         f"[{files.example.name}]({example})",
     ]
@@ -261,10 +259,8 @@ def _row(name: str) -> str:
 
 def _parameter_table(name: str) -> list[str]:
     """The lines of an effect's parameter table (name, type, unit, range, default, description), under a heading of its
-    own; none for a TRANSITIONAL legacy effect, which has no model to read them from."""
+    own."""
     model = registry.parameters(name)
-    if model is None:
-        return []
     lines = ["", f"### `{name}`", "", "| Parameter | Type | Unit | Range | Default | Description |"]
     lines.append("| --- | --- | --- | --- | --- | --- |")
     for doc in model.fields_doc():

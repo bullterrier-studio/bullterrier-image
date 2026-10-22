@@ -6,12 +6,19 @@ import pytest
 from photo_fx import Recipe, Step, imageio, load_recipe, render, trace
 from photo_fx import recipe as facade
 from photo_fx.core import runner
+from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
 from photo_fx.matte import subject_matte
 from photo_fx.recipe import render_frames
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
+
+
+class AmountParams(EffectParams):
+    """The one parameter of a probe effect."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Recorded or ignored by the probe.")
 
 
 def write(tmp_path, text, name="r.toml"):
@@ -94,8 +101,8 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
 def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, throwaway_effects):
     seen = []
 
-    @effect(category="utilities")
-    def silhouette_probe(rgb, matte=None):
+    @effect(category="utilities", params=AmountParams)
+    def silhouette_probe(rgb, params, *, matte=None):
         """Records the silhouette it is given."""
         seen.append(matte)
         return rgb
@@ -250,10 +257,10 @@ def test_render_at_picks_a_moment_of_the_clip(photo, tmp_path):
 def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(photo, tmp_path, throwaway_effects):
     runs = []
 
-    @effect(category="utilities")
-    def still_probe(rgb, amount: float = 0.5):
+    @effect(category="utilities", params=AmountParams)
+    def still_probe(rgb, params):
         """A step that does not change over the clip; counts how often it runs."""
-        runs.append(amount)
+        runs.append(params.amount)
         return rgb
 
     animated = load_recipe(write(tmp_path, ANIMATED))
@@ -267,8 +274,8 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
 
 
 def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatch(photo, throwaway_effects):
-    @effect(category="utilities")
-    def halve_for_shape_test(rgb, amount: float = 0.5):
+    @effect(category="utilities", params=AmountParams)
+    def halve_for_shape_test(rgb, params):
         return rgb[::2, ::2]
 
     recipe = Recipe("shapeshift", (Step("halve_for_shape_test"),), size=None)

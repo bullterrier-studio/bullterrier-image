@@ -102,8 +102,7 @@ class Step(ValidatedModel):
         """The parameters with every animated value worked out for a moment of the clip (see `Animated.at`). An
         animated whole-number parameter is rounded to the nearest whole number (halves to the even one, as Python's
         `round`): it moves in whole steps."""
-        model = registry.parameters(self.effect)
-        whole = model.whole_number_fields() if model is not None else frozenset()
+        whole = registry.parameters(self.effect).whole_number_fields()
         values = {}
         for name, value in self.params.items():
             if isinstance(value, Animated):

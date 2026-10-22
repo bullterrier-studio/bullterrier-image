@@ -1,7 +1,6 @@
 """Discovery of effect folders: `src/photo_fx/effects/<name>/` holds one effect's code, and importing the package finds
 it with no other edit. Every rule is tried on a copy of the package, from a fresh interpreter, so the real
 package is never touched; each known-bad tree must stop the import with a message naming the folder and the rule.
-(TRANSITIONAL: loose modules are still found too; see test_contract.py.)
 """
 
 import json
@@ -103,6 +102,33 @@ def test_a_new_folder_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
     assert report["cli_lists_it"]
 
 
+def test_folders_are_imported_in_sorted_order_and_private_ones_not_at_all(tmp_path):
+    log = "from photo_fx.effects import _order_log\n_order_log.seen.append(__name__)\n"
+    done = _import_a_copy_with(
+        tmp_path,
+        {
+            "_order_log.py": "seen = []\n",
+            "zz_b/__init__.py": TRIGGER,
+            "zz_b/effect.py": log + _effect_module("zz_b"),
+            "zz_a/__init__.py": TRIGGER,
+            "zz_a/effect.py": log + _effect_module("zz_a"),
+            "_zz_hidden/__init__.py": TRIGGER,
+            "_zz_hidden/effect.py": _effect_module("zz_hidden"),
+        },
+        """
+        import json, sys
+        from photo_fx.core import registry
+        from photo_fx.effects import _order_log
+        json.dump({"seen": _order_log.seen, "registered": sorted(registry.describe())}, sys.stdout)
+        """,
+    )
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert report["seen"] == ["photo_fx.effects.zz_a.effect", "photo_fx.effects.zz_b.effect"]  # sorted, not as found
+    assert {"zz_a", "zz_b"} <= set(report["registered"])
+    assert "zz_hidden" not in report["registered"]
+
+
 KNOWN_BAD = {
     "a folder that registers nothing": (
         {"zz_bad/__init__.py": "", "zz_bad/effect.py": '"""No effect here."""\n'},
@@ -130,19 +156,15 @@ KNOWN_BAD = {
             "zz_bad/effect.py": _effect_module("zz_bad"),
             "zz_bad.py": '"""A module that the folder would silently hide."""\n',
         },
-        ["effects/zz_bad/", "effects/zz_bad.py"],
+        ["effects/zz_bad.py", "loose module"],
     ),
     "a folder without __init__.py": (
         {"zz_bad/effect.py": _effect_module("zz_bad")},
         ["effects/zz_bad/", "__init__.py"],
     ),
-    "a folder and a module defining the same effect": (
-        {
-            "zz_bad/__init__.py": TRIGGER,
-            "zz_bad/effect.py": _effect_module("zz_bad"),
-            "zz_loose.py": _effect_module("zz_bad"),
-        },
-        ["two effects are called 'zz_bad'", "photo_fx.effects.zz_bad.effect", "photo_fx.effects.zz_loose"],
+    "a loose module": (
+        {"zz_loose.py": _effect_module("zz_loose")},
+        ["effects/zz_loose.py", "loose module", "effects/zz_loose/"],
     ),
 }
 

@@ -157,8 +157,8 @@ convention = "google"
 "examples/*.py" = ["T20"]
 "src/photo_fx/effects/**" = ["A001"]  # the `ascii` effect function shadows a builtin by design
 "**/__init__.py" = ["F401"]
-# TRANSITIONAL: findings of BLE and PTH in modules other branches are rewriting now; each owner fixes them and deletes
-# its line (pipeline: a deliberate per-photo catch-all wants a reasoned noqa, glob of user patterns, open; loader: open)
+# Known BLE and PTH findings, each to be fixed in its module and its line deleted (pipeline: a deliberate per-photo
+# catch-all wants a reasoned noqa, glob of user patterns, open; loader: open)
 "src/photo_fx/pipeline.py" = ["BLE001", "PTH123", "PTH207"]
 "src/photo_fx/core/loader.py" = ["PTH123"]
 
@@ -262,8 +262,8 @@ forbidden_modules = ["photo_fx.*"]  # every top-level module but ops itself (ove
 [[tool.importlinter.contracts]]
 name = "Effects never import each other"
 type = "independence"
-# Every module (later: every folder) in effects/. `_`-prefixed modules cannot be excluded by a wildcard, and none
-# exist: code that two effects share belongs in ops/.
+# Every effect folder in effects/. `_`-prefixed modules cannot be excluded by a wildcard, and none hold Python
+# code: code that two effects share belongs in ops/.
 modules = ["photo_fx.effects.*"]
 
 [[tool.importlinter.contracts]]

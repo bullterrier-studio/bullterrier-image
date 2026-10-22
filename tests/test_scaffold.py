@@ -107,13 +107,12 @@ def test_the_name_of_an_existing_effect_is_refused_and_nothing_is_written(checko
 @pytest.mark.parametrize(
     "existing",
     [
-        "src/photo_fx/effects/lamp_probe.py",
         "src/photo_fx/effects/lamp_probe/notes.txt",
         "tests/effects/lamp_probe/test_lamp_probe.py",
         "examples/effects/lamp_probe.toml",
         "docs/gallery/lamp_probe.jpg",
     ],
-    ids=["module", "package", "tests", "example recipe", "picture"],
+    ids=["package", "tests", "example recipe", "picture"],
 )
 def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     (checkout / existing).parent.mkdir(parents=True, exist_ok=True)
@@ -138,9 +137,8 @@ def test_a_name_that_is_no_lowercase_identifier_is_refused(checkout, name):
         ("np", "effect.py"),  # the function would hide numpy from its own body
         ("param", "effect.py"),
         ("effect", "effect.py"),
-        ("inspect", "fx"),  # fx.inspect is fx's own module, so it would never build the effect
         ("stub_text", "fx"),
-        ("registry", "fx"),
+        ("registry", "fx"),  # fx.registry is a module fx imports for itself, so it would never build the effect
         ("cache", "fx"),
     ],
 )

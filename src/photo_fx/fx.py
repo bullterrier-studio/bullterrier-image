@@ -18,28 +18,31 @@ change over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`.
 `uv run photo-fx regenerate`, once at integration rather than on every branch, so it can lag behind a branch's effects.
 """
 
-import inspect
 from collections.abc import Callable
 from functools import cache
 from typing import Any
 
-from . import effects
 from .core import registry
 from .core.steps import Step
+
+# The effect builders are module attributes made on demand (`__getattr__`), one per registered effect.
+__all__ = ["stub_text"]
 
 
 def __getattr__(name: str) -> Callable[..., Step]:
     if name.startswith("_"):
         raise AttributeError(name)
     try:
-        function = effects.get(name)
+        function = registry.get(name)
     except KeyError:
-        raise AttributeError(f"fx has no effect {name!r}; available: {', '.join(sorted(effects.describe()))}") from None
+        raise AttributeError(
+            f"fx has no effect {name!r}; available: {', '.join(sorted(registry.describe()))}"
+        ) from None
     return _builder(name, function)
 
 
 def __dir__() -> list[str]:
-    return sorted(effects.describe())
+    return sorted(registry.describe())
 
 
 @cache  # keyed by the function too, so an effect replaced under the same name (a reload) gets a new builder
@@ -50,8 +53,6 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     so a misspelt or out-of-range value fails here exactly as it would in a recipe file.
     """
     model = registry.parameters(name)
-    if model is None:  # TRANSITIONAL: a legacy effect's parameters are its keyword arguments
-        return _legacy_builder(name, function)
     fields = model.field_names()
 
     def build(*args: Any, **values: Any) -> Step:
@@ -69,30 +70,6 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     return build
 
 
-def _legacy_builder(name: str, function: Callable) -> Callable[..., Step]:
-    """TRANSITIONAL: the builder of a legacy keyword-argument effect, checked against its signature."""
-    signature = inspect.signature(function)
-    image_parameter = next(iter(signature.parameters))
-
-    def build(*args: Any, **params: Any) -> Step:
-        try:
-            bound = signature.bind_partial(None, *args, **params)  # None stands in for the image
-        except TypeError as error:
-            raise TypeError(f"fx.{name}(): {error}") from None
-        return Step(name, {k: v for k, v in bound.arguments.items() if k != image_parameter})
-
-    build.__name__, build.__qualname__, build.__doc__ = name, f"fx.{name}", function.__doc__
-    # `inspect.signature` reads this documented hook, which mypy does not model on functions
-    build.__signature__ = _legacy_signature(signature).replace(return_annotation="Step")  # type: ignore[attr-defined]
-    return build
-
-
-def _legacy_signature(signature: inspect.Signature) -> inspect.Signature:
-    """TRANSITIONAL: a legacy effect's signature without the image and without `matte` (the recipe supplies both)."""
-    parameters = [p for p in list(signature.parameters.values())[1:] if p.name != "matte"]
-    return signature.replace(parameters=parameters, return_annotation=inspect.Signature.empty)
-
-
 def stub_text() -> str:
     """The text of `fx.pyi`: one typed, documented function per effect, for editors."""
     lines = [
@@ -103,14 +80,8 @@ def stub_text() -> str:
         "from .recipe import Step",
         "",
     ]
-    for name in sorted(effects.describe()):
-        model = registry.parameters(name)
-        if model is None:  # TRANSITIONAL: a legacy effect
-            signature = _legacy_signature(inspect.signature(effects.get(name)))
-            doc = inspect.getdoc(effects.get(name)) or ""
-        else:
-            signature, doc = model.signature(), registry.documentation(name)
-        lines.append(f"def {name}{signature} -> Step:")
-        doc = doc.replace("\\", "\\\\").replace('"""', "'''")
+    for name in sorted(registry.describe()):
+        lines.append(f"def {name}{registry.parameters(name).signature()} -> Step:")
+        doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")
         lines += [f'    """{doc}"""', "    ...", ""]
     return "\n".join(lines)

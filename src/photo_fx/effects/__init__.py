@@ -11,11 +11,10 @@ module of the folder that registers anything) and `__init__.py` (imports `effect
 gallery picture live outside the package under the same name (`tests/effects/<name>/`, `examples/effects/<name>.toml`,
 `docs/gallery/<name>.jpg`; see `photo_fx.gallery.effect_files`). `uv run photo-fx new-effect <name> --category
 <category>` writes all of them from the template in `_template/`. Nothing else needs editing: importing this package
-imports every folder (and, TRANSITIONAL, every module not yet moved into a folder) whose name does not start with `_`,
-in sorted order. A folder that registers no effect, or another number, or an effect named otherwise or registered
-outside `effect.py`, a folder without `__init__.py`, and a folder and a module of the same name are each a `ValueError`
-at import, naming the folder.
-Effects never import each other: shared code lives in `photo_fx.ops`.
+imports every folder whose name does not start with `_`, in sorted order. A folder that registers no effect, or
+another number, or an effect named otherwise or registered outside `effect.py`, a folder without `__init__.py`, and a
+loose module (`effects/<name>.py`) are each a `ValueError` at import, naming the folder or file.
+Effects never import each other: shared code lives in `photo_fx.ops`. Look effects up in `photo_fx.core.registry`.
 
 The query names below (`get`, `apply`, `describe`...) are the registry's, re-exported so that `photo_fx.effects.get`
 and friends keep working.
@@ -32,22 +31,22 @@ _EFFECT_MODULE = "effect"
 
 
 def _discover() -> None:
-    """Import every folder and (TRANSITIONAL) loose module of this package, then check the folder rules."""
+    """Import every effect folder of this package, then check the folder rules."""
     here = Path(__file__).parent
-    found = {info.name: info.ispkg for info in pkgutil.iter_modules(__path__) if not info.name.startswith("_")}
+    folders = sorted(
+        info.name for info in pkgutil.iter_modules(__path__) if info.ispkg and not info.name.startswith("_")
+    )
     for entry in sorted(here.iterdir()):
-        if not entry.is_dir() or entry.name.startswith(("_", ".")) or found.get(entry.name):
+        if entry.name.startswith(("_", ".")) or entry.name in folders:
             continue
-        # A folder left holding only `__pycache__` (after a move or a branch switch) is residue, not a missing effect.
-        if any(child.name != "__pycache__" for child in entry.iterdir()):
-            raise ValueError(f"effects/{entry.name}/ has no __init__.py, so its effect would never be found: add one")
-    folders = sorted(name for name, is_folder in found.items() if is_folder)
-    for name in folders:
-        if (here / f"{name}.py").exists():
+        if entry.suffix == ".py":  # an effect left here as a module, or hidden by a folder, would never be found
             raise ValueError(
-                f"effects/{name}/ and effects/{name}.py share a name, and the folder would hide the module: rename one"
+                f"effects/{entry.name} is a loose module: an effect lives in a folder, effects/{entry.stem}/"
             )
-    for name in sorted(found):
+        # A folder left holding only `__pycache__` (after a move or a branch switch) is residue, not a missing effect.
+        if entry.is_dir() and any(child.name != "__pycache__" for child in entry.iterdir()):
+            raise ValueError(f"effects/{entry.name}/ has no __init__.py, so its effect would never be found: add one")
+    for name in folders:
         importlib.import_module(f"{__name__}.{name}")
     for name in folders:
         _check_folder(name)
@@ -75,7 +74,7 @@ def _check_folder(folder: str) -> None:
         raise ValueError(f"effects/{folder}/: the effect is registered in {module}; register it in effect.py")
 
 
-# Before the public names below are bound, so that a folder or module named like one of them cannot replace it.
+# Before the public names below are bound, so that a folder named like one of them cannot replace it.
 _discover()
 
 

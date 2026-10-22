@@ -3,6 +3,8 @@
 Every effect here is the test's own (`throwaway_effects` removes it again), so nothing depends on the real effects.
 """
 
+import importlib
+import sys
 from typing import Any
 
 import numpy as np
@@ -82,6 +84,7 @@ def test_the_wrapper_keeps_the_name_and_documentation_and_tells_its_model_catego
     assert gain.category == "light"
     assert gain.inputs == ()
     assert effects.get("gain_probe") is gain
+    assert "gain_probe" in registry.categories()["light"]
 
 
 def test_an_effect_that_declares_the_matte_gets_it_and_says_so(throwaway_effects):
@@ -154,16 +157,60 @@ def test_a_parameter_may_not_be_named_like_an_input(throwaway_effects):
     assert "clash_probe" not in effects.describe()
 
 
-def test_an_unknown_category_is_refused_for_a_modelled_effect_too(throwaway_effects):
-    with pytest.raises(ValueError, match="'lights'"):
-        effect(category="lights", params=GainParams)(gain_probe)
+@pytest.mark.parametrize("category", ["lights", "Light", ""], ids=["misspelt", "capitalised", "empty"])
+def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(category, throwaway_effects):
+    with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, animation"):
+        effect(category=category, params=GainParams)(gain_probe)
     assert "gain_probe" not in effects.describe()
 
 
 def test_registering_an_effect_again_keeps_the_very_same_effect(gain):
-    assert effect(category="light")(gain) is gain
     assert effect(category="light", params=GainParams)(gain) is gain
     assert effects.get("gain_probe") is gain
+
+
+def test_registering_the_same_function_twice_is_allowed(throwaway_effects):
+    effect(category="utilities", params=GainParams)(gain_probe)
+    again = effect(category="utilities", params=GainParams)(gain_probe)
+    assert effects.get("gain_probe") is again
+
+
+def test_a_second_function_under_an_existing_name_is_an_error_naming_both_modules(throwaway_effects):
+    def twin(rgb, params):
+        """First."""
+        return rgb
+
+    first = twin
+    first.__module__ = "photo_fx.effects.first_module"
+
+    def twin(rgb, params):  # type: ignore[no-redef]  # the point of the test: a second function, same name
+        """Second."""
+        return 1 - rgb
+
+    twin.__module__ = "photo_fx.effects.second_module"
+    registered = effect(category="utilities", params=GainParams)(first)
+    with pytest.raises(ValueError, match=r"twin.*first_module.*second_module"):
+        effect(category="utilities", params=GainParams)(twin)
+    assert effects.get("twin") is registered  # the first one stays
+    np.testing.assert_array_equal(effects.apply("twin", GREY), GREY)
+
+
+def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, throwaway_effects):
+    (tmp_path / "reload_probe_module.py").write_text(
+        "from photo_fx.core.params import EffectParams\n"
+        "from photo_fx.core.registry import effect\n\n"
+        "class ReloadParams(EffectParams):\n"
+        '    """None."""\n\n'
+        '@effect(category="utilities", params=ReloadParams)\n'
+        'def reload_probe(rgb, params):\n    """Reloaded."""\n    return rgb\n'
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "reload_probe_module", raising=False)  # and removed again afterwards
+    first = importlib.import_module("reload_probe_module").reload_probe
+    reloaded = importlib.reload(sys.modules["reload_probe_module"]).reload_probe
+    # replaced, not rejected
+    assert reloaded is not first
+    assert effects.get("reload_probe") is reloaded
 
 
 def test_registering_an_effect_again_with_another_model_is_refused(gain):
@@ -172,21 +219,17 @@ def test_registering_an_effect_again_with_another_model_is_refused(gain):
 
     with pytest.raises(ValueError, match=r"gain_probe.*OtherParams"):
         effect(category="light", params=OtherParams)(gain)
-    assert effects.get("gain_probe").params_model is GainParams  # type: ignore[attr-defined]  # a modelled effect
+    assert effects.get("gain_probe").params_model is GainParams
 
 
-def test_the_legacy_keyword_style_still_registers_unchanged(throwaway_effects):
-    """TRANSITIONAL: until every effect module declares a model, a plain keyword-argument effect still registers as
-    it is. Delete with the legacy path."""
-
-    def legacy_probe(rgb, amount: float = 0.5, matte=None):
-        """Old style."""
+def test_an_effect_without_a_model_is_refused(throwaway_effects):
+    def keywords_probe(rgb, amount: float = 0.5):
+        """Parameters as keyword arguments, with no model."""
         return rgb
 
-    assert effect(category="utilities")(legacy_probe) is legacy_probe
-    assert registry.parameters("legacy_probe") is None
-    assert registry.schema("legacy_probe") is None
-    assert registry.inputs("legacy_probe") == ("matte",)
+    with pytest.raises(TypeError, match="params"):
+        effect(category="utilities")(keywords_probe)  # type: ignore[call-arg]  # the point of the test
+    assert "keywords_probe" not in registry.describe()
 
 
 # --- queries ---------------------------------------------------------------------------------------------------------
@@ -194,7 +237,7 @@ def test_the_legacy_keyword_style_still_registers_unchanged(throwaway_effects):
 
 def test_parameters_and_schema_describe_the_model(gain):
     assert registry.parameters("gain_probe") is GainParams
-    properties = registry.schema("gain_probe")["properties"]  # type: ignore[index]  # a modelled effect has one
+    properties = registry.schema("gain_probe")["properties"]
     assert properties["gain"]["unit"] == "ratio"
     assert properties["offset"]["description"] == "Added after the gain."
 
@@ -205,17 +248,31 @@ def test_validate_returns_the_model_or_explains_what_is_wrong(gain):
         registry.validate("gain_probe", {"offset": -2})
 
 
-def test_validate_checks_a_legacy_effects_parameter_names(throwaway_effects):
-    """TRANSITIONAL: a legacy effect has no model, so only its parameter names can be checked."""
+def _summary_of(docstring: str) -> str:
+    """The summary of a throwaway effect with this docstring."""
 
-    @effect(category="utilities")
-    def legacy_names(rgb, amount: float = 0.5):
-        """Old style."""
+    def summary_probe(rgb, params):
         return rgb
 
-    assert registry.validate("legacy_names", {"amount": 0.2}) is None
-    with pytest.raises(ValueError, match="amuont"):
-        registry.validate("legacy_names", {"amuont": 0.2})
+    summary_probe.__doc__ = docstring
+    effect(category="utilities", params=GainParams)(summary_probe)
+    return registry.summary("summary_probe")
+
+
+@pytest.mark.parametrize(
+    ("docstring", "first_sentence"),
+    [
+        ("Basic probe controls. Then a second sentence.", "Basic probe controls."),
+        (
+            "Blend 0.5 of it over 0..1 of the\n        width, e.g. half! Then more. And more.",
+            "Blend 0.5 of it over 0..1 of the width, e.g. half!",
+        ),
+        ("Does a thing", "Does a thing"),
+    ],
+    ids=["plain", "decimals-and-abbreviations", "no-full-stop"],
+)
+def test_summary_is_the_first_sentence_of_the_docstring_on_one_line(docstring, first_sentence, throwaway_effects):
+    assert _summary_of(docstring) == first_sentence
 
 
 def test_describe_gives_the_documentation_and_every_parameter(gain):

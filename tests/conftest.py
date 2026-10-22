@@ -26,7 +26,7 @@ def empty_registry() -> Iterator[None]:
         for name in effects.all_effects():
             unregister(name)
         for _, fn, category in real:
-            effect(category=category)(fn)
+            effect(category=category, params=fn.params_model)(fn)
 
 
 @pytest.fixture

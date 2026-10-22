@@ -28,7 +28,6 @@ from .params import UNITS, Color, EffectParams, param
 from .registry import (
     CATEGORIES,
     INPUTS,
-    Effect,
     ModelledEffect,
     all_effects,
     apply,
@@ -51,7 +50,7 @@ from .vocabulary import DISCOURAGED
 
 __all__ = [
     "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "BackendUnavailableError", "Color",
-    "Effect", "EffectParams", "ImageReadError", "ModelledEffect", "PhotoFxError", "Recipe", "RecipeError", "Stage",
+    "EffectParams", "ImageReadError", "ModelledEffect", "PhotoFxError", "Recipe", "RecipeError", "Stage",
     "Step", "SubjectFinder", "SubjectNotFoundError", "UnknownEffectError", "all_effects", "apply", "categories",
     "category",
     "describe", "documentation", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render",
