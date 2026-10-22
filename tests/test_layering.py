@@ -4,7 +4,7 @@ import sees. Each layer may import only the layers below it:
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte
     effects    one module per effect; never import each other
-    core       loader | runner > steps > registry | timing | types | vocabulary; may import ops
+    core       loader | runner > steps > registry > params | timing | vocabulary > types; may import ops
     ops        imports nothing from photo_fx outside ops
 
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
@@ -31,7 +31,7 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 LAYERS = "Layers: app > adapters > effects > core > ops"
 OPS_ALONE = "ops imports nothing else from photo_fx"
 EFFECTS_APART = "Effects never import each other"
-CORE_ORDER = "Core modules: loader | runner > steps > registry | timing | types | vocabulary"
+CORE_ORDER = "Core order: loader | runner > steps > registry > params | timing > types"
 LOADER_DIRECT = "loader imports only steps and timing from core"
 TIMING_ALONE = "timing imports nothing else from photo_fx"
 CONTRACTS = [LAYERS, OPS_ALONE, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
@@ -79,6 +79,7 @@ FORBIDDEN = {
     "steps to loader": ("core/steps.py", "import photo_fx.core.loader", "photo_fx.core.steps", CORE_ORDER),
     "registry to steps": ("core/registry.py", "import photo_fx.core.steps", "photo_fx.core.registry", CORE_ORDER),
     "loader to registry": ("core/loader.py", "import photo_fx.core.registry", "photo_fx.core.loader", LOADER_DIRECT),
+    "params to registry": ("core/params.py", "import photo_fx.core.registry", "photo_fx.core.params", CORE_ORDER),
     "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", CORE_ORDER),
     "timing to ops": ("core/timing.py", "import photo_fx.ops.warp", "photo_fx.core.timing", TIMING_ALONE),
 }

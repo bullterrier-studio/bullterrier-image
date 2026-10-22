@@ -12,6 +12,7 @@ requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.5.4",
     "pillow>=13.0.0",
+    "pydantic>=2.14.1",
     "pyobjc-framework-quartz>=12.2.2 ; sys_platform == 'darwin'",
     "pyobjc-framework-vision>=12.2.2 ; sys_platform == 'darwin'",
     "scipy>=1.18.1",
@@ -125,7 +126,9 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 show_error_codes = true
 # NOT enabled: warn_return_any (scipy and parts of numpy return Any: pure noise here), disallow_any_generics (bare
-# np.ndarray everywhere), full --strict. No pydantic plugin: Pydantic is not a dependency yet.
+# np.ndarray everywhere), full --strict.
+# The pydantic plugin types each model's constructor from its fields, so a misspelt parameter name is a type error.
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*"]
@@ -174,11 +177,13 @@ type = "independence"
 modules = ["photo_fx.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core modules: loader | runner > steps > registry | timing | types | vocabulary"
+name = "Core order: loader | runner > steps > registry > params | timing > types"  # vocabulary sits with timing
 type = "layers"
 containers = ["photo_fx.core"]
 exhaustive = true  # a new core module must be placed in a layer here
-layers = ["loader | runner", "steps", "registry | timing | types | vocabulary"]
+# registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
+# (types). Both edges point down, so each gets a layer of its own; nothing else changes.
+layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types"]
 
 [[tool.importlinter.contracts]]
 name = "loader imports only steps and timing from core"
