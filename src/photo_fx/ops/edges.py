@@ -12,11 +12,18 @@ Magnitudes are normalised so that the strongest response any 0..1 picture can pr
 That is a bound, not the reading of a typical edge: see `Edges.magnitude` for what an ideal step reads. Magnitudes scale
 linearly with contrast and ignore a constant brightness offset (except `canny`, which is binary).
 
+The module treats its input as a picture in 0..1 and CLIPS overshoot: effects earlier in a recipe may return values a
+little outside the range (a glow can reach 1.2), and an edge detector placed after them must not fail. 8-bit-scale input
+(0..255) is not detected: it is clipped like any other overshoot and so becomes black and white. Only NaN and infinity
+are rejected.
+
 Every number that shapes the result is a keyword argument of `detect_edges`. What remains fixed is part of the method's
-definition: the Rec. 709 luminance weights, the Sobel kernels, and the four-direction rounding of Canny's suppression.
+definition: the Rec. 709 luminance weights, the Sobel kernels, and Canny's four-direction suppression (see
+`detect_edges`, "Fixed behaviours").
 """
 
 import math
+import numbers
 from dataclasses import dataclass
 from typing import Literal
 
@@ -49,8 +56,9 @@ class Edges:
             can produce is exactly 1. Real edges read lower: for `"sobel"` the divisor is sqrt(20), the Sobel
             maximum, which is a diagonal corner pattern, so an ideal black-to-white axis-aligned step reads
             4 / sqrt(20) = 0.894 with no blur and about 0.57 at the default `sigma` of 1. `"dog"` is divided by the
-            strongest response of its own kernel the same way (an ideal step reads well below 1). `"canny"` is 1.0
-            on kept edge pixels and 0 elsewhere, regardless of edge strength.
+            strongest response of its own kernel the same way (an ideal step reads well below 1) and clipped, so
+            float32 rounding cannot push it above 1. `"canny"` is 1.0 on kept edge pixels and 0 elsewhere,
+            regardless of edge strength.
         direction: `(h, w)` float32 in radians, in (-pi, pi]. Angle of the brightness gradient (the edge's normal)
             with x to the right and y down; 0 means brightness rises towards the right. Where there is no gradient
             it is 0.
@@ -76,10 +84,11 @@ def detect_edges(
     """Find the edges of a picture and the direction each one faces.
 
     Args:
-        image: Grey `(h, w)` or RGB `(h, w, 3)` array, at least one pixel, values in 0..1 (the project's float
-            pictures; an 8-bit picture must be divided by 255 first). Values outside 0..1, NaN and infinity are
-            rejected rather than silently producing magnitudes above 1. RGB is reduced to Rec. 709 luminance first.
-            It is never modified.
+        image: Grey `(h, w)` or RGB `(h, w, 3)` array with at least one pixel, treated as a picture in 0..1 (the
+            project's float pictures). Values outside 0..1 are CLIPPED to it (every RGB channel, before luminance),
+            so overshoot from an earlier effect is harmless; a picture in 0..255 is NOT detected and would be clipped
+            to black and white, so divide 8-bit pictures by 255 yourself. NaN and infinity are rejected. RGB is
+            reduced to Rec. 709 luminance. `image` is never modified.
         method: `"sobel"` gives the gradient magnitude, a soft map that is strongest on the edge itself; `sigma`
             attenuates it (an ideal step reads about 0.57 at sigma 1, see `Edges.magnitude`). `"dog"` gives
             `|G(sigma) - G(dog_ratio * sigma)|`, a band-pass response that is zero exactly on a step and peaks on both
@@ -103,23 +112,46 @@ def detect_edges(
             the border pixel (d c b a | a b c d), `"mirror"` mirrors excluding it (d c b | a b c d), `"wrap"` tiles
             the picture, so opposite borders count as neighbours.
         tie_tolerance: `"canny"` only. Relative difference (0 up to, not including, 1) below which two neighbouring
-            gradient strengths count as equal when thinning edges; the pixel that comes first in reading order wins a
-            tie, so a step between two pixels leaves one line. Absorbs float rounding; raise it to thin plateaus of
-            near-equal strength.
+            gradient strengths count as equal when thinning edges. A pixel survives if its gradient is at least
+            `(1 - tie_tolerance)` times that of its next neighbour across the edge and more than `(1 + tie_tolerance)`
+            times that of its previous neighbour, "next" being later in reading order (lower row, then right). So of
+            two equal neighbours the earlier one wins, and a step between two pixels leaves one line. At 0 only
+            exactly equal gradients tie, which makes the winner depend on float rounding; the default absorbs that.
+            Larger values widen what counts as a tie and change which pixels survive in both directions, so the
+            number of edge pixels is not monotonic in it.
         connectivity: `"canny"` only. Which pixels count as touching when hysteresis links weak pixels to strong ones:
             4 (edge-sharing only) or 8 (diagonals too, the usual choice).
+
+    Fixed behaviours (part of the method, not tunable):
+        - Canny's non-maximum suppression treats the space outside the picture as having zero gradient, whatever
+          `border_mode` is, so an edge lying on the first or last row or column is kept, not suppressed.
+        - Canny's `low` and `high` comparisons are strict: a pixel whose gradient is exactly `low` (or `high`) times
+          the strongest gradient does not count as above it.
+        - Canny rounds the gradient direction to the nearest of four axes (0, 45, 90, 135 degrees) by adding half a
+          sector before flooring, so an angle exactly halfway between two axes rounds up to the later one.
 
     Returns:
         `Edges` with `(h, w)` float32 `magnitude` and `direction`, see its docstring.
 
     Raises:
-        ValueError: `image` is empty, is not `(h, w)` or `(h, w, 3)`, or has values outside 0..1 or not finite;
-            `method` or `border_mode` is unknown; `sigma` or `truncate` is not a positive finite number; `dog_ratio`
-            is not a finite number above 1; `low`/`high` do not satisfy `0 <= low < high <= 1`; `tie_tolerance` is
-            outside [0, 1); `connectivity` is not 4 or 8. The message names the argument.
+        ValueError: `image` is empty, is not `(h, w)` or `(h, w, 3)`, or contains NaN or infinity; `method` or
+            `border_mode` is unknown; `sigma` or `truncate` is not a positive finite number; `dog_ratio` is not a
+            finite number above 1; `low`/`high` do not satisfy `0 <= low < high <= 1`; `tie_tolerance` is outside
+            [0, 1); `connectivity` is not 4 or 8; or any numeric argument is not a number at all (a string, None, a
+            list). The message names the argument; a wrong type never surfaces as a TypeError.
     """
     if method not in ("sobel", "canny", "dog"):
         raise ValueError(f"method must be 'sobel', 'canny' or 'dog', got {method!r}")
+    for name, value in (
+        ("sigma", sigma),
+        ("low", low),
+        ("high", high),
+        ("dog_ratio", dog_ratio),
+        ("truncate", truncate),
+        ("tie_tolerance", tie_tolerance),
+    ):
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise ValueError(f"{name} must be a number, got {value!r}")
     if not (0 < sigma < math.inf):
         raise ValueError(f"sigma must be a positive, finite number of pixels, got {sigma}")
     if not low >= 0:
@@ -132,7 +164,7 @@ def detect_edges(
         raise ValueError(f"dog_ratio must be a finite number above 1, got {dog_ratio}")
     if not (0 < truncate < math.inf):
         raise ValueError(f"truncate must be a positive, finite number of standard deviations, got {truncate}")
-    if border_mode not in _NUMPY_PAD_MODE:
+    if border_mode not in tuple(_NUMPY_PAD_MODE):
         raise ValueError(f"border_mode must be one of {sorted(_NUMPY_PAD_MODE)}, got {border_mode!r}")
     if not 0 <= tie_tolerance < 1:
         raise ValueError(f"tie_tolerance must be at least 0 and below 1, got {tie_tolerance}")
@@ -161,13 +193,12 @@ def _to_grey(image: np.ndarray) -> np.ndarray:
         raise ValueError(f"image must have shape (h, w) or (h, w, 3), got {array.shape}")
     if array.size == 0:
         raise ValueError(f"image must have at least one pixel, got shape {array.shape}")
-    darkest, brightest = array.min(), array.max()
-    # Written so that NaN fails too: every comparison with NaN is False.
-    if not (darkest >= 0 and brightest <= 1):
-        raise ValueError(
-            f"image values must lie in 0..1 and be finite, got {darkest} to {brightest}; divide 8-bit pictures by 255"
-        )
-    grey = array.astype(np.float32) @ _LUMA if array.ndim == 3 else array.astype(np.float32)
+    # min and max both propagate NaN and report an infinity, so two reductions check every value.
+    if not (math.isfinite(array.min()) and math.isfinite(array.max())):
+        raise ValueError("image must not contain NaN or infinity")
+    # Overshoot is clipped, not rejected: a recipe step's output is passed on unclipped, and e.g. a glow reaches 1.2.
+    colours = np.clip(array.astype(np.float32), 0.0, 1.0)
+    grey = colours @ _LUMA if array.ndim == 3 else colours
     # Only differences matter, so shifting the darkest pixel to 0 changes nothing but float32 rounding, which then
     # scales with the picture's contrast instead of its brightness.
     return grey - grey.min()
@@ -203,7 +234,8 @@ def _difference_of_gaussians(
     scale = _dog_peak_response(sigma, ratio * sigma, truncate)
     if scale == 0.0:  # both blurs are narrower than a pixel, so they are the identity and cancel
         return np.zeros_like(grey)
-    return np.abs(narrow - wide) / np.float32(scale)
+    # Clipped because float32 rounding can read the strongest possible patch as 1.0000001.
+    return np.minimum(np.abs(narrow - wide) / np.float32(scale), 1.0)
 
 
 def _dog_peak_response(narrow_sigma: float, wide_sigma: float, truncate: float) -> float:

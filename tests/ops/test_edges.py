@@ -1,5 +1,6 @@
 """Behaviour of photo_fx.ops.edges, stated as properties of the output (never as a golden image)."""
 
+import math
 import time
 
 import numpy as np
@@ -65,24 +66,52 @@ def test_unsupported_or_empty_image_shape_raises_value_error_naming_image(shape)
 
 
 @pytest.mark.parametrize("method", METHODS)
-@pytest.mark.parametrize(
-    "bad_picture",
-    [
-        255 * blocks(),  # 0..255 float input
-        (255 * blocks()).astype(np.uint8),  # 8-bit input that was never scaled to 0..1
-        blocks() - 0.1,  # slightly negative
-        np.where(blocks() > 0.5, np.nan, blocks()),
-        np.where(blocks() > 0.5, np.inf, blocks()),
-    ],
-    ids=["float-0-255", "uint8", "negative", "nan", "inf"],
-)
-def test_pictures_outside_zero_to_one_or_not_finite_are_rejected_naming_image(method, bad_picture):
-    with pytest.raises(ValueError, match=r"image.*0\.\.1"):
-        detect_edges(bad_picture, method)
+@pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf], ids=["nan", "inf", "minus-inf"])
+@pytest.mark.parametrize("shape", [(24, 30), (24, 30, 3)])
+def test_pictures_with_nan_or_infinity_are_rejected_naming_image(method, bad_value, shape):
+    picture = np.full(shape, 0.5, dtype=np.float32)
+    picture[7, 9] = bad_value
+    with pytest.raises(ValueError, match="image"):
+        detect_edges(picture, method)
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_pictures_exactly_spanning_zero_to_one_are_accepted(method):
+@pytest.mark.parametrize(("left", "right"), [(1.0, 1.2), (0.0, -0.3), (1.0, 255.0)])
+def test_overshoot_beyond_the_range_is_clipped_so_a_step_that_clipping_flattens_has_no_edge(method, left, right):
+    # Both sides clip to the same value, so there is no edge to find. A missing clip would report one.
+    picture = np.full((30, 40), left, dtype=np.float32)
+    picture[:, 20:] = right
+    assert not detect_edges(picture, method).magnitude.any()
+
+
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("shape", [(48, 66), (48, 66, 3)])
+def test_values_outside_zero_to_one_give_exactly_the_result_for_the_clipped_picture(method, shape):
+    rng = np.random.default_rng(8)
+    cells = 1.6 * rng.random((8, 11) + shape[2:], dtype=np.float32) - 0.3  # flat squares between -0.3 and 1.3
+    picture = np.kron(cells, np.ones((6, 6) + (1,) * (len(shape) - 2), dtype=np.float32))
+    assert (picture > 1).any()
+    assert (picture < 0).any()
+    clipped = np.clip(picture, 0, 1)
+    unclipped_anyway = detect_edges(picture, method)
+    expected = detect_edges(clipped, method)
+    np.testing.assert_array_equal(unclipped_anyway.magnitude, expected.magnitude)
+    np.testing.assert_array_equal(unclipped_anyway.direction, expected.direction)
+    assert expected.magnitude.max() > 0.1  # the comparison is between real edge maps, not two empty ones
+
+
+def test_eight_bit_scale_pictures_are_not_detected_and_are_clipped_to_black_and_white():
+    rng = np.random.default_rng(9)
+    eight_bit = np.kron(rng.integers(0, 256, (8, 11), dtype=np.uint8), np.ones((6, 6), dtype=np.uint8))
+    as_clipped = np.clip(eight_bit.astype(np.float32), 0, 1)  # every non-zero value becomes 1
+    for method in METHODS:
+        np.testing.assert_array_equal(
+            detect_edges(eight_bit, method).magnitude, detect_edges(as_clipped, method).magnitude
+        )
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_the_boundary_values_zero_and_one_are_accepted(method):
     picture = np.zeros((10, 10), dtype=np.float32)
     picture[:, 5:] = 1.0
     assert detect_edges(picture, method).magnitude.max() > 0
@@ -288,7 +317,8 @@ def test_half_the_contrast_gives_half_the_magnitude(method):
 
 @pytest.mark.parametrize("method", METHODS)
 def test_adding_a_constant_brightness_offset_changes_nothing(method):
-    picture = 0.7 * blocks()  # leaves room below 1 for the offset
+    # Headroom below 1 for the offset: brightness above 1 is clipped, and clipping is not offset-invariant.
+    picture = 0.7 * blocks()
     base = detect_edges(picture, method)
     shifted = detect_edges(picture + 0.25, method)
     np.testing.assert_allclose(shifted.magnitude, base.magnitude, atol=1e-5)
@@ -391,7 +421,7 @@ def test_raising_low_above_the_weak_strength_disconnects_the_weak_part_of_the_li
 
 @pytest.mark.parametrize("highs", [(0.2, 0.4), (0.4, 0.6), (0.6, 0.9)])
 def test_raising_high_never_adds_edge_pixels(highs):
-    picture = 0.9 * blocks() + 0.1 * np.random.default_rng(2).random((48, 66), dtype=np.float32)
+    picture = blocks() + 0.1 * np.random.default_rng(2).random((48, 66), dtype=np.float32)
     lower, higher = (edge_pixels(detect_edges(picture, "canny", low=0.1, high=h)) for h in highs)
     assert lower.sum() > higher.sum() > 0  # the thresholds really bite on this picture
     assert not (higher & ~lower).any()  # every pixel kept at the higher threshold was already kept at the lower one
@@ -596,3 +626,80 @@ def test_four_connectivity_follows_fewer_weak_edge_pixels_than_eight_because_dia
     assert not (four & ~eight).any()  # linking less never keeps more
     assert four[45:55].sum() < eight[45:55].sum()  # in the weak tail, diagonal links are what 8-connectivity adds
     assert four[:15].sum() == eight[:15].sum()  # the strong head is seeded pixel by pixel either way
+
+
+# --- review round 2: exact range, non-finite arguments, fixed behaviours ------------------------------------------
+
+
+@pytest.mark.parametrize(("sigma", "dog_ratio", "truncate"), [(0.7, 1.2, 4.0), (0.7, 2.0, 4.0), (0.7, 3.0, 3.0)])
+@pytest.mark.parametrize("polarity", [1, -1])
+def test_dog_magnitude_never_exceeds_one_even_for_the_strongest_possible_patch(sigma, dog_ratio, truncate, polarity):
+    # In float32 the strongest patch can read 1.0000001 before clipping.
+    size = 2 * int(truncate * dog_ratio * sigma + 0.5) + 9
+    delta = np.zeros((size, size))
+    delta[size // 2, size // 2] = 1.0
+    kernel = ndimage.gaussian_filter(delta, sigma, truncate=truncate) - ndimage.gaussian_filter(
+        delta, dog_ratio * sigma, truncate=truncate
+    )
+    picture = (polarity * kernel > 0).astype(np.float32)
+    magnitude = detect_edges(picture, "dog", sigma=sigma, dog_ratio=dog_ratio, truncate=truncate).magnitude
+    assert magnitude.max() <= 1.0
+    assert magnitude.max() > 0.9999  # and it really is the strongest patch, so the bound was tested at its limit
+
+
+@pytest.mark.parametrize("name", ["sigma", "dog_ratio", "truncate"])
+@pytest.mark.parametrize("bad_value", [math.inf, math.nan], ids=["inf", "nan"])
+def test_non_finite_sigma_dog_ratio_and_truncate_raise_value_error_naming_them(name, bad_value):
+    with pytest.raises(ValueError, match=name):
+        detect_edges(vertical_step(), **{name: bad_value})
+
+
+@pytest.mark.parametrize("name", ["sigma", "low", "high", "dog_ratio", "truncate", "tie_tolerance"])
+@pytest.mark.parametrize("bad_value", ["1.0", None, [1.0], 1.0 + 2.0j], ids=["str", "none", "list", "complex"])
+def test_non_numeric_numeric_arguments_raise_value_error_naming_them(name, bad_value):
+    with pytest.raises(ValueError, match=name):
+        detect_edges(vertical_step(), **{name: bad_value})
+
+
+def test_an_unhashable_border_mode_or_connectivity_raises_value_error_not_type_error():
+    for name in ("border_mode", "connectivity", "method"):
+        with pytest.raises(ValueError, match=name):
+            detect_edges(vertical_step(), **{name: ["nearest"]})
+
+
+def test_canny_suppression_treats_the_outside_of_the_picture_as_having_no_gradient():
+    # Dark first row, bright below: the edge lies on the very top row. Its gradient is as strong as the row below,
+    # and the row below wins any tie against a missing neighbour only if the outside copies the border (it must not).
+    picture = np.ones((20, 30), dtype=np.float32)
+    picture[0] = 0.0
+    on = detect_edges(picture, "canny", sigma=0.01).magnitude > 0
+    assert on[0, 4:-4].all()
+    assert not on[1:].any(axis=None)
+
+
+def two_steps_of_contrast_one_and_one_half():
+    """Left to right: 0 -> 1 at column 10, 1 -> 0.5 at column 30. Gradient strengths are exactly 1 : 0.5."""
+    picture = np.zeros((20, 50), dtype=np.float32)
+    picture[:, 10:] = 1.0
+    picture[:, 30:] = 0.5
+    return picture
+
+
+def test_canny_high_threshold_is_strict_an_edge_exactly_at_the_share_does_not_start_a_line():
+    picture = two_steps_of_contrast_one_and_one_half()
+    exactly_at = detect_edges(picture, "canny", sigma=0.01, low=0.1, high=0.5).magnitude > 0
+    just_below = detect_edges(picture, "canny", sigma=0.01, low=0.1, high=0.4999).magnitude > 0
+    assert exactly_at[:, 5:20].any()  # the strong step is found
+    assert not exactly_at[:, 25:40].any()  # the half-strength step sits exactly on `high`: not above it
+    assert just_below[:, 25:40].any()
+
+
+def test_canny_low_threshold_is_strict_a_weak_pixel_exactly_at_the_share_is_not_linked():
+    # A vertical edge of contrast 1 above row 20 and 0.5 below it: one line, strong then exactly half as strong.
+    picture = np.zeros((40, 30), dtype=np.float32)
+    picture[:20, 10:] = 1.0
+    picture[20:, 10:] = 0.5
+    linked = detect_edges(picture, "canny", sigma=0.01, low=0.4999, high=0.9).magnitude > 0
+    cut = detect_edges(picture, "canny", sigma=0.01, low=0.5, high=0.9).magnitude > 0
+    assert linked[30:, 8:12].any()
+    assert not cut[30:, 8:12].any()
