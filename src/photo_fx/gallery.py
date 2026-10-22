@@ -110,7 +110,7 @@ def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path 
     pictures cannot be rendered. Returns the files written."""
     _chosen(only, checkout)  # a bad name fails before anything is written
     page = _layout(checkout).page
-    page.write_text(render_effects_page())
+    page.write_text(render_effects_page(), encoding="utf-8")
     rendered = render_gallery(only, force, checkout=checkout)
     return [page, *(effect_files(name, checkout=checkout).picture for name in rendered)]
 
@@ -121,7 +121,7 @@ def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
     checkout that lacks one gets `FileNotFoundError` and no file is written."""
     _chosen((), checkout)
     stub = _layout(checkout).stub
-    stub.write_text(fx.stub_text())
+    stub.write_text(fx.stub_text(), encoding="utf-8")
     return [stub, *write_docs(checkout=checkout)]
 
 
@@ -169,7 +169,9 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
     words = _words(name, category)
     for template, target in targets.items():
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(Template((layout.template / template).read_text()).substitute(words))
+        target.write_text(
+            Template((layout.template / template).read_text(encoding="utf-8")).substitute(words), encoding="utf-8"
+        )
     return sorted(targets.values())
 
 
@@ -182,7 +184,9 @@ def _names_in_the_template_effect(template: Path) -> set[str]:
     """The module-level names the template's effect.py binds for itself (its imports, mainly), read from the template,
     so the list follows the template: an effect of one of these names would replace it or be replaced by it."""
     placeholder = "zzplaceholder"  # stands in for the name, so the names made from it can be told apart
-    source = Template((template / "effect.py.tmpl").read_text()).substitute(_words(placeholder, effects.CATEGORIES[0]))
+    source = Template((template / "effect.py.tmpl").read_text(encoding="utf-8")).substitute(
+        _words(placeholder, effects.CATEGORIES[0])
+    )
     names: set[str] = set()
     for node in ast.parse(source).body:
         if isinstance(node, ast.Import | ast.ImportFrom):

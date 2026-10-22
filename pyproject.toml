@@ -70,7 +70,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 # Preview for the linter only (the formatter keeps its stable style), and only for the preview rules listed by code
-# in `select` (PLC2701), never a whole preview family.
+# in `select` (PLC2701, PLW1514), never a whole preview family.
 preview = true
 explicit-preview-rules = true
 # Opinionated enough to keep the code consistent, typed and documented; not so strict that it blocks progress.
@@ -84,6 +84,9 @@ select = [
     "SLF001",  # private-member access: applies to tests too, which must not reach into the implementation
     "PLC2701",  # import of a private name (a preview rule, turned on alone by explicit-preview-rules)
     "PGH003",  # a `# type: ignore` must name its error code (RUF100, in RUF, fails an unused `# noqa`)
+    "PLW1514",  # text files opened without `encoding=` use the locale's, which breaks non-ASCII names on Windows (preview)
+    "BLE",  # `except Exception` hides bugs; catch what can happen, or say why everything must be caught
+    "PTH",  # pathlib, not os.path / open() / glob: one way to handle paths
 ]
 # Deliberately NOT enabled: TRY003 / EM (message-style noise); the docstring style rules D2xx / D4xx beyond D419 (we
 # enforce presence, not formatting); PLR2004 magic numbers and PLR0913 argument counts (numeric code and
@@ -110,6 +113,10 @@ convention = "google"
 "examples/*.py" = ["T20"]
 "src/photo_fx/effects/**" = ["A001"]  # the `ascii` effect function shadows a builtin by design
 "**/__init__.py" = ["F401"]
+# TRANSITIONAL: findings of BLE and PTH in modules other branches are rewriting now; each owner fixes them and deletes
+# its line (pipeline: a deliberate per-photo catch-all wants a reasoned noqa, glob of user patterns, open; loader: open)
+"src/photo_fx/pipeline.py" = ["BLE001", "PTH123", "PTH207"]
+"src/photo_fx/core/loader.py" = ["PTH123"]
 
 # `uv run mypy` checks src and tests; the gate (`poe check`) and the pre-push hook run it.
 [tool.mypy]

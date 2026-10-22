@@ -113,6 +113,27 @@ OFFENCES = {
         ruff,
         "PGH003",
     ),
+    "text read in the locale's encoding": (
+        LIBRARY_MODULE,
+        '"""Probe."""\n\n\ndef first_line(name: str) -> str:\n    """Its first line."""\n'
+        "    with open(name) as file:\n        return file.readline()\n",
+        ruff,
+        "PLW1514",
+    ),
+    "a blind except": (
+        LIBRARY_MODULE,
+        '"""Probe."""\n\n\ndef safe(value: str) -> float:\n    """A number or 0."""\n    try:\n'
+        "        return float(value)\n    except Exception:\n        return 0.0\n",
+        ruff,
+        "BLE001",
+    ),
+    "os.path instead of pathlib": (
+        LIBRARY_MODULE,
+        '"""Probe."""\n\nimport os\n\n\ndef config(folder: str) -> str:\n    """Its config file."""\n'
+        '    return os.path.join(folder, "photo-fx.toml")\n',
+        ruff,
+        "PTH118",
+    ),
     "a test importing a private name": (
         TEST_MODULE,
         "from photo_fx.ops.glyphs import _load_font\n\n\ndef test_probe():\n    assert callable(_load_font)\n",
