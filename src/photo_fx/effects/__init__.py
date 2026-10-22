@@ -1,13 +1,15 @@
 """The effect library.
 
-An effect is a function `(rgb, **params) -> rgb`: it takes the image representation described in `imageio`
-and returns a new one of the same shape. Effects know nothing about files, mattes or recipes; where and how
-strongly one applies is decided by the recipe that calls it.
+An effect is a function `(rgb, params, *, matte=None) -> rgb`: it takes the image representation described in
+`imageio` and its validated parameter model (an `EffectParams` subclass, see `photo_fx.core.params`) and returns a new
+image of the same shape. Effects know nothing about files or recipes; where and how strongly one applies is decided by
+the recipe that calls it. `color.py` is the worked example to copy. (TRANSITIONAL: modules not migrated yet still use
+the older `(rgb, **params) -> rgb` style.)
 
-Add one by writing a function with the `@effect(category=...)` decorator (from `photo_fx.core.registry`) in a new
-module in this package. Nothing else needs editing: importing the package imports every module in it whose name does
-not start with `_`, in sorted order, and importing a module registers its effects. Effects never import each other:
-shared code lives in `photo_fx.ops`.
+Add one by writing its parameter model and a function with the `@effect(category=..., params=...)` decorator (from
+`photo_fx.core.registry`) in a new module in this package. Nothing else needs editing: importing the package imports
+every module in it whose name does not start with `_`, in sorted order, and importing a module registers its effects.
+Effects never import each other: shared code lives in `photo_fx.ops`.
 
 The query names below (`get`, `apply`, `describe`...) are the registry's, re-exported so that `photo_fx.effects.get`
 and friends keep working.

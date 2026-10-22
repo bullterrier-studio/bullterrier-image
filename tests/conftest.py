@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from photo_fx import effects
+from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect, unregister
 
 
@@ -39,18 +40,24 @@ def registry_emptied():
     return empty_registry
 
 
+class ProbeParams(EffectParams):
+    """The one parameter of a probe effect."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused: a probe returns the picture unchanged.")
+
+
 @pytest.fixture
 def register_probe():
     """`register_probe(name, category)` registers a do-nothing effect with that name. Use it inside `fresh_registry`
     or `throwaway_effects`, which remove it again."""
 
     def register(name: str, category: str = "utilities") -> None:
-        def probe(rgb, amount: float = 0.5):
+        def probe(rgb, params: ProbeParams):
             return rgb
 
         probe.__name__ = probe.__qualname__ = name
         probe.__doc__ = f"The {name} probe."
-        effect(category=category)(probe)
+        effect(category=category, params=ProbeParams)(probe)
 
     return register
 

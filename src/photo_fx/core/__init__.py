@@ -18,7 +18,9 @@ from .loader import load_recipe
 from .params import UNITS, Color, EffectParams, param
 from .registry import (
     CATEGORIES,
+    INPUTS,
     Effect,
+    ModelledEffect,
     all_effects,
     apply,
     categories,
@@ -26,6 +28,9 @@ from .registry import (
     describe,
     effect,
     get,
+    inputs,
+    parameters,
+    schema,
     summary,
     unregister,
 )
@@ -35,7 +40,8 @@ from .timing import Animated, Animation, ramp
 from .vocabulary import DISCOURAGED
 
 __all__ = [
-    "CATEGORIES", "DISCOURAGED", "UNITS", "Animated", "Animation", "Color", "Effect", "EffectParams", "Recipe", "Stage",
-    "Step", "SubjectFinder", "all_effects", "apply", "categories", "category", "describe", "effect", "get",
-    "load_recipe", "param", "ramp", "render", "render_all", "render_frames", "summary", "trace", "unregister",
+    "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "Color", "Effect", "EffectParams",
+    "ModelledEffect", "Recipe", "Stage", "Step", "SubjectFinder", "all_effects", "apply", "categories", "category",
+    "describe", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render", "render_all",
+    "render_frames", "schema", "summary", "trace", "unregister",
 ]  # fmt: skip

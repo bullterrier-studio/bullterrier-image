@@ -16,9 +16,13 @@ import pytest
 
 import photo_fx
 from photo_fx import effects
+from photo_fx.core import registry
+from photo_fx.core.params import UNITS, EffectParams, param
 from photo_fx.core.registry import effect
 
 ALL = sorted(effects.describe())
+# Effects with a parameter model; TRANSITIONAL: the others are legacy keyword-argument effects until F1b migrates them.
+MODELLED = [name for name in ALL if registry.parameters(name) is not None]
 
 
 @pytest.mark.parametrize("name", ALL)
@@ -82,9 +86,12 @@ def _naming_problems(name: str) -> list[str]:
     """Every parameter of the effect `name` that uses a discouraged name, with the name to use instead."""
     from photo_fx.core.vocabulary import DISCOURAGED
 
+    model = registry.parameters(name)
+    # TRANSITIONAL: a legacy effect's parameters are its keyword arguments
+    names = list(model.model_fields) if model is not None else list(inspect.signature(effects.get(name)).parameters)
     return [
         f"effect {name!r}: parameter `{parameter}` should be called `{DISCOURAGED[parameter]}`"
-        for parameter in inspect.signature(effects.get(name)).parameters
+        for parameter in names
         if parameter in DISCOURAGED
     ]
 
@@ -110,6 +117,20 @@ def test_the_vocabulary_check_flags_discouraged_names_and_passes_preferred_ones(
         "effect 'bad_probe': parameter `rng` should be called `seed`",
     ]
     assert _naming_problems("good_probe") == []
+
+
+def test_the_vocabulary_check_reads_a_models_field_names(throwaway_effects):
+    class StrengthParams(EffectParams):
+        """Uses a discouraged name."""
+
+        strength: float = param(0.5, unit="fraction", min=0, max=1, doc="Should be called amount.")
+
+    @effect(category="light", params=StrengthParams)
+    def model_probe(rgb, params):
+        """Uses a discouraged field name."""
+        return rgb
+
+    assert _naming_problems("model_probe") == ["effect 'model_probe': parameter `strength` should be called `amount`"]
 
 
 def test_the_vocabulary_is_the_agreed_one():
@@ -359,3 +380,90 @@ def test_summary_of_a_one_sentence_docstring_without_a_full_stop_is_all_of_it(th
 
     effect(category="utilities")(terse)
     assert effects.summary("terse") == "Does a thing"
+
+
+# --- the parameter model of every modelled effect --------------------------------------------------------------------
+
+
+def _small(photo: np.ndarray) -> np.ndarray:
+    return np.ascontiguousarray(photo[::4, ::4])  # 24 x 32: quick, even with every parameter at its maximum
+
+
+def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
+    """The injected inputs the effect declares, made for `photo`: a soft disc as the subject's matte."""
+    y, x = np.mgrid[0 : photo.shape[0], 0 : photo.shape[1]].astype(np.float32)
+    disc = np.clip(min(photo.shape[:2]) / 3 - np.hypot(x - photo.shape[1] / 2, y - photo.shape[0] / 2), 0, 1)
+    return {"matte": disc.astype(np.float32)} if "matte" in registry.inputs(name) else {}
+
+
+def _bounds() -> list[tuple[str, str, str]]:
+    """(effect, numeric field, "min" or "max") for every numeric field of every modelled effect."""
+    found = []
+    for name in MODELLED:
+        model = registry.parameters(name)
+        assert model is not None
+        found += [
+            (name, doc.name, side) for doc in model.fields_doc() if doc.minimum is not None for side in ("min", "max")
+        ]
+    return found
+
+
+def _bound_value(name: str, field: str, side: str, beyond: bool = False) -> float:
+    model = registry.parameters(name)
+    assert model is not None
+    doc = next(d for d in model.fields_doc() if d.name == field)
+    bound = doc.minimum if side == "min" else doc.maximum
+    assert bound is not None
+    value = bound + ((-1 if side == "min" else 1) if beyond else 0)
+    return int(value) if isinstance(doc.default, int) else float(value)
+
+
+@pytest.mark.parametrize("name", MODELLED)
+def test_every_parameter_is_described_and_has_a_unit_entry(name):
+    schema = registry.schema(name)
+    assert schema is not None
+    for field, prop in schema["properties"].items():
+        assert prop.get("description", "").strip(), f"{name}.{field} has no description"
+        assert "unit" in prop, f"{name}.{field} has no unit entry"
+        if prop.get("type") in ("number", "integer"):
+            assert prop["unit"] in UNITS, f"{name}.{field}: unit {prop['unit']!r}"
+
+
+@pytest.mark.parametrize(("name", "field", "side"), _bounds())
+def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
+    small = _small(photo)
+    out = effects.apply(name, small, **{field: _bound_value(name, field, side)}, **_inputs(name, small))
+    assert out.shape == small.shape
+    assert np.isfinite(out).all()
+    assert out.min() >= -1e-6
+    assert out.max() <= 1 + 1e-6
+
+
+@pytest.mark.parametrize(("name", "field", "side"), _bounds())
+def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, photo):
+    with pytest.raises(ValueError, match=f"`{field}`"):
+        effects.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
+
+
+@pytest.mark.parametrize("name", MODELLED)
+def test_every_modelled_effect_refuses_an_unknown_parameter(name, photo):
+    with pytest.raises(ValueError, match="not_a_parameter"):
+        effects.apply(name, _small(photo), not_a_parameter=1)
+
+
+@pytest.mark.parametrize("name", MODELLED)
+def test_every_modelled_effect_takes_its_model_its_keywords_or_nothing(name, photo):
+    small, model = _small(photo), registry.parameters(name)
+    assert model is not None
+    inputs = _inputs(name, small)
+    defaults = {field: info.default for field, info in model.model_fields.items()}
+    by_model = effects.get(name)(small, model(), **inputs)
+    np.testing.assert_array_equal(effects.get(name)(small, **inputs), by_model)
+    np.testing.assert_array_equal(effects.get(name)(small, **defaults, **inputs), by_model)
+
+
+def test_only_the_modules_not_yet_migrated_hold_legacy_effects():
+    """TRANSITIONAL: F1b migrates these modules and deletes this test together with the legacy path."""
+    legacy_modules = {"ascii", "texture", "glitch", "evaporate", "disperse", "color"}
+    legacy = {name for name in ALL if registry.parameters(name) is None}
+    assert legacy == {name for name in ALL if effects.get(name).__module__.rsplit(".", 1)[-1] in legacy_modules}
