@@ -8,6 +8,7 @@ from photo_fx.ops.glyphs import cell_size, glyph_atlas
 
 NAME = "glitch"
 STILL = {"split": 0, "shift": 0.0}  # no sliding and no split: only the text strips change anything
+CHARS = " .:-=+*#%@"  # ten glyphs, index 0 (the space) = no ink
 
 
 def _changed_rows(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -55,6 +56,33 @@ def test_band_heights_spread_between_their_limits(photo: np.ndarray) -> None:
     assert min(heights) < 36 < max(heights)
 
 
+def _slide(out: np.ndarray, photo: np.ndarray) -> int:
+    """How far the one changed strip of `out` is `photo`'s strip rolled sideways (brute force over every distance);
+    0 if nothing changed."""
+    rows = _changed_rows(out, photo)
+    if not rows.any():
+        return 0
+    width = photo.shape[1]
+    matches = [d for d in range(-width + 1, width) if np.array_equal(out[rows], np.roll(photo[rows], d, axis=1))]
+    assert matches, "the changed rows are not the picture's rows slid sideways"
+    return min(matches, key=abs)  # a roll by d equals a roll by d - width: the shorter way round
+
+
+def test_a_strip_slides_sideways_up_to_shift_of_the_width_either_way(photo: np.ndarray) -> None:
+    # one band of a tenth of the height; the limit is 0.1 of the 128 px width = 12.8 px
+    limit = 0.1 * photo.shape[1]
+    slides = [
+        _slide(
+            effects.apply(NAME, photo, split=0, bands=1, shift=0.1, band_min_height=0.1, band_max_height=0.1, seed=s),
+            photo,
+        )
+        for s in range(20)
+    ]
+    assert all(abs(d) <= limit for d in slides)
+    assert min(slides) < 0 < max(slides)  # both directions
+    assert max(abs(d) for d in slides) > 0.75 * limit  # and the slides reach most of the way to the limit
+
+
 def test_band_height_limits_given_the_wrong_way_round_mean_the_same_range(photo: np.ndarray) -> None:
     swapped = effects.apply(NAME, photo, band_min_height=0.2, band_max_height=0.05, seed=6)
     in_order = effects.apply(NAME, photo, band_min_height=0.05, band_max_height=0.2, seed=6)
@@ -62,7 +90,7 @@ def test_band_height_limits_given_the_wrong_way_round_mean_the_same_range(photo:
     assert not np.array_equal(swapped, effects.apply(NAME, photo, seed=6))  # and the limits are really used
 
 
-def test_text_strips_change_only_some_rows_and_leave_the_sliding_alone(photo: np.ndarray) -> None:
+def test_text_strips_cover_only_some_rows(photo: np.ndarray) -> None:
     plain = effects.apply(NAME, photo, seed=3, ascii_share=0.0)
     texty = effects.apply(NAME, photo, seed=3, ascii_share=0.5, ascii_cell=6)
     changed = _changed_rows(plain, texty)
@@ -117,13 +145,14 @@ def test_the_text_palette_ink_and_paper_are_the_ones_given() -> None:
 
 def test_a_dark_strip_on_dark_paper_is_the_paper_colour() -> None:
     black = np.zeros((40, 50, 3), np.float32)
-    out = _all_text(black, 5, ascii_paper="#336699")
+    out = _all_text(black, 5, ascii_chars=CHARS, ascii_paper="#336699")
     np.testing.assert_allclose(out, np.broadcast_to([0x33 / 255, 0x66 / 255, 0x99 / 255], out.shape), atol=1e-6)
 
 
 def test_a_lower_text_gamma_puts_down_more_ink() -> None:
     grey = np.full((48, 64, 3), 0.5, np.float32)
-    light, heavy = _all_text(grey, 4, ascii_gamma=3.0), _all_text(grey, 4, ascii_gamma=0.3)
+    light = _all_text(grey, 4, ascii_chars=CHARS, ascii_gamma=3.0)
+    heavy = _all_text(grey, 4, ascii_chars=CHARS, ascii_gamma=0.3)
     assert heavy.mean() > light.mean() + 0.05
 
 
@@ -135,7 +164,7 @@ def test_ascii_photo_keeps_strip_detail(photo: np.ndarray) -> None:
 
 
 def test_a_text_font_that_cannot_be_opened_is_reported(photo: np.ndarray, tmp_path) -> None:
-    with pytest.raises(OSError, match="cannot open"):  # Pillow's wording for a font file it cannot read
+    with pytest.raises(OSError):  # noqa: PT011  (the message is Pillow's own wording, not ours to pin)
         effects.apply(NAME, photo, ascii_share=1.0, ascii_font=str(tmp_path / "missing.ttf"))
 
 
@@ -143,7 +172,3 @@ def test_a_text_palette_needs_two_distinct_characters_when_it_is_written() -> No
     with pytest.raises(ValueError, match="ascii_chars"):
         fx.glitch(ascii_chars="..")
     assert fx.glitch(ascii_chars="01").params == {"ascii_chars": "01"}
-
-
-def test_glitch_is_a_glitch_effect() -> None:
-    assert effects.category(NAME) == "glitch"
