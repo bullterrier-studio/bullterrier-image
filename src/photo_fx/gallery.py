@@ -9,17 +9,13 @@ parallel work free of merge conflicts. These are developer commands; they need a
 import inspect
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 from . import effects, fx, imageio
 from .matte import subject_matte
 from .recipe import load_recipe, render
 
-_ROOT = Path(__file__).resolve().parents[2]  # src/photo_fx/gallery.py -> the checkout
-EXAMPLES = _ROOT / "examples" / "effects"
-PHOTO = _ROOT / "examples" / "photos" / "bullterrier.jpeg"
-GALLERY = _ROOT / "docs" / "gallery"
-EFFECTS_PAGE = _ROOT / "docs" / "effects.md"
-STUB = Path(__file__).with_name("fx.pyi")
+CHECKOUT = Path(__file__).resolve().parents[2]  # src/photo_fx/gallery.py -> the source checkout photo-fx runs from
 
 _SIDE = 480  # px, longest side of a gallery picture
 _QUALITY = 82  # JPEG: small files, and these are thumbnails
@@ -48,22 +44,26 @@ def render_effects_page() -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_gallery(out_dir: Path, only: Sequence[str] = (), force: bool = False) -> list[str]:
+def render_gallery(
+    out_dir: Path, only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT
+) -> list[str]:
     """Render the example recipe of each effect (all, or those named in `only`) on the demo photo into
     `out_dir/<name>.jpg`, longest side 480 px. Pictures that already exist are kept unless `force` is set, so nothing
-    changes that does not need to. Returns the names rendered.
+    changes that does not need to. Returns the names rendered. `checkout` is the photo-fx source checkout whose
+    example recipes (`examples/effects/<name>.toml`) and demo photo (`examples/photos/bullterrier.jpeg`) are used.
 
     Everything is checked before anything is rendered: an unknown name raises `ValueError` listing the effects, a
     missing example recipe `FileNotFoundError`. Example recipes that cut out the subject need Apple Vision (macOS).
     """
-    names = _chosen(only)
+    layout = _layout(checkout)
+    names = _chosen(only, layout.examples)
     todo = [name for name in names if force or not (out_dir / f"{name}.jpg").exists()]
     if not todo:
         return []
-    photo, matte = imageio.load(PHOTO), None
+    photo, matte = imageio.load(layout.photo), None
     out_dir.mkdir(parents=True, exist_ok=True)
     for name in todo:
-        recipe = load_recipe(EXAMPLES / f"{name}.toml")
+        recipe = load_recipe(layout.examples / f"{name}.toml")
         if recipe.needs_matte and matte is None:
             matte = subject_matte(photo)  # once for all the recipes that need it
         picture = render(photo, recipe, matte, at=_ANIMATION_MOMENT)
@@ -71,33 +71,56 @@ def render_gallery(out_dir: Path, only: Sequence[str] = (), force: bool = False)
     return todo
 
 
-def write_docs(only: Sequence[str] = (), force: bool = False) -> list[Path]:
-    """Write `docs/effects.md` and render the gallery pictures that are missing (or those in `only`, or all of them with
-    `force`; see `render_gallery`). The page is written first, so it is up to date even where pictures cannot be
-    rendered. Returns the files written."""
-    _chosen(only)  # a bad name fails before anything is written
-    EFFECTS_PAGE.write_text(render_effects_page())
-    return [EFFECTS_PAGE, *(GALLERY / f"{name}.jpg" for name in render_gallery(GALLERY, only, force))]
+def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT) -> list[Path]:
+    """Write `docs/effects.md` and render the gallery pictures into `docs/gallery/` that are missing (or those in
+    `only`, or all of them with `force`; see `render_gallery`), both in `checkout`. The page is written first, so it is
+    up to date even where pictures cannot be rendered. Returns the files written."""
+    layout = _layout(checkout)
+    _chosen(only, layout.examples)  # a bad name fails before anything is written
+    layout.page.write_text(render_effects_page())
+    rendered = render_gallery(layout.gallery, only, force, checkout=checkout)
+    return [layout.page, *(layout.gallery / f"{name}.jpg" for name in rendered)]
 
 
-def regenerate() -> list[Path]:
-    """The one integration step after effects were added or changed: write `fx.pyi` (for editors), then `write_docs`.
-    Returns the files written."""
-    STUB.write_text(fx.stub_text())
-    return [STUB, *write_docs()]
+def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
+    """The one integration step after effects were added or changed: write `src/photo_fx/fx.pyi` (for editors) in
+    `checkout`, then `write_docs`. Returns the files written."""
+    stub = _layout(checkout).stub
+    stub.write_text(fx.stub_text())
+    return [stub, *write_docs(checkout=checkout)]
 
 
-def _chosen(only: Sequence[str]) -> list[str]:
-    """The effects to work on, checked: each is a known effect with an example recipe."""
+class _Layout(NamedTuple):
+    """Where the generated files and their sources live in a source checkout."""
+
+    examples: Path  # one example recipe per effect
+    photo: Path  # the demo photo every example recipe is shown on
+    gallery: Path  # the pictures docs/effects.md shows
+    page: Path  # docs/effects.md
+    stub: Path  # fx.pyi, next to fx.py
+
+
+def _layout(checkout: Path) -> _Layout:
+    return _Layout(
+        examples=checkout / "examples" / "effects",
+        photo=checkout / "examples" / "photos" / "bullterrier.jpeg",
+        gallery=checkout / "docs" / "gallery",
+        page=checkout / "docs" / "effects.md",
+        stub=checkout / "src" / "photo_fx" / "fx.pyi",
+    )
+
+
+def _chosen(only: Sequence[str], examples: Path) -> list[str]:
+    """The effects to work on, checked: each is a known effect with an example recipe in `examples`."""
     names = list(only) or sorted(effects.describe())
     for name in names:
         try:
             effects.get(name)
         except KeyError as error:
             raise ValueError(error.args[0]) from None
-    if not EXAMPLES.is_dir():
-        raise FileNotFoundError(f"{EXAMPLES} does not exist: this needs a source checkout of photo-fx")
-    missing = [EXAMPLES / f"{name}.toml" for name in names if not (EXAMPLES / f"{name}.toml").is_file()]
+    if not examples.is_dir():
+        raise FileNotFoundError(f"{examples} does not exist: this needs a source checkout of photo-fx")
+    missing = [examples / f"{name}.toml" for name in names if not (examples / f"{name}.toml").is_file()]
     if missing:
         raise FileNotFoundError(f"no example recipe: add {', '.join(map(str, missing))}")
     return names

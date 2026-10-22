@@ -6,12 +6,14 @@ depend on which real effects exist or how they are documented.
 
 import io
 import re
+import shutil
+from pathlib import Path
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from photo_fx import effects, fx, gallery
+from photo_fx import effects, fx, gallery, imageio
 from photo_fx.cli import main
 from photo_fx.core.registry import effect
 
@@ -83,10 +85,25 @@ def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
 
 # --- the gallery pictures ----------------------------------------------------------------------------------------
 
+REAL_EXAMPLES = Path(__file__).parent.parent / "examples" / "effects"
+
 
 @pytest.fixture
-def probe(tmp_path, monkeypatch, throwaway_effects):
-    """A throwaway effect with an example recipe of its own in a scratch examples folder. It needs no cut-out, so it
+def checkout(tmp_path, photo):
+    """A scratch source checkout to generate into: a copy of the real example recipes, a demo photo, and the empty
+    folders the generated files go to. Nothing in the real checkout is written."""
+    root = tmp_path / "checkout"
+    shutil.copytree(REAL_EXAMPLES, root / "examples" / "effects")
+    (root / "examples" / "photos").mkdir()
+    imageio.save(photo, root / "examples" / "photos" / "bullterrier.jpeg")
+    (root / "docs" / "gallery").mkdir(parents=True)
+    (root / "src" / "photo_fx").mkdir(parents=True)
+    return root
+
+
+@pytest.fixture
+def probe(checkout, throwaway_effects):
+    """A throwaway effect with an example recipe of its own in the scratch checkout. It needs no cut-out, so it
     renders anywhere. Its recipe renders at 300 px, to show the gallery picture is 480 px whatever the recipe says."""
 
     @effect(category="utilities")
@@ -94,12 +111,9 @@ def probe(tmp_path, monkeypatch, throwaway_effects):
         """Darkens the picture."""
         return (rgb * amount).astype(np.float32)
 
-    examples = tmp_path / "examples"
-    examples.mkdir()
-    (examples / "gallery_probe.toml").write_text(
+    (checkout / "examples" / "effects" / "gallery_probe.toml").write_text(
         'name = "gallery_probe"\nsize = 300\n[[step]]\neffect = "gallery_probe"\n'
     )
-    monkeypatch.setattr(gallery, "EXAMPLES", examples)
     return "gallery_probe"
 
 
@@ -115,39 +129,53 @@ def _jpeg_tables(quality: int) -> dict:
     return _quantization(buffer)
 
 
-def test_gallery_renders_missing_pictures_only_unless_forced(tmp_path, probe):
+def test_gallery_renders_missing_pictures_only_unless_forced(tmp_path, checkout, probe):
     out = tmp_path / "out"
-    assert gallery.render_gallery(out, only=[probe]) == [probe]
+    assert gallery.render_gallery(out, only=[probe], checkout=checkout) == [probe]
     first = (out / f"{probe}.jpg").read_bytes()
     (out / f"{probe}.jpg").write_bytes(b"placeholder")
-    assert gallery.render_gallery(out, only=[probe]) == []  # it exists, so it is left alone
+    assert gallery.render_gallery(out, only=[probe], checkout=checkout) == []  # it exists, so it is left alone
     assert (out / f"{probe}.jpg").read_bytes() == b"placeholder"
-    assert gallery.render_gallery(out, only=[probe], force=True) == [probe]
+    assert gallery.render_gallery(out, only=[probe], force=True, checkout=checkout) == [probe]
     assert (out / f"{probe}.jpg").read_bytes() == first  # rendered again, and rendering is deterministic
 
 
-def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(tmp_path, probe):
-    gallery.render_gallery(tmp_path, only=[probe])
+def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(tmp_path, checkout, probe):
+    gallery.render_gallery(tmp_path, only=[probe], checkout=checkout)
     with Image.open(tmp_path / f"{probe}.jpg") as picture:
         assert picture.format == "JPEG" and max(picture.size) == 480  # from a 300 px recipe
     assert _jpeg_tables(82) != _jpeg_tables(90)  # the tables do tell qualities apart
     assert _quantization(tmp_path / f"{probe}.jpg") == _jpeg_tables(82)
 
 
-def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path, probe):
-    with pytest.raises(ValueError, match=r"unknown effect 'nope'.*available: .*gallery_probe"):
-        gallery.render_gallery(tmp_path / "out", only=[probe, "nope"])
+def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_recipe(tmp_path, checkout, probe, photo):
+    gallery.render_gallery(tmp_path, only=[probe], checkout=checkout)
+    picture = imageio.load(tmp_path / f"{probe}.jpg")
+    expected = imageio.resize(photo * 0.5, 480)  # the probe halves the brightness; the demo photo is `photo`
+    assert picture.shape == expected.shape and np.abs(picture - expected).mean() < 0.02  # JPEG and resampling only
+
+
+def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path, checkout, probe):
+    with pytest.raises(ValueError) as raised:
+        gallery.render_gallery(tmp_path / "out", only=[probe, "nope"], checkout=checkout)
+    assert "'nope'" in str(raised.value) and "gallery_probe" in str(raised.value)  # the name, and the choices
     assert not (tmp_path / "out").exists()
 
 
-def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, probe):
+def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, checkout, probe):
     @effect(category="utilities")
     def recipe_less(rgb, amount: float = 0.5):
         """Has no example recipe."""
         return rgb
 
     with pytest.raises(FileNotFoundError, match=r"recipe_less\.toml"):
-        gallery.render_gallery(tmp_path / "out", only=[probe, "recipe_less"])
+        gallery.render_gallery(tmp_path / "out", only=[probe, "recipe_less"], checkout=checkout)
+    assert not (tmp_path / "out").exists()
+
+
+def test_gallery_outside_a_source_checkout_says_the_examples_are_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="examples"):
+        gallery.render_gallery(tmp_path / "out", only=["grain"], checkout=tmp_path / "not-a-checkout")
     assert not (tmp_path / "out").exists()
 
 
@@ -155,43 +183,40 @@ def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, pr
 
 
 @pytest.fixture
-def docs(tmp_path, monkeypatch):
-    """Point the generated files at a scratch folder, with every gallery picture already there (so none renders)."""
-    monkeypatch.setattr(gallery, "GALLERY", tmp_path / "gallery")
-    monkeypatch.setattr(gallery, "EFFECTS_PAGE", tmp_path / "effects.md")
-    monkeypatch.setattr(gallery, "STUB", tmp_path / "fx.pyi")
-    (tmp_path / "gallery").mkdir()
+def docs(checkout):
+    """The scratch checkout with every gallery picture already there (so none renders)."""
     for name in effects.describe():
-        (tmp_path / "gallery" / f"{name}.jpg").write_bytes(b"existing")
-    return tmp_path
+        (checkout / "docs" / "gallery" / f"{name}.jpg").write_bytes(b"existing")
+    return checkout
 
 
 def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(docs, capsys):
-    assert main(["regenerate"]) == 0
-    assert (docs / "fx.pyi").read_text() == fx.stub_text()
-    assert (docs / "effects.md").read_text() == gallery.render_effects_page()
-    assert {p.read_bytes() for p in (docs / "gallery").iterdir()} == {b"existing"}
-    assert capsys.readouterr().out.split() == [str(docs / "fx.pyi"), str(docs / "effects.md")]
+    assert main(["regenerate", "--checkout", str(docs)]) == 0
+    stub, page = docs / "src" / "photo_fx" / "fx.pyi", docs / "docs" / "effects.md"
+    assert stub.read_text() == fx.stub_text()
+    assert page.read_text() == gallery.render_effects_page()
+    assert {p.read_bytes() for p in (docs / "docs" / "gallery").iterdir()} == {b"existing"}
+    assert capsys.readouterr().out.split() == [str(stub), str(page)]
 
 
 def test_the_gallery_command_writes_the_page_too(docs, capsys):
-    assert main(["gallery"]) == 0
-    assert (docs / "effects.md").read_text() == gallery.render_effects_page()
-    assert not (docs / "fx.pyi").exists()
+    assert main(["gallery", "--checkout", str(docs)]) == 0
+    assert (docs / "docs" / "effects.md").read_text() == gallery.render_effects_page()
+    assert not (docs / "src" / "photo_fx" / "fx.pyi").exists()
 
 
 def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(probe, docs, capsys):
-    picture = docs / "gallery" / f"{probe}.jpg"
+    picture = docs / "docs" / "gallery" / f"{probe}.jpg"
     assert picture.read_bytes() == b"existing"
-    assert main(["gallery", "--only", probe]) == 0
+    assert main(["gallery", "--only", probe, "--checkout", str(docs)]) == 0
     assert picture.read_bytes() == b"existing"  # kept
-    assert main(["gallery", "--only", probe, "--force"]) == 0
+    assert main(["gallery", "--only", probe, "--force", "--checkout", str(docs)]) == 0
     with Image.open(picture) as rendered:
         assert rendered.format == "JPEG"  # rendered again
     assert str(picture) in capsys.readouterr().out.split()
 
 
 def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(probe, docs, capsys):
-    assert main(["gallery", "--only", probe, "nope"]) == 1
-    assert "unknown effect 'nope'" in capsys.readouterr().err
-    assert not (docs / "effects.md").exists()
+    assert main(["gallery", "--only", probe, "nope", "--checkout", str(docs)]) == 1
+    assert "'nope'" in capsys.readouterr().err
+    assert not (docs / "docs" / "effects.md").exists()
