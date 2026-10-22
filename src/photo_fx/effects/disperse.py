@@ -160,7 +160,8 @@ def disperse(
     np.maximum.at(canvas, (yy[on_canvas], xx[on_canvas]), shaded[on_canvas])
 
     kept = cells.join(out, canvas.shape[0], canvas.shape[1])
-    return np.maximum(kept, canvas)[:height, :width].astype(np.float32)
+    # The glow and the shimmer brighten; on what is already white they would leave the 0..1 range, so they stop there.
+    return np.clip(np.maximum(kept, canvas)[:height, :width], 0.0, 1.0).astype(np.float32)
 
 
 def hover_gate(hover: float) -> float:
