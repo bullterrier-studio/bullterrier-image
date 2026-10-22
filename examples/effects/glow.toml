@@ -1,0 +1,14 @@
+# Bloom spilling from the bright fur onto the black around it.
+name = "glow"
+size = 480
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"           # the subject on black
+
+[[step]]
+effect = "glow"
+radius = 16
+amount = 0.8
+threshold = 0.45

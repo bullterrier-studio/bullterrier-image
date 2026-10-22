@@ -1,0 +1,24 @@
+# The outline sheds characters that drift up and away, like smoke.
+name = "evaporate"
+size = 480
+
+[[step]]
+effect = "ascii"
+cell = 5
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"           # the subject on black
+
+[[step]]
+effect = "evaporate"
+cell = 5                      # same as the ascii step: whole characters move
+start = 0.4
+end = 0.16
+edge = 0.1
+outward = 0.5
+rise = 0.22
+vanish = 0.35
+seed = 3

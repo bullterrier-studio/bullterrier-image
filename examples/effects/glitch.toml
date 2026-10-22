@@ -1,0 +1,12 @@
+# Torn strips slid sideways and red and blue pulled apart; some strips turn into text.
+name = "glitch"
+size = 480
+
+[[step]]
+effect = "glitch"
+split = 6
+bands = 9
+shift = 0.05
+ascii_share = 0.3
+ascii_cell = 6
+seed = 4

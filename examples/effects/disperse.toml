@@ -1,0 +1,25 @@
+# One moment of the dispersal, part-way through: the right side has already blown away up and to the right.
+name = "disperse"
+size = 480
+
+[[step]]
+effect = "ascii"
+cell = 5
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"           # the subject on black
+
+[[step]]
+effect = "disperse"
+cell = 5                      # same as the ascii step: whole characters move
+progress = 0.4
+sweep = -1.0
+top = 0
+edge = 0
+wind = 0.3
+angle = 30
+hover = 0.25
+seed = 4

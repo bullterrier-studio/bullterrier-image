@@ -1,0 +1,14 @@
+# The photo redrawn as text, every character in the photo's own colour.
+name = "ascii"
+size = 480
+
+[[step]]
+effect = "ascii"
+cell = 5
+gamma = 0.6
+photo = 0.25
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"           # the subject on black

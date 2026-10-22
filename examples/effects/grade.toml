@@ -1,0 +1,9 @@
+# Brighter, punchier and more colourful: exposure, contrast and saturation.
+name = "grade"
+size = 480
+
+[[step]]
+effect = "grade"
+exposure = 0.3
+contrast = 1.25
+saturation = 1.4

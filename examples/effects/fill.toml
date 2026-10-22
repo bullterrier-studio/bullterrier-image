@@ -1,0 +1,8 @@
+# Masked to the background, a flat colour removes the background.
+name = "fill"
+size = 480
+
+[[step]]
+effect = "fill"
+color = "#14213d"
+mask = "background"

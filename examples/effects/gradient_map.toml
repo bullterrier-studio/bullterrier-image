@@ -1,0 +1,12 @@
+# Recoloured by brightness with a neon gradient, on black.
+name = "gradient_map"
+size = 480
+
+[[step]]
+effect = "gradient_map"
+stops = ["#0a0020", "#6a1bff", "#ff2bd6", "#00f0ff"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"           # the subject on black

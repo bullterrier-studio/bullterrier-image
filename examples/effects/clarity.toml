@@ -1,0 +1,8 @@
+# Local contrast: fur and features stand out without the whole picture getting harsher.
+name = "clarity"
+size = 480
+
+[[step]]
+effect = "clarity"
+radius = 24
+amount = 1.2
