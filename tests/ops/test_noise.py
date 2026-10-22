@@ -149,12 +149,15 @@ def test_lag_anomaly_flags_a_field_that_repeats_at_the_lattice_spacing(kind):
     assert _lag_anomaly(tiled, 32) > 0.015
 
 
-def test_four_octaves_at_1600_square_take_under_two_seconds():
-    start = time.perf_counter()
-    field = fractal_noise((1600, 1600), 100, 1, octaves=4)
-    elapsed = time.perf_counter() - start
+def test_four_octaves_at_1600_square_take_under_two_seconds_of_cpu():
+    # CPU time of this process, best of three (about 0.14 s here): a busy machine cannot fail a correct implementation.
+    timings = []
+    for _ in range(3):
+        start = time.process_time()
+        field = fractal_noise((1600, 1600), 100, 1, octaves=4)
+        timings.append(time.process_time() - start)
     assert field.shape == (1600, 1600)
-    assert elapsed < 2.0, f"took {elapsed:.2f}s"
+    assert min(timings) < 2.0, f"took {min(timings):.2f}s of CPU"
 
 
 # ---------------------------------------------------------------------------------------------------------------------

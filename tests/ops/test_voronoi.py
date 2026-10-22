@@ -30,25 +30,12 @@ def test_random_points_have_shape_dtype_and_stay_inside_a_non_square_picture():
     assert pts[:, 0].max() > 30 and pts[:, 1].max() > 20
 
 
-class _LargestDraw:
-    """Stands in for a numpy Generator whose uniform draws all take the largest value below the upper bound."""
-
-    _below_one = np.nextafter(1.0, 0.0)
-
-    def random(self, size=None):
-        return np.full(size, self._below_one)
-
-    def uniform(self, low=0.0, high=1.0, size=None):
-        return low + (high - low) * np.full(size, self._below_one)
-
-
-def test_random_points_never_reach_the_far_edge_even_for_the_largest_random_draw(monkeypatch):
-    # A real draw this large is a one-in-10^8 event, so force it. Scaled by 3 and rounded to float32 it would be exactly
-    # 3.0, outside the picture. The stand-in answers both ways of asking numpy for uniform numbers and fails loudly
-    # (AttributeError) if the function asks any other way.
-    monkeypatch.setattr(np.random, "default_rng", lambda seed: _LargestDraw())
-    pts = voronoi.random_points((5, 3), 4, seed=0)
-    assert (pts[:, 0] < 3).all() and (pts[:, 1] < 5).all()
+def test_random_points_never_reach_the_far_edge_even_when_rounding_to_float32_would_put_them_on_it():
+    # Among numpy's draws for seed 177 is 1 - 3e-8 (point 59228). Scaled by 17 and rounded to float32 it is exactly
+    # 17.0, on the far edge, outside the picture. Found by searching seeds; a draw that large is a one-in-10^7 event.
+    pts = voronoi.random_points((17, 17), 59_229, seed=177)
+    assert pts.max() < 17 and pts.min() >= 0
+    assert pts.max() > 16.99999  # the draw really came that close to the edge
 
 
 def test_random_points_stay_in_half_open_bounds_for_many_seeds():
@@ -120,10 +107,15 @@ def test_cell_labels_reject_no_points():
 
 
 def test_cell_labels_of_a_large_picture_are_fast():
+    # CPU time of this process (all its threads), best of three: a busy machine does not fail a correct implementation.
+    # About 1.2 s here; a per-pixel loop or a full distance matrix would take minutes.
     points = voronoi.random_points((1600, 1600), 2000, seed=0)
-    start = time.perf_counter()
-    voronoi.cell_labels((1600, 1600), points)
-    assert time.perf_counter() - start < 1.5
+    timings = []
+    for _ in range(3):
+        start = time.process_time()
+        voronoi.cell_labels((1600, 1600), points)
+        timings.append(time.process_time() - start)
+    assert min(timings) < 4.0
 
 
 # ---------------------------------------------------------------- cell_means

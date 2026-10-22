@@ -205,11 +205,14 @@ def test_oklab_to_rgb_does_not_clip_out_of_gamut_colours():
 
 def test_oklab_converts_a_full_size_image_quickly():
     # A loose regression guard against per-pixel Python loops (these run in a fraction of a second when vectorised).
+    # CPU time of this process, best of three (about 0.6 s here): a busy machine does not fail a correct implementation.
     image = np.random.default_rng(2).random((1600, 1600, 3), dtype=np.float32)
-    start = time.perf_counter()
-    lab = cs.rgb_to_oklab(image)
-    cs.oklab_to_rgb(lab)
-    assert time.perf_counter() - start < 4
+    timings = []
+    for _ in range(3):
+        start = time.process_time()
+        cs.oklab_to_rgb(cs.rgb_to_oklab(image))
+        timings.append(time.process_time() - start)
+    assert min(timings) < 4
 
 
 # --- in_linear_light --------------------------------------------------------------------------------------------------
