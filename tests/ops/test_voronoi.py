@@ -30,15 +30,39 @@ def test_random_points_have_shape_dtype_and_stay_inside_a_non_square_picture():
     assert pts[:, 0].max() > 30 and pts[:, 1].max() > 20
 
 
-def test_random_points_never_reach_the_far_edge_even_for_the_largest_random_draw(monkeypatch):
-    class LargestDraw:
-        # the biggest value Generator.random can return; scaled by 3 and rounded to float32 it becomes exactly 3.0
-        def random(self, size):
-            return np.full(size, np.nextafter(1.0, 0.0))
+class _LargestDraw:
+    """Stands in for a numpy Generator whose uniform draws all take the largest value below the upper bound."""
 
-    monkeypatch.setattr(np.random, "default_rng", lambda seed: LargestDraw())
+    _below_one = np.nextafter(1.0, 0.0)
+
+    def random(self, size=None):
+        return np.full(size, self._below_one)
+
+    def uniform(self, low=0.0, high=1.0, size=None):
+        return low + (high - low) * np.full(size, self._below_one)
+
+
+def test_random_points_never_reach_the_far_edge_even_for_the_largest_random_draw(monkeypatch):
+    # A real draw this large is a one-in-10^8 event, so force it. Scaled by 3 and rounded to float32 it would be exactly
+    # 3.0, outside the picture. The stand-in answers both ways of asking numpy for uniform numbers and fails loudly
+    # (AttributeError) if the function asks any other way.
+    monkeypatch.setattr(np.random, "default_rng", lambda seed: _LargestDraw())
     pts = voronoi.random_points((5, 3), 4, seed=0)
     assert (pts[:, 0] < 3).all() and (pts[:, 1] < 5).all()
+
+
+def test_random_points_stay_in_half_open_bounds_for_many_seeds():
+    for seed in range(300):
+        pts = voronoi.random_points((7, 3), 200, seed=seed)
+        assert (pts >= 0).all() and (pts[:, 0] < 3).all() and (pts[:, 1] < 7).all()
+
+
+def test_random_points_cover_the_picture_uniformly():
+    shape = (30, 80)
+    pts = voronoi.random_points(shape, 10000, seed=2)
+    # 4 x 4 grid of equal tiles: each expects 625 points (standard deviation about 24); the tolerance is over 6 sigma
+    counts, _, _ = np.histogram2d(pts[:, 1], pts[:, 0], bins=4, range=[[0, 30], [0, 80]])
+    assert np.abs(counts - 625).max() < 150
 
 
 def test_random_points_zero_count_is_empty():
@@ -148,6 +172,14 @@ def test_cell_means_of_a_grayscale_image_have_one_channel():
     means = voronoi.cell_means(image, labels, 2)
     assert means.shape == (2, 1)
     assert np.allclose(means[:, 0], [0.5, 0.58333333])
+
+
+def test_cell_means_reject_an_image_whose_size_differs_from_the_labels():
+    labels = np.zeros((2, 3), dtype=np.int32)
+    with pytest.raises(ValueError, match="shape"):
+        voronoi.cell_means(np.zeros((2, 6), dtype=np.float32), labels, 1)  # would silently read as 2 channels
+    with pytest.raises(ValueError, match="shape"):
+        voronoi.cell_means(np.zeros((3, 2, 3), dtype=np.float32), labels, 1)
 
 
 def test_cell_means_reject_labels_outside_the_cell_count():
@@ -304,9 +336,20 @@ def test_triangulate_rejects_collinear_points():
         voronoi.triangulate(points)
 
 
-def test_triangulate_rejects_points_that_are_not_an_n_by_2_array():
-    with pytest.raises(ValueError):
-        voronoi.triangulate(np.zeros((4, 3), dtype=np.float32))
+@pytest.mark.parametrize(
+    "points",
+    [
+        np.array(
+            [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float32
+        ),  # distinct 3-D points: a valid tetrahedron
+        np.array([0, 1, 2, 5, 9], dtype=np.float32),  # 1-D
+        np.array([[[0], [0]], [[1], [0]], [[0], [1]]], dtype=np.float32),  # (3, 2, 1)
+    ],
+    ids=["n_by_3", "1d", "n_by_2_by_1"],
+)
+def test_triangulate_rejects_points_that_are_not_an_n_by_2_array(points):
+    with pytest.raises(ValueError, match="shape"):
+        voronoi.triangulate(points)
 
 
 def test_triangulate_ignores_a_repeated_point():

@@ -52,12 +52,15 @@ def cell_means(image: np.ndarray, labels: np.ndarray, count: int) -> np.ndarray:
 
     Args:
         image: `(h, w)` or `(h, w, c)` array of any numeric values (typically float32 in 0..1).
-        labels: `(h, w)` integer cell labels, as from `cell_labels`; every label must be in `[0, count)`.
+        labels: `(h, w)` integer cell labels, as from `cell_labels`, of the same `(h, w)` as `image`; every label must
+            be in `[0, count)`.
         count: number of cells.
 
     Returns:
         `(count, c)` float32 array (`c = 1` for a 2-D image); a cell that owns no pixel gets zeros.
     """
+    if image.shape[:2] != labels.shape:
+        raise ValueError(f"image shape {image.shape} does not match labels shape {labels.shape}")
     if labels.size and (labels.min() < 0 or labels.max() >= count):
         raise ValueError(f"labels must lie in [0, {count}), got [{labels.min()}, {labels.max()}]")
     flat = labels.ravel()
