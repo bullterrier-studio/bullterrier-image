@@ -32,6 +32,9 @@ _SOBEL_MAX = math.sqrt(20.0)
 # Laplacian of Gaussian).
 _DOG_RATIO = 1.6
 
+# Gradients closer than this share of each other count as equal when thinning edges (float32 rounding is ~1e-7).
+_TIE = 1e-4
+
 _GAUSSIAN_TRUNCATE = 4.0  # scipy's default; named because the DoG normalisation has to rebuild the very same kernels
 
 
@@ -105,7 +108,7 @@ def detect_edges(
     elif method == "dog":
         magnitude = _difference_of_gaussians(grey, blurred, sigma)
     else:
-        raise NotImplementedError(method)
+        magnitude = _canny_lines(gradient, direction, low, high)
     return Edges(magnitude=magnitude.astype(np.float32, copy=False), direction=direction)
 
 
@@ -125,13 +128,12 @@ def _to_grey(image: np.ndarray) -> np.ndarray:
 
 def _sobel(grey: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Un-normalised Sobel derivatives (d/dx, d/dy) with x to the right and y down; borders replicate the edge pixel."""
-    difference, smooth = [-1.0, 0.0, 1.0], [1.0, 2.0, 1.0]
-    gx = ndimage.correlate1d(
-        ndimage.correlate1d(grey, difference, axis=1, mode="nearest"), smooth, axis=0, mode="nearest"
-    )
-    gy = ndimage.correlate1d(
-        ndimage.correlate1d(grey, difference, axis=0, mode="nearest"), smooth, axis=1, mode="nearest"
-    )
+    # Written with shifted slices rather than ndimage.correlate1d: about three times faster on large pictures.
+    padded = np.pad(grey, 1, mode="edge")
+    across_x = padded[:, 2:] - padded[:, :-2]  # (h + 2, w): right minus left
+    across_y = padded[2:, :] - padded[:-2, :]  # (h, w + 2): below minus above
+    gx = across_x[:-2] + 2 * across_x[1:-1] + across_x[2:]
+    gy = across_y[:, :-2] + 2 * across_y[:, 1:-1] + across_y[:, 2:]
     return gx, gy
 
 
@@ -169,3 +171,39 @@ def _dog_peak_response(sigma: float) -> float:
         positive += row[row > 0].sum()
         negative -= row[row < 0].sum()
     return max(positive, negative)
+
+
+def _canny_lines(gradient: np.ndarray, direction: np.ndarray, low: float, high: float) -> np.ndarray:
+    """Thin edge lines: 1.0 on kept pixels, 0 elsewhere."""
+    if not gradient.any():
+        return np.zeros_like(gradient)
+    ridge = _non_maximum_suppression(gradient, direction)
+    strongest = gradient.max()
+    candidate = ridge & (gradient > low * strongest)
+    seed = ridge & (gradient > high * strongest)
+
+    # Hysteresis: keep every connected group of candidate pixels that contains at least one seed.
+    groups, count = ndimage.label(candidate, structure=np.ones((3, 3), dtype=bool))
+    has_seed = np.zeros(count + 1, dtype=bool)
+    has_seed[groups[seed]] = True
+    has_seed[0] = False  # label 0 is the background
+    return has_seed[groups].astype(np.float32)
+
+
+def _non_maximum_suppression(gradient: np.ndarray, direction: np.ndarray) -> np.ndarray:
+    """Mask of pixels not weaker than their two neighbours along the gradient, i.e. the crest across an edge."""
+    height, width = gradient.shape
+    padded = np.pad(gradient, 1)
+    # The gradient axis rounded to the nearest of four lines through the pixel (0, 45, 90, 135 degrees). The angle is
+    # taken modulo pi because a direction and its opposite name the same pair of neighbours.
+    sector = np.floor(np.mod(direction, np.pi) / (np.pi / 4) + 0.5).astype(np.int8) % 4
+    # (dy, dx) of the "next" neighbour for each sector; the "previous" one is the opposite offset.
+    steps = ((0, 1), (1, 1), (1, 0), (1, -1))
+    keep = np.zeros(gradient.shape, dtype=bool)
+    for index, (dy, dx) in enumerate(steps):
+        after = padded[1 + dy : 1 + dy + height, 1 + dx : 1 + dx + width]
+        before = padded[1 - dy : 1 - dy + height, 1 - dx : 1 - dx + width]
+        # A step between two pixels makes both equally strong. The earlier one wins such a tie, and "equally" allows for
+        # rounding so that the winner does not flip when the picture is shifted in brightness or transposed.
+        keep |= (sector == index) & (gradient >= after * (1 - _TIE)) & (gradient > before * (1 + _TIE))
+    return keep

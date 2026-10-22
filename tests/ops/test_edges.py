@@ -1,12 +1,15 @@
 """Behaviour of photo_fx.ops.edges, stated as properties of the output (never as a golden image)."""
 
+import time
+
 import numpy as np
 import pytest
 from scipy import ndimage
 
 from photo_fx.ops.edges import Edges, detect_edges
 
-METHODS = ["sobel", "dog"]  # "canny" joins in the Canny commit
+METHODS = ["sobel", "canny", "dog"]
+LINEAR_METHODS = ["sobel", "dog"]  # canny is binary, so contrast scaling does not apply to it
 
 
 def vertical_step(h=40, w=60, low=0.0, high=1.0, column=30):
@@ -242,7 +245,7 @@ def test_magnitude_stays_within_zero_and_one_on_binary_noise(method, sigma):
     assert magnitude.max() > 0.1  # binary noise is full of edges, so the bound is not met by returning zeros
 
 
-@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("method", LINEAR_METHODS)
 def test_half_the_contrast_gives_half_the_magnitude(method):
     picture = blocks()
     full = detect_edges(picture, method).magnitude
@@ -284,3 +287,119 @@ def test_dog_profile_across_a_step_is_the_difference_of_a_sigma_and_a_one_point_
     magnitude = detect_edges(img, "dog", sigma=sigma).magnitude
     # Compared as shapes, so the test does not repeat the module's normalisation.
     np.testing.assert_allclose(magnitude[20] / magnitude[20].max(), expected[20] / expected[20].max(), atol=1e-4)
+
+
+# --- canny: thin lines, hysteresis ---------------------------------------------------------------------------------
+
+
+def edge_pixels(edges):
+    return edges.magnitude > 0
+
+
+def test_canny_magnitude_is_exactly_one_on_kept_pixels_and_zero_elsewhere():
+    magnitude = detect_edges(blocks(), "canny").magnitude
+    assert set(np.unique(magnitude)) == {0.0, 1.0}
+
+
+def test_canny_gives_a_line_one_pixel_wide_on_a_straight_step():
+    on = edge_pixels(detect_edges(vertical_step(), "canny"))
+    assert on.any()
+    padded = np.pad(on, 1)
+    neighbours = sum(
+        padded[1 + dy : 1 + dy + on.shape[0], 1 + dx : 1 + dx + on.shape[1]]
+        for dy in (-1, 0, 1)
+        for dx in (-1, 0, 1)
+        if (dy, dx) != (0, 0)
+    )
+    assert neighbours[on].max() <= 3
+    assert on[20].sum() == 1  # one pixel across the edge, on every row
+    assert abs(int(np.argmax(on[20])) - 30) <= 1
+
+
+def test_canny_is_blind_to_contrast_because_thresholds_are_shares_of_the_strongest_gradient():
+    picture = blocks()
+    np.testing.assert_array_equal(
+        detect_edges(picture, "canny").magnitude, detect_edges(0.5 * picture, "canny").magnitude
+    )
+
+
+def strong_then_weak_edge_with_an_isolated_weak_edge():
+    """A bright band whose left edge fades from contrast 1.0 (top) to 0.2 (bottom): one line, strong then weak.
+
+    A second, separate step of the same 0.2 contrast stands at column 80, 20 px from the band. Gradient shares after
+    normalising by the strongest are about 0.2 for both weak edges, between low=0.1 and high=0.3.
+    """
+    img = np.zeros((80, 100), dtype=np.float32)
+    level = np.interp(np.arange(80), [0, 20, 40, 79], [1.0, 1.0, 0.2, 0.2]).astype(np.float32)
+    img[:, 20:60] = level[:, None]
+    img[:, 80:] = 0.2
+    return img
+
+
+def test_hysteresis_keeps_a_weak_edge_connected_to_a_strong_one_and_drops_an_isolated_weak_edge():
+    edges = detect_edges(strong_then_weak_edge_with_an_isolated_weak_edge(), "canny", low=0.1, high=0.3)
+    on = edge_pixels(edges)
+    assert on[5:15, 19:22].any()  # the strong part is found
+    assert on[55:75, 19:22].any()  # the weak part of the same line is kept: it is connected
+    assert not on[:, 75:].any()  # the isolated weak step (same 0.2 contrast) is dropped
+
+
+def test_lowering_high_lets_the_isolated_weak_edge_start_its_own_line():
+    img = strong_then_weak_edge_with_an_isolated_weak_edge()
+    on = edge_pixels(detect_edges(img, "canny", low=0.05, high=0.15))
+    assert on[:, 75:].any()
+
+
+def test_raising_low_above_the_weak_strength_disconnects_the_weak_part_of_the_line():
+    img = strong_then_weak_edge_with_an_isolated_weak_edge()
+    on = edge_pixels(detect_edges(img, "canny", low=0.25, high=0.3))
+    assert on[5:15, 19:22].any()
+    assert not on[55:75, 19:22].any()
+
+
+@pytest.mark.parametrize("highs", [(0.2, 0.4), (0.4, 0.6), (0.6, 0.9)])
+def test_raising_high_never_adds_edge_pixels(highs):
+    picture = blocks() + 0.1 * np.random.default_rng(2).random((48, 66), dtype=np.float32)
+    lower, higher = (edge_pixels(detect_edges(picture, "canny", low=0.1, high=h)) for h in highs)
+    assert lower.sum() > higher.sum() > 0  # the thresholds really bite on this picture
+    assert not (higher & ~lower).any()  # every pixel kept at the higher threshold was already kept at the lower one
+
+
+# --- noise and speed -----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_a_larger_sigma_finds_fewer_false_edges_in_a_noisy_flat_region(method):
+    rng = np.random.default_rng(0)
+    scene = np.full((96, 128), 0.3, dtype=np.float32)
+    scene[:, 64:] = 0.7  # a real step on the right keeps the relative thresholds of canny anchored to a real edge
+    noisy = np.clip(scene + rng.normal(0, 0.2, scene.shape), 0, 1).astype(np.float32)
+
+    def false_edges(sigma):
+        flat_part = detect_edges(noisy, method, sigma=sigma).magnitude[:, :40]  # 24 px clear of the step
+        return int((flat_part > 0.05).sum())
+
+    fine, coarse = false_edges(1.0), false_edges(3.0)
+    assert fine > 100  # the noise really does produce false edges at sigma=1
+    assert coarse < fine / 2
+
+
+def test_the_real_step_survives_the_noise_that_the_large_sigma_removes():
+    rng = np.random.default_rng(0)
+    scene = np.full((96, 128), 0.3, dtype=np.float32)
+    scene[:, 64:] = 0.7
+    noisy = np.clip(scene + rng.normal(0, 0.2, scene.shape), 0, 1).astype(np.float32)
+    on = detect_edges(noisy, "canny", sigma=3.0).magnitude > 0
+    assert on[:, 62:67].any(axis=1).mean() > 0.9  # most rows still have an edge pixel at the step
+
+
+@pytest.mark.parametrize(("method", "budget_seconds"), [("sobel", 0.3), ("canny", 1.5)])
+def test_a_1600_by_1600_picture_is_processed_within_budget(method, budget_seconds):
+    picture = np.random.default_rng(0).random((1600, 1600), dtype=np.float32)  # noise: the most edges there can be
+    timings = []
+    # CPU time of this process, best of three: other processes sharing the machine do not fail a correct implementation.
+    for _ in range(3):
+        start = time.process_time()
+        detect_edges(picture, method)
+        timings.append(time.process_time() - start)
+    assert min(timings) < budget_seconds
