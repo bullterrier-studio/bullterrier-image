@@ -1,9 +1,13 @@
-"""Everything generated from the effects themselves: the gallery pictures, `docs/effects.md` and `fx.pyi`.
+"""The developer commands on a source checkout: what is generated from the effects (the gallery pictures,
+`docs/effects.md`, `fx.pyi`).
 
-Effects carry their own documentation (category, docstring, signature) and each has an example recipe in
-`examples/effects/<name>.toml`, so nothing here is written by hand and no effect needs a shared file edited. The files
-are regenerated deliberately, once, at integration (`photo-fx regenerate`), not on every branch: that is what keeps
-parallel work free of merge conflicts. These are developer commands; they need a source checkout of photo-fx.
+Everything about an effect is found by its name, in a layout that mirrors the package: its code in
+`src/photo_fx/effects/<name>/`, its tests in `tests/effects/<name>/`, its example recipe in `examples/effects/` and its
+gallery picture in `docs/gallery/`. `effect_files` is the one place that says so; everything else asks it. Effects carry
+their own documentation (category, docstring, signature), so nothing here is written by hand and no effect needs a
+shared file edited. The shared files (`docs/effects.md`, `fx.pyi`) are regenerated deliberately, once, at integration
+(`photo-fx regenerate`), not on every branch: that is what keeps parallel work free of merge conflicts. These are
+developer commands; they need a source checkout of photo-fx.
 """
 
 import inspect
@@ -49,99 +53,124 @@ def render_effects_page() -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_gallery(
-    out_dir: Path, only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT
-) -> list[str]:
-    """Render the example recipe of each effect (all, or those named in `only`) on the demo photo into
-    `out_dir/<name>.jpg`, longest side 480 px. Pictures that already exist are kept unless `force` is set, so nothing
-    changes that does not need to. Returns the names rendered. `checkout` is the photo-fx source checkout whose
-    example recipes (`examples/effects/<name>.toml`) and demo photo (`examples/photos/bullterrier.jpeg`) are used.
+class EffectFiles(NamedTuple):
+    """Where everything about one effect lives in a source checkout, by its name."""
+
+    package: Path  # src/photo_fx/effects/<name>/: its code, `__init__.py` and `effect.py`
+    tests: Path  # tests/effects/<name>/test_<name>.py: its behaviour tests
+    example: Path  # examples/effects/<name>.toml: the short recipe that shows it, rendered for its picture
+    picture: Path  # docs/gallery/<name>.jpg: its gallery picture (JPEG, longest side 480 px), shown by docs/effects.md
+
+
+def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
+    """Where the files of an effect called `name` live in `checkout`, whether or not they exist (yet). TRANSITIONAL: an
+    effect still in a loose module has its code in that module and its tests in `tests/effects/test_<module>.py`; its
+    example recipe and picture are where this says."""
+    return EffectFiles(
+        package=_layout(checkout).effects / name,
+        tests=checkout / "tests" / "effects" / name / f"test_{name}.py",
+        example=checkout / "examples" / "effects" / f"{name}.toml",
+        picture=checkout / "docs" / "gallery" / f"{name}.jpg",
+    )
+
+
+def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT) -> list[str]:
+    """Render the example recipe of each effect (all, or those named in `only`) on the demo photo into its gallery
+    picture (see `effect_files`), longest side 480 px. Pictures that already exist are kept unless `force` is set, so
+    nothing changes that does not need to. Returns the names rendered. `checkout` is the photo-fx source checkout whose
+    example recipes, demo photo (`examples/photos/bullterrier.jpeg`) and pictures are used.
 
     Everything is checked before anything is rendered: an unknown name raises `ValueError` listing the effects, a
-    missing example recipe `FileNotFoundError`. Example recipes that cut out the subject need Apple Vision (macOS).
+    missing example recipe or a `checkout` that is no source checkout `FileNotFoundError`. Example recipes that cut out
+    the subject need Apple Vision (macOS).
     """
-    layout = _layout(checkout)
-    names = _chosen(only, layout.examples)
-    todo = [name for name in names if force or not (out_dir / f"{name}.jpg").exists()]
+    names = _chosen(only, checkout)
+    todo = [name for name in names if force or not effect_files(name, checkout=checkout).picture.exists()]
     if not todo:
         return []
-    photo, matte = imageio.load(layout.photo), None
-    out_dir.mkdir(parents=True, exist_ok=True)
+    photo, matte = imageio.load(_layout(checkout).photo), None
     for name in todo:
-        recipe = load_recipe(layout.examples / f"{name}.toml")
+        files = effect_files(name, checkout=checkout)
+        recipe = load_recipe(files.example)
         if recipe.needs_matte and matte is None:
             matte = subject_matte(photo)  # once for all the recipes that need it
         picture = render(photo, recipe, matte, at=_ANIMATION_MOMENT)
-        imageio.save(imageio.resize(picture, _SIDE), out_dir / f"{name}.jpg", quality=_QUALITY)
+        files.picture.parent.mkdir(parents=True, exist_ok=True)
+        imageio.save(imageio.resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo
 
 
 def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT) -> list[Path]:
-    """Write `docs/effects.md` and render the gallery pictures into `docs/gallery/` that are missing (or those in
-    `only`, or all of them with `force`; see `render_gallery`), both in `checkout`. The page is written first, so it is
-    up to date even where pictures cannot be rendered. Returns the files written."""
-    layout = _layout(checkout)
-    _chosen(only, layout.examples)  # a bad name fails before anything is written
-    layout.page.write_text(render_effects_page())
-    rendered = render_gallery(layout.gallery, only, force, checkout=checkout)
-    return [layout.page, *(layout.gallery / f"{name}.jpg" for name in rendered)]
+    """Write `docs/effects.md` and render the gallery pictures that are missing (or those in `only`, or all of them
+    with `force`; see `render_gallery`), both in `checkout`. The page is written first, so it is up to date even where
+    pictures cannot be rendered. Returns the files written."""
+    _chosen(only, checkout)  # a bad name fails before anything is written
+    page = _layout(checkout).page
+    page.write_text(render_effects_page())
+    rendered = render_gallery(only, force, checkout=checkout)
+    return [page, *(effect_files(name, checkout=checkout).picture for name in rendered)]
 
 
 def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
     """The one integration step after effects were added or changed: write `src/photo_fx/fx.pyi` (for editors) in
     `checkout`, then `write_docs`. Returns the files written. Every effect's example recipe is checked first, so a
     checkout that lacks one gets `FileNotFoundError` and no file is written."""
-    layout = _layout(checkout)
-    _chosen((), layout.examples)
-    layout.stub.write_text(fx.stub_text())
-    return [layout.stub, *write_docs(checkout=checkout)]
+    _chosen((), checkout)
+    stub = _layout(checkout).stub
+    stub.write_text(fx.stub_text())
+    return [stub, *write_docs(checkout=checkout)]
 
 
 class _Layout(NamedTuple):
-    """Where the generated files and their sources live in a source checkout."""
+    """Where the files shared by all effects live in a source checkout."""
 
-    examples: Path  # one example recipe per effect
+    effects: Path  # src/photo_fx/effects, one folder per effect: its presence makes a folder a source checkout
     photo: Path  # the demo photo every example recipe is shown on
-    gallery: Path  # the pictures docs/effects.md shows
     page: Path  # docs/effects.md
     stub: Path  # fx.pyi, next to fx.py
 
 
 def _layout(checkout: Path) -> _Layout:
+    package = checkout / "src" / "photo_fx"
     return _Layout(
-        examples=checkout / "examples" / "effects",
+        effects=package / "effects",
         photo=checkout / "examples" / "photos" / "bullterrier.jpeg",
-        gallery=checkout / "docs" / "gallery",
         page=checkout / "docs" / "effects.md",
-        stub=checkout / "src" / "photo_fx" / "fx.pyi",
+        stub=package / "fx.pyi",
     )
 
 
-def _chosen(only: Sequence[str], examples: Path) -> list[str]:
-    """The effects to work on, checked: each is a known effect with an example recipe in `examples`."""
+def _chosen(only: Sequence[str], checkout: Path) -> list[str]:
+    """The effects to work on, checked: each is a known effect with its example recipe in `checkout`."""
     names = list(only) or sorted(effects.describe())
     for name in names:
         try:
             effects.get(name)
         except KeyError as error:
             raise ValueError(error.args[0]) from None
-    if not examples.is_dir():
-        raise FileNotFoundError(f"{examples} does not exist: this needs a source checkout of photo-fx")
-    missing = [examples / f"{name}.toml" for name in names if not (examples / f"{name}.toml").is_file()]
+    if not _layout(checkout).effects.is_dir():
+        raise FileNotFoundError(f"{checkout} has no src/photo_fx/effects: this needs a source checkout of photo-fx")
+    missing = [
+        str(path) for path in (effect_files(name, checkout=checkout).example for name in names) if not path.is_file()
+    ]
     if missing:
-        raise FileNotFoundError(f"no example recipe: add {', '.join(map(str, missing))}")
+        raise FileNotFoundError(f"no example recipe: add {', '.join(missing)}")
     return names
 
 
 def _row(name: str) -> str:
     # fx's signature is the one a recipe author sees: without the image, and without `matte`, which the recipe supplies
     parameters = inspect.signature(getattr(fx, name)).parameters.values()
+    files = effect_files(name)
+    page_folder = CHECKOUT / "docs"  # links are relative to the page, docs/effects.md
+    example = files.example.relative_to(page_folder, walk_up=True).as_posix()
+    picture = files.picture.relative_to(page_folder, walk_up=True).as_posix()
     cells = [
-        f'<img src="gallery/{name}.jpg" width="160" alt="{name}">',
+        f'<img src="{picture}" width="160" alt="{name}">',
         f"`{name}`",
         effects.summary(name),
         " ".join(f"`{p.name}={p.default!r}`" for p in parameters) or "none",
-        f"[{name}.toml](../examples/effects/{name}.toml)",
+        f"[{files.example.name}]({example})",
     ]
     return "| " + " | ".join(_cell(text) for text in cells) + " |"
 

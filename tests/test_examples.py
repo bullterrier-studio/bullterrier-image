@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from photo_fx import effects, load_project, load_recipe
+from photo_fx import effects, gallery, load_project, load_recipe
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
 
 @pytest.mark.parametrize("name", sorted(effects.describe()))
 def test_every_effect_has_a_short_example_recipe_that_shows_it(name):
-    path = EXAMPLES / "effects" / f"{name}.toml"
+    path = gallery.effect_files(name).example
     assert path.is_file(), f"add {path.relative_to(EXAMPLES.parent)}: a short recipe showing {name}"
     recipe = load_recipe(path)
     assert recipe.name == name
@@ -40,7 +40,8 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
 def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the_text_they_move():
     """disperse/evaporate move whole characters, so their cell must equal the ascii step's cell."""
     checked = []
-    for path in [*(EXAMPLES / "recipes").glob("*.toml"), *(EXAMPLES / "effects").glob("*.toml")]:
+    examples = [gallery.effect_files(name).example for name in effects.describe()]
+    for path in [*(EXAMPLES / "recipes").glob("*.toml"), *examples]:
         steps = {s.effect: s.params for s in load_recipe(path).steps}
         for mover in ("disperse", "evaporate"):
             if mover in steps and "ascii" in steps:
