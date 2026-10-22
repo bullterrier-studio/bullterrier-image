@@ -28,9 +28,6 @@ MODEL_SIZE = 178_648_008  # bytes
 _SIDE = 1024
 _MEAN = 0.5
 _EIGHT_BIT = 255.0  # the model was trained on 8-bit pictures
-# ONNX Runtime's log level for warnings and above is 2; 3 keeps only errors, so a user's run is not filled with notices
-# about graph optimisations that do not affect the result
-_LOG_ERRORS_ONLY = 3
 
 
 def subject_probability(rgb: np.ndarray, model: Path) -> np.ndarray:
@@ -39,7 +36,7 @@ def subject_probability(rgb: np.ndarray, model: Path) -> np.ndarray:
     model: the ONNX model file, which must follow the model contract in this module's docstring.
     Raises ImportError when onnxruntime is not installed.
     """
-    session = _session(*_identity(model))
+    session = _session(_identity(model))
     square = imageio.to_pil(rgb).resize((_SIDE, _SIDE), Image.Resampling.BILINEAR)
     pixels = np.asarray(square, np.float32) / _EIGHT_BIT - _MEAN
     batch = pixels.transpose(2, 0, 1)[np.newaxis]  # (height, width, channel) -> (1, channel, height, width)
@@ -55,9 +52,9 @@ def _identity(model: Path) -> tuple[str, int, int]:
 
 
 @lru_cache(maxsize=2)
-def _session(path: str, size: int, modified: int) -> Any:  # an onnxruntime.InferenceSession; loading takes a second
+def _session(identity: tuple[str, int, int]) -> Any:  # an onnxruntime.InferenceSession; loading takes a second
+    """The model's session, kept for the next call; `identity` (path, size, modification time) is the cache key."""
     import onnxruntime
 
-    options = onnxruntime.SessionOptions()
-    options.log_severity_level = _LOG_ERRORS_ONLY
-    return onnxruntime.InferenceSession(path, options, providers=["CPUExecutionProvider"])
+    path, _, _ = identity
+    return onnxruntime.InferenceSession(path, providers=["CPUExecutionProvider"])
