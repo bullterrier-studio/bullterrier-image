@@ -10,6 +10,7 @@ older people-only model. Another backend (for Linux) would be selected inside `s
 
 import io
 import sys
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -44,7 +45,8 @@ def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:
 
     `shrink` (px) pulls the edge in: a pixel keeps the lowest value within a disc of that radius around it, so a halo
     up to `shrink` px wide is cut away; the picture's own border does not count as an edge. Then `feather` (px) blurs
-    the edge with a Gaussian of that sigma, which softens it without changing the matte's total. 0 turns either off.
+    the edge with a Gaussian of that sigma, which softens it without changing the matte's total. 0 turns either off,
+    and so does a negative value (it is not an error).
     `subject_matte` applies this to the model's answer; use it on a matte from anywhere else for the same clean cut.
     """
     if shrink > 0:
@@ -56,7 +58,7 @@ def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:
     return np.clip(alpha, 0.0, 1.0).astype(np.float32)
 
 
-def _vision_handler(rgb: np.ndarray):
+def _vision_handler(rgb: np.ndarray) -> Any:  # a VNImageRequestHandler; pyobjc has no type stubs
     """A Vision request handler for `rgb` (imported here so the rest of the package works without pyobjc)."""
     import Foundation
     import Vision
@@ -67,7 +69,7 @@ def _vision_handler(rgb: np.ndarray):
     return Vision.VNImageRequestHandler.alloc().initWithData_options_(data, {})
 
 
-def _read_mask(buffer) -> np.ndarray:
+def _read_mask(buffer: Any) -> np.ndarray:  # a CVPixelBuffer
     """uint8 mask (0..255) from a Vision pixel buffer holding one 8-bit or 32-bit float channel."""
     import Quartz
 

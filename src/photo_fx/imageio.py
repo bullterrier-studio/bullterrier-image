@@ -12,6 +12,7 @@ import subprocess
 from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
+from typing import IO, cast
 
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
@@ -35,7 +36,9 @@ def load(path: str | Path) -> np.ndarray:
         if profile:
             try:
                 source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
-                img = ImageCms.profileToProfile(img.convert("RGB"), source, _SRGB, outputMode="RGB")
+                # typed `Image | None` by Pillow, but None only with inPlace=True, which is not used here
+                converted = ImageCms.profileToProfile(img.convert("RGB"), source, _SRGB, outputMode="RGB")
+                img = cast(Image.Image, converted)
             except ImageCms.PyCMSError:
                 pass  # unreadable profile: treat the pixels as sRGB, which is what most viewers do too
         return from_pil(img)
@@ -104,7 +107,7 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
         [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", shrink,
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
          "-g", "30", str(target)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,  # the return code is checked below, with the message
     )  # fmt: skip
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()}")
@@ -132,16 +135,18 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         str(path),
     ]  # fmt: skip
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    # typed `IO[bytes] | None`, but always open: both were asked for with PIPE
+    stdin, stderr = cast(IO[bytes], process.stdin), cast(IO[bytes], process.stderr)
     count = 0
     try:
         for frame in chain([first], frames):
-            process.stdin.write(_to_uint8(frame).tobytes())
+            stdin.write(_to_uint8(frame).tobytes())
             count += 1
     except BrokenPipeError:
         pass  # ffmpeg stopped early; its error message below says why
     finally:
-        process.stdin.close()
-    error = process.stderr.read().decode(errors="replace").strip()
+        stdin.close()
+    error = stderr.read().decode(errors="replace").strip()
     if process.wait() != 0:
         raise RuntimeError(f"ffmpeg failed: {error}")
     return count
