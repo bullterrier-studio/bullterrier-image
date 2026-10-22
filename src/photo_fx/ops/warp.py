@@ -5,7 +5,6 @@ bilinear sampling and a choice of what lies beyond the picture's edge. Fields ar
 produced, so an all-zero field is the identity and a constant field is a translation.
 """
 
-from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 import numpy as np
@@ -86,8 +85,4 @@ def remap(
 
     if image.ndim == 2:
         return sample(image.astype(np.float32, copy=False))
-    # scipy releases the GIL, so the channels are resampled side by side; each lands in its own plane, so the result is
-    # independent of scheduling.
-    planes = [np.ascontiguousarray(image[..., c], dtype=np.float32) for c in range(image.shape[2])]
-    with ThreadPoolExecutor(max_workers=max(1, len(planes))) as pool:
-        return np.stack(list(pool.map(sample, planes)), axis=-1)
+    return np.stack([sample(image[..., c].astype(np.float32)) for c in range(image.shape[2])], axis=-1)

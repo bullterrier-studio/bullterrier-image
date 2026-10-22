@@ -135,20 +135,63 @@ def test_half_pixel_shift_in_x_is_the_mean_of_horizontal_neighbours():
     np.testing.assert_allclose(out[:, :-1], (image[:, :-1] + image[:, 1:]) / 2, atol=1e-6)
 
 
-def test_quarter_pixel_displacement_on_a_2x2_patch_matches_the_hand_computed_bilinear_value():
+def test_quarter_pixel_displacement_on_a_2x2_patch_matches_the_hand_computed_bilinear_values():
     a, b, c, d = 0.0, 1.0, 0.5, 0.25  # [[a, b], [c, d]], all different so any swap shows
     patch = np.array([[a, b], [c, d]], np.float32)
     dx = np.full((2, 2), 0.25, np.float32)
     dy = np.full((2, 2), 0.125, np.float32)  # different from dx: a swapped dx/dy gives another number
 
-    out = remap(patch, dx, dy)
+    out = remap(patch, dx, dy)  # clamp: beyond the last row/column the edge pixel repeats
 
-    # top-left pixel samples (x=0.25, y=0.125): blend along x within each row, then down the rows
-    top = a * 0.75 + b * 0.25
-    bottom = c * 0.75 + d * 0.25
-    assert out[0, 0] == pytest.approx(top * 0.875 + bottom * 0.125, abs=1e-6)
-    swapped = remap(patch, dy, dx)
-    assert out[0, 0] != pytest.approx(swapped[0, 0], abs=1e-3)
+    # each pixel samples (x + 0.25, y + 0.125): blend along x within each row, then down the rows
+    expected = np.array(
+        [
+            [(a * 0.75 + b * 0.25) * 0.875 + (c * 0.75 + d * 0.25) * 0.125, b * 0.875 + d * 0.125],
+            [c * 0.75 + d * 0.25, d],
+        ]
+    )
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+    assert np.abs(remap(patch, dy, dx) - expected).max() > 1e-2  # the swapped field is a different picture
+
+
+@pytest.mark.parametrize("pad_mode, mode", [("symmetric", "mirror"), ("wrap", "wrap")])
+@pytest.mark.parametrize("sx, sy", [(3.25, 0.0), (-2.75, 0.0), (0.0, 4.5), (-3.5, 2.25)])
+def test_fractional_shift_across_the_edge_interpolates_with_what_lies_beyond(pad_mode, mode, sx, sy):
+    image = _picture(7, 9)
+    h, w = image.shape[:2]
+    pad = 8
+    padded = np.pad(image, ((pad, pad), (pad, pad), (0, 0)), mode=pad_mode)
+
+    # content moves by (+sx, +sy): output[r, c] samples position (c - sx, r - sy) of the padded picture
+    fx, fy = np.floor(-sx), np.floor(-sy)
+    ax, ay = -sx - fx, -sy - fy  # weights of the far neighbour along each axis
+
+    def window(ox, oy):
+        r0, c0 = pad + int(fy) + oy, pad + int(fx) + ox
+        return padded[r0 : r0 + h, c0 : c0 + w]
+
+    top = window(0, 0) * (1 - ax) + window(1, 0) * ax
+    bottom = window(0, 1) * (1 - ax) + window(1, 1) * ax
+    expected = top * (1 - ay) + bottom * ay
+
+    out = _shift(image, sx, sy, mode=mode)
+
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+def test_sub_pixel_positions_on_a_very_wide_picture_are_not_rounded_to_float32():
+    # In float32, x = 33000 + 0.3 rounds to a multiple of 1/256, so a coordinate built in float32 would be off by up to
+    # ~0.002 px, which on this sawtooth (slope 1/64 per pixel) is a visible 3e-5 error in the value.
+    w = 40_000
+    column = np.arange(w)
+    image = ((column % 64) / 64).astype(np.float32)[None, :]
+    dx = np.full((1, w), 0.3, np.float32)
+
+    out = remap(image, dx, np.zeros_like(dx))
+
+    inside_tooth = (column % 64) < 63  # the sawtooth drops back to 0 after 63, which is not linear
+    expected = (((column % 64) + np.float64(np.float32(0.3))) / 64)[inside_tooth]
+    assert np.abs(out[0, inside_tooth] - expected).max() < 3e-6
 
 
 def test_displacement_in_dx_alone_moves_content_only_along_x():
