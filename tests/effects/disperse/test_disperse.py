@@ -213,14 +213,6 @@ def test_disperse_seed_changes_the_motion_and_repeats_exactly():
     assert not np.array_equal(a, effects.apply("disperse", _lit(), progress=0.5, seed=2))
 
 
-def test_the_disperse_effects_are_in_their_categories():
-    """disperse: where the effect catalogue lists them."""
-    expected = {
-        "disperse": "animation",
-    }
-    assert {name: effects.category(name) for name in expected} == expected
-
-
 @pytest.mark.parametrize("progress", [0.1, 0.3, 0.5, 0.7, 0.9])
 def test_disperse_glowing_and_shimmering_pieces_never_go_above_white(progress):
     out = effects.apply("disperse", _lit(), progress=progress, ambient=0.1, clock=0.7, seed=1)

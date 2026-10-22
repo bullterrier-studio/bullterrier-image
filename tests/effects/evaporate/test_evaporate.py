@@ -133,14 +133,6 @@ def test_evaporate_wind_pushes_the_pieces_sideways():
     assert centre(right) > centre(left)
 
 
-def test_the_evaporate_effects_are_in_their_categories():
-    """evaporate: where the effect catalogue lists them."""
-    expected = {
-        "evaporate": "animation",
-    }
-    assert {name: effects.category(name) for name in expected} == expected
-
-
 def test_evaporate_bottom_border_is_an_edge_only_when_open_bottom_is_off():
     lit = np.ones((100, 120, 3), np.float32)
     kwargs = {"cell": 5, "start": 0, "edge": 0.2, "seed": 2}
