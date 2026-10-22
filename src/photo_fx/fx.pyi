@@ -25,7 +25,8 @@ Parameters
 ----------
 radius : number, px, 0 to 500, default 30.0
     Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the
-    recipe's size. Larger compares bigger regions; 0 turns the effect off.
+    recipe's size. Larger compares bigger regions and takes longer (at the top of the
+    range, with a large truncate, seconds per picture); 0 turns the effect off.
 amount : number, ratio, 0 to 5, default 1.0
     How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1
     = doubled.
@@ -141,7 +142,7 @@ saturation : number, ratio, 0 to 5, default 1.0
     vivid."""
     ...
 
-def gradient_map(stops: tuple[str | list[float] | tuple[float, float, float], ...] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01) -> Step:
+def gradient_map(stops: tuple[str | list[float] | tuple[float, float, float], ...] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear') -> Step:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
 
 Two stops make a duotone, three a tritone; e.g. stops = ["#0b0020", "#ff2bd6", "#00f0ff"] is a neon scheme.
@@ -158,7 +159,15 @@ shadow_clip : number, fraction, 0 to 0.5, default 0.01
     stop; 0 maps only the darkest pixel there. Larger gives deeper shadows.
 highlight_clip : number, fraction, 0 to 0.5, default 0.01
     Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the
-    last stop. Larger gives brighter highlights."""
+    last stop. Larger gives brighter highlights.
+quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased', default 'linear'
+    How the stretch's clip points are read from the picture's brightness (numpy's
+    quantile methods): 'linear' interpolates between the two nearest pixels; 'lower',
+    'higher', 'nearest' and 'midpoint' take the darker, the brighter, the nearer pixel
+    or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation',
+    'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and
+    'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan).
+    Only visible on small or flat pictures."""
     ...
 
 def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0) -> Step:
@@ -173,15 +182,15 @@ def halftone(cell: int = 14, angle: float = 45.0, fg: str | list[float] | tuple[
 `fg` = one colour for every dot; leave it out to take each dot's colour from the photo."""
     ...
 
-def hue_shift(degrees: float = 90.0) -> Step:
-    """Rotate every hue around the colour wheel by `degrees`: the quickest way to try another colour scheme.
+def hue_shift(hue: float = 90.0) -> Step:
+    """Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme.
 
 Brightness is preserved (as `luminance` measures it), so the picture keeps its lighting while colours change,
 except for very saturated colours whose rotated version cannot be displayed and gets clipped.
 
 Parameters
 ----------
-degrees : number, degrees, -360 to 360, default 90.0
+hue : number, degrees, -360 to 360, default 90.0
     The turn around the colour wheel: 120 sends red to green, 360 is a full turn
     (unchanged)."""
     ...
