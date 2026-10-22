@@ -1,14 +1,81 @@
-"""The package's layering: what a fresh import sees, and (with import-linter) which way imports may point."""
+"""The package's layering: which way imports may point (import-linter, configured in pyproject.toml), and what a fresh
+import sees.
+
+    app        cli, pipeline, gallery, sheet, checks, fx, recipe
+    adapters   imageio, matte
+    effects    one module per effect; never import each other
+    core | ops siblings: neither imports the other; neither imports anything else from photo_fx
+"""
 
 import ast
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 import photo_fx
 
 PACKAGE = Path(photo_fx.__file__).parent
+ROOT = PACKAGE.parent.parent  # the repository: pyproject.toml holds the contracts
+LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-imports` from the repository root
+
+LAYERS = "Layers: app > adapters > effects > core | ops"
+CORE_ALONE = "core imports nothing else from photo_fx"
+OPS_ALONE = "ops imports nothing else from photo_fx"
+EFFECTS_APART = "Effects never import each other"
+CORE_ORDER = "Core modules: loader | runner > steps > timing"
+TIMING_ALONE = "timing imports nothing from the other core modules"
+CONTRACTS = [LAYERS, CORE_ALONE, OPS_ALONE, EFFECTS_APART, CORE_ORDER, TIMING_ALONE]
+
+
+def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProcess:
+    environment = {**os.environ, "PYTHONPATH": str(pythonpath)} if pythonpath else None
+    return subprocess.run(
+        [str(LINT_IMPORTS), "--no-cache"], cwd=cwd, env=environment, capture_output=True, text=True, check=False
+    )
+
+
+def test_the_package_keeps_every_import_contract():
+    result = lint(ROOT)
+    assert result.returncode == 0, result.stdout + result.stderr
+    for name in CONTRACTS:  # every contract was really checked (a dropped or renamed one cannot pass silently)
+        assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"
+
+
+# One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
+FORBIDDEN = {
+    "effect to effect": (
+        "effects/glitch.py",
+        "import photo_fx.effects.ascii",
+        "photo_fx.effects.glitch",
+        EFFECTS_APART,
+    ),
+    "ops to core": ("ops/warp.py", "import photo_fx.core.timing", "photo_fx.ops.warp", OPS_ALONE),
+    "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", CORE_ALONE),
+    "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", CORE_ALONE),
+    "effects to imageio": ("effects/color.py", "import photo_fx.imageio", "photo_fx.effects.color", LAYERS),
+    "loader to runner": ("core/loader.py", "import photo_fx.core.runner", "photo_fx.core.loader", CORE_ORDER),
+    "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", TIMING_ALONE),
+    # the one recorded exception (core.runner -> ops.resample) must not let any other core -> ops import through
+    "core to another ops module": ("core/steps.py", "import photo_fx.ops.warp", "photo_fx.core.steps", CORE_ALONE),
+}
+
+
+@pytest.mark.parametrize("module, line, importer, contract", FORBIDDEN.values(), ids=FORBIDDEN.keys())
+def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract, tmp_path):
+    shutil.copytree(PACKAGE, tmp_path / "photo_fx", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy(ROOT / "pyproject.toml", tmp_path)
+    target = tmp_path / "photo_fx" / module
+    target.write_text(target.read_text() + f"\n{line}  # forbidden\n")
+    result = lint(tmp_path, pythonpath=tmp_path)
+    assert result.returncode != 0
+    assert re.search(rf"{re.escape(contract)} BROKEN", result.stdout), result.stdout + result.stderr
+    assert importer in result.stdout, result.stdout
 
 
 def _effects_declared_in_the_source() -> set[str]:

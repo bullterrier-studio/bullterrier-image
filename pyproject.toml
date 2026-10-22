@@ -26,6 +26,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.15",
     "poethepoet>=0.49.0",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
@@ -60,3 +61,55 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+# The layering rules of CLAUDE.md, checked by `uv run lint-imports` (tests/test_layering.py runs it, and proves each
+# contract fails on a forbidden import). Imports flow downward only. Wildcards keep the rules free of effect names, so
+# adding an effect never edits this file.
+[tool.importlinter]
+root_package = "photo_fx"
+
+[[tool.importlinter.contracts]]
+name = "Layers: app > adapters > effects > core | ops"
+type = "layers"
+containers = ["photo_fx"]
+exhaustive = true  # a new top-level module must be placed in a layer here
+layers = [
+    "cli : pipeline : gallery : sheet : checks : fx : recipe",  # app (":" = may import each other)
+    "imageio : matte",  # adapters
+    "effects",
+    "core | ops",  # siblings ("|" = independent)
+]
+# The one recorded exception: the runner scales the photo to `recipe.size` with ops.resample (M1 brief, decision 2).
+ignore_imports = ["photo_fx.core.runner -> photo_fx.ops.resample"]
+
+[[tool.importlinter.contracts]]
+name = "core imports nothing else from photo_fx"
+type = "forbidden"
+source_modules = ["photo_fx.core"]
+forbidden_modules = ["photo_fx.*"]  # every top-level module but core itself (overlaps are skipped)
+ignore_imports = ["photo_fx.core.runner -> photo_fx.ops.resample"]  # the recorded exception, as above
+
+[[tool.importlinter.contracts]]
+name = "ops imports nothing else from photo_fx"
+type = "forbidden"
+source_modules = ["photo_fx.ops"]
+forbidden_modules = ["photo_fx.*"]
+
+[[tool.importlinter.contracts]]
+name = "Effects never import each other"
+type = "independence"
+# Every module (later: every folder) in effects/. `_`-prefixed modules cannot be excluded by a wildcard, and none
+# exist: code that two effects share belongs in ops/.
+modules = ["photo_fx.effects.*"]
+
+[[tool.importlinter.contracts]]
+name = "Core modules: loader | runner > steps > timing"
+type = "layers"
+containers = ["photo_fx.core"]
+layers = ["loader | runner", "steps", "timing"]
+
+[[tool.importlinter.contracts]]
+name = "timing imports nothing from the other core modules"
+type = "forbidden"
+source_modules = ["photo_fx.core.timing"]
+forbidden_modules = ["photo_fx.core.*"]
