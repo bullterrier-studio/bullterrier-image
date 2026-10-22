@@ -157,16 +157,48 @@ def test_disperse_ambient_shimmer_is_small_runs_with_the_clock_and_travels_again
     assert drift(0.2) > 0 > drift(-0.2)  # wind to the right: shimmer to the left, and the other way round
 
 
-@pytest.mark.parametrize("reach", [0.5, 1.0])
-def test_disperse_keeps_the_pieces_in_flight_at_once_to_a_third_or_less(reach):
-    from photo_fx.effects.disperse import _schedule
+GRID_ROWS, GRID_COLS, GRID_STEP = 30, 20, 3  # lit pieces in every other row and every third column
 
-    rng = np.random.default_rng(0)
-    order, spread = rng.random(20000), rng.random(20000)
-    detach_at, lifetime = _schedule(order, spread, reach=reach)
-    goes = order <= reach
-    peak = max((goes & (p > detach_at) & (p < detach_at + lifetime)).mean() for p in np.linspace(0, 1, 101))
-    assert peak <= 1 / 3  # of ALL pieces, even when every one of them eventually goes
+
+def _isolated_pieces() -> np.ndarray:
+    """Lit pieces with dark pieces between them, so each can be watched on its own. With no wind a piece does not
+    travel; it only sways a few px sideways as it fades, which never reaches its neighbour."""
+    cell_w, cell_h = cell_size(5)
+    img = np.zeros((2 * GRID_ROWS * cell_h, GRID_STEP * GRID_COLS * cell_w, 3), np.float32)
+    for row in range(GRID_ROWS):
+        for col in range(GRID_COLS):
+            img[
+                2 * row * cell_h : (2 * row + 1) * cell_h, GRID_STEP * col * cell_w : (GRID_STEP * col + 1) * cell_w
+            ] = 1
+    return img
+
+
+def _share_in_flight(frame: np.ndarray) -> float:
+    """The share of the pieces that have left and not yet vanished: neither at home at full brightness nor gone."""
+    cell_w, cell_h = cell_size(5)
+    flying = 0
+    for row in range(GRID_ROWS):
+        for col in range(GRID_COLS):
+            rows = slice(2 * row * cell_h, (2 * row + 1) * cell_h)
+            around = slice(max(0, (GRID_STEP * col - 1) * cell_w), (GRID_STEP * col + 2) * cell_w)
+            brightest = frame[rows, around].max()
+            flying += 0.0 < brightest != 1.0  # fading (or glowing) on its way out
+    return flying / (GRID_ROWS * GRID_COLS)
+
+
+@pytest.mark.parametrize("reach, goes", [(0.5, 0.5), (1.0, 1.0)])
+def test_disperse_spreads_the_pieces_over_the_clip_so_fewer_than_half_are_in_flight_at_once(reach, goes):
+    img = _isolated_pieces()
+    moments = np.linspace(0.0, 1.0, 51)
+    frames = [
+        effects.apply("disperse", img, progress=p, top=0, edge=0, sweep=1.0, wind=0.0, reach=reach, seed=1)
+        for p in moments
+    ]
+    in_flight = [_share_in_flight(frame) for frame in frames]
+    assert max(in_flight) < 1 / 2  # of ALL pieces, even when every one of them eventually goes
+    assert max(p for p, share in zip(moments, in_flight, strict=True) if share > 0) >= 0.8  # the whole clip is used
+    gone = (frames[-1] == 0).all(axis=2)
+    assert gone[img[..., 0] == 1].mean() == pytest.approx(goes, abs=0.05)  # and `reach` of them have gone at the end
 
 
 def test_disperse_seed_changes_the_motion_and_repeats_exactly():
