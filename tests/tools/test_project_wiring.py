@@ -1,4 +1,8 @@
-"""The project's tooling is wired the way CLAUDE.md promises: poe tasks, commit-message settings, hook wiring."""
+"""The project's tooling is wired by the rules CLAUDE.md promises: poe tasks, hook wiring, documentation.
+
+Rules, not lists: these tests say what every task and every hook must satisfy (declared correctly, run a pinned tool,
+check without rewriting, say how to reproduce a failure), so adding a gate or a hook edits no test.
+"""
 
 import re
 import shlex
@@ -17,86 +21,57 @@ SYSTEM_COMMANDS = {"git", "uv"}
 # tool settings must live in pyproject.toml, never in the hook wiring
 TOOL_OPTIONS = ("--select", "--ignore", "--extend-select", "--line-length", "--config", "--strict", "--python-version")
 FIXING_OPTIONS = ("--fix", "--unsafe-fixes", "--write")
-REMOTE_HOOK_IDS = {
-    "check-toml",
-    "check-yaml",
-    "check-merge-conflict",
-    "check-case-conflict",
-    "check-added-large-files",
-    "detect-private-key",
-}
-LOCAL_HOOK_IDS = {"ruff-format", "ruff-check", "commit-message", "tests", "mypy"}
-# what each local hook prints on failure (pre-commit shows the hook name): the command that fixes or reproduces it
-FIX_COMMANDS = {
-    "ruff-format": "uv run poe fix",
-    "ruff-check": "uv run poe fix",
-    "commit-message": "uv run python tools/check_commit_message.py",
-    "tests": "uv run poe test",
-    "mypy": "uv run mypy",
-}
+# pre-commit prints a failing hook's name, so the name carries the command that fixes or reproduces the failure
+COMMAND_IN_NAME = re.compile(r"`uv run [^`]+`")
 
 
 @pytest.fixture(scope="module")
 def pyproject():
-    return tomllib.loads((ROOT / "pyproject.toml").read_text())
+    return tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 def dev_dependency_names(pyproject) -> set[str]:
     return {re.split(r"[<>=!~ \[;]", spec, maxsplit=1)[0].lower() for spec in pyproject["dependency-groups"]["dev"]}
 
 
-def poe_commands(task) -> list[str]:
-    """Every command line a poe task runs, flattened (sequence items may be strings, cmd tables or refs)."""
+def poe_commands(task, tasks: dict | None = None) -> list[str]:
+    """Every command line a poe task runs, flattened (sequence items may be strings, cmd tables or refs). A `ref` is
+    expanded into the referred task's commands when `tasks` is given, and left out otherwise."""
     if isinstance(task, str):
         return [task]
     if "cmd" in task:
         return [task["cmd"]]
     if "sequence" in task:
-        return [command for item in task["sequence"] for command in poe_commands(item)]
-    return []  # a `ref` runs another task, whose commands are listed there
+        return [command for item in task["sequence"] for command in poe_commands(item, tasks)]
+    if "ref" in task and tasks is not None:
+        return poe_commands(tasks[task["ref"]], tasks)
+    return []
 
 
-def test_commit_message_settings_are_the_documented_ones(pyproject):
-    assert pyproject["tool"]["commit-message"] == {
-        "types": ["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore", "revert"],
-        "header-max-length": 72,
-        "body-max-line-length": 100,
-        "scope-pattern": "^[a-z0-9][a-z0-9/_-]*$",
-    }
+def test_the_gate_runs_the_test_task_by_reference_so_the_test_command_is_defined_once(pyproject):
+    assert {"ref": "test"} in pyproject["tool"]["poe"]["tasks"]["check"]["sequence"]
 
 
-def test_poe_tasks_exist_and_the_gate_runs_format_lint_types_tests_in_order(pyproject):
+def test_the_gate_only_checks_and_never_rewrites_files(pyproject):
     tasks = pyproject["tool"]["poe"]["tasks"]
-    assert {"check", "fix", "test", "setup"} <= tasks.keys()
-    assert poe_commands(tasks["test"]) == ["pytest -q"]
-    assert poe_commands(tasks["fix"]) == ["ruff check --fix .", "ruff format ."]
-    # the test command is defined once (task `test`) and the gate refers to it
-    assert tasks["check"]["sequence"] == ["ruff format --check .", "ruff check .", "mypy", {"ref": "test"}]
-    assert poe_commands(tasks["setup"]) == [
-        "pre-commit install --install-hooks",
-        "git config --local commit.template .gitmessage",
-    ]
+    commands = poe_commands(tasks["check"], tasks)
+    assert [command for command in commands if set(shlex.split(command)) & set(FIXING_OPTIONS)] == [], commands
+    assert "ruff format --check ." in commands  # the formatter, in its checking mode
 
 
-@pytest.mark.parametrize(
-    ("task", "commands"),
-    [
-        ("test", ["pytest -q"]),
-        ("fix", ["ruff check --fix .", "ruff format ."]),
-        ("check", ["ruff format --check .", "ruff check .", "mypy", "pytest -q"]),
-        ("setup", ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"]),
-    ],
-)
-def test_poe_accepts_each_task_and_would_run_exactly_these_commands_in_order(task, commands):
+def test_poe_accepts_every_task_and_would_run_exactly_its_declared_commands(pyproject):
     # poe's own dry run: it rejects a task that is wrongly declared (a bare string in a sequence is a task name, not a
     # command), and prints each command it would run, in order, without running it
-    result = subprocess.run(
-        [sys.executable, "-m", "poethepoet", "--dry-run", task], cwd=ROOT, capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, result.stderr
-    output = result.stdout + result.stderr
-    printed = [line.removeprefix("Poe => ") for line in output.splitlines() if line.startswith("Poe => ")]
-    assert printed == commands, output
+    tasks = pyproject["tool"]["poe"]["tasks"]
+    for task in tasks:
+        result = subprocess.run(
+            [sys.executable, "-m", "poethepoet", "--dry-run", task], cwd=ROOT, capture_output=True, text=True
+        )
+        assert result.returncode == 0, result.stderr
+        output = result.stdout + result.stderr
+        printed = [line.removeprefix("Poe => ") for line in output.splitlines() if line.startswith("Poe => ")]
+        assert printed, f"poe task {task!r} runs nothing:\n{output}"
+        assert printed == poe_commands(tasks[task], tasks), output
 
 
 def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject):
@@ -118,7 +93,7 @@ def test_dev_group_names_the_tools_the_tasks_and_tests_use(pyproject):
 
 @pytest.fixture(scope="module")
 def precommit():
-    return yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    return yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
 
 
 def hooks_by_id(precommit, repo_kind: str) -> dict[str, dict]:
@@ -142,19 +117,11 @@ def test_the_three_git_hook_types_are_installed_by_a_bare_install(precommit):
     assert precommit["default_install_hook_types"] == ["pre-commit", "commit-msg", "pre-push"]
 
 
-def test_the_hook_ids_are_exactly_the_documented_ones(precommit):
-    assert set(hooks_by_id(precommit, "remote")) == REMOTE_HOOK_IDS
-    assert set(hooks_by_id(precommit, "local")) == LOCAL_HOOK_IDS
-
-
-def test_the_remote_hooks_come_from_one_repository_pinned_to_a_release_tag(precommit):
-    [remote] = [repo for repo in precommit["repos"] if repo["repo"] != "local"]
-    assert remote["repo"] == "https://github.com/pre-commit/pre-commit-hooks"
-    assert re.fullmatch(r"v\d+\.\d+\.\d+", remote["rev"]), remote["rev"]  # a tag, never a branch such as main
-
-
-def test_the_large_file_limit_admits_the_gallery_pictures_but_not_much_more(precommit):
-    assert hooks_by_id(precommit, "remote")["check-added-large-files"]["args"] == ["--maxkb=1000"]
+def test_every_remote_hook_repository_is_pinned_to_a_release_tag(precommit):
+    remotes = [repo for repo in precommit["repos"] if repo["repo"] != "local"]
+    assert remotes
+    for remote in remotes:
+        assert re.fullmatch(r"v\d+\.\d+\.\d+", remote["rev"]), remote  # a tag, never a branch such as main
 
 
 def test_local_hooks_run_the_projects_pinned_tools_through_uv(precommit, pyproject):
@@ -169,36 +136,34 @@ def test_local_hooks_run_the_projects_pinned_tools_through_uv(precommit, pyproje
             assert tokens[2] in dev_dependency_names(pyproject), f"{hook_id} runs {tokens[2]}, not a dev dependency"
 
 
-def test_hooks_run_at_the_documented_stages(precommit):
+def test_file_hooks_run_on_commit_and_whole_repository_hooks_on_push(precommit):
     # a hook with no `stages` would otherwise also run on commit-msg and push, where its files are meaningless or stale
     assert precommit["default_stages"] == ["pre-commit"]
     for hook_id, hook in hooks_by_id(precommit, "remote").items():
         assert "stages" not in hook, hook_id
     local = hooks_by_id(precommit, "local")
     assert local["commit-message"]["stages"] == ["commit-msg"]
-    # the whole-repository checks run on push and in `poe check`, not on every commit: commits stay fast
-    assert local["tests"]["stages"] == ["pre-push"]
-    assert local["tests"]["entry"] == "uv run pytest -q"
-    assert local["mypy"]["stages"] == ["pre-push"]
-    assert local["mypy"]["entry"] == "uv run mypy"
-    for hook_id in ("ruff-format", "ruff-check"):
-        assert "stages" not in local[hook_id]  # default stage: pre-commit
-
-
-@pytest.mark.parametrize("hook_id", ["tests", "mypy"])
-def test_whole_repository_hooks_run_on_every_push_over_everything(precommit, hook_id):
-    # pass_filenames: false, or pre-commit would hand over only the pushed files and the check would see a part;
-    # always_run: true, or a push that touches no Python file would skip it
-    hook = hooks_by_id(precommit, "local")[hook_id]
-    assert hook["pass_filenames"] is False
-    assert hook["always_run"] is True
+    whole = {hook_id for hook_id, hook in local.items() if hook.get("pass_filenames") is False}
+    assert whole, "the whole-repository checks (tests, types) must run somewhere"
+    for hook_id, hook in local.items():
+        if hook_id in whole:
+            # on push (and in `poe check`), never on every commit, so commits stay fast; always_run, or a push that
+            # touches no Python file would skip it
+            assert hook["stages"] == ["pre-push"], hook_id
+            assert hook["always_run"] is True, hook_id
+        elif hook_id != "commit-message":
+            assert "stages" not in hook, hook_id  # a check of the staged files: the default stage, pre-commit
 
 
 def test_every_local_hook_failure_says_how_to_fix_or_reproduce_it(precommit):
-    local = hooks_by_id(precommit, "local")
-    assert set(FIX_COMMANDS) == set(local)  # a new hook must say its command too
-    for hook_id, command in FIX_COMMANDS.items():
-        assert f"`{command}" in local[hook_id]["name"], hook_id  # pre-commit prints the name on the failure line
+    for hook_id, hook in hooks_by_id(precommit, "local").items():
+        assert COMMAND_IN_NAME.search(hook["name"]), f"{hook_id}: {hook['name']!r} names no `uv run ...` command"
+
+
+def test_the_fix_command_detector_wants_a_quoted_uv_run_command():
+    assert COMMAND_IN_NAME.search("mypy (reproduce with `uv run mypy`)")
+    assert not COMMAND_IN_NAME.search("mypy (reproduce with uv run mypy)")
+    assert not COMMAND_IN_NAME.search("mypy (reproduce with `mypy`)")
 
 
 def test_no_hook_rewrites_files(precommit):
@@ -232,13 +197,13 @@ def test_the_tool_settings_detector_catches_each_leak_and_passes_clean_hooks():
 
 
 def test_claude_md_lists_every_commit_type_from_the_configuration(pyproject):
-    claude_md = (ROOT / "CLAUDE.md").read_text()
+    claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     for commit_type in pyproject["tool"]["commit-message"]["types"]:
         assert f"`{commit_type}`" in claude_md, f"CLAUDE.md does not list the commit type {commit_type!r}"
 
 
 @pytest.mark.parametrize("document", ["CLAUDE.md", "README.md"])
 def test_every_poe_command_the_documentation_mentions_is_a_task(pyproject, document):
-    mentioned = set(re.findall(r"uv run poe ([a-z][a-z-]*)", (ROOT / document).read_text()))
+    mentioned = set(re.findall(r"uv run poe ([a-z][a-z-]*)", (ROOT / document).read_text(encoding="utf-8")))
     assert mentioned, f"{document} should mention at least one poe task"
     assert mentioned <= pyproject["tool"]["poe"]["tasks"].keys()
