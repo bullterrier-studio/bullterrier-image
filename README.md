@@ -332,7 +332,7 @@ import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run 
 ```bash
 uv sync
 uv run poe setup       # once per clone: installs the git hooks and the commit-message template
-uv run poe check       # before every push or merge: format check, lint (ruff), types (mypy), the test suite
+uv run poe check       # before every push or merge: format, lint, dead code, dependencies, build, types, tests
 uv run poe fix         # applies the automatic lint and format fixes
 uv run photo-fx new-effect my_effect --category light   # a new effect's files, from the template
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
@@ -346,8 +346,8 @@ Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects.md`) are not update
 add effects never conflict over them; each effect's picture is a file of its own. After merging, `photo-fx regenerate` brings them up to date in one
 commit. Pictures that exist are kept (`photo-fx gallery --force` renders them again).
 
-Lint rules (ruff) and the type check (mypy) are configured in `pyproject.toml`; `uv run mypy` runs the type check alone,
-and the pre-push hook runs it with the tests.
+Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
+[CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); the pre-push hook runs mypy, vulture and the tests.
 
 Tests that need Apple Vision are skipped elsewhere, and tests that need `ffmpeg` are skipped when it is missing.
 

@@ -77,7 +77,9 @@ What a new effect looks like is defined once, by the template in `src/photo_fx/e
 3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run photo-fx regenerate` is run by the
    integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`.
 
-## Lint and types
+## Lint, types and the other gates
+
+`uv run poe check` runs every gate, cheapest first, and stops at the first failure: `ruff format --check`; `ruff check` (rules below, plus explicit encodings `PLW1514`, no blind `except` `BLE`, pathlib `PTH`); `vulture` (dead code in `src`; framework-called names are exempt in `[tool.vulture]`); `deptry` (every import declared, development tools not used by the library); `poe build-check` (sdist and wheel checked by twine and check-wheel-contents); `mypy`; the tests, in random order, which include the import contracts, the effect contract (odd sizes, every number across its range) and the hidden-tunable scan (a number in an effect is a `param` or carries `# constant: <reason>`). Each gate has a test proving it fails on a known-bad input. Process rule: **a defect a review finds twice becomes a gate**, so reviews stay light.
 
 `ruff` (rules in `pyproject.toml`) wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI. `mypy` type-checks `src` and `tests` (not the generated `fx.pyi`, so a misspelt `fx.<effect>` or parameter name is only caught at run time). Fix a finding properly; for a false positive write a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`: a bare or unused one fails the gate. Tests may not reach private names (`SLF001`, `PLC2701`), except architecture tests, with a reason.
 
@@ -121,7 +123,7 @@ Where they pull against this file: tests follow this file (no goldens); design f
 
 ## Git conventions
 
-Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (format check, lint, `mypy` type check, tests; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs mypy and the tests.
+Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (every gate, see "Lint, types and the other gates"; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs mypy, vulture and the tests.
 - **Trunk-based:** work on a short-lived branch (in a worktree only when the project owner asks for one; the controller says so in the brief) named `<type>/<short-description>` (`feat/glow-falloff`), rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scope is optional and lowercase: the effect name, `core`, `ops`, `cli`, `pipeline`, `docs` or `deps`. `!` or a `BREAKING CHANGE:` footer marks a breaking change.
 - **Subject:** imperative present tense ("add", not "added"), lowercase start (acronyms and identifiers excepted), no final period, header at most 72 characters. Imperative mood is a convention, not checked by the hook.
