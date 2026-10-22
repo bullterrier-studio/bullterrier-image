@@ -207,6 +207,30 @@ imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 recipes can be handed straight to the pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`. See
 [`examples/python_api.py`](examples/python_api.py) for a complete, runnable example.
 
+Every effect declares its parameters once, as a frozen Pydantic model in which each field has a description, a unit, a
+range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `photo-fx effects` and
+[docs/effects.md](docs/effects.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
+field, the limit and the value. Writing an effect follows the same pattern ([`effects/color.py`](src/photo_fx/effects/color.py)
+is the worked example):
+
+```python
+from photo_fx.core.params import EffectParams, param
+from photo_fx.core.registry import effect
+
+
+class GlowParams(EffectParams):
+    """Bloom around the bright parts of the picture."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, doc="Gaussian sigma of the halo. Larger = wider, softer.")
+    amount: float = param(0.6, unit="fraction", min=0, max=2, doc="How strongly the halo is screened over the picture.")
+
+
+@effect(category="light", params=GlowParams)
+def glow(rgb, params: GlowParams):
+    """Make the bright parts bloom."""
+    ...  # use params.radius and params.amount; return a new image of the same shape
+```
+
 ## Seeing what each step does
 
 When a look is not right, the cause is rarely the last step. Print the picture after every step:
