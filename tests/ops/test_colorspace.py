@@ -1,10 +1,12 @@
+import time
+
 import numpy as np
 import pytest
 
 from photo_fx.ops import colorspace as cs
 
 # Every public one-array conversion; the shape/dtype/input contracts apply to each of them.
-CONVERSIONS = ["srgb_to_linear", "linear_to_srgb", "rgb_to_hsv", "hsv_to_rgb"]
+CONVERSIONS = ["srgb_to_linear", "linear_to_srgb", "rgb_to_hsv", "hsv_to_rgb", "rgb_to_oklab", "oklab_to_rgb"]
 
 
 def random_colours(n=10_000, seed=0):
@@ -153,3 +155,58 @@ def test_hue_is_always_below_one_even_for_reds_with_a_hint_of_blue():
     assert ((hue >= 0) & (hue < 1)).all()
     h = cs.rgb_to_hsv(random_colours())[:, 0]
     assert ((h >= 0) & (h < 1)).all()
+
+
+# --- OKLab ------------------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("rgb", "lab"),
+    [
+        ((1, 1, 1), (1, 0, 0)),
+        ((0, 0, 0), (0, 0, 0)),
+        # Primaries as published with Bjorn Ottosson's OKLab definition.
+        ((1, 0, 0), (0.6280, 0.2249, 0.1258)),
+        ((0, 1, 0), (0.8664, -0.2339, 0.1795)),
+        ((0, 0, 1), (0.4520, -0.0324, -0.3115)),
+    ],
+)
+def test_rgb_to_oklab_known_colours(rgb, lab):
+    out = cs.rgb_to_oklab(np.array(rgb, dtype=np.float32))
+    np.testing.assert_allclose(out, lab, atol=2e-3)
+
+
+@pytest.mark.parametrize("grey", [0.05, 0.3, 0.5, 0.8, 0.95])
+def test_greys_have_no_chroma(grey):
+    lab = cs.rgb_to_oklab(np.full(3, grey, dtype=np.float32))
+    np.testing.assert_allclose(lab[1:], 0, atol=1e-4)
+    assert 0 < lab[0] < 1
+
+
+def test_oklab_lightness_is_not_a_plain_channel_average():
+    # Green is far lighter than blue to the eye: L must order them that way (catches swapped channels).
+    green, blue = cs.rgb_to_oklab(np.array([[0, 1, 0], [0, 0, 1]], dtype=np.float32))[:, 0]
+    assert green > blue + 0.3
+
+
+def test_oklab_round_trip_on_random_colours():
+    x = random_colours()
+    np.testing.assert_allclose(cs.oklab_to_rgb(cs.rgb_to_oklab(x)), x, atol=1e-4)
+
+
+def test_oklab_to_rgb_does_not_clip_out_of_gamut_colours():
+    lab = np.array([0.5, 0.3, 0.3], dtype=np.float32)  # far more chromatic than any sRGB colour of this lightness
+    rgb = cs.oklab_to_rgb(lab)
+    assert np.isfinite(rgb).all()
+    assert rgb.min() < 0 or rgb.max() > 1
+    # Still the same colour: converting back recovers the OKLab coordinates.
+    np.testing.assert_allclose(cs.rgb_to_oklab(rgb), lab, atol=1e-3)
+
+
+def test_oklab_converts_a_full_size_image_quickly():
+    # A loose regression guard against per-pixel Python loops (these run in a fraction of a second when vectorised).
+    image = np.random.default_rng(2).random((1600, 1600, 3), dtype=np.float32)
+    start = time.perf_counter()
+    lab = cs.rgb_to_oklab(image)
+    cs.oklab_to_rgb(lab)
+    assert time.perf_counter() - start < 4

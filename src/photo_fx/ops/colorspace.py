@@ -15,6 +15,28 @@ import numpy as np
 _SRGB_ENCODED_BREAK = 0.04045  # encoded value where the linear segment ends
 _SRGB_LINEAR_BREAK = 0.0031308  # the same point in linear light
 
+# OKLab (Bjorn Ottosson, 2020): linear sRGB -> cone responses, then a cube root, then to (L, a, b). The inverses are
+# computed rather than typed in so a round trip is exact whatever the rounding of the published constants.
+_LINEAR_RGB_TO_LMS = np.array(
+    [
+        [0.4122214708, 0.5363325363, 0.0514459929],
+        [0.2119034982, 0.6806995451, 0.1073969566],
+        [0.0883024619, 0.2817188376, 0.6299787005],
+    ]
+)
+_LMS_ROOT_TO_LAB = np.array(
+    [
+        [0.2104542553, 0.7936177850, -0.0040720468],
+        [1.9779984951, -2.4285922050, 0.4505937099],
+        [0.0259040371, 0.7827717662, -0.8086757660],
+    ]
+)
+# Applied to row vectors (x @ M.T), so each is stored already transposed.
+_RGB_TO_LMS_T = _LINEAR_RGB_TO_LMS.T.astype(np.float32)
+_LMS_ROOT_TO_LAB_T = _LMS_ROOT_TO_LAB.T.astype(np.float32)
+_LMS_TO_RGB_T = np.linalg.inv(_LINEAR_RGB_TO_LMS).T.astype(np.float32)
+_LAB_TO_LMS_ROOT_T = np.linalg.inv(_LMS_ROOT_TO_LAB).T.astype(np.float32)
+
 
 def _as_triplets(array: np.ndarray) -> np.ndarray:
     """Return ``array`` as float32 (a copy only if the dtype differs), after checking that its last axis is RGB."""
@@ -109,3 +131,32 @@ def hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
     k = (np.array([5, 3, 1], dtype=np.float32) + hue * 6) % 6
     ramp = np.clip(np.minimum(k, 4 - k), 0, 1)
     return (value - value * saturation * ramp).astype(np.float32)
+
+
+def rgb_to_oklab(rgb: np.ndarray) -> np.ndarray:
+    """Convert sRGB to OKLab, a perceptually uniform space (Bjorn Ottosson, 2020).
+
+    Args:
+        rgb: sRGB values, last axis length 3 (r, g, b), 0..1.
+
+    Returns:
+        float32 array of the same shape holding (L, a, b). L is perceptual lightness, 0 (black) to 1 (white); a runs
+        green (negative) to red (positive) and b blue (negative) to yellow (positive), roughly -0.4..0.4 for sRGB
+        colours. Greys have a = b = 0.
+    """
+    lms = srgb_to_linear(rgb) @ _RGB_TO_LMS_T
+    return (np.cbrt(lms) @ _LMS_ROOT_TO_LAB_T).astype(np.float32)
+
+
+def oklab_to_rgb(lab: np.ndarray) -> np.ndarray:
+    """Convert OKLab to sRGB; the inverse of `rgb_to_oklab`.
+
+    Args:
+        lab: last axis length 3 (L, a, b) as returned by `rgb_to_oklab`; L is 0..1, a and b are unbounded.
+
+    Returns:
+        float32 array of the same shape holding sRGB (r, g, b). The result is NOT clipped: colours outside the sRGB
+        gamut come back with channels below 0 or above 1, and the caller decides how to bring them into range.
+    """
+    lms = (_as_triplets(lab) @ _LAB_TO_LMS_ROOT_T) ** 3
+    return linear_to_srgb(lms @ _LMS_TO_RGB_T)
