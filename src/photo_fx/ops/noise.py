@@ -29,7 +29,7 @@ _GRADIENT_BOUND = 0.5 * np.sqrt(2.0)
 
 
 def _mix(z: np.ndarray) -> np.ndarray:
-    """Scramble uint64 values (splitmix64 finaliser); equal inputs give equal outputs, near inputs give unrelated ones."""
+    """Scramble uint64 values (splitmix64 finaliser): near inputs give unrelated outputs."""
     z = z ^ (z >> np.uint64(30))
     z = z * np.uint64(0xBF58476D1CE4E5B9)
     z = z ^ (z >> np.uint64(27))
@@ -58,7 +58,7 @@ def _unit_interval(hashes: np.ndarray) -> np.ndarray:
 
 
 def _fade(t: np.ndarray) -> np.ndarray:
-    """Perlin's quintic ease: 0 -> 0, 1 -> 1, zero slope and curvature at both ends, so lattice cells blend without creases."""
+    """Perlin's quintic ease: 0 -> 0, 1 -> 1, flat at both ends, so neighbouring lattice cells blend without creases."""
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 
 
