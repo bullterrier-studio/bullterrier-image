@@ -93,10 +93,10 @@ def _hidden(node: ast.Constant, parents: dict[ast.AST, ast.AST]) -> bool:
         isinstance(parent, ast.IfExp) and child is parent.test
     ):
         child, parent = parent, parents[parent]
-    positional = isinstance(parent, ast.Call) and child in parent.args
+    called = _called_name(parent.func) if isinstance(parent, ast.Call) and child in parent.args else None
     if isinstance(parent, ast.keyword):
         return not (parent.arg in ("axis", "axes") and isinstance(node.value, int))
-    if positional and _called_name(parent.func) in AXIS_CALLS and isinstance(node.value, int):
+    if called in AXIS_CALLS and isinstance(node.value, int):
         return False
     if isinstance(parent, ast.arguments) or node.value not in TRIVIAL:
         return True
@@ -104,7 +104,7 @@ def _hidden(node: ast.Constant, parents: dict[ast.AST, ast.AST]) -> bool:
         return False
     if isinstance(parent, ast.Subscript):
         return child is not parent.slice
-    return not (positional and _called_name(parent.func) in BOUND_CALLS)
+    return called not in BOUND_CALLS
 
 
 def _covered_lines(source: str, tree: ast.Module) -> set[int]:
@@ -114,7 +114,7 @@ def _covered_lines(source: str, tree: ast.Module) -> set[int]:
     spans = [
         (
             min([stmt.lineno, *(decorator.lineno for decorator in getattr(stmt, "decorator_list", []))]),
-            stmt.body[0].lineno - 1 if getattr(stmt, "body", None) else stmt.end_lineno or stmt.lineno,
+            body[0].lineno - 1 if (body := getattr(stmt, "body", None)) else stmt.end_lineno or stmt.lineno,
         )
         for stmt in ast.walk(tree)
         if isinstance(stmt, ast.stmt)
