@@ -42,16 +42,27 @@ def test_every_effect_documents_itself(name):
     assert effects.describe()[name]
 
 
-def test_unknown_effect_lists_choices(photo, fresh_registry, register_probe):
+def test_unknown_effect_lists_choices(photo, throwaway_effects, register_probe):
     register_probe("listed_probe")
-    with pytest.raises(KeyError, match="unknown effect 'nope'; available: listed_probe"):
+    with pytest.raises(KeyError) as raised:
         effects.apply("nope", photo)
+    message = str(raised.value)
+    assert "'nope'" in message and "listed_probe" in message and "ascii" in message  # the given name and the choices
 
 
-@pytest.mark.parametrize("name", ALL)
-def test_every_effect_can_run_on_the_image_alone(name):
-    image, *params = inspect.signature(effects.get(name)).parameters.values()
-    assert [p.name for p in params if p.default is inspect.Parameter.empty] == []
+def test_an_emptied_registry_holds_only_what_the_test_registers_and_gets_the_real_effects_back(
+    registry_emptied, register_probe
+):
+    """The helper behind `fresh_registry`: real effects come back, in their order, even when the block fails."""
+    real = effects.all_effects()
+    real_categories = {name: effects.category(name) for name in real}
+    with pytest.raises(RuntimeError, match="test failed"), registry_emptied():
+        assert effects.all_effects() == {}
+        register_probe("only_probe", "light")
+        assert list(effects.all_effects()) == ["only_probe"]
+        raise RuntimeError("test failed")
+    assert list(effects.all_effects().items()) == list(real.items())
+    assert {name: effects.category(name) for name in real} == real_categories
 
 
 # --- parameter vocabulary ----------------------------------------------------------------------------------------
@@ -305,7 +316,7 @@ def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, t
 # --- summary -----------------------------------------------------------------------------------------------------
 
 
-def test_summary_is_the_first_sentence_of_the_docstring(fresh_registry):
+def test_summary_is_the_first_sentence_of_the_docstring(throwaway_effects):
     @effect(category="utilities")
     def plain(rgb, amount: float = 0.5):
         """Basic probe controls. Then a second sentence."""

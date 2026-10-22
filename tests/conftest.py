@@ -1,17 +1,42 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 import numpy as np
 import pytest
 
 from photo_fx import effects
-from photo_fx.core import registry
-from photo_fx.core.registry import unregister
+from photo_fx.core.registry import effect, unregister
+
+
+@contextmanager
+def empty_registry() -> Iterator[None]:
+    """Inside the block the effect registry is empty; afterwards, even if the block raised, whatever was registered in
+    it is removed and the real effects are back, in their original order. Uses only the registry's public interface:
+    `unregister`, and registering the same function again, which the registry allows."""
+    real = [(name, fn, effects.category(name)) for name, fn in effects.all_effects().items()]
+    for name, _, _ in real:
+        unregister(name)
+    try:
+        yield
+    finally:
+        for name in effects.all_effects():
+            unregister(name)
+        for _, fn, category in real:
+            effect(category=category)(fn)
 
 
 @pytest.fixture
-def fresh_registry(monkeypatch):
+def fresh_registry():
     """An empty effect registry for one test, so it can build exactly the effects and categories it needs, whatever
-    real effects exist. The real registry comes back afterwards, untouched."""
-    monkeypatch.setattr(registry, "_EFFECTS", {})
-    monkeypatch.setattr(registry, "_CATEGORY", {})
+    real effects exist (see `empty_registry`)."""
+    with empty_registry():
+        yield
+
+
+@pytest.fixture
+def registry_emptied():
+    """The `empty_registry` context manager itself, for the tests of that helper."""
+    return empty_registry
 
 
 @pytest.fixture
@@ -25,7 +50,7 @@ def register_probe():
 
         probe.__name__ = probe.__qualname__ = name
         probe.__doc__ = f"The {name} probe."
-        registry.effect(category=category)(probe)
+        effect(category=category)(probe)
 
     return register
 
