@@ -1,5 +1,5 @@
 """The developer commands on a source checkout: what is generated from the effects (the gallery pictures,
-`docs/effects.md`, `fx.pyi`).
+`docs/effects.md`, `fx.pyi`) and the files of a new effect (`new_effect`, from the template).
 
 Everything about an effect is found by its name, in a layout that mirrors the package: its code in
 `src/photo_fx/effects/<name>/`, its tests in `tests/effects/<name>/`, its example recipe in `examples/effects/` and its
@@ -10,9 +10,13 @@ shared file edited. The shared files (`docs/effects.md`, `fx.pyi`) are regenerat
 developer commands; they need a source checkout of photo-fx.
 """
 
+import ast
 import inspect
+import keyword
+import re
 from collections.abc import Sequence
 from pathlib import Path
+from string import Template
 from typing import NamedTuple
 
 from . import effects, fx, imageio
@@ -121,10 +125,85 @@ def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
     return [stub, *write_docs(checkout=checkout)]
 
 
+def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
+    """Write the files of a new effect called `name`, in `category` (one of `effects.CATEGORIES`), into `checkout`, each
+    made from the template in `src/photo_fx/effects/_template/` and placed where `effect_files` says: its package
+    (`__init__.py`, and `effect.py` with a parameter model with one documented example field and a working effect),
+    its tests (`test_<name>.py`) and its example recipe. Returns the files written, sorted.
+
+    The effect is registered whenever photo_fx is imported, and as written it passes the contract tests and its own;
+    replacing the example with the real effect is the author's part. Its gallery picture is rendered later, from its
+    example recipe, by `photo-fx gallery --only <name>` (or at integration). Raises `ValueError`, writing nothing, when
+    `name` is not a lowercase Python identifier (a letter, then letters, digits and _) or is a Python keyword, is a
+    name the template's `effect.py` already uses (its imports) or one `fx` defines for itself (so `fx.<name>` would not
+    be the effect), or the category is unknown; `FileExistsError` when an effect of that name exists, or any of its
+    files (or a module `effects/<name>.py`); and `FileNotFoundError` when `checkout` holds no template.
+    """
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or keyword.iskeyword(name):
+        raise ValueError(
+            f"{name!r} cannot name an effect: use lowercase letters, digits and _, starting with a letter, and no "
+            f"Python keyword"
+        )
+    if category not in effects.CATEGORIES:
+        raise ValueError(f"unknown category {category!r}; choose one of: {', '.join(effects.CATEGORIES)}")
+    if name in effects.describe():
+        raise FileExistsError(f"there is already an effect called {name!r}")
+    layout, files = _layout(checkout), effect_files(name, checkout=checkout)
+    for taken in (*files, layout.effects / f"{name}.py"):
+        if taken.exists():
+            raise FileExistsError(f"{taken} already exists: choose another name")
+    if not (layout.template / "effect.py.tmpl").is_file():
+        raise FileNotFoundError(f"no effect template in {layout.template}: this needs a source checkout of photo-fx")
+    if name in _names_in_the_template_effect(layout.template):
+        raise ValueError(f"{name!r} cannot name an effect: the template's effect.py already uses {name!r} for itself")
+    if name in _names_fx_defines():
+        raise ValueError(
+            f"{name!r} cannot name an effect: fx defines {name!r} for itself, so fx.{name} would not build the effect"
+        )
+    targets = {  # template file -> where its copy goes
+        "__init__.py.tmpl": files.package / "__init__.py",
+        "effect.py.tmpl": files.package / "effect.py",
+        "test_effect.py.tmpl": files.tests,
+        "example.toml.tmpl": files.example,
+    }
+    words = _words(name, category)
+    for template, target in targets.items():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(Template((layout.template / template).read_text()).substitute(words))
+    return sorted(targets.values())
+
+
+def _words(name: str, category: str) -> dict[str, str]:
+    """What the template's placeholders stand for: $name, $Name (the name in CamelCase, for the model), $category."""
+    return {"name": name, "Name": "".join(part.capitalize() for part in name.split("_")), "category": category}
+
+
+def _names_in_the_template_effect(template: Path) -> set[str]:
+    """The module-level names the template's effect.py binds for itself (its imports, mainly), read from the template,
+    so the list follows the template: an effect of one of these names would replace it or be replaced by it."""
+    placeholder = "zzplaceholder"  # stands in for the name, so the names made from it can be told apart
+    source = Template((template / "effect.py.tmpl").read_text()).substitute(_words(placeholder, effects.CATEGORIES[0]))
+    names: set[str] = set()
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Import | ast.ImportFrom):
+            names |= {(alias.asname or alias.name).split(".")[0] for alias in node.names}
+        elif isinstance(node, ast.ClassDef | ast.FunctionDef):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names |= {target.id for target in node.targets if isinstance(target, ast.Name)}
+    return {name for name in names if placeholder not in name.lower()}
+
+
+def _names_fx_defines() -> set[str]:
+    """The public names of the `fx` module itself: `fx.<name>` finds those before it would look for an effect."""
+    return {name for name in vars(fx) if not name.startswith("_")}
+
+
 class _Layout(NamedTuple):
     """Where the files shared by all effects live in a source checkout."""
 
     effects: Path  # src/photo_fx/effects, one folder per effect: its presence makes a folder a source checkout
+    template: Path  # the files a new effect's folder is made from (string.Template: $name, $Name, $category)
     photo: Path  # the demo photo every example recipe is shown on
     page: Path  # docs/effects.md
     stub: Path  # fx.pyi, next to fx.py
@@ -134,6 +213,7 @@ def _layout(checkout: Path) -> _Layout:
     package = checkout / "src" / "photo_fx"
     return _Layout(
         effects=package / "effects",
+        template=package / "effects" / "_template",
         photo=checkout / "examples" / "photos" / "bullterrier.jpeg",
         page=checkout / "docs" / "effects.md",
         stub=package / "fx.pyi",

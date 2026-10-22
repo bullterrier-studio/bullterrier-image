@@ -1,4 +1,4 @@
-"""Command line: `photo-fx render|sheet|cutout|animate|run|steps|init|effects|gallery|regenerate`.
+"""Command line: `photo-fx render|sheet|cutout|animate|run|steps|init|effects|gallery|regenerate|new-effect`.
 
 A thin layer over the library; no logic of its own.
 """
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p = commands.add_parser(
         "gallery",
-        help="render each effect's example recipe into docs/gallery/ (missing ones) and write docs/effects.md",
+        help="render each effect's missing gallery picture from its example recipe and write docs/effects.md",
     )
     p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
     p.add_argument("--force", action="store_true", help="render again even if the picture exists")
@@ -90,6 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser(
         "regenerate", help="after adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures"
     )
+
+    p = commands.add_parser(
+        "new-effect", help="create a new effect's files from the template: its code, its tests and its example recipe"
+    )
+    p.add_argument("name", help="the effect's name: lowercase letters, digits and _, starting with a letter")
+    p.add_argument("--category", required=True, choices=effects.CATEGORIES, help="its section of the catalogue")
 
     args = parser.parse_args(argv)
     try:
@@ -104,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             "effects": _effects,
             "gallery": lambda args: _print_paths(gallery.write_docs(args.only, args.force)),
             "regenerate": lambda args: _print_paths(gallery.regenerate()),
+            "new-effect": _new_effect,
         }[args.command](args)
     except (ValueError, RuntimeError, FileNotFoundError, FileExistsError, NotImplementedError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -216,6 +223,16 @@ def _steps(args: argparse.Namespace) -> int:
 
 def _init(args: argparse.Namespace) -> int:
     print(init_project(args.directory))
+    return 0
+
+
+def _new_effect(args: argparse.Namespace) -> int:
+    _print_paths(gallery.new_effect(args.name, args.category))
+    print(
+        f"next: fill in the effect, its tests and its example recipe, then render its picture with "
+        f"`photo-fx gallery --only {args.name}`",
+        file=sys.stderr,
+    )
     return 0
 
 

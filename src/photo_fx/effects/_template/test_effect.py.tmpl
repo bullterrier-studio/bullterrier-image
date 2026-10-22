@@ -1,0 +1,19 @@
+"""Behaviour of the `$name` effect."""
+
+# Replace these with the properties that define the effect, each against an expected value worked
+# out independently of the code. The contract tests already check every effect's shape, range,
+# determinism, untouched input, parameter limits and documentation.
+
+import numpy as np
+
+from photo_fx import effects
+
+NAME = "$name"
+
+
+def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
+    np.testing.assert_array_equal(effects.apply(NAME, photo, amount=0.0), photo)
+
+
+def test_full_amount_gives_the_negative(photo: np.ndarray) -> None:
+    np.testing.assert_allclose(effects.apply(NAME, photo, amount=1.0), 1 - photo, atol=1e-6)
