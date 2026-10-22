@@ -178,20 +178,23 @@ def test_a_new_module_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
 # --- categories --------------------------------------------------------------------------------------------------
 
 
+AGREED_CATEGORIES = (
+    "colour", "light", "texture", "stylised", "text", "distortion", "glitch", "atmosphere", "subject",
+    "compositing", "backgrounds", "utilities", "animation",
+)  # fmt: skip
+
+
 def test_the_categories_are_exactly_the_agreed_slugs_in_order():
-    assert effects.CATEGORIES == (
-        "colour", "light", "texture", "stylised", "text", "distortion", "glitch", "atmosphere", "subject",
-        "compositing", "backgrounds", "utilities", "animation",
-    )  # fmt: skip
+    assert effects.CATEGORIES == AGREED_CATEGORIES  # the published list effect authors choose from
 
 
 def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_registry, register_probe):
     for name, category in [("zeta", "animation"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
         register_probe(name, category)  # registered out of order, on purpose
-    expected = {category: [] for category in effects.CATEGORIES}
+    expected = {category: [] for category in AGREED_CATEGORIES}
     expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
     assert effects.categories() == expected
-    assert list(effects.categories()) == list(effects.CATEGORIES)  # dict order is the catalogue order
+    assert list(effects.categories()) == list(AGREED_CATEGORIES)  # dict order is the catalogue order
 
 
 def test_categories_lists_a_category_with_no_effects_as_empty(fresh_registry, register_probe):
@@ -203,7 +206,7 @@ def test_categories_lists_a_category_with_no_effects_as_empty(fresh_registry, re
 
 def test_the_real_effects_are_each_in_exactly_one_category():
     grouped = effects.categories()
-    assert list(grouped) == list(effects.CATEGORIES)
+    assert list(grouped) == list(AGREED_CATEGORIES)
     assert sorted(name for names in grouped.values() for name in names) == ALL
     assert all(names == sorted(names) for names in grouped.values())
 
