@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 import pytest
+from scipy.spatial import ConvexHull
 
 from photo_fx.ops import voronoi
 
@@ -255,3 +256,65 @@ def test_relax_leaves_a_point_whose_cell_has_no_pixels_where_it_was():
 def test_relax_rejects_negative_iterations():
     with pytest.raises(ValueError):
         voronoi.relax(voronoi.random_points((10, 10), 3, seed=0), (10, 10), iterations=-1)
+
+
+# ---------------------------------------------------------------- triangulate
+
+
+def _triangle_areas(points, triangles):
+    a, b, c = (points[triangles[:, k]].astype(np.float64) for k in range(3))
+    return 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1]))
+
+
+def test_triangulate_unit_square_with_centre_gives_the_four_expected_triangles():
+    points = np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0.5, 0.5]], dtype=np.float32)
+    triangles = voronoi.triangulate(points)
+    assert triangles.shape == (4, 3)
+    assert {frozenset(t) for t in triangles.tolist()} == {
+        frozenset({0, 1, 4}),
+        frozenset({1, 2, 4}),
+        frozenset({2, 3, 4}),
+        frozenset({3, 0, 4}),
+    }
+
+
+def test_triangulate_gives_non_degenerate_triangles_that_cover_the_convex_hull():
+    points = voronoi.random_points((40, 90), 40, seed=6)
+    triangles = voronoi.triangulate(points)
+    areas = _triangle_areas(points, triangles)
+    assert (areas > 0).all()
+    assert np.isclose(areas.sum(), ConvexHull(points.astype(np.float64)).volume, rtol=1e-5)  # in 2-D, volume is area
+
+
+def test_triangulate_of_a_regular_grid_has_no_zero_area_triangles():
+    xs, ys = np.meshgrid(np.arange(5), np.arange(4))  # many cocircular points: the hard case for Delaunay
+    points = np.stack([xs.ravel(), ys.ravel()], axis=1).astype(np.float32)
+    assert (_triangle_areas(points, voronoi.triangulate(points)) > 0).all()
+
+
+@pytest.mark.parametrize("count", [0, 1, 2])
+def test_triangulate_rejects_fewer_than_three_points(count):
+    with pytest.raises(ValueError):
+        voronoi.triangulate(voronoi.random_points((10, 10), count, seed=0))
+
+
+def test_triangulate_rejects_collinear_points():
+    points = np.array([[0, 0], [1, 1], [2, 2], [5, 5]], dtype=np.float32)
+    with pytest.raises(ValueError):
+        voronoi.triangulate(points)
+
+
+def test_triangulate_rejects_points_that_are_not_an_n_by_2_array():
+    with pytest.raises(ValueError):
+        voronoi.triangulate(np.zeros((4, 3), dtype=np.float32))
+
+
+def test_triangulate_ignores_a_repeated_point():
+    points = np.array([[0, 0], [1, 0], [0, 1], [0, 0]], dtype=np.float32)
+    triangles = voronoi.triangulate(points)
+    assert len(triangles) == 1 and len({0, 3} & set(triangles[0].tolist())) == 1
+
+
+def test_triangulate_rejects_fewer_than_three_distinct_points():
+    with pytest.raises(ValueError):
+        voronoi.triangulate(np.array([[0, 0], [0, 0], [1, 1]], dtype=np.float32))

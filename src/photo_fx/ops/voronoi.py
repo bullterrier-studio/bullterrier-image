@@ -7,7 +7,7 @@ and never modifies its arguments. Invalid arguments raise `ValueError`.
 """
 
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import Delaunay, QhullError, cKDTree
 
 
 def random_points(shape: tuple[int, int], count: int, seed: int) -> np.ndarray:
@@ -133,3 +133,26 @@ def relax(points: np.ndarray, shape: tuple[int, int], iterations: int = 3) -> np
         current = current.copy()
         current[occupied] = sums[occupied] / sizes[occupied, None]
     return current
+
+
+def triangulate(points: np.ndarray) -> np.ndarray:
+    """Return the Delaunay triangulation of a point set.
+
+    No triangle's circumcircle contains another point, which gives well-shaped, non-overlapping triangles that tile the
+    convex hull of the points.
+
+    Args:
+        points: `(n, 2)` array of `(x, y)` with `n >= 3`, not all on one line.
+
+    Returns:
+        `(n_triangles, 3)` integer array; each row holds the indices into `points` of one triangle's corners (in no
+        particular order or orientation). A point repeated in the input is used by no triangle.
+    """
+    if points.ndim != 2 or points.shape[1] != 2:
+        raise ValueError(f"points must have shape (n, 2), got {points.shape}")
+    if len(points) < 3:
+        raise ValueError(f"triangulation needs at least 3 points, got {len(points)}")
+    try:
+        return Delaunay(points.astype(np.float64)).simplices
+    except QhullError as error:  # Qhull's own message is pages long; the cause is always a degenerate point set
+        raise ValueError("points cannot be triangulated: they are collinear or too few are distinct") from error
