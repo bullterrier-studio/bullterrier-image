@@ -318,12 +318,15 @@ Each module owns one decision and callers never see it: `imageio` is the only pl
 
 ```bash
 uv sync
-uv run pytest          # the test suite
-uv run ruff check .    # lint
-uv run ruff format .
+uv run poe setup       # once per clone: installs the git hooks and the commit-message template
+uv run poe check       # before every push or merge: format check, lint and the test suite
+uv run poe fix         # applies the automatic lint and format fixes
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
 uv run photo-fx regenerate   # at integration: fx.pyi, docs/effects.md, missing pictures
 ```
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): imperative subject`, header at
+most 72 characters, body explaining why); a `commit-msg` hook checks it. The details are in [CLAUDE.md](CLAUDE.md#git-conventions).
 
 Generated files (`src/photo_fx/fx.pyi`, `docs/effects.md`, `docs/gallery/`) are not updated on feature branches, so
 branches that add effects never conflict over them. After merging, `photo-fx regenerate` brings them up to date in one

@@ -36,10 +36,10 @@ dev = [
 # One command for agents and humans: `uv run poe check` before every push, `uv run poe fix` when it complains.
 [tool.poe.tasks]
 test = { cmd = "pytest -q", help = "Run the test suite" }
-fix = { sequence = ["ruff check --fix .", "ruff format ."], help = "Apply every automatic lint and format fix" }
-check = { sequence = ["ruff format --check .", "ruff check .", { ref = "test" }], help = "The full gate; stops at the first failure" }
+fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
+check = { sequence = ["ruff format --check .", "ruff check .", { ref = "test" }], default_item_type = "cmd", help = "The full gate; stops at the first failure" }
 # `default_install_hook_types` in .pre-commit-config.yaml names the three hook types, so a bare `install` covers them
-setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"], help = "Install the git hooks and the commit-message template (once per clone)" }
+setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"], default_item_type = "cmd", help = "Install the git hooks and the commit-message template (once per clone)" }
 
 # Read by tools/check_commit_message.py (the commit-msg hook): Conventional Commits 1.0 with these limits.
 [tool.commit-message]
