@@ -297,10 +297,10 @@ def _number(value: float) -> str:
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
-    """One sentence for a failed validation: `owner` (e.g. "effect 'glow'"), then each problem with its field, the
-    constraint and the value given. `valid` names the fields, listed when an unknown one was given."""
-    problems = [_problem(detail, sorted(valid)) for detail in error.errors()]
-    return f"{owner}: " + "; ".join(problems)
+    """One sentence for a failed validation: `owner` (e.g. "effect 'glow'"; "" for none), then each problem with its
+    field, the constraint and the value given. `valid` names the fields, listed when an unknown one was given."""
+    problems = "; ".join(_problem(detail, sorted(valid)) for detail in error.errors())
+    return f"{owner}: {problems}" if owner else problems
 
 
 def _problem(detail: Any, valid: list[str]) -> str:

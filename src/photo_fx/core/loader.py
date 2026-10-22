@@ -51,30 +51,15 @@ def _animated_value(value: object, where: str, key: str) -> object:
     """Turn `{ from, to, ease, over }` into an Animated; any other value is returned unchanged."""
     if not isinstance(value, dict):
         return value
-    ease = value.get("ease", "linear")
-    if isinstance(ease, list):
-        ease = tuple(ease)
-    numbers = all(isinstance(value.get(k), int | float) and not isinstance(value.get(k), bool) for k in ("from", "to"))
-    named = isinstance(ease, str) and ease in EASE_NAMES
-    curve = (
-        isinstance(ease, tuple)
-        and len(ease) == 4
-        and all(isinstance(n, int | float) and not isinstance(n, bool) for n in ease)
-        and 0 <= ease[0] <= 1
-        and 0 <= ease[2] <= 1
-    )
-    if (
-        set(value) - {"from", "to", "ease", "over"}
-        or not numbers
-        or not (named or curve)
-        or value.get("over", "motion") not in ("motion", "clip")
-    ):
-        names = EASE_NAMES
+    if set(value) - {"from", "to", "ease", "over"} or not {"from", "to"} <= set(value):
         raise ValueError(
-            f"{where}: `{key}` must be {{ from = number, to = number, ease = one of {names} or [x1, y1, x2, y2] "
-            f'with x1, x2 in 0..1, over = "motion" or "clip" }}'
+            f"{where}: `{key}` must be {{ from = number, to = number, ease = one of {', '.join(EASE_NAMES)} or "
+            f'[x1, y1, x2, y2] with x1, x2 in 0..1, over = "motion" or "clip" }}'
         )
-    return Animated(float(value["from"]), float(value["to"]), ease, value.get("over", "motion"))
+    try:
+        return Animated(value["from"], value["to"], value.get("ease", "linear"), value.get("over", "motion"))
+    except ValueError as error:
+        raise ValueError(f"{where}: `{key}`: {error}") from None
 
 
 def _load_animation(table: dict, filename: str) -> Animation:
@@ -83,14 +68,10 @@ def _load_animation(table: dict, filename: str) -> Animation:
         raise ValueError(
             f"{filename}: [animation] needs `seconds`; allowed keys: seconds, fps, hold_start, hold_end, loop"
         )
-    animation = Animation(**table)
-    if animation.seconds <= 0 or animation.fps < 1 or animation.hold_start < 0 or animation.hold_end < 0:
-        raise ValueError(f"{filename}: [animation] needs positive seconds and fps, and holds of 0 or more")
-    if animation.hold_start + animation.hold_end >= animation.seconds:
-        raise ValueError(f"{filename}: [animation] the holds leave no time for the animation itself")
-    if animation.loop not in ("once", "pingpong"):
-        raise ValueError(f"{filename}: [animation] loop must be 'once' or 'pingpong'")
-    return animation
+    try:
+        return Animation(**table)
+    except ValueError as error:
+        raise ValueError(f"{filename}: [animation] {error}") from None
 
 
 def load_recipe(path: str | Path) -> Recipe:
