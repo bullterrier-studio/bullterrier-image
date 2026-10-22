@@ -17,11 +17,13 @@ BACKGROUND, TEXT, MUTED = (13, 14, 18), (232, 234, 240), (130, 135, 148)
 
 
 def tile(path: Path) -> Image.Image:
+    """The picture at `path`, scaled to the banner's tile height with its proportions kept."""
     picture = imageio.to_pil(imageio.load(path))
     return picture.resize((round(picture.width * TILE_HEIGHT / picture.height), TILE_HEIGHT), Image.Resampling.LANCZOS)
 
 
 def main() -> None:
+    """Write docs/images/banner.jpg from the demo's results (run the demo pipeline first) and print its path."""
     original = tile(ROOT / "examples" / "photos" / "bullterrier.jpeg")
     results = [(name, tile(RESULTS / f"{name}.jpg")) for name in LOOKS]
     arrow = 90

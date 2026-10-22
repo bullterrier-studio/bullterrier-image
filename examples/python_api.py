@@ -30,6 +30,7 @@ TOXIC_NEON = Recipe(
 
 
 def main(output: Path = HERE / "output" / "python-api") -> None:
+    """Show every step of the look on the demo photo, then run it through the pipeline; everything goes in `output`."""
     photo = imageio.load(PHOTO)
 
     # See what every step does: the photo, the subject cut-out, and the picture after each step.
