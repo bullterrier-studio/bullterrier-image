@@ -24,6 +24,19 @@ from photo_fx import effects, gallery
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _in_a_git_checkout(folder: Path) -> bool:
+    """Whether the git command exists and `folder` is inside a git work tree (a source archive is not)."""
+    if shutil.which("git") is None:
+        return False
+    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=folder, capture_output=True, check=False)
+    return inside.returncode == 0
+
+
+needs_git = pytest.mark.skipif(
+    not _in_a_git_checkout(ROOT), reason="reads the repository with git: needs the git command and a git checkout"
+)
+
+
 @pytest.fixture
 def checkout(tmp_path):
     """A scratch source checkout holding a copy of this photo-fx package (with its effect template)."""
@@ -202,6 +215,7 @@ def _scaffold_into(copy: Path) -> list[str]:
     return sorted(set(after) - set(before))
 
 
+@needs_git
 def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_existing_file(tmp_path):
     created = _scaffold_into(_copy_of_the_tree(tmp_path / "tree"))
     assert created  # something was added ...
@@ -209,6 +223,7 @@ def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_exi
     assert all(path.startswith(places) for path in created), created  # ... and only files named for the effect
 
 
+@needs_git
 def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as_written(tmp_path):
     """Bounded on purpose, to keep the suite fast: in the copy, ruff on the new files, then the contract tests (which
     run over every effect) and the new effect's own tests; not the whole gate."""

@@ -1,4 +1,6 @@
 import importlib.util
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,6 +9,20 @@ import pytest
 from photo_fx import effects, gallery, load_project, load_recipe
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
+
+
+def _in_a_git_checkout(folder: Path) -> bool:
+    """Whether the git command exists and `folder` is inside a git work tree (a source archive is not)."""
+    if shutil.which("git") is None:
+        return False
+    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=folder, capture_output=True, check=False)
+    return inside.returncode == 0
+
+
+needs_git = pytest.mark.skipif(
+    not _in_a_git_checkout(EXAMPLES.parent),
+    reason="reads the repository with git: needs the git command and a git checkout",
+)
 
 
 @pytest.mark.parametrize("name", sorted(effects.describe()))
@@ -70,10 +86,10 @@ def test_the_python_example_runs(tmp_path, capsys):
     assert "toxic-neon: done" in capsys.readouterr().out
 
 
+@needs_git
 def test_no_video_or_gif_is_checked_in():
-    import subprocess
-
-    tracked = subprocess.run(["git", "ls-files"], cwd=EXAMPLES.parent, capture_output=True, text=True).stdout.split()
+    listed = subprocess.run(["git", "ls-files"], cwd=EXAMPLES.parent, capture_output=True, text=True, check=True)
+    tracked = listed.stdout.split()
     assert not [f for f in tracked if f.lower().endswith((".mp4", ".mov", ".webm", ".gif"))]
 
 
