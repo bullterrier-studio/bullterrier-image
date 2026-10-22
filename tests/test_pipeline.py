@@ -1,5 +1,6 @@
 import json
 import shutil
+import subprocess
 
 import numpy as np
 import pytest
@@ -273,6 +274,17 @@ exposure = {{ from = 0.0, to = 1.0 }}
 """
 
 
+def video_size(path) -> tuple[int, int]:
+    """(width, height) of a video file, read back with ffprobe."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+         str(path)],
+        capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    width, height = map(int, out.strip().split(","))
+    return width, height
+
+
 @FFMPEG
 def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
     (folder / "recipes" / "steady.toml").write_text(ANIMATED.format(hold_end=0.0).replace('"move"', '"steady"'))
@@ -280,7 +292,8 @@ def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
     (folder / "photo-fx.toml").write_text("[export]\nsizes = [24]\n")
     items = {i.recipe: i for i in run(load_project(folder / "photo-fx.toml")) if i.photo == "a.png"}
     out = folder / "out" / "a"
-    assert (out / "steady.mp4").stat().st_size > 0 and (out / "steady_24.mp4").stat().st_size > 0  # and a smaller copy
+    assert video_size(out / "steady.mp4") == (48, 36)  # the recipe's 48 px, from the 128x96 photo
+    assert video_size(out / "steady_24.mp4") == (24, 18)  # and a smaller copy
     assert items["steady"].warnings == () and "motion stops early" in items["stalls"].warnings[0]
     page = (folder / "out" / "index.html").read_text()
     assert "<video" in page and 'href="a/steady.frames.png"' in page

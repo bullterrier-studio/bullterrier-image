@@ -105,16 +105,32 @@ def test_eight_bit_scale_pictures_are_not_detected_and_are_clipped_to_black_and_
     eight_bit = np.kron(rng.integers(0, 256, (8, 11), dtype=np.uint8), np.ones((6, 6), dtype=np.uint8))
     as_clipped = np.clip(eight_bit.astype(np.float32), 0, 1)  # every non-zero value becomes 1
     for method in METHODS:
-        np.testing.assert_array_equal(
-            detect_edges(eight_bit, method).magnitude, detect_edges(as_clipped, method).magnitude
-        )
+        expected = detect_edges(as_clipped, method).magnitude
+        np.testing.assert_array_equal(detect_edges(eight_bit, method).magnitude, expected)
+        assert expected.max() > 0.1, method  # real edge maps are compared, not two empty ones
 
 
-@pytest.mark.parametrize("method", METHODS)
-def test_the_boundary_values_zero_and_one_are_accepted(method):
-    picture = np.zeros((10, 10), dtype=np.float32)
-    picture[:, 5:] = 1.0
-    assert detect_edges(picture, method).magnitude.max() > 0
+def dog_step_strength_by_hand(sigma: float, ratio: float = 1.6) -> float:
+    """The strongest DoG response to a 0-to-1 step, from a kernel the test builds itself: across a vertical step the
+    response at each column is the kernel's total over the columns that lie on the bright side, and the module
+    divides by the most any 0..1 picture can give, the sum of the kernel's positive weights."""
+    delta = np.zeros((61, 61), dtype=np.float64)
+    delta[30, 30] = 1.0
+    kernel = ndimage.gaussian_filter(delta, sigma) - ndimage.gaussian_filter(delta, ratio * sigma)
+    tails = np.cumsum(kernel.sum(axis=0)[::-1])  # total over the last 1, 2, 3, ... columns
+    return float(np.abs(tails).max() / kernel[kernel > 0].sum())
+
+
+def test_a_zero_to_one_step_has_its_known_strength_for_every_method():
+    """0 and 1 are accepted as they are (neither rejected nor read as 8-bit values), so a 0-to-1 step reads exactly
+    the strength worked out by hand."""
+    step = vertical_step()
+    sobel = detect_edges(step, "sobel", sigma=0.01).magnitude  # no pre-blur: the Sobel kernel meets the step itself
+    assert sobel.max() == pytest.approx(4 / np.sqrt(20), abs=1e-5)  # (1 + 2 + 1) of the most a 3x3 patch can give
+    dog = detect_edges(step, "dog", sigma=1.0).magnitude
+    assert dog.max() == pytest.approx(dog_step_strength_by_hand(1.0), abs=1e-4)
+    canny = detect_edges(step, "canny").magnitude
+    assert canny.max() == 1.0 and canny[20].sum() == 1.0  # one full-strength pixel across the step on each row
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -137,10 +153,13 @@ def test_input_is_not_modified(method):
     np.testing.assert_array_equal(img, before)
 
 
-def test_float64_input_is_accepted_and_gives_float32_output():
-    edges = detect_edges(vertical_step().astype(np.float64))
-    assert edges.magnitude.dtype == np.float32
-    assert edges.magnitude.max() > 0
+@pytest.mark.parametrize("method", METHODS)
+def test_float64_input_gives_the_float32_result_as_float32(method):
+    picture = blocks()
+    from_float64, from_float32 = detect_edges(picture.astype(np.float64), method), detect_edges(picture, method)
+    assert from_float64.magnitude.dtype == np.float32 and from_float64.direction.dtype == np.float32
+    np.testing.assert_allclose(from_float64.magnitude, from_float32.magnitude, atol=1e-5)
+    assert from_float32.magnitude.max() > 0.1  # the comparison is between real edge maps, not two empty ones
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -409,7 +428,8 @@ def test_hysteresis_keeps_a_weak_edge_connected_to_a_strong_one_and_drops_an_iso
 def test_lowering_high_lets_the_isolated_weak_edge_start_its_own_line():
     img = strong_then_weak_edge_with_an_isolated_weak_edge()
     on = edge_pixels(detect_edges(img, "canny", low=0.05, high=0.15))
-    assert on[:, 75:].any()
+    assert on[5:75, 79:82].any(axis=1).all()  # now a line runs down the isolated step at column 80
+    assert not on[:, 83:].any()  # and nowhere else on that side
 
 
 def test_raising_low_above_the_weak_strength_disconnects_the_weak_part_of_the_line():
