@@ -12,7 +12,7 @@ they share (`ops/*.py`), so it reads them with `ast`. A numeric literal fails un
 Anything else fails, whatever its value: an option of a call, by keyword or position (`sigma=2`, `iterations=1`,
 `gaussian_filter(x, 2)`), a default of a function, a value assigned to a name, an element of a list that is not an
 index.
-TRANSITIONAL: the legacy loose effect modules join when migrated; `EXEMPT` lists the findings their owners remove.
+`EXEMPT` lists the known findings still to be turned into parameters; each entry goes with its finding.
 """
 
 import ast
@@ -50,14 +50,12 @@ BOUND_CALLS = {
     "uniform",
 }
 
-# TRANSITIONAL: findings left in place because the code is being rewritten elsewhere or exposing the value needs effect
-# changes. Key: (module relative to photo_fx, literal); value: who removes it and why. One entry per line, so removals
+# Known findings whose fix needs new effect parameters (a change of each effect's interface, not of its look). Key:
+# (module relative to photo_fx, literal); value: where it is used and what it does. One entry per line, so removals
 # merge cleanly; an entry that no longer matches anything fails, so it is removed with its finding.
 EXEMPT: dict[tuple[str, float], str] = {
     ("ops/color.py", 0.35): "ops audit: vivid's floor on the brightest channel, shaped by ascii/halftone/glitch",
-    ("ops/cells.py", 0.02): "evaporate/disperse migration: `lit`'s brightness threshold for a visible piece",
-    ("ops/textart.py", 3): "ascii migration (textart is being edited): the channel count needs a `# constant:`",
-    ("effects/glitch/effect.py", 1): "glitch (in flight): the second random stream's id needs a `# constant:`",
+    ("ops/cells.py", 0.02): "evaporate and disperse: `lit`'s brightness threshold for a visible piece",
 }
 
 
@@ -161,7 +159,7 @@ def test_every_number_is_a_parameter_or_a_cited_constant(path):
 
 
 @pytest.mark.parametrize(("module", "literal"), EXEMPT.keys(), ids=[f"{m}:{v}" for m, v in EXEMPT])
-def test_every_transitional_exemption_still_matches_a_finding(module, literal):
+def test_every_exemption_still_matches_a_finding(module, literal):
     found = hidden_tunables((PACKAGE / module).read_text(encoding="utf-8"))
     assert literal in {value for _, value in found}, f"{module}: {literal} is fixed, delete its EXEMPT entry"
 

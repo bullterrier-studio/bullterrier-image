@@ -148,6 +148,7 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
         strips.append((top, band_height))
 
     if params.ascii_share > 0 and strips:
+        # constant: the id of a second random stream, independent of the band offsets drawn above
         chosen = np.random.default_rng([params.seed, 1]).choice(
             len(strips), math.ceil(params.ascii_share * len(strips)), replace=False
         )
