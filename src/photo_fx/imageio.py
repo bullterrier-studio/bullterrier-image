@@ -71,9 +71,10 @@ def _to_uint8(data: np.ndarray) -> np.ndarray:
 def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, max_side: int | None = None) -> int:
     """Write `frames` (RGB images of one size) as a video or animation; the extension picks the format.
 
-    .mp4 / .mov: H.264 through ffmpeg, which must be installed; frames are streamed, so a long clip never has to
-    fit in memory. .gif: no extra tools, but every frame is held in memory and colours are limited to 256, so use it
-    for small, short clips. Returns the number of frames written.
+    .mp4 / .mov: H.264 through ffmpeg (the one on the PATH, else the one the `[video]` extra installs:
+    `pip install "photo-fx[video]"`); frames are streamed, so a long clip never has to fit in memory. .gif: no extra
+    tools, but every frame is held in memory and colours are limited to 256, so use it for small, short clips.
+    Returns the number of frames written. RuntimeError when ffmpeg is needed and found nowhere, or fails.
 
     `max_side` shrinks frames larger than that (longest side, in px) while keeping the aspect ratio: 1600 px square
     needs an unusually high H.264 level that some players struggle with, 1080 is playable almost everywhere.
@@ -99,9 +100,7 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
 
     Cheaper than rendering an animation again at a second size.
     """
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise RuntimeError("resizing a video needs ffmpeg on the PATH (brew install ffmpeg)")
+    ffmpeg = _ffmpeg("resizing a video")
     shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
     result = subprocess.run(
         [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", shrink,
@@ -114,9 +113,7 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
 
 
 def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_side: int | None) -> int:
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise RuntimeError("writing .mp4 needs ffmpeg on the PATH (brew install ffmpeg); .gif works without it")
+    ffmpeg = _ffmpeg(f"writing {path.suffix.lower()}")
     frames = iter(frames)
     first = next(frames, None)
     if first is None:
@@ -150,6 +147,26 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
     if process.wait() != 0:
         raise RuntimeError(f"ffmpeg failed: {error}")
     return count
+
+
+def _ffmpeg(task: str) -> str:
+    """The ffmpeg program to run: the one on the PATH, else the one the `[video]` extra (imageio-ffmpeg) bundles."""
+    found = shutil.which("ffmpeg")
+    if found is not None:
+        return found
+    try:
+        import imageio_ffmpeg
+
+        bundled: str | None = imageio_ffmpeg.get_ffmpeg_exe()
+    except (ImportError, RuntimeError):  # the extra is not installed, or has no binary for this platform
+        bundled = None
+    if bundled is not None and Path(bundled).is_file():
+        return bundled
+    raise RuntimeError(
+        f'{task} needs ffmpeg: install the video extra (pip install "photo-fx[video]"), or install ffmpeg so it is on '
+        "the PATH (macOS: brew install ffmpeg; Debian or Ubuntu: sudo apt install ffmpeg; Windows: winget install "
+        "ffmpeg). Writing .gif needs neither."
+    )
 
 
 def from_pil(img: Image.Image) -> np.ndarray:

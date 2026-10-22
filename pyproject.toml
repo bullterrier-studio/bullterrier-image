@@ -23,6 +23,11 @@ dependencies = [
 [project.scripts]
 photo-fx = "photo_fx.cli:main"
 
+[project.optional-dependencies]
+video = [
+    "imageio-ffmpeg>=0.6.0",
+]
+
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
@@ -44,6 +49,7 @@ dev = [
     "import-linter>=2.15",
     "mypy>=2.4.0",
     "onnx>=1.23.2",
+    "photo-fx[video]",
     "poethepoet>=0.49.0",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
@@ -159,7 +165,7 @@ show_error_codes = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*"]
+module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*", "imageio_ffmpeg"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -259,3 +265,6 @@ name = "timing imports nothing else from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
 forbidden_modules = ["photo_fx.*", "photo_fx.core.*"]  # overlaps (core itself, timing itself) are skipped
+
+[tool.uv.sources]
+photo-fx = { workspace = true }

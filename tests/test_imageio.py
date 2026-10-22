@@ -1,5 +1,7 @@
+import re
 import shutil
 import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -107,3 +109,44 @@ def test_save_video_gif_max_side_shrinks_frames(tmp_path):
     imageio.save_video(iter(_frames(3, 100, 200)), tmp_path / "s.gif", fps=10, max_side=50)
     with Image.open(tmp_path / "s.gif") as gif:
         assert gif.size == (50, 25)
+
+
+# --- which ffmpeg: the one on the PATH, else the `[video]` extra's (imageio-ffmpeg, a dev dependency here) -----------
+# PATH and IMAGEIO_FFMPEG_EXE (imageio-ffmpeg's documented override) are set through the environment; ffmpeg itself is
+# the external boundary, stood in for by a script where its choice must be seen.
+
+
+def is_mp4(path) -> bool:
+    return path.read_bytes()[4:8] == b"ftyp"  # an MP4 file starts with its 'ftyp' box (ISO/IEC 14496-12)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the stand-in ffmpeg is a POSIX shell script")
+def test_an_ffmpeg_on_the_path_is_used_before_the_bundled_one(tmp_path, monkeypatch):
+    folder = tmp_path / "bin"
+    folder.mkdir()
+    stand_in = folder / "ffmpeg"
+    stand_in.write_text("#!/bin/sh\necho 'the ffmpeg on the PATH ran' >&2\nexit 3\n")
+    stand_in.chmod(0o755)
+    monkeypatch.setenv("PATH", str(folder))
+    with pytest.raises(RuntimeError, match="the ffmpeg on the PATH ran"):
+        imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
+
+
+def test_without_ffmpeg_on_the_path_the_video_extras_ffmpeg_writes_the_clip(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.delenv("IMAGEIO_FFMPEG_EXE", raising=False)
+    assert imageio.save_video(iter(_frames(6)), tmp_path / "a.mp4", fps=12) == 6
+    assert is_mp4(tmp_path / "a.mp4")
+    imageio.resize_video(tmp_path / "a.mp4", tmp_path / "small.mp4", 32)
+    assert is_mp4(tmp_path / "small.mp4")
+
+
+def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    monkeypatch.setenv("IMAGEIO_FFMPEG_EXE", str(tmp_path / "no-ffmpeg-here"))
+    with pytest.raises(RuntimeError, match=re.escape('pip install "photo-fx[video]"')):
+        imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
+    with pytest.raises(RuntimeError, match=re.escape("photo-fx[video]")):
+        imageio.resize_video(tmp_path / "a.mp4", tmp_path / "b.mp4", 32)
+    assert not (tmp_path / "a.mp4").exists()
+    assert imageio.save_video(iter(_frames(3)), tmp_path / "a.gif", fps=10) == 3
