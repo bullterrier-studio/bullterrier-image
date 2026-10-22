@@ -15,7 +15,7 @@ import pytest
 from photo_fx import imageio
 from photo_fx.matte import onnx_model_path, refine_edge, subject_matte
 
-EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
+EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
 
 def found(photo: np.ndarray, segmenter: str | None = None) -> np.ndarray:
