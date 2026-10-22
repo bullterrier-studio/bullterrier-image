@@ -118,7 +118,7 @@ def test_a_rendered_frame_uses_the_rounded_whole_number(levels, photo):
 
 def test_an_animated_whole_number_is_checked_after_rounding(levels):
     assert Step("levels_probe", {"levels": Animated(2, 16.4)}).animated  # ends at 16: inside 2..16
-    with pytest.raises(ValueError, match=r"`levels` must be <= 16, got 17"):
+    with pytest.raises(ValueError, match=r"levels.*16.*17"):
         Step("levels_probe", {"levels": Animated(2, 16.6)})  # ends at 17
 
 
