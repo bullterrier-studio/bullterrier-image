@@ -4,12 +4,8 @@ import numpy as np
 
 from photo_fx.core.registry import effect
 from photo_fx.core.types import Color
-from photo_fx.ops.color import ink_amount, luminance, parse_color, vivid
-from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
-
-# Other effects and tests still import these names from here.
-_glyph_atlas = glyph_atlas
-__all__ = ["_glyph_atlas", "ascii", "cell_size"]
+from photo_fx.ops.color import parse_color
+from photo_fx.ops.textart import text_art
 
 
 @effect(category="text")
@@ -33,23 +29,13 @@ def ascii(
     (fine detail is lost to the character grid), 1 = text laid over the untouched photo, so every detail stays visible.
     `font` = path to a monospaced .ttf/.ttc if you do not want the system one.
     """
-    bg_color = parse_color(bg)
-    atlas = glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
-    n, cell_h, cell_w = atlas.shape
-    height, width = rgb.shape[:2]
-    rows, cols = -(-height // cell_h), -(-width // cell_w)
-    padded = np.pad(rgb, ((0, rows * cell_h - height), (0, cols * cell_w - width), (0, 0)), mode="edge")
-
-    # The colour and brightness of each character cell is the average of the pixels it covers.
-    cells = padded.reshape(rows, cell_h, cols, cell_w, 3).mean(axis=(1, 3))
-    ink = np.clip(ink_amount(luminance(cells), bg_color), 0.0, 1.0) ** gamma
-    glyph = np.rint(ink * (n - 1)).astype(int)
-
-    coverage = paint(glyph, atlas)[..., None]
-    if fg is None:
-        text = np.repeat(np.repeat(vivid(cells), cell_h, axis=0), cell_w, axis=1)
-    else:
-        text = parse_color(fg)
-    base = bg_color * (1.0 - photo) + padded * photo
-    out = base * (1.0 - coverage) + text * coverage
-    return out[:height, :width].astype(np.float32)
+    return text_art(
+        rgb,
+        cell=cell,
+        chars=chars,
+        fg=None if fg is None else parse_color(fg),
+        background=parse_color(bg),
+        gamma=gamma,
+        photo=photo,
+        font=font,
+    )

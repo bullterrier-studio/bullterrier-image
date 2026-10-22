@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from photo_fx import effects
-from photo_fx.effects.ascii import cell_size
+from photo_fx.ops.glyphs import cell_size
 
 
 def _lit(height=120, width=160):

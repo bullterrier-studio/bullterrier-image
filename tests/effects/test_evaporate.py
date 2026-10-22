@@ -3,7 +3,7 @@
 import numpy as np
 
 from photo_fx import effects
-from photo_fx.effects.ascii import cell_size
+from photo_fx.ops.glyphs import cell_size
 
 
 def test_evaporate_leaves_everything_below_start_untouched():

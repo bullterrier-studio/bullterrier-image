@@ -9,9 +9,8 @@ travelling against the wind.
 import numpy as np
 
 from photo_fx.core.registry import effect
-
-from ..ops import cells, distance
-from .ascii import cell_size
+from photo_fx.ops import cells, distance
+from photo_fx.ops.glyphs import cell_size
 
 # All times are shares of the moving part of the clip (progress 0..1), so they scale with the clip's length.
 _ANTICIPATE = 0.06  # wind-up before a piece goes; the first piece detaches only after this, so every piece has one

@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from photo_fx.effects import ascii as ascii_module
 from photo_fx.ops import glyphs
 from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
 
@@ -121,11 +120,6 @@ def test_paint_rejects_non_integer_indices():
 def test_paint_rejects_an_atlas_that_is_not_a_stack_of_glyphs(shape):
     with pytest.raises(ValueError, match="atlas"):
         paint(np.zeros((1, 1), dtype=int), np.zeros(shape, dtype=np.float32))
-
-
-def test_ascii_module_keeps_the_names_other_code_imports():
-    assert ascii_module.cell_size is glyphs.cell_size
-    assert ascii_module._glyph_atlas is glyphs.glyph_atlas
 
 
 # --- fonts and glyph geometry -----------------------------------------------------------------------------------

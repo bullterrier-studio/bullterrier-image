@@ -5,11 +5,13 @@ import math
 import numpy as np
 
 from photo_fx.core.registry import effect
-
-from .ascii import ascii as text_art
+from photo_fx.ops.color import parse_color
+from photo_fx.ops.textart import text_art
 
 _TEXT_ROWS = 3  # fewest rows of characters in a text strip
 _TEXT_GAMMA = 0.55  # < 1 puts more ink down, so the text carries enough light to read against the black
+_TEXT_CHARS = " .:-=+*#%@"  # the character palette of the text strips (the `ascii` effect's default palette)
+_TEXT_BACKGROUND = "#000000"  # the paper behind the text strips' characters
 
 
 @effect(category="glitch")
@@ -54,7 +56,14 @@ def glitch(
             band_height = max(band_height, text_height)
             top = min(top, height - band_height)
             out[top : top + band_height] = text_art(
-                out[top : top + band_height], cell=ascii_cell, gamma=_TEXT_GAMMA, photo=ascii_photo
+                out[top : top + band_height],
+                cell=ascii_cell,
+                chars=_TEXT_CHARS,
+                fg=None,  # each character in the colour of the strip under it
+                background=parse_color(_TEXT_BACKGROUND),
+                gamma=_TEXT_GAMMA,
+                photo=ascii_photo,
+                font=None,
             )
 
     out[..., 0] = np.roll(out[..., 0], split, axis=1)

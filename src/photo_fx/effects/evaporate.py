@@ -3,9 +3,8 @@
 import numpy as np
 
 from photo_fx.core.registry import effect
-
-from ..ops import cells, distance
-from .ascii import cell_size
+from photo_fx.ops import cells, distance
+from photo_fx.ops.glyphs import cell_size
 
 
 @effect(category="animation")
