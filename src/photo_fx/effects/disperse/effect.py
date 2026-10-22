@@ -325,7 +325,8 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     )
     inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
     rng = np.random.default_rng(p.seed)
-    u = rng.random((6, rows, cols))  # constant: one random field per use below (fixed, so a seed keeps its look)
+    # constant: six random fields, one per use below (a fixed number, so a seed keeps its look)
+    order_noise, flight_noise, speed_noise, angle_noise, sway_noise, phase_noise = rng.random((6, rows, cols))
 
     # Order of detaching: 0 = first, 1 = last.
     y = np.broadcast_to(((np.arange(rows) + 0.5) * cell_h / height)[:, None], (rows, cols))
@@ -337,10 +338,10 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     if present.any():
         low, high = order[present].min(), order[present].max()
         order = (order - low) / max(high - low, 1e-6)  # constant: guards a flat order
-    order = np.clip(order * (1.0 - p.jitter) + u[0] * p.jitter, 0.0, 1.0)
+    order = np.clip(order * (1.0 - p.jitter) + order_noise * p.jitter, 0.0, 1.0)
 
     # When each piece detaches and how long it flies, in progress units; the last one has vanished by `finish`.
-    lifetime = p.flight * ((1 - p.flight_variation) + 2 * p.flight_variation * u[1])
+    lifetime = p.flight * ((1 - p.flight_variation) + 2 * p.flight_variation * flight_noise)
     span = max(p.finish - p.anticipation - p.flight * (1 + p.flight_variation), 0.0)
     detach_at = p.anticipation + order / max(p.reach, 1e-6) * span  # constant: guards reach == 0
     age = (p.progress - detach_at) / lifetime  # <= 0: not yet, 0..1: in flight, >= 1: gone
@@ -357,7 +358,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     # Ambient layer: a slow wave through the pieces that stay, moving against the wind.
     shimmer = np.ones((rows, cols))
     if p.ambient > 0.0:
-        against = 1.0 if p.wind >= 0 else -1.0
+        against = 1.0 if p.wind >= 0 else -1.0  # constant: the sign of a direction
         phase = p.clock / p.ambient_period + against * x / p.ambient_wavelength
         shimmer = 1.0 + p.ambient * np.sin(2.0 * np.pi * phase)
     out = np.where(staying[..., None, None, None], pieces * shimmer[..., None, None, None], 0.0)
@@ -366,8 +367,8 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     row, col = np.nonzero(winding | flying)
     a = age[row, col]
     t = np.clip(a, 0.0, 1.0)  # how far through its flight
-    speed = p.distance_minimum + (1 - p.distance_minimum) * u[2][row, col]
-    direction = np.radians(p.angle + (u[3][row, col] - 0.5) * p.angle_spread)
+    speed = p.distance_minimum + (1 - p.distance_minimum) * speed_noise[row, col]
+    direction = np.radians(p.angle + (angle_noise[row, col] - 0.5) * p.angle_spread)
     reach_px = abs(p.wind) * width * speed  # this piece's whole journey
     journey_x = (
         np.sign(p.wind) * reach_px * np.cos(direction) + p.outward * p.outward_distance * width * normal_x[row, col]
@@ -379,7 +380,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     hover_time = np.maximum(detach_at[row, col] - hover_start[row, col], 1e-9)  # constant: guards a zero hover
     floating = np.clip((p.progress - hover_start[row, col]) / hover_time, 0, 1)
     windup = np.clip((p.progress - (detach_at[row, col] - p.anticipation)) / p.anticipation, 0.0, 1.0)
-    settled = p.hover * floating * floating * (3.0 - 2.0 * floating)  # constant: smoothstep
+    settled = p.hover * floating * floating * (3.0 - 2.0 * floating)  # constant: smoothstep polynomial 3t^2 - 2t^3
     start = p.hover - p.pullback  # where flight begins, as a share of the journey
     along = np.where(a > 0.0, start + (1.0 - start) * path, settled - p.pullback * (1.0 - (1.0 - windup) ** 2))
     bob = (
@@ -387,9 +388,9 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
         * height
         * (1.0 if p.hover > 0.0 else 0.0)  # the bob only exists while pieces hover
         * np.sin(np.pi * floating)
-        * np.sin(2.0 * np.pi * (p.bob_cycles * floating + u[5][row, col]))
+        * np.sin(2.0 * np.pi * (p.bob_cycles * floating + phase_noise[row, col]))
     )
-    sway = p.sway * width * u[4][row, col] * t * np.sin(2.0 * np.pi * (p.sway_cycles * t + u[5][row, col]))
+    sway = p.sway * width * sway_noise[row, col] * t * np.sin(2.0 * np.pi * (p.sway_cycles * t + phase_noise[row, col]))
     dx = along * journey_x + sway
     dy = along * journey_y + np.where(a > 0.0, 0.0, bob)
 
@@ -400,7 +401,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     yy = row[:, None, None] * cell_h + np.rint(dy).astype(int)[:, None, None] + np.arange(cell_h)[None, :, None]
     xx = col[:, None, None] * cell_w + np.rint(dx).astype(int)[:, None, None] + np.arange(cell_w)[None, None, :]
     yy, xx = np.broadcast_arrays(yy, xx)  # both (pieces, cell_h, cell_w)
-    canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.float32)  # constant: RGB channels
+    canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.float32)  # constant: the three RGB channels
     on_canvas = (yy >= 0) & (yy < canvas.shape[0]) & (xx >= 0) & (xx < canvas.shape[1])
     shaded = pieces[row, col] * brightness[:, None, None, None]
     np.maximum.at(canvas, (yy[on_canvas], xx[on_canvas]), shaded[on_canvas])

@@ -185,7 +185,9 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     # How strongly each piece wants to detach, 0..1 (smoothstep: 3t^2 - 2t^3).
     centre = (np.arange(rows) + 0.5) * cell_h / height  # each row's height in the picture, 0 = top
     t = np.clip((p.start - centre) / max(p.start - p.end, 1e-6), 0.0, 1.0)  # constant: guards start == end
-    strength = np.broadcast_to((t * t * (3.0 - 2.0 * t))[:, None], (rows, cols))  # constant: smoothstep
+    strength = np.broadcast_to(
+        (t * t * (3.0 - 2.0 * t))[:, None], (rows, cols)
+    )  # constant: smoothstep polynomial 3t^2 - 2t^3
     figure = cells.figure(lit, matte, cell_w, cell_h, height, width)
     edges = distance.edge_distance(
         figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing
@@ -193,7 +195,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
     if p.edge > 0:
         t = np.clip(1.0 - inside / max(p.edge * width, 1.0), 0.0, 1.0)
-        strength = np.maximum(strength, t * t * (3.0 - 2.0 * t))  # constant: smoothstep
+        strength = np.maximum(strength, t * t * (3.0 - 2.0 * t))  # constant: smoothstep polynomial 3t^2 - 2t^3
 
     detached = u[0] < strength
     out = np.where(detached[..., None, None, None], 0.0, pieces)
