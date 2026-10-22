@@ -113,36 +113,49 @@ def masked_recipes(folder):
         )
 
 
-def test_the_subject_is_found_once_per_photo_and_remembered_between_runs(folder, monkeypatch):
+class StandInFinder:
+    """Stands in for the subject-finding model (the external boundary): records the photos it is asked about and
+    returns a disc of `radius` px, or raises `error` when one is given."""
+
+    def __init__(self, radius: int = 30, error: Exception | None = None):
+        self.radius, self.error, self.seen = radius, error, []
+
+    def __call__(self, rgb: np.ndarray) -> np.ndarray:
+        self.seen.append(rgb.copy())
+        if self.error is not None:
+            raise self.error
+        return disc_matte(rgb.shape[:2], self.radius)
+
+
+def test_the_subject_is_found_once_per_photo_and_remembered_between_runs(folder):
     masked_recipes(folder)
-    calls = []
-    monkeypatch.setattr(pipeline, "subject_matte", lambda rgb: calls.append(1) or disc_matte(rgb.shape[:2]))
+    finder = StandInFinder()
     project = load_project(folder / "photo-fx.toml")
-    run(project)
-    assert len(calls) == 2  # two photos, though four recipes ask for the subject... two of them do
-    run(project, force=True)
-    assert len(calls) == 2  # the second run reads the cached matte from disk
-    assert any((folder / "out" / ".cache").glob("*.npz"))
+    run(project, find_subject=finder)
+    assert len(finder.seen) == 2  # two photos; two of the four recipes need the subject, and ask once per photo
+    photos = sorted(imageio.load(folder / "photos" / name).tobytes() for name in ("a.png", "b.png"))
+    assert sorted(seen.tobytes() for seen in finder.seen) == photos  # each photo itself, at full size
+    run(project, force=True, find_subject=finder)
+    assert len(finder.seen) == 2  # redoing everything reads the remembered subject instead of looking again
 
 
-def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one(folder, monkeypatch):
+def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_searched_once(folder):
     masked_recipes(folder)
-
-    def nothing(rgb):
-        raise RuntimeError("no subject found in the picture")
-
-    monkeypatch.setattr(pipeline, "subject_matte", nothing)
-    items = run(load_project(folder / "photo-fx.toml"))
+    finder = StandInFinder(error=RuntimeError("no subject found in the picture"))
+    items = run(load_project(folder / "photo-fx.toml"), find_subject=finder)
     by = {(i.photo, i.recipe): i for i in items}
     assert by[("a.png", "cut1")].status == "failed" and "no subject" in by[("a.png", "cut1")].error
+    assert by[("a.png", "cut2")].status == "failed" and "no subject" in by[("a.png", "cut2")].error
     assert by[("a.png", "grainy")].status == "done" and by[("b.png", "warm")].status == "done"
+    assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second masked recipe
 
 
-def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder, monkeypatch):
+def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder):
     masked_recipes(folder)
-    monkeypatch.setattr(pipeline, "subject_matte", lambda rgb: disc_matte(rgb.shape[:2], radius=3))
-    items = [i for i in run(load_project(folder / "photo-fx.toml")) if i.recipe == "cut1"]
-    assert {i.status for i in items} == {"done"} and all("covers only" in i.warnings[0] for i in items)
+    items = run(load_project(folder / "photo-fx.toml"), find_subject=StandInFinder(radius=3))
+    cut = [i for i in items if i.recipe == "cut1"]
+    assert {i.status for i in cut} == {"done"} and all("covers only" in i.warnings[0] for i in cut)
+    assert all(i.warnings == () for i in items if i.recipe == "grainy")  # recipes without a subject are not judged
 
 
 def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):

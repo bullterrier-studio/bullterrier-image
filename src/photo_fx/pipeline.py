@@ -178,12 +178,16 @@ def run(
     dry_run: bool = False,
     only: str | None = None,
     log: Callable[[str], None] = lambda message: None,
+    find_subject: Callable[[np.ndarray], np.ndarray] = subject_matte,
 ) -> list[Item]:
     """Process every photo with every recipe and write the report; returns what happened to each pair.
 
     Pairs whose photo, recipe, export settings and the tool's own code are unchanged since the last run, and whose
     files still exist, are skipped unless `force`. `only` is a file-name pattern selecting some of the photos.
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once.
+    `find_subject(rgb) -> matte` finds the subject of a photo for the recipes that need it (default: `subject_matte`).
+    It is asked at most once per photo, and never again for a photo whose subject is remembered in the project's
+    cache from an earlier run; if it raises, the recipes of that photo that need the subject fail, and the rest run.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
     names = [recipe.name for _, recipe in recipes]
@@ -210,7 +214,7 @@ def run(
     total = len(photos) * len(recipes)
     for photo in photos:
         photo_hash = hashlib.sha256(photo.read_bytes()).hexdigest()
-        state = _Photo(photo, photo_hash, project)
+        state = _Photo(photo, photo_hash, project, find_subject)
         for path, recipe in recipes:
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
             fingerprint = _fingerprint(
@@ -278,6 +282,7 @@ class _Photo:
     path: Path
     hash: str
     project: Project
+    find_subject: Callable[[np.ndarray], np.ndarray]
     _rgb: np.ndarray | None = field(default=None, repr=False)
     _matte: np.ndarray | None = field(default=None, repr=False)
     _matte_error: Exception | None = field(default=None, repr=False)
@@ -297,7 +302,7 @@ class _Photo:
                 self._matte = np.load(cached)["matte"].astype(np.float32)
             else:
                 try:
-                    self._matte = subject_matte(self.rgb())  # analyse
+                    self._matte = self.find_subject(self.rgb())  # analyse
                 except Exception as error:
                     self._matte_error = error
                     raise
