@@ -305,7 +305,7 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
                            timing.py (easing, `ramp`, `Animation`), steps.py (`Step`, `Recipe`), loader.py (TOML),
                            runner.py (render, render_frames, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: colorspace, color, resample, textart, glyphs,
-                           cells, distance, warp, voronoi... (core and ops are siblings: neither imports the other)
+                           cells, distance, warp, voronoi... (core may import ops; ops imports nothing above it)
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect
 docs/            the effect catalogue (effects.md, generated) and its pictures, the roadmap and build order

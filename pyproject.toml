@@ -69,31 +69,28 @@ select = ["E", "F", "I", "B", "UP"]
 root_package = "photo_fx"
 
 [[tool.importlinter.contracts]]
-name = "Layers: app > adapters > effects > core | ops"
+name = "Layers: app > adapters > effects > core > ops"
 type = "layers"
 containers = ["photo_fx"]
 exhaustive = true  # a new top-level module must be placed in a layer here
+# Each layer may import only the layers below it ("|" = independent siblings, ":" = siblings that may import each
+# other). Being exhaustive, it also stops core and ops importing anything above them.
 layers = [
-    "cli : pipeline : gallery : sheet : checks : fx : recipe",  # app (":" = may import each other)
+    "cli",  # app, split so its modules cannot form cycles: recipe imports no other app module
+    "pipeline | gallery",
+    "sheet | checks | fx",
+    "recipe",
     "imageio : matte",  # adapters
     "effects",
-    "core | ops",  # siblings ("|" = independent)
+    "core",  # may import ops
+    "ops",
 ]
-# The one recorded exception: the runner scales the photo to `recipe.size` with ops.resample (M1 brief, decision 2).
-ignore_imports = ["photo_fx.core.runner -> photo_fx.ops.resample"]
-
-[[tool.importlinter.contracts]]
-name = "core imports nothing else from photo_fx"
-type = "forbidden"
-source_modules = ["photo_fx.core"]
-forbidden_modules = ["photo_fx.*"]  # every top-level module but core itself (overlaps are skipped)
-ignore_imports = ["photo_fx.core.runner -> photo_fx.ops.resample"]  # the recorded exception, as above
 
 [[tool.importlinter.contracts]]
 name = "ops imports nothing else from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.ops"]
-forbidden_modules = ["photo_fx.*"]
+forbidden_modules = ["photo_fx.*"]  # every top-level module but ops itself (overlaps are skipped)
 
 [[tool.importlinter.contracts]]
 name = "Effects never import each other"
@@ -103,13 +100,21 @@ type = "independence"
 modules = ["photo_fx.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core modules: loader | runner > steps > timing"
+name = "Core modules: loader | runner > steps > registry | timing | types | vocabulary"
 type = "layers"
 containers = ["photo_fx.core"]
-layers = ["loader | runner", "steps", "timing"]
+exhaustive = true  # a new core module must be placed in a layer here
+layers = ["loader | runner", "steps", "registry | timing | types | vocabulary"]
 
 [[tool.importlinter.contracts]]
-name = "timing imports nothing from the other core modules"
+name = "loader imports only steps and timing from core"
+type = "forbidden"
+source_modules = ["photo_fx.core.loader"]
+forbidden_modules = ["photo_fx.core.registry", "photo_fx.core.types", "photo_fx.core.vocabulary"]
+allow_indirect_imports = true  # through steps is fine: the TOML reader itself only builds Steps and Recipes
+
+[[tool.importlinter.contracts]]
+name = "timing imports nothing else from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
-forbidden_modules = ["photo_fx.core.*"]
+forbidden_modules = ["photo_fx.*", "photo_fx.core.*"]  # overlaps (core itself, timing itself) are skipped

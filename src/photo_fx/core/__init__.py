@@ -8,8 +8,8 @@
     loader      `load_recipe`: the TOML format
     runner      running a recipe on a photo; the subject is given to it (a matte or a `find_subject` function)
 
-`core` imports nothing from photo_fx outside itself (import-linter enforces it; the one recorded exception is
-`runner` using `ops.resample`), so it stays small and stable while effects, adapters and the app change around it.
+`core` imports only `ops` from the rest of photo_fx (import-linter enforces it), so it stays small and stable while
+effects, adapters and the app change around it.
 Users import from `photo_fx` / `photo_fx.recipe`, whose `render` & co. also know how to find the subject.
 """
 

@@ -13,11 +13,11 @@ Code is organised as **vertical slices**: one effect is one folder holding every
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
 adapters   imageio (files), matte (finding the subject)               (may import core, ops)
 effects    one folder per effect                                      (may import core, ops; never other effects)
-core | ops core: Params base, registry, recipe engine   ops: pure numeric primitives     (siblings; neither imports the other;
-                                                                                         core/ops import nothing else from photo_fx)
+core       Params base, registry, recipe engine                       (may import ops)
+ops        pure numeric primitives                                    (imports nothing from photo_fx)
 ```
 Imports flow **downward only**. `import-linter` enforces this in the test suite (contracts in `pyproject.toml`, run by `tests/test_layering.py`; `uv run lint-imports`).
-If you want an import the rules forbid, the code is in the wrong layer: move it. One recorded exception: `core.runner` scales the photo with `ops.resample`.
+If you want an import the rules forbid, the code is in the wrong layer: move it.
 The app layer (`photo_fx/__init__`) imports `effects`, so importing any `photo_fx` module registers every effect; `core` never imports `effects`.
 The runner is given the subject (a `matte`, or a `find_subject` function); the public `photo_fx.recipe` binds `matte.subject_matte` as the default.
 
@@ -106,7 +106,7 @@ The target above is being introduced in small steps; until a step lands, the old
 - [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
 - [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites (some still in review)
 - [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
-- [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/` (`color`, `resample`, `textart`); import-linter contracts
+- [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
 - [ ] F1a: Pydantic params model pattern in `core/`; Step/Recipe/Animation as Pydantic models
 - [ ] F1b: each existing effect becomes a folder with params, tests and example (`ascii`, `texture`, `glitch`, `evaporate`, `disperse`, `color`)
 - [ ] T1b: lint rules, mypy and fixes

@@ -19,7 +19,8 @@ Layers, each importing only from the ones below it (import-linter checks this in
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
     adapters   imageio (files and the one in-memory image type), matte (finding the subject)
     effects    the effect library: pure functions image -> image, found automatically
-    core, ops  core: the registry and the recipe engine (timing, steps, loader, runner); ops: shared numeric primitives
+    core       the registry and the recipe engine (timing, steps, loader, runner)
+    ops        shared numeric primitives, named by concept
 """
 
 # First, before anything else: importing the effect library registers every effect, so whichever photo_fx module is

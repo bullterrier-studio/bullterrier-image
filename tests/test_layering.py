@@ -1,10 +1,11 @@
 """The package's layering: which way imports may point (import-linter, configured in pyproject.toml), and what a fresh
-import sees.
+import sees. Each layer may import only the layers below it:
 
-    app        cli, pipeline, gallery, sheet, checks, fx, recipe
+    app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte
     effects    one module per effect; never import each other
-    core | ops siblings: neither imports the other; neither imports anything else from photo_fx
+    core       loader | runner > steps > registry | timing | types | vocabulary; may import ops
+    ops        imports nothing from photo_fx outside ops
 
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
 unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
@@ -27,13 +28,13 @@ PACKAGE = Path(photo_fx.__file__).parent
 ROOT = PACKAGE.parent.parent  # the repository: pyproject.toml holds the contracts
 LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-imports` from the repository root
 
-LAYERS = "Layers: app > adapters > effects > core | ops"
-CORE_ALONE = "core imports nothing else from photo_fx"
+LAYERS = "Layers: app > adapters > effects > core > ops"
 OPS_ALONE = "ops imports nothing else from photo_fx"
 EFFECTS_APART = "Effects never import each other"
-CORE_ORDER = "Core modules: loader | runner > steps > timing"
-TIMING_ALONE = "timing imports nothing from the other core modules"
-CONTRACTS = [LAYERS, CORE_ALONE, OPS_ALONE, EFFECTS_APART, CORE_ORDER, TIMING_ALONE]
+CORE_ORDER = "Core modules: loader | runner > steps > registry | timing | types | vocabulary"
+LOADER_DIRECT = "loader imports only steps and timing from core"
+TIMING_ALONE = "timing imports nothing else from photo_fx"
+CONTRACTS = [LAYERS, OPS_ALONE, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
 
 
 def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProcess:
@@ -41,6 +42,15 @@ def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProce
     return subprocess.run(
         [str(LINT_IMPORTS), "--no-cache"], cwd=cwd, env=environment, capture_output=True, text=True, check=False
     )
+
+
+def lint_a_copy_with(tmp_path: Path, module: str, line: str) -> subprocess.CompletedProcess:
+    """Lint a copy of the package (and its contracts) in which `module` also has the import `line`."""
+    shutil.copytree(PACKAGE, tmp_path / "photo_fx", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy(ROOT / "pyproject.toml", tmp_path)
+    target = tmp_path / "photo_fx" / module
+    target.write_text(target.read_text() + f"\n{line}  # injected by the test\n")
+    return lint(tmp_path, pythonpath=tmp_path)
 
 
 def test_the_package_keeps_every_import_contract():
@@ -59,26 +69,35 @@ FORBIDDEN = {
         EFFECTS_APART,
     ),
     "ops to core": ("ops/warp.py", "import photo_fx.core.timing", "photo_fx.ops.warp", OPS_ALONE),
-    "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", CORE_ALONE),
-    "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", CORE_ALONE),
+    "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
+    "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
     "effects to imageio": ("effects/color.py", "import photo_fx.imageio", "photo_fx.effects.color", LAYERS),
+    "recipe to pipeline": ("recipe.py", "import photo_fx.pipeline", "photo_fx.recipe", LAYERS),
+    "fx to gallery": ("fx.py", "import photo_fx.gallery", "photo_fx.fx", LAYERS),
+    "pipeline to cli": ("pipeline.py", "import photo_fx.cli", "photo_fx.pipeline", LAYERS),
     "loader to runner": ("core/loader.py", "import photo_fx.core.runner", "photo_fx.core.loader", CORE_ORDER),
-    "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", TIMING_ALONE),
-    # the one recorded exception (core.runner -> ops.resample) must not let any other core -> ops import through
-    "core to another ops module": ("core/steps.py", "import photo_fx.ops.warp", "photo_fx.core.steps", CORE_ALONE),
+    "steps to loader": ("core/steps.py", "import photo_fx.core.loader", "photo_fx.core.steps", CORE_ORDER),
+    "registry to steps": ("core/registry.py", "import photo_fx.core.steps", "photo_fx.core.registry", CORE_ORDER),
+    "loader to registry": ("core/loader.py", "import photo_fx.core.registry", "photo_fx.core.loader", LOADER_DIRECT),
+    "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", CORE_ORDER),
+    "timing to ops": ("core/timing.py", "import photo_fx.ops.warp", "photo_fx.core.timing", TIMING_ALONE),
 }
 
 
 @pytest.mark.parametrize("module, line, importer, contract", FORBIDDEN.values(), ids=FORBIDDEN.keys())
 def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract, tmp_path):
-    shutil.copytree(PACKAGE, tmp_path / "photo_fx", ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copy(ROOT / "pyproject.toml", tmp_path)
-    target = tmp_path / "photo_fx" / module
-    target.write_text(target.read_text() + f"\n{line}  # forbidden\n")
-    result = lint(tmp_path, pythonpath=tmp_path)
+    result = lint_a_copy_with(tmp_path, module, line)
     assert result.returncode != 0
     assert re.search(rf"{re.escape(contract)} BROKEN", result.stdout), result.stdout + result.stderr
     assert importer in result.stdout, result.stdout
+
+
+def test_core_may_import_ops(tmp_path):
+    """Owner ruling: the layers are linear, app > adapters > effects > core > ops, so core may use ops."""
+    result = lint_a_copy_with(tmp_path, "core/steps.py", "import photo_fx.ops.warp")
+    assert result.returncode == 0, result.stdout + result.stderr
+    for name in CONTRACTS:
+        assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"
 
 
 def _effects_declared_in_the_source() -> set[str]:

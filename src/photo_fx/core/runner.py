@@ -8,8 +8,8 @@ an error. The runner is given everything it uses: the photo, and the subject eit
 needs the subject. It never loads a file or looks for the subject on its own; `photo_fx.recipe` binds the default
 finder for users.
 
-Dependency direction: imports `steps`, the effect registry and `ops.resample` (the one recorded exception to "core
-never imports ops", see pyproject.toml); never `loader`, so recipes built in Python run without the TOML reader.
+Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never `loader`, so recipes
+built in Python run without the TOML reader.
 """
 
 from collections import deque
