@@ -12,9 +12,21 @@ from photo_fx.ops.noise import fractal_noise, worley
 
 KINDS = ["gradient", "value"]
 
+# Seeds that differ in the low bit, in high bits only (2**32 would collide with 0 if the seed were truncated to 32 bits)
+# and in sign. Every pair of them must give an unrelated field.
+SEEDS = [*range(8), 2**32, 2**32 + 1, -1, -2]
+
 
 def _correlation(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.corrcoef(a.ravel(), b.ravel())[0, 1])
+
+
+def _assert_pairwise_unrelated(fields: list[np.ndarray]) -> None:
+    """Pearson correlation of independent fields with ~1000 features is ~0.02 (measured: mean 0.016-0.028, worst
+    pair 0.10 over 66 pairs), so the bounds sit well above that and far below the 1.0 of two equal fields."""
+    correlations = [abs(_correlation(a, b)) for i, a in enumerate(fields) for b in fields[:i]]
+    assert np.mean(correlations) < 0.05
+    assert np.max(correlations) < 0.15
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -24,10 +36,9 @@ class TestFractalNoiseContract:
         b = fractal_noise((64, 80), 16, 5, octaves=3, kind=kind)
         assert np.array_equal(a, b)
 
-    def test_different_seed_gives_an_unrelated_field(self, kind):
-        a = fractal_noise((128, 128), 16, 1, kind=kind)
-        b = fractal_noise((128, 128), 16, 2, kind=kind)
-        assert abs(_correlation(a, b)) < 0.1
+    def test_different_seeds_give_unrelated_fields(self, kind):
+        fields = [fractal_noise((128, 128), 4, seed, kind=kind) for seed in SEEDS]
+        _assert_pairwise_unrelated(fields)
 
     def test_float32_requested_shape_and_range_for_non_square(self, kind):
         field = fractal_noise((40, 90), 12, 3, octaves=3, kind=kind)
@@ -48,8 +59,12 @@ class TestFractalNoiseContract:
         assert np.array_equal(wide[:, :45], narrow)
 
 
-def test_gradient_noise_uses_most_of_the_range():
-    field = fractal_noise((256, 256), 64, 1)
+@pytest.mark.parametrize("seed", range(40))
+def test_gradient_noise_uses_most_of_the_range(seed):
+    # The brief's bounds (1st percentile < 0.25, 99th > 0.75) hold for every seed tried, but only just for a few:
+    # across seeds 0-39 the worst 1st percentile is 0.241 and the worst 99th is 0.775. A 256x256 canvas holds only
+    # 4 x 4 features at scale 64, so the spread comes from the seed, hence the many seeds.
+    field = fractal_noise((256, 256), 64, seed)
     low, high = np.percentile(field, [1, 99])
     assert low < 0.25
     assert high > 0.75
@@ -163,9 +178,9 @@ class TestWorleyContract:
         assert np.array_equal(worley((50, 70), 5, 9, metric=metric), worley((50, 70), 5, 9, metric=metric))
 
     @pytest.mark.parametrize("metric", METRICS)
-    def test_different_seed_gives_an_unrelated_field(self, metric):
-        a, b = worley((128, 128), 8, 1, metric=metric), worley((128, 128), 8, 2, metric=metric)
-        assert abs(_correlation(a, b)) < 0.2
+    def test_different_seeds_give_unrelated_fields(self, metric):
+        fields = [worley((128, 128), 16, seed, metric=metric) for seed in SEEDS]
+        _assert_pairwise_unrelated(fields)
 
     @pytest.mark.parametrize("metric", METRICS)
     def test_float32_requested_shape_and_range_for_non_square(self, metric):
@@ -336,3 +351,118 @@ class TestEdgeCases:
             field = worley((30, 50), cells, 4, metric=metric)
             assert field.shape == (30, 50)
             assert 0.0 <= field.min() and field.max() <= 1.0
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# octave structure and smoothness
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+def _relative_roughness(field: np.ndarray) -> float:
+    """Mean neighbour difference in units of the field's own spread: proportional to 1 / feature size."""
+    return _roughness(field) / float(field.std())
+
+
+def _mean_relative_roughness(**arguments) -> float:
+    return float(
+        np.mean([_relative_roughness(fractal_noise((256, 256), seed=seed, **arguments)) for seed in range(12)])
+    )
+
+
+@pytest.mark.parametrize("kind", KINDS)
+class TestOctaveFeatureSize:
+    # `persistence` of 1e6 makes octave 1 carry a million times the weight of octave 0, so the two-octave field is
+    # octave 1 alone. Its roughness must then match a single octave whose scale is the expected feature size.
+    # Roughness of a lattice field is inversely proportional to the lattice spacing: scale 32 and 64 measure
+    # 0.075 and 0.039 (gradient), so a wrong factor (3 instead of 2 gives a spacing of 21, not 32) is off by 50%.
+
+    def test_second_octave_has_half_the_feature_size(self, kind):
+        second = _mean_relative_roughness(scale=64, octaves=2, persistence=1e6, kind=kind)
+        half_size = _mean_relative_roughness(scale=32, kind=kind)
+        assert second == pytest.approx(half_size, rel=0.1)
+
+    def test_third_octave_has_a_quarter_of_the_feature_size(self, kind):
+        third = _mean_relative_roughness(scale=128, octaves=3, persistence=1e6, kind=kind)
+        quarter_size = _mean_relative_roughness(scale=32, kind=kind)
+        assert third == pytest.approx(quarter_size, rel=0.1)
+
+    def test_lacunarity_sets_the_ratio_between_octaves(self, kind):
+        # Lacunarity 3: octave 1 has a third of the scale, so scale 96 gives 32.
+        second = _mean_relative_roughness(scale=96, octaves=2, persistence=1e6, lacunarity=3.0, kind=kind)
+        third_size = _mean_relative_roughness(scale=32, kind=kind)
+        assert second == pytest.approx(third_size, rel=0.1)
+
+    def test_lacunarity_defaults_to_two(self, kind):
+        default = fractal_noise((48, 48), 24, 5, octaves=3, kind=kind)
+        explicit = fractal_noise((48, 48), 24, 5, octaves=3, lacunarity=2.0, kind=kind)
+        assert np.array_equal(default, explicit)
+
+    def test_fractional_lacunarity_is_respected(self, kind):
+        # 1.5: octave 1 has features 2/3 the size, so scale 48 matches scale 32.
+        second = _mean_relative_roughness(scale=48, octaves=2, persistence=1e6, lacunarity=1.5, kind=kind)
+        assert second == pytest.approx(_mean_relative_roughness(scale=32, kind=kind), rel=0.1)
+
+    def test_octaves_are_independent_of_each_other(self, kind):
+        # Octave 0 alone and octave 1 alone (by extreme persistence) must be unrelated fields even though they come
+        # from one seed: octaves that shared their randomness would reinforce each other into visible patterns.
+        # Lacunarity 1 gives both octaves the same feature size, where shared randomness would make them identical
+        # (at other sizes shared hashes happen to land on different lattice points and hide the fault).
+        correlations = []
+        for seed in range(10):
+            coarse = fractal_noise((128, 128), 16, seed, octaves=2, persistence=1e-6, lacunarity=1, kind=kind)
+            fine = fractal_noise((128, 128), 16, seed, octaves=2, persistence=1e6, lacunarity=1, kind=kind)
+            correlations.append(abs(_correlation(coarse, fine)))
+        assert np.mean(correlations) < 0.1
+
+
+def _crease_ratio(field: np.ndarray, axis: int) -> float:
+    """Largest third difference along `axis` relative to its root mean square.
+
+    The module promises fields without creases: the interpolation between lattice points has a continuous first and
+    second derivative. A crease (jump in the first derivative, as in linear interpolation) or a kink (jump in the
+    second derivative, as in smoothstep) shows as a spike in the third difference on every lattice line, whereas
+    a smooth field has a third difference without outliers. Using a ratio makes the statistic independent of the
+    field's amplitude, and it needs no knowledge of where the lattice lines fall. Measured at scale 32: 3.2-5.5 for
+    smooth fields, 8.5-14.9 for linear and smoothstep interpolation, and for either applied along one axis only.
+    """
+    third = np.diff(field.astype(np.float64), n=3, axis=axis)
+    return float(np.abs(third).max() / np.sqrt((third**2).mean()))
+
+
+@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize("seed", [0, 1, 2])
+@pytest.mark.parametrize("axis", [0, 1])
+def test_fields_have_no_creases_along_either_axis(kind, seed, axis):
+    field = fractal_noise((200, 300), 32, seed, kind=kind)
+    assert _crease_ratio(field, axis) < 7.0
+
+
+def test_crease_ratio_flags_linear_interpolation_of_a_lattice():
+    lattice = np.random.default_rng(0).random((9, 12))
+    creased = ndimage.zoom(lattice, 32, order=1)
+    smooth = ndimage.zoom(lattice, 32, order=3)
+    for axis in (0, 1):
+        assert _crease_ratio(creased, axis) > 8.0
+        assert _crease_ratio(smooth, axis) < 7.0
+
+
+class TestArgumentTypes:
+    @pytest.mark.parametrize("lacunarity", [0.99, 0, -2.0, float("nan"), float("inf")])
+    def test_lacunarity_must_be_at_least_one_and_finite(self, lacunarity):
+        with pytest.raises(ValueError, match="lacunarity"):
+            fractal_noise((8, 8), 4, 1, octaves=2, lacunarity=lacunarity)
+
+    def test_lacunarity_of_exactly_one_is_allowed(self):
+        assert fractal_noise((8, 8), 4, 1, octaves=2, lacunarity=1).shape == (8, 8)
+
+    @pytest.mark.parametrize("octaves", [2.5, 2.0, True, "3"])
+    def test_octaves_must_be_an_integer(self, octaves):
+        with pytest.raises(ValueError, match="octaves"):
+            fractal_noise((8, 8), 4, 1, octaves=octaves)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("bad", [True, "8", None])
+    def test_scale_and_cells_must_be_numbers(self, bad):
+        with pytest.raises(ValueError, match="scale"):
+            fractal_noise((8, 8), bad, 1)  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="cells"):
+            worley((8, 8), bad, 1)  # type: ignore[arg-type]

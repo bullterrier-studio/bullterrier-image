@@ -8,6 +8,7 @@ output size. (`worley` sizes its cells relative to the canvas and so does not pr
 """
 
 import math
+import numbers
 import operator
 from typing import Literal
 
@@ -41,7 +42,14 @@ def _check_shape(shape: tuple[int, int]) -> tuple[int, int]:
     return height, width
 
 
+def _check_number(name: str, value: float) -> None:
+    # bool is a number to Python but never what a caller means by a size or a count.
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise ValueError(f"{name} must be a number; got {value!r}")
+
+
 def _check_positive(name: str, value: float) -> None:
+    _check_number(name, value)
     if not (math.isfinite(value) and value > 0):
         raise ValueError(f"{name} must be a positive, finite number; got {value!r}")
 
@@ -124,6 +132,7 @@ def fractal_noise(
     *,
     octaves: int = 1,
     persistence: float = 0.5,
+    lacunarity: float = 2.0,
     kind: Literal["gradient", "value"] = "gradient",
 ) -> np.ndarray:
     """Smooth noise, optionally with finer detail layered on top.
@@ -136,28 +145,41 @@ def fractal_noise(
         scale: size in pixels of the largest feature (the lattice spacing of the first octave), positive and finite.
             Below 1 it acts as 1.
         seed: any integer (taken modulo 2**64); each seed gives an unrelated field.
-        octaves: number of layers, at least 1. Each extra octave has features half the size of the previous one
-            and `persistence` times its weight. Octaves whose features would be under one pixel are left out
-            (they only add aliasing), so very fine scales may use fewer octaves than asked.
+        octaves: number of layers, an integer of at least 1. Each extra octave has features `lacunarity` times
+            smaller than the previous one (half the size by default) and `persistence` times its weight. Octaves
+            whose features would be under one pixel are left out (they only add aliasing), so very fine scales may
+            use fewer octaves than asked.
         persistence: weight of each octave relative to the previous one, positive and finite; below 1 the fine
             detail is fainter than the coarse shape.
+        lacunarity: factor by which the feature size shrinks from one octave to the next, at least 1 and finite.
+            2 (the default) halves it; larger values spread the octaves further apart in size, 1 stacks
+            independent layers of the same size. Only matters when `octaves` is above 1.
         kind: "gradient" for Perlin-style noise (zero-mean ripples, no visible grid), "value" for interpolated
             random lattice values (blobbier, with plateaus).
 
     Returns:
         float32 array of `shape` with values in [0, 1].
+
+    The curve that blends lattice points is fixed (Perlin's quintic, 6t^5 - 15t^4 + 10t^3, which has no creases:
+    its first and second derivatives are continuous), as are the sampling at pixel centres and the normalisation
+    that maps the field into [0, 1]; none of them is a style choice.
     """
     height, width = _check_shape(shape)
     _check_positive("scale", scale)
     _check_positive("persistence", persistence)
+    _check_number("lacunarity", lacunarity)
+    if not (math.isfinite(lacunarity) and lacunarity >= 1):
+        raise ValueError(f"lacunarity must be a finite number of at least 1; got {lacunarity!r}")
     _check_choice("kind", kind, ("gradient", "value"))
+    if isinstance(octaves, bool) or not isinstance(octaves, numbers.Integral):
+        raise ValueError(f"octaves must be an integer; got {octaves!r}")
     if octaves < 1:
         raise ValueError(f"octaves must be at least 1; got {octaves!r}")
 
     total = np.zeros((height, width), dtype=np.float32)
     weight_sum = 0.0
     for octave in range(octaves):
-        spacing = scale / 2**octave
+        spacing = scale / lacunarity**octave
         if octave > 0 and spacing < 1.0:
             break
         weight = persistence**octave
@@ -183,8 +205,10 @@ def worley(
     """Cellular noise: distance to the nearest of a scatter of random feature points.
 
     The canvas is divided into square cells, each holding one feature point at a random position, so the points
-    are evenly spread but irregular. Unlike `fractal_noise`, the cell size is relative to the canvas (the longer side
-    holds `cells` cells), so the same seed on a different shape gives different cells, not a crop.
+    are evenly spread but irregular (a point lies anywhere in its cell with equal chance; that is fixed, not a style
+    choice, and the same goes for the Euclidean distance). Unlike `fractal_noise`, the cell size is relative to the
+    canvas (the longer side holds `cells` cells), so the same seed on a different shape gives different cells, not a
+    crop.
 
     Args:
         shape: `(height, width)` of the result in pixels, both positive.
