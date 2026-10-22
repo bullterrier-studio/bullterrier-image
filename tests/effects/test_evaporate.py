@@ -56,7 +56,7 @@ def test_evaporate_edge_sheds_the_outline_and_keeps_the_inside():
 
 
 def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
-    sides = lambda img: img[:, :55].sum() + img[:, 145:].sum()  # noqa: E731
+    sides = lambda img: img[:, :55].sum() + img[:, 145:].sum()  # noqa: E731  (a one-line helper)
     kwargs = {"cell": 5, "start": 0, "edge": 0.1, "seed": 1}
     assert sides(effects.apply("evaporate", _block(), outward=0.8, **kwargs)) > sides(
         effects.apply("evaporate", _block(), outward=0.0, **kwargs)
@@ -64,7 +64,7 @@ def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
 
 
 def test_evaporate_wind_makes_the_outward_drift_lopsided():
-    left_and_right = lambda img: (img[:, :55].sum(), img[:, 145:].sum())  # noqa: E731
+    left_and_right = lambda img: (img[:, :55].sum(), img[:, 145:].sum())  # noqa: E731  (a one-line helper)
     left, right = left_and_right(effects.apply("evaporate", _block(), cell=5, start=0, edge=0.1, outward=0.4, wind=3.0))
     assert right > left
 
@@ -128,7 +128,7 @@ def test_evaporate_wind_pushes_the_pieces_sideways():
     right = effects.apply("evaporate", lit, wind=0.8, **kwargs)
     left = effects.apply("evaporate", lit, wind=-0.8, **kwargs)
     columns = np.arange(200)
-    centre = lambda img: float((img.max(axis=(0, 2)) * columns).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731
+    centre = lambda img: float((img.max(axis=(0, 2)) * columns).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731  (a one-line helper)
     assert centre(right) > centre(left)
 
 

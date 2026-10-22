@@ -200,7 +200,7 @@ def test_edge_distance_does_not_modify_its_input_and_returns_an_immutable_record
     np.testing.assert_array_equal(shape, before)
     assert isinstance(field, EdgeField)
     with pytest.raises(dataclasses.FrozenInstanceError):
-        field.distance = field.normal_x  # type: ignore[misc]
+        field.distance = field.normal_x  # type: ignore[misc]  # frozen on purpose: the test proves it
 
 
 @pytest.mark.parametrize(

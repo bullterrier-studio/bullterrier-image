@@ -120,7 +120,7 @@ def test_scatter_rejects_invalid_arguments_naming_them(kwargs, name):
 def test_placement_is_frozen():
     p = scatter((10, 10), 3, seed=0)
     with pytest.raises(AttributeError):
-        p.x = p.y  # type: ignore[misc]
+        p.x = p.y  # type: ignore[misc]  # frozen on purpose: the test proves it
     assert isinstance(p, Placement)
 
 

@@ -41,7 +41,7 @@ def test_disperse_reach_leaves_the_rest_standing():
 def test_disperse_wind_carries_pieces_in_its_direction():
     blob = np.zeros((120, 200, 3), np.float32)
     blob[40:80, 80:120] = 1.0
-    centre = lambda img: float((img.max(axis=(0, 2)) * np.arange(200)).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731
+    centre = lambda img: float((img.max(axis=(0, 2)) * np.arange(200)).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731  (a one-line helper)
     kwargs = {"progress": 0.25, "top": 0, "edge": 0, "sweep": 0, "angle": 0, "seed": 2}
     assert (
         centre(effects.apply("disperse", blob, wind=0.3, **kwargs))
@@ -51,7 +51,7 @@ def test_disperse_wind_carries_pieces_in_its_direction():
 
 
 def test_disperse_neighbouring_frames_look_alike_so_the_motion_is_continuous():
-    frame = lambda p, seed: effects.apply("disperse", _lit(), progress=p, seed=seed, wind=0.2)  # noqa: E731
+    frame = lambda p, seed: effects.apply("disperse", _lit(), progress=p, seed=seed, wind=0.2)  # noqa: E731  (a one-line helper)
     continuous = np.abs(frame(0.50, 3) - frame(0.51, 3)).mean()  # one frame later, same pieces on the same paths
     re_rolled = np.abs(frame(0.50, 3) - frame(0.51, 4)).mean()  # what picking new random paths per frame would give
     assert continuous < re_rolled / 2
@@ -120,7 +120,7 @@ def test_disperse_no_piece_travels_more_than_a_third_of_the_picture_at_any_angle
 def test_disperse_hover_floats_a_piece_slowly_with_the_wind_long_before_it_goes():
     img, (_, x0) = _one_piece()
     kwargs = {"wind": 0.3, "angle": 30, "seed": 3}
-    drift = lambda hover: next(x for p, x, _ in _track(img, hover=hover, **kwargs) if p >= 0.05) - x0  # noqa: E731
+    drift = lambda hover: next(x for p, x, _ in _track(img, hover=hover, **kwargs) if p >= 0.05) - x0  # noqa: E731  (a one-line helper)
     assert drift(0.3) > 1.0  # floating up and with the wind: nothing has detached yet
     assert drift(0.0) <= 0.5  # without hovering it stays put (or starts to pull back) at this point
 
@@ -145,7 +145,7 @@ def test_disperse_glows_briefly_as_pieces_leave_but_never_flashes():
 
 def test_disperse_ambient_shimmer_is_small_runs_with_the_clock_and_travels_against_the_wind():
     grey = np.full((60, 200, 3), 0.5, np.float32)
-    shimmer = lambda clock, wind: effects.apply("disperse", grey, progress=0.0, ambient=0.08, clock=clock, wind=wind)  # noqa: E731
+    shimmer = lambda clock, wind: effects.apply("disperse", grey, progress=0.0, ambient=0.08, clock=clock, wind=wind)  # noqa: E731  (a one-line helper)
     assert np.abs(shimmer(0.7, 0.2) / 0.5 - 1).max() <= 0.08 + 1e-5  # never more than the amplitude
     assert not np.array_equal(shimmer(0.0, 0.2), shimmer(1.0, 0.2))  # alive while nothing detaches
     np.testing.assert_array_equal(

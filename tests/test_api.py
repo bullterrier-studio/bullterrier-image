@@ -67,7 +67,7 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
     with pytest.raises(TypeError, match=r"fx\.glitch\(\).*spilt"):
         fx.glitch(spilt=3)
     with pytest.raises(AttributeError, match=r"available: .*ascii"):
-        fx.sparkle  # noqa: B018
+        fx.sparkle  # noqa: B018  (the lookup itself is what must raise)
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
