@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from photo_fx import effects
 
@@ -73,6 +74,25 @@ def test_angle_turns_the_screen_and_a_quarter_turn_gives_the_same_square_grid() 
     assert np.abs(screen(30.0) - screen(120.0)).mean() < 1e-3
     assert np.abs(screen(30.0) - screen(0.0)).mean() > 0.1
     assert screen(30.0).mean() == pytest.approx(screen(0.0).mean(), rel=0.03)  # turning moves ink, adds none
+
+
+@pytest.mark.parametrize("angle", [20.0, -20.0, 65.0])
+def test_angle_turns_the_screen_clockwise_on_screen(angle: float) -> None:
+    """Rows of dots run along the direction `angle` degrees clockwise from the x axis (y points down): from any dot,
+    the next one along a row lies at (cell cos angle, cell sin angle) in (x, y) and not at its mirror image."""
+    cell = 20
+    out = effects.apply(NAME, flat(0.3), cell=cell, angle=angle, **WHITE_ON_BLACK)[..., 0]
+    labels, count = ndimage.label(out > 0.5)
+    centres = np.array(ndimage.center_of_mass(out, labels, range(1, count + 1)))  # (y, x) of every dot
+    middle = centres[np.argmin(np.hypot(*(centres - 100).T))]
+    step = cell * np.array([math.sin(math.radians(angle)), math.cos(math.radians(angle))])  # (y, x)
+    mirror = step * [-1, 1]
+
+    def nearest_dot(where: np.ndarray) -> float:
+        return float(np.hypot(*(centres - where).T).min())
+
+    assert nearest_dot(middle + step) < 0.5
+    assert nearest_dot(middle + mirror) > 3
 
 
 def test_each_dot_stands_for_the_tone_at_its_centre(photo: np.ndarray) -> None:

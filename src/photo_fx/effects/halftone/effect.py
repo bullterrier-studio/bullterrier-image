@@ -26,8 +26,9 @@ class HalftoneParams(EffectParams):
         unit="degrees",
         min=-360,
         max=360,
-        doc="Rotation of the dot grid, counter-clockwise in degrees; the grid is square, so 90 degrees on looks the "
-        "same. 45 is the classic screen angle for one ink.",
+        doc="Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many degrees below the "
+        "x axis (negative = above). The grid is square, so 90 degrees on looks the same; 45 is the classic screen "
+        "angle for one ink.",
     )
     fg: Color | None = param(
         None,
