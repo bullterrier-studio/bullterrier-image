@@ -33,6 +33,7 @@ class Server:
     url: str
     body: bytes = PAYLOAD
     announce: int | None = None  # Content-Length to claim; more than len(body) cuts the transfer short
+    length_header: bool = True  # False: no Content-Length, the end of the body is where the connection closes
     redirects: dict[str, str] = field(default_factory=dict)  # request path -> where it redirects to
     requests: list[str] = field(default_factory=list)
 
@@ -51,7 +52,8 @@ def server() -> Iterator[Server]:
                 self.end_headers()
                 return
             self.send_response(200)
-            self.send_header("Content-Length", str(state.announce or len(state.body)))
+            if state.length_header:
+                self.send_header("Content-Length", str(state.announce or len(state.body)))
             self.end_headers()
             self.wfile.write(state.body)
             self.close_connection = True
@@ -77,7 +79,7 @@ def files_in(folder: Path) -> list[str]:
 
 def test_a_verified_download_lands_at_the_target_with_the_served_bytes(server, tmp_path):
     target = tmp_path / "cache" / "model.onnx"  # the folder does not exist yet
-    assert fetch(server.url, sha256(PAYLOAD), target) == target
+    assert fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD)) == target
     assert target.read_bytes() == PAYLOAD
     assert files_in(target.parent) == ["model.onnx"]  # no temporary file left beside it
 
@@ -87,7 +89,7 @@ def test_the_kept_file_is_readable_like_any_file_the_user_saves(server, tmp_path
     """Not only by its owner, as a private temporary file would be: the usual 0o666 less the user's umask."""
     umask = os.umask(0o022)
     try:
-        target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+        target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     finally:
         os.umask(umask)
     assert stat.S_IMODE(target.stat().st_mode) == 0o644
@@ -95,15 +97,15 @@ def test_the_kept_file_is_readable_like_any_file_the_user_saves(server, tmp_path
 
 def test_a_second_fetch_uses_the_cached_file_without_asking_the_server(server, tmp_path):
     target = tmp_path / "model.onnx"
-    fetch(server.url, sha256(PAYLOAD), target)
-    fetch(server.url, sha256(PAYLOAD), target)
+    fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD))
+    fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD))
     assert len(server.requests) == 1
 
 
 def test_a_checksum_mismatch_is_rejected_and_nothing_is_cached(server, tmp_path):
     expected = sha256(b"the model we pinned")
     with pytest.raises(DownloadError) as caught:
-        fetch(server.url, expected, tmp_path / "model.onnx")
+        fetch(server.url, expected, tmp_path / "model.onnx", size=len(PAYLOAD))
     assert expected in str(caught.value)
     assert sha256(PAYLOAD) in str(caught.value)  # what arrived instead
     assert files_in(tmp_path) == []
@@ -112,14 +114,32 @@ def test_a_checksum_mismatch_is_rejected_and_nothing_is_cached(server, tmp_path)
 def test_an_interrupted_download_leaves_no_partial_file(server, tmp_path):
     server.announce = len(PAYLOAD) * 2  # the connection closes halfway through what was promised
     with pytest.raises(DownloadError, match=r"model\.onnx"):
-        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
+    assert files_in(tmp_path) == []
+
+
+@pytest.mark.parametrize("length_header", [True, False])
+def test_a_download_larger_than_the_file_asked_for_is_stopped_and_nothing_is_kept(server, tmp_path, length_header):
+    """Announced or not, more bytes than the pinned size means it is not the file: stop before the disk fills."""
+    server.body = PAYLOAD * 3
+    server.length_header = length_header
+    with pytest.raises(DownloadError, match=f"larger than the expected {len(PAYLOAD)} bytes"):
+        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
+    assert files_in(tmp_path) == []
+
+
+def test_a_download_that_ends_early_says_how_far_it_got(server, tmp_path):
+    server.body = PAYLOAD[:1000]
+    server.length_header = False  # nothing announced, so only the pinned size shows that bytes are missing
+    with pytest.raises(DownloadError, match=f"stopped after 1000 of {len(PAYLOAD)} bytes"):
+        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert files_in(tmp_path) == []
 
 
 def test_a_corrupt_cached_file_is_downloaded_again_and_replaced(server, tmp_path):
     target = tmp_path / "model.onnx"
     target.write_bytes(PAYLOAD[:100])  # an earlier, broken copy
-    fetch(server.url, sha256(PAYLOAD), target)
+    fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD))
     assert target.read_bytes() == PAYLOAD
     assert len(server.requests) == 1
 
@@ -131,7 +151,7 @@ def test_offline_explains_how_to_download_by_hand(tmp_path):
     url = f"http://127.0.0.1:{port}/model.onnx"
     target = tmp_path / "model.onnx"
     with pytest.raises(DownloadError) as caught:
-        fetch(url, sha256(PAYLOAD), target)
+        fetch(url, sha256(PAYLOAD), target, size=len(PAYLOAD))
     message = str(caught.value)
     assert url in message
     assert str(target) in message  # where to save a copy downloaded by hand
@@ -149,7 +169,7 @@ def test_offline_explains_how_to_download_by_hand(tmp_path):
 )
 def test_a_url_to_another_computer_must_be_secure(tmp_path, url):
     with pytest.raises(DownloadError, match="only https") as caught:
-        fetch(url, sha256(PAYLOAD), tmp_path / "model.onnx")
+        fetch(url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert url.split(":")[0] in str(caught.value)  # names the scheme it refused
     assert files_in(tmp_path) == []
 
@@ -158,20 +178,20 @@ def test_a_url_to_another_computer_must_be_secure(tmp_path, url):
 def test_plain_http_to_this_computer_is_allowed(tmp_path, host):
     """Loopback names other than 127.0.0.1 pass the check; nothing listens there, so the download itself fails."""
     with pytest.raises(DownloadError) as caught:
-        fetch(f"http://{host}:9/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx")
+        fetch(f"http://{host}:9/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert "only https" not in str(caught.value)
 
 
 def test_a_redirect_away_from_https_is_refused(server, tmp_path):
     server.redirects["/model.onnx"] = "http://example.invalid/model.onnx"
     with pytest.raises(DownloadError, match=re.escape("redirected to http://example.invalid")):
-        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert files_in(tmp_path) == []
 
 
 def test_a_redirect_that_stays_on_this_computer_is_followed(server, tmp_path):
     server.redirects["/model.onnx"] = "/moved/model.onnx"
-    target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+    target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert target.read_bytes() == PAYLOAD
     assert server.requests == ["/model.onnx", "/moved/model.onnx"]
 
@@ -180,7 +200,7 @@ def test_a_file_url_is_fetched_like_any_other(tmp_path):
     source = tmp_path / "source.onnx"
     source.write_bytes(PAYLOAD)
     target = tmp_path / "cache" / "model.onnx"
-    fetch(source.as_uri(), sha256(PAYLOAD), target)
+    fetch(source.as_uri(), sha256(PAYLOAD), target, size=len(PAYLOAD))
     assert target.read_bytes() == PAYLOAD
 
 

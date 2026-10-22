@@ -104,7 +104,7 @@ def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
             raise RuntimeError(f"{tried}: {MODEL_VARIABLE} names {model}, which is not a file")
     else:
         try:
-            fetch(_onnx.MODEL_URL, _onnx.MODEL_SHA256, model)
+            fetch(_onnx.MODEL_URL, _onnx.MODEL_SHA256, model, size=_onnx.MODEL_SIZE)
         except DownloadError as error:
             raise RuntimeError(
                 f"{tried}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the subject's matte yourself "

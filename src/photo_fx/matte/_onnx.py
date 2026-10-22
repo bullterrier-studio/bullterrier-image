@@ -21,7 +21,8 @@ from photo_fx import imageio
 
 MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"
 MODEL_SHA256 = "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a"
-MODEL_FILE = "isnet-general-use.onnx"  # 178,648,008 bytes
+MODEL_FILE = "isnet-general-use.onnx"
+MODEL_SIZE = 178_648_008  # bytes
 
 # The model's published input (DIS repository, Inference.py): 1024 x 1024, value / 255 - 0.5 (mean 0.5, std 1).
 _SIDE = 1024

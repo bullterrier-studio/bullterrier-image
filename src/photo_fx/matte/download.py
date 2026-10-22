@@ -36,11 +36,12 @@ class DownloadError(RuntimeError):
     """A model file could not be downloaded or did not verify; the message says how to get it by hand."""
 
 
-def fetch(url: str, sha256: str, target: Path) -> Path:
+def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
     """Return `target`, downloading it from `url` first unless it is already there with SHA-256 `sha256`.
 
     url: where the file is: `https://`, or `http://` to this computer (127.0.0.1, ::1, localhost), or `file://`.
     A redirect may lead only to https or to http on this computer. sha256: its expected SHA-256, lowercase hex.
+    size: its exact size in bytes; a server that offers or sends more is cut off at once, so it cannot fill the disk.
     target: where it is kept; missing folders are created. A file at `target` with another digest (an earlier broken
     copy) is replaced. Raises DownloadError, naming `url` and `target` so the file can be fetched by hand, when the
     download fails, the URL or a redirect is not allowed, or what arrived has another digest; `target` is then left as
@@ -60,18 +61,22 @@ def fetch(url: str, sha256: str, target: Path) -> Path:
         with os.fdopen(descriptor, "wb") as out:  # closed before the rename below, which Windows requires
             try:
                 with urllib.request.build_opener(_SecureRedirects).open(url, timeout=_TIMEOUT) as response:
-                    expected_size = response.headers.get("Content-Length")
+                    too_large = f"what {url} sends is larger than the expected {size} bytes, so it is not the file"
+                    offered = response.headers.get("Content-Length")
+                    if offered is not None and int(offered) > size:
+                        raise DownloadError(f"{too_large}; {by_hand}")
                     received = 0
-                    while chunk := response.read(_CHUNK):
+                    while chunk := response.read(min(_CHUNK, size + 1 - received)):  # one byte past `size` is enough
+                        received += len(chunk)
+                        if received > size:
+                            raise DownloadError(f"{too_large}; {by_hand}")
                         out.write(chunk)
                         digest.update(chunk)
-                        received += len(chunk)
             except (OSError, http.client.HTTPException) as error:  # URLError, timeouts and resets are OSErrors
                 raise DownloadError(f"could not download {url} ({error}); {by_hand}") from error
-        if expected_size is not None and received != int(expected_size):
-            raise DownloadError(
-                f"the download of {url} stopped after {received} of {expected_size} bytes; try again, or {by_hand}"
-            )
+        if received != size:
+            stopped = f"the download of {url} stopped after {received} of {size} bytes"
+            raise DownloadError(f"{stopped}; try again, or {by_hand}")
         if digest.hexdigest() != sha256:
             raise DownloadError(
                 f"the file downloaded from {url} has SHA-256 {digest.hexdigest()}, but {sha256} was expected, so it "
