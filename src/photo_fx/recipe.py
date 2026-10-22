@@ -61,7 +61,7 @@ def render_all(
 
 
 def _finder(find_subject: SubjectFinder | None) -> SubjectFinder:
-    # Looked up on each call, not bound once at import, so the finder can be swapped (tests stand in for Vision).
+    # None stands for the default finder, so the signature matches the core's and the core never names `matte`.
     return subject.subject_matte if find_subject is None else find_subject
 
 
