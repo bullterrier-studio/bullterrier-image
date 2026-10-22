@@ -47,6 +47,7 @@ import numpy as np
 
 from . import imageio
 from .checks import MotionMeter, matte_warnings, still_warnings
+from .core.runner import subject_from
 from .matte import subject_matte
 from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
 from .sheet import contact_sheet, write_stages
@@ -314,7 +315,7 @@ class _Photo:
                 self._matte = np.load(cached)["matte"].astype(np.float32)
             else:
                 try:
-                    self._matte = self.find_subject(self.rgb())  # analyse
+                    self._matte = subject_from(self.find_subject, self.rgb())  # analyse
                 except Exception as error:
                     self._matte_error = error
                     raise

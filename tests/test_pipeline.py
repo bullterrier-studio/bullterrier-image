@@ -177,6 +177,19 @@ def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_sea
     assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second masked recipe
 
 
+def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_and_says_so(folder):
+    masked_recipes(folder)
+
+    def finds_nothing(rgb):
+        return None  # a broken finder, typed loosely on purpose: the point of the test
+
+    items = run(load_project(folder / "photo-fx.toml"), find_subject=finds_nothing)
+    by = {(i.photo, i.recipe): i for i in items}
+    assert by[("a.png", "cut1")].status == "failed"
+    assert "`find_subject` returned None" in str(by[("a.png", "cut1")].error)
+    assert by[("a.png", "grainy")].status == "done"
+
+
 def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder):
     masked_recipes(folder)
     items = run(load_project(folder / "photo-fx.toml"), find_subject=StandInFinder(radius=3))

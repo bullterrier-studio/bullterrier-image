@@ -140,11 +140,18 @@ def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder |
             f"recipe {recipe.name!r} has masked steps, so it needs the subject: pass `matte` (the subject's alpha) "
             "or `find_subject` (a function photo -> alpha, e.g. photo_fx.matte.subject_matte)"
         )
+    return subject_from(find_subject, rgb)
+
+
+def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
+    """Ask `find_subject` for the subject of `rgb` and return its matte. The one place a finder is called and its answer
+    checked (the runner and the pipeline both use it): ValueError if it returned None, since a finder must answer or
+    raise, and carrying on would drop the subject without a word."""
     matte = find_subject(rgb)
-    if matte is None:  # a finder must answer or raise; carrying on would drop the subject without a word
+    if matte is None:
         raise ValueError(
-            f"recipe {recipe.name!r} needs the subject, but `find_subject` returned None: it must return the subject's "
-            "alpha (float32, the photo's height and width, 0..1) or raise when it finds none"
+            "`find_subject` returned None: it must return the subject's alpha (float32, the photo's height and width, "
+            "0..1) or raise when it finds none"
         )
     return matte
 
