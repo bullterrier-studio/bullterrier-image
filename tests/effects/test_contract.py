@@ -510,6 +510,6 @@ def test_every_modelled_effect_takes_its_model_its_keywords_or_nothing(name, pho
 
 def test_only_the_modules_not_yet_migrated_hold_legacy_effects():
     """TRANSITIONAL: F1b migrates these modules and deletes this test together with the legacy path."""
-    legacy_modules = {"texture", "evaporate", "disperse"}
+    legacy_modules = {"texture", "disperse"}
     legacy = {name for name in ALL if registry.parameters(name) is None}
     assert legacy == {name for name in ALL if effects.get(name).__module__.rsplit(".", 1)[-1] in legacy_modules}

@@ -1,6 +1,7 @@
-"""Tests of `effects/evaporate.py`."""
+"""Behaviour of the `evaporate` effect."""
 
 import numpy as np
+import pytest
 
 from photo_fx import effects
 from photo_fx.ops.glyphs import cell_size
@@ -138,3 +139,52 @@ def test_the_evaporate_effects_are_in_their_categories():
         "evaporate": "animation",
     }
     assert {name: effects.category(name) for name in expected} == expected
+
+
+def test_evaporate_bottom_border_is_an_edge_only_when_open_bottom_is_off():
+    lit = np.ones((100, 120, 3), np.float32)
+    kwargs = {"cell": 5, "start": 0, "edge": 0.2, "seed": 2}
+    assert effects.apply("evaporate", lit, **kwargs)[-10:, 50:70].min() == 1.0
+    assert effects.apply("evaporate", lit, open_bottom=False, **kwargs)[-10:, 50:70].mean() < 1.0
+
+
+def test_evaporate_without_falloff_keeps_risen_pieces_at_full_brightness():
+    lit = np.ones((120, 128, 3), np.float32)
+    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2}
+    dimmed = effects.apply("evaporate", lit, **kwargs)
+    undimmed = effects.apply("evaporate", lit, falloff=0.0, **kwargs)
+    assert set(np.unique(undimmed)) == {0.0, 1.0}  # every piece is either gone or as bright as it was
+    assert ((dimmed > 0) & (dimmed < 1)).any()  # by default they fade with height
+
+
+def _one_column_of_pieces() -> np.ndarray:
+    cell_w, cell_h = cell_size(5)
+    img = np.zeros((40 * cell_h, 40 * cell_w, 3), np.float32)
+    img[20 * cell_h :, 20 * cell_w : 21 * cell_w] = 1.0  # one character wide, from the middle down
+    return img
+
+
+def test_evaporate_without_sway_pieces_rise_straight_up():
+    img = _one_column_of_pieces()
+    kwargs = {"cell": 5, "start": 1.0, "end": 0.6, "rise": 0.5, "vanish": 0.0, "seed": 1}
+    straight = effects.apply("evaporate", img, sway=0.0, sway_minimum=0.0, **kwargs)
+    swaying = effects.apply("evaporate", img, **kwargs)
+    column = slice(20 * 5, 21 * 5)
+    assert straight[: img.shape[0] // 2, column].max() > 0  # pieces did rise...
+    assert np.delete(straight, np.s_[column], axis=1).max() == 0.0  # ...and none left their column
+    assert np.delete(swaying, np.s_[column], axis=1).max() > 0.0  # by default they sway sideways
+
+
+def test_evaporate_thinning_and_vanish_decide_how_many_risen_pieces_survive():
+    lit = np.ones((120, 128, 3), np.float32)
+    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2, "vanish": 0.0}
+    upper = slice(0, 40)
+    every = effects.apply("evaporate", lit, thinning=0.0, **kwargs)[upper].sum()
+    thinned = effects.apply("evaporate", lit, thinning=1.0, **kwargs)[upper].sum()
+    assert thinned < every
+
+
+@pytest.mark.parametrize(("field", "value"), [("vanish", 1.5), ("cell", 0), ("rise_gamma", -1.0), ("wind", 99.0)])
+def test_evaporate_refuses_a_value_outside_its_range_naming_the_field(field, value):
+    with pytest.raises(ValueError, match=field):
+        effects.apply("evaporate", np.ones((20, 20, 3), np.float32), **{field: value})
