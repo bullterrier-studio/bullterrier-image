@@ -6,7 +6,7 @@ from . import _pieces
 from ._registry import effect
 
 
-@effect
+@effect(category="animation")
 def evaporate(
     rgb: np.ndarray,
     cell: int = 5,

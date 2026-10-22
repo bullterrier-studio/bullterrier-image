@@ -19,7 +19,7 @@ _FONTS = [
 ]
 
 
-@effect
+@effect(category="text")
 def ascii(
     rgb: np.ndarray,
     cell: int = 10,

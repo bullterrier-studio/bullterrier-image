@@ -26,7 +26,7 @@ _AMBIENT_PERIOD = 3.0  # seconds per shimmer cycle (breathing: 2-4 s)
 _AMBIENT_WAVELENGTH = 0.2  # of the picture width: with the period, the wave moves at about a quarter of a piece's speed
 
 
-@effect
+@effect(category="animation")
 def disperse(
     rgb: np.ndarray,
     cell: int = 5,

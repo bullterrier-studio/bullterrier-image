@@ -1,6 +1,19 @@
 import numpy as np
 import pytest
 
+from photo_fx import effects
+from photo_fx.effects._registry import unregister
+
+
+@pytest.fixture
+def throwaway_effects():
+    """Lets a test register effects of its own: whatever it registered is removed again afterwards, even if the test
+    fails, so no other test ever sees it."""
+    before = set(effects.all_effects())
+    yield
+    for name in set(effects.all_effects()) - before:
+        unregister(name)
+
 
 @pytest.fixture
 def photo() -> np.ndarray:

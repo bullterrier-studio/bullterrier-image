@@ -11,7 +11,7 @@ _TEXT_ROWS = 3  # fewest rows of characters in a text strip
 _TEXT_GAMMA = 0.55  # < 1 puts more ink down, so the text carries enough light to read against the black
 
 
-@effect
+@effect(category="glitch")
 def glitch(
     rgb: np.ndarray,
     split: int = 10,

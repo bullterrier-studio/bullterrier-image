@@ -7,7 +7,7 @@ from ._common import Color, ink_amount, luminance, parse_color, vivid
 from ._registry import effect
 
 
-@effect
+@effect(category="stylised")
 def halftone(
     rgb: np.ndarray,
     cell: int = 14,
@@ -40,7 +40,7 @@ def halftone(
     return (bg_color * (1.0 - coverage) + dots * coverage).astype(np.float32)
 
 
-@effect
+@effect(category="light")
 def glow(rgb: np.ndarray, radius: float = 24.0, strength: float = 0.6, threshold: float = 0.55) -> np.ndarray:
     """Soft bloom around the bright parts. `radius` in px, `strength` 0..1+, `threshold` = where glow starts."""
     bright = np.clip((rgb - threshold) / (1.0 - threshold), 0.0, 1.0)
@@ -48,7 +48,7 @@ def glow(rgb: np.ndarray, radius: float = 24.0, strength: float = 0.6, threshold
     return (1.0 - (1.0 - rgb) * (1.0 - np.clip(strength * halo, 0, 1))).astype(np.float32)  # screen blend
 
 
-@effect
+@effect(category="texture")
 def grain(rgb: np.ndarray, amount: float = 0.08, size: float = 1.0, seed: int = 0) -> np.ndarray:
     """Film grain: brightness noise of strength `amount` (0.08 is visible, 0.2 is heavy), clumped to `size` px.
 

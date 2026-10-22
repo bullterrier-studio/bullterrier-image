@@ -7,13 +7,13 @@ from ._common import LUMA, Color, luminance, parse_color
 from ._registry import effect
 
 
-@effect
+@effect(category="subject")
 def fill(rgb: np.ndarray, color: Color = "#000000") -> np.ndarray:
     """Replace the whole picture with one colour. Masked to the background, this is 'remove the background'."""
     return np.broadcast_to(parse_color(color), rgb.shape).copy()
 
 
-@effect
+@effect(category="colour")
 def grade(rgb: np.ndarray, exposure: float = 0.0, contrast: float = 1.0, saturation: float = 1.0) -> np.ndarray:
     """Basic tone controls. `exposure` in stops (+1 = twice as bright), `contrast` and `saturation` 1.0 = unchanged."""
     out = rgb * np.float32(2.0**exposure)
@@ -23,7 +23,7 @@ def grade(rgb: np.ndarray, exposure: float = 0.0, contrast: float = 1.0, saturat
     return np.clip(out, 0.0, 1.0).astype(np.float32)
 
 
-@effect
+@effect(category="light")
 def clarity(rgb: np.ndarray, radius: float = 30.0, amount: float = 1.0) -> np.ndarray:
     """Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when
     the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
@@ -33,7 +33,7 @@ def clarity(rgb: np.ndarray, radius: float = 30.0, amount: float = 1.0) -> np.nd
     return np.clip(rgb + amount * (rgb - blurred), 0.0, 1.0).astype(np.float32)
 
 
-@effect
+@effect(category="colour")
 def gradient_map(rgb: np.ndarray, stops: list[Color] = ("#000000", "#ffffff")) -> np.ndarray:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
 
@@ -51,7 +51,7 @@ def gradient_map(rgb: np.ndarray, stops: list[Color] = ("#000000", "#ffffff")) -
     return (colors[i] * (1 - f) + colors[i + 1] * f).astype(np.float32)
 
 
-@effect
+@effect(category="colour")
 def split_tone(
     rgb: np.ndarray,
     shadow: Color = "#3a1bff",
@@ -86,7 +86,7 @@ _LUMA_CHROMA = np.array(
 _LUMA_CHROMA_INVERSE = np.linalg.inv(_LUMA_CHROMA)
 
 
-@effect
+@effect(category="colour")
 def hue_shift(rgb: np.ndarray, degrees: float = 90.0) -> np.ndarray:
     """Rotate every hue around the colour wheel by `degrees`: the quickest way to try another colour scheme.
 
