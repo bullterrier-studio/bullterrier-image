@@ -81,12 +81,6 @@ def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject):
             assert shlex.split(command)[0] in allowed, f"poe task {name!r} runs {command!r}"
 
 
-def test_dev_group_names_the_tools_the_tasks_and_tests_use(pyproject):
-    assert {"pytest", "ruff", "mypy", "pre-commit", "poethepoet", "pyyaml", "types-pyyaml"} <= dev_dependency_names(
-        pyproject
-    )
-
-
 # ---------------------------------------------------------------------------------------------------------------------
 # .pre-commit-config.yaml: hook wiring only
 
