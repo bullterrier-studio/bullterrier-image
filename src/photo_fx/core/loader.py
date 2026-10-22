@@ -4,7 +4,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 (a TOML syntax error keeps its line and column); nothing is read except that one file. The format (UTF-8 TOML):
 
     format = 1                     # optional: the recipe format version; this release reads 1 (the default)
-    name = "green-terminal"        # optional (default: the file name without .toml): letters, digits, . _ -
+    name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
 
     [[step]]
@@ -49,7 +49,7 @@ import tomllib
 from pathlib import Path
 
 from .errors import RecipeError
-from .steps import Recipe, Step
+from .steps import Recipe, Step, safe_name
 from .timing import EASE_NAMES, Animated, Animation
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
@@ -120,12 +120,20 @@ def _load_animation(table: object, filename: str) -> Animation:
 def load_recipe(path: str | Path) -> Recipe:
     """Read a recipe file and return the validated `Recipe`.
 
-    path: a TOML file in the format above. The recipe is named after the file (without `.toml`) unless it sets `name`.
+    path: a TOML file in the format above. A `name` it sets is used as written (and refused if it is not a safe file
+    name); without one the recipe is named after the file, made safe (see `steps.safe_name`: "my look.toml" gives
+    "my-look"), and a file name that leaves nothing usable ("日本.toml", "con.toml") is refused, asking for a `name`.
     Raises RecipeError (a ValueError; an unknown effect is an UnknownEffectError) for anything invalid, starting with
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
     path = Path(path)
     raw = _read(path)
+    recipe_name = raw["name"] if "name" in raw else safe_name(path.stem)
+    if not recipe_name:
+        raise RecipeError(
+            f'{path.name}: the file name gives no usable recipe name: add name = "..." (letters, digits, . _ -) or '
+            "rename the file"
+        )
     animation = _load_animation(raw["animation"], path.name) if "animation" in raw else None
     entries = raw.get("step", [])
     if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
@@ -144,6 +152,6 @@ def load_recipe(path: str | Path) -> Recipe:
         except ValueError as error:
             raise _located(error, where) from None
     try:
-        return Recipe(raw.get("name", path.stem), tuple(steps), raw.get("size", 1024), animation)
+        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), animation)
     except ValueError as error:
         raise _located(error, path.name) from None

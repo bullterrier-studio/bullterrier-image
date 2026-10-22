@@ -32,6 +32,31 @@ def test_a_file_that_is_not_utf8_names_the_file(tmp_path):
         load_recipe(path)
 
 
+# Without `name`, a recipe is named after its file: every run of characters a name may not hold becomes one `-`, and the
+# ends are trimmed so that the name starts with a letter or digit (expected values worked out by hand).
+@pytest.mark.parametrize(
+    ("file", "name"),
+    [
+        ("my look.toml", "my-look"),
+        ("  --Holiday  (2024)!!.toml", "Holiday-2024"),
+        ("v1.2 final.toml", "v1.2-final"),
+        ("café au lait.toml", "caf-au-lait"),
+        ("_draft_.toml", "draft_"),
+        ("plain.toml", "plain"),
+        ("a" * 63 + " b.toml", "a" * 63),  # cut to 64 characters, then the dangling `-` trimmed
+        ("b" * 80 + ".toml", "b" * 64),
+    ],
+)
+def test_a_recipe_without_a_name_is_named_after_its_file_made_safe(tmp_path, file, name):
+    assert load_recipe(_write(tmp_path, STEP, file)).name == name
+
+
+@pytest.mark.parametrize("file", ["日本.toml", "---.toml", "con.toml", "LPT1 .toml"])
+def test_a_file_name_that_leaves_no_usable_name_asks_for_a_name_or_a_new_file_name(tmp_path, file):
+    with pytest.raises(RecipeError, match=rf"^{re.escape(file)}: .*name = .*rename"):
+        load_recipe(_write(tmp_path, STEP, file))
+
+
 def test_a_recipe_without_a_format_or_with_format_1_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"

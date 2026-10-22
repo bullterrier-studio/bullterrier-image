@@ -18,10 +18,11 @@ Dependency direction: imports `timing`, the effect registry, `params` and `error
 and `runner` (running a `Recipe` on a photo) both build on this module and do not know each other.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from . import registry
 from .errors import RecipeError
@@ -133,19 +134,46 @@ def _short(value: object) -> str:
     return text if len(text) <= 18 else text[:15] + "..."
 
 
+# A recipe name becomes a file name and recipes are shared as data, so it holds nothing that could leave the output
+# folder or hide a file (CWE-22), on any operating system.
+_NAME_CHARACTERS = "A-Za-z0-9._-"
+_NAME_LENGTH = 64
+_NAME_PATTERN = rf"^[A-Za-z0-9][{_NAME_CHARACTERS}]{{0,{_NAME_LENGTH - 1}}}$"
+# Windows keeps these names for devices, in any case and whatever the extension: such a file cannot be made there.
+_WINDOWS_DEVICES = frozenset(
+    {"CON", "PRN", "AUX", "NUL", *(f"COM{digit}" for digit in range(1, 10)), *(f"LPT{digit}" for digit in range(1, 10))}
+)
+
+
+def _a_device(name: str) -> bool:
+    return name.split(".", 1)[0].upper() in _WINDOWS_DEVICES
+
+
+def safe_name(text: str) -> str:
+    """`text` (e.g. a file name without its extension) made into a valid recipe name, or "" when none is left.
+
+    Every run of characters a name may not hold becomes one `-`, repeated `-` collapse into one, anything before the
+    first letter or digit is dropped, the result is cut to 64 characters and a trailing `-` or `.` is trimmed: "my
+    look" gives "my-look". "" when nothing remains or the result is a name Windows reserves for a device ("con")."""
+    name = re.sub(r"-{2,}", "-", re.sub(rf"[^{_NAME_CHARACTERS}]+", "-", text))
+    name = re.sub(r"^[^A-Za-z0-9]+", "", name)[:_NAME_LENGTH].rstrip("-.")
+    return "" if not name or _a_device(name) else name
+
+
 class Recipe(ValidatedModel):
     """A named look: ordered steps, the size the photo is scaled to, and an optional animation.
 
     name: used for output file names, so it must be a safe one: 1 to 64 letters, digits, `.`, `_` or `-`, starting with
-        a letter or digit (no folders, no hidden files); anything else is a RecipeError.
+        a letter or digit (no folders, no hidden files), and not a device name Windows reserves (CON, PRN, AUX, NUL,
+        COM1-9, LPT1-9, in any case, with or without an extension); anything else is a RecipeError. `safe_name` makes
+        a valid one from any text.
     steps: at least one `Step`, run in order (a list is accepted and kept as a tuple).
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. animation: an `Animation`; required if any step has an animated parameter.
     """
 
-    # Recipes are shared as data and the name becomes a file name: nothing that could leave the output folder (CWE-22).
     name: str = Field(
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+        pattern=_NAME_PATTERN,
         description="Used for output file names: 1 to 64 of A-Z a-z 0-9 . _ -, starting with a letter or digit.",
     )
     steps: tuple[Step, ...] = Field(description="The steps, run in order, each on the previous one's output.")
@@ -164,6 +192,17 @@ class Recipe(ValidatedModel):
     ) -> None:
         """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name)."""
         self._init_checked("", name=name, steps=tuple(steps), size=size, animation=animation, **unknown)
+
+    @field_validator("name")
+    @classmethod
+    def _not_a_device(cls, name: str) -> str:
+        """After the pattern: a name Windows keeps for a device is refused too, on every system."""
+        if _a_device(name):
+            raise RecipeError(
+                f"{name!r} is reserved: Windows keeps CON, PRN, AUX, NUL, COM1-9 and LPT1-9 (with any extension) for "
+                "devices; choose another name"
+            )
+        return name
 
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":

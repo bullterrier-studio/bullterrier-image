@@ -264,10 +264,25 @@ def test_a_safe_file_name_is_kept_as_the_recipe_name(name):
     assert Recipe(name, [Step("grade")]).name == name
 
 
-def test_a_file_named_with_an_unsafe_stem_and_no_name_is_refused_naming_the_file(tmp_path):
-    path = tmp_path / "my look.toml"
-    path.write_text("[[step]]\neffect = 'grade'\n", encoding="utf-8")
-    with pytest.raises(RecipeError, match=r"^my look\.toml: .*'my look'"):
+# Windows reserves these device names in any case, with or without an extension: a file so named cannot be made there.
+@pytest.mark.parametrize(
+    "name", ["CON", "con", "Prn", "AUX", "nul", "COM1", "com9", "LPT1", "lpt9", "CON.png", "nul.tar.gz", "Aux.v2"]
+)
+def test_a_name_windows_reserves_for_a_device_is_refused_naming_it(name):
+    with pytest.raises(RecipeError, match="reserved") as raised:
+        Recipe(name, [Step("grade")])
+    assert repr(name) in str(raised.value)
+
+
+@pytest.mark.parametrize("name", ["CONSOLE", "com10", "nullify", "aux-look", "my.con", "LPT", "printer"])
+def test_a_name_that_only_resembles_a_device_name_is_kept(name):
+    assert Recipe(name, [Step("grade")]).name == name
+
+
+def test_an_explicit_name_in_a_file_is_not_repaired(tmp_path):
+    path = tmp_path / "fine.toml"
+    path.write_text("name = 'my look'\n[[step]]\neffect = 'grade'\n", encoding="utf-8")
+    with pytest.raises(RecipeError, match=r"^fine\.toml: .*'my look'"):
         load_recipe(path)
 
 
