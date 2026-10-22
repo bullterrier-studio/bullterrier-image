@@ -38,7 +38,7 @@ import json
 import os
 import time
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
@@ -48,7 +48,7 @@ import numpy as np
 from . import imageio
 from .checks import MotionMeter, matte_warnings, still_warnings
 from .matte import subject_matte
-from .recipe import Recipe, load_recipe, render, render_frames, trace
+from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
 from .sheet import contact_sheet, write_stages
 
 _FORMATS = ("jpg", "png", "webp")
@@ -57,6 +57,14 @@ _PROJECT_FILE = "photo-fx.toml"
 
 @dataclass(frozen=True)
 class Project:
+    """A pipeline as `photo-fx.toml` describes it (see the module documentation; `load_project` reads one).
+
+    photos: the photo files. recipes: recipe files, or `Recipe` objects built in code. output: the folder everything is
+    written to. formats, sizes, quality: how stills are exported (sizes = longest side in px; empty = as rendered).
+    subject_share, frozen_tail: the limits of the automatic checks. steps, steps_at: also save the picture after every
+    step, taken at that moment (0..1) of an animated recipe.
+    """
+
     photos: tuple[Path, ...]
     recipes: tuple[Path | Recipe, ...]  # recipe files, or Recipe objects built in code
     output: Path
@@ -70,6 +78,7 @@ class Project:
 
     @property
     def cache(self) -> Path:
+        """The folder of remembered subject mattes, inside `output`, so a photo is analysed once across runs."""
         return self.output / ".cache"
 
 
@@ -188,6 +197,8 @@ def run(
     `find_subject(rgb) -> matte` finds the subject of a photo for the recipes that need it (default: `subject_matte`).
     It is asked at most once per photo, and never again for a photo whose subject is remembered in the project's
     cache from an earlier run; if it raises, the recipes of that photo that need the subject fail, and the rest run.
+    The cache knows the photo, not the finder: after switching to a different `find_subject`, delete `project.cache`,
+    or the subjects the earlier finder found are used again.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
     names = [recipe.name for _, recipe in recipes]
@@ -251,7 +262,7 @@ def run(
                     f"{label}: {item.status}"
                     + (f" ({'; '.join(item.warnings)})" if item.warnings else "")
                     + (f" {item.error}" if item.error else "")
-                )  # noqa: E501
+                )
     if not dry_run:
         # The record keeps earlier results for photos this run left alone (--only); the return value does not.
         seen = {(i.photo, i.recipe) for i in items}
@@ -264,7 +275,8 @@ def run(
         (project.output / "manifest.json").write_text(
             json.dumps(
                 {
-                    "generated": datetime.now().isoformat(timespec="seconds"),
+                    # local time, for the person reading the report; zone-aware would change the manifest's format
+                    "generated": datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005
                     "code": code,
                     "items": [asdict(i) for i in record],
                 },
@@ -320,8 +332,8 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
     folder = project.output / photo.path.stem
     folder.mkdir(parents=True, exist_ok=True)
     stages = trace(photo.rgb(), recipe, matte, at=project.steps_at) if project.steps else None
-    if recipe.animation:
-        outputs = _export_animation(project, photo, recipe, matte, folder, warnings)
+    if recipe.animation is not None:
+        outputs = _export_animation(project, photo, recipe, recipe.animation, matte, folder, warnings)
     else:
         image = stages[-1].image if stages else render(photo.rgb(), recipe, matte)  # style (a trace ends in the render)
         warnings += still_warnings(image)  # check
@@ -358,16 +370,23 @@ _FILMSTRIP_FRAMES = 6  # how many frames of an animation go into its preview pic
 
 
 def _export_animation(
-    project: Project, photo: _Photo, recipe: Recipe, matte, folder: Path, warnings: list[str]
+    project: Project,
+    photo: _Photo,
+    recipe: Recipe,
+    animation: Animation,
+    matte: np.ndarray | None,
+    folder: Path,
+    warnings: list[str],
 ) -> list[Path]:
-    """Render the clip to video, plus a filmstrip picture of a few of its frames, and check its motion."""
+    """Render the clip of `recipe` (whose timeline is `animation`) to video, plus a filmstrip picture of a few of its
+    frames, and check its motion."""
     meter = MotionMeter()
-    fps = recipe.animation.fps
-    total = len(recipe.animation.frames())
+    fps = animation.fps
+    total = len(animation.frames())
     keep = {int(i) for i in np.linspace(0, total - 1, _FILMSTRIP_FRAMES).round()}
     strip: list[tuple[str, np.ndarray]] = []
 
-    def frames():
+    def frames() -> Iterator[np.ndarray]:
         for number, frame in enumerate(render_frames(photo.rgb(), recipe, matte)):  # style
             meter.add(frame)  # check
             if number in keep:
@@ -380,7 +399,8 @@ def _export_animation(
     filmstrip = folder / f"{recipe.name}.frames.png"  # a picture of the animation, for places a video cannot go
     imageio.save(contact_sheet(strip, columns=len(strip), tile=340), filmstrip)
     outputs = [native, filmstrip]
-    for size in _sizes(project, max(meter.shape)):
+    # (an empty clip leaves no measured size; `save_video` refuses one first, but then there is nothing to shrink)
+    for size in _sizes(project, max(meter.shape) if meter.shape is not None else 0):
         if size is not None:
             smaller = folder / f"{recipe.name}_{size}.mp4"
             imageio.resize_video(native, smaller, size)
