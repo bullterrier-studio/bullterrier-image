@@ -62,7 +62,7 @@ def clarity(rgb: np.ndarray, params: ClarityParams) -> np.ndarray:
             ndimage.gaussian_filter(
                 rgb[..., c], params.radius, mode=params.mode, cval=params.constant_value, truncate=params.truncate
             )
-            for c in range(3)  # constant: the three channels of an RGB image
+            for c in range(rgb.shape[-1])
         ],
         axis=-1,
     )

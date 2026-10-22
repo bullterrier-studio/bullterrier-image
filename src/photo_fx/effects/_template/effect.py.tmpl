@@ -14,7 +14,8 @@ class ${Name}Params(EffectParams):
     # the field's own terms (radius, amount, threshold, angle, seed...), never strength, intensity or factor.
     # bool, Literal[...], str and Color fields take no unit, min or max. Options of every library call are fields
     # too; constants are allowed only for standards (Rec. 709, sRGB...) and pure guards (an epsilon), each with a
-    # `# constant: <citation or reason>` comment on its line or the line before (a test fails on any other number).
+    # `# constant: <citation or reason>` comment ending its statement or on the line above it (a test fails on any
+    # other number, and on any number given to a library call as an option).
     amount: float = param(
         1.0,
         unit="fraction",

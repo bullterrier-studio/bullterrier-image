@@ -13,17 +13,18 @@ def parse_color(color: str | Sequence[float]) -> np.ndarray:
     """
     if isinstance(color, str):
         h = color.lstrip("#")
-        if len(h) == 3:
+        if len(h) == 3:  # constant: the short hex form #rgb
             h = "".join(c * 2 for c in h)
-        if len(h) != 6:
+        if len(h) != 6:  # constant: the long hex form #rrggbb
             raise ValueError(f"bad colour {color!r}: use '#rrggbb'")
+        # constant: two hex digits (base 16) per channel, at offsets 0, 2 and 4
         return np.array([int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4)], dtype=np.float32)
-    if len(color) != 3:
+    if len(color) != 3:  # constant: red, green and blue
         raise ValueError(f"bad colour {color!r}: need 3 numbers")
     return np.asarray(color, dtype=np.float32)
 
 
-LUMA = (0.2126, 0.7152, 0.0722)  # Rec. 709 weights of red, green, blue in perceived brightness
+LUMA = (0.2126, 0.7152, 0.0722)  # constant: Rec. 709 weights of red, green, blue in perceived brightness
 
 
 def luminance(rgb: np.ndarray) -> np.ndarray:

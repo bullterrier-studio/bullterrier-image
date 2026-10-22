@@ -25,7 +25,10 @@ class EdgeField:
 
 
 def edge_distance(
-    shape: np.ndarray, sampling: tuple[float, float] = (1.0, 1.0), *, open_bottom: bool = True
+    shape: np.ndarray,
+    sampling: tuple[float, float] = (1.0, 1.0),  # constant: one px per element, a unit grid
+    *,
+    open_bottom: bool = True,
 ) -> EdgeField:
     """Distance to the nearest edge, and the outward direction, for every element of a 2-D bool mask.
 
@@ -57,7 +60,7 @@ def edge_distance(
     grad_y = np.gradient(smooth, row_height, axis=0) if shape.shape[0] > 1 else np.zeros_like(smooth)
     grad_x = np.gradient(smooth, col_width, axis=1) if shape.shape[1] > 1 else np.zeros_like(smooth)
     length = np.hypot(grad_x, grad_y)
-    flat = length < 1e-6
+    flat = length < 1e-6  # constant: float noise, or beyond the smoothing's reach (see above)
     safe = np.where(flat, 1.0, length)
     return EdgeField(
         distance=distance,

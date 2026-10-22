@@ -34,7 +34,7 @@ def cell_size(cell: int, font: str | None = None) -> tuple[int, int]:
     return cell, ascent + descent
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=16)  # constant: a cache size, which never changes a result
 def glyph_atlas(chars: str, cell: int, font: str | None = None) -> np.ndarray:
     """Ink coverage of each distinct character of `chars`, ordered from least to most ink.
 
@@ -49,7 +49,8 @@ def glyph_atlas(chars: str, cell: int, font: str | None = None) -> np.ndarray:
     cell_w, cell_h = cell_size(cell, font)
     bitmaps = []
     for ch in dict.fromkeys(chars):  # unique, order kept
-        canvas = Image.new("L", (cell_w, cell_h), 0)
+        canvas = Image.new("L", (cell_w, cell_h), 0)  # constant: 8-bit grey, no ink
+        # constant: full 8-bit ink, the glyph centred in its cell
         ImageDraw.Draw(canvas).text((cell_w / 2, cell_h / 2), ch, fill=255, font=glyph_font, anchor="mm")
         bitmaps.append(np.asarray(canvas, dtype=np.float32) / 255.0)
     if len(bitmaps) < 2:
@@ -73,7 +74,7 @@ def paint(indices: np.ndarray, atlas: np.ndarray) -> np.ndarray:
         raise ValueError(f"paint needs a 2-D grid of indices, got {indices.ndim}-D")
     if not np.issubdtype(indices.dtype, np.integer):
         raise ValueError(f"paint needs integer indices, got {indices.dtype}")
-    if atlas.ndim != 3:
+    if atlas.ndim != 3:  # constant: glyphs, rows, columns
         raise ValueError(f"paint needs an atlas of shape (n_glyphs, cell_h, cell_w), got {atlas.ndim}-D")
     if indices.size and (indices.min() < 0 or indices.max() >= len(atlas)):
         raise IndexError(f"glyph index outside the atlas of {len(atlas)} glyphs")
@@ -82,16 +83,17 @@ def paint(indices: np.ndarray, atlas: np.ndarray) -> np.ndarray:
     return atlas[indices].transpose(0, 2, 1, 3).reshape(rows * cell_h, cols * cell_w)
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=16)  # constant: a cache size, which never changes a result
 def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
     """A monospaced font sized so one character is `cell` px wide."""
     path = font_path or next((p for p in _FONTS if Path(p).exists()), None)
     if path is None:
+        # constant: a monospaced advance is about 0.6 em, so this em makes one character `cell` px wide
         default = ImageFont.load_default(size=round(cell / 0.6))
         # Pillow falls back to a fixed-size bitmap font, which cannot be measured or scaled, only without FreeType
         if not isinstance(default, ImageFont.FreeTypeFont):
             raise RuntimeError("no system font was found and this Pillow has no FreeType to draw its own; pass `font`")
         return default
-    reference = ImageFont.truetype(path, 100)
-    em_per_advance = 100.0 / reference.getlength("M")
-    return ImageFont.truetype(path, max(4, round(cell * em_per_advance)))
+    reference = ImageFont.truetype(path, 100)  # constant: a measuring size; it cancels out below
+    em_per_advance = 100.0 / reference.getlength("M")  # constant: the same measuring size
+    return ImageFont.truetype(path, max(4, round(cell * em_per_advance)))  # constant: FreeType's smallest legible size

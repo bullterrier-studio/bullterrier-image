@@ -69,7 +69,7 @@ def glow(rgb: np.ndarray, params: GlowParams) -> np.ndarray:
     bright = np.clip((rgb - params.threshold) / (1.0 - params.threshold), 0.0, 1.0)
     halo = ndimage.gaussian_filter(
         bright,
-        sigma=(params.radius, params.radius, 0),  # no blur across the colour axis
+        sigma=(params.radius, params.radius, 0),  # constant: a zero sigma, so no blur across the colour axis
         mode=params.mode,
         cval=params.constant_value,
         truncate=params.truncate,
