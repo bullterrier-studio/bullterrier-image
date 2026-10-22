@@ -210,3 +210,65 @@ def test_oklab_converts_a_full_size_image_quickly():
     lab = cs.rgb_to_oklab(image)
     cs.oklab_to_rgb(lab)
     assert time.perf_counter() - start < 4
+
+
+# --- in_linear_light --------------------------------------------------------------------------------------------------
+
+
+def checkerboard(size=8):
+    """Black and white pixels alternating like a chessboard, as an sRGB image."""
+    yy, xx = np.indices((size, size))
+    return np.repeat(((yy + xx) % 2).astype(np.float32)[..., None], 3, axis=2)
+
+
+def box_blur_2x2(image):
+    """Average every 2x2 block and spread it back over the block (a test-local stand-in for any blur or resize)."""
+    h, w, c = image.shape
+    blocks = image.reshape(h // 2, 2, w // 2, 2, c).mean(axis=(1, 3))
+    return np.repeat(np.repeat(blocks, 2, axis=0), 2, axis=1)
+
+
+def test_identity_function_returns_the_input():
+    image = np.random.default_rng(4).random((20, 30, 3), dtype=np.float32)
+    out = cs.in_linear_light(lambda x: x, image)
+    assert out.shape == image.shape and out.dtype == np.float32
+    np.testing.assert_allclose(out, image, atol=1e-5)
+
+
+def test_blurring_a_checkerboard_in_linear_light_gives_the_srgb_of_half_the_light():
+    board = checkerboard()
+    in_gamma = box_blur_2x2(board)
+    in_linear = cs.in_linear_light(box_blur_2x2, board)
+    np.testing.assert_allclose(in_gamma, 0.5, atol=1e-6)  # averaging encoded values: too dark
+    np.testing.assert_allclose(in_linear, 0.7354, atol=1e-3)  # sRGB encoding of linear 0.5
+
+
+def test_function_sees_linear_values():
+    seen = []
+    cs.in_linear_light(lambda x: seen.append(x.copy()) or x, np.full((2, 2, 3), 0.5, dtype=np.float32))
+    np.testing.assert_allclose(seen[0], 0.2140411, atol=1e-6)
+
+
+def test_function_that_changes_the_channel_count_is_rejected():
+    with pytest.raises(ValueError, match=r"last axis.*length 3"):
+        cs.in_linear_light(lambda x: x[..., :1], np.zeros((4, 4, 3), dtype=np.float32))
+
+
+def test_input_survives_a_function_that_modifies_its_argument():
+    image = random_colours(50).reshape(5, 10, 3)
+    before = image.copy()
+
+    def scribble(x):
+        x[:] = 0
+        return x
+
+    cs.in_linear_light(scribble, image)
+    np.testing.assert_array_equal(image, before)
+
+
+def test_input_that_is_not_rgb_is_rejected_before_calling_the_function():
+    def never(_):
+        raise AssertionError("function must not run")
+
+    with pytest.raises(ValueError, match="last axis"):
+        cs.in_linear_light(never, np.zeros((4, 4, 4), dtype=np.float32))

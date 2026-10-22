@@ -9,6 +9,8 @@ Values outside 0..1 are not rejected or clipped: the conversions carry them thro
 extended symmetrically around zero), so callers decide how to handle out-of-gamut colours.
 """
 
+from collections.abc import Callable
+
 import numpy as np
 
 # sRGB transfer function, IEC 61966-2-1.
@@ -160,3 +162,23 @@ def oklab_to_rgb(lab: np.ndarray) -> np.ndarray:
     """
     lms = (_as_triplets(lab) @ _LAB_TO_LMS_ROOT_T) ** 3
     return linear_to_srgb(lms @ _LMS_TO_RGB_T)
+
+
+def in_linear_light(function: Callable[[np.ndarray], np.ndarray], rgb: np.ndarray) -> np.ndarray:
+    """Apply an image function to sRGB data as if it were linear light, then return sRGB again.
+
+    Blurs, glows, resizes and blends model physical light, which adds in linear values; applied to gamma-encoded values
+    they come out too dark (the average of black and white is 0.5 encoded, but should look like 0.735).
+
+    Args:
+        function: maps an image to an image of the same shape (last axis 3). It receives a private linear-light
+            float32 copy, 0..1, that it may modify freely, and may return values outside 0..1; those are kept.
+        rgb: sRGB image, last axis length 3, 0..1.
+
+    Returns:
+        float32 sRGB array holding the function's result. With the identity function this is `rgb` again.
+
+    Raises:
+        ValueError: if `rgb` or the function's result does not have a last axis of length 3.
+    """
+    return linear_to_srgb(function(srgb_to_linear(rgb)))
