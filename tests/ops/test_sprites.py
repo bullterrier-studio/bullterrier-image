@@ -22,6 +22,14 @@ def test_scatter_is_deterministic_per_seed_and_differs_across_seeds():
     assert not np.array_equal(a.y, other.y)
 
 
+def test_scatter_gives_a_different_placement_for_every_one_of_many_seeds():
+    # a seed that were truncated (low bit, a modulus) would repeat placements among consecutive seeds
+    placements = {scatter((40, 90), 20, seed=seed).x.tobytes() for seed in range(64)}
+    assert len(placements) == 64
+    ys = {scatter((40, 90), 20, seed=seed).y.tobytes() for seed in range(64)}
+    assert len(ys) == 64
+
+
 def test_scatter_returns_exactly_count_float32_sprites_of_every_field():
     p = scatter((40, 90), 123, seed=1)
     for name in FIELDS:
@@ -54,7 +62,8 @@ def test_scatter_has_exactly_depth_layers_distinct_depths_in_unit_range():
     assert len(depths) == 4
     assert depths.min() >= 0 and depths.max() <= 1
     assert depths.min() < depths.max()
-    assert len(np.unique(scatter((50, 50), 300, seed=2, depth_layers=1).depth)) == 1
+    single = scatter((50, 50), 300, seed=2, size=(3.0, 9.0), depth_layers=1)
+    assert np.all(single.depth == 1.0) and np.all(single.size == 9.0)  # one layer = everything near and large
     assert p.phase.min() >= 0 and p.phase.max() <= 1
     assert len(np.unique(p.phase)) > 250  # a per-sprite random number, not a constant per layer
 
@@ -118,7 +127,10 @@ def sprite(x: float, y: float, size: float = 10.0, depth: float = 1.0) -> Placem
 
 def many(xs, ys, size: float = 10.0, depth: float = 1.0) -> Placement:
     n = len(xs)
-    full = lambda v: np.full(n, v, dtype=np.float32)  # noqa: E731
+
+    def full(value: float) -> np.ndarray:
+        return np.full(n, value, dtype=np.float32)
+
     return Placement(np.asarray(xs, np.float32), np.asarray(ys, np.float32), full(size), full(depth), full(0.0))
 
 
@@ -171,7 +183,10 @@ def test_the_sprite_is_centred_where_it_is_asked_to_be_in_x_and_y_separately():
 
 @pytest.mark.parametrize(("small", "large"), [(4.0, 8.0), (6.0, 12.0), (5.0, 15.0)])
 def test_total_light_follows_the_area_law(small, large):
-    light = lambda size: stamp(black(), sprite(CENTRE, CENTRE, size), blend="add").sum()  # noqa: E731
+
+    def light(size):
+        return stamp(black(), sprite(CENTRE, CENTRE, size), blend="add").sum()
+
     assert light(large) / light(small) == pytest.approx((large / small) ** 2, rel=0.15)
 
 
@@ -183,7 +198,10 @@ def test_sub_pixel_sprites_still_add_light_that_grows_with_size():
 
 def test_add_light_is_linear_in_opacity():
     colour = (0.9, 0.5, 0.2)
-    light = lambda op: stamp(black(), sprite(CENTRE, CENTRE), color=colour, opacity=op, blend="add").sum()  # noqa: E731
+
+    def light(opacity):
+        return stamp(black(), sprite(CENTRE, CENTRE), color=colour, opacity=opacity, blend="add").sum()
+
     assert light(0.5) == pytest.approx(2 * light(0.25), rel=1e-4)
     assert light(1.0) == pytest.approx(4 * light(0.25), rel=1e-4)
     assert light(0.0) == 0.0
@@ -359,7 +377,10 @@ def test_a_disc_ignores_angle_and_length():
 
 
 def test_streak_light_grows_with_length():
-    light = lambda n: stamp(black(), sprite(CENTRE, CENTRE, 8), shape="streak", length=n, blend="add").sum()  # noqa: E731
+
+    def light(length):
+        return stamp(black(), sprite(CENTRE, CENTRE, 8), shape="streak", length=length, blend="add").sum()
+
     assert light(4.0) / light(2.0) == pytest.approx(2.0, rel=0.15)
 
 
@@ -411,13 +432,14 @@ def test_invalid_blend_is_rejected_even_when_there_is_nothing_to_draw():
 
 
 def test_batches_of_large_sprites_equal_drawing_each_alone():
-    # 30 sprites of ~300 px on a 400x400 picture need many internal batches; the result must not depend on batching
-    p = scatter((400, 400), 30, seed=5, size=(200.0, 320.0), depth_layers=2)
+    # 80 sprites of ~300 px on a 400x400 picture (about 6 million drawn pixels) need many internal batches and
+    # several merges of equal pixels; the result must not depend on either
+    p = scatter((400, 400), 80, seed=5, size=(200.0, 320.0), depth_layers=2)
     zero = np.zeros((400, 400, 3), np.float32)
-    together = stamp(zero, p, blend="add", opacity=0.03)
+    together = stamp(zero, p, blend="add", opacity=0.01)
     one_by_one = sum(
-        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.03)
-        for i in range(30)
+        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.01)
+        for i in range(80)
     )
     assert together.max() < 1.0
     np.testing.assert_allclose(together, one_by_one, atol=1e-5)
@@ -435,3 +457,135 @@ def _timed(fn) -> float:
     start = time.perf_counter()
     fn()
     return time.perf_counter() - start
+
+
+# ---------------------------------------------------------------- sprites that reach in from outside
+
+
+# A size-8 sprite at depth 1 has radius 4 and, by default, an edge ramp 2 px wide from d=3 to d=5, so its light at
+# distance d from its centre is (5 - d) / 2. Pixel centres are at col + 0.5. Each case puts the centre OUTSIDE the
+# picture (101 x 101) and names the one border pixel it reaches and the light that pixel must get.
+@pytest.mark.parametrize(
+    ("x", "y", "pixel", "expected"),
+    [
+        (-4.0, 50.5, (50, 0), 0.25),  # left: d = 4.5
+        (-3.0, 50.5, (50, 0), 0.75),  # d = 3.5
+        (105.0, 50.5, (50, 100), 0.25),  # right: pixel centre 100.5, d = 4.5
+        (104.0, 50.5, (50, 100), 0.75),
+        (50.5, -4.0, (0, 50), 0.25),  # top
+        (50.5, -3.0, (0, 50), 0.75),
+        (50.5, 105.0, (100, 50), 0.25),  # bottom
+        (50.5, 104.0, (100, 50), 0.75),
+        (-4.0, -4.0, (0, 0), 0.0),  # diagonal: d = 6.4, out of reach
+        (-3.0, -3.0, (0, 0), (5 - np.hypot(3.5, 3.5)) / 2),  # corner: d = 4.95
+    ],
+)
+def test_a_disc_centred_outside_the_picture_still_lights_the_border_pixel_it_reaches(x, y, pixel, expected):
+    out = stamp(black(), sprite(x, y, size=8), blend="add")
+    assert out[pixel][0] == pytest.approx(expected, abs=1e-6)
+
+
+# A streak 12 px outside, 4 times longer than wide: along its axis distances shrink 4-fold, so the border pixel at
+# axis distance 12.5 is at d = 3.125 and gets (5 - 3.125) / 2 = 0.9375. A disc would not reach it at all.
+@pytest.mark.parametrize(
+    ("x", "y", "angle", "pixel"),
+    [
+        (-12.0, 50.5, 0.0, (50, 0)),
+        (113.0, 50.5, 180.0, (50, 100)),
+        (50.5, -12.0, 90.0, (0, 50)),
+        (50.5, 113.0, 270.0, (100, 50)),
+    ],
+)
+def test_a_streak_centred_outside_reaches_in_along_its_axis(x, y, angle, pixel):
+    out = stamp(black(), sprite(x, y, size=8), shape="streak", angle=angle, length=4.0, blend="add")
+    assert out[pixel][0] == pytest.approx(0.9375, abs=1e-6)
+    disc = stamp(black(), sprite(x, y, size=8), blend="add")
+    assert disc.sum() == 0.0
+
+
+def test_a_streak_pointing_away_from_the_picture_does_not_reach_it():
+    out = stamp(black(), sprite(-12.0, 50.5, size=8), shape="streak", angle=90.0, length=4.0, blend="add")
+    assert out.sum() == 0.0
+
+
+# ---------------------------------------------------------------- memory
+
+
+def test_memory_follows_what_is_drawn_not_the_size_of_the_picture():
+    import tracemalloc
+
+    canvas = np.zeros((2000, 3000, 3), np.float32)  # 72 MB
+    placement = scatter((2000, 3000), 20, seed=1)
+    tracemalloc.start()
+    try:
+        out = stamp(canvas, placement)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert out.max() > 0.5
+    # the returned copy is 1x the picture; a dense float64 per-pixel accumulator would add 2x on top
+    assert peak < 1.5 * canvas.nbytes, f"peak {peak / canvas.nbytes:.2f}x the picture"
+
+
+# ---------------------------------------------------------------- tunable look: feather, softness, brightness
+
+
+def test_feather_sets_the_minimum_edge_width_in_pixels():
+    # size 2 -> radius 1; the default edge is 1 px wide: the centre pixel is fully lit, the pixel 2 px away is dark.
+    # with feather 4 the ramp is (1 + 2 - d) / 4 wide: 0.75 at the centre, 0.25 two pixels away
+    wide = stamp(black(), sprite(CENTRE, CENTRE, size=2), feather=4.0, blend="add")[..., 0]
+    default = stamp(black(), sprite(CENTRE, CENTRE, size=2), blend="add")[..., 0]
+    assert wide[50, 50] == pytest.approx(0.75, abs=1e-6) and wide[50, 52] == pytest.approx(0.25, abs=1e-6)
+    assert default[50, 50] == 1.0 and default[50, 52] == 0.0
+
+
+def test_softness_sets_the_edge_width_as_a_fraction_of_the_radius():
+    # size 40 -> radius 20. softness 0.5 (default): ramp 10 px, from d=15 to 25, value (25 - d) / 10.
+    # softness 0.1: ramp 2 px, from d=19 to 21, value (21 - d) / 2.
+    default = stamp(black(), sprite(CENTRE, CENTRE, size=40), blend="add")[50]
+    sharp = stamp(black(), sprite(CENTRE, CENTRE, size=40), softness=0.1, blend="add")[50]
+    for column, want_default, want_sharp in [(69, 0.6, 1.0), (70, 0.5, 0.5), (71, 0.4, 0.0)]:
+        assert default[column, 0] == pytest.approx(want_default, abs=1e-6)
+        assert sharp[column, 0] == pytest.approx(want_sharp, abs=1e-6)
+
+
+def test_far_and_near_brightness_set_the_brightness_range_over_depth():
+    def core(depth, **kwargs):
+        return stamp(black(), sprite(CENTRE, CENTRE, depth=depth), blend="add", **kwargs)[50, 50, 0]
+
+    for depth, want in [(0.0, 0.1), (0.5, 0.45), (1.0, 0.8)]:
+        assert core(depth, far_brightness=0.1, near_brightness=0.8) == pytest.approx(want, abs=1e-6)
+    assert core(0.0) == pytest.approx(0.4, abs=1e-6) and core(1.0) == 1.0  # defaults: 0.4 far, 1 near
+
+
+def test_over_at_a_far_depth_is_dimmed_by_the_far_brightness_unless_it_is_raised_to_one():
+    canvas = np.full((101, 101, 3), 0.7, dtype=np.float32)
+    dim = stamp(canvas, sprite(CENTRE, CENTRE, depth=0.0), color=(0, 0, 0), blend="over")
+    assert dim[50, 50, 0] == pytest.approx(0.7 * (1 - 0.4), abs=1e-6)
+    solid = stamp(canvas, sprite(CENTRE, CENTRE, depth=0.0), color=(0, 0, 0), blend="over", far_brightness=1.0)
+    assert solid[50, 50, 0] == pytest.approx(0.0, abs=1e-5)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "name"),
+    [
+        ({"feather": 0.0}, "feather"),
+        ({"feather": -1.0}, "feather"),
+        ({"feather": float("nan")}, "feather"),
+        ({"softness": -0.1}, "softness"),
+        ({"softness": float("inf")}, "softness"),
+        ({"far_brightness": -0.1}, "far_brightness"),
+        ({"far_brightness": 1.1}, "far_brightness"),
+        ({"near_brightness": 1.1}, "near_brightness"),
+        ({"near_brightness": float("nan")}, "near_brightness"),
+    ],
+)
+def test_the_look_parameters_are_validated_naming_them(kwargs, name):
+    with pytest.raises(ValueError, match=name):
+        stamp(black(), sprite(CENTRE, CENTRE), **kwargs)
+
+
+def test_a_black_sprite_under_add_changes_nothing_not_even_an_out_of_range_pixel():
+    canvas = np.full((101, 101, 3), 1.5, dtype=np.float32)  # out of range on purpose: any clipping would show
+    out = stamp(canvas, sprite(CENTRE, CENTRE), color=(0.0, 0.0, 0.0), blend="add")
+    np.testing.assert_array_equal(out, canvas)
