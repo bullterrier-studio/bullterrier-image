@@ -4,7 +4,7 @@ import pytest
 from photo_fx.ops import colorspace as cs
 
 # Every public one-array conversion; the shape/dtype/input contracts apply to each of them.
-CONVERSIONS = ["srgb_to_linear", "linear_to_srgb"]
+CONVERSIONS = ["srgb_to_linear", "linear_to_srgb", "rgb_to_hsv", "hsv_to_rgb"]
 
 
 def random_colours(n=10_000, seed=0):
@@ -92,3 +92,64 @@ def test_out_of_range_values_stay_finite_and_round_trip():
         back = cs.linear_to_srgb(linear)
     assert np.isfinite(linear).all()
     np.testing.assert_allclose(back, ramp, atol=1e-4)
+
+
+# --- HSV --------------------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("rgb", "hsv"),
+    [
+        ((1, 0, 0), (0, 1, 1)),
+        ((0, 1, 0), (1 / 3, 1, 1)),
+        ((0, 0, 1), (2 / 3, 1, 1)),
+        ((1, 1, 0), (1 / 6, 1, 1)),
+        ((0, 1, 1), (1 / 2, 1, 1)),
+        ((1, 0, 1), (5 / 6, 1, 1)),
+        ((1, 1, 1), (0, 0, 1)),
+        ((0, 0, 0), (0, 0, 0)),
+        ((0.5, 0.25, 0.25), (0, 0.5, 0.5)),  # an unsaturated, darker red: distinct s and v
+        ((0.2, 0.6, 0.4), (5 / 12, 2 / 3, 0.6)),  # all three channels differ: exposes swapped channels
+    ],
+)
+def test_rgb_to_hsv_known_colours(rgb, hsv):
+    out = cs.rgb_to_hsv(np.array(rgb, dtype=np.float32))
+    np.testing.assert_allclose(out, hsv, atol=1e-6)
+
+
+@pytest.mark.parametrize("grey", [0.0, 0.1, 0.5, 0.9, 1.0])
+def test_greys_have_zero_saturation(grey):
+    assert cs.rgb_to_hsv(np.full(3, grey, dtype=np.float32))[1] == 0
+
+
+def test_hsv_to_rgb_known_colours():
+    hsv = np.array([[0, 1, 1], [1 / 3, 1, 1], [2 / 3, 1, 1], [5 / 12, 2 / 3, 0.6]], dtype=np.float32)
+    expected = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.2, 0.6, 0.4]]
+    np.testing.assert_allclose(cs.hsv_to_rgb(hsv), expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("hue", [0.0, 0.15, 0.4, 0.77, 0.99])
+@pytest.mark.parametrize("shift", [1, -1, 3])
+def test_hue_wraps_around_the_circle(hue, shift):
+    base = cs.hsv_to_rgb(np.array([hue, 0.8, 0.7], dtype=np.float32))
+    shifted = cs.hsv_to_rgb(np.array([hue + shift, 0.8, 0.7], dtype=np.float32))
+    np.testing.assert_allclose(shifted, base, atol=1e-5)
+
+
+def test_hsv_round_trip_on_random_colours():
+    x = random_colours()
+    np.testing.assert_allclose(cs.hsv_to_rgb(cs.rgb_to_hsv(x)), x, atol=1e-4)
+
+
+def test_hsv_is_the_inverse_in_the_other_direction_too():
+    hsv = random_colours(seed=3)
+    hsv[:, 1:] = 0.2 + 0.8 * hsv[:, 1:]  # hue is undefined as s or v -> 0, so keep clear of that
+    np.testing.assert_allclose(cs.rgb_to_hsv(cs.hsv_to_rgb(hsv)), hsv, atol=1e-4)
+
+
+def test_hue_is_always_below_one_even_for_reds_with_a_hint_of_blue():
+    reds = np.array([[1, 0, 1e-9], [1, 1e-9, 1e-8], [1, 0, 1e-6]], dtype=np.float32)
+    hue = cs.rgb_to_hsv(reds)[:, 0]
+    assert ((hue >= 0) & (hue < 1)).all()
+    h = cs.rgb_to_hsv(random_colours())[:, 0]
+    assert ((h >= 0) & (h < 1)).all()
