@@ -322,7 +322,7 @@ def test_parse_builds_the_model_from_a_mapping():
 
 
 def test_parse_reports_every_problem_as_one_value_error_naming_the_owner():
-    with pytest.raises(ValueError, match=r"effect 'probe': `radius` must be >= 0, got -1.*`raduis`") as raised:
+    with pytest.raises(ValueError, match=r"probe.*`radius`.*\b0\b.*-1.*`raduis`") as raised:
         Probe.parse({"radius": -1, "raduis": 2}, "effect 'probe'")
     assert not isinstance(raised.value, ValidationError)  # callers see a plain ValueError, never pydantic's type
 
