@@ -90,3 +90,11 @@ def test_an_animation_whose_parameters_never_change_is_the_still_held_for_the_wh
     still = runner.render(photo, PLAIN)
     for frame in frames:
         np.testing.assert_array_equal(frame, still)
+
+
+@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
+def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
+    """A finder returning None (instead of raising) would otherwise make `trace` drop the subject stage silently."""
+    recipe = CLIP if run is RUNS["render_frames"] else MASKED
+    with pytest.raises(ValueError, match="`find_subject` returned None"):
+        run(photo, recipe, find_subject=lambda rgb: None)

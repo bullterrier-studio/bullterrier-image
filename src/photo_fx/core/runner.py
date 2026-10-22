@@ -46,7 +46,7 @@ def render(
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
     height and width, 0..1 (white = subject), or None. at: position in the clip, 0..1 (ignored by a still recipe).
     find_subject: called with the photo (already scaled to `recipe.size`) when a step needs the subject and no `matte`
-    was given. Raises ValueError when a step needs the subject and neither was given.
+    was given. Raises ValueError when a step needs the subject and neither was given, or the finder returns None.
     """
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
     return _finish(_run(rgb, recipe.steps, matte, at, at))
@@ -140,7 +140,13 @@ def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder |
             f"recipe {recipe.name!r} has masked steps, so it needs the subject: pass `matte` (the subject's alpha) "
             "or `find_subject` (a function photo -> alpha, e.g. photo_fx.matte.subject_matte)"
         )
-    return find_subject(rgb)
+    matte = find_subject(rgb)
+    if matte is None:  # a finder must answer or raise; carrying on would drop the subject without a word
+        raise ValueError(
+            f"recipe {recipe.name!r} needs the subject, but `find_subject` returned None: it must return the subject's "
+            "alpha (float32, the photo's height and width, 0..1) or raise when it finds none"
+        )
+    return matte
 
 
 def _run(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None, motion: float, clip: float) -> np.ndarray:
