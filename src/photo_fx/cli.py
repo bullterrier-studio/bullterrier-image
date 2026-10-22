@@ -8,15 +8,16 @@ import sys
 import textwrap
 from collections.abc import Iterable, Iterator
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 
 import numpy as np
 
 from . import effects, gallery, imageio
 from .imageio import save_video
-from .matte import subject_matte
+from .matte import SEGMENTERS, refine_edge, subject_matte
 from .pipeline import init_project, load_project, run
-from .recipe import Recipe, load_recipe, render_all, render_frames, trace
+from .recipe import Recipe, SubjectFinder, load_recipe, render_all, render_frames, trace
 from .sheet import contact_sheet, write_stages
 
 
@@ -34,11 +35,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p = commands.add_parser("render", help="render a photo through one or more recipes, one file each")
     _photo_and_recipes(p)
+    _subject_options(p)
     p.add_argument("-o", "--out", default="out", help="output folder (default: out)")
     p.add_argument("--format", default="png", choices=["png", "jpg", "webp"])
 
     p = commands.add_parser("sheet", help="render recipes and put them side by side in one comparison image")
     _photo_and_recipes(p)
+    _subject_options(p)
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
     p.add_argument("--columns", type=int, default=3)
 
@@ -47,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--out", default="out/cutout.png")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
+    _subject_options(p)
 
     p = commands.add_parser("animate", help="render an animated recipe to a video (.mp4, .mov) or a .gif")
     p.add_argument("photo")
@@ -55,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--max-side", type=int, help="shrink the video so its longest side is at most this many px (e.g. 1080)"
     )
+    _subject_options(p)
 
     p = commands.add_parser(
         "run", help="process every photo of a project with every recipe: cached, checked, with a report"
@@ -66,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--strict", action="store_true", help="exit with an error if any result has a warning")
 
     p.add_argument("--steps", action="store_true", help="also save the picture after every step of every recipe")
+    _segmenter_option(p, " (subjects found before are remembered in the output's .cache: delete it after switching)")
 
     p = commands.add_parser("steps", help="show what every step of a recipe does to a photo: one picture per step")
     p.add_argument("photo")
@@ -74,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--at", type=float, default=0.5, help="for an animated recipe: the moment of the clip, 0..1 (default 0.5)"
     )
+    _subject_options(p)
 
     p = commands.add_parser("init", help="create a starter photo-fx.toml, a photos/ folder and two recipes")
     p.add_argument("directory", nargs="?", default=".")
@@ -122,6 +129,31 @@ def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
     p.add_argument("recipes", nargs="+", help="recipe .toml files, or folders of them")
 
 
+def _subject_options(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--matte",
+        metavar="PICTURE",
+        help="the subject's matte, the photo's size: a cut-out PNG (its transparency) or a black-and-white mask "
+        "(white = subject); no model is used",
+    )
+    _segmenter_option(p, "")
+
+
+def _segmenter_option(p: argparse.ArgumentParser, note: str) -> None:
+    p.add_argument(
+        "--segmenter",
+        choices=SEGMENTERS,
+        help="what finds the subject: vision (Apple Vision, macOS) or onnx (a portable model, downloaded on first "
+        f"use); default: $PHOTO_FX_SEGMENTER, else vision where available{note}",
+    )
+
+
+def _subject(args: argparse.Namespace) -> tuple[np.ndarray | None, SubjectFinder]:
+    """The subject as the command line gives it: a matte file (--matte), and how to find it otherwise (--segmenter)."""
+    matte = imageio.load_matte(args.matte) if args.matte else None
+    return matte, partial(subject_matte, segmenter=args.segmenter)
+
+
 def _load_recipes(paths: list[str]) -> list[Recipe]:
     files: list[Path] = []
     for path in map(Path, paths):
@@ -134,7 +166,11 @@ def _load_recipes(paths: list[str]) -> list[Recipe]:
 def _render_all(args: argparse.Namespace) -> tuple[list[Recipe], list[np.ndarray]]:
     recipes = _load_recipes(args.recipes)  # validated before any slow work starts
     print(f"rendering {len(recipes)} recipe(s)...", file=sys.stderr)
-    return recipes, render_all(imageio.load(args.photo), recipes)
+    matte, find = _subject(args)
+    if matte is not None:
+        given = matte
+        find = lambda photo: given  # noqa: E731  (render_all asks with the photo as given, which the matte fits)
+    return recipes, render_all(imageio.load(args.photo), recipes, find_subject=find)
 
 
 def _render(args: argparse.Namespace) -> int:
@@ -159,8 +195,15 @@ def _sheet(args: argparse.Namespace) -> int:
 
 def _cutout(args: argparse.Namespace) -> int:
     photo = imageio.load(args.photo)
-    options = {k: v for k, v in (("shrink", args.shrink), ("feather", args.feather)) if v is not None}
-    alpha = subject_matte(photo, **options)
+    matte, find = _subject(args)
+    if matte is None:
+        options = {k: v for k, v in (("shrink", args.shrink), ("feather", args.feather)) if v is not None}
+        alpha = find(photo, **options)
+    elif matte.shape != photo.shape[:2]:
+        (mh, mw), (ph, pw) = matte.shape, photo.shape[:2]
+        raise ValueError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
+    else:  # a matte given is used as it is, unless an edge clean-up is asked for
+        alpha = refine_edge(matte, args.shrink or 0.0, args.feather or 0.0)
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
     imageio.save(photo, target, alpha=alpha)
@@ -182,8 +225,9 @@ def _animate(args: argparse.Namespace) -> int:
                 print(f"frame {i}/{total}", file=sys.stderr)
             yield frame
 
+    matte, find = _subject(args)
     save_video(
-        with_progress(render_frames(imageio.load(args.photo), recipe)),
+        with_progress(render_frames(imageio.load(args.photo), recipe, matte, find_subject=find)),
         target,
         fps=recipe.animation.fps,
         max_side=args.max_side,
@@ -202,6 +246,7 @@ def _run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         only=args.only,
         log=lambda message: print(message, file=sys.stderr),
+        find_subject=partial(subject_matte, segmenter=args.segmenter),
     )
     failed = [i for i in items if i.status == "failed"]
     flagged = [i for i in items if i.warnings]
@@ -214,7 +259,8 @@ def _run(args: argparse.Namespace) -> int:
 def _steps(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
-    stages = trace(imageio.load(args.photo), recipe, at=args.at)
+    matte, find = _subject(args)
+    stages = trace(imageio.load(args.photo), recipe, matte, at=args.at, find_subject=find)
     for stage in stages:
         print(f"  {stage.label}", file=sys.stderr)
     print(write_stages(stages, folder))
