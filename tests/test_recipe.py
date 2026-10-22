@@ -3,6 +3,7 @@ import pytest
 
 from portrait_fx import Recipe, Step, load_recipe, render, render_all
 from portrait_fx.matte import _refine_edge
+from portrait_fx.recipe import Animated, Animation, render_frames
 
 
 def write(tmp_path, text, name="r.toml"):
@@ -79,6 +80,149 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
     assert ok.steps[0].opacity == 0.4 and "opacity" not in ok.steps[0].params
     with pytest.raises(ValueError, match="step 1.*opacity"):
         load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=1.5\n', "bad.toml"))
+
+
+def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, monkeypatch):
+    from portrait_fx.effects import _registry
+
+    seen = []
+    monkeypatch.setitem(_registry._EFFECTS, "spy", lambda rgb, matte=None: seen.append(matte) or rgb)
+    r = Recipe("s", (Step("spy"),), size=None)
+    assert r.needs_matte  # an effect that wants the silhouette makes the recipe look for the person
+    render(photo, r, matte)
+    assert len(seen) == 1 and seen[0] is matte
+
+
+def test_matte_cannot_be_set_in_a_recipe_file(tmp_path):
+    with pytest.raises(ValueError, match="matte"):
+        load_recipe(write(tmp_path, '[[step]]\neffect="evaporate"\nmatte=1\n'))
+
+
+ANIMATED = """
+[animation]
+seconds = 2
+fps = 10
+hold_start = 0.5
+hold_end = 0.5
+
+[[step]]
+effect = "grade"
+exposure = { from = 0.0, to = 1.0, ease = "in-out" }
+"""
+
+
+def test_animation_is_read_from_the_file(tmp_path):
+    r = load_recipe(write(tmp_path, ANIMATED))
+    assert r.animation == Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5)
+    assert r.steps[0].params == {"exposure": Animated(0.0, 1.0, "in-out")} and r.steps[0].animated
+
+
+def test_animation_positions_hold_at_both_ends_and_run_in_between():
+    positions = Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).positions()
+    assert len(positions) == 20
+    assert positions[:6] == [0.0] * 6 and positions[-5:] == [1.0] * 5  # held, then still at the end
+    assert positions == sorted(positions)
+
+
+def test_pingpong_plays_forward_then_back_without_repeating_the_turning_frames():
+    once = Animation(seconds=1, fps=5).positions()
+    both = Animation(seconds=1, fps=5, loop="pingpong").positions()
+    assert both == once + once[-2:0:-1] and len(both) == 2 * len(once) - 2
+
+
+def test_animated_values_ease_between_their_end_points():
+    for ease in ("linear", "in", "out", "in-out"):
+        value = Animated(2.0, 6.0, ease)
+        assert value.at(0.0) == 2.0 and value.at(1.0) == 6.0
+        assert value.at(0.25) <= value.at(0.5) <= value.at(0.75)
+    assert Animated(0.0, 1.0, "in-out").at(0.5) == 0.5 and Animated(0.0, 1.0, "in").at(0.5) < 0.5
+
+
+@pytest.mark.parametrize(
+    "text, expect",
+    [
+        ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "no \\[animation\\] table"),
+        (ANIMATED.replace('{ from = 0.0, to = 1.0, ease = "in-out" }', "{ from = 0.0 }"), "step 1.*exposure"),
+        (ANIMATED.replace('"in-out"', '"bouncy"'), "step 1.*exposure"),
+        (ANIMATED.replace("hold_end = 0.5", "hold_end = 1.5"), "no time"),
+        (ANIMATED.replace("seconds = 2", "speed = 2"), "needs `seconds`"),
+        (ANIMATED.replace("hold_end = 0.5", 'loop = "spiral"'), "loop"),
+    ],
+)
+def test_bad_animations_fail_at_load_time(tmp_path, text, expect):
+    with pytest.raises(ValueError, match=expect):
+        load_recipe(write(tmp_path, text))
+
+
+def test_cubic_bezier_easing_slow_in_slow_out_without_overshoot():
+    gentle = Animated(0.0, 1.0, "gentle")
+    values = [gentle.at(i / 100) for i in range(101)]
+    assert values[0] == 0.0 and abs(values[-1] - 1.0) < 1e-9
+    assert values == sorted(values) and max(values) <= 1.0 + 1e-9  # smooth, never past the target
+    assert gentle.at(0.1) < 0.1 and gentle.at(0.9) > 0.9  # slow start, slow finish
+    assert Animated(0, 1, (0.4, 0.0, 0.2, 1.0)).at(0.3) == gentle.at(0.3)  # the preset is that curve
+
+
+@pytest.mark.parametrize("name", ["gentle", "standard", "accelerate", "decelerate", "emphasized", "sine"])
+def test_every_named_curve_runs_from_zero_to_one(name):
+    curve = Animated(0.0, 1.0, name)
+    assert abs(curve.at(0.0)) < 1e-9 and abs(curve.at(1.0) - 1.0) < 1e-9
+
+
+def test_exit_and_entrance_curves_accelerate_and_decelerate():
+    assert Animated(0, 1, "accelerate").at(0.3) < 0.3 < Animated(0, 1, "decelerate").at(0.3)
+
+
+@pytest.mark.parametrize("ease", ["[0.4, 0.0, 0.2]", "[1.5, 0.0, 0.2, 1.0]", '"wobbly"', '[0.4, 0.0, "x", 1.0]'])
+def test_bad_easing_is_rejected_when_loading(tmp_path, ease):
+    text = ANIMATED.replace('ease = "in-out"', f"ease = {ease}")
+    with pytest.raises(ValueError, match="step 1.*exposure"):
+        load_recipe(write(tmp_path, text))
+
+
+def test_a_custom_cubic_bezier_can_be_written_as_four_numbers(tmp_path):
+    r = load_recipe(write(tmp_path, ANIMATED.replace('ease = "in-out"', "ease = [0.4, 0.0, 0.2, 1.0]")))
+    assert r.steps[0].params["exposure"].ease == (0.4, 0.0, 0.2, 1.0)
+
+
+def test_over_clip_keeps_running_through_the_holds():
+    still = Animated(0.0, 10.0, over="motion")
+    clock = Animated(0.0, 10.0, over="clip")
+    assert still.at(0.0, clip=0.5) == 0.0 and clock.at(0.0, clip=0.5) == 5.0  # held at its start / still running
+    frames = Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).frames()
+    assert frames[0] == (0.0, 0.0) and frames[3] == (0.0, 3 / 19) and frames[-1] == (1.0, 1.0)
+    assert [clip for _, clip in frames] == sorted(clip for _, clip in frames)
+
+
+def test_over_must_be_motion_or_clip(tmp_path):
+    with pytest.raises(ValueError, match="step 1.*exposure"):
+        load_recipe(write(tmp_path, ANIMATED.replace('ease = "in-out"', 'over = "forever"')))
+
+
+def test_render_at_picks_a_moment_of_the_clip(photo, tmp_path):
+    r = load_recipe(write(tmp_path, ANIMATED.replace("size", "size")))
+    r = Recipe(r.name, r.steps, size=None, animation=r.animation)
+    np.testing.assert_allclose(render(photo, r, at=0.0), photo, atol=1e-6)
+    np.testing.assert_allclose(render(photo, r, at=1.0), np.clip(photo * 2.0, 0, 1), atol=1e-5)
+
+
+def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(photo, tmp_path, monkeypatch):
+    r = load_recipe(write(tmp_path, ANIMATED.replace("[[step]]", '[[step]]\neffect="grain"\n[[step]]', 1)))
+    r = Recipe(r.name, r.steps, size=None, animation=r.animation)
+    calls = []
+    real = effects_apply = __import__("portrait_fx").recipe.effects.apply
+    monkeypatch.setattr(
+        "portrait_fx.recipe.effects.apply", lambda name, *a, **k: calls.append(name) or real(name, *a, **k)
+    )
+    frames = list(render_frames(photo, r))
+    assert len(frames) == 20 and calls.count("grain") == 1 and calls.count("grade") == 20
+    np.testing.assert_allclose(frames[0], render(photo, r, at=0.0), atol=1e-6)
+    assert effects_apply is real
+
+
+def test_render_frames_needs_an_animated_recipe(photo):
+    with pytest.raises(ValueError, match="no \\[animation\\]"):
+        list(render_frames(photo, Recipe("still", (Step("grain"),), size=None)))
 
 
 def test_size_scales_photo_and_matte_together(photo, matte):

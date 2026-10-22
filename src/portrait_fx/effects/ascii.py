@@ -62,12 +62,20 @@ def ascii(
     return out[:height, :width].astype(np.float32)
 
 
+def cell_size(cell: int, font: str | None = None) -> tuple[int, int]:
+    """(width, height) in px of one character cell for `ascii(cell=cell, font=font)`.
+
+    Effects that move whole characters around (evaporate) use this to stay on the same grid as the ascii step.
+    """
+    ascent, descent = _load_font(cell, font).getmetrics()
+    return cell, ascent + descent
+
+
 @lru_cache(maxsize=16)
 def _glyph_atlas(chars: str, cell: int, font_path: str | None) -> np.ndarray:
     """Render each distinct character once into a (cell_h, cell_w) coverage bitmap, ordered from least to most ink."""
     glyph_font = _load_font(cell, font_path)
-    ascent, descent = glyph_font.getmetrics()
-    cell_w, cell_h = cell, ascent + descent
+    cell_w, cell_h = cell_size(cell, font_path)
     bitmaps = []
     for ch in dict.fromkeys(chars):  # unique, order kept
         canvas = Image.new("L", (cell_w, cell_h), 0)
@@ -79,6 +87,7 @@ def _glyph_atlas(chars: str, cell: int, font_path: str | None) -> np.ndarray:
     return np.stack(bitmaps)
 
 
+@lru_cache(maxsize=16)
 def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
     """A monospaced font sized so one character is `cell` px wide."""
     path = font_path or next((p for p in _FONTS if Path(p).exists()), None)

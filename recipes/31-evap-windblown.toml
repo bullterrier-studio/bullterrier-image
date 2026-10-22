@@ -1,0 +1,35 @@
+# Edges dissolve and everything is blown to the right, like dust in a wind.
+name = "evap-windblown"
+size = 1600
+
+[[step]]
+effect = "grade"
+saturation = 1.25
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.5
+
+[[step]]
+effect = "ascii"
+cell = 5
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "evaporate"
+cell = 5                     # same as the ascii step, so whole characters fly away
+start = 0.4
+end = 0.16
+edge = 0.12
+outward = 0.4
+wind = 1.4
+rise = 0.24
+vanish = 0.35
+seed = 9

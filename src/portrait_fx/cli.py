@@ -6,8 +6,9 @@ import textwrap
 from pathlib import Path
 
 from . import effects, imageio
+from .imageio import save_video
 from .matte import subject_matte
-from .recipe import Recipe, load_recipe, render_all
+from .recipe import Recipe, load_recipe, render_all, render_frames
 from .sheet import contact_sheet
 
 
@@ -31,11 +32,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
 
+    p = commands.add_parser("animate", help="render an animated recipe to a video (.mp4, .mov) or a .gif")
+    p.add_argument("photo")
+    p.add_argument("recipe", help="a recipe .toml with an [animation] table")
+    p.add_argument("-o", "--out", help="output file (default: out/<photo>__<recipe>.mp4)")
+    p.add_argument(
+        "--max-side", type=int, help="shrink the video so its longest side is at most this many px (e.g. 1080)"
+    )
+
     commands.add_parser("effects", help="list the available effects and their parameters")
 
     args = parser.parse_args(argv)
     try:
-        return {"render": _render, "sheet": _sheet, "cutout": _cutout, "effects": _effects}[args.command](args)
+        return {"render": _render, "sheet": _sheet, "cutout": _cutout, "animate": _animate, "effects": _effects}[
+            args.command
+        ](args)
     except (ValueError, RuntimeError, FileNotFoundError, NotImplementedError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
@@ -88,6 +99,30 @@ def _cutout(args) -> int:
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
     imageio.save(photo, target, alpha=alpha)
+    print(target)
+    return 0
+
+
+def _animate(args) -> int:
+    recipe = load_recipe(args.recipe)
+    if recipe.animation is None:
+        raise ValueError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
+    target = Path(args.out) if args.out else Path("out") / f"{Path(args.photo).stem}__{recipe.name}.mp4"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    total = len(recipe.animation.positions())
+
+    def with_progress(frames):
+        for i, frame in enumerate(frames, start=1):
+            if i % 10 == 0 or i == total:
+                print(f"frame {i}/{total}", file=sys.stderr)
+            yield frame
+
+    save_video(
+        with_progress(render_frames(imageio.load(args.photo), recipe)),
+        target,
+        fps=recipe.animation.fps,
+        max_side=args.max_side,
+    )
     print(target)
     return 0
 

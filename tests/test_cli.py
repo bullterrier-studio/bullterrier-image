@@ -45,3 +45,19 @@ def test_photo_without_a_person_is_reported_clearly(files, capsys):
     (files / "recipes" / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n')
     assert main(["render", str(files / "me.png"), str(files / "recipes" / "m.toml")]) == 1
     assert "no person" in capsys.readouterr().err.lower()
+
+
+def test_animate_writes_the_clip(files):
+    recipe = files / "recipes" / "anim.toml"
+    recipe.write_text(
+        'name="anim"\nsize=48\n[animation]\nseconds=0.5\nfps=8\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n'
+    )
+    target = files / "clip.gif"
+    assert main(["animate", str(files / "me.png"), str(recipe), "-o", str(target)]) == 0
+    with Image.open(target) as clip:
+        assert clip.n_frames == 4
+
+
+def test_animate_explains_that_a_still_recipe_has_nothing_to_animate(files, capsys):
+    assert main(["animate", str(files / "me.png"), str(files / "recipes" / "a.toml")]) == 1
+    assert "no [animation]" in capsys.readouterr().err

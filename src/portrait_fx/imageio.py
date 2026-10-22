@@ -6,6 +6,10 @@ about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of
 """
 
 import io
+import shutil
+import subprocess
+from collections.abc import Iterable
+from itertools import chain
 from pathlib import Path
 
 import numpy as np
@@ -46,8 +50,74 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
 
 def to_pil(rgb: np.ndarray, alpha: np.ndarray | None = None) -> Image.Image:
     """Convert to a Pillow image (RGB, or RGBA when `alpha` is given)."""
-    data = rgb if alpha is None else np.dstack([rgb, alpha])
-    return Image.fromarray((np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8))
+    return Image.fromarray(_to_uint8(rgb if alpha is None else np.dstack([rgb, alpha])))
+
+
+def _to_uint8(data: np.ndarray) -> np.ndarray:
+    return (np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+
+
+def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, max_side: int | None = None) -> int:
+    """Write `frames` (RGB images of one size) as a video or animation; the extension picks the format.
+
+    .mp4 / .mov: H.264 through ffmpeg, which must be installed; frames are streamed, so a long clip never has to
+    fit in memory. .gif: no extra tools, but every frame is held in memory and colours are limited to 256, so use it
+    for small, short clips. Returns the number of frames written.
+
+    `max_side` shrinks frames larger than that (longest side, in px) while keeping the aspect ratio: 1600 px square
+    needs an unusually high H.264 level that some players struggle with, 1080 is playable almost everywhere.
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix == ".gif":
+        images = [
+            to_pil(frame if max_side is None or max(frame.shape[:2]) <= max_side else resize(frame, max_side))
+            for frame in frames
+        ]
+        if not images:
+            raise ValueError("no frames to write")
+        images[0].save(path, save_all=True, append_images=images[1:], duration=round(1000 / fps), loop=0)
+        return len(images)
+    if suffix in {".mp4", ".mov"}:
+        return _save_with_ffmpeg(frames, path, fps, max_side)
+    raise ValueError(f"cannot write {suffix!r} videos: use .mp4, .mov or .gif")
+
+
+def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_side: int | None) -> int:
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("writing .mp4 needs ffmpeg on the PATH (brew install ffmpeg); .gif works without it")
+    frames = iter(frames)
+    first = next(frames, None)
+    if first is None:
+        raise ValueError("no frames to write")
+    height, width = first.shape[:2]
+    filters = "pad=ceil(iw/2)*2:ceil(ih/2)*2"  # H.264 in yuv420p needs even dimensions
+    if max_side is not None and max(height, width) > max_side:
+        shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
+        filters = f"{shrink},{filters}"
+    command = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
+        "-an", "-vf", filters,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "14", "-preset", "medium", "-movflags", "+faststart",
+        "-g", str(max(1, fps)),  # a keyframe every second: seekable, and one bad frame cannot spoil the rest
+        str(path),
+    ]  # fmt: skip
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    count = 0
+    try:
+        for frame in chain([first], frames):
+            process.stdin.write(_to_uint8(frame).tobytes())
+            count += 1
+    except BrokenPipeError:
+        pass  # ffmpeg stopped early; its error message below says why
+    finally:
+        process.stdin.close()
+    error = process.stderr.read().decode(errors="replace").strip()
+    if process.wait() != 0:
+        raise RuntimeError(f"ffmpeg failed: {error}")
+    return count
 
 
 def from_pil(img: Image.Image) -> np.ndarray:

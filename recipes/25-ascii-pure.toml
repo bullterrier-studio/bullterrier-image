@@ -1,0 +1,23 @@
+# Pure ASCII in the photo's own colours, small letters, nothing else.
+name = "ascii-pure"
+size = 1600                   # the photo's own resolution: small letters need the pixels
+
+[[step]]
+effect = "grade"
+saturation = 1.25            # keeps skin warm; brightness comes from the ascii step's gamma, not from exposure
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.5
+
+[[step]]
+effect = "ascii"
+cell = 4                     # small letters
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'   # 60 characters = many tonal steps
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"

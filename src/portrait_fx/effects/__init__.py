@@ -8,7 +8,7 @@ strongly one applies is decided by the recipe that calls it. Add one by writing 
 
 import numpy as np
 
-from . import ascii, color, glitch, texture  # noqa: F401  (importing registers their effects)
+from . import ascii, color, disperse, evaporate, glitch, texture  # noqa: F401  (importing registers their effects)
 from ._registry import all_effects, get
 
 

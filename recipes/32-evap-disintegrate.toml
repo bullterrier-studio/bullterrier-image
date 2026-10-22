@@ -1,0 +1,35 @@
+# Heavy: the whole outline and the top come apart, long plumes in every direction.
+name = "evap-disintegrate"
+size = 1600
+
+[[step]]
+effect = "grade"
+saturation = 1.25
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.5
+
+[[step]]
+effect = "ascii"
+cell = 5
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "evaporate"
+cell = 5                     # same as the ascii step, so whole characters fly away
+start = 0.5
+end = 0.22
+edge = 0.2
+outward = 0.7
+rise = 0.3
+wind = 0
+vanish = 0.45
+seed = 7

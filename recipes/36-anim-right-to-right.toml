@@ -1,0 +1,57 @@
+# Evaporation from the right to the right: everything goes, the picture ends empty.
+#
+# Choreography: the figure's whole outline starts to hover slowly; the right part is the first to let go, and a wind
+# front travels right to left across the picture. Every piece lets go when the front reaches it and is blown to the
+# right and upward at 30 degrees, through space the right side has already cleared.
+#
+# Motion design (the motion-design skill): a calm, elegant EXIT, so the Premium personality with the "gas" material
+# (slow, no overshoot). The front eases in and out only gently (a sine curve left a long still tail); the pieces' own exit accelerates.
+#   Primary:   the front and the pieces carried on the wind (never more than 1/3 of the picture's width).
+#   Secondary: the outline hovers first, each piece eases back a little before it goes (anticipation), and it glows
+#              briefly as it leaves.
+#   Ambient:   the pieces that stay shimmer in a slow wave, all through the clip, travelling left against the wind.
+# Narrative, 4.8 s: 0.5 s still (the shimmer is alive) / 4.0 s hovering, then the front and the flight, evenly paced / 0.3 s of black.
+name = "anim-right-to-right"
+size = 1600
+
+[animation]
+seconds = 4.8
+fps = 30
+hold_start = 0.5
+hold_end = 0.3
+
+[[step]]
+effect = "grade"
+saturation = 1.25
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.5
+
+[[step]]
+effect = "ascii"
+cell = 5
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "disperse"
+cell = 5
+progress = { from = 0.0, to = 0.88, ease = [0.25, 0.1, 0.75, 0.9] }   # a gentle S: soft ends, steady middle, so the motion never stalls
+clock = { from = 0.0, to = 4.8, over = "clip" }   # seconds; keep equal to `seconds` above
+ambient = 0.12
+sweep = -1.0                 # the front starts at the right edge and moves left...
+top = 0                      # ...and nothing else decides the order, so it is one clean wave
+edge = 0
+reach = 1.0
+wind = 0.3                   # ...while the pieces are blown right: at most 0.3 of the width, under the 1/3 rule
+angle = 30                   # 30 degrees above the horizontal
+hover = 0.25                  # the outline floats along that direction by this share of a piece's journey first
+outward = 0
+seed = 4

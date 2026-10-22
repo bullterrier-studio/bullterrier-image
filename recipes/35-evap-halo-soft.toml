@@ -1,0 +1,35 @@
+# The halo look with a shallower edge zone: the face stays clearly readable, the outline still sheds.
+name = "evap-halo-soft"
+size = 1600
+
+[[step]]
+effect = "grade"
+saturation = 1.25
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.5
+
+[[step]]
+effect = "ascii"
+cell = 5
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
+gamma = 0.6
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "evaporate"
+cell = 5                     # same as the ascii step, so whole characters fly away
+start = 0.4
+end = 0.16
+edge = 0.065
+outward = 0.5
+rise = 0.22
+wind = 0
+vanish = 0.35
+seed = 3
