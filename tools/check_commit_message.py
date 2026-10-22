@@ -25,6 +25,7 @@ The rules, each reported as `[rule-id] explanation: "offending line"`:
     body-max-line-length        a body line is longer than `body-max-line-length`. Exempt: a line that is a single URL,
                                 and a line indented by four spaces or a tab (a code block)
     breaking-change-description a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer without a description
+    message-unreadable          the message file is missing or is not UTF-8 text (`main` only)
 
 Accepted without validation: merge commits (`Merge ...`), `Revert "..."`, and `fixup!`, `squash!`, `amend!` commits,
 which git creates or rewrites itself. Trailers such as `Co-Authored-By:` need no special handling: they are ordinary
@@ -200,7 +201,12 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as error:
         print(f"commit-message: configuration error: {error}", file=sys.stderr)
         return 2
-    problems = check_message(arguments.message_file.read_text(encoding="utf-8"), config)
+    try:
+        message = arguments.message_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        problems = [_problem("message-unreadable", f"{arguments.message_file} cannot be read as UTF-8 text: {error}")]
+    else:
+        problems = check_message(message, config)
     if problems:
         print(_report(problems), file=sys.stderr)
         return 1

@@ -233,10 +233,21 @@ def test_main_uses_the_pyproject_it_is_pointed_at(tmp_path, capsys):
         "scope-pattern = '^a$'\n",  # types must be a list
         "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 0\nbody-max-line-length = 100\n"
         "scope-pattern = '^a$'\n",  # a limit must be a positive integer
+        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = true\nbody-max-line-length = 100\n"
+        "scope-pattern = '^a$'\n",  # TOML's true is not the number 1, although Python's bool is an int
         "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 72\nbody-max-line-length = 100\n"
         "scope-pattern = '['\n",  # not a regular expression
     ],
-    ids=["no table", "missing key", "unknown key", "misspelt key", "types not a list", "zero limit", "bad regex"],
+    ids=[
+        "no table",
+        "missing key",
+        "unknown key",
+        "misspelt key",
+        "types not a list",
+        "zero limit",
+        "boolean limit",
+        "bad regex",
+    ],  # fmt: skip
 )
 def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, capsys):
     pyproject = tmp_path / "pyproject.toml"
@@ -276,6 +287,28 @@ def test_main_rejects_an_empty_message_file(tmp_path, capsys):
     message.write_text("# only comments\n")
     assert checker.main([str(message)]) == 1
     assert "[empty-message]" in capsys.readouterr().err
+
+
+def test_a_boolean_limit_is_rejected_naming_the_key_and_the_value(tmp_path):
+    pyproject = write_pyproject(tmp_path / "pyproject.toml", **{"body-max-line-length": "true"})
+    with pytest.raises(checker.ConfigError, match=r"body-max-line-length .*True"):
+        checker.load_config(pyproject)
+
+
+@pytest.mark.parametrize(
+    ("content", "what"),
+    [(None, "missing"), (b"feat: add a caf\xe9 effect\n", "not UTF-8")],  # \xe9 is Latin-1, not valid UTF-8
+    ids=["missing file", "not UTF-8"],
+)
+def test_an_unreadable_message_file_is_rejected_with_a_rule_not_a_traceback(tmp_path, capsys, content, what):
+    message = tmp_path / "COMMIT_EDITMSG"
+    if content is not None:
+        message.write_bytes(content)
+    assert checker.main([str(message)]) == 1
+    err = capsys.readouterr().err
+    assert "[message-unreadable]" in err
+    assert "COMMIT_EDITMSG" in err  # names the file
+    assert "Traceback" not in err
 
 
 def test_the_real_pyproject_table_matches_what_the_checker_loaded():
