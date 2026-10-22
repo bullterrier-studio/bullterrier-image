@@ -10,6 +10,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "annotated-types>=0.8.0",
     "numpy>=2.5.4",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
@@ -31,6 +32,7 @@ wheel-exclude = ["photo_fx/effects/_template"]
 
 [dependency-groups]
 dev = [
+    "deptry>=0.25.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
     "poethepoet>=0.49.0",
@@ -47,7 +49,7 @@ dev = [
 [tool.poe.tasks]
 test = { cmd = "pytest -q", help = "Run the test suite" }
 fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
-check = { sequence = ["ruff format --check .", "ruff check .", "vulture", "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, dead code, types, tests); stops at the first failure" }
+check = { sequence = ["ruff format --check .", "ruff check .", "vulture", "deptry .", "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, dead code, dependencies, types, tests); stops at the first failure" }
 # `default_install_hook_types` in .pre-commit-config.yaml names the three hook types, so a bare `install` covers them
 setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"], default_item_type = "cmd", help = "Install the git hooks and the commit-message template (once per clone)" }
 
@@ -172,6 +174,19 @@ ignore_names = [
     "writeable",  # numpy's array flag: setting it makes a shared, cached array read-only
     "blend",  # `Step.blend`: public API (README, `fx`), called by users' scripts and never inside the package
 ]
+
+# Every import is declared, and only once in the right place (`uv run deptry .`, in `poe check`): a missing, unused,
+# transitive-only or development-only dependency fails. tests/ is not scanned (deptry's default): tests may use the
+# development tools.
+[tool.deptry]
+known_first_party = ["photo_fx"]
+# pyobjc is not installed off macOS, so deptry cannot read which module each framework provides: say it
+package_module_name_map = { "pyobjc-framework-quartz" = "Quartz", "pyobjc-framework-vision" = "Vision" }
+
+[tool.deptry.per_rule_ignores]
+# Foundation comes with pyobjc-framework-cocoa, which both declared pyobjc frameworks depend on (macOS only)
+DEP001 = ["Foundation"]
+DEP003 = ["Foundation"]
 
 # The layering rules of CLAUDE.md, checked by `uv run lint-imports` (tests/test_layering.py runs it, and proves each
 # contract fails on a forbidden import). Imports flow downward only. Wildcards keep the rules free of effect names, so
