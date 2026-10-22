@@ -88,7 +88,7 @@ def load_recipe(path: str | Path) -> Recipe:
     animation = _load_animation(raw["animation"], path.name) if "animation" in raw else None
     steps = []
     for i, entry in enumerate(raw.get("step", []), start=1):
-        where = f"{path.name}, step {i}"
+        where = f"{path.name}: step {i}"
         entry = dict(entry)
         name = entry.pop("effect", None)
         if name is None:

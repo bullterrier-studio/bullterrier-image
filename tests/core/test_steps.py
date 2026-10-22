@@ -1,6 +1,8 @@
 """A step's values are validated by its effect's parameter model, at once and over the whole animation; the recipe
 objects (Step, Recipe, Animated, Animation) are validated, frozen models wherever they are made."""
 
+import re
+
 import numpy as np
 import pytest
 
@@ -49,10 +51,28 @@ def test_a_narrow_overshoot_passes_the_steps_own_check_but_fails_the_recipe_at_t
         "amount = { from = 0, to = 1, ease = [0.95, 1.0, 1.0, 1.08] }\n"
     )
     frame = _first_frame_past_one(4, 30)
-    with pytest.raises(ValueError, match=r"narrow\.toml: step 2: effect 'split_tone': `amount` must be <= 1") as raised:
+    with pytest.raises(ValueError, match=r"narrow\.toml.*step 2.*split_tone.*`amount`.*\b1\b.*\b1\.00\d*") as raised:
         load_recipe(path)
-    assert f"frame {frame} " in str(raised.value)
-    assert f"{frame / 30:.2f} s" in str(raised.value)
+    message = str(raised.value)
+    assert re.search(rf"frame\D*\b{frame}\b", message)  # the frame that would break, by number
+    assert re.search(rf"\b{frame / 30:.1f}\d*", message)  # and its moment in the clip, in seconds
+
+
+def test_every_error_about_a_step_in_a_file_names_the_file_and_the_step_the_same_way(gain, tmp_path):
+    """A step's own check and the recipe's frame check report in one form, so a reader (or a tool) finds both alike."""
+    plain, framed = tmp_path / "plain.toml", tmp_path / "framed.toml"
+    plain.write_text("[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\ngain = 7.5\n")
+    framed.write_text(
+        "[animation]\nseconds = 4\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\n"
+        "gain = { from = 0, to = 4, ease = [0.95, 1.0, 1.0, 1.08] }\n"
+    )
+    prefixes = []
+    for path in (plain, framed):
+        with pytest.raises(ValueError, match=r"`gain`") as raised:
+            load_recipe(path)
+        prefixes.append(str(raised.value).split("`gain`")[0].replace(path.name, "FILE"))
+    assert "step 2" in prefixes[0]
+    assert prefixes[0] == prefixes[1]
 
 
 def test_a_recipe_whose_every_frame_is_valid_loads(gain):
@@ -164,14 +184,14 @@ def test_an_animation_that_overshoots_in_a_recipe_file_names_the_file_step_and_f
         "[animation]\nseconds = 2\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\n"
         "gain = { from = 0, to = 4, ease = [0.3, 1.6, 0.7, 1.0] }\n"
     )
-    with pytest.raises(ValueError, match=r"bouncy\.toml, step 2.*`gain`.*<= 4"):
+    with pytest.raises(ValueError, match=r"bouncy\.toml.*step 2.*`gain`.*\b4\b"):
         load_recipe(path)
 
 
 def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_value(gain, tmp_path):
     path = tmp_path / "hot.toml"
     path.write_text("[[step]]\neffect = 'gain_probe'\ngain = 7.5\n")
-    with pytest.raises(ValueError, match=r"hot\.toml, step 1: effect 'gain_probe'.*`gain`.*<= 4.*7\.5"):
+    with pytest.raises(ValueError, match=r"hot\.toml.*step 1.*gain_probe.*`gain`.*\b4\b.*7\.5"):
         load_recipe(path)
 
 
