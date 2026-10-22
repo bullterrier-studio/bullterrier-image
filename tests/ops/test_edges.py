@@ -403,3 +403,66 @@ def test_a_1600_by_1600_picture_is_processed_within_budget(method, budget_second
         detect_edges(picture, method)
         timings.append(time.process_time() - start)
     assert min(timings) < budget_seconds
+
+
+# --- canny on diagonal and curved edges (the suppression looks at a different neighbour pair for each direction) ----
+
+
+def diagonal_step(orientation, size=64):
+    """A 0|1 step along a 45 degree line, and each pixel's distance (px) from that line's geometric position."""
+    y, x = np.mgrid[0:size, 0:size].astype(np.float32)
+    if orientation == "anti-diagonal":  # bright where x + y >= size: the line runs from bottom-left to top-right
+        return (x + y >= size).astype(np.float32), np.abs(x + y - (size - 0.5)) / np.sqrt(2)
+    return (x - y >= 0).astype(np.float32), np.abs(x - y + 0.5) / np.sqrt(2)  # bright below-right of the main diagonal
+
+
+def components(mask):
+    return ndimage.label(mask, structure=np.ones((3, 3)))[1]
+
+
+@pytest.mark.parametrize("orientation", ["anti-diagonal", "main-diagonal"])
+def test_canny_traces_a_45_degree_step_as_one_unbroken_thin_line_on_the_true_edge(orientation):
+    picture, distance = diagonal_step(orientation)
+    on = detect_edges(picture, "canny").magnitude > 0
+    inner = np.zeros_like(on)
+    inner[8:56, 8:56] = True  # away from the picture corners where the step meets the border
+    kept = on & inner
+
+    assert distance[kept].max() <= 1.0  # on the geometric edge, not beside it
+    assert components(kept) == 1  # one unbroken line
+    assert kept[8:56].any(axis=1).all()  # a pixel in every row ...
+    assert kept[:, 8:56].any(axis=0).all()  # ... and every column crosses the edge
+    assert kept[8:56].sum(axis=1).max() <= 2  # at most two pixels thick
+    assert kept[:, 8:56].sum(axis=0).max() <= 2
+
+
+def test_canny_traces_a_disc_outline_as_one_closed_thin_ring_on_the_true_circle():
+    y, x = np.mgrid[0:64, 0:64].astype(np.float32)
+    radius = np.hypot(x - 31.5, y - 31.5)
+    on = detect_edges((radius <= 20).astype(np.float32), "canny").magnitude > 0
+
+    assert np.abs(radius[on] - 20.5).max() <= 1.5  # every kept pixel lies on the outline
+    assert components(on) == 1
+    angle = np.degrees(np.arctan2(y - 31.5, x - 31.5))
+    for start in range(-180, 180, 5):  # no gap in any 5 degree wedge of the ring: the diagonal arcs included
+        wedge = on & (angle >= start) & (angle < start + 5)
+        assert wedge.any(), f"gap in the outline between {start} and {start + 5} degrees"
+        assert np.ptp(radius[wedge]) <= 1.5  # and the ring is at most about two pixels thick there
+    assert on.sum() <= 1.5 * 2 * np.pi * 20.5  # about one pixel of line per pixel of circumference
+
+
+@pytest.mark.parametrize("bright_side", ["bright-after", "bright-before"])
+@pytest.mark.parametrize(("axis", "expected"), [("main", {0, 1}), ("anti", {62, 63})])
+def test_canny_gives_a_tie_to_the_pixel_that_comes_first_in_reading_order(axis, expected, bright_side):
+    # A grey one-pixel diagonal between a dark and a bright side: the pixels on either side of it have exactly equal
+    # gradients and are each other's neighbours across the edge, so only one may stay. Reading order (upper row first,
+    # then left) names the winner: for x - y the pair is d = -1 / +1 and +1 is up-right; for x + y it is s = 62 / 64
+    # and 62 is up-left. Each pair is a different diagonal sector of the suppression, so this pins both offsets.
+    y, x = np.mgrid[0:64, 0:64]
+    line = x - y if axis == "main" else x + y
+    middle = 0 if axis == "main" else 63
+    dark_side = line < middle if bright_side == "bright-after" else line > middle
+    picture = np.where(line == middle, 0.5, np.where(dark_side, 0.0, 1.0)).astype(np.float32)
+    on = detect_edges(picture, "canny", sigma=0.01).magnitude > 0
+    interior = (y > 8) & (y < 56) & (x > 8) & (x < 56)
+    assert set(line[on & interior]) == expected
