@@ -173,3 +173,11 @@ def test_disperse_seed_changes_the_motion_and_repeats_exactly():
     a = effects.apply("disperse", _lit(), progress=0.5, seed=1)
     np.testing.assert_array_equal(a, effects.apply("disperse", _lit(), progress=0.5, seed=1))
     assert not np.array_equal(a, effects.apply("disperse", _lit(), progress=0.5, seed=2))
+
+
+def test_the_disperse_effects_are_in_their_categories():
+    """disperse: where the effect catalogue lists them."""
+    expected = {
+        "disperse": "animation",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

@@ -41,3 +41,11 @@ def test_glitch_ascii_photo_keeps_strip_detail(photo):
     over = effects.apply("glitch", photo, seed=3, ascii_share=1.0, ascii_cell=6, ascii_photo=1.0)
     plain = effects.apply("glitch", photo, seed=3)
     assert np.abs(over - plain).mean() < np.abs(flat - plain).mean()
+
+
+def test_the_glitch_effects_are_in_their_categories():
+    """glitch: where the effect catalogue lists them."""
+    expected = {
+        "glitch": "glitch",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

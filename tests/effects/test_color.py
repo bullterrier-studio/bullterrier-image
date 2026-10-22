@@ -67,3 +67,16 @@ def test_grade_exposure_one_stop_doubles_brightness():
 
 def test_clarity_zero_amount_is_identity(photo):
     np.testing.assert_allclose(effects.apply("clarity", photo, amount=0.0), photo, atol=1e-6)
+
+
+def test_the_color_effects_are_in_their_categories():
+    """clarity, fill, grade, gradient_map, hue_shift, split_tone: where the effect catalogue lists them."""
+    expected = {
+        "fill": "subject",
+        "grade": "colour",
+        "clarity": "light",
+        "gradient_map": "colour",
+        "split_tone": "colour",
+        "hue_shift": "colour",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

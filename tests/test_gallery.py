@@ -1,6 +1,13 @@
-import re
-import sys
+"""The generated effect catalogue: docs/effects.md, the gallery pictures, `photo-fx gallery` and `photo-fx regenerate`.
 
+These tests build their own effects (throwaway or in a fresh registry) and their own example recipes, so they do not
+depend on which real effects exist or how they are documented.
+"""
+
+import io
+import re
+
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -27,49 +34,39 @@ def _unescaped_pipes(row: str) -> int:
 # --- the effects page --------------------------------------------------------------------------------------------
 
 
-def test_the_effects_page_has_one_section_per_used_category_in_catalogue_order():
-    headings = list(_sections(gallery.render_effects_page()))
-    used = {effects.category(name).capitalize() for name in effects.describe()}
-    assert set(headings) == used  # a category without effects gets no empty table
-    assert headings == [c.capitalize() for c in effects.CATEGORIES if c.capitalize() in used]
-    assert headings.index("Colour") < headings.index("Light") < headings.index("Animation")
+def test_the_effects_page_has_one_section_per_used_category_in_catalogue_order(fresh_registry, register_probe):
+    for name, category in [("drift", "animation"), ("tint", "colour"), ("lamp", "light")]:
+        register_probe(name, category)  # registered in another order than the catalogue's
+    assert list(_sections(gallery.render_effects_page())) == ["Colour", "Light", "Animation"]
 
 
-def test_a_category_appears_on_the_page_once_it_has_an_effect(throwaway_effects):
-    empty = next((c for c, names in effects.categories().items() if not names), None)
-    if empty is None:
-        pytest.skip("every category has an effect")
-    assert empty.capitalize() not in _sections(gallery.render_effects_page())
-
-    @effect(category=empty)
-    def newcomer(rgb, amount: float = 0.5):
-        """The first effect of its category."""
-        return rgb
-
-    assert "`newcomer`" in _sections(gallery.render_effects_page())[empty.capitalize()]
+def test_a_category_appears_on_the_page_once_it_has_an_effect(fresh_registry, register_probe):
+    register_probe("lamp", "light")
+    assert "Distortion" not in _sections(gallery.render_effects_page())  # no empty table
+    register_probe("swirl", "distortion")
+    assert "`swirl`" in _sections(gallery.render_effects_page())["Distortion"]
 
 
-def test_every_effect_is_listed_once_in_its_own_category_section():
+def test_every_real_effect_is_listed_once_in_its_own_category_section():
     sections = _sections(gallery.render_effects_page())
     for name in effects.describe():
         homes = [heading for heading, text in sections.items() if f"`{name}`" in text]
         assert homes == [effects.category(name).capitalize()], name
 
 
-def test_an_effects_row_has_its_picture_summary_parameters_and_recipe():
-    row = _row(gallery.render_effects_page(), "glow")
-    assert 'src="gallery/glow.jpg"' in row
-    assert "Soft bloom around the bright parts." in row
-    assert "`radius=24.0`" in row and "`amount=0.6`" in row and "`threshold=0.55`" in row
-    assert "](../examples/effects/glow.toml)" in row
+def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_registry):
+    @effect(category="light")
+    def row_probe(rgb, radius: float = 24.0, chars: str = " .:", fg: str | None = None, matte=None):
+        """Softly probes the bright parts. Then says more."""
+        return rgb
+
+    row = _row(gallery.render_effects_page(), "row_probe")
+    assert 'src="gallery/row_probe.jpg"' in row
+    assert "| Softly probes the bright parts. |" in row  # the first sentence only
+    assert "`radius=24.0` `chars=' .:'` `fg=None`" in row  # what a recipe sets, in order, with defaults
+    assert "rgb" not in row and "matte" not in row  # the recipe supplies the image and the cut-out itself
+    assert "[row_probe.toml](../examples/effects/row_probe.toml)" in row
     assert _unescaped_pipes(row) == 6  # five columns
-
-
-def test_the_parameters_shown_are_the_ones_a_recipe_sets():
-    page = gallery.render_effects_page()
-    assert "`cell=10`" in _row(page, "ascii") and "`chars=' .:-=+*#%@'`" in _row(page, "ascii")
-    assert "rgb=" not in page  # the image is not a parameter
-    assert "matte=" not in _row(page, "evaporate")  # the recipe supplies the cut-out itself
 
 
 def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
@@ -87,36 +84,71 @@ def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
 # --- the gallery pictures ----------------------------------------------------------------------------------------
 
 
-def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path):
-    with pytest.raises(ValueError, match=r"unknown effect 'nope'.*available: .*glow"):
-        gallery.render_gallery(tmp_path / "out", only=["glow", "nope"])
+@pytest.fixture
+def probe(tmp_path, monkeypatch, throwaway_effects):
+    """A throwaway effect with an example recipe of its own in a scratch examples folder. It needs no cut-out, so it
+    renders anywhere. Its recipe renders at 300 px, to show the gallery picture is 480 px whatever the recipe says."""
+
+    @effect(category="utilities")
+    def gallery_probe(rgb, amount: float = 0.5):
+        """Darkens the picture."""
+        return (rgb * amount).astype(np.float32)
+
+    examples = tmp_path / "examples"
+    examples.mkdir()
+    (examples / "gallery_probe.toml").write_text(
+        'name = "gallery_probe"\nsize = 300\n[[step]]\neffect = "gallery_probe"\n'
+    )
+    monkeypatch.setattr(gallery, "EXAMPLES", examples)
+    return "gallery_probe"
+
+
+def _quantization(source) -> dict:
+    with Image.open(source) as picture:
+        return picture.quantization
+
+
+def _jpeg_tables(quality: int) -> dict:
+    """The quantization tables Pillow writes for `quality`: they identify the quality setting of a JPEG."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (16, 16), (90, 120, 150)).save(buffer, "JPEG", quality=quality)
+    return _quantization(buffer)
+
+
+def test_gallery_renders_missing_pictures_only_unless_forced(tmp_path, probe):
+    out = tmp_path / "out"
+    assert gallery.render_gallery(out, only=[probe]) == [probe]
+    first = (out / f"{probe}.jpg").read_bytes()
+    (out / f"{probe}.jpg").write_bytes(b"placeholder")
+    assert gallery.render_gallery(out, only=[probe]) == []  # it exists, so it is left alone
+    assert (out / f"{probe}.jpg").read_bytes() == b"placeholder"
+    assert gallery.render_gallery(out, only=[probe], force=True) == [probe]
+    assert (out / f"{probe}.jpg").read_bytes() == first  # rendered again, and rendering is deterministic
+
+
+def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(tmp_path, probe):
+    gallery.render_gallery(tmp_path, only=[probe])
+    with Image.open(tmp_path / f"{probe}.jpg") as picture:
+        assert picture.format == "JPEG" and max(picture.size) == 480  # from a 300 px recipe
+    assert _jpeg_tables(82) != _jpeg_tables(90)  # the tables do tell qualities apart
+    assert _quantization(tmp_path / f"{probe}.jpg") == _jpeg_tables(82)
+
+
+def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path, probe):
+    with pytest.raises(ValueError, match=r"unknown effect 'nope'.*available: .*gallery_probe"):
+        gallery.render_gallery(tmp_path / "out", only=[probe, "nope"])
     assert not (tmp_path / "out").exists()
 
 
-def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, throwaway_effects):
+def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, probe):
     @effect(category="utilities")
     def recipe_less(rgb, amount: float = 0.5):
         """Has no example recipe."""
         return rgb
 
-    with pytest.raises(FileNotFoundError, match=r"examples/effects/recipe_less\.toml"):
-        gallery.render_gallery(tmp_path / "out", only=["glow", "recipe_less"])
+    with pytest.raises(FileNotFoundError, match=r"recipe_less\.toml"):
+        gallery.render_gallery(tmp_path / "out", only=[probe, "recipe_less"])
     assert not (tmp_path / "out").exists()
-
-
-@pytest.mark.skipif(
-    sys.platform != "darwin", reason="the example recipes cut out the subject, which needs Apple Vision"
-)
-def test_gallery_renders_missing_pictures_only_unless_forced(tmp_path):
-    assert gallery.render_gallery(tmp_path, only=["glow"]) == ["glow"]
-    with Image.open(tmp_path / "glow.jpg") as picture:
-        assert picture.format == "JPEG" and max(picture.size) == 480
-    first = (tmp_path / "glow.jpg").read_bytes()
-    (tmp_path / "glow.jpg").write_bytes(b"placeholder")
-    assert gallery.render_gallery(tmp_path, only=["glow"]) == []  # it exists, so it is left alone
-    assert (tmp_path / "glow.jpg").read_bytes() == b"placeholder"
-    assert gallery.render_gallery(tmp_path, only=["glow"], force=True) == ["glow"]
-    assert (tmp_path / "glow.jpg").read_bytes() == first  # rendering is deterministic
 
 
 # --- writing everything: `photo-fx gallery` and `photo-fx regenerate` --------------------------------------------
@@ -148,7 +180,18 @@ def test_the_gallery_command_writes_the_page_too(docs, capsys):
     assert not (docs / "fx.pyi").exists()
 
 
-def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs, capsys):
-    assert main(["gallery", "--only", "glow", "nope"]) == 1
+def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(probe, docs, capsys):
+    picture = docs / "gallery" / f"{probe}.jpg"
+    assert picture.read_bytes() == b"existing"
+    assert main(["gallery", "--only", probe]) == 0
+    assert picture.read_bytes() == b"existing"  # kept
+    assert main(["gallery", "--only", probe, "--force"]) == 0
+    with Image.open(picture) as rendered:
+        assert rendered.format == "JPEG"  # rendered again
+    assert str(picture) in capsys.readouterr().out.split()
+
+
+def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(probe, docs, capsys):
+    assert main(["gallery", "--only", probe, "nope"]) == 1
     assert "unknown effect 'nope'" in capsys.readouterr().err
     assert not (docs / "effects.md").exists()

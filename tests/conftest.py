@@ -2,7 +2,32 @@ import numpy as np
 import pytest
 
 from photo_fx import effects
+from photo_fx.effects import _registry
 from photo_fx.effects._registry import unregister
+
+
+@pytest.fixture
+def fresh_registry(monkeypatch):
+    """An empty effect registry for one test, so it can build exactly the effects and categories it needs, whatever
+    real effects exist. The real registry comes back afterwards, untouched."""
+    monkeypatch.setattr(_registry, "_EFFECTS", {})
+    monkeypatch.setattr(_registry, "_CATEGORY", {})
+
+
+@pytest.fixture
+def register_probe():
+    """`register_probe(name, category)` registers a do-nothing effect with that name. Use it inside `fresh_registry`
+    or `throwaway_effects`, which remove it again."""
+
+    def register(name: str, category: str = "utilities") -> None:
+        def probe(rgb, amount: float = 0.5):
+            return rgb
+
+        probe.__name__ = probe.__qualname__ = name
+        probe.__doc__ = f"The {name} probe."
+        _registry.effect(category=category)(probe)
+
+    return register
 
 
 @pytest.fixture

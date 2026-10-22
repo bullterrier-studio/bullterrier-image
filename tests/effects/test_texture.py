@@ -28,3 +28,13 @@ def test_halftone_white_is_nearly_all_dots_and_black_is_blank():
     white, black = np.ones((64, 64, 3), np.float32), np.zeros((64, 64, 3), np.float32)
     assert effects.apply("halftone", white, fg="#ffffff").mean() > 0.9
     assert effects.apply("halftone", black, fg="#ffffff").mean() < 0.01
+
+
+def test_the_texture_effects_are_in_their_categories():
+    """glow, grain, halftone: where the effect catalogue lists them."""
+    expected = {
+        "halftone": "stylised",
+        "glow": "light",
+        "grain": "texture",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

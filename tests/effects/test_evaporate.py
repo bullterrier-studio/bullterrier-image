@@ -125,3 +125,11 @@ def test_evaporate_wind_pushes_the_pieces_sideways():
     columns = np.arange(200)
     centre = lambda img: float((img.max(axis=(0, 2)) * columns).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731
     assert centre(right) > centre(left)
+
+
+def test_the_evaporate_effects_are_in_their_categories():
+    """evaporate: where the effect catalogue lists them."""
+    expected = {
+        "evaporate": "animation",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

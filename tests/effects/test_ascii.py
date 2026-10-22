@@ -48,3 +48,11 @@ def test_ascii_photo_keeps_the_picture_visible_behind_the_text(photo):
 def test_cell_size_matches_the_grid_ascii_draws_on():
     cell_w, cell_h = cell_size(8)
     assert _glyph_atlas(" .:", 8, None).shape[1:] == (cell_h, cell_w)
+
+
+def test_the_ascii_effects_are_in_their_categories():
+    """ascii: where the effect catalogue lists them."""
+    expected = {
+        "ascii": "text",
+    }
+    assert {name: effects.category(name) for name in expected} == expected

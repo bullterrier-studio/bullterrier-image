@@ -42,8 +42,9 @@ def test_every_effect_documents_itself(name):
     assert effects.describe()[name]
 
 
-def test_unknown_effect_lists_choices(photo):
-    with pytest.raises(KeyError, match="ascii"):
+def test_unknown_effect_lists_choices(photo, fresh_registry, register_probe):
+    register_probe("listed_probe")
+    with pytest.raises(KeyError, match="unknown effect 'nope'; available: listed_probe"):
         effects.apply("nope", photo)
 
 
@@ -166,26 +167,6 @@ def test_a_new_module_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
 # --- categories --------------------------------------------------------------------------------------------------
 
 
-def test_the_original_effects_keep_their_categories():
-    """The 13 effects that existed before categories; effects added later are free to join any category."""
-    migrated = {
-        "grade": "colour",
-        "gradient_map": "colour",
-        "split_tone": "colour",
-        "hue_shift": "colour",
-        "clarity": "light",
-        "glow": "light",
-        "grain": "texture",
-        "halftone": "stylised",
-        "ascii": "text",
-        "glitch": "glitch",
-        "fill": "subject",
-        "evaporate": "animation",
-        "disperse": "animation",
-    }
-    assert {name: effects.category(name) for name in migrated} == migrated
-
-
 def test_the_categories_are_exactly_the_agreed_slugs_in_order():
     assert effects.CATEGORIES == (
         "colour", "light", "texture", "stylised", "text", "distortion", "glitch", "atmosphere", "subject",
@@ -193,28 +174,27 @@ def test_the_categories_are_exactly_the_agreed_slugs_in_order():
     )  # fmt: skip
 
 
-def test_categories_maps_every_category_in_order_to_its_sorted_effects():
+def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_registry, register_probe):
+    for name, category in [("zeta", "animation"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
+        register_probe(name, category)  # registered out of order, on purpose
+    expected = {category: [] for category in effects.CATEGORIES}
+    expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
+    assert effects.categories() == expected
+    assert list(effects.categories()) == list(effects.CATEGORIES)  # dict order is the catalogue order
+
+
+def test_categories_lists_a_category_with_no_effects_as_empty(fresh_registry, register_probe):
+    register_probe("lamp", "light")
+    assert effects.categories()["distortion"] == []  # listed, although it has nothing yet
+    register_probe("swirl", "distortion")
+    assert effects.categories()["distortion"] == ["swirl"]
+
+
+def test_the_real_effects_are_each_in_exactly_one_category():
     grouped = effects.categories()
-    assert list(grouped) == list(effects.CATEGORIES)  # every category, even one with no effect yet
+    assert list(grouped) == list(effects.CATEGORIES)
+    assert sorted(name for names in grouped.values() for name in names) == ALL
     assert all(names == sorted(names) for names in grouped.values())
-    assert sorted(name for names in grouped.values() for name in names) == ALL  # each effect exactly once
-    colour = grouped["colour"]
-    assert {"grade", "gradient_map", "hue_shift", "split_tone"} <= set(colour)
-    assert colour.index("grade") < colour.index("gradient_map") < colour.index("hue_shift")  # sorted by name
-
-
-def test_categories_lists_a_category_with_no_effects_as_empty(throwaway_effects):
-    empty = next((c for c, names in effects.categories().items() if not names), None)
-    if empty is None:
-        pytest.skip("every category has an effect")
-    assert effects.categories()[empty] == []
-
-    @effect(category=empty)
-    def newcomer(rgb, amount: float = 0.5):
-        """The first effect of its category."""
-        return rgb
-
-    assert effects.categories()[empty] == ["newcomer"]
 
 
 def _probe(rgb, amount: float = 0.5):
@@ -309,18 +289,29 @@ def test_registering_the_same_function_twice_is_allowed(throwaway_effects):
     assert effects.get("_probe") is _probe
 
 
-def test_reloading_an_effects_module_is_not_a_duplicate():
-    before = effects.get("grade")
-    color = importlib.reload(importlib.import_module("photo_fx.effects.color"))
-    assert effects.get("grade") is color.grade and color.grade is not before  # the reloaded function replaced it
+def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, throwaway_effects):
+    (tmp_path / "reload_probe_module.py").write_text(
+        "from photo_fx.effects._registry import effect\n\n"
+        '@effect(category="utilities")\n'
+        'def reload_probe(rgb, amount: float = 0.5):\n    """Reloaded."""\n    return rgb\n'
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "reload_probe_module", raising=False)  # and removed again afterwards
+    first = importlib.import_module("reload_probe_module").reload_probe
+    reloaded = importlib.reload(sys.modules["reload_probe_module"]).reload_probe
+    assert reloaded is not first and effects.get("reload_probe") is reloaded  # replaced, not rejected
 
 
 # --- summary -----------------------------------------------------------------------------------------------------
 
 
-def test_summary_is_the_first_sentence_of_the_docstring():
-    assert effects.summary("grade") == "Basic tone controls."
-    assert effects.summary("fill") == "Replace the whole picture with one colour."
+def test_summary_is_the_first_sentence_of_the_docstring(fresh_registry):
+    @effect(category="utilities")
+    def plain(rgb, amount: float = 0.5):
+        """Basic probe controls. Then a second sentence."""
+        return rgb
+
+    assert effects.summary("plain") == "Basic probe controls."
 
 
 def test_summary_is_the_first_sentence_even_with_decimals_and_abbreviations(throwaway_effects):

@@ -99,7 +99,7 @@ def _chosen(only: Sequence[str]) -> list[str]:
         raise FileNotFoundError(f"{EXAMPLES} does not exist: this needs a source checkout of photo-fx")
     missing = [EXAMPLES / f"{name}.toml" for name in names if not (EXAMPLES / f"{name}.toml").is_file()]
     if missing:
-        raise FileNotFoundError(f"no example recipe: add {', '.join(str(p.relative_to(_ROOT)) for p in missing)}")
+        raise FileNotFoundError(f"no example recipe: add {', '.join(map(str, missing))}")
     return names
 
 
