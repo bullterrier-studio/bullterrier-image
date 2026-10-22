@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from photo_fx import Recipe, Step, load_recipe, render, render_all
+from photo_fx import Recipe, Step, load_recipe, render, render_all, trace
 from photo_fx.matte import _refine_edge
 from photo_fx.runner import render_frames
 from photo_fx.timing import Animated, Animation
@@ -174,7 +174,18 @@ def test_exit_and_entrance_curves_accelerate_and_decelerate():
     assert Animated(0, 1, "accelerate").at(0.3) < 0.3 < Animated(0, 1, "decelerate").at(0.3)
 
 
-@pytest.mark.parametrize("ease", ["[0.4, 0.0, 0.2]", "[1.5, 0.0, 0.2, 1.0]", '"wobbly"', '[0.4, 0.0, "x", 1.0]'])
+@pytest.mark.parametrize(
+    "ease",
+    [
+        "[0.4, 0.0, 0.2]",
+        "[1.5, 0.0, 0.2, 1.0]",
+        "[0.4, 0.0, 1.5, 1.0]",  # x2 out of 0..1, like x1 above
+        "[0.4, 0.0, -0.1, 1.0]",
+        "[-0.1, 0.0, 0.2, 1.0]",
+        '"wobbly"',
+        '[0.4, 0.0, "x", 1.0]',
+    ],
+)
 def test_bad_easing_is_rejected_when_loading(tmp_path, ease):
     text = ANIMATED.replace('ease = "in-out"', f"ease = {ease}")
     with pytest.raises(ValueError, match="step 1.*exposure"):
@@ -219,6 +230,22 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
     assert len(frames) == 20 and calls.count("grain") == 1 and calls.count("grade") == 20
     np.testing.assert_allclose(frames[0], render(photo, r, at=0.0), atol=1e-6)
     assert effects_apply is real
+
+
+def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatch(photo, throwaway_effects):
+    from photo_fx.effects._registry import effect
+
+    @effect(category="utilities")
+    def halve_for_shape_test(rgb, amount: float = 0.5):
+        return rgb[::2, ::2]
+
+    recipe = Recipe("shapeshift", (Step("halve_for_shape_test"),), size=None)
+    with pytest.raises(
+        RuntimeError, match=r"halve_for_shape_test.*changed the image shape \(96, 128, 3\) -> \(48, 64, 3\)"
+    ):
+        render(photo, recipe)
+    with pytest.raises(RuntimeError, match="changed the image shape"):
+        trace(photo, recipe)
 
 
 def test_render_frames_needs_an_animated_recipe(photo):

@@ -30,9 +30,10 @@ without the stub; rendering needs the subject cut-out, so macOS.)
 
 ## 1. The shared contract
 
-These change how recipes run, and all of them pass through `recipe.py` (396 lines mixing easing, the step model, TOML
-loading and running). **Do them one at a time**, after splitting that file into timing, steps, loading and running, so that
-they touch different files.
+These change how recipes run, and all of them pass through the recipe modules. `recipe.py` (396 lines mixing easing, the
+step model, TOML loading and running) has been split (**done**) into `timing.py`, `steps.py`, `loader.py` and `runner.py`
+(`recipe.py` stays as the public namespace), so that each step below touches different files. **Do them one at a time.**
+`tests/test_module_graph.py` enforces which of these modules may import which.
 
 1. **Inputs beyond the image.** Generalise today's `matte` into declared inputs injected by name: `matte`, then `edges`, `depth`, `saliency`, assets. One protocol; later effects only declare what they need.
 2. **Masks and blend modes on the step.** `blend = "multiply"`; masks beyond subject and background (luminance, highlights, shadows, edges, gradient), invertible and feathered. Effects stay unaware of both.
@@ -101,7 +102,7 @@ An effect is done when:
 
 1. **Section 0**, all of it. It is the only thing that has to come before everything else.
 2. **In parallel** with each other:
-   - split `recipe.py`, then contract steps 1 and 2, one after the other;
+   - ~~split `recipe.py`~~ (done), then contract steps 1 and 2, one after the other;
    - the toolbox modules, each as its own task, starting with `colorspace`, `noise`, `edges`, `warp`;
    - two streams that need nothing, to prove the workflow: Colour and tone (the "now" group) and Glitch and signal.
 3. The remaining streams as their toolbox modules land. Presets last.

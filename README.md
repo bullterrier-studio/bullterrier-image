@@ -294,7 +294,11 @@ src/photo_fx/
   matte.py       subject_matte(rgb) -> alpha. Which model finds the subject is hidden here
   effects/       the effect library: pure functions (rgb, **params) -> rgb
   fx.py          the effects as validated step builders for Python (+ generated fx.pyi)
-  recipe.py      Step / Recipe, TOML loading, render, render_frames, trace, animation timing
+  timing.py      easing, `ramp` / `Animated`, `Animation`: values changing over a clip
+  steps.py       `Step` and `Recipe`: the data model of a look and its validation
+  loader.py      `load_recipe`: the TOML format
+  runner.py      render, render_frames, render_all, trace: running a recipe on a photo
+  recipe.py      the public namespace re-exporting the four above
   pipeline.py    many photos x many recipes: cache, checks, export, report
   checks.py      automatic quality checks
   sheet.py       contact sheets and step sheets
