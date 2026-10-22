@@ -58,7 +58,7 @@ never `strength`, `intensity`, `factor`, `val`, `k`. A misspelt or out-of-range 
 
 ## Lint and types
 
-`ruff` (rules in `pyproject.toml`) wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI. `mypy` type-checks `src` and `tests`. Fix a finding properly; for a false positive write a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`: a bare or unused one fails the gate. Tests may not reach private names (`SLF001`, `PLC2701`), except architecture tests, with a reason.
+`ruff` (rules in `pyproject.toml`) wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI. `mypy` type-checks `src` and `tests` (not the generated `fx.pyi`, so a misspelt `fx.<effect>` or parameter name is only caught at run time). Fix a finding properly; for a false positive write a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`: a bare or unused one fails the gate. Tests may not reach private names (`SLF001`, `PLC2701`), except architecture tests, with a reason.
 
 ## Testing
 
