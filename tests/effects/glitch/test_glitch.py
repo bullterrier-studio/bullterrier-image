@@ -109,7 +109,7 @@ def _all_text(picture: np.ndarray, cell: int, **params: object) -> np.ndarray:
 def test_the_text_palette_ink_and_paper_are_the_ones_given() -> None:
     width, height = cell_size(8)
     white = np.ones((2 * height, 3 * width, 3), np.float32)
-    out = _all_text(white, 8, ascii_chars=". ", ascii_fg="#ff0000", ascii_bg="#000000")
+    out = _all_text(white, 8, ascii_chars=". ", ascii_ink="#ff0000", ascii_paper="#000000")
     dot = np.tile(glyph_atlas(" .", 8, None)[-1], (2, 3))  # white on black paper: the densest of the palette
     np.testing.assert_allclose(out[..., 0], dot, atol=1e-6)
     assert out[..., 1:].max() == 0.0  # red ink on black paper, no green or blue
@@ -117,7 +117,7 @@ def test_the_text_palette_ink_and_paper_are_the_ones_given() -> None:
 
 def test_a_dark_strip_on_dark_paper_is_the_paper_colour() -> None:
     black = np.zeros((40, 50, 3), np.float32)
-    out = _all_text(black, 5, ascii_bg="#336699")
+    out = _all_text(black, 5, ascii_paper="#336699")
     np.testing.assert_allclose(out, np.broadcast_to([0x33 / 255, 0x66 / 255, 0x99 / 255], out.shape), atol=1e-6)
 
 

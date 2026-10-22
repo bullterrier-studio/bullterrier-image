@@ -10,7 +10,7 @@ from scipy import ndimage
 from photo_fx import effects
 
 NAME = "halftone"
-WHITE_ON_BLACK = {"fg": "#ffffff", "bg": "#000000"}
+WHITE_ON_BLACK = {"ink": "#ffffff", "paper": "#000000"}
 
 
 def flat(value: float, size: int = 200) -> np.ndarray:
@@ -35,7 +35,7 @@ def test_white_is_nearly_all_dots_and_black_is_blank() -> None:
     ids=["black on dark paper", "white on light paper"],
 )
 def test_where_no_ink_is_needed_the_paper_shows_exactly(picture: float, ink: str, paper: tuple[int, int, int]) -> None:
-    out = effects.apply(NAME, flat(picture, 64), fg=ink, bg="#{:02x}{:02x}{:02x}".format(*paper))
+    out = effects.apply(NAME, flat(picture, 64), ink=ink, paper="#{:02x}{:02x}{:02x}".format(*paper))
     np.testing.assert_array_equal(out, np.broadcast_to(np.array(paper, np.float32) / 255, out.shape))
 
 
@@ -79,20 +79,20 @@ def test_ink_is_proportional_to_tone_while_the_dots_do_not_touch() -> None:
 
 
 def test_on_a_light_background_dark_tones_get_the_ink() -> None:
-    black_ink_on_white = {"fg": "#000000", "bg": "#ffffff"}
+    black_ink_on_white = {"ink": "#000000", "paper": "#ffffff"}
     assert effects.apply(NAME, flat(1.0, 64), **black_ink_on_white).min() == 1.0  # white needs no ink
     assert effects.apply(NAME, flat(0.0, 64), **black_ink_on_white).mean() < 0.1  # black is nearly all ink
 
 
-def test_with_fg_every_pixel_is_a_mix_of_the_ink_and_the_paper(photo: np.ndarray) -> None:
+def test_with_one_ink_every_pixel_is_a_mix_of_the_ink_and_the_paper(photo: np.ndarray) -> None:
     ink, paper = np.array([1.0, 0.5, 0.0], np.float32), np.array([0.0, 0.0, 0.25], np.float32)
-    out = effects.apply(NAME, photo, cell=6, fg="#ff8000", bg="#000040")
+    out = effects.apply(NAME, photo, cell=6, ink="#ff8000", paper="#000040")
     share = out[..., 0]  # the red channel goes from paper (0) to ink (1): it is the share of ink
     np.testing.assert_allclose(out, paper + share[..., None] * (ink - paper), atol=2e-3)  # colours as bytes
     assert 0.0 < share.mean() < 1.0
 
 
-def test_without_fg_the_dots_take_the_photo_colour_never_darker() -> None:
+def test_without_an_ink_the_dots_take_the_photo_colour_never_darker() -> None:
     red = np.zeros((64, 64, 3), np.float32)
     red[..., 0] = 0.8
     out = effects.apply(NAME, red, cell=8)

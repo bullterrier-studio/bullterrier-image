@@ -15,7 +15,7 @@ amount = 0.6
 [[step]]
 effect = "ascii"
 cell = 5
-fg = "#00ff9c"
+ink = "#00ff9c"
 gamma = 0.85
 
 [[step]]

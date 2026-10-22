@@ -6,7 +6,7 @@ size = 480
 effect = "halftone"
 cell = 7
 angle = 45
-fg = "#fff1de"
+ink = "#fff1de"
 
 [[step]]
 effect = "fill"

@@ -30,12 +30,12 @@ class HalftoneParams(EffectParams):
         "x axis (negative = above). The grid is square, so 90 degrees on looks the same; 45 is the classic screen "
         "angle for one ink.",
     )
-    fg: Color | None = param(
+    ink: Color | None = param(
         None,
         doc="The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave it out to give each "
         "dot the colour of the photo under it, brightened so small dots stay visible.",
     )
-    bg: Color = param(
+    paper: Color = param(
         "#000000",
         doc="The paper colour between the dots. On a dark paper bright tones get the ink; on a light one, dark tones.",
     )
@@ -83,12 +83,12 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     """Print-style dot screen: tone becomes dot size. `cell` = distance between dots in px, `angle` = screen rotation.
 
     A dot's area is proportional to the ink its tone needs, so the screen keeps the picture's tones; dots touch at
-    half tone and fill their cell at full tone. `fg` = one colour for every dot; leave it out to take each dot's
+    half tone and fill their cell at full tone. `ink` = one colour for every dot; leave it out to take each dot's
     colour from the photo.
     """
     height, width = rgb.shape[:2]
     cell = params.cell
-    paper = np.asarray(params.bg, dtype=np.float32)
+    paper = np.asarray(params.paper, dtype=np.float32)
     smooth = np.stack(
         [
             ndimage.gaussian_filter(
@@ -124,5 +124,5 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     # own area.
     fade_in = np.clip(radius * cell / (params.feather / 2), 0.0, 1.0)
     coverage = (np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0) * fade_in)[..., None]
-    dots = vivid(sampled) if params.fg is None else np.asarray(params.fg, dtype=np.float32)
+    dots = vivid(sampled) if params.ink is None else np.asarray(params.ink, dtype=np.float32)
     return (paper * (1.0 - coverage) + dots * coverage).astype(np.float32)

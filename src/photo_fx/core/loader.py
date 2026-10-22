@@ -10,7 +10,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     [[step]]
     effect = "ascii"               # any effect from photo_fx.effects; the other keys are its parameters
     cell = 9
-    fg = "#00ff9c"
+    ink = "#00ff9c"
 
     [[step]]
     effect = "fill"

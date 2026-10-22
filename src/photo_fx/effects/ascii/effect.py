@@ -30,12 +30,12 @@ class AsciiParams(EffectParams):
         "each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest on light "
         "paper. Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).",
     )
-    fg: Color | None = param(
+    ink: Color | None = param(
         None,
         doc="The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
         "character from the photo under it, brightened so thin strokes stay readable.",
     )
-    bg: Color = param(
+    paper: Color = param(
         "#000000",
         doc="The paper colour behind the characters. Dark paper puts dense characters on bright areas, light paper on "
         "dark ones.",
@@ -54,7 +54,7 @@ class AsciiParams(EffectParams):
         min=0,
         max=1,
         doc="How much of the original picture shows through the paper behind the characters, 0 to 1: 0 = text on flat "
-        "`bg` (fine detail is lost to the grid), 1 = text laid over the untouched photo.",
+        "`paper` (fine detail is lost to the grid), 1 = text laid over the untouched photo.",
     )
     font: str | None = param(
         None,
@@ -73,8 +73,8 @@ def ascii(rgb: np.ndarray, params: AsciiParams) -> np.ndarray:
         rgb,
         cell=params.cell,
         chars=params.chars,
-        fg=None if params.fg is None else np.asarray(params.fg, np.float32),
-        background=np.asarray(params.bg, np.float32),
+        ink=None if params.ink is None else np.asarray(params.ink, np.float32),
+        paper=np.asarray(params.paper, np.float32),
         gamma=params.gamma,
         photo=params.photo,
         font=params.font,

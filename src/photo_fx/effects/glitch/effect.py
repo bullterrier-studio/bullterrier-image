@@ -59,8 +59,8 @@ class GlitchParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="How much of the strip shows through behind its characters, 0 to 1: 0 = text on flat `ascii_bg`, 1 = text "
-        "laid over the strip, keeping all its detail.",
+        doc="How much of the strip shows through behind its characters, 0 to 1: 0 = text on flat `ascii_paper`, "
+        "1 = text laid over the strip, keeping all its detail.",
     )
     seed: int = param(
         0,
@@ -105,12 +105,12 @@ class GlitchParams(EffectParams):
         doc="The character palette of the text strips, in any order, at least two different characters; sorted by how "
         "much ink each glyph puts down, so the densest is used for the brightest areas on dark paper.",
     )
-    ascii_fg: Color | None = param(
+    ascii_ink: Color | None = param(
         None,
         doc="The ink colour of the text strips ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
         "character from the strip under it.",
     )
-    ascii_bg: Color = param(
+    ascii_paper: Color = param(
         "#000000",
         doc="The paper colour behind the text strips' characters. Dark paper puts dense characters on bright areas.",
     )
@@ -159,8 +159,8 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
                 out[top : top + band_height],
                 cell=params.ascii_cell,
                 chars=params.ascii_chars,
-                fg=None if params.ascii_fg is None else np.asarray(params.ascii_fg, np.float32),
-                background=np.asarray(params.ascii_bg, np.float32),
+                ink=None if params.ascii_ink is None else np.asarray(params.ascii_ink, np.float32),
+                paper=np.asarray(params.ascii_paper, np.float32),
                 gamma=params.ascii_gamma,
                 photo=params.ascii_photo,
                 font=params.ascii_font,
