@@ -33,7 +33,7 @@ Imports flow **downward only**. `import-linter` enforces this in the test suite.
 An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`photo_fx/imageio.py` is the only place that knows about file formats):
 
 ```python
-@effect(category="light", params=GlowParams)          # category is one of CATEGORIES; params is the effect's Pydantic model
+@effect(category="light", params=GlowParams)  # category is one of CATEGORIES; params is the effect's Pydantic model
 def glow(rgb: np.ndarray, params: GlowParams, *, matte: np.ndarray | None = None) -> np.ndarray: ...
 ```
 It returns an array of the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum and maximum.
@@ -81,7 +81,7 @@ The target above is being introduced in small steps; until a step lands, the old
 
 - [x] Registry with auto-discovery and duplicate-name check; contract tests over every effect (F0)
 - [x] `ops/` primitives: colorspace, noise, edges, warp, glyphs, cells, distance, voronoi, sprites (some still in review)
-- [ ] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1, in review)
+- [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
 - [ ] M1: `core/` package (registry, params, steps, timing, loader, runner); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/`; import-linter contracts
 - [ ] F1a: Pydantic params model pattern in `core/`; Step/Recipe/Animation as Pydantic models
 - [ ] F1b: each existing effect becomes a folder with params, tests and example (`ascii`, `texture`, `glitch`, `evaporate`, `disperse`, `color`)
