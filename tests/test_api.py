@@ -55,7 +55,7 @@ def test_a_step_describes_itself_briefly_for_labels():
     assert str(fx.fill("#000000").where("background")) == "fill(color='#000000') on background"
     assert str(fx.grade(exposure=0.5).blend(0.3)) == "grade(exposure=0.5) x0.3"
     assert str(fx.disperse(progress=ramp(0, 0.9))) == "disperse(progress=0->0.9)"
-    assert len(fx.ascii(chars="x" * 200).describe(width=30)) == 30
+    assert len(fx.ascii(chars="xy" * 100).describe(width=30)) == 30
 
 
 # --- fx: the effects as step builders ------------------------------------------------------------------------------
