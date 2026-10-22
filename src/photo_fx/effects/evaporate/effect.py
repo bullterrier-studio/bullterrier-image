@@ -180,7 +180,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     lit = cells.lit(pieces)
 
     rng = np.random.default_rng(p.seed)
-    u = rng.random((3, rows, cols))
+    u = rng.random((3, rows, cols))  # constant: one random field per use below (fixed, so a seed keeps its look)
 
     # How strongly each piece wants to detach, 0..1 (smoothstep: 3t^2 - 2t^3).
     centre = (np.arange(rows) + 0.5) * cell_h / height  # each row's height in the picture, 0 = top

@@ -188,3 +188,47 @@ def test_evaporate_thinning_and_vanish_decide_how_many_risen_pieces_survive():
 def test_evaporate_refuses_a_value_outside_its_range_naming_the_field(field, value):
     with pytest.raises(ValueError, match=field):
         effects.apply("evaporate", np.ones((20, 20, 3), np.float32), **{field: value})
+
+
+def _one_row_of_pieces(row: int = 30) -> np.ndarray:
+    """40 rows of 64 pieces, black but for piece row `row`."""
+    cell_w, cell_h = cell_size(5)
+    img = np.zeros((40 * cell_h, 64 * cell_w, 3), np.float32)
+    img[row * cell_h : (row + 1) * cell_h] = 1.0
+    return img
+
+
+def _rows_with_content(frame: np.ndarray) -> set[int]:
+    cell_h = cell_size(5)[1]
+    return {int(r) // cell_h for r in np.nonzero(frame.max(axis=(1, 2)) > 0)[0]}
+
+
+# Every detached piece is visible where it lands: none vanish, none dim, none sway out of their row.
+_LANDING = {"cell": 5, "vanish": 0.0, "thinning": 0.0, "falloff": 0.0, "sway": 0.0, "sway_minimum": 0.0, "seed": 1}
+
+
+def test_evaporate_rise_minimum_one_makes_every_fully_pulled_piece_climb_the_whole_rise():
+    img = _one_row_of_pieces(30)
+    pulled = {"start": 1.0, "end": 0.99, "rise": 0.25, **_LANDING}  # row 30 is far above `end`: every piece detaches
+    assert _rows_with_content(effects.apply("evaporate", img, rise_minimum=1.0, **pulled)) == {20}  # 0.25 x 40 rows
+    assert len(_rows_with_content(effects.apply("evaporate", img, **pulled))) > 3  # by default climbs differ
+
+
+def test_evaporate_rise_gamma_zero_lets_weakly_pulled_pieces_climb_as_far_as_strongly_pulled_ones():
+    img = _one_row_of_pieces(30)
+    weak = {"start": 1.0, "end": 0.0, "rise": 0.25, "rise_minimum": 1.0, **_LANDING}  # row 30: pulled at about 0.14
+    assert _rows_with_content(effects.apply("evaporate", img, rise_gamma=0.0, **weak)) == {20, 30}
+    assert 20 not in _rows_with_content(effects.apply("evaporate", img, **weak))  # default gamma: they climb less
+
+
+def test_evaporate_rise_skew_above_one_keeps_most_pieces_low():
+    img = _one_row_of_pieces(30)
+    pulled = {"start": 1.0, "end": 0.99, "rise": 0.5, "rise_minimum": 0.0, **_LANDING}
+
+    def mean_climb(skew: float) -> float:
+        """Average height climbed by the lit pixels, in px."""
+        profile = effects.apply("evaporate", img, rise_skew=skew, **pulled).max(axis=(1, 2))
+        rows = np.arange(len(profile))
+        return 30 * cell_size(5)[1] - float((rows * profile).sum() / profile.sum())
+
+    assert mean_climb(4.0) < mean_climb(1.0) < mean_climb(0.25)
