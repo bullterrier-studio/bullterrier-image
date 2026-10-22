@@ -6,8 +6,11 @@ A thin layer over the library; no logic of its own.
 import argparse
 import sys
 import textwrap
+from collections.abc import Iterable, Iterator
 from dataclasses import replace
 from pathlib import Path
+
+import numpy as np
 
 from . import effects, gallery, imageio
 from .imageio import save_video
@@ -18,6 +21,11 @@ from .sheet import contact_sheet, write_stages
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command line with `argv` (default: `sys.argv[1:]`) and return the exit code.
+
+    0 on success; 1 when a command fails (the reason is printed to stderr as `error: ...`, never as a traceback), when
+    `run` has a failed result, or with `run --strict` a warning. A usage error exits through argparse with code 2.
+    """
     parser = argparse.ArgumentParser(
         prog="photo-fx",
         description="Style photos with composable effects, optionally on a cut-out subject, and animate them.",
@@ -116,13 +124,13 @@ def _load_recipes(paths: list[str]) -> list[Recipe]:
     return [load_recipe(f) for f in files]
 
 
-def _render_all(args) -> tuple[list[Recipe], list]:
+def _render_all(args: argparse.Namespace) -> tuple[list[Recipe], list[np.ndarray]]:
     recipes = _load_recipes(args.recipes)  # validated before any slow work starts
     print(f"rendering {len(recipes)} recipe(s)...", file=sys.stderr)
     return recipes, render_all(imageio.load(args.photo), recipes)
 
 
-def _render(args) -> int:
+def _render(args: argparse.Namespace) -> int:
     recipes, results = _render_all(args)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -133,7 +141,7 @@ def _render(args) -> int:
     return 0
 
 
-def _sheet(args) -> int:
+def _sheet(args: argparse.Namespace) -> int:
     recipes, results = _render_all(args)
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -142,7 +150,7 @@ def _sheet(args) -> int:
     return 0
 
 
-def _cutout(args) -> int:
+def _cutout(args: argparse.Namespace) -> int:
     photo = imageio.load(args.photo)
     options = {k: v for k, v in (("shrink", args.shrink), ("feather", args.feather)) if v is not None}
     alpha = subject_matte(photo, **options)
@@ -153,7 +161,7 @@ def _cutout(args) -> int:
     return 0
 
 
-def _animate(args) -> int:
+def _animate(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     if recipe.animation is None:
         raise ValueError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
@@ -161,7 +169,7 @@ def _animate(args) -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     total = len(recipe.animation.positions())
 
-    def with_progress(frames):
+    def with_progress(frames: Iterable[np.ndarray]) -> Iterator[np.ndarray]:
         for i, frame in enumerate(frames, start=1):
             if i % 10 == 0 or i == total:
                 print(f"frame {i}/{total}", file=sys.stderr)
@@ -177,7 +185,7 @@ def _animate(args) -> int:
     return 0
 
 
-def _run(args) -> int:
+def _run(args: argparse.Namespace) -> int:
     project = load_project(args.project)
     if args.steps:
         project = replace(project, steps=True)
@@ -196,7 +204,7 @@ def _run(args) -> int:
     return 1 if failed or (args.strict and flagged) else 0
 
 
-def _steps(args) -> int:
+def _steps(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
     stages = trace(imageio.load(args.photo), recipe, at=args.at)
@@ -206,7 +214,7 @@ def _steps(args) -> int:
     return 0
 
 
-def _init(args) -> int:
+def _init(args: argparse.Namespace) -> int:
     print(init_project(args.directory))
     return 0
 
@@ -217,7 +225,7 @@ def _print_paths(paths: list[Path]) -> int:
     return 0
 
 
-def _effects(args) -> int:
+def _effects(args: argparse.Namespace) -> int:
     for name, doc in effects.describe().items():
         print(f"{name}\n{textwrap.indent(textwrap.fill(' '.join(doc.split()), 96), '    ')}\n")
     return 0

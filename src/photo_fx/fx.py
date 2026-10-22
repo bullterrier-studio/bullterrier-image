@@ -21,6 +21,7 @@ change over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`.
 import inspect
 from collections.abc import Callable
 from functools import cache
+from typing import Any
 
 from . import effects
 from .core.steps import Step
@@ -46,7 +47,7 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     signature = inspect.signature(function)
     image_parameter = next(iter(signature.parameters))
 
-    def build(*args, **params) -> Step:
+    def build(*args: Any, **params: Any) -> Step:
         try:
             bound = signature.bind_partial(None, *args, **params)  # None stands in for the image
         except TypeError as error:
@@ -54,7 +55,8 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
         return Step(name, {k: v for k, v in bound.arguments.items() if k != image_parameter})
 
     build.__name__, build.__qualname__, build.__doc__ = name, f"fx.{name}", function.__doc__
-    build.__signature__ = _public_signature(signature).replace(return_annotation="Step")
+    # `inspect.signature` reads this documented hook, which mypy does not model on functions
+    build.__signature__ = _public_signature(signature).replace(return_annotation="Step")  # type: ignore[attr-defined]
     return build
 
 

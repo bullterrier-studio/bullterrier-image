@@ -44,6 +44,7 @@ class MotionMeter:
         self._last: np.ndarray | None = None
 
     def add(self, frame: np.ndarray) -> None:
+        """Measure the next frame of the clip, float32 (h, w, 3) 0..1, against the one before it."""
         self.shape = self.shape or frame.shape[:2]
         step = max(1, max(frame.shape[:2]) // 160)  # compare a coarse copy: cheap, and plenty for spotting motion
         small = frame[::step, ::step].mean(axis=2)
@@ -60,6 +61,11 @@ class MotionMeter:
         return 1.0 - (last_moving + 1) / len(energy)
 
     def warnings(self, frozen_tail: float = 0.3) -> list[str]:
+        """Problems with the motion so far, as sentences for the report; empty when it looks fine.
+
+        Clips shorter than 10 frames are never judged. frozen_tail: the share of the clip (0..1) that may stand still
+        at its end before it counts as 'the motion stops early'.
+        """
         if len(self.energy) < 10:
             return []
         if max(self.energy) <= 1e-6:

@@ -34,12 +34,14 @@ def render(
     *,
     find_subject: SubjectFinder | None = None,
 ) -> np.ndarray:
+    """One still of `recipe` on `rgb`: `photo_fx.core.runner.render` with the default subject finder."""
     return runner.render(rgb, recipe, matte, at, find_subject=_finder(find_subject))
 
 
 def render_frames(
     rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None, *, find_subject: SubjectFinder | None = None
 ) -> Iterator[np.ndarray]:
+    """Every frame of an animated recipe: `photo_fx.core.runner.render_frames` with the default subject finder."""
     return runner.render_frames(rgb, recipe, matte, find_subject=_finder(find_subject))
 
 
@@ -51,12 +53,14 @@ def trace(
     *,
     find_subject: SubjectFinder | None = None,
 ) -> list[Stage]:
+    """Every stage of a render: `photo_fx.core.runner.trace` with the default subject finder."""
     return runner.trace(rgb, recipe, matte, at, find_subject=_finder(find_subject))
 
 
 def render_all(
     rgb: np.ndarray, recipes: list[Recipe], *, find_subject: SubjectFinder | None = None
 ) -> list[np.ndarray]:
+    """Several recipes on one photo: `photo_fx.core.runner.render_all` with the default subject finder."""
     return runner.render_all(rgb, recipes, find_subject=_finder(find_subject))
 
 
@@ -65,7 +69,8 @@ def _finder(find_subject: SubjectFinder | None) -> SubjectFinder:
     return subject.subject_matte if find_subject is None else find_subject
 
 
-# Each function above is the core's, with the default finder bound: it carries the core's documentation, plus that.
+# Each function above is the core's, with the default finder bound: its one-line docstring is replaced by the core's
+# full documentation, plus that.
 for _public in (render, render_frames, trace, render_all):
     _public.__doc__ = (
         getattr(runner, _public.__name__).__doc__.rstrip()
