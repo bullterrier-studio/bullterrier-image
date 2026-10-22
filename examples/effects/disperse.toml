@@ -1,11 +1,12 @@
-# One moment of the dispersal, part-way through: the right side has already blown away up and to the right.
+# One moment of the dispersal, part-way through: the right side is blowing away up and to the right.
 name = "disperse"
 size = 480
 
 [[step]]
 effect = "ascii"
-cell = 5
-gamma = 0.6
+cell = 6
+gamma = 0.5
+photo = 0.35
 
 [[step]]
 effect = "fill"
@@ -14,8 +15,8 @@ mask = "background"           # the subject on black
 
 [[step]]
 effect = "disperse"
-cell = 5                      # same as the ascii step: whole characters move
-progress = 0.4
+cell = 6                      # same as the ascii step: whole characters move
+progress = 0.3
 sweep = -1.0
 top = 0
 edge = 0

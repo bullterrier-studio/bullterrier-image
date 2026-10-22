@@ -1,12 +1,12 @@
-# The photo redrawn as text, every character in the photo's own colour.
+# The photo redrawn as text, every character in the photo's own colour, over a faint ghost of the photo.
 name = "ascii"
 size = 480
 
 [[step]]
 effect = "ascii"
-cell = 5
-gamma = 0.6
-photo = 0.25
+cell = 6
+gamma = 0.5
+photo = 0.35                  # thin text alone is dark; a faint copy of the photo behind it keeps it readable
 
 [[step]]
 effect = "fill"
