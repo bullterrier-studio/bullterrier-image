@@ -3,7 +3,7 @@ import sees. Each layer may import only the layers below it:
 
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte
-    effects    one module per effect; never import each other
+    effects    one folder per effect (TRANSITIONAL: or a loose module); never import each other
     core       loader | runner > steps > registry > params | timing | vocabulary > types; may import ops
     ops        imports nothing from photo_fx outside ops
 
@@ -35,6 +35,15 @@ CORE_ORDER = "Core order: loader | runner > steps > registry > params | timing >
 LOADER_DIRECT = "loader imports only steps and timing from core"
 TIMING_ALONE = "timing imports nothing else from photo_fx"
 CONTRACTS = [LAYERS, OPS_ALONE, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
+
+
+def fresh_python(code: str) -> subprocess.CompletedProcess:
+    """Run `code` in a fresh interpreter that imports this very package (the one these tests read the source of), with
+    neither the current directory nor the user's site on its path."""
+    environment = {**os.environ, "PYTHONPATH": str(PACKAGE.parent)}
+    return subprocess.run(
+        [sys.executable, "-P", "-s", "-c", code], env=environment, capture_output=True, text=True, check=False
+    )
 
 
 def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProcess:
@@ -71,7 +80,18 @@ FORBIDDEN = {
     "ops to core": ("ops/warp.py", "import photo_fx.core.timing", "photo_fx.ops.warp", OPS_ALONE),
     "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
     "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
-    "effects to imageio": ("effects/color.py", "import photo_fx.imageio", "photo_fx.effects.color", LAYERS),
+    "effects to imageio": (
+        "effects/grade/effect.py",
+        "import photo_fx.imageio",
+        "photo_fx.effects.grade.effect",
+        LAYERS,
+    ),
+    "effect folder to effect folder": (
+        "effects/grade/effect.py",
+        "import photo_fx.effects.clarity.effect",
+        "photo_fx.effects.grade.effect",
+        EFFECTS_APART,
+    ),
     "recipe to pipeline": ("recipe.py", "import photo_fx.pipeline", "photo_fx.recipe", LAYERS),
     "fx to gallery": ("fx.py", "import photo_fx.gallery", "photo_fx.fx", LAYERS),
     "pipeline to cli": ("pipeline.py", "import photo_fx.cli", "photo_fx.pipeline", LAYERS),
@@ -102,11 +122,13 @@ def test_core_may_import_ops(tmp_path):
 
 
 def _effects_declared_in_the_source() -> set[str]:
-    """Names of the functions decorated with `effect(...)` in the effect modules that discovery imports (every module
-    of `effects/` not starting with `_`), read from the source with `ast`: an oracle independent of the registry."""
+    """Names of the functions decorated with `effect(...)` in the effect modules that discovery imports (the
+    `effect.py` of every folder of `effects/`, and every TRANSITIONAL loose module, not starting with `_`), read from
+    the source with `ast`: an oracle independent of the registry."""
     names = set()
-    for path in sorted((PACKAGE / "effects").glob("*.py")):
-        if path.name.startswith("_"):
+    effects = PACKAGE / "effects"
+    for path in sorted([*effects.glob("*.py"), *effects.glob("*/effect.py")]):
+        if path.relative_to(effects).parts[0].startswith("_"):
             continue
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.FunctionDef) and any(
@@ -124,7 +146,7 @@ def test_importing_one_core_module_alone_registers_every_effect():
         "from photo_fx.core import registry\n"
         "json.dump(sorted(registry.all_effects()), sys.stdout)\n"
     )
-    result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, check=False)
+    result = fresh_python(code)
     assert result.returncode == 0, result.stderr
     declared = _effects_declared_in_the_source()
     assert len(declared) >= 10  # the oracle really found the effects (13 today)
@@ -153,5 +175,5 @@ def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
         "assert not missing, missing\n"
         "assert photo_fx.recipe.render is photo_fx.render and photo_fx.recipe.load_recipe is photo_fx.load_recipe\n"
     )
-    result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, check=False)
+    result = fresh_python(code)
     assert result.returncode == 0, result.stderr
