@@ -1,8 +1,9 @@
-"""Reading, writing and resizing pictures.
+"""Reading and writing pictures and videos.
 
 Every other module works on a single image representation: a float32 array of shape (height, width, 3),
 RGB, values 0..1, sRGB-encoded (display-referred, not linear). This module is the only place that knows
 about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of that leaks into effects.
+`resize` is `photo_fx.ops.resample.resize`, kept here because `imageio.resize` was public before it moved.
 """
 
 import io
@@ -14,6 +15,10 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
+
+from photo_fx.ops.resample import resize  # also re-exported: `imageio.resize` was public before it moved to ops (M1)
+
+__all__ = ["from_pil", "load", "resize", "resize_video", "save", "save_video", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 
@@ -145,20 +150,3 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
 def from_pil(img: Image.Image) -> np.ndarray:
     """Convert a Pillow image to RGB float32 0..1 (transparency is dropped)."""
     return np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
-
-
-def resize(array: np.ndarray, longest_side: int) -> np.ndarray:
-    """Scale an RGB image, or a (height, width) alpha, so its longest side is `longest_side` px.
-
-    Aspect ratio is kept. Works on float data without going through 8 bits, so a matte keeps its softness.
-    """
-    height, width = array.shape[:2]
-    scale = longest_side / max(height, width)
-    size = (max(1, round(width * scale)), max(1, round(height * scale)))
-    if size == (width, height):
-        return array
-    resample = Image.Resampling.LANCZOS if scale < 1 else Image.Resampling.BICUBIC
-    channels = [array] if array.ndim == 2 else [array[..., c] for c in range(array.shape[2])]
-    scaled = [np.asarray(Image.fromarray(c, mode="F").resize(size, resample)) for c in channels]
-    out = scaled[0] if array.ndim == 2 else np.dstack(scaled)
-    return np.clip(out, 0.0, 1.0).astype(np.float32)

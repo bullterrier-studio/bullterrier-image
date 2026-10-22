@@ -1,18 +1,10 @@
-"""Tests of `effects/color.py` (and the colour parsing its effects share)."""
+"""Tests of `effects/color.py`."""
 
 import numpy as np
 import pytest
 
 from photo_fx import effects
-from photo_fx.effects._common import parse_color
-
-
-def test_parse_color_forms():
-    np.testing.assert_allclose(parse_color("#ff8000"), [1.0, 128 / 255, 0.0], atol=1e-6)
-    np.testing.assert_allclose(parse_color("#f00"), [1, 0, 0])
-    np.testing.assert_allclose(parse_color([0.1, 0.2, 0.3]), [0.1, 0.2, 0.3])
-    with pytest.raises(ValueError):
-        parse_color("#12")
+from photo_fx.ops.color import luminance, parse_color
 
 
 def test_fill_ignores_the_picture(photo):
@@ -38,8 +30,6 @@ def test_hue_shift_full_turn_is_identity(photo):
 
 
 def test_hue_shift_keeps_brightness_and_moves_colour():
-    from photo_fx.effects._common import luminance
-
     skin_and_wall = np.array([[[0.8, 0.6, 0.5], [0.5, 0.35, 0.3], [0.6, 0.4, 0.4]]], np.float32)  # in-gamut colours
     out = effects.apply("hue_shift", skin_and_wall, degrees=120)
     np.testing.assert_allclose(luminance(out), luminance(skin_and_wall), atol=1e-4)
@@ -47,8 +37,6 @@ def test_hue_shift_keeps_brightness_and_moves_colour():
 
 
 def test_split_tone_tints_without_changing_brightness(photo):
-    from photo_fx.effects._common import luminance
-
     midtones = 0.25 + photo * 0.5  # away from pure black and white, where a tint would clip and change brightness
     out = effects.apply("split_tone", midtones, amount=0.2)
     assert not np.allclose(out, midtones)

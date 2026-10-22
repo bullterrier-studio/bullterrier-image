@@ -30,17 +30,6 @@ def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
         assert img.getpixel((0, 0))[3] == 0 and img.getpixel((64, 48))[3] == 255
 
 
-def test_resize_keeps_aspect_ratio_and_range(photo, matte):
-    small = imageio.resize(photo, 64)
-    assert small.shape == (48, 64, 3)
-    assert 0.0 <= small.min() and small.max() <= 1.0
-    assert imageio.resize(matte, 64).shape == (48, 64)
-
-
-def test_resize_to_same_size_is_a_no_op(photo):
-    assert imageio.resize(photo, 128) is photo
-
-
 def _frames(count=4, height=47, width=63):
     rng = np.random.default_rng(0)
     return [rng.random((height, width, 3), dtype=np.float32) for _ in range(count)]

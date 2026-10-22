@@ -1,12 +1,16 @@
-"""Small helpers shared by effects: colour literals and luminance."""
+"""Colour as effects meet it: colour literals from recipes, perceived brightness, and how much ink a mark-making effect
+lays down on a given paper colour."""
+
+from collections.abc import Sequence
 
 import numpy as np
 
-from photo_fx.core.types import Color  # noqa: F401  (re-exported until this module moves to ops)
 
+def parse_color(color: str | Sequence[float]) -> np.ndarray:
+    """'#rrggbb' / '#rgb', or [r, g, b] with values 0..1 -> float32 array of 3. Raises ValueError for anything else.
 
-def parse_color(color: Color) -> np.ndarray:
-    """'#rrggbb' / '#rgb', or [r, g, b] with values 0..1 -> float32 array of 3."""
+    (The same forms as `photo_fx.core.types.Color`, spelt out here because ops never import core.)
+    """
     if isinstance(color, str):
         h = color.lstrip("#")
         if len(h) == 3:
