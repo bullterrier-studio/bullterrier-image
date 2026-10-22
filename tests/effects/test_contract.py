@@ -43,6 +43,25 @@ def test_every_effect_is_deterministic_and_leaves_its_input_alone(name, photo):
     np.testing.assert_array_equal(photo, before)
 
 
+# Sizes no cell, tile or block divides: a single pixel, a single row or column, and two odd rectangles.
+ODD_SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)]
+
+
+@pytest.mark.parametrize("size", ODD_SIZES, ids=[f"{h}x{w}" for h, w in ODD_SIZES])
+@pytest.mark.parametrize("name", ALL)
+def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, size, photo):
+    rgb = np.ascontiguousarray(photo[: size[0], : size[1]])
+    before = rgb.copy()
+    inputs = _inputs(name, rgb)
+    out = effects.apply(name, rgb, **inputs)
+    assert out.shape == rgb.shape
+    assert out.dtype == np.float32
+    assert np.isfinite(out).all()
+    assert out.min() >= -1e-6
+    assert out.max() <= 1 + 1e-6
+    np.testing.assert_array_equal(rgb, before)
+
+
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_documents_itself(name):
     assert effects.describe()[name]
@@ -433,6 +452,33 @@ def test_every_parameter_is_described_and_has_a_unit_entry(name):
 def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
     small = _small(photo)
     out = effects.apply(name, small, **{field: _bound_value(name, field, side)}, **_inputs(name, small))
+    assert out.shape == small.shape
+    assert np.isfinite(out).all()
+    assert out.min() >= -1e-6
+    assert out.max() <= 1 + 1e-6
+
+
+def _interior_values() -> list[tuple[str, str, float]]:
+    """(effect, numeric field, value) for five values evenly inside the range of every int or float field of every
+    modelled effect (ints rounded, repeats dropped): the values an animation passes through."""
+    found = []
+    for name in MODELLED:
+        model = registry.parameters(name)
+        assert model is not None
+        for doc in model.fields_doc():
+            if doc.minimum is None or doc.maximum is None or not isinstance(doc.default, int | float):
+                continue  # not a number (a list of numbers is not animated as a whole)
+            values = [doc.minimum + (doc.maximum - doc.minimum) * k / 6 for k in range(1, 6)]
+            if isinstance(doc.default, int):
+                values = sorted({round(value) for value in values})
+            found += [(name, doc.name, value) for value in values]
+    return found
+
+
+@pytest.mark.parametrize(("name", "field", "value"), _interior_values())
+def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, field, value, photo):
+    small = _small(photo)
+    out = effects.apply(name, small, **{field: value}, **_inputs(name, small))
     assert out.shape == small.shape
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6
