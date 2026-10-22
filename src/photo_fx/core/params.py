@@ -21,6 +21,7 @@ Promises:
   command line, in a caller's types (a `Color` is shown as the forms one may write).
 """
 
+import functools
 import inspect
 import math
 import re
@@ -218,8 +219,7 @@ class EffectParams(ValidatedModel):
     @classmethod
     def whole_number_fields(cls) -> frozenset[str]:
         """The fields that hold a whole number (`int`): an animated value for one is rounded to the nearest."""
-        hints = typing.get_type_hints(cls)
-        return frozenset(name for name in cls.model_fields if _scalar(hints[name]) == {int})
+        return _whole_number_fields(cls)
 
     @classmethod
     def signature(cls) -> inspect.Signature:
@@ -279,6 +279,12 @@ class EffectParams(ValidatedModel):
 
 
 _MISSING = object()
+
+
+@functools.cache  # a model's fields are fixed when its class is made; every animated frame asks again
+def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
+    hints = typing.get_type_hints(model)
+    return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})
 
 
 def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]:
