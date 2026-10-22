@@ -26,12 +26,12 @@ def test_gradient_map_needs_two_stops(photo):
 
 
 def test_hue_shift_full_turn_is_identity(photo):
-    np.testing.assert_allclose(effects.apply("hue_shift", photo, degrees=360), photo, atol=1e-5)
+    np.testing.assert_allclose(effects.apply("hue_shift", photo, hue=360), photo, atol=1e-5)
 
 
 def test_hue_shift_keeps_brightness_and_moves_colour():
     skin_and_wall = np.array([[[0.8, 0.6, 0.5], [0.5, 0.35, 0.3], [0.6, 0.4, 0.4]]], np.float32)  # in-gamut colours
-    out = effects.apply("hue_shift", skin_and_wall, degrees=120)
+    out = effects.apply("hue_shift", skin_and_wall, hue=120)
     np.testing.assert_allclose(luminance(out), luminance(skin_and_wall), atol=1e-4)
     assert (out.argmax(axis=-1) != skin_and_wall.argmax(axis=-1)).all()  # the dominant channel moved
 
@@ -102,6 +102,23 @@ def test_gradient_map_clip_fractions_set_how_much_is_pushed_to_the_end_stops():
     clipped = effects.apply("gradient_map", ramp, stops=black_white, shadow_clip=0.1, highlight_clip=0.2)
     assert abs((clipped[0, :, 0] == 0.0).sum() - 100) <= 1  # the darkest 10% are the first stop
     assert abs((clipped[0, :, 0] == 1.0).sum() - 200) <= 1  # the brightest 20% are the last stop
+
+
+@pytest.mark.parametrize(("method", "expected"), [("linear", 0.5), ("lower", 1.0), ("higher", 0.0)])
+def test_gradient_map_quantile_method_decides_where_the_stretch_bounds_fall(method, expected):
+    """Five greys 0, .25, .5, .75, 1, clipping 30% at each end: the 30% and 70% quantiles are 0.3 and 0.7 by linear
+    interpolation, 0.25 and 0.5 rounding down to a sample ('lower'), 0.5 and 0.75 rounding up ('higher'). The middle
+    grey 0.5 then sits at (0.5 - lo) / (hi - lo) of a black-to-white gradient."""
+    greys = np.repeat(np.array([0, 0.25, 0.5, 0.75, 1], np.float32)[None, :, None], 3, axis=2)
+    out = effects.apply(
+        "gradient_map",
+        greys,
+        stops=["#000000", "#ffffff"],
+        shadow_clip=0.3,
+        highlight_clip=0.3,
+        quantile_method=method,
+    )
+    assert out[0, 2, 0] == pytest.approx(expected, abs=1e-6)
 
 
 def test_split_tone_softness_sets_how_sharply_one_tint_hands_over_to_the_other():

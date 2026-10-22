@@ -14,7 +14,7 @@ separate code.
 | `grade` ✓ | Exposure, contrast, saturation. | `fx.grade(exposure=0.3)` |
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
-| `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(degrees=150)` |
+| `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
 | `levels` | Black point, white point, gamma. | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` | Tone curve through control points. | `fx.curves(points=[[0,0],[0.25,0.18],[1,1]])` |
 | `auto_levels` | Stretch to the full tonal range. | `fx.auto_levels(clip=0.5)` |

@@ -222,7 +222,7 @@ class GlowParams(EffectParams):
     """Bloom around the bright parts of the picture."""
 
     radius: float = param(24.0, unit="px", min=0, max=500, doc="Gaussian sigma of the halo. Larger = wider, softer.")
-    amount: float = param(0.6, unit="fraction", min=0, max=2, doc="How strongly the halo is screened over the picture.")
+    amount: float = param(0.6, unit="ratio", min=0, max=2, doc="How strongly the halo is screened over the picture.")
 
 
 @effect(category="light", params=GlowParams)

@@ -4,4 +4,4 @@ size = 480
 
 [[step]]
 effect = "hue_shift"
-degrees = 150
+hue = 150

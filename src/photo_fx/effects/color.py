@@ -84,7 +84,8 @@ class ClarityParams(EffectParams):
         min=0,
         max=500,
         doc="Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the recipe's size. Larger "
-        "compares bigger regions; 0 turns the effect off.",
+        "compares bigger regions and takes longer (at the top of the range, with a large truncate, seconds per "
+        "picture); 0 turns the effect off.",
     )
     amount: float = param(
         1.0,
@@ -163,6 +164,29 @@ class GradientMapParams(EffectParams):
         doc="Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the last stop. Larger gives "
         "brighter highlights.",
     )
+    quantile_method: Literal[
+        "linear",
+        "lower",
+        "higher",
+        "nearest",
+        "midpoint",
+        "inverted_cdf",
+        "averaged_inverted_cdf",
+        "closest_observation",
+        "interpolated_inverted_cdf",
+        "hazen",
+        "weibull",
+        "median_unbiased",
+        "normal_unbiased",
+    ] = param(
+        "linear",
+        doc="How the stretch's clip points are read from the picture's brightness (numpy's quantile methods): 'linear' "
+        "interpolates between the two nearest pixels; 'lower', 'higher', 'nearest' and 'midpoint' take the darker, "
+        "the brighter, the nearer pixel or their mean; 'inverted_cdf', 'averaged_inverted_cdf', "
+        "'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and "
+        "'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or "
+        "flat pictures.",
+    )
 
 
 @effect(category="colour", params=GradientMapParams)
@@ -176,7 +200,7 @@ def gradient_map(rgb: np.ndarray, params: GradientMapParams) -> np.ndarray:
     colors = np.array(params.stops, dtype=np.float32)
     count = len(params.stops)
     lum = luminance(rgb)
-    lo, hi = np.quantile(lum, [params.shadow_clip, 1.0 - params.highlight_clip])
+    lo, hi = np.quantile(lum, [params.shadow_clip, 1.0 - params.highlight_clip], method=params.quantile_method)
     t = np.clip((lum - lo) / max(hi - lo, _FLAT), 0.0, 1.0) * (count - 1)
     i = np.minimum(t.astype(int), count - 2)
     f = (t - i)[..., None]
@@ -249,7 +273,7 @@ _LUMA_CHROMA_INVERSE = np.linalg.inv(_LUMA_CHROMA)
 class HueShiftParams(EffectParams):
     """How far every hue turns around the colour wheel."""
 
-    degrees: float = param(
+    hue: float = param(
         90.0,
         unit="degrees",
         min=-360,
@@ -260,12 +284,12 @@ class HueShiftParams(EffectParams):
 
 @effect(category="colour", params=HueShiftParams)
 def hue_shift(rgb: np.ndarray, params: HueShiftParams) -> np.ndarray:
-    """Rotate every hue around the colour wheel by `degrees`: the quickest way to try another colour scheme.
+    """Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme.
 
     Brightness is preserved (as `luminance` measures it), so the picture keeps its lighting while colours change,
     except for very saturated colours whose rotated version cannot be displayed and gets clipped.
     """
-    c, s = np.cos(np.radians(params.degrees)), np.sin(np.radians(params.degrees))
+    c, s = np.cos(np.radians(params.hue)), np.sin(np.radians(params.hue))
     rotate_chroma = np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])  # hue = angle in the (Cb, Cr) plane
     matrix = (_LUMA_CHROMA_INVERSE @ rotate_chroma @ _LUMA_CHROMA).astype(np.float32)
     return np.clip(rgb @ matrix.T, 0.0, 1.0).astype(np.float32)
