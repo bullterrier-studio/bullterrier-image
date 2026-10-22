@@ -19,9 +19,12 @@ from PIL import Image, ImageCms, ImageOps
 
 from photo_fx.ops.resample import resize  # also re-exported: `imageio.resize` was public before it moved to ops (M1)
 
-__all__ = ["from_pil", "load", "resize", "resize_video", "save", "save_video", "to_pil"]
+__all__ = ["from_pil", "load", "load_matte", "resize", "resize_video", "save", "save_video", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
+_EIGHT_BIT = 255.0  # the largest 8-bit value
+_SIXTEEN_BIT = 65535.0  # the largest 16-bit value
+_ALPHA = 3  # the alpha channel of RGBA
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -42,6 +45,22 @@ def load(path: str | Path) -> np.ndarray:
             except ImageCms.PyCMSError:
                 pass  # unreadable profile: treat the pixels as sRGB, which is what most viewers do too
         return from_pil(img)
+
+
+def load_matte(path: str | Path) -> np.ndarray:
+    """Read a subject matte someone already has: float32 (height, width), 1 = subject, 0 = background.
+
+    A picture with transparency (a cut-out PNG) gives its alpha channel; any other gives its brightness, so a
+    black-and-white mask works as it is. 8- and 16-bit files keep their full range; EXIF rotation is applied, as in
+    `load`, so the matte lines up with the photo it was made for.
+    """
+    with Image.open(path) as opened:
+        img = ImageOps.exif_transpose(opened)
+        if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants, or "I" from older Pillow)
+            return np.clip(np.asarray(img, np.float32) / _SIXTEEN_BIT, 0.0, 1.0)
+        if img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info:
+            return np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
+        return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
 
 
 def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, quality: int = 95) -> None:

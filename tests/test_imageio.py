@@ -150,3 +150,51 @@ def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_p
         imageio.resize_video(tmp_path / "a.mp4", tmp_path / "b.mp4", 32)
     assert not (tmp_path / "a.mp4").exists()
     assert imageio.save_video(iter(_frames(3)), tmp_path / "a.gif", fps=10) == 3
+
+
+# --- bring your own matte: imageio.load_matte ----------------------------------------------------------------------
+
+
+def halves(height=20, width=30, low=0, high=255) -> np.ndarray:
+    """uint8: `low` in the left half, `high` in the right half."""
+    values = np.full((height, width), low, np.uint8)
+    values[:, width // 2 :] = high
+    return values
+
+
+def test_a_transparent_png_gives_its_alpha_channel_whatever_its_colours(tmp_path):
+    rgba = np.dstack([np.full((20, 30, 3), 200, np.uint8), halves(low=51, high=255)])
+    Image.fromarray(rgba, "RGBA").save(tmp_path / "m.png")
+    matte = imageio.load_matte(tmp_path / "m.png")
+    assert matte.dtype == np.float32
+    assert matte.shape == (20, 30)
+    np.testing.assert_allclose(matte[:, :15], 0.2, atol=1e-6)  # 51 / 255
+    np.testing.assert_allclose(matte[:, 15:], 1.0, atol=1e-6)
+
+
+def test_a_greyscale_png_gives_its_grey_levels(tmp_path):
+    Image.fromarray(halves(low=0, high=102), "L").save(tmp_path / "m.png")
+    matte = imageio.load_matte(tmp_path / "m.png")
+    np.testing.assert_allclose(matte[:, :15], 0.0)
+    np.testing.assert_allclose(matte[:, 15:], 0.4, atol=1e-6)  # 102 / 255
+
+
+def test_a_black_and_white_rgb_picture_gives_its_brightness(tmp_path):
+    Image.fromarray(np.dstack([halves()] * 3), "RGB").save(tmp_path / "m.jpg", quality=100)
+    matte = imageio.load_matte(tmp_path / "m.jpg")
+    assert matte[:, :10].max() < 0.02
+    assert matte[:, 20:].min() > 0.98
+
+
+def test_a_16_bit_greyscale_png_keeps_its_full_range(tmp_path):
+    levels = halves().astype(np.uint16) * 0
+    levels[:, 15:] = 16384  # a quarter of 65535, rounded
+    Image.fromarray(levels).save(tmp_path / "m.png")
+    matte = imageio.load_matte(tmp_path / "m.png")
+    np.testing.assert_allclose(matte[:, 15:], 16384 / 65535, atol=1e-6)
+    np.testing.assert_allclose(matte[:, :15], 0.0)
+
+
+def test_a_missing_matte_file_is_named(tmp_path):
+    with pytest.raises(FileNotFoundError, match=r"nope\.png"):
+        imageio.load_matte(tmp_path / "nope.png")
