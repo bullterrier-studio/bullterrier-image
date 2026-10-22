@@ -8,18 +8,25 @@ every new effect would collide, (1) settle the shared contract and build the sha
 
 ## 0. Make adding an effect conflict-free
 
-Do first; small. Each row is something every new effect would otherwise have to touch.
+**Status: implemented.** Adding an effect now means adding exactly three files and editing no shared file:
+`src/photo_fx/effects/<module>.py` (the effect), `tests/effects/test_<module>.py` (its tests) and
+`examples/effects/<effect>.toml` (its example recipe). Each row was something every new effect had to touch.
 
-| Today | Problem | Fix |
+| Was | Problem | Now |
 | --- | --- | --- |
-| `effects/__init__.py` lists every module | Everyone edits the same line. | Import every module in the package automatically. |
-| The registry stores `_EFFECTS[name] = fn` | Two effects with the same name silently replace each other (verified). | Raise on a duplicate name; test it. |
-| `fx.pyi` is committed and a test fails if it is stale | Every branch changes it; every merge conflicts. | Regenerate it at integration instead of per branch, or do not commit it. |
-| The README effect table is test-enforced | Every effect edits the README. | Generate the effect table and gallery from effect metadata; the README links to it. |
-| `tests/test_effects.py` holds the per-effect tests | One shared file. (The generic contract tests apply to every effect automatically and stay.) | One test file per module: `tests/effects/test_<module>.py`. |
-| Example pictures are committed and regenerate whenever any code changes | Binary merge conflicts. | One gallery image per effect, in its own file, generated from the effect's example recipe, regenerated deliberately. |
-| An effect declares nothing about itself | Docs, gallery and checks cannot be generated. | `@effect(category=..., example=...)`; a test requires both. |
-| Parameter names are free-form | Independent authors drift: `strength`, `amount`, `intensity`. | A test that flags non-standard names for common concepts (`amount`, `radius`, `cell`, `angle`, `seed`, `opacity`). |
+| `effects/__init__.py` listed every module | Everyone edits the same line. | Every module in the package whose name does not start with `_` is imported automatically, in sorted order. |
+| The registry stored `_EFFECTS[name] = fn` | Two effects with the same name silently replace each other. | A second, different function under an existing name raises `ValueError` naming both modules (a module reload is allowed). |
+| `fx.pyi` was committed and a test failed if it was stale | Every branch changes it; every merge conflicts. | Still committed, but regenerated only at integration; the test checks that the generator's output is valid Python with one function per effect. |
+| The README effect table was test-enforced | Every effect edits the README. | `docs/effects.md`, generated from the effects, one table per category with picture, summary, parameters and example recipe; the README links to it. |
+| `tests/test_effects.py` held the per-effect tests | One shared file. | One test file per module, `tests/effects/test_<module>.py`; the generic contract tests are in `tests/effects/test_contract.py` and apply to every effect automatically. |
+| Example pictures regenerated whenever any code changed | Binary merge conflicts. | One gallery picture per effect, `docs/gallery/<effect>.jpg`, rendered from its example recipe; only missing pictures are rendered unless forced. |
+| An effect declared nothing about itself | Docs, gallery and checks cannot be generated. | `@effect(category="...")`, one of the categories in `effects.CATEGORIES`; every parameter must have a default; the example recipe is found by name. All checked when the effect registers, or by a test. |
+| Parameter names were free-form | Independent authors drift: `strength`, `amount`, `intensity`. | `effects/_vocabulary.py` lists discouraged names and the name to use instead (`strength` -> `amount`, `rng` -> `seed`, ...); a contract test flags them. `glow(strength=)` became `glow(amount=)`. |
+
+**The one integration command** is `photo-fx regenerate`: it writes `src/photo_fx/fx.pyi` and `docs/effects.md` and
+renders any missing gallery pictures. Feature branches do not run it or commit those files; whoever merges runs it once
+afterwards and commits the result. (`photo-fx gallery [--only NAME ...] [--force]` renders pictures and writes the page
+without the stub; rendering needs the subject cut-out, so macOS.)
 
 ## 1. The shared contract
 

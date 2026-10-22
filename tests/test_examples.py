@@ -67,14 +67,12 @@ def test_no_video_or_gif_is_checked_in():
     assert not [f for f in tracked if f.lower().endswith((".mp4", ".mov", ".webm", ".gif"))]
 
 
-def test_the_readme_documents_every_effect_and_every_picture_it_shows_exists():
+def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists():
     import re
 
-    from photo_fx import effects
-
     readme = (EXAMPLES.parent / "README.md").read_text()
-    missing = [name for name in effects.describe() if f"`{name}`" not in readme]
-    assert not missing, f"README's effect table is missing {missing}"
+    assert re.search(r"\]\(docs/effects\.md\)", readme), "the README must link to docs/effects.md, the effect catalogue"
+    assert (EXAMPLES.parent / "docs" / "effects.md").is_file()
     local = [p for p in re.findall(r'src="([^"]+)"', readme) if not p.startswith("http")]
     assert len(local) >= 8  # the banner, the gallery, the step sheet and the filmstrip
     for path in local:
