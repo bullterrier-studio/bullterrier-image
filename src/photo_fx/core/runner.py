@@ -58,14 +58,16 @@ def render_frames(
     """Yield every frame of an animated recipe, in order (see `Animation.positions`).
 
     The steps before the first animated one cannot change between frames, so they run once for the whole clip, and the
-    subject is found once for the whole clip.
+    subject is found once for the whole clip. A recipe with an animation but no animated parameter gives the same still
+    picture in every frame.
 
     rgb, matte, find_subject: as for `render`. recipe: must have an animation (ValueError otherwise).
     """
     if recipe.animation is None:
         raise ValueError(f"recipe {recipe.name!r} has no animation: add an [animation] table (seconds, fps)")
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
-    first_moving = next(i for i, step in enumerate(recipe.steps) if step.animated)
+    # With no animated step every step is still: the clip is the still picture, held for every frame.
+    first_moving = next((i for i, step in enumerate(recipe.steps) if step.animated), len(recipe.steps))
     still = _run(rgb, recipe.steps[:first_moving], matte, 0.0, 0.0)
     for motion, clip in recipe.animation.frames():
         yield _finish(_run(still, recipe.steps[first_moving:], matte, motion, clip))

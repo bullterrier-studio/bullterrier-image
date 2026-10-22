@@ -80,3 +80,12 @@ def test_the_finder_sees_the_photo_already_scaled_to_the_recipes_size(photo, mat
     small = Recipe("small", MASKED.steps, size=64)
     assert runner.render(photo, small, find_subject=finder).shape == (48, 64, 3)
     assert finder.seen == [(48, 64, 3)]
+
+
+def test_an_animation_whose_parameters_never_change_is_the_still_held_for_the_whole_clip(photo):
+    held = Recipe("held", PLAIN.steps, size=None, animation=Animation(seconds=3, fps=1))  # three frames, none moving
+    frames = list(runner.render_frames(photo, held))
+    assert len(frames) == 3
+    still = runner.render(photo, PLAIN)
+    for frame in frames:
+        np.testing.assert_array_equal(frame, still)
