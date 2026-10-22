@@ -18,7 +18,9 @@ Promises: every error names the file, the step and the offending key; nothing is
 
 Removing the background is not a feature of its own: it is a `fill` step masked to the background.
 
-A recipe becomes an animation with an [animation] table, and any numeric parameter can then change over the clip:
+A recipe becomes an animation with an [animation] table, and any numeric parameter can then change over the clip (a
+whole-number parameter moves in whole steps, rounded to the nearest; every frame is checked against the range when
+the recipe loads):
 
     [animation]
     seconds = 5

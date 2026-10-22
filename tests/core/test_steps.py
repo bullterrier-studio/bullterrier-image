@@ -30,6 +30,78 @@ def gain(throwaway_effects):
 OVERSHOOT = (0.3, 1.6, 0.7, 1.0)  # y1 above 1: the curve rises past its end before settling on it
 
 
+# --- every rendered frame of a recipe is checked, not only a few moments ---------------------------------------------
+
+NARROW = [0.95, 1.0, 1.0, 1.08]  # overshoots only very near its end: between the 11 moments a lone step checks
+
+
+def _first_frame_past_one(seconds: float, fps: int) -> int:
+    """The first frame at which a 0 -> 1 animation with the NARROW curve goes above 1, found by walking the frames."""
+    curve = Animated(0.0, 1.0, NARROW)
+    return next(i for i, (motion, clip) in enumerate(Animation(seconds, fps).frames()) if curve.at(motion, clip) > 1)
+
+
+def test_a_narrow_overshoot_passes_the_steps_own_check_but_fails_the_recipe_at_the_frame_it_would_break(tmp_path):
+    assert Step("split_tone", {"amount": Animated(0.0, 1.0, NARROW)}).animated  # alone, the step's 11 moments pass
+    path = tmp_path / "narrow.toml"
+    path.write_text(
+        "[animation]\nseconds = 4\nfps = 30\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'split_tone'\n"
+        "amount = { from = 0, to = 1, ease = [0.95, 1.0, 1.0, 1.08] }\n"
+    )
+    frame = _first_frame_past_one(4, 30)
+    with pytest.raises(ValueError, match=r"narrow\.toml: step 2: effect 'split_tone': `amount` must be <= 1") as raised:
+        load_recipe(path)
+    assert f"frame {frame} " in str(raised.value)
+    assert f"{frame / 30:.2f} s" in str(raised.value)
+
+
+def test_a_recipe_whose_every_frame_is_valid_loads(gain):
+    recipe = Recipe("ok", [Step("gain_probe", {"gain": Animated(0.0, 3.6, NARROW)})], None, Animation(4, 30))
+    assert recipe.animation == Animation(4, 30)  # peaks just above 3.6, still inside 0..4
+
+
+# --- whole-number fields move in whole steps -------------------------------------------------------------------------
+
+
+class LevelsParams(EffectParams):
+    """Levels of the probe."""
+
+    levels: int = param(4, unit="count", min=2, max=16, doc="How many levels.")
+
+
+@pytest.fixture
+def levels(throwaway_effects):
+    def levels_probe(rgb: np.ndarray, params: LevelsParams) -> np.ndarray:
+        """Fills the picture with levels / 16, so the level used can be read back from any pixel."""
+        assert isinstance(params.levels, int)
+        return np.full_like(rgb, params.levels / 16)
+
+    return effect(category="utilities", params=LevelsParams)(levels_probe)
+
+
+def test_an_animated_whole_number_is_rounded_to_the_nearest_whole_number(levels):
+    step = Step("levels_probe", {"levels": Animated(2, 8)})  # 2 + 6 t
+    assert step.params_at(0.0) == {"levels": 2}
+    assert step.params_at(1.0) == {"levels": 8}
+    assert step.params_at(0.5) == {"levels": 5}
+    assert step.params_at(0.25) == {"levels": 4}  # 3.5: halves go to the even neighbour (Python's round)
+    assert step.params_at(0.75) == {"levels": 6}  # 6.5
+    assert all(isinstance(value, int) for value in step.params_at(0.4).values())
+
+
+def test_a_rendered_frame_uses_the_rounded_whole_number(levels, photo):
+    from photo_fx.core.runner import render
+
+    recipe = Recipe("lv", [Step("levels_probe", {"levels": Animated(2, 8)})], None, Animation(2, 10))
+    np.testing.assert_array_equal(render(photo, recipe, at=0.5), np.float32(5 / 16))
+
+
+def test_an_animated_whole_number_is_checked_after_rounding(levels):
+    assert Step("levels_probe", {"levels": Animated(2, 16.4)}).animated  # ends at 16: inside 2..16
+    with pytest.raises(ValueError, match=r"`levels` must be <= 16, got 17"):
+        Step("levels_probe", {"levels": Animated(2, 16.6)})  # ends at 17
+
+
 # --- values through the model ----------------------------------------------------------------------------------------
 
 

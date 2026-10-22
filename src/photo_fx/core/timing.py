@@ -75,7 +75,8 @@ def _explain(error: ValidationError, owner: str) -> str:
 class Animated(BaseModel):
     """A parameter that changes over the clip, written `{ from = 0, to = 1, ease = "gentle" }` in a recipe.
 
-    start, end: the parameter's value at the start and at the end of the movement (in the parameter's own unit).
+    start, end: the parameter's value at the start and at the end of the movement (in the parameter's own unit); for a
+        whole-number parameter the value in between is rounded to the nearest whole number by the step.
     ease: a name from `EASE_NAMES`, or a cubic-bezier as four numbers (x1, y1, x2, y2) with x1 and x2 in 0..1.
     over: "motion" runs only while the animation itself runs (after `hold_start`, before `hold_end`); "clip" runs across
         the whole clip, holds included, e.g. a clock for ambient motion.

@@ -19,9 +19,8 @@ from dataclasses import dataclass
 from typing import Any, overload
 
 import numpy as np
-from pydantic import ValidationError
 
-from .params import EffectParams, describe_error
+from .params import EffectParams
 
 Effect = Callable[..., np.ndarray]
 
@@ -86,11 +85,7 @@ class ModelledEffect[P: EffectParams]:
 
     def validate(self, values: Mapping[str, object]) -> P:
         """The model for `values` (parameter name -> value); ValueError naming the effect and every problem."""
-        try:
-            return self.params_model.model_validate(dict(values))
-        except ValidationError as error:
-            owner = f"effect {self.__name__!r}"
-            raise ValueError(describe_error(error, owner, self.params_model.model_fields)) from None
+        return self.params_model.parse(values, f"effect {self.__name__!r}")
 
 
 @dataclass(frozen=True)
@@ -165,7 +160,7 @@ def parameters(name: str) -> type[EffectParams] | None:
 def schema(name: str) -> dict[str, Any] | None:
     """The JSON schema of the effect's parameter model, with a `unit` on every property (None like `parameters`)."""
     model = parameters(name)
-    return None if model is None else model.model_json_schema()
+    return None if model is None else model.json_schema()
 
 
 def inputs(name: str) -> tuple[str, ...]:
@@ -267,7 +262,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
                 f"effect {name!r}: the input `{parameter.name}` needs a default (None), so that {name}(rgb) works"
             )
         declared.append(parameter.name)
-    clash = sorted(set(params.model_fields) & set(INPUTS))
+    clash = sorted(set(params.field_names()) & set(INPUTS))
     if clash:
         raise ValueError(f"effect {name!r}: `{clash[0]}` is supplied by the recipe, so it cannot be a parameter")
     return tuple(declared)

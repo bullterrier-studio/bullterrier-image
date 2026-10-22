@@ -52,7 +52,7 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     model = registry.parameters(name)
     if model is None:  # TRANSITIONAL: a legacy effect's parameters are its keyword arguments
         return _legacy_builder(name, function)
-    fields = list(model.model_fields)
+    fields = model.field_names()
 
     def build(*args: Any, **values: Any) -> Step:
         if len(args) > len(fields):

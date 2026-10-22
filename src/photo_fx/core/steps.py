@@ -5,8 +5,10 @@ Promises:
 - Everything is validated when it is made, wherever it comes from (a TOML file, `fx`, or your own code): an unknown
   effect, a misspelt or out-of-range parameter, a bad mask or opacity, an animated parameter without an animation, or
   an empty recipe fails at once with a `ValueError` saying what is valid. A step's parameters are checked by its
-  effect's own parameter model; an animated parameter is checked at both ends of its movement and at 9 moments
-  between, because an easing curve can overshoot its ends, so a bad animation fails here, not at some frame later.
+  effect's own parameter model. An animated parameter is checked by a step at both ends of its movement and at 9
+  moments between, and by its recipe at every frame that will be rendered, because an easing curve can overshoot its
+  ends: a bad animation fails when the recipe is made, not at some frame later. An animated whole-number parameter
+  moves in whole steps (rounded to the nearest whole number) and is checked that way.
 - Steps and recipes are immutable values (frozen Pydantic models): `where` and `blend` return changed copies. A step
   keeps its parameters as they were written, so `describe` shows them that way.
 - `Step.params_at` works out animated parameters for a moment of the clip; `Step.describe` gives a short readable form.
@@ -18,10 +20,10 @@ Dependency direction: imports `timing`, the effect registry and `params` only. `
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import Field, model_validator
 
 from . import registry
-from .params import describe_error
+from .params import ValidatedModel
 from .timing import Animated, Animation
 
 # The moments of an animated parameter's movement at which a step checks it: both ends first (so a bad end value is
@@ -29,14 +31,12 @@ from .timing import Animated, Animation
 _CHECKED_MOMENTS = (0.0, 1.0, *(i / 10 for i in range(1, 10)))
 
 
-class Step(BaseModel):
+class Step(ValidatedModel):
     """One effect with its parameters, optionally limited to the subject or the background and blended in partway.
 
     Steps are checked when they are made, wherever they come from (a recipe file, `fx`, or your own code): an unknown
     effect, a misspelt or out-of-range parameter or opacity fails at once with a message saying what is valid.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     effect: str = Field(description="The name of a registered effect.")
     params: dict[str, Any] = Field(
@@ -59,10 +59,7 @@ class Step(BaseModel):
     ) -> None:
         """Validate and make the step; ValueError saying what is wrong and what is valid (`unknown` keywords, which
         pydantic's own validation may pass, are refused by name)."""
-        try:
-            super().__init__(effect=effect, params=dict(params or {}), mask=mask, opacity=opacity, **unknown)
-        except ValidationError as error:
-            raise ValueError(describe_error(error, "", type(self).model_fields)) from None
+        self._init_checked("", effect=effect, params=dict(params or {}), mask=mask, opacity=opacity, **unknown)
 
     @model_validator(mode="after")
     def _valid_for_the_effect(self) -> "Step":
@@ -71,9 +68,10 @@ class Step(BaseModel):
             if name in self.params:
                 raise ValueError(f"`{name}` is supplied by the recipe itself and cannot be set")
         try:
-            registry.validate(self.effect, self.params_at(0.0))
-        except KeyError as error:
+            registry.inputs(self.effect)
+        except KeyError as error:  # an unknown effect: the message lists the known ones
             raise ValueError(error.args[0]) from None
+        registry.validate(self.effect, self.params_at(0.0))
         if self.animated:
             for moment in _CHECKED_MOMENTS:
                 try:
@@ -101,8 +99,18 @@ class Step(BaseModel):
         return "matte" in registry.inputs(self.effect)
 
     def params_at(self, position: float, clip: float | None = None) -> dict:
-        """The parameters with every animated value worked out for a moment of the clip (see `Animated.at`)."""
-        return {k: v.at(position, clip) if isinstance(v, Animated) else v for k, v in self.params.items()}
+        """The parameters with every animated value worked out for a moment of the clip (see `Animated.at`). An
+        animated whole-number parameter is rounded to the nearest whole number (halves to the even one, as Python's
+        `round`): it moves in whole steps."""
+        model = registry.parameters(self.effect)
+        whole = model.whole_number_fields() if model is not None else frozenset()
+        values = {}
+        for name, value in self.params.items():
+            if isinstance(value, Animated):
+                value = value.at(position, clip)
+                value = round(value) if name in whole else value
+            values[name] = value
+        return values
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `fill(color='#000000') on background`, cut to `width` characters."""
@@ -126,15 +134,13 @@ def _short(value: object) -> str:
     return text if len(text) <= 18 else text[:15] + "..."
 
 
-class Recipe(BaseModel):
+class Recipe(ValidatedModel):
     """A named look: ordered steps, the size the photo is scaled to, and an optional animation.
 
     name: used for output file names. steps: at least one `Step`, run in order (a list is accepted and kept as a tuple).
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. animation: an `Animation`; required if any step has an animated parameter.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(description="Used for output file names.")
     steps: tuple[Step, ...] = Field(description="The steps, run in order, each on the previous one's output.")
@@ -152,10 +158,7 @@ class Recipe(BaseModel):
         **unknown: Any,
     ) -> None:
         """Validate and make the recipe; ValueError saying what is wrong (unknown keywords are refused by name)."""
-        try:
-            super().__init__(name=name, steps=tuple(steps), size=size, animation=animation, **unknown)
-        except ValidationError as error:
-            raise ValueError(describe_error(error, "", type(self).model_fields)) from None
+        self._init_checked("", name=name, steps=tuple(steps), size=size, animation=animation, **unknown)
 
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":
@@ -165,7 +168,23 @@ class Recipe(BaseModel):
             raise ValueError(
                 "a parameter is animated but the recipe has no animation: add an [animation] table (seconds, fps)"
             )
+        if self.animation is not None:
+            self._check_every_frame(self.animation)
         return self
+
+    def _check_every_frame(self, animation: Animation) -> None:
+        """Each animated step's values at every frame that will be rendered: an easing curve can leave the range
+        between any few moments a step checks on its own, so the recipe, which knows its frames, checks them all."""
+        frames = animation.frames()
+        for number, step in enumerate(self.steps, start=1):
+            if not step.animated:
+                continue
+            for index, (motion, clip) in enumerate(frames):
+                try:
+                    registry.validate(step.effect, step.params_at(motion, clip))
+                except ValueError as error:
+                    where = f"frame {index} at {index / animation.fps:.2f} s"
+                    raise ValueError(f"step {number}: {error} (animated: {where})") from None
 
     @property
     def needs_matte(self) -> bool:
