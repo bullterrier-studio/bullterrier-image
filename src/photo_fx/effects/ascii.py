@@ -2,10 +2,10 @@
 
 import numpy as np
 
+from photo_fx.core.registry import effect
 from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
 
 from ._common import Color, ink_amount, luminance, parse_color, vivid
-from ._registry import effect
 
 # Other effects and tests still import these names from here.
 _glyph_atlas = glyph_atlas

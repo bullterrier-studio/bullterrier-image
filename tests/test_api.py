@@ -87,7 +87,7 @@ def test_every_effect_is_available_as_a_step_builder():
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(throwaway_effects):
     """fx.pyi itself is regenerated at integration (`photo-fx regenerate`), so only its generator is checked here."""
     from photo_fx import effects
-    from photo_fx.effects._registry import effect
+    from photo_fx.core.registry import effect
 
     @effect(category="utilities")
     def stub_probe(rgb, radius: float = 2.0, amount: float = 0.5, matte=None):
@@ -102,7 +102,7 @@ def test_the_editor_stub_is_valid_python_with_one_function_per_effect(throwaway_
 
 
 def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
-    from photo_fx.effects._registry import effect, unregister
+    from photo_fx.core.registry import effect, unregister
 
     @effect(category="utilities")
     def renamed_probe(rgb, old: float = 1.0):

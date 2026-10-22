@@ -13,7 +13,7 @@ from PIL import Image
 
 from photo_fx import effects, fx, gallery
 from photo_fx.cli import main
-from photo_fx.effects._registry import effect
+from photo_fx.core.registry import effect
 
 
 def _sections(page: str) -> dict[str, str]:

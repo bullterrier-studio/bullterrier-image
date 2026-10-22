@@ -3,8 +3,9 @@
 import numpy as np
 from scipy import ndimage
 
+from photo_fx.core.registry import effect
+
 from ._common import LUMA, Color, luminance, parse_color
-from ._registry import effect
 
 
 @effect(category="subject")

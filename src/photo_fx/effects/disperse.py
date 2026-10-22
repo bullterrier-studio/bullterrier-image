@@ -8,8 +8,9 @@ travelling against the wind.
 
 import numpy as np
 
+from photo_fx.core.registry import effect
+
 from ..ops import cells, distance
-from ._registry import effect
 from .ascii import cell_size
 
 # All times are shares of the moving part of the clip (progress 0..1), so they scale with the clip's length.

@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from photo_fx import effects
-from photo_fx.effects import _registry
-from photo_fx.effects._registry import unregister
+from photo_fx.core import registry as _registry
+from photo_fx.core.registry import unregister
 
 
 @pytest.fixture

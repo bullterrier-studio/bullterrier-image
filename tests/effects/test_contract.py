@@ -15,7 +15,7 @@ import pytest
 
 import photo_fx
 from photo_fx import effects
-from photo_fx.effects._registry import effect
+from photo_fx.core.registry import effect
 
 ALL = sorted(effects.describe())
 
@@ -59,7 +59,7 @@ def test_every_effect_can_run_on_the_image_alone(name):
 
 def _naming_problems(name: str) -> list[str]:
     """Every parameter of the effect `name` that uses a discouraged name, with the name to use instead."""
-    from photo_fx.effects._vocabulary import DISCOURAGED
+    from photo_fx.core.vocabulary import DISCOURAGED
 
     return [
         f"effect {name!r}: parameter `{parameter}` should be called `{DISCOURAGED[parameter]}`"
@@ -92,7 +92,7 @@ def test_the_vocabulary_check_flags_discouraged_names_and_passes_preferred_ones(
 
 
 def test_the_vocabulary_is_the_agreed_one():
-    from photo_fx.effects._vocabulary import DISCOURAGED
+    from photo_fx.core.vocabulary import DISCOURAGED
 
     assert DISCOURAGED == {
         "strength": "amount", "intensity": "amount", "factor": "amount", "colour": "color", "rotation": "angle",
@@ -104,7 +104,7 @@ def test_the_vocabulary_is_the_agreed_one():
 
 _NEW_MODULES = {
     "zz_probe.py": '''
-        from ._registry import effect
+        from photo_fx.core.registry import effect
 
         @effect(category="utilities")
         def probe_effect(rgb, amount: float = 0.5):
@@ -112,7 +112,7 @@ _NEW_MODULES = {
             return rgb
     ''',
     "_hidden.py": '''
-        from ._registry import effect
+        from photo_fx.core.registry import effect
 
         @effect(category="utilities")
         def hidden_probe(rgb, amount: float = 0.5):
@@ -291,7 +291,7 @@ def test_registering_the_same_function_twice_is_allowed(throwaway_effects):
 
 def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, throwaway_effects):
     (tmp_path / "reload_probe_module.py").write_text(
-        "from photo_fx.effects._registry import effect\n\n"
+        "from photo_fx.core.registry import effect\n\n"
         '@effect(category="utilities")\n'
         'def reload_probe(rgb, amount: float = 0.5):\n    """Reloaded."""\n    return rgb\n'
     )

@@ -4,7 +4,8 @@ import math
 
 import numpy as np
 
-from ._registry import effect
+from photo_fx.core.registry import effect
+
 from .ascii import ascii as text_art
 
 _TEXT_ROWS = 3  # fewest rows of characters in a text strip

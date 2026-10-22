@@ -3,8 +3,9 @@
 import numpy as np
 from scipy import ndimage
 
+from photo_fx.core.registry import effect
+
 from ._common import Color, ink_amount, luminance, parse_color, vivid
-from ._registry import effect
 
 
 @effect(category="stylised")

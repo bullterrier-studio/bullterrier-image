@@ -84,7 +84,7 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
 
 
 def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, monkeypatch):
-    from photo_fx.effects import _registry
+    from photo_fx.core import registry as _registry
 
     seen = []
     monkeypatch.setitem(_registry._EFFECTS, "spy", lambda rgb, matte=None: seen.append(matte) or rgb)
@@ -233,7 +233,7 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
 
 
 def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatch(photo, throwaway_effects):
-    from photo_fx.effects._registry import effect
+    from photo_fx.core.registry import effect
 
     @effect(category="utilities")
     def halve_for_shape_test(rgb, amount: float = 0.5):

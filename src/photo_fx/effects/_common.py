@@ -2,7 +2,7 @@
 
 import numpy as np
 
-Color = str | list[float] | tuple[float, float, float]
+from photo_fx.core.types import Color  # noqa: F401  (re-exported until this module moves to ops)
 
 
 def parse_color(color: Color) -> np.ndarray:

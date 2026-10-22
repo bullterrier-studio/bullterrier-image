@@ -2,8 +2,9 @@
 
 import numpy as np
 
+from photo_fx.core.registry import effect
+
 from ..ops import cells, distance
-from ._registry import effect
 from .ascii import cell_size
 
 

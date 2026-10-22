@@ -1,10 +1,13 @@
-"""The table of effects and the rules for getting into it.
+"""The table of effects, the rules for getting into it, and the queries over it.
 
-Kept apart from the package so effect modules can register themselves without importing it. Every rule is checked when
-an effect registers, so a broken effect fails at import, naming itself, instead of in some recipe much later.
+Effect modules register themselves here with `@effect(category=...)`; recipes, `fx`, the catalogue and the command line
+look effects up here. The registry knows nothing about where effects live: the app layer imports the effect library
+(`photo_fx.effects`), which registers every effect, before anything asks. Every rule is checked when an effect
+registers, so a broken effect fails at import, naming itself, instead of in some recipe much later.
 """
 
 import inspect
+import re
 from collections.abc import Callable
 
 import numpy as np
@@ -19,6 +22,10 @@ CATEGORIES = (
 
 _EFFECTS: dict[str, Effect] = {}
 _CATEGORY: dict[str, str] = {}
+
+# The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
+# never followed by a space; "e.g." and "i.e." are, so they are skipped.
+_SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")
 
 
 def effect(fn: Effect | None = None, *, category: str | None = None):
@@ -63,6 +70,23 @@ def category(name: str) -> str:
 def categories() -> dict[str, list[str]]:
     """Every category, in the order of `CATEGORIES`, with the sorted names of its effects (empty if it has none)."""
     return {c: sorted(name for name, of in _CATEGORY.items() if of == c) for c in CATEGORIES}
+
+
+def apply(name: str, rgb: np.ndarray, **params) -> np.ndarray:
+    """Run the effect called `name` with `params`; unknown names and parameters raise with the valid choices."""
+    return get(name)(rgb, **params)
+
+
+def describe() -> dict[str, str]:
+    """Effect name -> its documentation, for `photo-fx effects`."""
+    return {name: (fn.__doc__ or "").strip() for name, fn in sorted(_EFFECTS.items())}
+
+
+def summary(name: str) -> str:
+    """The first sentence of the documentation of the effect called `name`, on one line."""
+    text = " ".join((get(name).__doc__ or "").split())
+    end = _SENTENCE_END.search(text)
+    return text[: end.end()] if end else text
 
 
 def _register(fn: Effect, category: str | None) -> Effect:
