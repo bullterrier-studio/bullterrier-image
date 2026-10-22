@@ -32,6 +32,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# test files are named after the module they test, so equal names in different folders must never collide
+addopts = ["--import-mode=importlib"]
 
 [tool.ruff]
 line-length = 120
