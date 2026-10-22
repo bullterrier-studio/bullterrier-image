@@ -48,8 +48,8 @@ def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
     size: its exact size in bytes; a server that offers or sends more is cut off at once, so it cannot fill the disk.
     target: where it is kept; missing folders are created. A file at `target` with another digest (an earlier broken
     copy) is replaced. Raises DownloadError, naming `url` and `target` so the file can be fetched by hand, when the
-    download fails, the URL or a redirect is not allowed, or what arrived has another digest; `target` is then left as
-    it was and no temporary file remains.
+    folder cannot be written, the download fails, the URL or a redirect is not allowed, or what arrived has another
+    size or digest; `target` is then left as it was and no temporary file remains.
     """
     target = Path(target)
     if _is_verified(target, sha256):
@@ -58,11 +58,14 @@ def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
     scheme = urllib.parse.urlsplit(url).scheme
     if scheme != "file" and not _secure_or_local(url):
         raise DownloadError(f"only https downloads are allowed from other computers, not {scheme}: {url}; {by_hand}")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    _clear_dead_downloads(target)
     temporary = target.parent / f".{target.name}.{secrets.token_hex(8)}.part"
-    # created like any new file (0o666 less the umask, so the kept file needs no chmod) and only if it is new
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _BINARY, _NEW_FILE)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _clear_dead_downloads(target)
+        # created like any new file (0o666 less the umask, so the kept file needs no chmod) and only if it is new
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _BINARY, _NEW_FILE)
+    except OSError as error:  # no permission, a file in the way, a read-only or full disk
+        raise DownloadError(f"cannot write to the folder {target.parent} ({error}); {by_hand}") from error
     try:
         digest = hashlib.sha256()
         with os.fdopen(descriptor, "wb") as out:  # closed before the rename below, which Windows requires

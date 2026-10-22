@@ -151,6 +151,16 @@ def test_leftovers_of_a_download_killed_long_ago_are_cleared_by_the_next_downloa
     assert files_in(tmp_path) == [".model.onnx.live.part", ".other.onnx.dead.part", "model.onnx"]
 
 
+def test_a_cache_folder_that_cannot_be_written_gives_the_same_advice_before_any_download(server, tmp_path):
+    blocker = tmp_path / "not-a-folder"
+    blocker.write_text("a file where the cache folder should be")
+    target = blocker / "photo-fx" / "model.onnx"
+    with pytest.raises(DownloadError, match="by hand") as caught:
+        fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD))
+    assert str(blocker / "photo-fx") in str(caught.value)
+    assert server.requests == []
+
+
 def test_a_corrupt_cached_file_is_downloaded_again_and_replaced(server, tmp_path):
     target = tmp_path / "model.onnx"
     target.write_bytes(PAYLOAD[:100])  # an earlier, broken copy

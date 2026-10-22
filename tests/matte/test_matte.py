@@ -142,6 +142,19 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
     assert not missing.exists()  # pointing at a local file never downloads
 
 
+def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, monkeypatch):
+    """The user's cache folder lies under a file, so it cannot be made: the advice comes before any download."""
+    blocker = tmp_path / "not-a-home"
+    blocker.write_text("a file where the home folder should be")
+    for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
+        monkeypatch.setenv(variable, str(blocker))
+    monkeypatch.delenv("PHOTO_FX_MODEL")
+    with pytest.raises(RuntimeError, match="by hand") as caught:
+        subject_matte(ramp(), segmenter="onnx")
+    assert "PHOTO_FX_MODEL" in str(caught.value)
+    assert "--matte" in str(caught.value)
+
+
 def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
     monkeypatch.setenv("PHOTO_FX_MODEL", str(tmp_path / "mine.onnx"))
     assert onnx_model_path() == tmp_path / "mine.onnx"
