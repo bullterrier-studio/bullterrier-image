@@ -23,6 +23,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import IO
 
+from photo_fx.core.errors import PhotoFxError
+
 APP = "photo-fx"
 _CHUNK = 1 << 20  # bytes read at a time: memory use only, the result does not depend on it
 _TIMEOUT = 60.0  # seconds a stalled connection may stay silent before the download fails
@@ -36,8 +38,9 @@ _BINARY = getattr(os, "O_BINARY", 0)  # Windows only: no newline translation; 0 
 _verified: set[tuple[Path, int, int, str]] = set()
 
 
-class DownloadError(RuntimeError):
-    """A model file could not be downloaded or did not verify; the message says how to get it by hand."""
+class DownloadError(PhotoFxError, OSError):
+    """A model file could not be downloaded or did not verify; the message says how to get it by hand. An OSError too,
+    as a failed transfer or an unwritable folder is."""
 
 
 def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
@@ -82,6 +85,8 @@ def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
                             raise DownloadError(f"{too_large}; {by_hand}")
                         out.write(chunk)
                         digest.update(chunk)
+            except DownloadError:  # already says what went wrong (and is an OSError itself)
+                raise
             except (OSError, http.client.HTTPException) as error:  # URLError, timeouts and resets are OSErrors
                 raise DownloadError(f"could not download {url} ({error}); {by_hand}") from error
         if received != size:

@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from photo_fx import imageio
+from photo_fx import BackendUnavailableError, SubjectNotFoundError, imageio
 from photo_fx.matte import onnx_model_path, refine_edge, subject_matte
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
@@ -81,7 +81,7 @@ def test_the_onnx_matte_gets_the_same_edge_clean_up_as_any_matte(echo_red):
 
 def test_a_picture_where_nothing_stands_out_is_an_error(echo_red):
     flat = picture(np.full((20, 30), 0.3, np.float32))  # the model's answer stays below one half everywhere
-    with pytest.raises(RuntimeError, match="no subject"):
+    with pytest.raises(SubjectNotFoundError, match="no subject"):
         subject_matte(flat, segmenter="onnx")
 
 
@@ -123,7 +123,7 @@ def test_on_macos_the_automatic_choice_is_apple_vision(echo_red, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
 def test_apple_vision_is_refused_off_macos_saying_what_to_use_instead():
-    with pytest.raises(RuntimeError, match="macOS") as caught:
+    with pytest.raises(BackendUnavailableError, match="macOS") as caught:
         subject_matte(ramp(), segmenter="vision")
     assert "onnx" in str(caught.value)
 
@@ -137,7 +137,7 @@ def test_off_macos_the_automatic_choice_is_the_portable_model(echo_red):
 def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it(tmp_path, monkeypatch):
     missing = tmp_path / "isnet.onnx"
     monkeypatch.setenv("PHOTO_FX_MODEL", str(missing))
-    with pytest.raises(RuntimeError, match="PHOTO_FX_MODEL") as caught:
+    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_MODEL") as caught:
         subject_matte(ramp(), segmenter="onnx")
     assert str(missing) in str(caught.value)
     assert not missing.exists()  # pointing at a local file never downloads
@@ -150,7 +150,7 @@ def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, 
     for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
         monkeypatch.setenv(variable, str(blocker))
     monkeypatch.delenv("PHOTO_FX_MODEL")
-    with pytest.raises(RuntimeError, match="by hand") as caught:
+    with pytest.raises(BackendUnavailableError, match="by hand") as caught:
         subject_matte(ramp(), segmenter="onnx")
     assert "PHOTO_FX_MODEL" in str(caught.value)
     assert "--matte" in str(caught.value)

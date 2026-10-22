@@ -25,6 +25,8 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from photo_fx.core.errors import BackendUnavailableError, SubjectNotFoundError
+
 from . import _onnx, _vision
 from .download import DownloadError, fetch, user_cache_dir
 
@@ -46,14 +48,15 @@ def subject_matte(
     `segmenter` is `"vision"` or `"onnx"`; None leaves the choice to `PHOTO_FX_SEGMENTER`, then to what this computer
     has (see the module documentation).
 
-    Raises ValueError for an unknown segmenter name, RuntimeError if nothing stands out or the chosen backend cannot run
+    Raises ValueError for an unknown segmenter name, SubjectNotFoundError if nothing stands out, and
+    BackendUnavailableError if the chosen backend cannot run
     here (the message says what was tried and what to do instead).
     """
     name, why = _choose(segmenter)
     mask = _vision_mask(rgb, why) if name == "vision" else _onnx_mask(rgb, why)
     eight_bit = mask is not None and mask.dtype == np.uint8  # Vision answers in 0..255, the portable model in 0..1
     if mask is None or not (mask >= (_HALF * _EIGHT_BIT if eight_bit else _HALF)).any():
-        raise RuntimeError("no subject found in the picture (no person, pet or object stood out)")
+        raise SubjectNotFoundError("no subject found in the picture (no person, pet or object stood out)")
     height, width = rgb.shape[:2]
     alpha = np.asarray(Image.fromarray(mask).resize((width, height), Image.Resampling.BILINEAR), np.float32)
     if eight_bit:
@@ -89,7 +92,7 @@ def _choose(segmenter: str | None) -> tuple[str, str]:
 def _vision_mask(rgb: np.ndarray, why: str) -> np.ndarray | None:
     reason = _vision.unavailable_reason()
     if reason is not None:
-        raise RuntimeError(
+        raise BackendUnavailableError(
             f"cannot find the subject with Apple Vision, chosen by {why}: {reason}. Choose the portable model "
             f"instead (segmenter 'onnx', or {SEGMENTER_VARIABLE}=onnx), or give the subject's matte yourself (--matte)"
         )
@@ -101,19 +104,19 @@ def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
     model = onnx_model_path()
     if os.environ.get(MODEL_VARIABLE):
         if not model.is_file():
-            raise RuntimeError(f"{tried}: {MODEL_VARIABLE} names {model}, which is not a file")
+            raise BackendUnavailableError(f"{tried}: {MODEL_VARIABLE} names {model}, which is not a file")
     else:
         try:
             fetch(_onnx.MODEL_URL, _onnx.MODEL_SHA256, model, size=_onnx.MODEL_SIZE)
         except DownloadError as error:
-            raise RuntimeError(
+            raise BackendUnavailableError(
                 f"{tried}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the subject's matte yourself "
                 "(--matte)"
             ) from error
     try:
         return _onnx.subject_probability(rgb, model)
     except ImportError as error:
-        raise RuntimeError(f"{tried}: it needs onnxruntime (pip install onnxruntime): {error}") from error
+        raise BackendUnavailableError(f"{tried}: it needs onnxruntime (pip install onnxruntime): {error}") from error
 
 
 def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:

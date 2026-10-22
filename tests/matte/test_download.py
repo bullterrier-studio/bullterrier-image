@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from photo_fx import PhotoFxError
 from photo_fx.matte.download import DownloadError, fetch, user_cache_dir
 
 PAYLOAD = b"not really a model, but bytes all the same\n" * 1000
@@ -78,6 +79,11 @@ def files_in(folder: Path) -> list[str]:
     return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
 
 
+def test_a_failed_download_is_one_of_photo_fxs_own_errors(tmp_path):
+    with pytest.raises(PhotoFxError, match="only https"):
+        fetch("ftp://models.example.invalid/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
+
+
 def test_a_verified_download_lands_at_the_target_with_the_served_bytes(server, tmp_path):
     target = tmp_path / "cache" / "model.onnx"  # the folder does not exist yet
     assert fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD)) == target
@@ -125,8 +131,9 @@ def test_a_download_larger_than_the_file_asked_for_is_stopped_and_nothing_is_kep
     """Announced or not, more bytes than the pinned size means it is not the file: stop before the disk fills."""
     server.body = PAYLOAD * 3
     server.length_header = length_header
-    with pytest.raises(DownloadError, match=f"larger than the expected {len(PAYLOAD)} bytes"):
+    with pytest.raises(DownloadError, match=f"larger than the expected {len(PAYLOAD)} bytes") as caught:
         fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
+    assert str(caught.value).count("by hand") == 1  # said once, not wrapped in a second "could not download"
     assert files_in(tmp_path) == []
 
 
