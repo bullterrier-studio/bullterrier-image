@@ -10,6 +10,7 @@ import socket
 import stat
 import sys
 import threading
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -135,6 +136,19 @@ def test_a_download_that_ends_early_says_how_far_it_got(server, tmp_path):
     with pytest.raises(DownloadError, match=f"stopped after 1000 of {len(PAYLOAD)} bytes"):
         fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
     assert files_in(tmp_path) == []
+
+
+def test_leftovers_of_a_download_killed_long_ago_are_cleared_by_the_next_download(server, tmp_path):
+    """A killed process cannot clean up after itself; the next download does, but only what is clearly dead."""
+    two_days_ago = time.time() - 2 * 24 * 3600
+    for name in (".model.onnx.dead1.part", ".model.onnx.dead2.part"):
+        (tmp_path / name).write_bytes(b"half a model")
+        os.utime(tmp_path / name, (two_days_ago, two_days_ago))
+    (tmp_path / ".model.onnx.live.part").write_bytes(b"another process, still downloading")  # touched just now
+    (tmp_path / ".other.onnx.dead.part").write_bytes(b"not ours")
+    os.utime(tmp_path / ".other.onnx.dead.part", (two_days_ago, two_days_ago))
+    fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
+    assert files_in(tmp_path) == [".model.onnx.live.part", ".other.onnx.dead.part", "model.onnx"]
 
 
 def test_a_corrupt_cached_file_is_downloaded_again_and_replaced(server, tmp_path):

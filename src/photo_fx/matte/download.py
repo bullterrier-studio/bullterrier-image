@@ -9,11 +9,13 @@ computer (tests, a local mirror). Nothing here runs at import time.
 `user_cache_dir()` is where such files belong on each platform.
 """
 
+import glob
 import hashlib
 import http.client
 import os
 import secrets
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +27,7 @@ APP = "photo-fx"
 _CHUNK = 1 << 20  # bytes read at a time: memory use only, the result does not depend on it
 _TIMEOUT = 60.0  # seconds a stalled connection may stay silent before the download fails
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}  # this computer: the IPv4 and IPv6 loopback addresses and their name
+_DEAD_AFTER = 24 * 3600  # seconds since a temporary file was last written after which its download is surely dead
 _NEW_FILE = 0o666  # the permissions a new file asks for before the umask (POSIX open())
 _BINARY = getattr(os, "O_BINARY", 0)  # Windows only: no newline translation; 0 (no flag) elsewhere
 
@@ -56,6 +59,7 @@ def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
     if scheme != "file" and not _secure_or_local(url):
         raise DownloadError(f"only https downloads are allowed from other computers, not {scheme}: {url}; {by_hand}")
     target.parent.mkdir(parents=True, exist_ok=True)
+    _clear_dead_downloads(target)
     temporary = target.parent / f".{target.name}.{secrets.token_hex(8)}.part"
     # created like any new file (0o666 less the umask, so the kept file needs no chmod) and only if it is new
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _BINARY, _NEW_FILE)
@@ -109,6 +113,17 @@ def user_cache_dir(
         local = environ.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
         return Path(local) / APP / "Cache"
     return Path(environ.get("XDG_CACHE_HOME") or home / ".cache") / APP
+
+
+def _clear_dead_downloads(target: Path) -> None:
+    """Delete the temporary files of earlier downloads of `target` that died without cleaning up (a killed process,
+    a power cut). One untouched for a day is dead; a younger one may be another process still downloading."""
+    for leftover in target.parent.glob(f".{glob.escape(target.name)}.*.part"):
+        try:
+            if time.time() - leftover.stat().st_mtime > _DEAD_AFTER:
+                leftover.unlink()
+        except OSError:  # gone already, or held open by its process (Windows): not ours to force
+            continue
 
 
 def _secure_or_local(url: str) -> bool:
