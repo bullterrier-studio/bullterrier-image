@@ -11,8 +11,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import effects, fx, imageio
+from .loader import load_recipe
 from .matte import subject_matte
-from .recipe import load_recipe, render
+from .runner import render
 
 _ROOT = Path(__file__).resolve().parents[2]  # src/photo_fx/gallery.py -> the checkout
 EXAMPLES = _ROOT / "examples" / "effects"

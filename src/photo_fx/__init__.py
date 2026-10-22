@@ -19,7 +19,11 @@ Modules, each owning one decision:
     matte      finding the subject: person, pet or object (which model is hidden here)
     effects    the effect library: pure functions image -> image
     fx         the same effects as validated steps, for building recipes in Python
-    recipe     effect lists (Python or TOML), running them, tracing them, animating them
+    timing     values changing over a clip: easing, `ramp`, `Animation`
+    steps      `Step` and `Recipe`: the data model of a look
+    loader     recipes from TOML files
+    runner     running a recipe on a photo: render, trace, animate
+    recipe     the public namespace re-exporting the four above
     pipeline   many photos x many recipes: caching, automatic checks, export, report
     checks     automatic quality checks
     gallery    the effect catalogue and its pictures (docs/effects.md)
@@ -28,9 +32,12 @@ Modules, each owning one decision:
 """
 
 from . import fx, imageio
+from .loader import load_recipe
 from .matte import subject_matte
 from .pipeline import Project, load_project, run
-from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
+from .runner import Stage, render, render_all, render_frames, trace
+from .steps import Recipe, Step
+from .timing import Animation, ramp
 
 __all__ = [
     "Animation", "Project", "Recipe", "Stage", "Step", "fx", "imageio", "load_project", "load_recipe",

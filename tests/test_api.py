@@ -7,7 +7,7 @@ import pytest
 
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
-from photo_fx.recipe import Animated, Animation
+from photo_fx.timing import Animated, Animation
 
 # --- steps are checked when they are made, wherever they come from ------------------------------------------------
 
