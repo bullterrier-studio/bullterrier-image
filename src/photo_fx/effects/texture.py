@@ -39,11 +39,3 @@ def halftone(
     coverage = np.clip((radius - dist) * cell + 0.5, 0.0, 1.0)[..., None]  # one pixel of anti-aliasing
     dots = vivid(sampled) if fg is None else parse_color(fg)
     return (bg_color * (1.0 - coverage) + dots * coverage).astype(np.float32)
-
-
-@effect(category="light")
-def glow(rgb: np.ndarray, radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55) -> np.ndarray:
-    """Soft bloom around the bright parts. `radius` in px, `amount` 0..1+, `threshold` = where glow starts."""
-    bright = np.clip((rgb - threshold) / (1.0 - threshold), 0.0, 1.0)
-    halo = ndimage.gaussian_filter(bright, sigma=(radius, radius, 0))
-    return (1.0 - (1.0 - rgb) * (1.0 - np.clip(amount * halo, 0, 1))).astype(np.float32)  # screen blend
