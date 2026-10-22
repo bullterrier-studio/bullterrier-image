@@ -487,3 +487,33 @@ def test_disperse_edge_depth_is_how_deep_closeness_to_the_edge_decides_the_order
     shallow = (effects.apply("disperse", _lit(), edge_depth=0.05, **settings) == 1.0).mean()
     deep = (effects.apply("disperse", _lit(), edge_depth=1.0, **settings) == 1.0).mean()
     assert shallow > deep + 0.2
+
+
+def test_disperse_takes_its_edge_from_the_matte_when_given():
+    img = np.ones((200, 200, 3), np.float32)  # everything is lit...
+    matte = np.zeros((200, 200), np.float32)
+    matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
+    kwargs = {"progress": 0.5, "top": 0, "edge": 1.0, "sweep": 0, "seed": 1}
+    with_matte = effects.apply("disperse", img, matte=matte, **kwargs)
+    without = effects.apply("disperse", img, **kwargs)
+    outside = (slice(150, None), slice(20, 60))
+    assert with_matte[outside].max() == 0.0  # outside the silhouette is all edge: it has gone by half-way
+    assert without[outside].mean() > 0.8  # with no matte only the picture's borders are edges, so most of it stays
+    assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure waits its turn
+
+
+def _ragged_picture() -> np.ndarray:
+    """Lit and dark pieces at random, so the outline turns at every piece."""
+    cell_w, cell_h = cell_size(5)
+    lit = np.random.default_rng(0).random((20, 40)) < 0.5
+    return np.kron(lit, np.ones((cell_h, cell_w)))[..., None].repeat(3, axis=2).astype(np.float32)
+
+
+def test_disperse_normal_smoothing_changes_which_way_pieces_are_thrown():
+    kwargs = {"progress": 0.4, "outward": 1.0, "seed": 1}
+    sharp = effects.apply("disperse", _ragged_picture(), normal_smoothing=1.0, **kwargs)
+    blurred = effects.apply("disperse", _ragged_picture(), normal_smoothing=8.0, **kwargs)
+    assert not np.array_equal(sharp, blurred)
+    for out in (sharp, blurred):
+        assert out.min() >= 0.0
+        assert out.max() <= 1.0

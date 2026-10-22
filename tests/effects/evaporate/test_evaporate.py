@@ -224,3 +224,20 @@ def test_evaporate_rise_skew_above_one_keeps_most_pieces_low():
         return 30 * cell_size(5)[1] - float((rows * profile).sum() / profile.sum())
 
     assert mean_climb(4.0) < mean_climb(1.0) < mean_climb(0.25)
+
+
+def _ragged_picture() -> np.ndarray:
+    """Lit and dark pieces at random, so the outline turns at every piece."""
+    cell_w, cell_h = cell_size(5)
+    lit = np.random.default_rng(0).random((20, 40)) < 0.5
+    return np.kron(lit, np.ones((cell_h, cell_w)))[..., None].repeat(3, axis=2).astype(np.float32)
+
+
+def test_evaporate_normal_smoothing_changes_which_way_pieces_are_thrown():
+    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "outward": 1.0, "seed": 1}
+    sharp = effects.apply("evaporate", _ragged_picture(), normal_smoothing=1.0, **kwargs)
+    blurred = effects.apply("evaporate", _ragged_picture(), normal_smoothing=8.0, **kwargs)
+    assert not np.array_equal(sharp, blurred)
+    for out in (sharp, blurred):
+        assert out.min() >= 0.0
+        assert out.max() <= 1.0
