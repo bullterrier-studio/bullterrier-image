@@ -44,10 +44,7 @@ def cell_labels(shape: tuple[int, int], points: np.ndarray) -> np.ndarray:
     if len(points) == 0:
         raise ValueError("cell_labels needs at least one point")
     h, w = shape
-    ys, xs = np.mgrid[0:h, 0:w]
-    centres = np.stack([xs.ravel() + 0.5, ys.ravel() + 0.5], axis=1)
-    _, nearest = cKDTree(points.astype(np.float64)).query(centres, workers=-1)
-    return nearest.reshape(h, w).astype(np.int32)
+    return _nearest(points, _sample_centres(h, w, h, w)).reshape(h, w)
 
 
 def cell_means(image: np.ndarray, labels: np.ndarray, count: int) -> np.ndarray:
@@ -88,3 +85,51 @@ def cell_borders(labels: np.ndarray) -> np.ndarray:
     borders[:, :-1] |= labels[:, :-1] != labels[:, 1:]
     borders[:-1, :] |= labels[:-1, :] != labels[1:, :]
     return borders
+
+
+# Lloyd relaxation only needs centroids good to a fraction of a cell, so large pictures are sampled on a coarser grid.
+_RELAX_MAX_SAMPLES = 256
+
+
+def _sample_centres(h: int, w: int, rows: int, cols: int) -> np.ndarray:
+    """`(rows * cols, 2)` float64 (x, y) centres of a `rows x cols` grid of equal tiles covering the h x w picture."""
+    ys = (np.arange(rows) + 0.5) * (h / rows)
+    xs = (np.arange(cols) + 0.5) * (w / cols)
+    return np.stack(np.meshgrid(xs, ys), axis=-1).reshape(-1, 2)
+
+
+def _nearest(points: np.ndarray, samples: np.ndarray) -> np.ndarray:
+    """int32 index of the point nearest each sample position."""
+    _, nearest = cKDTree(points.astype(np.float64)).query(samples, workers=-1)
+    return nearest.astype(np.int32)
+
+
+def relax(points: np.ndarray, shape: tuple[int, int], iterations: int = 3) -> np.ndarray:
+    """Spread points evenly with Lloyd relaxation: repeatedly move each point to the centroid of its Voronoi cell.
+
+    Args:
+        points: `(n, 2)` array of `(x, y)` in pixels, inside the picture.
+        shape: picture size `(h, w)` in pixels.
+        iterations: number of relaxation rounds, 0 or more; 0 returns a copy of `points`. Three rounds give visibly
+            even spacing; more rounds approach a regular hexagonal pattern.
+
+    Returns:
+        New `(n, 2)` float32 array, same order as `points`, every point still inside the picture. A point whose cell
+        holds no pixel (for example a duplicate) stays where it was.
+    """
+    if iterations < 0:
+        raise ValueError(f"iterations must be 0 or more, got {iterations}")
+    h, w = shape
+    step = max(1, -(-max(h, w) // _RELAX_MAX_SAMPLES))
+    samples = _sample_centres(h, w, -(-h // step), -(-w // step))
+    current = points.astype(np.float32)
+    for _ in range(iterations):
+        labels = _nearest(current, samples)
+        sizes = np.bincount(labels, minlength=len(current))
+        sums = np.stack(
+            [np.bincount(labels, weights=samples[:, axis], minlength=len(current)) for axis in (0, 1)], axis=1
+        )
+        occupied = sizes > 0
+        current = current.copy()
+        current[occupied] = sums[occupied] / sizes[occupied, None]
+    return current

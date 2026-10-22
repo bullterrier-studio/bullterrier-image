@@ -184,3 +184,74 @@ def test_cell_borders_flag_the_pixel_before_a_change_never_the_one_after():
     labels = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=np.int32)
     expected = np.array([[False, True, False], [True, True, False], [False, False, False]])
     assert np.array_equal(voronoi.cell_borders(labels), expected)
+
+
+# ---------------------------------------------------------------- relax
+
+
+def _area_spread(shape, points):
+    """Coefficient of variation of the Voronoi cell areas (pixel counts)."""
+    areas = np.bincount(voronoi.cell_labels(shape, points).ravel(), minlength=len(points))
+    return areas.std() / areas.mean()
+
+
+def test_relax_makes_cell_areas_more_even():
+    shape = (120, 160)
+    points = voronoi.random_points(shape, 60, seed=0)
+    relaxed = voronoi.relax(points, shape, iterations=3)
+    assert _area_spread(shape, relaxed) < 0.7 * _area_spread(shape, points)
+
+
+def test_relax_makes_cell_areas_more_even_on_a_large_picture():
+    shape = (700, 1000)  # bigger than the sampling grid relax uses internally
+    points = voronoi.random_points(shape, 80, seed=4)
+    relaxed = voronoi.relax(points, shape, iterations=3)
+    assert _area_spread(shape, relaxed) < 0.7 * _area_spread(shape, points)
+
+
+def test_relax_keeps_points_inside_the_picture_even_from_the_corner():
+    shape = (30, 80)
+    points = np.vstack([voronoi.random_points(shape, 40, seed=1), [[0.0, 0.0]]]).astype(np.float32)
+    relaxed = voronoi.relax(points, shape, iterations=5)
+    assert relaxed.shape == points.shape and relaxed.dtype == np.float32
+    assert relaxed[:, 0].min() >= 0 and relaxed[:, 0].max() < 80
+    assert relaxed[:, 1].min() >= 0 and relaxed[:, 1].max() < 30
+
+
+def test_relax_with_zero_iterations_returns_the_input_values_in_a_new_array():
+    points = voronoi.random_points((30, 80), 10, seed=1)
+    result = voronoi.relax(points, (30, 80), iterations=0)
+    assert np.array_equal(result, points) and result is not points
+
+
+def test_relax_is_deterministic_and_leaves_its_input_untouched():
+    points = voronoi.random_points((30, 80), 10, seed=1)
+    before = points.copy()
+    first = voronoi.relax(points, (30, 80))
+    second = voronoi.relax(points, (30, 80))
+    assert np.array_equal(first, second) and np.array_equal(points, before)
+    assert not np.array_equal(first, points)
+
+
+def test_relax_moves_a_single_point_to_the_centre_of_a_non_square_picture():
+    relaxed = voronoi.relax(np.array([[3.0, 4.0]], dtype=np.float32), (20, 60), iterations=1)
+    assert np.allclose(relaxed, [[30.0, 10.0]])
+
+
+def test_relax_moves_each_point_to_the_centroid_of_its_cell():
+    # the boundary between the points is x = 18 (a pixel edge), so the cells are x in [0, 18) and [18, 40), y in [0, 20)
+    points = np.array([[5.0, 3.0], [31.0, 3.0]], dtype=np.float32)
+    relaxed = voronoi.relax(points, (20, 40), iterations=1)
+    assert np.allclose(relaxed, [[9.0, 10.0], [29.0, 10.0]])
+
+
+def test_relax_leaves_a_point_whose_cell_has_no_pixels_where_it_was():
+    points = np.array([[5.0, 10.0], [5.0, 10.0], [31.0, 10.0]], dtype=np.float32)  # the first two coincide
+    relaxed = voronoi.relax(points, (20, 40), iterations=1)
+    assert np.isfinite(relaxed).all()
+    assert 5.0 in relaxed[:, 0] and np.isclose(relaxed[:, 0], 9.0).any()
+
+
+def test_relax_rejects_negative_iterations():
+    with pytest.raises(ValueError):
+        voronoi.relax(voronoi.random_points((10, 10), 3, seed=0), (10, 10), iterations=-1)
