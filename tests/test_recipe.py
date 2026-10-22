@@ -311,7 +311,7 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default():
     it refuses, and the facade passing that refusal on shows the same default. No stand-in is needed either way."""
     photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
-    animated = Recipe("a", masked.steps + (Step("grade", {"exposure": Animated(0.0, 1.0)}),), None, Animation(2, 1))
+    animated = Recipe("a", (*masked.steps, Step("grade", {"exposure": Animated(0.0, 1.0)})), None, Animation(2, 1))
     if sys.platform == "darwin":
         alpha = subject_matte(photo)
         expected = runner.render(photo, masked, alpha)

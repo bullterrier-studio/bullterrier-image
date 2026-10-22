@@ -60,11 +60,16 @@ def test_an_emptied_registry_holds_only_what_the_test_registers_and_gets_the_rea
     """The helper behind `fresh_registry`: real effects come back, in their order, even when the block fails."""
     real = effects.all_effects()
     real_categories = {name: effects.category(name) for name in real}
-    with pytest.raises(RuntimeError, match="test failed"), registry_emptied():
-        assert effects.all_effects() == {}
-        register_probe("only_probe", "light")
-        assert list(effects.all_effects()) == ["only_probe"]
-        raise RuntimeError("test failed")
+
+    def use_the_emptied_registry_then_fail():
+        with registry_emptied():
+            assert effects.all_effects() == {}
+            register_probe("only_probe", "light")
+            assert list(effects.all_effects()) == ["only_probe"]
+            raise RuntimeError("test failed")
+
+    with pytest.raises(RuntimeError, match="test failed"):
+        use_the_emptied_registry_then_fail()
     assert list(effects.all_effects().items()) == list(real.items())
     assert {name: effects.category(name) for name in real} == real_categories
 
@@ -292,7 +297,7 @@ def test_a_second_function_under_an_existing_name_is_an_error_naming_both_module
     first = twin
     first.__module__ = "photo_fx.effects.first_module"
 
-    def twin(rgb, amount: float = 0.5):  # noqa: F811  (the point of the test: a second function, same name)
+    def twin(rgb, amount: float = 0.5):  # type: ignore[no-redef]  the point of the test: a second function, same name
         """Second."""
         return 1 - rgb
 

@@ -32,7 +32,7 @@ def test_evaporate_only_moves_pieces_up_and_never_adds_light():
 
 def test_evaporate_vanish_controls_how_many_pieces_survive_the_trip():
     lit = np.ones((120, 128, 3), np.float32)
-    kwargs = dict(cell=5, start=0.9, end=0.5, rise=0.4, seed=2)
+    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2}
     keep_all = effects.apply("evaporate", lit, vanish=0.0, **kwargs)
     some = effects.apply("evaporate", lit, vanish=0.5, **kwargs)
     none = effects.apply("evaporate", lit, vanish=1.0, **kwargs)
@@ -57,7 +57,7 @@ def test_evaporate_edge_sheds_the_outline_and_keeps_the_inside():
 
 def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
     sides = lambda img: img[:, :55].sum() + img[:, 145:].sum()  # noqa: E731
-    kwargs = dict(cell=5, start=0, edge=0.1, seed=1)
+    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "seed": 1}
     assert sides(effects.apply("evaporate", _block(), outward=0.8, **kwargs)) > sides(
         effects.apply("evaporate", _block(), outward=0.0, **kwargs)
     )
@@ -97,7 +97,7 @@ def _figure_with_a_dark_gap():
 
 def test_evaporate_does_not_treat_dark_parts_of_the_figure_as_its_edge():
     img, matte = _figure_with_a_dark_gap()
-    kwargs = dict(cell=5, start=0, edge=0.1, outward=0.5, seed=1)
+    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "outward": 0.5, "seed": 1}
     for given in (matte, None):  # with the real silhouette, and with the fallback that fills enclosed gaps
         out = effects.apply("evaporate", img, matte=given, **kwargs)
         assert out[100:140, 80:120][img[100:140, 80:120] > 0].min() == 1.0  # lit pieces around the gap survive
@@ -107,7 +107,7 @@ def test_evaporate_takes_its_edge_from_the_matte_when_given():
     img = np.ones((200, 200, 3), np.float32)  # everything is lit...
     matte = np.zeros((200, 200), np.float32)
     matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
-    kwargs = dict(cell=5, start=0, edge=0.05, seed=1)
+    kwargs = {"cell": 5, "start": 0, "edge": 0.05, "seed": 1}
     with_matte = effects.apply("evaporate", img, matte=matte, **kwargs)
     without = effects.apply("evaporate", img, **kwargs)
     assert with_matte[150:, 20:60].mean() < 1.0  # outside the silhouette: sheds
@@ -124,7 +124,7 @@ def test_evaporate_seed_controls_the_dissolve(photo):
 def test_evaporate_wind_pushes_the_pieces_sideways():
     lit = np.zeros((200, 200, 3), np.float32)
     lit[120:140, 90:110] = 1.0  # a lit block near the middle
-    kwargs = dict(cell=5, start=1.0, end=0.5, rise=0.5, seed=3)
+    kwargs = {"cell": 5, "start": 1.0, "end": 0.5, "rise": 0.5, "seed": 3}
     right = effects.apply("evaporate", lit, wind=0.8, **kwargs)
     left = effects.apply("evaporate", lit, wind=-0.8, **kwargs)
     columns = np.arange(200)

@@ -332,18 +332,18 @@ class TestEdgeCases:
         field = fractal_noise((24, 40), scale, 2, octaves=3, kind=kind)
         assert field.shape == (24, 40)
         assert field.dtype == np.float32
-        assert 0.0 <= field.min()
+        assert field.min() >= 0.0
         assert field.max() <= 1.0
 
     @pytest.mark.parametrize("persistence", [0.01, 1.0, 5.0])
     def test_persistence_beyond_the_usual_range_stays_in_0_1(self, persistence):
         field = fractal_noise((64, 64), 16, 2, octaves=4, persistence=persistence)
-        assert 0.0 <= field.min()
+        assert field.min() >= 0.0
         assert field.max() <= 1.0
 
     def test_the_most_octaves_allowed_stay_in_range(self):
         field = fractal_noise((200, 200), 1e6, 2, octaves=32)
-        assert 0.0 <= field.min()
+        assert field.min() >= 0.0
         assert field.max() <= 1.0
 
     @pytest.mark.parametrize("lacunarity", [1.0, 2.0])
@@ -359,7 +359,7 @@ class TestEdgeCases:
     def test_single_row_column_or_pixel_canvases(self, shape):
         for field in (fractal_noise(shape, 8, 3, octaves=2), worley(shape, 3, 3), worley(shape, 3, 3, metric="f2-f1")):
             assert field.shape == shape
-            assert 0.0 <= field.min()
+            assert field.min() >= 0.0
             assert field.max() <= 1.0
 
     @pytest.mark.parametrize("cells", [0.2, 1e7])
@@ -367,7 +367,7 @@ class TestEdgeCases:
         for metric in METRICS:
             field = worley((30, 50), cells, 4, metric=metric)
             assert field.shape == (30, 50)
-            assert 0.0 <= field.min()
+            assert field.min() >= 0.0
             assert field.max() <= 1.0
 
 
@@ -493,7 +493,7 @@ def test_extreme_scale_and_lacunarity_do_not_overflow():
     # lacunarity ** octave alone would exceed the float range at octave 2.
     field = fractal_noise((8, 8), 1e308, 1, octaves=3, lacunarity=1e300)
     assert field.shape == (8, 8)
-    assert 0.0 <= field.min()
+    assert field.min() >= 0.0
     assert field.max() <= 1.0
 
 

@@ -48,9 +48,10 @@ def violations(source: str) -> list[str]:
                     if any(_private(part) for part in alias.name.split(".")):
                         found.append((node.lineno, f"imports private {alias.name}"))
     for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute) and _private(node.attr) and _refers_to_photo_fx(node.value, bound):
-            found.append((node.lineno, f"reads private {ast.unparse(node)}"))
-        elif isinstance(node, ast.Call) and _is_private_getattr(node, bound):
+        reads_attribute = isinstance(node, ast.Attribute) and _private(node.attr)
+        if (reads_attribute and _refers_to_photo_fx(node.value, bound)) or (
+            isinstance(node, ast.Call) and _is_private_getattr(node, bound)
+        ):
             found.append((node.lineno, f"reads private {ast.unparse(node)}"))
         elif isinstance(node, ast.Call) and _is_patch(node.func):
             target = node.args[0] if node.args else next((k.value for k in node.keywords if k.arg == "target"), None)
@@ -90,9 +91,11 @@ def unexplained(root: Path, allowed: dict[tuple[str, str], str]) -> list[str]:
     problems = []
     for path in sorted(root.rglob("*.py")):
         relative = path.relative_to(root).as_posix()
-        for problem in violations(path.read_text()):
-            if not any(file == relative and name in problem for (file, name) in allowed):
-                problems.append(f"{relative} {problem}")
+        problems.extend(
+            f"{relative} {problem}"
+            for problem in violations(path.read_text())
+            if not any(file == relative and name in problem for (file, name) in allowed)
+        )
     return problems
 
 

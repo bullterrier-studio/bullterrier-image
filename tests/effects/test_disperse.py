@@ -42,7 +42,7 @@ def test_disperse_wind_carries_pieces_in_its_direction():
     blob = np.zeros((120, 200, 3), np.float32)
     blob[40:80, 80:120] = 1.0
     centre = lambda img: float((img.max(axis=(0, 2)) * np.arange(200)).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731
-    kwargs = dict(progress=0.25, top=0, edge=0, sweep=0, angle=0, seed=2)
+    kwargs = {"progress": 0.25, "top": 0, "edge": 0, "sweep": 0, "angle": 0, "seed": 2}
     assert (
         centre(effects.apply("disperse", blob, wind=0.3, **kwargs))
         > 100
@@ -118,8 +118,8 @@ def test_disperse_no_piece_travels_more_than_a_third_of_the_picture_at_any_angle
 
 
 def test_disperse_hover_floats_a_piece_slowly_with_the_wind_long_before_it_goes():
-    img, (y0, x0) = _one_piece()
-    kwargs = dict(wind=0.3, angle=30, seed=3)
+    img, (_, x0) = _one_piece()
+    kwargs = {"wind": 0.3, "angle": 30, "seed": 3}
     drift = lambda hover: next(x for p, x, _ in _track(img, hover=hover, **kwargs) if p >= 0.05) - x0  # noqa: E731
     assert drift(0.3) > 1.0  # floating up and with the wind: nothing has detached yet
     assert drift(0.0) <= 0.5  # without hovering it stays put (or starts to pull back) at this point

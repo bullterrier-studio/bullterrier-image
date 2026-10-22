@@ -27,7 +27,7 @@ def test_atlas_shape_matches_cell_size(cell):
     atlas = glyph_atlas("a. #", cell)
     assert atlas.shape == (4, height, width)
     assert atlas.dtype == np.float32
-    assert 0.0 <= atlas.min()
+    assert atlas.min() >= 0.0
     assert atlas.max() <= 1.0
 
 

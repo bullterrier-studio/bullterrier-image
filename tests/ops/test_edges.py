@@ -88,7 +88,7 @@ def test_overshoot_beyond_the_range_is_clipped_so_a_step_that_clipping_flattens_
 @pytest.mark.parametrize("shape", [(48, 66), (48, 66, 3)])
 def test_values_outside_zero_to_one_give_exactly_the_result_for_the_clipped_picture(method, shape):
     rng = np.random.default_rng(8)
-    cells = 1.6 * rng.random((8, 11) + shape[2:], dtype=np.float32) - 0.3  # flat squares between -0.3 and 1.3
+    cells = 1.6 * rng.random((8, 11, *shape[2:]), dtype=np.float32) - 0.3  # flat squares between -0.3 and 1.3
     picture = np.kron(cells, np.ones((6, 6) + (1,) * (len(shape) - 2), dtype=np.float32))
     assert (picture > 1).any()
     assert (picture < 0).any()
