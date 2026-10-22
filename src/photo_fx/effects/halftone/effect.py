@@ -118,6 +118,11 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     # so it covers the cell; dots touch their neighbours at half ink.
     full_ink_radius = 0.7071  # constant: sqrt(2) / 2 to four places, the half-diagonal of a unit cell
     radius = np.sqrt(np.clip(ink_amount(luminance(sampled), paper), 0, 1)) * full_ink_radius
-    coverage = np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0)[..., None]  # ramp centred on the edge
+    # The soft edge is a ramp `feather` px wide centred on the dot's edge. A dot narrower than the ramp would still
+    # print its inner half (half strength at the centre even at zero ink), so the ramp fades in with the dot: in full
+    # once the radius reaches half the feather, gone at zero. Zero ink is bare paper, and a tiny dot prints about its
+    # own area.
+    fade_in = np.clip(radius * cell / (params.feather / 2), 0.0, 1.0)
+    coverage = (np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0) * fade_in)[..., None]
     dots = vivid(sampled) if params.fg is None else np.asarray(params.fg, dtype=np.float32)
     return (paper * (1.0 - coverage) + dots * coverage).astype(np.float32)

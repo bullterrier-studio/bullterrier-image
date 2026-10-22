@@ -1,5 +1,6 @@
 """Behaviour of the `halftone` effect."""
 
+import itertools
 import math
 
 import numpy as np
@@ -10,7 +11,6 @@ from photo_fx import effects
 
 NAME = "halftone"
 WHITE_ON_BLACK = {"fg": "#ffffff", "bg": "#000000"}
-BLANK = 0.01  # the most ink black may show: a dot's soft edge leaves a faint pixel at a zero-tone dot's centre
 
 
 def flat(value: float, size: int = 200) -> np.ndarray:
@@ -24,10 +24,50 @@ def half_black_half_white(size: int = 200) -> np.ndarray:
     return rgb
 
 
-def test_white_is_nearly_all_dots_and_black_is_nearly_blank() -> None:
-    """(Nearly: a dot's soft edge leaves a faint pixel at the centre of a zero-tone dot.)"""
+def test_white_is_nearly_all_dots_and_black_is_blank() -> None:
     assert effects.apply(NAME, flat(1.0, 64), **WHITE_ON_BLACK).mean() > 0.9
-    assert effects.apply(NAME, flat(0.0, 64), **WHITE_ON_BLACK).mean() < BLANK
+    assert effects.apply(NAME, flat(0.0, 64), **WHITE_ON_BLACK).max() == 0.0
+
+
+@pytest.mark.parametrize(
+    ("picture", "ink", "paper"),
+    [(0.0, "#ffffff", (0x20, 0x30, 0x40)), (1.0, "#000000", (0xF0, 0xE8, 0xD0))],
+    ids=["black on dark paper", "white on light paper"],
+)
+def test_where_no_ink_is_needed_the_paper_shows_exactly(picture: float, ink: str, paper: tuple[int, int, int]) -> None:
+    out = effects.apply(NAME, flat(picture, 64), fg=ink, bg="#{:02x}{:02x}{:02x}".format(*paper))
+    np.testing.assert_array_equal(out, np.broadcast_to(np.array(paper, np.float32) / 255, out.shape))
+
+
+DOT_RADII = (0.1, 0.25, 0.4, 0.5, 1.0, 2.0, 3.0)  # px
+
+
+def ink_of_one_dot(radius: float, cell: int = 20) -> float:
+    """The ink one dot prints on average (px^2, sum of its coverage) on an even tone of dots this many px in radius.
+
+    The tone comes from the screen's documented geometry: a dot's area is its tone times the full-tone circle around
+    the square cell (radius cell / sqrt(2)), so pi radius^2 = tone pi cell^2 / 2. The screen is turned a little so the
+    dots' centres fall at every position between pixels: a dot centred on a pixel is sampled unevenly (the pixel grid
+    misses or doubles its edge), and the average over positions is the dot's true printed area."""
+    tone = 2 * (radius / cell) ** 2
+    out = effects.apply(NAME, flat(tone, 400), cell=cell, angle=10.0, **WHITE_ON_BLACK)[..., 0]
+    return float(out.mean()) * cell**2  # ink per cell
+
+
+def test_a_dot_prints_about_its_own_area_however_small() -> None:
+    """A soft edge one pixel wide (feather = 1) may add at most pi / 12 px^2 to a dot: a linear ramp of width f centred
+    on a circle's edge adds pi f^2 / 12 (integrate the ramp over the ring). 1 % more is allowed for the cells the
+    picture's border cuts. A tiny dot must not print much more than its area."""
+    for radius in DOT_RADII:
+        area = math.pi * radius**2
+        assert abs(ink_of_one_dot(radius) - area) <= math.pi / 12 + 0.01 * area, radius
+    assert ink_of_one_dot(0.1) < 0.1  # its area is 0.03 px^2: a centre pixel at half strength would be 0.5
+
+
+def test_a_dot_prints_more_ink_the_larger_its_tone() -> None:
+    inks = [ink_of_one_dot(radius) for radius in (0.0, 0.05, *DOT_RADII)]
+    assert inks[0] == 0.0
+    assert all(smaller < larger for smaller, larger in itertools.pairwise(inks))
 
 
 def test_ink_is_proportional_to_tone_while_the_dots_do_not_touch() -> None:
@@ -40,7 +80,7 @@ def test_ink_is_proportional_to_tone_while_the_dots_do_not_touch() -> None:
 
 def test_on_a_light_background_dark_tones_get_the_ink() -> None:
     black_ink_on_white = {"fg": "#000000", "bg": "#ffffff"}
-    assert effects.apply(NAME, flat(1.0, 64), **black_ink_on_white).mean() > 1 - BLANK  # white needs (nearly) no ink
+    assert effects.apply(NAME, flat(1.0, 64), **black_ink_on_white).min() == 1.0  # white needs no ink
     assert effects.apply(NAME, flat(0.0, 64), **black_ink_on_white).mean() < 0.1  # black is nearly all ink
 
 
@@ -111,7 +151,7 @@ def test_sigma_spreads_tone_into_neighbouring_cells() -> None:
     def ink(**params: float) -> float:
         return float(effects.apply(NAME, picture, cell=10, angle=0.0, **WHITE_ON_BLACK, **params)[band].mean())
 
-    assert ink(sigma=0.0) < BLANK  # each dot sees only the pixel at its centre
+    assert ink(sigma=0.0) == 0.0  # each dot sees only the pixel at its centre
     assert ink(sigma=3.0) > 0.05  # each dot sees the tone 3 cells around it
 
 
@@ -123,7 +163,7 @@ def test_truncate_sets_how_far_the_tone_spreads() -> None:
         out = effects.apply(NAME, picture, cell=10, angle=0.0, sigma=3.0, truncate=truncate, **WHITE_ON_BLACK)
         return float(out[band].mean())
 
-    assert ink(1.0) < BLANK  # the blur reaches 1 x 3 cells = 30 px
+    assert ink(1.0) == 0.0  # the blur reaches 1 x 3 cells = 30 px
     assert ink(4.0) > 0.02
 
 
@@ -135,9 +175,9 @@ def test_mode_and_constant_value_set_what_lies_beyond_the_edge() -> None:
         out = effects.apply(NAME, picture, cell=10, angle=0.0, sigma=2.0, **WHITE_ON_BLACK, **params)
         return float(out[border].mean())
 
-    assert ink(mode="reflect") < BLANK
+    assert ink(mode="reflect") == 0.0
     assert ink(mode="constant", constant_value=1.0) > 0.05  # white beyond the edge bleeds in
-    assert ink(mode="constant", constant_value=0.0) < BLANK
+    assert ink(mode="constant", constant_value=0.0) == 0.0
 
 
 def test_feather_softens_the_dot_edges_without_changing_the_ink() -> None:
