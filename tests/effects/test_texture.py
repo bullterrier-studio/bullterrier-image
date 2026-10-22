@@ -18,12 +18,6 @@ def test_glow_amount_sets_how_much_it_brightens(photo):
     assert 0 < added[0] < added[1]
 
 
-def test_grain_seed_controls_noise(photo):
-    a, b = effects.apply("grain", photo, seed=1), effects.apply("grain", photo, seed=2)
-    assert not np.allclose(a, b)
-    np.testing.assert_array_equal(a, effects.apply("grain", photo, seed=1))
-
-
 def test_halftone_white_is_nearly_all_dots_and_black_is_blank():
     white, black = np.ones((64, 64, 3), np.float32), np.zeros((64, 64, 3), np.float32)
     assert effects.apply("halftone", white, fg="#ffffff").mean() > 0.9
@@ -35,6 +29,5 @@ def test_the_texture_effects_are_in_their_categories():
     expected = {
         "halftone": "stylised",
         "glow": "light",
-        "grain": "texture",
     }
     assert {name: effects.category(name) for name in expected} == expected

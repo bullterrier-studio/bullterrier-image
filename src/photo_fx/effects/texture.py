@@ -47,16 +47,3 @@ def glow(rgb: np.ndarray, radius: float = 24.0, amount: float = 0.6, threshold: 
     bright = np.clip((rgb - threshold) / (1.0 - threshold), 0.0, 1.0)
     halo = ndimage.gaussian_filter(bright, sigma=(radius, radius, 0))
     return (1.0 - (1.0 - rgb) * (1.0 - np.clip(amount * halo, 0, 1))).astype(np.float32)  # screen blend
-
-
-@effect(category="texture")
-def grain(rgb: np.ndarray, amount: float = 0.08, size: float = 1.0, seed: int = 0) -> np.ndarray:
-    """Film grain: brightness noise of strength `amount` (0.08 is visible, 0.2 is heavy), clumped to `size` px.
-
-    The same `seed` always gives the same grain, so renders are repeatable.
-    """
-    noise = np.random.default_rng(seed).standard_normal(rgb.shape[:2]).astype(np.float32)
-    if size > 1.0:
-        noise = ndimage.gaussian_filter(noise, size / 2.0)
-        noise /= max(float(noise.std()), 1e-6)
-    return np.clip(rgb + amount * noise[..., None], 0.0, 1.0).astype(np.float32)
