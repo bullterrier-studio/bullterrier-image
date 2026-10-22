@@ -3,15 +3,14 @@
 from typing import Annotated
 
 import numpy as np
-from pydantic import AfterValidator, StringConstraints
+from pydantic import AfterValidator
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.textart import check_palette, text_art
 
-# A palette keeps its spaces (a space is the lightest character), which the models' default whitespace stripping
-# would remove; at least two distinct characters, checked when the value is written.
-Palette = Annotated[str, StringConstraints(strip_whitespace=False), AfterValidator(check_palette)]
+# A text-art palette: at least two distinct characters, checked when the value is written.
+Palette = Annotated[str, AfterValidator(check_palette)]
 
 
 class AsciiParams(EffectParams):

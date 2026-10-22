@@ -203,9 +203,12 @@ class FieldDoc(NamedTuple):
 
 
 class EffectParams(ValidatedModel):
-    """Base class of every effect's parameter model: subclass it and declare each field with `param`."""
+    """Base class of every effect's parameter model: subclass it and declare each field with `param`.
 
-    model_config = ConfigDict(validate_default=True, str_strip_whitespace=True)
+    A text parameter is taken exactly as given, spaces included (a space can be data, as in a text-art palette).
+    """
+
+    model_config = ConfigDict(validate_default=True)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Check every field's declaration and turn it into a strict pydantic field.

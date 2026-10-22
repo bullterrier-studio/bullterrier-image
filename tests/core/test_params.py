@@ -80,8 +80,11 @@ def test_a_model_is_frozen():
         probe.radius = 3.0  # type: ignore[misc]  # the point of the test: models are frozen
 
 
-def test_text_is_stripped_of_surrounding_whitespace():
-    assert Probe(label="  neon  ").label == "neon"
+@pytest.mark.parametrize("text", ["  neon  ", " .:", "\tx\n", " "])
+def test_text_is_taken_exactly_as_given_spaces_included(text):
+    # a space can be data (the lightest character of a text-art palette), so nothing is trimmed
+    assert Probe(label=text).label == text
+    assert Probe.parse({"label": text}).label == text
 
 
 # --- Color -----------------------------------------------------------------------------------------------------------
