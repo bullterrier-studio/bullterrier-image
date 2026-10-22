@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from PIL import Image
+from PIL import GifImagePlugin, Image
 
 from photo_fx import effects, imageio
 from photo_fx.cli import main
@@ -58,6 +58,7 @@ def test_animate_writes_the_clip(files):
     target = files / "clip.gif"
     assert main(["animate", str(files / "me.png"), str(recipe), "-o", str(target)]) == 0
     with Image.open(target) as clip:
+        assert isinstance(clip, GifImagePlugin.GifImageFile)
         assert clip.n_frames == 4
 
 

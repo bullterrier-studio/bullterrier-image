@@ -106,7 +106,7 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
     failed = [i for i in items if i.status == "failed"]
     # it says which file could not be read
     assert len(failed) == 2
-    assert all("broken.png" in i.error for i in failed)
+    assert all("broken.png" in str(i.error) for i in failed)
     assert main(["run", str(folder / "photo-fx.toml")]) == 1  # a failure is reported in the exit code
     assert "failed" in (folder / "out" / "index.html").read_text()
 
@@ -141,7 +141,8 @@ class StandInFinder:
     returns a disc of `radius` px, or raises `error` when one is given."""
 
     def __init__(self, radius: int = 30, error: Exception | None = None):
-        self.radius, self.error, self.seen = radius, error, []
+        self.radius, self.error = radius, error
+        self.seen: list[np.ndarray] = []
 
     def __call__(self, rgb: np.ndarray) -> np.ndarray:
         self.seen.append(rgb.copy())
@@ -168,9 +169,9 @@ def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_sea
     items = run(load_project(folder / "photo-fx.toml"), find_subject=finder)
     by = {(i.photo, i.recipe): i for i in items}
     assert by[("a.png", "cut1")].status == "failed"
-    assert "no subject" in by[("a.png", "cut1")].error
+    assert "no subject" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "cut2")].status == "failed"
-    assert "no subject" in by[("a.png", "cut2")].error
+    assert "no subject" in str(by[("a.png", "cut2")].error)
     assert by[("a.png", "grainy")].status == "done"
     assert by[("b.png", "warm")].status == "done"
     assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second masked recipe

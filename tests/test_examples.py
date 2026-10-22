@@ -28,7 +28,9 @@ def test_every_example_recipe_belongs_to_an_effect():
 def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     project = load_project(EXAMPLES / "photo-fx.toml")
     assert [p.name for p in project.photos] == ["bullterrier.jpeg"]
-    recipes = [load_recipe(r) for r in project.recipes]
+    files = [r for r in project.recipes if isinstance(r, Path)]
+    assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects
+    recipes = [load_recipe(f) for f in files]
     assert len(recipes) <= 6  # a demo, not a catalogue
     assert len({r.name for r in recipes}) == len(recipes)
     assert any(r.animation for r in recipes)
@@ -57,6 +59,8 @@ def test_the_demo_pictures_the_readme_shows_exist():
 @pytest.mark.skipif(sys.platform != "darwin", reason="finding the subject needs Apple Vision")
 def test_the_python_example_runs(tmp_path, capsys):
     spec = importlib.util.spec_from_file_location("python_api_example", EXAMPLES / "python_api.py")
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.main(tmp_path)

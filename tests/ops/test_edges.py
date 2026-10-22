@@ -2,6 +2,7 @@
 
 import math
 import time
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -9,7 +10,7 @@ from scipy import ndimage
 
 from photo_fx.ops.edges import Edges, detect_edges
 
-METHODS = ["sobel", "canny", "dog"]
+METHODS: list[Literal["sobel", "canny", "dog"]] = ["sobel", "canny", "dog"]
 LINEAR_METHODS = ["sobel", "dog"]  # canny is binary, so contrast scaling does not apply to it
 
 
@@ -389,11 +390,14 @@ def test_canny_gives_a_line_one_pixel_wide_on_a_straight_step():
     on = edge_pixels(detect_edges(vertical_step(), "canny"))
     assert on.any()
     padded = np.pad(on, 1)
-    neighbours = sum(
-        padded[1 + dy : 1 + dy + on.shape[0], 1 + dx : 1 + dx + on.shape[1]]
-        for dy in (-1, 0, 1)
-        for dx in (-1, 0, 1)
-        if (dy, dx) != (0, 0)
+    neighbours = np.sum(
+        [
+            padded[1 + dy : 1 + dy + on.shape[0], 1 + dx : 1 + dx + on.shape[1]]
+            for dy in (-1, 0, 1)
+            for dx in (-1, 0, 1)
+            if (dy, dx) != (0, 0)
+        ],
+        axis=0,
     )
     assert neighbours[on].max() <= 3
     assert on[20].sum() == 1  # one pixel across the edge, on every row
@@ -555,7 +559,7 @@ def test_canny_gives_a_tie_to_the_pixel_that_comes_first_in_reading_order(axis, 
 
 # --- every value that shapes the result is a parameter -------------------------------------------------------------
 
-BORDER_MODES = ["nearest", "reflect", "mirror", "wrap"]
+BORDER_MODES: list[Literal["nearest", "reflect", "mirror", "wrap"]] = ["nearest", "reflect", "mirror", "wrap"]
 
 
 def reference_sobel_magnitude(picture, sigma, truncate, border_mode):
@@ -687,7 +691,7 @@ def test_non_numeric_numeric_arguments_raise_value_error_naming_them(name, bad_v
 def test_an_unhashable_border_mode_or_connectivity_raises_value_error_not_type_error():
     for name in ("border_mode", "connectivity", "method"):
         with pytest.raises(ValueError, match=name):
-            detect_edges(vertical_step(), **{name: ["nearest"]})
+            detect_edges(vertical_step(), **{name: ["nearest"]})  # type: ignore[arg-type]  # deliberately invalid: the runtime check is under test
 
 
 def test_canny_suppression_treats_the_outside_of_the_picture_as_having_no_gradient():

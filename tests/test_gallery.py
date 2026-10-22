@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, JpegImagePlugin
 
 import photo_fx
 from photo_fx import effects, fx, gallery, imageio
@@ -125,6 +125,7 @@ def probe(checkout, throwaway_effects):
 
 def _quantization(source) -> dict:
     with Image.open(source) as picture:
+        assert isinstance(picture, JpegImagePlugin.JpegImageFile)
         return picture.quantization
 
 

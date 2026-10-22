@@ -3,7 +3,7 @@ import subprocess
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import GifImagePlugin, Image
 
 from photo_fx import imageio
 
@@ -28,8 +28,9 @@ def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
     imageio.save(photo, tmp_path / "cut.png", alpha=matte)
     with Image.open(tmp_path / "cut.png") as img:
         assert img.mode == "RGBA"
-        assert img.getpixel((0, 0))[3] == 0
-        assert img.getpixel((64, 48))[3] == 255
+        alpha = np.asarray(img)[..., 3]
+        assert alpha[0, 0] == 0
+        assert alpha[48, 64] == 255
 
 
 def _frames(count=4, height=47, width=63):
@@ -40,6 +41,7 @@ def _frames(count=4, height=47, width=63):
 def test_save_video_gif_keeps_every_frame(tmp_path):
     assert imageio.save_video(iter(_frames(5)), tmp_path / "a.gif", fps=10) == 5
     with Image.open(tmp_path / "a.gif") as gif:
+        assert isinstance(gif, GifImagePlugin.GifImageFile)
         assert gif.n_frames == 5
         assert gif.size == (63, 47)
 

@@ -22,7 +22,8 @@ class CountingFinder:
     """A stand-in subject finder: records the photos it was asked about and returns a fixed matte."""
 
     def __init__(self, matte: np.ndarray):
-        self.matte, self.seen = matte, []
+        self.matte = matte
+        self.seen: list[tuple[int, ...]] = []
 
     def __call__(self, rgb: np.ndarray) -> np.ndarray:
         self.seen.append(rgb.shape)

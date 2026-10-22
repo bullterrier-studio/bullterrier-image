@@ -1,11 +1,13 @@
 """Behaviour of photo_fx.ops.warp, checked against independent oracles (np.roll, np.pad, hand-computed values)."""
 
+from typing import Literal
+
 import numpy as np
 import pytest
 
 from photo_fx.ops.warp import pixel_grid, remap
 
-MODES = ["clamp", "mirror", "wrap", "fill"]
+MODES: list[Literal["clamp", "mirror", "wrap", "fill"]] = ["clamp", "mirror", "wrap", "fill"]
 
 
 def test_pixel_grid_is_column_and_row_index():
@@ -51,7 +53,7 @@ def test_field_of_the_wrong_shape_is_rejected_naming_the_mismatch():
 def test_unknown_mode_is_rejected_listing_the_valid_ones():
     zero = np.zeros((7, 9), np.float32)
     with pytest.raises(ValueError, match=r"clamp.*mirror.*wrap.*fill"):
-        remap(_picture(7, 9), zero, zero, mode="bounce")
+        remap(_picture(7, 9), zero, zero, mode="bounce")  # type: ignore[arg-type]  # deliberately invalid: the runtime check is under test
 
 
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])

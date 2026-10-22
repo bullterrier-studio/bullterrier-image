@@ -74,7 +74,7 @@ def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
     signature = inspect.signature(fx.glitch)
     assert list(signature.parameters)[:3] == ["split", "bands", "shift"]  # no image parameter, no matte
     assert "matte" not in inspect.signature(fx.evaporate).parameters
-    assert "slide sideways" in fx.glitch.__doc__
+    assert "slide sideways" in str(fx.glitch.__doc__)
     assert fx.glitch.__name__ == "glitch"
     assert {"ascii", "glitch", "disperse"} <= set(dir(fx))
 
@@ -114,8 +114,9 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
     assert list(inspect.signature(fx.renamed_probe).parameters) == ["old"]
     unregister("renamed_probe")
 
-    @effect(category="utilities")
-    def renamed_probe(rgb, new: float = 1.0):  # noqa: F811  (a different effect under the same name)
+    # a different effect under the same name, on purpose (mypy reports a redefinition at the decorator)
+    @effect(category="utilities")  # type: ignore[no-redef]  # the point of the test
+    def renamed_probe(rgb, new: float = 1.0):  # noqa: F811  (the point of the test)
         """Second version."""
         return rgb
 

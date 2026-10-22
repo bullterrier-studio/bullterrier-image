@@ -9,6 +9,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -201,7 +202,7 @@ def test_the_categories_are_exactly_the_agreed_slugs_in_order():
 def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_registry, register_probe):
     for name, category in [("zeta", "animation"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
         register_probe(name, category)  # registered out of order, on purpose
-    expected = {category: [] for category in AGREED_CATEGORIES}
+    expected: dict[str, list[str]] = {category: [] for category in AGREED_CATEGORIES}
     expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
     assert effects.categories() == expected
     assert list(effects.categories()) == list(AGREED_CATEGORIES)  # dict order is the catalogue order
@@ -279,7 +280,7 @@ def test_a_parameter_without_a_default_is_rejected_naming_the_effect_and_the_par
     ids=["args", "kwargs", "no-image"],
 )
 def test_an_effect_must_take_the_image_and_name_every_parameter(source, throwaway_effects):
-    namespace = {}
+    namespace: dict[str, Any] = {}
     exec(source, namespace)  # builds a function with exactly the signature under test
     with pytest.raises(ValueError, match="loose"):
         effect(category="utilities")(namespace["loose"])
@@ -297,7 +298,7 @@ def test_a_second_function_under_an_existing_name_is_an_error_naming_both_module
     first = twin
     first.__module__ = "photo_fx.effects.first_module"
 
-    def twin(rgb, amount: float = 0.5):  # type: ignore[no-redef]  the point of the test: a second function, same name
+    def twin(rgb, amount: float = 0.5):  # type: ignore[no-redef]  # the point of the test: a second function, same name
         """Second."""
         return 1 - rgb
 

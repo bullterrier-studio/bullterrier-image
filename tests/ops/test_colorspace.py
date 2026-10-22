@@ -127,7 +127,7 @@ def test_greys_have_zero_saturation(grey):
 
 def test_hsv_to_rgb_known_colours():
     hsv = np.array([[0, 1, 1], [1 / 3, 1, 1], [2 / 3, 1, 1], [5 / 12, 2 / 3, 0.6]], dtype=np.float32)
-    expected = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.2, 0.6, 0.4]]
+    expected: list[list[float]] = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.2, 0.6, 0.4]]
     np.testing.assert_allclose(cs.hsv_to_rgb(hsv), expected, atol=1e-6)
 
 
@@ -250,7 +250,12 @@ def test_blurring_a_checkerboard_in_linear_light_gives_the_srgb_of_half_the_ligh
 
 def test_function_sees_linear_values():
     seen = []
-    cs.in_linear_light(lambda x: seen.append(x.copy()) or x, np.full((2, 2, 3), 0.5, dtype=np.float32))
+
+    def record(x):
+        seen.append(x.copy())
+        return x
+
+    cs.in_linear_light(record, np.full((2, 2, 3), 0.5, dtype=np.float32))
     np.testing.assert_allclose(seen[0], 0.2140411, atol=1e-6)
 
 

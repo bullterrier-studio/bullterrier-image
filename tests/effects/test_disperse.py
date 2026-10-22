@@ -113,7 +113,7 @@ def test_disperse_no_piece_travels_more_than_a_third_of_the_picture_at_any_angle
         shown = effects.apply("disperse", block, progress=progress, wind=0.3, angle=angle, seed=4).max(axis=(0, 2))
         columns = np.nonzero(shown > 0.01)[0]
         if len(columns):
-            farthest = max(farthest, columns.max())
+            farthest = max(farthest, int(columns.max()))
     assert farthest <= 20 + 400 / 3
 
 

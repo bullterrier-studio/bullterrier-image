@@ -1,4 +1,5 @@
 import tracemalloc
+from typing import Any
 
 import numpy as np
 import pytest
@@ -445,7 +446,7 @@ def test_stamp_rejects_a_placement_whose_fields_differ_in_length_or_are_not_1d()
 
 def test_invalid_blend_is_rejected_even_when_there_is_nothing_to_draw():
     with pytest.raises(ValueError, match="blend"):
-        stamp(black(), scatter((10, 10), 0, seed=0), blend="nope")
+        stamp(black(), scatter((10, 10), 0, seed=0), blend="nope")  # type: ignore[arg-type]  # deliberately invalid: the runtime check is under test
 
 
 # ---------------------------------------------------------------- sprites that reach in from outside
@@ -715,7 +716,7 @@ def handmade(xs, ys, sizes, depths=None) -> Placement:
 # Each scene is chosen so that the drawing takes a different route inside: a few small sprites on a big picture,
 # many mid-size sprites overlapping (most pixels drawn on many times), sprites several times the picture, sprites
 # clipped by the borders or centred outside, and streaks with every look parameter changed.
-SCENES = {
+SCENES: dict[str, tuple[tuple[int, int], Placement, dict[str, Any]]] = {
     "a few small sprites": ((61, 47), scatter((61, 47), 5, seed=1), {}),
     "many overlapping mid-size sprites": ((90, 120), scatter((90, 120), 30, seed=2, size=(30.0, 120.0)), {}),
     "sprites several times the picture": ((40, 50), scatter((40, 50), 5, seed=3, size=(400.0, 900.0)), {}),

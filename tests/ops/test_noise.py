@@ -2,6 +2,7 @@
 
 import time
 import warnings
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -164,7 +165,7 @@ def test_four_octaves_at_1600_square_take_under_two_seconds_of_cpu():
 # worley
 # ---------------------------------------------------------------------------------------------------------------------
 
-METRICS = ["f1", "f2-f1"]
+METRICS: list[Literal["f1", "f2-f1"]] = ["f1", "f2-f1"]
 
 
 def _feature_points(f1: np.ndarray, cell_pixels: float) -> np.ndarray:
@@ -289,7 +290,7 @@ class TestInvalidArguments:
 
     def test_fractal_noise_rejects_an_unknown_kind(self):
         with pytest.raises(ValueError, match="kind"):
-            fractal_noise((8, 8), 4, 1, kind="simplex")  # type: ignore[arg-type]
+            fractal_noise((8, 8), 4, 1, kind="simplex")  # type: ignore[arg-type]  # deliberately invalid: the runtime check is under test
 
     @pytest.mark.parametrize("cells", [0, -3, float("nan"), float("inf")])
     def test_worley_rejects_cells_that_are_not_positive_and_finite(self, cells):
@@ -298,7 +299,7 @@ class TestInvalidArguments:
 
     def test_worley_rejects_an_unknown_metric(self):
         with pytest.raises(ValueError, match="metric"):
-            worley((8, 8), 2, 1, metric="f3")  # type: ignore[arg-type]
+            worley((8, 8), 2, 1, metric="f3")  # type: ignore[arg-type]  # deliberately invalid: the runtime check is under test
 
     @pytest.mark.parametrize("shape", [(0, 5), (5, 0), (-3, 5), (5,), (4, 4, 3), (2.5, 4)])
     def test_both_reject_a_shape_that_is_not_two_positive_integers(self, shape):
@@ -309,7 +310,8 @@ class TestInvalidArguments:
 
     def test_valid_arguments_are_not_rejected(self):
         # The known-good side of every check above, with numpy integers for the shape.
-        assert fractal_noise((np.int64(8), np.int32(9)), 4, 1, octaves=2, persistence=2.0, kind="value").shape == (8, 9)
+        shape = (np.int64(8), np.int32(9))  # numpy integers work at run time; the annotation names plain ints
+        assert fractal_noise(shape, 4, 1, octaves=2, persistence=2.0, kind="value").shape == (8, 9)  # type: ignore[arg-type]
         assert worley((8, 9), 0.5, 1, metric="f2-f1").shape == (8, 9)
 
 
@@ -479,14 +481,14 @@ class TestArgumentTypes:
     @pytest.mark.parametrize("octaves", [2.5, 2.0, True, "3"])
     def test_octaves_must_be_an_integer(self, octaves):
         with pytest.raises(ValueError, match="octaves"):
-            fractal_noise((8, 8), 4, 1, octaves=octaves)  # type: ignore[arg-type]
+            fractal_noise((8, 8), 4, 1, octaves=octaves)
 
     @pytest.mark.parametrize("bad", [True, "8", None])
     def test_scale_and_cells_must_be_numbers(self, bad):
         with pytest.raises(ValueError, match="scale"):
-            fractal_noise((8, 8), bad, 1)  # type: ignore[arg-type]
+            fractal_noise((8, 8), bad, 1)
         with pytest.raises(ValueError, match="cells"):
-            worley((8, 8), bad, 1)  # type: ignore[arg-type]
+            worley((8, 8), bad, 1)
 
 
 def test_extreme_scale_and_lacunarity_do_not_overflow():

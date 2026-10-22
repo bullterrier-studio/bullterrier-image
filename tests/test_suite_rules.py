@@ -36,7 +36,7 @@ def violations(source: str) -> list[str]:
     bound: set[str] = set()  # names that refer to photo_fx modules or objects in this file
     found: list[tuple[int, str]] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and _from_photo_fx(node.module):
+        if isinstance(node, ast.ImportFrom) and node.module is not None and _from_photo_fx(node.module):
             for alias in node.names:
                 bound.add(alias.asname or alias.name)
                 if _private(alias.name) or any(_private(part) for part in node.module.split(".")):
@@ -48,10 +48,10 @@ def violations(source: str) -> list[str]:
                     if any(_private(part) for part in alias.name.split(".")):
                         found.append((node.lineno, f"imports private {alias.name}"))
     for node in ast.walk(tree):
-        reads_attribute = isinstance(node, ast.Attribute) and _private(node.attr)
-        if (reads_attribute and _refers_to_photo_fx(node.value, bound)) or (
-            isinstance(node, ast.Call) and _is_private_getattr(node, bound)
-        ):
+        # (two branches with one body: each narrows `node` to a different type, which mypy needs)
+        if isinstance(node, ast.Attribute) and _private(node.attr) and _refers_to_photo_fx(node.value, bound):  # noqa: SIM114
+            found.append((node.lineno, f"reads private {ast.unparse(node)}"))
+        elif isinstance(node, ast.Call) and _is_private_getattr(node, bound):
             found.append((node.lineno, f"reads private {ast.unparse(node)}"))
         elif isinstance(node, ast.Call) and _is_patch(node.func):
             target = node.args[0] if node.args else next((k.value for k in node.keywords if k.arg == "target"), None)
@@ -88,7 +88,7 @@ def _is_patch(func: ast.expr) -> bool:
 
 def unexplained(root: Path, allowed: dict[tuple[str, str], str]) -> list[str]:
     """Every violation in the .py files under `root` that no `allowed` entry (file, name) covers."""
-    problems = []
+    problems: list[str] = []
     for path in sorted(root.rglob("*.py")):
         relative = path.relative_to(root).as_posix()
         problems.extend(

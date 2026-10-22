@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _load_checker():
     spec = importlib.util.spec_from_file_location("check_one_config_home", ROOT / "tools" / "check_one_config_home.py")
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
