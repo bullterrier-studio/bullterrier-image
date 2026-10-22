@@ -983,7 +983,7 @@ source = { editable = "." }
 dependencies = [
     { name = "annotated-types" },
     { name = "numpy" },
-    { name = "onnxruntime" },
+    { name = "onnxruntime", marker = "python_full_version < '3.15'" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'" },
@@ -1020,7 +1020,7 @@ requires-dist = [
     { name = "annotated-types", specifier = ">=0.8.0" },
     { name = "imageio-ffmpeg", marker = "extra == 'video'", specifier = ">=0.6.0" },
     { name = "numpy", specifier = ">=2.5.4" },
-    { name = "onnxruntime", specifier = ">=1.23.2" },
+    { name = "onnxruntime", marker = "python_full_version < '3.15'", specifier = ">=1.23.2" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },

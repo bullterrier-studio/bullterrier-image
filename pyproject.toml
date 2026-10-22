@@ -27,8 +27,9 @@ dependencies = [
     "annotated-types>=0.8.0",
     "numpy>=2.5.4",
     # the portable subject finder; 1.23 is the last release with wheels for Intel Macs and macOS 13, so the floor
-    # stays there and those machines get it too
-    "onnxruntime>=1.23.2",
+    # stays there and those machines get it too. No release has Python 3.15 wheels yet: there photo-fx installs
+    # without it, and the portable backend says onnxruntime is missing (Apple Vision and --matte still work)
+    "onnxruntime>=1.23.2 ; python_version < '3.15'",
     "pillow>=13.0.0",
     "pydantic>=2.14.1",
     "pyobjc-framework-quartz>=12.2.2 ; sys_platform == 'darwin'",
