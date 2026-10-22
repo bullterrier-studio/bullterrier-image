@@ -59,6 +59,11 @@ def test_scatter_has_exactly_depth_layers_distinct_depths_in_unit_range():
     assert len(np.unique(p.phase)) > 250  # a per-sprite random number, not a constant per layer
 
 
+def test_scatter_uses_every_layer_even_when_there_are_barely_enough_sprites():
+    for seed in range(20):
+        assert len(np.unique(scatter((50, 50), 6, seed=seed, depth_layers=6).depth)) == 6
+
+
 def test_scatter_nearer_sprites_are_larger():
     p = scatter((50, 50), 300, seed=2, size=(2.0, 9.0), depth_layers=4)
     order = np.argsort(p.depth, kind="stable")
