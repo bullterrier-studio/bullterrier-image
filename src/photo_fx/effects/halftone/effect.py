@@ -97,7 +97,7 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
                 cval=params.constant_value,
                 truncate=params.truncate,
             )
-            for c in range(3)
+            for c in range(3)  # constant: the three colour channels, red, green, blue
         ],
         axis=-1,
     )
