@@ -56,6 +56,10 @@ never `strength`, `intensity`, `factor`, `val`, `k`. A misspelt or out-of-range 
 3. `uv run photo-fx regenerate` is run by the integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`.
 4. Gate: `uv run poe check`. Nothing outside the new folder should appear in `git status`.
 
+## Lint and types
+
+`ruff` (rules in `pyproject.toml`) wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI. `mypy` type-checks `src` and `tests`. Fix a finding properly; for a false positive write a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`: a bare or unused one fails the gate. Tests may not reach private names (`SLF001`, `PLC2701`), except architecture tests, with a reason.
+
 ## Testing
 
 Tests must follow the testing-best-practices skill, no exceptions. A test that is coupled to implementation, or otherwise poor (weak sole assertion, tautology, golden file, sleep, mock of our own code), is worse than no test: delete it rather than keep it. A smaller suite of behaviour tests beats a larger one with coupling. Reviewers treat such tests as blocking findings.
@@ -95,8 +99,8 @@ Where they pull against this file: tests follow this file (no goldens); design f
 
 ## Git conventions
 
-Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (format check, lint, tests; `uv run poe fix` repairs what it can).
-- **Trunk-based:** work on a short-lived branch (own worktree for agents) named `<type>/<short-description>` (`feat/glow-falloff`), rebase on `main` before reporting; the controller merges. Never push.
+Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (format check, lint, `mypy` type check, tests; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs mypy and the tests.
+- **Trunk-based:** work on a short-lived branch (in a worktree only when the project owner asks for one; the controller says so in the brief) named `<type>/<short-description>` (`feat/glow-falloff`), rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scope is optional and lowercase: the effect name, `core`, `ops`, `cli`, `pipeline`, `docs` or `deps`. `!` or a `BREAKING CHANGE:` footer marks a breaking change.
 - **Subject:** imperative present tense ("add", not "added"), lowercase start (acronyms and identifiers excepted), no final period, header at most 72 characters. Imperative mood is a convention, not checked by the hook.
 - **Body** (after a blank line, wrapped at 100): why the change was made, not what the diff shows. **One logical change per commit**; small commits.
@@ -115,5 +119,5 @@ The target above is being introduced in small steps; until a step lands, the old
 - [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
 - [ ] F1a: Pydantic params model pattern in `core/`; Step/Recipe/Animation as Pydantic models
 - [ ] F1b: each existing effect becomes a folder with params, tests and example (`ascii`, `texture`, `glitch`, `evaporate`, `disperse`, `color`)
-- [ ] T1b: lint rules, mypy and fixes
+- [x] T1b: lint rules, mypy and fixes (ruff rule set and mypy in `pyproject.toml`, run by `poe check` and the pre-push hook)
 - [ ] `photo-fx new-effect`, CI workflow (macOS and Linux)

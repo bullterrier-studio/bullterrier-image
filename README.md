@@ -322,7 +322,7 @@ import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run 
 ```bash
 uv sync
 uv run poe setup       # once per clone: installs the git hooks and the commit-message template
-uv run poe check       # before every push or merge: format check, lint and the test suite
+uv run poe check       # before every push or merge: format check, lint (ruff), types (mypy), the test suite
 uv run poe fix         # applies the automatic lint and format fixes
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
 uv run photo-fx regenerate   # at integration: fx.pyi, docs/effects.md, missing pictures
@@ -334,6 +334,9 @@ most 72 characters, body explaining why); a `commit-msg` hook checks it. The det
 Generated files (`src/photo_fx/fx.pyi`, `docs/effects.md`, `docs/gallery/`) are not updated on feature branches, so
 branches that add effects never conflict over them. After merging, `photo-fx regenerate` brings them up to date in one
 commit. Pictures that exist are kept (`photo-fx gallery --force` renders them again).
+
+Lint rules (ruff) and the type check (mypy) are configured in `pyproject.toml`; `uv run mypy` runs the type check alone,
+and the pre-push hook runs it with the tests.
 
 Tests that need Apple Vision are skipped elsewhere, and tests that need `ffmpeg` are skipped when it is missing.
 
