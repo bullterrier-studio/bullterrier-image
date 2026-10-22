@@ -84,10 +84,12 @@ def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path 
 
 def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
     """The one integration step after effects were added or changed: write `src/photo_fx/fx.pyi` (for editors) in
-    `checkout`, then `write_docs`. Returns the files written."""
-    stub = _layout(checkout).stub
-    stub.write_text(fx.stub_text())
-    return [stub, *write_docs(checkout=checkout)]
+    `checkout`, then `write_docs`. Returns the files written. Every effect's example recipe is checked first, so a
+    checkout that lacks one gets `FileNotFoundError` and no file is written."""
+    layout = _layout(checkout)
+    _chosen((), layout.examples)
+    layout.stub.write_text(fx.stub_text())
+    return [layout.stub, *write_docs(checkout=checkout)]
 
 
 class _Layout(NamedTuple):

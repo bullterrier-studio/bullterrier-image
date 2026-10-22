@@ -5,16 +5,19 @@ depend on which real effects exist or how they are documented.
 """
 
 import io
+import os
 import re
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
 from PIL import Image
 
+import photo_fx
 from photo_fx import effects, fx, gallery, imageio
-from photo_fx.cli import main
 from photo_fx.core.registry import effect
 
 
@@ -173,6 +176,14 @@ def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(tmp_path, ch
     assert not (tmp_path / "out").exists()
 
 
+def test_regenerate_checks_the_checkout_before_writing_anything(checkout):
+    (checkout / "examples" / "effects" / "grain.toml").unlink()  # one effect without its example recipe
+    with pytest.raises(FileNotFoundError, match=r"grain\.toml"):
+        gallery.regenerate(checkout=checkout)
+    assert not (checkout / "src" / "photo_fx" / "fx.pyi").exists()
+    assert not (checkout / "docs" / "effects.md").exists()
+
+
 def test_gallery_outside_a_source_checkout_says_the_examples_are_missing(tmp_path):
     with pytest.raises(FileNotFoundError, match="examples"):
         gallery.render_gallery(tmp_path / "out", only=["grain"], checkout=tmp_path / "not-a-checkout")
@@ -182,41 +193,62 @@ def test_gallery_outside_a_source_checkout_says_the_examples_are_missing(tmp_pat
 # --- writing everything: `photo-fx gallery` and `photo-fx regenerate` --------------------------------------------
 
 
+# The commands always work on the checkout photo-fx runs from. To run them without touching the real one, each test
+# runs `photo-fx` in a fresh interpreter from a copy of the package placed in the scratch checkout's src/: imported
+# from there, photo-fx takes the scratch checkout for its own.
+
+
 @pytest.fixture
 def docs(checkout):
-    """The scratch checkout with every gallery picture already there (so none renders)."""
+    """The scratch checkout holding a copy of this photo-fx package (without its fx.pyi, so writing one shows) and
+    every gallery picture already there (so none renders)."""
+    package = checkout / "src" / "photo_fx"
+    shutil.rmtree(package)
+    shutil.copytree(Path(photo_fx.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
+    (package / "fx.pyi").unlink()
     for name in effects.describe():
         (checkout / "docs" / "gallery" / f"{name}.jpg").write_bytes(b"existing")
     return checkout
 
 
-def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(docs, capsys):
-    assert main(["regenerate", "--checkout", str(docs)]) == 0
+def photo_fx_command(checkout: Path, *args: str) -> subprocess.CompletedProcess:
+    """`photo-fx ARGS`, run from the copy of the package in `checkout`."""
+    environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
+    return subprocess.run(
+        [sys.executable, "-m", "photo_fx.cli", *args], cwd=checkout, env=environment, capture_output=True, text=True
+    )
+
+
+def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(docs):
+    done = photo_fx_command(docs, "regenerate")
+    assert done.returncode == 0, done.stderr
     stub, page = docs / "src" / "photo_fx" / "fx.pyi", docs / "docs" / "effects.md"
+    assert done.stdout.split() == [str(stub), str(page)]  # written into the scratch checkout, nowhere else
     assert stub.read_text() == fx.stub_text()
     assert page.read_text() == gallery.render_effects_page()
     assert {p.read_bytes() for p in (docs / "docs" / "gallery").iterdir()} == {b"existing"}
-    assert capsys.readouterr().out.split() == [str(stub), str(page)]
 
 
-def test_the_gallery_command_writes_the_page_too(docs, capsys):
-    assert main(["gallery", "--checkout", str(docs)]) == 0
+def test_the_gallery_command_writes_the_page_too(docs):
+    done = photo_fx_command(docs, "gallery")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.split() == [str(docs / "docs" / "effects.md")]
     assert (docs / "docs" / "effects.md").read_text() == gallery.render_effects_page()
     assert not (docs / "src" / "photo_fx" / "fx.pyi").exists()
 
 
-def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(probe, docs, capsys):
-    picture = docs / "docs" / "gallery" / f"{probe}.jpg"
-    assert picture.read_bytes() == b"existing"
-    assert main(["gallery", "--only", probe, "--checkout", str(docs)]) == 0
+def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(docs):
+    picture = docs / "docs" / "gallery" / "grain.jpg"  # grain's example recipe needs no cut-out, so it renders anywhere
+    assert photo_fx_command(docs, "gallery", "--only", "grain").returncode == 0
     assert picture.read_bytes() == b"existing"  # kept
-    assert main(["gallery", "--only", probe, "--force", "--checkout", str(docs)]) == 0
+    done = photo_fx_command(docs, "gallery", "--only", "grain", "--force")
+    assert done.returncode == 0, done.stderr
     with Image.open(picture) as rendered:
-        assert rendered.format == "JPEG"  # rendered again
-    assert str(picture) in capsys.readouterr().out.split()
+        assert rendered.format == "JPEG" and max(rendered.size) == 480  # rendered again
+    assert str(picture) in done.stdout.split()
 
 
-def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(probe, docs, capsys):
-    assert main(["gallery", "--only", probe, "nope", "--checkout", str(docs)]) == 1
-    assert "'nope'" in capsys.readouterr().err
+def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
+    done = photo_fx_command(docs, "gallery", "--only", "grain", "nope")
+    assert done.returncode == 1 and "'nope'" in done.stderr
     assert not (docs / "docs" / "effects.md").exists()

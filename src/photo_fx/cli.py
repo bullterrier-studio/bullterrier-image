@@ -78,12 +78,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
     p.add_argument("--force", action="store_true", help="render again even if the picture exists")
-    _checkout(p)
 
-    p = commands.add_parser(
+    commands.add_parser(
         "regenerate", help="after adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures"
     )
-    _checkout(p)
 
     args = parser.parse_args(argv)
     try:
@@ -96,21 +94,12 @@ def main(argv: list[str] | None = None) -> int:
             "steps": _steps,
             "init": _init,
             "effects": _effects,
-            "gallery": lambda args: _print_paths(gallery.write_docs(args.only, args.force, checkout=args.checkout)),
-            "regenerate": lambda args: _print_paths(gallery.regenerate(checkout=args.checkout)),
+            "gallery": lambda args: _print_paths(gallery.write_docs(args.only, args.force)),
+            "regenerate": lambda args: _print_paths(gallery.regenerate()),
         }[args.command](args)
     except (ValueError, RuntimeError, FileNotFoundError, FileExistsError, NotImplementedError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-
-
-def _checkout(p: argparse.ArgumentParser) -> None:
-    p.add_argument(
-        "--checkout",
-        type=Path,
-        default=gallery.CHECKOUT,
-        help="the photo-fx source checkout to read the examples from and write into (default: the one running)",
-    )
 
 
 def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
