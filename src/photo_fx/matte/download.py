@@ -97,7 +97,7 @@ def fetch(url: str, sha256: str, target: Path, *, size: int) -> Path:
                 f"the file downloaded from {url} has SHA-256 {digest.hexdigest()}, but {sha256} was expected, so it "
                 f"was not saved; {by_hand} (and check that it is the right file)"
             )
-        os.replace(temporary, target)
+        temporary.replace(target)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
