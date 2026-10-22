@@ -298,3 +298,56 @@ def test_stamp_rejects_non_finite_positions_naming_the_placement():
             stamp(black(), sprite(bad, 5.0))
         with pytest.raises(ValueError, match="placement"):
             stamp(black(), sprite(5.0, bad))
+
+
+# ---------------------------------------------------------------- streaks
+
+
+def lit_box(img: np.ndarray, threshold: float = 0.5) -> tuple[int, int]:
+    """(width, height) in pixel steps (last - first lit column or row) of the pixels brighter than `threshold`."""
+    rows, cols = np.nonzero(img[..., 0] > threshold)
+    return int(cols.max() - cols.min()), int(rows.max() - rows.min())
+
+
+@pytest.mark.parametrize("length", [2.0, 3.0, 5.0])
+def test_a_horizontal_streak_is_about_length_times_wider_than_tall(length):
+    out = stamp(black(), sprite(CENTRE, CENTRE, size=16), shape="streak", angle=0.0, length=length, blend="add")
+    width, height = lit_box(out)
+    assert width / height == pytest.approx(length, rel=0.15)
+    assert height > 8  # it is the disc's width that stays 16, so a streak is not shrunk to get longer
+
+
+def test_a_vertical_streak_is_about_length_times_taller_than_wide():
+    out = stamp(black(), sprite(CENTRE, CENTRE, size=16), shape="streak", angle=90.0, length=3.0, blend="add")
+    width, height = lit_box(out)
+    assert height / width == pytest.approx(3.0, rel=0.15)
+
+
+def test_a_diagonal_streak_is_as_wide_as_tall_and_lies_along_the_diagonal():
+    out = stamp(black(), sprite(CENTRE, CENTRE, size=10), shape="streak", angle=45.0, length=5.0, blend="add")
+    width, height = lit_box(out)
+    assert abs(width - height) <= 2
+    assert out[50 + 10, 50 + 10, 0] > 0.5  # down and to the right (y points down)
+    assert out[50 - 10, 50 + 10, 0] == 0.0  # the other diagonal is dark
+
+
+def test_a_streak_with_a_non_integer_angle_keeps_its_direction():
+    out = stamp(black(), sprite(CENTRE, CENTRE, size=10), shape="streak", angle=-30.0, length=4.0, blend="add")
+    assert out[50 - 8, 50 + 14, 0] > 0.5  # up and to the right: tan(30) * 14 = 8
+    assert out[50 + 8, 50 + 14, 0] == 0.0
+
+
+def test_a_disc_ignores_angle_and_length():
+    base = stamp(black(), sprite(CENTRE, CENTRE), blend="add")
+    np.testing.assert_array_equal(stamp(black(), sprite(CENTRE, CENTRE), angle=33.0, length=9.0, blend="add"), base)
+
+
+def test_streak_light_grows_with_length():
+    light = lambda n: stamp(black(), sprite(CENTRE, CENTRE, 8), shape="streak", length=n, blend="add").sum()  # noqa: E731
+    assert light(4.0) / light(2.0) == pytest.approx(2.0, rel=0.15)
+
+
+def test_streaks_are_clipped_at_the_edges_like_discs():
+    out = stamp(black(), many([0.0, 101.0], [50.5, 50.5], size=8), shape="streak", angle=0.0, length=6.0, blend="add")
+    assert out[50, 0, 0] > 0.9 and out[50, 100, 0] > 0.9
+    assert np.all(out[:, 40:60] == 0)  # nothing wrapped to the middle

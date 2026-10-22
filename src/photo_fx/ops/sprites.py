@@ -162,11 +162,16 @@ def stamp(
     radius = size / 2.0
     soft = np.maximum(1.0, radius / 2.0)
     reach = radius + soft / 2.0  # beyond this distance from its centre a sprite is invisible
+    stretch, direction = (length, np.radians(angle)) if shape == "streak" else (1.0, 0.0)
+    cos, sin = np.cos(direction), np.sin(direction)
+    # how far the stretched sprite reaches along x and y, as a multiple of `reach`
+    spread_x, spread_y = np.hypot(stretch * cos, sin), np.hypot(stretch * sin, cos)
     brightness = _NEAR_BRIGHTNESS[0] + _NEAR_BRIGHTNESS[1] * np.clip(depth, 0.0, 1.0)
     gain = opacity * brightness
 
     # Drop sprites that cannot touch the picture while still in float, so absurd coordinates never reach integer code.
-    visible = (x + reach > 0) & (x - reach < w) & (y + reach > 0) & (y - reach < h) & (gain > 0) & (size > 0)
+    ex, ey = reach * spread_x, reach * spread_y
+    visible = (x + ex > 0) & (x - ex < w) & (y + ey > 0) & (y - ey < h) & (gain > 0) & (size > 0)
     if not visible.any():
         return out
 
@@ -176,8 +181,8 @@ def stamp(
     patch_class = np.ceil(reach).astype(np.int64)
     for cls in np.unique(patch_class[visible]):
         ids = np.flatnonzero(visible & (patch_class == cls))
-        k = int(min(cls + 1, max(h, w) - 1))
-        kx, ky = min(k, w - 1), min(k, h - 1)
+        kx = int(min(np.ceil(cls * spread_x) + 1, w - 1))
+        ky = int(min(np.ceil(cls * spread_y) + 1, h - 1))
         offsets_x, offsets_y = np.arange(-kx, kx + 1), np.arange(-ky, ky + 1)
         per_chunk = max(1, _MAX_PATCH_ELEMENTS // (offsets_x.size * offsets_y.size))
         for start in range(0, len(ids), per_chunk):
@@ -189,7 +194,8 @@ def stamp(
             cols, rows = cx[:, None] + offsets_x, cy[:, None] + offsets_y
             dx = (cols + 0.5 - x[sel, None])[:, None, :]
             dy = (rows + 0.5 - y[sel, None])[:, :, None]
-            dist = np.hypot(dx, dy)
+            # distance in the sprite's own frame, where a streak is a disc: along its axis lengths shrink by `stretch`
+            dist = np.hypot((dx * cos + dy * sin) / stretch, -dx * sin + dy * cos)
             r, s = radius[sel, None, None], soft[sel, None, None]
             alpha = np.clip((r + s / 2.0 - dist) / s, 0.0, 1.0) * gain[sel, None, None]
             inside = ((cols >= 0) & (cols < w))[:, None, :] & ((rows >= 0) & (rows < h))[:, :, None] & (alpha > 0)
