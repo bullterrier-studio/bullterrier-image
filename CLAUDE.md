@@ -34,6 +34,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
+8. **Errors:** callers catch `PhotoFxError` (`photo_fx.core.errors`, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
 
 ## The effect contract
 
