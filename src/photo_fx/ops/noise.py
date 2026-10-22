@@ -15,6 +15,10 @@ from typing import Literal
 import numpy as np
 from scipy.spatial import cKDTree
 
+# Most octaves `fractal_noise` accepts. Halving 32 times takes a feature from 4 billion pixels to one, more than any
+# picture holds, and a bound is needed because with `lacunarity=1` no octave ever becomes too fine to drop.
+_MAX_OCTAVES = 32
+
 _GOLDEN = 0x9E3779B97F4A7C15
 _MASK_64 = 0xFFFFFFFFFFFFFFFF
 _COLUMN_PRIME = np.uint64(0xC2B2AE3D27D4EB4F)
@@ -145,7 +149,7 @@ def fractal_noise(
         scale: size in pixels of the largest feature (the lattice spacing of the first octave), positive and finite.
             Below 1 it acts as 1.
         seed: any integer (taken modulo 2**64); each seed gives an unrelated field.
-        octaves: number of layers, an integer of at least 1. Each extra octave has features `lacunarity` times
+        octaves: number of layers, an integer from 1 to 32. Each extra octave has features `lacunarity` times
             smaller than the previous one (half the size by default) and `persistence` times its weight. Octaves
             whose features would be under one pixel are left out (they only add aliasing), so very fine scales may
             use fewer octaves than asked.
@@ -173,18 +177,21 @@ def fractal_noise(
     _check_choice("kind", kind, ("gradient", "value"))
     if isinstance(octaves, bool) or not isinstance(octaves, numbers.Integral):
         raise ValueError(f"octaves must be an integer; got {octaves!r}")
-    if octaves < 1:
-        raise ValueError(f"octaves must be at least 1; got {octaves!r}")
+    if not 1 <= octaves <= _MAX_OCTAVES:
+        raise ValueError(f"octaves must be between 1 and {_MAX_OCTAVES}; got {octaves!r}")
 
     total = np.zeros((height, width), dtype=np.float32)
     weight_sum = 0.0
+    spacing = scale
     for octave in range(octaves):
-        spacing = scale / lacunarity**octave
-        if octave > 0 and spacing < 1.0:
-            break
+        if octave > 0:
+            spacing /= lacunarity  # divide step by step: lacunarity ** octave can overflow where the quotient is fine
+            if spacing < 1.0:
+                break  # this octave and every finer one would only add aliasing
         weight = persistence**octave
         # A lattice finer than the pixel grid is just white noise, and a table of it would be bigger than the image:
-        # so the first octave's features are never smaller than one pixel either.
+        # so the first octave's features are never smaller than one pixel either. (Later octaves that fine were
+        # dropped above, so only the first can need the clamp.)
         total += np.float32(weight) * _octave((height, width), max(spacing, 1.0), seed, octave, kind)
         weight_sum += weight
 

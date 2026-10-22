@@ -61,9 +61,12 @@ class TestFractalNoiseContract:
 
 @pytest.mark.parametrize("seed", range(40))
 def test_gradient_noise_uses_most_of_the_range(seed):
-    # The brief's bounds (1st percentile < 0.25, 99th > 0.75) hold for every seed tried, but only just for a few:
-    # across seeds 0-39 the worst 1st percentile is 0.241 and the worst 99th is 0.775. A 256x256 canvas holds only
-    # 4 x 4 features at scale 64, so the spread comes from the seed, hence the many seeds.
+    # The brief's bounds (1st percentile < 0.25, 99th > 0.75) are a statistical property, not a guarantee for every
+    # seed: a 256x256 canvas holds only 4 x 4 features at scale 64, so the spread depends on the seed. Over seeds
+    # 0-299 two seeds (49 and 227) miss the upper bound (99th percentile 0.749 and 0.746) and the worst 1st
+    # percentile is 0.241. The test pins seeds 0-39, which all meet the bounds (worst 0.241 and 0.775), so it is
+    # deterministic and checks that typical fields use the range; a change that shrank the range would move
+    # many seeds below the bound at once.
     field = fractal_noise((256, 256), 64, seed)
     low, high = np.percentile(field, [1, 99])
     assert low < 0.25
@@ -135,7 +138,7 @@ class TestFractalNoiseCharacter:
     def test_octaves_finer_than_a_pixel_are_ignored(self, kind):
         # At scale 8 the octaves have spacing 8, 4, 2, 1; the fifth would be half a pixel.
         capped = fractal_noise((64, 64), 8, 2, octaves=4, kind=kind)
-        many = fractal_noise((64, 64), 8, 2, octaves=40, kind=kind)
+        many = fractal_noise((64, 64), 8, 2, octaves=32, kind=kind)
         assert np.array_equal(capped, many)
 
 
@@ -333,11 +336,17 @@ class TestEdgeCases:
         field = fractal_noise((64, 64), 16, 2, octaves=4, persistence=persistence)
         assert 0.0 <= field.min() and field.max() <= 1.0
 
-    def test_many_octaves_are_cheap_and_in_range(self):
-        start = time.perf_counter()
-        field = fractal_noise((200, 200), 64, 2, octaves=1000)
-        assert time.perf_counter() - start < 1.0
+    def test_the_most_octaves_allowed_stay_in_range(self):
+        field = fractal_noise((200, 200), 1e6, 2, octaves=32)
         assert 0.0 <= field.min() and field.max() <= 1.0
+
+    @pytest.mark.parametrize("lacunarity", [1.0, 2.0])
+    def test_more_than_32_octaves_are_rejected_at_once(self, lacunarity):
+        # With lacunarity 1 no octave ever falls under a pixel, so without a cap this would loop for ever.
+        with pytest.raises(ValueError, match="octaves"):
+            fractal_noise((8, 8), 4, 1, octaves=10**9, lacunarity=lacunarity)
+        with pytest.raises(ValueError, match="octaves"):
+            fractal_noise((8, 8), 4, 1, octaves=33, lacunarity=lacunarity)
 
     @pytest.mark.parametrize("shape", [(1, 1), (1, 50), (50, 1)])
     def test_single_row_column_or_pixel_canvases(self, shape):
@@ -406,13 +415,16 @@ class TestOctaveFeatureSize:
         # Octave 0 alone and octave 1 alone (by extreme persistence) must be unrelated fields even though they come
         # from one seed: octaves that shared their randomness would reinforce each other into visible patterns.
         # Lacunarity 1 gives both octaves the same feature size, where shared randomness would make them identical
-        # (at other sizes shared hashes happen to land on different lattice points and hide the fault).
+        # (at other sizes shared hashes happen to land on different lattice points and hide the fault). Scale 4 gives
+        # ~1000 features, so the correlation of independent fields is ~0.02 whatever the interpolation curve: over
+        # 240 seeds the mean |r| was 0.016 (gradient) and 0.024 (value), the worst 40-seed mean 0.027 and the worst
+        # pair 0.087. The bound is more than twice the worst mean; shared randomness gives 1.0.
         correlations = []
-        for seed in range(10):
-            coarse = fractal_noise((128, 128), 16, seed, octaves=2, persistence=1e-6, lacunarity=1, kind=kind)
-            fine = fractal_noise((128, 128), 16, seed, octaves=2, persistence=1e6, lacunarity=1, kind=kind)
+        for seed in range(40):
+            coarse = fractal_noise((128, 128), 4, seed, octaves=2, persistence=1e-6, lacunarity=1, kind=kind)
+            fine = fractal_noise((128, 128), 4, seed, octaves=2, persistence=1e6, lacunarity=1, kind=kind)
             correlations.append(abs(_correlation(coarse, fine)))
-        assert np.mean(correlations) < 0.1
+        assert np.mean(correlations) < 0.06
 
 
 def _crease_ratio(field: np.ndarray, axis: int) -> float:
@@ -466,3 +478,10 @@ class TestArgumentTypes:
             fractal_noise((8, 8), bad, 1)  # type: ignore[arg-type]
         with pytest.raises(ValueError, match="cells"):
             worley((8, 8), bad, 1)  # type: ignore[arg-type]
+
+
+def test_extreme_scale_and_lacunarity_do_not_overflow():
+    # lacunarity ** octave alone would exceed the float range at octave 2.
+    field = fractal_noise((8, 8), 1e308, 1, octaves=3, lacunarity=1e300)
+    assert field.shape == (8, 8)
+    assert 0.0 <= field.min() and field.max() <= 1.0
