@@ -10,7 +10,7 @@ def test_parse_color_forms():
     np.testing.assert_allclose(parse_color("#ff8000"), [1.0, 128 / 255, 0.0], atol=1e-6)
     np.testing.assert_allclose(parse_color("#f00"), [1, 0, 0])
     np.testing.assert_allclose(parse_color([0.1, 0.2, 0.3]), [0.1, 0.2, 0.3])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="'#12'"):
         parse_color("#12")
 
 
