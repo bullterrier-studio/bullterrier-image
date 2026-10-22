@@ -43,6 +43,14 @@ def luminance(rgb):
         ({"high": 1.5}, "high"),
         ({"low": -0.1}, "low"),
         ({"method": "laplacian"}, "method"),
+        ({"dog_ratio": 1.0}, "dog_ratio"),
+        ({"dog_ratio": 0.5}, "dog_ratio"),
+        ({"truncate": 0.0}, "truncate"),
+        ({"truncate": -1.0}, "truncate"),
+        ({"border_mode": "zeros"}, "border_mode"),
+        ({"tie_tolerance": -0.1}, "tie_tolerance"),
+        ({"tie_tolerance": 1.0}, "tie_tolerance"),
+        ({"connectivity": 6}, "connectivity"),
     ],
 )
 def test_bad_arguments_raise_value_error_naming_the_argument(kwargs, name):
@@ -50,10 +58,34 @@ def test_bad_arguments_raise_value_error_naming_the_argument(kwargs, name):
         detect_edges(vertical_step(), **kwargs)
 
 
-@pytest.mark.parametrize("shape", [(8,), (8, 8, 4), (8, 8, 1), (2, 8, 8, 3)])
-def test_unsupported_image_shape_raises_value_error_naming_image(shape):
+@pytest.mark.parametrize("shape", [(8,), (8, 8, 4), (8, 8, 1), (2, 8, 8, 3), (0, 5), (5, 0), (0, 5, 3), (0,)])
+def test_unsupported_or_empty_image_shape_raises_value_error_naming_image(shape):
     with pytest.raises(ValueError, match="image"):
         detect_edges(np.zeros(shape, dtype=np.float32))
+
+
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize(
+    "bad_picture",
+    [
+        255 * blocks(),  # 0..255 float input
+        (255 * blocks()).astype(np.uint8),  # 8-bit input that was never scaled to 0..1
+        blocks() - 0.1,  # slightly negative
+        np.where(blocks() > 0.5, np.nan, blocks()),
+        np.where(blocks() > 0.5, np.inf, blocks()),
+    ],
+    ids=["float-0-255", "uint8", "negative", "nan", "inf"],
+)
+def test_pictures_outside_zero_to_one_or_not_finite_are_rejected_naming_image(method, bad_picture):
+    with pytest.raises(ValueError, match=r"image.*0\.\.1"):
+        detect_edges(bad_picture, method)
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_pictures_exactly_spanning_zero_to_one_are_accepted(method):
+    picture = np.zeros((10, 10), dtype=np.float32)
+    picture[:, 5:] = 1.0
+    assert detect_edges(picture, method).magnitude.max() > 0
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -256,7 +288,7 @@ def test_half_the_contrast_gives_half_the_magnitude(method):
 
 @pytest.mark.parametrize("method", METHODS)
 def test_adding_a_constant_brightness_offset_changes_nothing(method):
-    picture = blocks()
+    picture = 0.7 * blocks()  # leaves room below 1 for the offset
     base = detect_edges(picture, method)
     shifted = detect_edges(picture + 0.25, method)
     np.testing.assert_allclose(shifted.magnitude, base.magnitude, atol=1e-5)
@@ -359,7 +391,7 @@ def test_raising_low_above_the_weak_strength_disconnects_the_weak_part_of_the_li
 
 @pytest.mark.parametrize("highs", [(0.2, 0.4), (0.4, 0.6), (0.6, 0.9)])
 def test_raising_high_never_adds_edge_pixels(highs):
-    picture = blocks() + 0.1 * np.random.default_rng(2).random((48, 66), dtype=np.float32)
+    picture = 0.9 * blocks() + 0.1 * np.random.default_rng(2).random((48, 66), dtype=np.float32)
     lower, higher = (edge_pixels(detect_edges(picture, "canny", low=0.1, high=h)) for h in highs)
     assert lower.sum() > higher.sum() > 0  # the thresholds really bite on this picture
     assert not (higher & ~lower).any()  # every pixel kept at the higher threshold was already kept at the lower one
@@ -466,3 +498,101 @@ def test_canny_gives_a_tie_to_the_pixel_that_comes_first_in_reading_order(axis, 
     on = detect_edges(picture, "canny", sigma=0.01).magnitude > 0
     interior = (y > 8) & (y < 56) & (x > 8) & (x < 56)
     assert set(line[on & interior]) == expected
+
+
+# --- every value that shapes the result is a parameter -------------------------------------------------------------
+
+BORDER_MODES = ["nearest", "reflect", "mirror", "wrap"]
+
+
+def reference_sobel_magnitude(picture, sigma, truncate, border_mode):
+    """Gaussian blur then Sobel, both straight from scipy with the given options: the independent oracle."""
+    blurred = ndimage.gaussian_filter(picture, sigma, truncate=truncate, mode=border_mode)
+    gx = ndimage.sobel(blurred, axis=1, mode=border_mode)
+    gy = ndimage.sobel(blurred, axis=0, mode=border_mode)
+    return np.hypot(gx, gy) / np.sqrt(20)
+
+
+@pytest.mark.parametrize("border_mode", BORDER_MODES)
+@pytest.mark.parametrize("truncate", [1.0, 2.5, 4.0])
+def test_sobel_is_a_gaussian_blur_then_scipys_sobel_with_the_chosen_kernel_width_and_border(truncate, border_mode):
+    picture = blocks()
+    expected = reference_sobel_magnitude(picture, 2.0, truncate, border_mode)
+    actual = detect_edges(picture, "sobel", sigma=2.0, truncate=truncate, border_mode=border_mode).magnitude
+    np.testing.assert_allclose(actual, expected, atol=2e-5)
+
+
+def test_the_border_mode_changes_the_edges_found_at_the_picture_border():
+    ramp = np.tile(np.linspace(0, 1, 40, dtype=np.float32), (30, 1))  # dark left edge, bright right edge
+    at_border = {mode: detect_edges(ramp, "sobel", border_mode=mode).magnitude[15, [0, -1]] for mode in BORDER_MODES}
+    assert at_border["wrap"].min() > 5 * at_border["nearest"].max()  # wrapping glues bright to dark: a huge step
+    assert len({round(float(v.max()), 5) for v in at_border.values()}) == 4  # no two modes are aliases
+
+
+def test_defaults_are_nearest_borders_and_four_sigma_kernels_and_a_ratio_of_one_point_six():
+    picture = blocks()
+    for method in METHODS:
+        default = detect_edges(picture, method)
+        explicit = detect_edges(
+            picture, method, dog_ratio=1.6, truncate=4.0, border_mode="nearest", tie_tolerance=1e-4, connectivity=8
+        )
+        np.testing.assert_array_equal(default.magnitude, explicit.magnitude)
+        np.testing.assert_array_equal(default.direction, explicit.direction)
+
+
+@pytest.mark.parametrize("border_mode", BORDER_MODES)
+@pytest.mark.parametrize(
+    ("sigma", "dog_ratio", "truncate"), [(1.0, 1.6, 4.0), (1.5, 2.0, 4.0), (1.0, 1.25, 3.0), (2.0, 3.0, 2.0)]
+)
+def test_dog_profile_is_the_difference_of_a_sigma_and_a_ratio_times_sigma_blur(sigma, dog_ratio, truncate, border_mode):
+    picture = blocks()
+    narrow = ndimage.gaussian_filter(picture, sigma, truncate=truncate, mode=border_mode)
+    wide = ndimage.gaussian_filter(picture, dog_ratio * sigma, truncate=truncate, mode=border_mode)
+    expected = np.abs(narrow - wide)
+    actual = detect_edges(
+        picture, "dog", sigma=sigma, dog_ratio=dog_ratio, truncate=truncate, border_mode=border_mode
+    ).magnitude
+    # Compared as shapes (both divided by their own maximum), so the test does not repeat the normalisation.
+    np.testing.assert_allclose(actual / actual.max(), expected / expected.max(), atol=1e-4)
+
+
+@pytest.mark.parametrize(("sigma", "dog_ratio", "truncate"), [(1.0, 2.5, 4.0), (1.5, 1.3, 2.0)])
+def test_the_strongest_possible_dog_patch_reads_one_for_any_ratio_and_kernel_width(sigma, dog_ratio, truncate):
+    delta = np.zeros((61, 61))
+    delta[30, 30] = 1.0
+    kernel = ndimage.gaussian_filter(delta, sigma, truncate=truncate) - ndimage.gaussian_filter(
+        delta, dog_ratio * sigma, truncate=truncate
+    )
+    edges = detect_edges((kernel > 0).astype(np.float32), "dog", sigma=sigma, dog_ratio=dog_ratio, truncate=truncate)
+    assert edges.magnitude[30, 30] == pytest.approx(1.0, abs=1e-4)
+
+
+def test_tie_tolerance_decides_which_of_two_nearly_equal_gradients_wins():
+    # Central differences along a row: 0, 0.4, 0.40002, 0: columns 29 and 30 differ by 0.005 percent.
+    picture = np.zeros((20, 60), dtype=np.float32)
+    picture[:, 30] = 0.4
+    picture[:, 31:] = 0.40002
+    sigma = 0.01  # narrower than a pixel: no blur
+
+    def kept_columns(tie_tolerance):
+        on = detect_edges(picture, "canny", sigma=sigma, tie_tolerance=tie_tolerance).magnitude > 0
+        return set(np.nonzero(on[10])[0])
+
+    assert kept_columns(1e-4) == {29}  # within tolerance they tie, and the earlier pixel wins
+    assert kept_columns(0.0) == {30}  # exact comparison: the very slightly stronger pixel wins
+
+
+def fading_diagonal_line():
+    """A one-pixel bright diagonal fading from 1.0 to 0.25: strong edge pixels leading into weak ones."""
+    y, x = np.mgrid[0:60, 0:60]
+    level = np.interp(y, [0, 20, 40, 59], [1.0, 1.0, 0.25, 0.25])
+    return np.where(x == y, level, 0.0).astype(np.float32)
+
+
+def test_four_connectivity_follows_fewer_weak_edge_pixels_than_eight_because_diagonal_touches_do_not_link():
+    picture = fading_diagonal_line()
+    eight = detect_edges(picture, "canny", low=0.1, high=0.5, connectivity=8).magnitude > 0
+    four = detect_edges(picture, "canny", low=0.1, high=0.5, connectivity=4).magnitude > 0
+    assert not (four & ~eight).any()  # linking less never keeps more
+    assert four[45:55].sum() < eight[45:55].sum()  # in the weak tail, diagonal links are what 8-connectivity adds
+    assert four[:15].sum() == eight[:15].sum()  # the strong head is seeded pixel by pixel either way
