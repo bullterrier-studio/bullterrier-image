@@ -74,6 +74,12 @@ Tests must follow the testing-best-practices skill, no exceptions. A test that i
 - Hard to test through the public interface is a design signal: change the interface (inject a dependency, expose a parameter), do not reach inside.
 - Two internal strategies (say a sparse and a dense path) are tested through the public API on inputs that naturally exercise each, against an independent reference written in the test (a naive implementation), not by forcing a private switch.
 
+Rewrite patterns, when a test reaches inside (`tests/test_suite_rules.py` fails on private imports and on patching `photo_fx`):
+- To observe or control our own code, inject through a public parameter (`pipeline.run(find_subject=...)`, `gallery.write_docs(checkout=...)`) and count the calls of the stand-in you passed.
+- A private name worth testing is promoted deliberately (public name, docstring), as `matte.refine_edge` was; otherwise test the behaviour it serves and delete the direct test.
+- Effects of a test's own: `throwaway_effects`, or `fresh_registry` for an empty registry; both use only the registry's public interface.
+- "Work was skipped" is seen in the files (a sentinel left untouched), not by spying on a function. Errors: the type plus a short substring naming the argument or value.
+
 ## Skills
 
 Use them; they are installed globally. `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion` for process; `testing-best-practices`
