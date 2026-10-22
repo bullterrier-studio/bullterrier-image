@@ -47,94 +47,9 @@ import numpy as np
 
 from . import effects, imageio
 from .matte import subject_matte
+from .timing import EASE_NAMES, Animated, Animation, ramp  # noqa: F401
 
 _MASKS = ("subject", "background")
-_SIMPLE_EASES = {
-    "linear": lambda t: t,
-    "in": lambda t: t * t,
-    "out": lambda t: 1.0 - (1.0 - t) ** 2,
-    "in-out": lambda t: t * t * (3.0 - 2.0 * t),
-}
-_CURVES = {  # cubic-bezier (x1, y1, x2, y2), as in the motion-design skill's easing tables
-    "gentle": (0.4, 0.0, 0.2, 1.0),  # smooth on-screen motion, no overshoot: the Premium signature
-    "standard": (0.2, 0.0, 0.0, 1.0),
-    "accelerate": (0.3, 0.0, 1.0, 1.0),  # exits
-    "decelerate": (0.0, 0.0, 0.0, 1.0),  # entrances
-    "emphasized": (0.05, 0.7, 0.1, 1.0),
-    "sine": (0.37, 0.0, 0.63, 1.0),  # ease-in-out sine: even, flowing motion; the skill's choice for calm
-}
-
-
-def _cubic_bezier(x1: float, y1: float, x2: float, y2: float):
-    """The CSS-style easing function for a cubic-bezier curve: time (0..1) -> progress (0..1)."""
-
-    def coordinate(a: float, b: float, t: float) -> float:
-        return 3 * a * (1 - t) ** 2 * t + 3 * b * (1 - t) * t**2 + t**3
-
-    def ease(u: float) -> float:
-        if u <= 0.0 or u >= 1.0:
-            return min(max(u, 0.0), 1.0)  # exact end points, so a held first or last frame is exactly the end state
-        low, high = 0.0, 1.0
-        for _ in range(40):  # x(t) rises steadily, so bisection finds the t whose x is `u`
-            mid = (low + high) / 2
-            low, high = (mid, high) if coordinate(x1, x2, mid) < u else (low, mid)
-        return coordinate(y1, y2, (low + high) / 2)
-
-    return ease
-
-
-def _easing(spec):
-    """The easing function for a name or a four-number cubic-bezier."""
-    if isinstance(spec, str):
-        return _SIMPLE_EASES[spec] if spec in _SIMPLE_EASES else _cubic_bezier(*_CURVES[spec])
-    return _cubic_bezier(*spec)
-
-
-@dataclass(frozen=True)
-class Animated:
-    """A parameter that changes over the clip, written `{ from = 0, to = 1, ease = "gentle" }` in a recipe."""
-
-    start: float
-    end: float
-    ease: str | tuple[float, float, float, float] = "linear"
-    over: str = "motion"
-
-    def at(self, position: float, clip: float | None = None) -> float:
-        """The value at `position` (0..1) of the moving part of the clip, or at `clip` (0..1 of the whole clip,
-        holds included) when `over` is "clip"."""
-        t = (position if clip is None else clip) if self.over == "clip" else position
-        return self.start + (self.end - self.start) * _easing(self.ease)(t)
-
-
-def ramp(start: float, end: float, ease="linear", over: str = "motion") -> Animated:
-    """A parameter that changes over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`."""
-    return Animated(float(start), float(end), tuple(ease) if isinstance(ease, list) else ease, over)
-
-
-@dataclass(frozen=True)
-class Animation:
-    seconds: float
-    fps: int = 30
-    hold_start: float = 0.0
-    hold_end: float = 0.0
-    loop: str = "once"
-
-    def frames(self) -> list[tuple[float, float]]:
-        """For every output frame, in order: (position in the moving part of the clip, position in the whole clip).
-
-        Both run 0..1. The first stays at 0 during `hold_start` and at 1 during `hold_end`; the second never stops.
-        Pingpong looping plays the frames forward and then backward, without repeating the turning frames.
-        """
-        count = max(2, round(self.seconds * self.fps))
-        moving = max(self.seconds - self.hold_start - self.hold_end, 1e-6)
-        motion = [min(max((i / self.fps - self.hold_start) / moving, 0.0), 1.0) for i in range(count)]
-        if self.loop == "pingpong":
-            motion = motion + motion[-2:0:-1]
-        return [(m, i / (len(motion) - 1)) for i, m in enumerate(motion)]
-
-    def positions(self) -> list[float]:
-        """The position in the moving part of the clip of every output frame (see `frames`)."""
-        return [motion for motion, _ in self.frames()]
 
 
 @dataclass(frozen=True)
@@ -237,7 +152,7 @@ def _animated_value(value, where: str, key: str):
     if isinstance(ease, list):
         ease = tuple(ease)
     numbers = all(isinstance(value.get(k), int | float) and not isinstance(value.get(k), bool) for k in ("from", "to"))
-    named = isinstance(ease, str) and (ease in _SIMPLE_EASES or ease in _CURVES)
+    named = isinstance(ease, str) and ease in EASE_NAMES
     curve = (
         isinstance(ease, tuple)
         and len(ease) == 4
@@ -251,7 +166,7 @@ def _animated_value(value, where: str, key: str):
         or not (named or curve)
         or value.get("over", "motion") not in ("motion", "clip")
     ):
-        names = (*_SIMPLE_EASES, *_CURVES)
+        names = EASE_NAMES
         raise ValueError(
             f"{where}: `{key}` must be {{ from = number, to = number, ease = one of {names} or [x1, y1, x2, y2] "
             f'with x1, x2 in 0..1, over = "motion" or "clip" }}'
