@@ -44,7 +44,8 @@ def test_save_video_gif_keeps_every_frame(tmp_path):
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 def test_save_video_mp4_streams_frames_and_copes_with_odd_sizes(tmp_path):
     assert imageio.save_video(iter(_frames(6)), tmp_path / "a.mp4", fps=12) == 6  # 63x47 is odd; H.264 needs even
-    assert (tmp_path / "a.mp4").stat().st_size > 0
+    width, height, frames = map(int, _probe(tmp_path / "a.mp4", "stream=width,height,nb_frames"))
+    assert (width, height, frames) == (64, 48, 6)  # every frame, made even by adding a row and a column
 
 
 def test_save_video_rejects_unknown_formats_and_no_frames(tmp_path):

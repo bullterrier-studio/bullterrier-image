@@ -23,9 +23,12 @@ def test_ascii_bright_areas_get_dense_glyphs_on_dark_background():
 
 
 def test_ascii_flips_the_ramp_on_a_light_background():
-    black = np.zeros((20, 10, 3), np.float32)
-    on_light = effects.apply("ascii", black, cell=10, fg="#000000", bg="#ffffff")
-    assert on_light.mean() < 0.9  # dark picture on paper = dense dark glyphs, not blank paper
+    chars = " .:-=+*#%@"
+    atlas = glyph_atlas(chars, 10, None)
+    black = np.zeros((*atlas.shape[1:], 3), np.float32)
+    on_light = effects.apply("ascii", black, cell=10, chars=chars, fg="#000000", bg="#ffffff")
+    # a dark picture on paper is the densest glyph in black ink, not blank paper
+    assert on_light.mean() == pytest.approx(1 - atlas[-1].mean(), abs=1e-3)
 
 
 def test_ascii_needs_two_distinct_characters(photo):
