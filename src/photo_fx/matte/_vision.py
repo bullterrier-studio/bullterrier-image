@@ -6,11 +6,24 @@ the package works where it is not installed.
 """
 
 import io
+import sys
 from typing import Any
 
 import numpy as np
 
 from photo_fx import imageio
+
+
+def unavailable_reason() -> str | None:
+    """Why Vision cannot run on this computer (a phrase for an error message), or None when it can."""
+    if sys.platform != "darwin":
+        return "Apple Vision is macOS only"
+    try:
+        import Quartz  # noqa: F401  (imported only to learn whether pyobjc is installed)
+        import Vision  # noqa: F401  (imported only to learn whether pyobjc is installed)
+    except ImportError as error:
+        return f"Apple Vision needs pyobjc-framework-vision and pyobjc-framework-quartz ({error})"
+    return None
 
 
 def subject_mask(rgb: np.ndarray) -> np.ndarray | None:

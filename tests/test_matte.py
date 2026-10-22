@@ -1,14 +1,166 @@
-"""Tests of `matte.refine_edge`, the part of finding the subject that runs anywhere (the model itself is Apple Vision).
+"""Tests of `photo_fx.matte`: choosing a backend, the portable ONNX backend, and `refine_edge`.
 
-Expected values are worked out by hand: erosion by a disc on axis-aligned shapes, and the normal distribution for a
-blurred straight edge."""
+The models are external boundaries: the portable backend is given tiny ONNX models built in the test (`echo_model` in
+conftest), whose answer follows from the documented model contract, so the expected mattes are worked out by hand.
+Apple Vision runs for real where it exists (macOS). Expected values for `refine_edge` are worked out by hand: erosion
+by a disc on axis-aligned shapes, and the normal distribution for a blurred straight edge."""
 
 import math
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from photo_fx.matte import refine_edge
+from photo_fx import imageio
+from photo_fx.matte import onnx_model_path, refine_edge, subject_matte
+
+EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
+
+
+def found(photo: np.ndarray, segmenter: str | None = None) -> np.ndarray:
+    """The subject as the backend answers, without the edge clean-up."""
+    return subject_matte(photo, segmenter=segmenter, shrink=0.0, feather=0.0)
+
+
+def picture(red: np.ndarray, green: float = 0.9, blue: float = 0.2) -> np.ndarray:
+    """An RGB picture whose red channel is `red` (h, w) and whose other channels are flat."""
+    return np.dstack([red, np.full_like(red, green), np.full_like(red, blue)]).astype(np.float32)
+
+
+def ramp(height: int = 60, width: int = 90) -> np.ndarray:
+    """Red rising from 0.1 at the left to 0.9 at the right: a non-square picture whose subject is 'the right part'."""
+    return picture(np.tile(np.linspace(0.1, 0.9, width, dtype=np.float32), (height, 1)))
+
+
+@pytest.fixture
+def echo_red(echo_model, monkeypatch):
+    """The portable backend answers with the red channel (see `echo_model`)."""
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+
+
+# --- choosing the backend: explicit > PHOTO_FX_SEGMENTER > auto ----------------------------------------------------
+
+
+def test_the_onnx_backend_reads_the_picture_as_the_model_contract_says(echo_red):
+    """The model is fed RGB in that order, scaled v/255 - 0.5 (the echo model returns red, so the matte is red), at
+    1024 x 1024, and its answer comes back at the photo's own, non-square size."""
+    photo = ramp()
+    alpha = found(photo, "onnx")
+    assert alpha.shape == (60, 90)
+    assert alpha.dtype == np.float32
+    # resized to 1024 and back: a straight ramp survives to within a step of 8-bit rounding and the resampling at the
+    # left and right borders
+    np.testing.assert_allclose(alpha[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
+
+
+@pytest.mark.parametrize(("channel", "expected"), [(1, 230 / 255), (2, 153 / 255)])
+def test_each_channel_reaches_the_model_in_rgb_order_as_its_8_bit_value(echo_model, monkeypatch, channel, expected):
+    """Flat channels are exact 8-bit values, so no resampling blurs them: the model sees exactly v/255 - 0.5."""
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(channel)))
+    alpha = found(picture(np.zeros((20, 30), np.float32), green=230 / 255, blue=153 / 255), "onnx")
+    np.testing.assert_allclose(alpha, expected, atol=1e-6)
+
+
+def test_the_onnx_matte_stays_in_range_is_repeatable_and_leaves_the_photo_alone(echo_red):
+    photo = ramp()
+    before = photo.copy()
+    first = subject_matte(photo, segmenter="onnx")
+    np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx"), first)
+    assert first.min() >= 0.0
+    assert first.max() <= 1.0
+    np.testing.assert_array_equal(photo, before)
+
+
+def test_the_onnx_matte_gets_the_same_edge_clean_up_as_any_matte(echo_red):
+    photo = picture(np.where(np.arange(90) >= 45, 0.9, 0.1).astype(np.float32) * np.ones((60, 1), np.float32))
+    raw = found(photo, "onnx")
+    np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx", shrink=2, feather=1), refine_edge(raw, 2, 1))
+
+
+def test_a_picture_where_nothing_stands_out_is_an_error(echo_red):
+    flat = picture(np.full((20, 30), 0.3, np.float32))  # the model's answer stays below one half everywhere
+    with pytest.raises(RuntimeError, match="no subject"):
+        subject_matte(flat, segmenter="onnx")
+
+
+def test_an_explicit_segmenter_wins_over_the_environment(echo_red, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "vision")  # would fail off macOS, and differ from the echo on macOS
+    photo = ramp()
+    np.testing.assert_allclose(found(photo, "onnx")[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
+
+
+@pytest.mark.parametrize("value", ["onnx", " ONNX "])
+def test_the_environment_variable_chooses_when_no_segmenter_is_given(echo_red, monkeypatch, value):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", value)  # on macOS the automatic choice would be Vision
+    photo = ramp()
+    np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
+
+
+def test_an_unknown_segmenter_is_refused_naming_the_known_ones():
+    with pytest.raises(ValueError, match="coreml") as caught:
+        subject_matte(ramp(), segmenter="coreml")
+    assert "vision" in str(caught.value)
+    assert "onnx" in str(caught.value)
+
+
+def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
+    with pytest.raises(ValueError, match="PHOTO_FX_SEGMENTER") as caught:
+        subject_matte(ramp())
+    assert "coreml" in str(caught.value)
+    assert "onnx" in str(caught.value)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the automatic choice is Apple Vision only where Vision exists")
+def test_on_macos_the_automatic_choice_is_apple_vision(echo_red, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "")  # empty means unset
+    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
+    np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="vision"))
+    assert not np.allclose(subject_matte(photo), subject_matte(photo, segmenter="onnx"), atol=0.05)
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
+def test_apple_vision_is_refused_off_macos_saying_what_to_use_instead():
+    with pytest.raises(RuntimeError, match="macOS") as caught:
+        subject_matte(ramp(), segmenter="vision")
+    assert "onnx" in str(caught.value)
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="on macOS the automatic choice is Apple Vision")
+def test_off_macos_the_automatic_choice_is_the_portable_model(echo_red):
+    photo = ramp()
+    np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
+
+
+def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it(tmp_path, monkeypatch):
+    missing = tmp_path / "isnet.onnx"
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(missing))
+    with pytest.raises(RuntimeError, match="PHOTO_FX_MODEL") as caught:
+        subject_matte(ramp(), segmenter="onnx")
+    assert str(missing) in str(caught.value)
+    assert not missing.exists()  # pointing at a local file never downloads
+
+
+def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(tmp_path / "mine.onnx"))
+    assert onnx_model_path() == tmp_path / "mine.onnx"
+
+
+def test_the_real_model_finds_the_dog(monkeypatch):
+    """The pinned model itself, when it has been downloaded before (tests never download it)."""
+    monkeypatch.delenv("PHOTO_FX_MODEL")
+    if not onnx_model_path().exists():
+        pytest.skip(f"the portable model is not in the cache ({onnx_model_path()}); `photo-fx cutout` downloads it")
+    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 320)
+    alpha = subject_matte(photo, segmenter="onnx")
+    height, width = alpha.shape
+    assert alpha[height // 2, width // 2] > 0.9  # the dog's chest, in the middle of the picture
+    assert alpha[: height // 10, : width // 10].max() < 0.1  # the window, top left
+    np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx"), alpha)
+
+
+# --- refine_edge ----------------------------------------------------------------------------------------------------
 
 
 def square(size: int = 40, start: int = 10, stop: int = 30) -> np.ndarray:

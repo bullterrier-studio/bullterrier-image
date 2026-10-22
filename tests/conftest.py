@@ -1,8 +1,11 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import numpy as np
+import onnx
 import pytest
+from onnx import TensorProto, helper
 
 from photo_fx import effects
 from photo_fx.core.params import EffectParams, param
@@ -86,3 +89,44 @@ def matte() -> np.ndarray:
     """A disc in the middle of the 96x128 picture: 1 inside, 0 outside, soft edge."""
     y, x = np.mgrid[0:96, 0:128].astype(np.float32)
     return np.clip(30 - np.hypot(x - 64, y - 48), 0, 1).astype(np.float32)
+
+
+@pytest.fixture(autouse=True)
+def no_model_download(monkeypatch):
+    """No test may download the subject-finding model, or depend on the settings of the person running the tests:
+    `PHOTO_FX_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it, instead of
+    downloading) and `PHOTO_FX_SEGMENTER` is unset. A test that needs a model sets `PHOTO_FX_MODEL` itself."""
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
+    monkeypatch.delenv("PHOTO_FX_SEGMENTER", raising=False)
+
+
+@pytest.fixture
+def echo_model(tmp_path) -> Callable[[int], Path]:
+    """`echo_model(channel)` writes a tiny ONNX segmentation model and returns its path. It stands in for the real
+    model (an external boundary) and obeys the documented contract: input float32 (1, 3, 1024, 1024) holding v/255 - 0.5
+    per RGB channel, first output (1, 1, 1024, 1024) the subject probability. It answers with input `channel` plus 0.5,
+    so the probability it reports is that channel's own value: a picture whose red channel paints the subject is found
+    exactly there, and a wrong channel order, scale or offset in the caller shows in the answer."""
+
+    def write(channel: int) -> Path:
+        side = 1024
+        graph = helper.make_graph(
+            [
+                helper.make_node("Gather", ["image", "channel"], ["picked"], axis=1),
+                helper.make_node("Add", ["picked", "half"], ["probability"]),
+            ],
+            "echo",
+            [helper.make_tensor_value_info("image", TensorProto.FLOAT, [1, 3, side, side])],
+            [helper.make_tensor_value_info("probability", TensorProto.FLOAT, [1, 1, side, side])],
+            initializer=[
+                helper.make_tensor("channel", TensorProto.INT64, [1], [channel]),
+                helper.make_tensor("half", TensorProto.FLOAT, [], [0.5]),
+            ],
+        )
+        model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8)
+        onnx.checker.check_model(model)
+        path = tmp_path / f"echo-{channel}.onnx"
+        onnx.save(model, path)
+        return path
+
+    return write

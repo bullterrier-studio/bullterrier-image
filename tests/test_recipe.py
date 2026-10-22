@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -305,30 +304,23 @@ def test_shipped_recipes_all_load():
     assert all(load_recipe(f).steps for f in files)
 
 
-def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default():
-    """Without a matte or `find_subject`, `photo_fx.recipe`'s functions find the subject with `subject_matte`. Where it
-    exists (Apple Vision, macOS) the real finder runs and the results must equal the core's with its matte; elsewhere
-    it refuses, and the facade passing that refusal on shows the same default. No stand-in is needed either way."""
+def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_model, monkeypatch):
+    """Without a matte or `find_subject`, `photo_fx.recipe`'s functions find the subject with `subject_matte`: the
+    results must equal the core's given `subject_matte`'s answer. The portable backend with a stand-in model (the
+    external boundary, see `echo_model`) is chosen through the environment, so the test is the same on every OS."""
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
     photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     animated = Recipe("a", (*masked.steps, Step("grade", {"exposure": Animated(0.0, 1.0)})), None, Animation(2, 1))
-    if sys.platform == "darwin":
-        alpha = subject_matte(photo)
-        expected = runner.render(photo, masked, alpha)
-        np.testing.assert_array_equal(facade.render(photo, masked), expected)
-        np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
-        np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
-        clip = list(facade.render_frames(photo, animated))
-        np.testing.assert_array_equal(clip[0], next(runner.render_frames(photo, animated, alpha)))
-    else:
-        for run in (
-            lambda: facade.render(photo, masked),
-            lambda: facade.trace(photo, masked),
-            lambda: facade.render_all(photo, [masked]),
-            lambda: list(facade.render_frames(photo, animated)),
-        ):
-            with pytest.raises(NotImplementedError, match="Apple Vision"):
-                run()
+    alpha = subject_matte(photo)
+    expected = runner.render(photo, masked, alpha)
+    assert not np.array_equal(expected, runner.render(photo, masked, np.ones_like(alpha)))  # the subject matters
+    np.testing.assert_array_equal(facade.render(photo, masked), expected)
+    np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
+    np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
+    clip = list(facade.render_frames(photo, animated))
+    np.testing.assert_array_equal(clip[0], next(runner.render_frames(photo, animated, alpha)))
 
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, matte):
