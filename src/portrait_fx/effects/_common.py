@@ -1,0 +1,41 @@
+"""Small helpers shared by effects: colour literals and luminance."""
+
+import numpy as np
+
+Color = str | list[float] | tuple[float, float, float]
+
+
+def parse_color(color: Color) -> np.ndarray:
+    """'#rrggbb' / '#rgb', or [r, g, b] with values 0..1 -> float32 array of 3."""
+    if isinstance(color, str):
+        h = color.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        if len(h) != 6:
+            raise ValueError(f"bad colour {color!r}: use '#rrggbb'")
+        return np.array([int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4)], dtype=np.float32)
+    if len(color) != 3:
+        raise ValueError(f"bad colour {color!r}: need 3 numbers")
+    return np.asarray(color, dtype=np.float32)
+
+
+LUMA = (0.2126, 0.7152, 0.0722)  # Rec. 709 weights of red, green, blue in perceived brightness
+
+
+def luminance(rgb: np.ndarray) -> np.ndarray:
+    """Perceived brightness (height, width) 0..1 (Rec. 709 weights)."""
+    return rgb @ np.array(LUMA, dtype=np.float32)
+
+
+def ink_amount(lum: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """How much ink a mark-making effect (ascii, halftone) should lay down for brightness `lum` on `background`.
+
+    Light marks on a dark background need to be dense where the picture is bright; dark marks on a light
+    background need to be dense where it is dark. Deciding that here means callers never pass an `invert` flag.
+    """
+    return lum if float(luminance(background)) < 0.5 else 1.0 - lum
+
+
+def vivid(colors: np.ndarray) -> np.ndarray:
+    """Brighten colours sampled from a photo so thin marks drawn in them stay readable (never darkens)."""
+    return np.clip(colors / np.maximum(colors.max(axis=-1, keepdims=True), 0.35), 0.0, 1.0)

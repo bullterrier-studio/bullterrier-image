@@ -1,0 +1,8 @@
+# Just you, on pure black. The baseline profile picture.
+name = "clean-black"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"

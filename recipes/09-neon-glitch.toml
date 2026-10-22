@@ -1,0 +1,25 @@
+# Neon colour scheme, then glitch: the red/blue split fringes in the neon colours; glow spills onto the black.
+name = "neon-glitch"
+size = 1024
+
+[[step]]
+effect = "gradient_map"
+stops = ["#12002b", "#ff2bd6", "#00f0ff"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 12
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "glow"
+radius = 26
+strength = 0.65
+threshold = 0.5

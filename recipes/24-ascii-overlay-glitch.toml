@@ -1,0 +1,27 @@
+# Text-over-photo face, then the glitch slides and splits it, then a hint of neon.
+name = "ascii-overlay-glitch"
+size = 1024
+
+[[step]]
+effect = "ascii"
+cell = 6
+photo = 0.85
+gamma = 0.8
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "split_tone"
+shadow = "#3a1bff"
+highlight = "#ff2bd6"
+amount = 0.35

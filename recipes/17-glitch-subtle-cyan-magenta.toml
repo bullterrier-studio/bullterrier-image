@@ -1,0 +1,26 @@
+# Same idea, flipped: magenta in the shadows, cyan in the highlights.
+name = "glitch-subtle-cyan-magenta"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "split_tone"
+shadow = "#ff2bd6"
+highlight = "#00f0ff"
+amount = 0.35
+
+[[step]]
+effect = "grain"
+amount = 0.06
+size = 1.6

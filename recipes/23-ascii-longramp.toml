@@ -1,0 +1,24 @@
+# Pure text, but with a 60-character ramp so there are many more tonal steps than ` .:-=+*#%@`.
+name = "ascii-longramp"
+size = 1024
+
+[[step]]
+effect = "grade"
+exposure = 0.3
+contrast = 1.1
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.6
+
+[[step]]
+effect = "ascii"
+cell = 6
+chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
+gamma = 0.85
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"

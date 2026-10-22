@@ -1,0 +1,24 @@
+# Terminal-green text portrait, nothing else in frame.
+name = "ascii-green"
+size = 1024
+
+[[step]]
+effect = "grade"          # stretch the face's narrow midtone band before it is turned into characters
+exposure = 0.3
+contrast = 1.1
+
+[[step]]
+effect = "clarity"
+radius = 60
+amount = 0.6
+
+[[step]]
+effect = "ascii"
+cell = 5
+fg = "#00ff9c"
+gamma = 0.85
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"

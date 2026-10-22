@@ -1,0 +1,47 @@
+import sys
+
+import pytest
+from PIL import Image
+
+from portrait_fx import imageio
+from portrait_fx.cli import main
+
+
+@pytest.fixture
+def files(photo, tmp_path):
+    imageio.save(photo, tmp_path / "me.png")
+    recipes = tmp_path / "recipes"
+    recipes.mkdir()
+    (recipes / "a.toml").write_text('name="a"\nsize=64\n[[step]]\neffect="grain"\n')
+    (recipes / "b.toml").write_text('name="b"\nsize=64\n[[step]]\neffect="glitch"\n')
+    return tmp_path
+
+
+def test_effects_lists_every_effect(capsys):
+    assert main(["effects"]) == 0
+    assert "halftone" in capsys.readouterr().out
+
+
+def test_render_writes_one_file_per_recipe_in_a_folder(files):
+    assert main(["render", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "out")]) == 0
+    assert sorted(p.name for p in (files / "out").iterdir()) == ["me__a.png", "me__b.png"]
+
+
+def test_sheet_combines_recipes_into_one_image(files):
+    assert main(["sheet", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "s.png")]) == 0
+    with Image.open(files / "s.png") as sheet:
+        assert sheet.width > 480
+
+
+def test_bad_recipe_is_reported_without_a_traceback(files, capsys):
+    (files / "recipes" / "c.toml").write_text('[[step]]\neffect="nope"\n')
+    assert main(["render", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "o")]) == 1
+    assert "c.toml" in capsys.readouterr().err
+    assert not (files / "o").exists()  # failed before doing any work
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the person matte needs Apple Vision")
+def test_photo_without_a_person_is_reported_clearly(files, capsys):
+    (files / "recipes" / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n')
+    assert main(["render", str(files / "me.png"), str(files / "recipes" / "m.toml")]) == 1
+    assert "no person" in capsys.readouterr().err.lower()

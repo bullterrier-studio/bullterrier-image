@@ -1,0 +1,25 @@
+# The full neon palette, but only 30% of it, laid over the normal glitch.
+name = "glitch-neon-blend"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "gradient_map"
+stops = ["#000000", "#ff2bd6", "#00f0ff"]
+opacity = 0.3
+
+[[step]]
+effect = "grain"
+amount = 0.06
+size = 1.6

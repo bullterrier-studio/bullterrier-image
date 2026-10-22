@@ -1,0 +1,20 @@
+# Clean cutout, then digital damage and grain over everything.
+name = "glitch"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "grain"
+amount = 0.07
+size = 1.6

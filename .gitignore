@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+dist/
+# photos are inputs and renders are outputs: personal, large and reproducible, so they stay out of git
+inputs/*
+!inputs/README.md
+out/

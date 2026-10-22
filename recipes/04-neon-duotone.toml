@@ -1,0 +1,18 @@
+# Magenta-to-cyan colour scheme with a glow that spills onto the black.
+name = "neon-duotone"
+size = 1024
+
+[[step]]
+effect = "gradient_map"
+stops = ["#12002b", "#ff2bd6", "#00f0ff"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glow"
+radius = 28
+strength = 0.7
+threshold = 0.5

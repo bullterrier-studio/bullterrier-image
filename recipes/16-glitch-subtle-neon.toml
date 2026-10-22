@@ -1,0 +1,32 @@
+# The normal glitch with a restrained neon cast: violet shadows, magenta highlights. Skin stays natural.
+name = "glitch-subtle-neon"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 8
+shift = 0.05
+seed = 4
+
+[[step]]
+effect = "split_tone"
+shadow = "#3a1bff"
+highlight = "#ff2bd6"
+amount = 0.4
+
+[[step]]
+effect = "glow"
+radius = 20
+strength = 0.25
+threshold = 0.6
+
+[[step]]
+effect = "grain"
+amount = 0.06
+size = 1.6

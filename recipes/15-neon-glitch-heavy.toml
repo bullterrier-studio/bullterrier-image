@@ -1,0 +1,32 @@
+# Maximum damage: many wide bands, strong channel split, more text, grain, strong glow.
+name = "neon-glitch-heavy"
+size = 1024
+
+[[step]]
+effect = "gradient_map"
+stops = ["#0b0020", "#7a2cff", "#ff2bd6", "#00f0ff"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 16
+bands = 18
+shift = 0.09
+ascii_share = 0.4
+ascii_cell = 10
+seed = 33
+
+[[step]]
+effect = "grain"
+amount = 0.08
+size = 1.6
+
+[[step]]
+effect = "glow"
+radius = 30
+strength = 0.8
+threshold = 0.4

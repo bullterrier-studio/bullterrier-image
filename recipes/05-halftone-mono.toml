@@ -1,0 +1,14 @@
+# White print dots on black.
+name = "halftone-mono"
+size = 1024
+
+[[step]]
+effect = "halftone"
+cell = 11
+angle = 45
+fg = "#ffffff"
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
