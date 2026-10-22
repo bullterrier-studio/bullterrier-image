@@ -29,6 +29,7 @@ def edge_distance(
     sampling: tuple[float, float] = (1.0, 1.0),  # constant: one px per element, a unit grid
     *,
     open_bottom: bool = True,
+    smoothing: float = 1.0,  # constant: light smoothing, one element; effects expose it as a parameter
 ) -> EdgeField:
     """Distance to the nearest edge, and the outward direction, for every element of a 2-D bool mask.
 
@@ -40,13 +41,16 @@ def edge_distance(
     `sampling` = (row height, column width) is the size of one element in px (both > 0, else ValueError), so a grid of
     tall characters gives distances in px of the picture, not in cells. Distances are in the same unit.
 
-    The direction is the negative gradient of the distance, lightly smoothed (1 element) so that it varies gently
-    across a ridge instead of flipping.
+    The direction is the negative gradient of the distance after a Gaussian blur of `smoothing` elements (sigma, >= 0,
+    else ValueError; 0 = none), so that it varies gently across a ridge instead of flipping. More smoothing turns the
+    direction more gradually, and lets it reach further beyond the shape (up to 4 sigma).
     """
     if not isinstance(shape, np.ndarray) or shape.dtype != bool or shape.ndim != 2 or shape.size == 0:
         raise ValueError("shape must be a non-empty 2-D bool array")
     if len(sampling) != 2 or not all(np.isfinite(s) and s > 0 for s in sampling):
         raise ValueError(f"sampling must be two positive numbers (row height, column width), got {sampling!r}")
+    if not (np.isfinite(smoothing) and smoothing >= 0):
+        raise ValueError(f"smoothing must be a number >= 0 (elements), got {smoothing!r}")
     row_height, col_width = sampling
 
     # A border is an edge by putting a row/column of "outside" next to it. Leaving the bottom unpadded is what makes it
@@ -54,9 +58,9 @@ def edge_distance(
     grid = np.pad(shape, ((1, 0 if open_bottom else 1), (1, 1)), constant_values=False)
     distance = ndimage.distance_transform_edt(grid, sampling=sampling)[1 : 1 + shape.shape[0], 1:-1]
 
-    # Smoothing is over 1 element (not px), the same for every sampling. A gradient under 1e-6 per px is float noise or
-    # beyond the reach of the smoothing (4 elements from the nearest inside element): there is no direction there.
-    smooth = ndimage.gaussian_filter(distance, 1.0)
+    # Smoothing is in elements (not px), the same for every sampling. A gradient under 1e-6 per px is float noise or
+    # beyond the reach of the smoothing (4 sigma from the nearest inside element): there is no direction there.
+    smooth = ndimage.gaussian_filter(distance, smoothing)
     grad_y = np.gradient(smooth, row_height, axis=0) if shape.shape[0] > 1 else np.zeros_like(smooth)
     grad_x = np.gradient(smooth, col_width, axis=1) if shape.shape[1] > 1 else np.zeros_like(smooth)
     length = np.hypot(grad_x, grad_y)

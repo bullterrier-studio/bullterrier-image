@@ -56,7 +56,6 @@ BOUND_CALLS = {
 EXEMPT: dict[tuple[str, float], str] = {
     ("ops/color.py", 0.35): "ops audit: vivid's floor on the brightest channel, shaped by ascii/halftone/glitch",
     ("ops/cells.py", 0.02): "evaporate/disperse migration: `lit`'s brightness threshold for a visible piece",
-    ("ops/distance.py", 1.0): "evaporate/disperse migration: the direction's smoothing sigma, 1 element",
     ("ops/textart.py", 3): "ascii migration (textart is being edited): the channel count needs a `# constant:`",
     ("effects/glitch/effect.py", 1): "glitch (in flight): the second random stream's id needs a `# constant:`",
 }

@@ -225,3 +225,27 @@ def test_shape_must_be_a_non_empty_2d_bool_array(shape):
 def test_sampling_must_be_two_positive_numbers(sampling):
     with pytest.raises(ValueError, match="sampling"):
         edge_distance(rectangle(), sampling)
+
+
+def _tall_strip() -> np.ndarray:
+    """Columns 20..39 of a 60-row array: below the first rows the nearest edges are the strip's two sides."""
+    shape = np.zeros((60, 60), dtype=bool)
+    shape[:, 20:40] = True
+    return shape
+
+
+def test_more_smoothing_gives_a_direction_further_beyond_the_shape():
+    # Row 45 is far below the top edge, so only the strip's sides matter there. Column 14 is 6 elements left of it.
+    unsmoothed, light, heavy = (edge_distance(_tall_strip(), smoothing=s) for s in (0.0, 1.0, 3.0))
+    assert (heavy.normal_x[45, 14], heavy.normal_y[45, 14]) == pytest.approx((-1.0, 0.0), abs=1e-6)  # away from it
+    assert (light.normal_x[45, 14], light.normal_y[45, 14]) == (0.0, -1.0)  # beyond 4 sigma: flat, so up
+    assert (unsmoothed.normal_x[45, 18], unsmoothed.normal_y[45, 18]) == (0.0, -1.0)  # 2 outside: no reach at all
+    # whatever the smoothing, the normals on the strip's sides point straight out
+    for field in (unsmoothed, light, heavy):
+        assert (field.normal_x[45, 20], field.normal_x[45, 39]) == pytest.approx((-1.0, 1.0))
+
+
+@pytest.mark.parametrize("smoothing", [-0.5, float("nan")])
+def test_smoothing_must_be_a_non_negative_number(smoothing):
+    with pytest.raises(ValueError, match="smoothing"):
+        edge_distance(rectangle(), smoothing=smoothing)
