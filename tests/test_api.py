@@ -68,7 +68,7 @@ def test_fx_builds_steps_from_keyword_or_positional_arguments():
 
 
 def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
-    with pytest.raises(TypeError, match=r"fx\.glitch\(\).*spilt"):
+    with pytest.raises(ValueError, match=r"glitch.*`spilt` is not a parameter"):
         fx.glitch(spilt=3)
     with pytest.raises(AttributeError, match=r"available: .*ascii"):
         fx.sparkle  # noqa: B018  (the lookup itself is what must raise)

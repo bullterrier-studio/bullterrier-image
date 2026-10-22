@@ -83,7 +83,7 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
     assert json.loads(done.stdout) == ["light", 0.75]  # the template's effect: the negative at amount 1
 
 
-@pytest.mark.parametrize("name", ["grade", "glitch"], ids=["in a folder", "in a loose module"])
+@pytest.mark.parametrize("name", ["grade", "glitch"])
 def test_the_name_of_an_existing_effect_is_refused_and_nothing_is_written(checkout, name):
     before = _tree(checkout)
     with pytest.raises(FileExistsError, match=f"'{name}'"):

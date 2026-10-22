@@ -72,9 +72,9 @@ def test_the_package_keeps_every_import_contract():
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
     "effect to effect": (
-        "effects/glitch.py",
+        "effects/glitch/effect.py",
         "import photo_fx.effects.ascii",
-        "photo_fx.effects.glitch",
+        "photo_fx.effects.glitch.effect",
         EFFECTS_APART,
     ),
     "ops to core": ("ops/warp.py", "import photo_fx.core.timing", "photo_fx.ops.warp", OPS_ALONE),
