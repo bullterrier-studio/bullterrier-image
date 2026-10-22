@@ -22,6 +22,7 @@ Modules, each owning one decision:
     recipe     effect lists (Python or TOML), running them, tracing them, animating them
     pipeline   many photos x many recipes: caching, automatic checks, export, report
     checks     automatic quality checks
+    gallery    the effect catalogue and its pictures (docs/effects.md)
     sheet      comparison images
     cli        the `photo-fx` command
 """

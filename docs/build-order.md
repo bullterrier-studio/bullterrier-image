@@ -1,7 +1,7 @@
 # Build order
 
 How to build the [effects roadmap](effects-roadmap.md) so that many effects can be written in parallel, by several people or
-agents, without colliding. Status: proposal.
+agents, without colliding. Status: section 0 is implemented and merged; the rest is the plan being followed.
 
 Parallel work pays only when tasks share no files and no unsettled decisions. So the order is: (0) remove the places where
 every new effect would collide, (1) settle the shared contract and build the shared toolbox, (2) run independent streams.

@@ -37,7 +37,7 @@ separate code.
 | `cyanotype` | Prussian-blue print. | `fx.cyanotype()` |
 | `cross_process` | Shifted curves per channel. | `fx.cross_process()` |
 | `bleach_bypass` | Desaturated, high-contrast film look. | `fx.bleach_bypass(amount=0.6)` |
-| `teal_orange` | The blockbuster grade. | `fx.teal_orange(strength=0.5)` |
+| `teal_orange` | The blockbuster grade. | `fx.teal_orange(amount=0.5)` |
 | `thermal` | Heat-camera false colour. | `fx.thermal()` |
 | `infrared` | False-colour infrared (swapped channels, bright foliage). | `fx.infrared()` |
 | `xray` | Inverted, blue, edge-lit. | `fx.xray()` |
@@ -52,10 +52,10 @@ separate code.
 | `glow` ✓ | Soft bloom around highlights. | `fx.glow(radius=28)` |
 | `sharpen` | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
 | `highpass` | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
-| `denoise` | Median, bilateral or non-local-means. | `fx.denoise(method="bilateral", strength=0.4)` |
+| `denoise` | Median, bilateral or non-local-means. | `fx.denoise(method="bilateral", amount=0.4)` |
 | `shadows_highlights` | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
 | `dehaze` | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
-| `tone_map` | Local tone mapping, the "HDR look". | `fx.tone_map(strength=0.7)` |
+| `tone_map` | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
 | `vignette` | Darken (or colour) the corners. | `fx.vignette(amount=0.5, roundness=0.8)` |
 | `gaussian_blur` | Blur. | `fx.gaussian_blur(radius=6)` |
 | `motion_blur` | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
@@ -157,7 +157,7 @@ separate code.
 | `ripple` | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
 | `displace` | Move pixels by noise or a map. | `fx.displace(map="noise", amount=12)` |
 | `lens_distortion` | Barrel or pincushion. | `fx.lens_distortion(k=0.2)` |
-| `fisheye` | Wide-angle bulge. | `fx.fisheye(strength=0.6)` |
+| `fisheye` | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
 | `polar` | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
 | `mirror` | Symmetry on an axis, or four-way. | `fx.mirror(axis="vertical")` |
 | `kaleidoscope` | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
