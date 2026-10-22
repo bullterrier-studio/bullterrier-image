@@ -1,4 +1,7 @@
-"""Command line: `photo-fx render|sheet|cutout|effects`. A thin layer over the library; no logic of its own."""
+"""Command line: `photo-fx render|sheet|cutout|animate|run|steps|init|effects|gallery|regenerate`.
+
+A thin layer over the library; no logic of its own.
+"""
 
 import argparse
 import sys
@@ -6,7 +9,7 @@ import textwrap
 from dataclasses import replace
 from pathlib import Path
 
-from . import effects, imageio
+from . import effects, gallery, imageio
 from .imageio import save_video
 from .matte import subject_matte
 from .pipeline import init_project, load_project, run
@@ -69,6 +72,17 @@ def main(argv: list[str] | None = None) -> int:
 
     commands.add_parser("effects", help="list the available effects and their parameters")
 
+    p = commands.add_parser(
+        "gallery",
+        help="render each effect's example recipe into docs/gallery/ (missing ones) and write docs/effects.md",
+    )
+    p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
+    p.add_argument("--force", action="store_true", help="render again even if the picture exists")
+
+    commands.add_parser(
+        "regenerate", help="after adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures"
+    )
+
     args = parser.parse_args(argv)
     try:
         return {
@@ -80,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
             "steps": _steps,
             "init": _init,
             "effects": _effects,
+            "gallery": lambda args: _print_paths(gallery.write_docs(args.only, args.force)),
+            "regenerate": lambda args: _print_paths(gallery.regenerate()),
         }[args.command](args)
     except (ValueError, RuntimeError, FileNotFoundError, FileExistsError, NotImplementedError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -192,6 +208,12 @@ def _steps(args) -> int:
 
 def _init(args) -> int:
     print(init_project(args.directory))
+    return 0
+
+
+def _print_paths(paths: list[Path]) -> int:
+    for path in paths:
+        print(path)
     return 0
 
 
