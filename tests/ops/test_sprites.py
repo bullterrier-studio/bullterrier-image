@@ -41,8 +41,10 @@ def test_scatter_returns_exactly_count_float32_sprites_of_every_field():
 def test_scatter_positions_are_inside_the_picture_and_cover_it():
     h, w = 40, 90  # non-square so that swapped axes fail
     p = scatter((h, w), 5000, seed=3)
-    assert p.x.min() >= 0 and p.x.max() < w
-    assert p.y.min() >= 0 and p.y.max() < h
+    assert p.x.min() >= 0
+    assert p.x.max() < w
+    assert p.y.min() >= 0
+    assert p.y.max() < h
     # uniform: every quarter of the picture gets roughly a quarter of the sprites
     for left in (True, False):
         for top in (True, False):
@@ -60,11 +62,15 @@ def test_scatter_has_exactly_depth_layers_distinct_depths_in_unit_range():
     p = scatter((50, 50), 300, seed=2, depth_layers=4)
     depths = np.unique(p.depth)
     assert len(depths) == 4
-    assert depths.min() >= 0 and depths.max() <= 1
+    assert depths.min() >= 0
+    assert depths.max() <= 1
     assert depths.min() < depths.max()
     single = scatter((50, 50), 300, seed=2, size=(3.0, 9.0), depth_layers=1)
-    assert np.all(single.depth == 1.0) and np.all(single.size == 9.0)  # one layer = everything near and large
-    assert p.phase.min() >= 0 and p.phase.max() <= 1
+    # one layer = everything near and large
+    assert np.all(single.depth == 1.0)
+    assert np.all(single.size == 9.0)
+    assert p.phase.min() >= 0
+    assert p.phase.max() <= 1
     assert len(np.unique(p.phase)) > 250  # a per-sprite random number, not a constant per layer
 
 
@@ -146,7 +152,8 @@ def test_stamp_of_an_empty_placement_is_an_equal_new_array(photo):
     empty = scatter(photo.shape[:2], 0, seed=0)
     out = stamp(photo, empty)
     np.testing.assert_array_equal(out, photo)
-    assert out is not photo and not np.shares_memory(out, photo)
+    assert out is not photo
+    assert not np.shares_memory(out, photo)
     np.testing.assert_array_equal(photo, before)
 
 
@@ -193,7 +200,8 @@ def test_total_light_follows_the_area_law(small, large):
 def test_sub_pixel_sprites_still_add_light_that_grows_with_size():
     light = [stamp(black(), sprite(CENTRE, CENTRE, s), blend="add").sum() for s in (0.25, 0.5, 1.0, 2.0)]
     assert light[0] > 0
-    assert light == sorted(light) and len(set(light)) == 4
+    assert light == sorted(light)
+    assert len(set(light)) == 4
 
 
 def test_add_light_is_linear_in_opacity():
@@ -216,7 +224,9 @@ def test_nearer_sprites_are_brighter_than_farther_ones_of_the_same_size():
 
 def test_colour_lands_in_the_matching_channels():
     out = stamp(black(), sprite(CENTRE, CENTRE), color=(1.0, 0.0, 0.5), blend="add")
-    assert out[50, 50, 0] > 0.99 and out[50, 50, 1] == 0 and out[50, 50, 2] == pytest.approx(0.5, abs=0.01)
+    assert out[50, 50, 0] > 0.99
+    assert out[50, 50, 1] == 0
+    assert out[50, 50, 2] == pytest.approx(0.5, abs=0.01)
 
 
 def test_add_is_clipped_to_one_after_summing_overlaps():
@@ -237,7 +247,8 @@ def test_screen_of_a_single_sprite_matches_the_screen_formula_at_one_pixel():
 
 def test_screen_never_exceeds_one_even_with_many_stacked_sprites_and_overlaps_combine_as_screens():
     out = stamp(black(), many([CENTRE] * 50, [CENTRE] * 50), blend="screen")
-    assert out.max() <= 1.0 and out[50, 50, 0] > 0.999
+    assert out.max() <= 1.0
+    assert out[50, 50, 0] > 0.999
     two = stamp(black(), many([CENTRE] * 2, [CENTRE] * 2), opacity=0.5, blend="screen")
     assert two[50, 50, 0] == pytest.approx(1 - 0.5 * 0.5, abs=1e-6)
 
@@ -258,15 +269,19 @@ def test_over_composites_stacked_sprites_one_after_the_other():
 @pytest.mark.parametrize("blend", ["add", "screen", "over"])
 def test_every_blend_returns_float32_in_range_for_a_busy_picture(photo, blend):
     out = stamp(photo, scatter(photo.shape[:2], 300, seed=1), blend=blend, opacity=0.9)
-    assert out.dtype == np.float32 and out.shape == photo.shape
-    assert out.min() >= 0.0 and out.max() <= 1.0
+    assert out.dtype == np.float32
+    assert out.shape == photo.shape
+    assert out.min() >= 0.0
+    assert out.max() <= 1.0
 
 
 def test_stamp_accepts_float64_and_non_contiguous_canvases_and_returns_float32():
     wide = np.zeros((101, 202, 3), dtype=np.float64)
     canvas = wide[:, ::2]
     out = stamp(canvas, sprite(CENTRE, CENTRE))
-    assert out.dtype == np.float32 and out.shape == (101, 101, 3) and out[50, 50, 0] > 0.99
+    assert out.dtype == np.float32
+    assert out.shape == (101, 101, 3)
+    assert out[50, 50, 0] > 0.99
     assert wide.max() == 0.0
 
 
@@ -310,7 +325,8 @@ def test_astronomically_large_sprites_and_streaks_still_just_cover_the_picture()
 
 def test_stamp_copes_with_tiny_pictures():
     out = stamp(black(1, 1), sprite(0.5, 0.5, size=4), blend="add")
-    assert out.shape == (1, 1, 3) and out[0, 0, 0] > 0.99
+    assert out.shape == (1, 1, 3)
+    assert out[0, 0, 0] > 0.99
     assert stamp(black(1, 40), many([5.5, 30.5], [0.5, 0.5]), blend="add")[0, 5, 0] > 0.5
 
 
@@ -386,7 +402,8 @@ def test_streak_light_grows_with_length():
 
 def test_streaks_are_clipped_at_the_edges_like_discs():
     out = stamp(black(), many([0.0, 101.0], [50.5, 50.5], size=8), shape="streak", angle=0.0, length=6.0, blend="add")
-    assert out[50, 0, 0] > 0.9 and out[50, 100, 0] > 0.9
+    assert out[50, 0, 0] > 0.9
+    assert out[50, 100, 0] > 0.9
     assert np.all(out[:, 40:60] == 0)  # nothing wrapped to the middle
 
 
@@ -505,8 +522,10 @@ def test_feather_sets_the_minimum_edge_width_in_pixels():
     # with feather 4 the ramp is (1 + 2 - d) / 4 wide: 0.75 at the centre, 0.25 two pixels away
     wide = stamp(black(), sprite(CENTRE, CENTRE, size=2), feather=4.0, blend="add")[..., 0]
     default = stamp(black(), sprite(CENTRE, CENTRE, size=2), blend="add")[..., 0]
-    assert wide[50, 50] == pytest.approx(0.75, abs=1e-6) and wide[50, 52] == pytest.approx(0.25, abs=1e-6)
-    assert default[50, 50] == 1.0 and default[50, 52] == 0.0
+    assert wide[50, 50] == pytest.approx(0.75, abs=1e-6)
+    assert wide[50, 52] == pytest.approx(0.25, abs=1e-6)
+    assert default[50, 50] == 1.0
+    assert default[50, 52] == 0.0
 
 
 def test_softness_sets_the_edge_width_as_a_fraction_of_the_radius():
@@ -525,7 +544,9 @@ def test_far_and_near_brightness_set_the_brightness_range_over_depth():
 
     for depth, want in [(0.0, 0.1), (0.5, 0.45), (1.0, 0.8)]:
         assert core(depth, far_brightness=0.1, near_brightness=0.8) == pytest.approx(want, abs=1e-6)
-    assert core(0.0) == pytest.approx(0.4, abs=1e-6) and core(1.0) == 1.0  # defaults: 0.4 far, 1 near
+    # defaults: 0.4 far, 1 near
+    assert core(0.0) == pytest.approx(0.4, abs=1e-6)
+    assert core(1.0) == 1.0
 
 
 def test_over_at_a_far_depth_is_dimmed_by_the_far_brightness_unless_it_is_raised_to_one():
@@ -757,5 +778,7 @@ def test_pixels_no_sprite_touches_come_back_unchanged_to_the_last_bit(sprites):
         centres = np.random.default_rng(1).uniform(25, 35, 30)
         placement = handmade(centres, centres[::-1], [12.0] * 30)
     out = stamp(canvas, placement, blend="add", opacity=0.5)
-    assert np.all(out[:15] == 1.5) and np.all(out[:, :15] == 1.5) and np.all(out[-15:] == 1.5)
+    assert np.all(out[:15] == 1.5)
+    assert np.all(out[:, :15] == 1.5)
+    assert np.all(out[-15:] == 1.5)
     assert out[30, 30, 0] == 1.0  # a touched pixel is clipped

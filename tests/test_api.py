@@ -39,7 +39,8 @@ def test_a_recipe_built_in_code_is_checked_too():
 def test_steps_can_be_limited_to_a_region_and_blended_without_changing_the_original():
     base = fx.fill("#000000")
     masked = base.where("background").blend(0.5)
-    assert (masked.mask, masked.opacity) == ("background", 0.5) and (base.mask, base.opacity) == (None, 1.0)
+    assert (masked.mask, masked.opacity) == ("background", 0.5)
+    assert (base.mask, base.opacity) == (None, 1.0)
     with pytest.raises(ValueError):
         base.where("left half")
     with pytest.raises(ValueError):
@@ -73,7 +74,8 @@ def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
     signature = inspect.signature(fx.glitch)
     assert list(signature.parameters)[:3] == ["split", "bands", "shift"]  # no image parameter, no matte
     assert "matte" not in inspect.signature(fx.evaporate).parameters
-    assert "slide sideways" in fx.glitch.__doc__ and fx.glitch.__name__ == "glitch"
+    assert "slide sideways" in fx.glitch.__doc__
+    assert fx.glitch.__name__ == "glitch"
     assert {"ascii", "glitch", "disperse"} <= set(dir(fx))
 
 
@@ -134,7 +136,8 @@ def test_python_and_toml_recipes_are_the_same_thing(tmp_path):
 
 def test_ramp_makes_an_animated_value():
     assert ramp(0, 1, "gentle") == Animated(0.0, 1.0, "gentle")
-    assert ramp(0, 1, [0.4, 0, 0.2, 1]).ease == (0.4, 0, 0.2, 1) and ramp(0, 5, over="clip").over == "clip"
+    assert ramp(0, 1, [0.4, 0, 0.2, 1]).ease == (0.4, 0, 0.2, 1)
+    assert ramp(0, 5, over="clip").over == "clip"
 
 
 # --- trace: the picture after every step -----------------------------------------------------------------------
@@ -150,7 +153,8 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     stages = trace(photo, look)
     assert [s.label.split("(")[0] for s in stages] == ["input", "1. grade", "2. glitch", "3. grain"]
     np.testing.assert_array_equal(stages[0].image, photo)
-    assert not np.array_equal(stages[1].image, stages[0].image) and not np.array_equal(stages[3].image, stages[2].image)
+    assert not np.array_equal(stages[1].image, stages[0].image)
+    assert not np.array_equal(stages[3].image, stages[2].image)
 
 
 def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo):
@@ -188,7 +192,8 @@ def make_project(tmp_path, photo, recipes, **options):
 def test_the_pipeline_runs_recipes_defined_in_code_and_notices_when_they_change(tmp_path, photo):
     a = Recipe("a", size=64, steps=[fx.grain(seed=1)])
     project = make_project(tmp_path, photo, [a])
-    assert [i.status for i in run(project)] == ["done"] and (tmp_path / "out" / "one" / "a.jpg").is_file()
+    assert [i.status for i in run(project)] == ["done"]
+    assert (tmp_path / "out" / "one" / "a.jpg").is_file()
     assert [i.status for i in run(project)] == ["skipped"]
     changed = Recipe("a", size=64, steps=[fx.grain(seed=2)])
     assert [i.status for i in run(make_project(tmp_path, photo, [changed]))] == ["done"]

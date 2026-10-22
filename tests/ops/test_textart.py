@@ -62,7 +62,9 @@ def test_with_one_ink_colour_every_pixel_is_a_mix_of_ink_and_paper(photo):
     out = draw(photo, fg=red, background=blue)
     assert out[..., 1].max() == 0.0  # neither colour has green
     np.testing.assert_allclose(out[..., 0] + out[..., 2], 1.0, atol=1e-6)  # ink share + paper share = 1
-    assert out[..., 0].max() > 0.5 and out[..., 2].max() == 1.0  # both colours really appear
+    # both colours really appear
+    assert out[..., 0].max() > 0.5
+    assert out[..., 2].max() == 1.0
 
 
 def test_with_photo_one_the_picture_shows_wherever_there_is_no_ink():
@@ -79,11 +81,14 @@ def test_the_photos_own_colours_are_used_when_no_ink_colour_is_given():
     green = np.zeros((height, width, 3), np.float32)
     green[..., 1] = 1.0
     out = draw(green, fg=None)
-    assert out[..., 0].max() == 0.0 and out[..., 2].max() == 0.0  # no red or blue ink on black paper
+    # no red or blue ink on black paper
+    assert out[..., 0].max() == 0.0
+    assert out[..., 2].max() == 0.0
     assert out[..., 1].max() > 0.5  # but plenty of green ink (antialiased glyphs never quite reach full coverage)
 
 
 def test_sizes_off_the_character_grid_keep_their_shape_and_type():
     odd = np.random.default_rng(0).random((37, 53, 3), dtype=np.float32)
     out = draw(odd)
-    assert out.shape == odd.shape and out.dtype == np.float32
+    assert out.shape == odd.shape
+    assert out.dtype == np.float32

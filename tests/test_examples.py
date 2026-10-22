@@ -14,7 +14,8 @@ def test_every_effect_has_a_short_example_recipe_that_shows_it(name):
     path = EXAMPLES / "effects" / f"{name}.toml"
     assert path.is_file(), f"add {path.relative_to(EXAMPLES.parent)}: a short recipe showing {name}"
     recipe = load_recipe(path)
-    assert recipe.name == name and recipe.size == 480
+    assert recipe.name == name
+    assert recipe.size == 480
     assert 1 <= len(recipe.steps) <= 3
     assert name in [step.effect for step in recipe.steps]
 
@@ -30,7 +31,8 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     recipes = [load_recipe(r) for r in project.recipes]
     assert len(recipes) <= 6  # a demo, not a catalogue
     assert len({r.name for r in recipes}) == len(recipes)
-    assert any(r.animation for r in recipes) and any(r.needs_matte for r in recipes)
+    assert any(r.animation for r in recipes)
+    assert any(r.needs_matte for r in recipes)
 
 
 def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the_text_they_move():

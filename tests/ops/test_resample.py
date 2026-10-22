@@ -9,7 +9,8 @@ from photo_fx.ops.resample import resize
 def test_resize_keeps_aspect_ratio_and_range(photo, matte):
     small = resize(photo, 64)
     assert small.shape == (48, 64, 3)
-    assert 0.0 <= small.min() and small.max() <= 1.0
+    assert 0.0 <= small.min()
+    assert small.max() <= 1.0
     assert resize(matte, 64).shape == (48, 64)
 
 

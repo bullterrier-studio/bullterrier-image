@@ -29,7 +29,8 @@ def test_simple_eases_have_their_textbook_values(name, at_quarter, at_half, at_t
     curve = Animated(2.0, 6.0, name)  # a start and an end that are not 0 and 1: a swapped argument would show
     for t, expected in [(0.25, at_quarter), (0.5, at_half), (0.75, at_three_quarters)]:
         assert curve.at(t) == pytest.approx(2.0 + 4.0 * expected, abs=1e-12)
-    assert curve.at(0.0) == 2.0 and curve.at(1.0) == 6.0
+    assert curve.at(0.0) == 2.0
+    assert curve.at(1.0) == 6.0
 
 
 def bezier_point(x1: float, y1: float, x2: float, y2: float, s: float) -> tuple[float, float]:

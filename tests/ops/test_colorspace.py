@@ -21,7 +21,8 @@ def random_colours(n=10_000, seed=0):
 def test_any_leading_shape_is_preserved_and_result_is_float32(name, shape):
     x = np.random.default_rng(1).random(shape, dtype=np.float32)
     out = getattr(cs, name)(x)
-    assert out.shape == shape and out.dtype == np.float32
+    assert out.shape == shape
+    assert out.dtype == np.float32
 
 
 @pytest.mark.parametrize("name", CONVERSIONS)
@@ -234,7 +235,8 @@ def box_blur_2x2(image):
 def test_identity_function_returns_the_input():
     image = np.random.default_rng(4).random((20, 30, 3), dtype=np.float32)
     out = cs.in_linear_light(lambda x: x, image)
-    assert out.shape == image.shape and out.dtype == np.float32
+    assert out.shape == image.shape
+    assert out.dtype == np.float32
     np.testing.assert_allclose(out, image, atol=1e-5)
 
 

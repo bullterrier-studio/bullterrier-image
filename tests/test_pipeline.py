@@ -34,16 +34,19 @@ def statuses(items):
 
 def test_run_exports_every_photo_with_every_recipe_and_writes_the_manifest_and_report(folder):
     items = run(load_project(folder / "photo-fx.toml"))
-    assert len(items) == 4 and {i.status for i in items} == {"done"}
+    assert len(items) == 4
+    assert {i.status for i in items} == {"done"}
     for photo in ("a", "b"):
         for recipe in ("grainy", "warm"):
-            assert (folder / "out" / photo / f"{recipe}.jpg").is_file() and (
-                folder / "out" / photo / f"{recipe}.png"
-            ).is_file()
+            assert (folder / "out" / photo / f"{recipe}.jpg").is_file()
+            assert (folder / "out" / photo / f"{recipe}.png").is_file()
     manifest = json.loads((folder / "out" / "manifest.json").read_text())
-    assert len(manifest["items"]) == 4 and manifest["items"][0]["status"] == "done"
+    assert len(manifest["items"]) == 4
+    assert manifest["items"][0]["status"] == "done"
     page = (folder / "out" / "index.html").read_text()
-    assert "a.png" in page and "grainy" in page and "4 done" in page
+    assert "a.png" in page
+    assert "grainy" in page
+    assert "4 done" in page
 
 
 SENTINEL = b"left alone"
@@ -64,7 +67,9 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     project = load_project(folder / "photo-fx.toml")
     run(project)
     mark_outputs(folder)
-    assert {i.status for i in run(project)} == {"skipped"} and remade(folder) == []  # nothing changed: nothing made
+    # nothing changed: nothing made
+    assert {i.status for i in run(project)} == {"skipped"}
+    assert remade(folder) == []
 
     (folder / "recipes" / "warm.toml").write_text(
         'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.9\n'
@@ -79,7 +84,8 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     assert remade(folder) == [("a", "grainy.jpg"), ("a", "grainy.png"), ("a", "warm.jpg"), ("a", "warm.png")]
 
     mark_outputs(folder)
-    assert {i.status for i in run(project, force=True)} == {"done"} and len(remade(folder)) == 8
+    assert {i.status for i in run(project, force=True)} == {"done"}
+    assert len(remade(folder)) == 8
 
 
 def test_a_missing_output_file_is_made_again(folder):
@@ -98,7 +104,9 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
         ("broken.png", "failed"),
     ]
     failed = [i for i in items if i.status == "failed"]
-    assert len(failed) == 2 and all("broken.png" in i.error for i in failed)  # it says which file could not be read
+    # it says which file could not be read
+    assert len(failed) == 2
+    assert all("broken.png" in i.error for i in failed)
     assert main(["run", str(folder / "photo-fx.toml")]) == 1  # a failure is reported in the exit code
     assert "failed" in (folder / "out" / "index.html").read_text()
 
@@ -159,9 +167,12 @@ def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_sea
     finder = StandInFinder(error=RuntimeError("no subject found in the picture"))
     items = run(load_project(folder / "photo-fx.toml"), find_subject=finder)
     by = {(i.photo, i.recipe): i for i in items}
-    assert by[("a.png", "cut1")].status == "failed" and "no subject" in by[("a.png", "cut1")].error
-    assert by[("a.png", "cut2")].status == "failed" and "no subject" in by[("a.png", "cut2")].error
-    assert by[("a.png", "grainy")].status == "done" and by[("b.png", "warm")].status == "done"
+    assert by[("a.png", "cut1")].status == "failed"
+    assert "no subject" in by[("a.png", "cut1")].error
+    assert by[("a.png", "cut2")].status == "failed"
+    assert "no subject" in by[("a.png", "cut2")].error
+    assert by[("a.png", "grainy")].status == "done"
+    assert by[("b.png", "warm")].status == "done"
     assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second masked recipe
 
 
@@ -169,7 +180,8 @@ def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(fol
     masked_recipes(folder)
     items = run(load_project(folder / "photo-fx.toml"), find_subject=StandInFinder(radius=3))
     cut = [i for i in items if i.recipe == "cut1"]
-    assert {i.status for i in cut} == {"done"} and all("covers only" in i.warnings[0] for i in cut)
+    assert {i.status for i in cut} == {"done"}
+    assert all("covers only" in i.warnings[0] for i in cut)
     assert all(i.warnings == () for i in items if i.recipe == "grainy")  # recipes without a subject are not judged
 
 
@@ -185,7 +197,8 @@ def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):
 
 def test_dry_run_writes_nothing_and_says_what_would_happen(folder):
     project = load_project(folder / "photo-fx.toml")
-    assert {i.status for i in run(project, dry_run=True)} == {"would-run"} and not (folder / "out").exists()
+    assert {i.status for i in run(project, dry_run=True)} == {"would-run"}
+    assert not (folder / "out").exists()
     run(project)
     assert {i.status for i in run(project, dry_run=True)} == {"skipped"}
 
@@ -196,7 +209,8 @@ def test_sizes_make_smaller_copies_and_never_enlarge(folder):
     out = folder / "out" / "a"
     assert sorted(p.name for p in out.glob("grainy*")) == ["grainy.jpg", "grainy_40.jpg"]  # 500 > 64: as rendered
     with Image.open(out / "grainy_40.jpg") as small, Image.open(out / "grainy.jpg") as native:
-        assert max(small.size) == 40 and max(native.size) == 64
+        assert max(small.size) == 40
+        assert max(native.size) == 64
 
 
 def test_only_limits_the_run_to_some_photos_without_forgetting_the_others(folder):
@@ -214,7 +228,8 @@ def test_the_report_escapes_what_it_shows(folder):
     (folder / "recipes" / "x.toml").write_text('name = "<b>x</b>"\nsize = 64\n[[step]]\neffect = "grain"\n')
     run(load_project(folder / "photo-fx.toml"))
     page = (folder / "out" / "index.html").read_text()
-    assert "<b>x</b>" not in page and "&lt;b&gt;x&lt;/b&gt;" in page
+    assert "<b>x</b>" not in page
+    assert "&lt;b&gt;x&lt;/b&gt;" in page
 
 
 @pytest.mark.parametrize(
@@ -244,7 +259,8 @@ def test_two_photos_with_the_same_name_are_refused(folder):
 
 def test_init_writes_a_working_starter_project(tmp_path, photo):
     target = init_project(tmp_path / "new")
-    assert target.name == "photo-fx.toml" and (tmp_path / "new" / "photos").is_dir()
+    assert target.name == "photo-fx.toml"
+    assert (tmp_path / "new" / "photos").is_dir()
     imageio.save(photo, tmp_path / "new" / "photos" / "one.jpg")
     finder = StandInFinder()  # cutout-black needs the subject; the stand-in keeps the model out of the test
     items = run(load_project(target), find_subject=finder)
@@ -257,7 +273,8 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
 def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, capsys):
     assert main(["run", str(folder / "photo-fx.toml")]) == 0
     assert "index.html" in capsys.readouterr().out
-    assert main(["init", str(tmp_path / "fresh")]) == 0 and (tmp_path / "fresh" / "photo-fx.toml").is_file()
+    assert main(["init", str(tmp_path / "fresh")]) == 0
+    assert (tmp_path / "fresh" / "photo-fx.toml").is_file()
     assert main(["run", str(tmp_path / "fresh" / "photo-fx.toml")]) == 1  # no photos yet: explained, not a traceback
     assert "no photos match" in capsys.readouterr().err
 
@@ -294,8 +311,11 @@ def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
     out = folder / "out" / "a"
     assert video_size(out / "steady.mp4") == (48, 36)  # the recipe's 48 px, from the 128x96 photo
     assert video_size(out / "steady_24.mp4") == (24, 18)  # and a smaller copy
-    assert items["steady"].warnings == () and "motion stops early" in items["stalls"].warnings[0]
+    assert items["steady"].warnings == ()
+    assert "motion stops early" in items["stalls"].warnings[0]
     page = (folder / "out" / "index.html").read_text()
-    assert "<video" in page and 'href="a/steady.frames.png"' in page
+    assert "<video" in page
+    assert 'href="a/steady.frames.png"' in page
     with Image.open(out / "steady.frames.png") as strip:  # a picture of the animation: six frames side by side
-        assert strip.size[0] > 5 * 24 and strip.format == "PNG"
+        assert strip.size[0] > 5 * 24
+        assert strip.format == "PNG"

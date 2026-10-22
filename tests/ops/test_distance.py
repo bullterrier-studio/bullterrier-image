@@ -170,7 +170,8 @@ def test_far_beyond_a_shape_the_distance_is_flat_so_the_normal_points_up():
     shape[10, 2] = True
     field = edge_distance(shape)
     # 1-element smoothing does not reach 30 elements away: no direction there, so up
-    assert np.all(field.normal_x[:, 32:] == 0.0) and np.all(field.normal_y[:, 32:] == -1.0)
+    assert np.all(field.normal_x[:, 32:] == 0.0)
+    assert np.all(field.normal_y[:, 32:] == -1.0)
 
 
 def test_a_shape_that_is_all_true_has_edges_at_its_borders_but_not_below():

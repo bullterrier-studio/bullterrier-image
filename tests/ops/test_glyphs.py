@@ -27,7 +27,8 @@ def test_atlas_shape_matches_cell_size(cell):
     atlas = glyph_atlas("a. #", cell)
     assert atlas.shape == (4, height, width)
     assert atlas.dtype == np.float32
-    assert 0.0 <= atlas.min() and atlas.max() <= 1.0
+    assert 0.0 <= atlas.min()
+    assert atlas.max() <= 1.0
 
 
 def test_atlas_is_ordered_from_least_to_most_ink():
@@ -54,7 +55,8 @@ def test_space_has_no_ink_and_the_full_block_has_the_most():
     atlas = glyph_atlas(" .:#█", 10)
     totals = ink(atlas)
     assert totals[0] == 0.0  # the space sorts first
-    assert totals[-1] == totals.max() and totals[-1] > totals[:-1].max()
+    assert totals[-1] == totals.max()
+    assert totals[-1] > totals[:-1].max()
     block_alone = glyph_atlas(" █", 10)[1]  # the block as rendered with only a space for company
     np.testing.assert_array_equal(atlas[-1], block_alone)
     assert block_alone.mean() > 0.5  # it really is a filled block, not an empty glyph
@@ -226,7 +228,8 @@ def test_letters_sit_in_the_middle_of_the_cell_as_the_font_designed_them(font, c
 @pytest.mark.parametrize("cell", CELLS)
 def test_a_capital_letter_leaves_room_above_and_below(font, cell):
     rows = np.flatnonzero(glyph_atlas("M ", cell, font)[1].max(axis=1) > 0)
-    assert rows.min() >= 1 and rows.max() <= cell_size(cell, font)[1] - 2
+    assert rows.min() >= 1
+    assert rows.max() <= cell_size(cell, font)[1] - 2
 
 
 @pytest.mark.parametrize("cell", CELLS)

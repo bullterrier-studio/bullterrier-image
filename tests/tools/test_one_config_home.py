@@ -85,4 +85,5 @@ def test_main_reports_each_stray_file_and_fails(tmp_path, capsys):
 def test_main_is_silent_and_succeeds_on_a_clean_tree(tmp_path, capsys):
     assert checker.main([str(tmp_path)]) == 0
     captured = capsys.readouterr()
-    assert captured.out == "" and captured.err == ""
+    assert captured.out == ""
+    assert captured.err == ""

@@ -130,7 +130,9 @@ def test_a_zero_to_one_step_has_its_known_strength_for_every_method():
     dog = detect_edges(step, "dog", sigma=1.0).magnitude
     assert dog.max() == pytest.approx(dog_step_strength_by_hand(1.0), abs=1e-4)
     canny = detect_edges(step, "canny").magnitude
-    assert canny.max() == 1.0 and canny[20].sum() == 1.0  # one full-strength pixel across the step on each row
+    # one full-strength pixel across the step on each row
+    assert canny.max() == 1.0
+    assert canny[20].sum() == 1.0
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -157,7 +159,8 @@ def test_input_is_not_modified(method):
 def test_float64_input_gives_the_float32_result_as_float32(method):
     picture = blocks()
     from_float64, from_float32 = detect_edges(picture.astype(np.float64), method), detect_edges(picture, method)
-    assert from_float64.magnitude.dtype == np.float32 and from_float64.direction.dtype == np.float32
+    assert from_float64.magnitude.dtype == np.float32
+    assert from_float64.direction.dtype == np.float32
     np.testing.assert_allclose(from_float64.magnitude, from_float32.magnitude, atol=1e-5)
     assert from_float32.magnitude.max() > 0.1  # the comparison is between real edge maps, not two empty ones
 

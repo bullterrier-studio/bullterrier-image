@@ -10,7 +10,8 @@ from photo_fx.ops.glyphs import cell_size, glyph_atlas
 def test_ascii_atlas_is_sorted_from_least_to_most_ink():
     atlas = glyph_atlas("@.:", 10, None)  # given deliberately out of order
     ink = atlas.reshape(len(atlas), -1).mean(axis=1)
-    assert list(ink) == sorted(ink) and ink[0] < ink[-1]
+    assert list(ink) == sorted(ink)
+    assert ink[0] < ink[-1]
 
 
 def test_ascii_bright_areas_get_dense_glyphs_on_dark_background():

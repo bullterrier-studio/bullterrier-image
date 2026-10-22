@@ -161,7 +161,8 @@ def test_the_checker_reports_each_kind_of_coupling(source):
 
 def test_the_checker_reports_the_line_and_the_name():
     (problem,) = violations("import numpy\n\nfrom photo_fx.matte import _refine_edge\n")
-    assert problem.startswith("line 3:") and "_refine_edge" in problem
+    assert problem.startswith("line 3:")
+    assert "_refine_edge" in problem
 
 
 def test_the_checker_passes_public_use_and_the_tests_own_private_names():

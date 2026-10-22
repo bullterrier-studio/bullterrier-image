@@ -26,7 +26,8 @@ def test_every_effect_keeps_shape_dtype_and_range(name, photo):
     assert out.shape == photo.shape
     assert out.dtype == np.float32
     assert np.isfinite(out).all()
-    assert out.min() >= -1e-6 and out.max() <= 1 + 1e-6
+    assert out.min() >= -1e-6
+    assert out.max() <= 1 + 1e-6
 
 
 @pytest.mark.parametrize("name", ALL)
@@ -47,7 +48,10 @@ def test_unknown_effect_lists_choices(photo, throwaway_effects, register_probe):
     with pytest.raises(KeyError) as raised:
         effects.apply("nope", photo)
     message = str(raised.value)
-    assert "'nope'" in message and "listed_probe" in message and "ascii" in message  # the given name and the choices
+    # the given name and the choices
+    assert "'nope'" in message
+    assert "listed_probe" in message
+    assert "ascii" in message
 
 
 def test_an_emptied_registry_holds_only_what_the_test_registers_and_gets_the_real_effects_back(
@@ -171,7 +175,8 @@ def test_a_new_module_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
     report = json.loads(done.stdout)
     assert Path(report["package"]).is_relative_to(tmp_path)  # it really looked at the copy
     assert set(report["registered"]) == set(ALL) | {"probe_effect"}  # found; the private module's effect is not
-    assert report["fx"] == report["recipe_step"] == "probe_effect" and report["cli_lists_it"]
+    assert report["fx"] == report["recipe_step"] == "probe_effect"
+    assert report["cli_lists_it"]
     assert report["import_order"] == ["photo_fx.effects.a_order", "photo_fx.effects.b_order"]  # sorted, not as found
 
 
@@ -241,7 +246,8 @@ def test_an_unknown_category_names_what_was_given(throwaway_effects):
 def test_a_valid_category_registers_the_effect_unchanged(throwaway_effects):
     registered = effect(category="utilities")(_probe)
     assert registered is _probe  # the decorator does not wrap the function
-    assert effects.get("_probe") is _probe and effects.category("_probe") == "utilities"
+    assert effects.get("_probe") is _probe
+    assert effects.category("_probe") == "utilities"
     assert "_probe" in effects.categories()["utilities"]
 
 
@@ -313,7 +319,9 @@ def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, t
     monkeypatch.delitem(sys.modules, "reload_probe_module", raising=False)  # and removed again afterwards
     first = importlib.import_module("reload_probe_module").reload_probe
     reloaded = importlib.reload(sys.modules["reload_probe_module"]).reload_probe
-    assert reloaded is not first and effects.get("reload_probe") is reloaded  # replaced, not rejected
+    # replaced, not rejected
+    assert reloaded is not first
+    assert effects.get("reload_probe") is reloaded
 
 
 # --- summary -----------------------------------------------------------------------------------------------------

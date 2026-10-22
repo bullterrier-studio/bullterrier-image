@@ -18,7 +18,8 @@ def test_evaporate_thins_out_the_top_more_than_the_bottom():
     lit = np.ones((96, 128, 3), np.float32)
     out = effects.apply("evaporate", lit, cell=5, start=0.8, end=0.3)
     assert out[:32].mean() < out[64:].mean()
-    assert out[64:].mean() > 0.95 and out[:20].mean() < 0.5
+    assert out[64:].mean() > 0.95
+    assert out[:20].mean() < 0.5
 
 
 def test_evaporate_only_moves_pieces_up_and_never_adds_light():
@@ -49,7 +50,9 @@ def test_evaporate_edge_sheds_the_outline_and_keeps_the_inside():
     out = effects.apply("evaporate", _block(), cell=5, start=0, edge=0.1, outward=0.5, seed=1)
     assert out[150:190, 90:110].min() == 1.0  # deep inside, more than `edge` from any edge, and the bottom is no edge
     assert not np.array_equal(out, _block())
-    assert out[:, :55].max() > 0 and out[:, 145:].max() > 0  # pieces flew out of both sides
+    # pieces flew out of both sides
+    assert out[:, :55].max() > 0
+    assert out[:, 145:].max() > 0
 
 
 def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
@@ -69,7 +72,9 @@ def test_evaporate_wind_makes_the_outward_drift_lopsided():
 def test_evaporate_treats_the_left_right_and_top_borders_as_edges_but_not_the_bottom():
     lit = np.ones((100, 120, 3), np.float32)
     out = effects.apply("evaporate", lit, cell=5, start=0, edge=0.2, seed=2)
-    assert out[:5, 50:70].mean() < 1.0 and out[40:80, :5].mean() < 1.0 and out[40:80, -5:].mean() < 1.0
+    assert out[:5, 50:70].mean() < 1.0
+    assert out[40:80, :5].mean() < 1.0
+    assert out[40:80, -5:].mean() < 1.0
     assert out[-10:, 50:70].min() == 1.0  # bottom centre: far from the other borders, and the bottom is no edge
 
 

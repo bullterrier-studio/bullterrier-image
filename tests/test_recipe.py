@@ -86,7 +86,8 @@ def test_opacity_combines_with_a_mask(photo, matte):
 
 def test_opacity_is_read_from_the_file_and_validated(tmp_path):
     ok = load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=0.4\n'))
-    assert ok.steps[0].opacity == 0.4 and "opacity" not in ok.steps[0].params
+    assert ok.steps[0].opacity == 0.4
+    assert "opacity" not in ok.steps[0].params
     with pytest.raises(ValueError, match="step 1.*opacity"):
         load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=1.5\n', "bad.toml"))
 
@@ -128,28 +129,34 @@ exposure = { from = 0.0, to = 1.0, ease = "in-out" }
 def test_animation_is_read_from_the_file(tmp_path):
     r = load_recipe(write(tmp_path, ANIMATED))
     assert r.animation == Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5)
-    assert r.steps[0].params == {"exposure": Animated(0.0, 1.0, "in-out")} and r.steps[0].animated
+    assert r.steps[0].params == {"exposure": Animated(0.0, 1.0, "in-out")}
+    assert r.steps[0].animated
 
 
 def test_animation_positions_hold_at_both_ends_and_run_in_between():
     positions = Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).positions()
     assert len(positions) == 20
-    assert positions[:6] == [0.0] * 6 and positions[-5:] == [1.0] * 5  # held, then still at the end
+    # held, then still at the end
+    assert positions[:6] == [0.0] * 6
+    assert positions[-5:] == [1.0] * 5
     assert positions == sorted(positions)
 
 
 def test_pingpong_plays_forward_then_back_without_repeating_the_turning_frames():
     once = Animation(seconds=1, fps=5).positions()
     both = Animation(seconds=1, fps=5, loop="pingpong").positions()
-    assert both == once + once[-2:0:-1] and len(both) == 2 * len(once) - 2
+    assert both == once + once[-2:0:-1]
+    assert len(both) == 2 * len(once) - 2
 
 
 def test_animated_values_ease_between_their_end_points():
     for ease in ("linear", "in", "out", "in-out"):
         value = Animated(2.0, 6.0, ease)
-        assert value.at(0.0) == 2.0 and value.at(1.0) == 6.0
+        assert value.at(0.0) == 2.0
+        assert value.at(1.0) == 6.0
         assert value.at(0.25) <= value.at(0.5) <= value.at(0.75)
-    assert Animated(0.0, 1.0, "in-out").at(0.5) == 0.5 and Animated(0.0, 1.0, "in").at(0.5) < 0.5
+    assert Animated(0.0, 1.0, "in-out").at(0.5) == 0.5
+    assert Animated(0.0, 1.0, "in").at(0.5) < 0.5
 
 
 @pytest.mark.parametrize(
@@ -171,16 +178,22 @@ def test_bad_animations_fail_at_load_time(tmp_path, text, expect):
 def test_cubic_bezier_easing_slow_in_slow_out_without_overshoot():
     gentle = Animated(0.0, 1.0, "gentle")
     values = [gentle.at(i / 100) for i in range(101)]
-    assert values[0] == 0.0 and abs(values[-1] - 1.0) < 1e-9
-    assert values == sorted(values) and max(values) <= 1.0 + 1e-9  # smooth, never past the target
-    assert gentle.at(0.1) < 0.1 and gentle.at(0.9) > 0.9  # slow start, slow finish
+    assert values[0] == 0.0
+    assert abs(values[-1] - 1.0) < 1e-9
+    # smooth, never past the target
+    assert values == sorted(values)
+    assert max(values) <= 1.0 + 1e-9
+    # slow start, slow finish
+    assert gentle.at(0.1) < 0.1
+    assert gentle.at(0.9) > 0.9
     assert Animated(0, 1, (0.4, 0.0, 0.2, 1.0)).at(0.3) == gentle.at(0.3)  # the preset is that curve
 
 
 @pytest.mark.parametrize("name", ["gentle", "standard", "accelerate", "decelerate", "emphasized", "sine"])
 def test_every_named_curve_runs_from_zero_to_one(name):
     curve = Animated(0.0, 1.0, name)
-    assert abs(curve.at(0.0)) < 1e-9 and abs(curve.at(1.0) - 1.0) < 1e-9
+    assert abs(curve.at(0.0)) < 1e-9
+    assert abs(curve.at(1.0) - 1.0) < 1e-9
 
 
 def test_exit_and_entrance_curves_accelerate_and_decelerate():
@@ -213,9 +226,13 @@ def test_a_custom_cubic_bezier_can_be_written_as_four_numbers(tmp_path):
 def test_over_clip_keeps_running_through_the_holds():
     still = Animated(0.0, 10.0, over="motion")
     clock = Animated(0.0, 10.0, over="clip")
-    assert still.at(0.0, clip=0.5) == 0.0 and clock.at(0.0, clip=0.5) == 5.0  # held at its start / still running
+    # held at its start / still running
+    assert still.at(0.0, clip=0.5) == 0.0
+    assert clock.at(0.0, clip=0.5) == 5.0
     frames = Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).frames()
-    assert frames[0] == (0.0, 0.0) and frames[3] == (0.0, 3 / 19) and frames[-1] == (1.0, 1.0)
+    assert frames[0] == (0.0, 0.0)
+    assert frames[3] == (0.0, 3 / 19)
+    assert frames[-1] == (1.0, 1.0)
     assert [clip for _, clip in frames] == sorted(clip for _, clip in frames)
 
 
@@ -243,7 +260,9 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
     animated = load_recipe(write(tmp_path, ANIMATED))
     r = Recipe("r", (Step("still_probe"), *animated.steps), size=None, animation=animated.animation)
     frames = list(render_frames(photo, r))
-    assert len(frames) == 20 and len(runs) == 1  # the still step ran once for the whole clip
+    # the still step ran once for the whole clip
+    assert len(frames) == 20
+    assert len(runs) == 1
     np.testing.assert_allclose(frames[0], render(photo, r, at=0.0), atol=1e-6)
     np.testing.assert_allclose(frames[-1], render(photo, r, at=1.0), atol=1e-6)
 
@@ -258,7 +277,9 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
         with pytest.raises(RuntimeError) as raised:
             run(photo, recipe)
         message = str(raised.value)  # names the effect and both shapes
-        assert "halve_for_shape_test" in message and "(96, 128, 3)" in message and "(48, 64, 3)" in message
+        assert "halve_for_shape_test" in message
+        assert "(96, 128, 3)" in message
+        assert "(48, 64, 3)" in message
 
 
 def test_render_frames_needs_an_animated_recipe(photo):
@@ -280,7 +301,8 @@ def test_shipped_recipes_all_load():
     from pathlib import Path
 
     files = sorted((Path(__file__).parent.parent / "recipes").glob("*.toml"))
-    assert files and all(load_recipe(f).steps for f in files)
+    assert files
+    assert all(load_recipe(f).steps for f in files)
 
 
 def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default():

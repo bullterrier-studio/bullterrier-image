@@ -69,7 +69,9 @@ def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_regi
     assert 'src="gallery/row_probe.jpg"' in row
     assert "| Softly probes the bright parts. |" in row  # the first sentence only
     assert "`radius=24.0` `chars=' .:'` `fg=None`" in row  # what a recipe sets, in order, with defaults
-    assert "rgb" not in row and "matte" not in row  # the recipe supplies the image and the cut-out itself
+    # the recipe supplies the image and the cut-out itself
+    assert "rgb" not in row
+    assert "matte" not in row
     assert "[row_probe.toml](../examples/effects/row_probe.toml)" in row
     assert _unescaped_pipes(row) == 6  # five columns
 
@@ -82,7 +84,8 @@ def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
         return rgb
 
     row = _row(gallery.render_effects_page(), "pipe_probe")
-    assert "`chars='a\\|b'`" in row and "Draws a \\| b across two lines." in row
+    assert "`chars='a\\|b'`" in row
+    assert "Draws a \\| b across two lines." in row
     assert _unescaped_pipes(row) == 6  # still five columns
 
 
@@ -146,7 +149,9 @@ def test_gallery_renders_missing_pictures_only_unless_forced(tmp_path, checkout,
 def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(tmp_path, checkout, probe):
     gallery.render_gallery(tmp_path, only=[probe], checkout=checkout)
     with Image.open(tmp_path / f"{probe}.jpg") as picture:
-        assert picture.format == "JPEG" and max(picture.size) == 480  # from a 300 px recipe
+        # from a 300 px recipe
+        assert picture.format == "JPEG"
+        assert max(picture.size) == 480
     assert _jpeg_tables(82) != _jpeg_tables(90)  # the tables do tell qualities apart
     assert _quantization(tmp_path / f"{probe}.jpg") == _jpeg_tables(82)
 
@@ -155,13 +160,17 @@ def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_reci
     gallery.render_gallery(tmp_path, only=[probe], checkout=checkout)
     picture = imageio.load(tmp_path / f"{probe}.jpg")
     expected = imageio.resize(photo * 0.5, 480)  # the probe halves the brightness; the demo photo is `photo`
-    assert picture.shape == expected.shape and np.abs(picture - expected).mean() < 0.02  # JPEG and resampling only
+    # JPEG and resampling only
+    assert picture.shape == expected.shape
+    assert np.abs(picture - expected).mean() < 0.02
 
 
 def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path, checkout, probe):
     with pytest.raises(ValueError) as raised:
         gallery.render_gallery(tmp_path / "out", only=[probe, "nope"], checkout=checkout)
-    assert "'nope'" in str(raised.value) and "gallery_probe" in str(raised.value)  # the name, and the choices
+    # the name, and the choices
+    assert "'nope'" in str(raised.value)
+    assert "gallery_probe" in str(raised.value)
     assert not (tmp_path / "out").exists()
 
 
@@ -244,11 +253,14 @@ def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(d
     done = photo_fx_command(docs, "gallery", "--only", "grain", "--force")
     assert done.returncode == 0, done.stderr
     with Image.open(picture) as rendered:
-        assert rendered.format == "JPEG" and max(rendered.size) == 480  # rendered again
+        # rendered again
+        assert rendered.format == "JPEG"
+        assert max(rendered.size) == 480
     assert str(picture) in done.stdout.split()
 
 
 def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
     done = photo_fx_command(docs, "gallery", "--only", "grain", "nope")
-    assert done.returncode == 1 and "'nope'" in done.stderr
+    assert done.returncode == 1
+    assert "'nope'" in done.stderr
     assert not (docs / "docs" / "effects.md").exists()

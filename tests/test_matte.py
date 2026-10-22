@@ -59,7 +59,8 @@ def test_feather_softens_a_straight_edge_like_a_gaussian_of_that_sigma_and_keeps
     # The pixel centres beside the edge lie 0.5 px from it: a sigma-2 blur gives them normal_cdf(+-0.25).
     assert soft[10, 30] == pytest.approx(normal_cdf(0.25), abs=0.01)
     assert soft[10, 29] == pytest.approx(normal_cdf(-0.25), abs=0.01)
-    assert soft.min() >= 0.0 and soft.max() <= 1.0
+    assert soft.min() >= 0.0
+    assert soft.max() <= 1.0
     assert soft.sum() == pytest.approx(half_plane(edge=30).sum(), rel=1e-4)  # the blur moves the edge, adds nothing
 
 
@@ -73,5 +74,6 @@ def test_the_result_is_float32_and_the_input_is_not_modified():
     alpha = square()
     before = alpha.copy()
     out = refine_edge(alpha, 2.0, 1.0)
-    assert out.dtype == np.float32 and out.shape == alpha.shape
+    assert out.dtype == np.float32
+    assert out.shape == alpha.shape
     np.testing.assert_array_equal(alpha, before)

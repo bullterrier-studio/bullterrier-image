@@ -254,7 +254,8 @@ def test_main_returns_zero_for_a_good_message_file_and_prints_nothing(tmp_path, 
     message.write_text("feat(glow): add a falloff parameter\n\nWhy: the halo had a hard edge.\n")
     assert checker.main([str(message)]) == 0
     captured = capsys.readouterr()
-    assert captured.out == "" and captured.err == ""
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_main_returns_one_and_reports_every_problem_on_stderr(tmp_path, capsys):

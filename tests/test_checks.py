@@ -19,12 +19,14 @@ def test_a_cutout_that_missed_the_subject_is_flagged_with_its_share():
     matte = np.zeros((100, 100), np.float32)
     matte.flat[:50] = 1.0  # exactly 0.5% of the picture
     (warning,) = matte_warnings(matte)
-    assert "only" in warning and "0.5%" in warning
+    assert "only" in warning
+    assert "0.5%" in warning
 
 
 def test_a_cutout_that_took_everything_is_flagged():
     (warning,) = matte_warnings(np.ones((100, 100), np.float32))
-    assert "almost no background" in warning and "100.0%" in warning
+    assert "almost no background" in warning
+    assert "100.0%" in warning
 
 
 def test_matte_share_limits_can_be_changed():
@@ -56,14 +58,16 @@ def meter_fed(changes, shape=(24, 32)) -> MotionMeter:
 
 def test_a_clip_that_keeps_moving_has_no_frozen_tail():
     steady = meter_fed(np.linspace(0.5, 0.25, 60))
-    assert steady.frozen_share() == 0.0 and steady.warnings() == []
+    assert steady.frozen_share() == 0.0
+    assert steady.warnings() == []
 
 
 def test_a_clip_whose_motion_stops_early_is_flagged():
     meter = meter_fed([0.5] * 40 + [0.0005] * 60)  # moves for 40%, then nothing but a faint shimmer
     assert meter.frozen_share() == pytest.approx(0.6)
     (warning,) = meter.warnings(frozen_tail=0.3)
-    assert "motion stops early" in warning and "60%" in warning
+    assert "motion stops early" in warning
+    assert "60%" in warning
     assert meter.warnings(frozen_tail=0.7) == []  # unless that much stillness is expected
 
 

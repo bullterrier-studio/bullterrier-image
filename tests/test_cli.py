@@ -31,7 +31,9 @@ def test_render_writes_one_file_per_recipe_in_a_folder(files):
 def test_sheet_combines_recipes_into_one_image(files):
     assert main(["sheet", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "s.png")]) == 0
     with Image.open(files / "s.png") as sheet:
-        assert sheet.width > 2 * 480 and sheet.height < 2 * 480  # two 480 px tiles side by side, in one row
+        # two 480 px tiles side by side, in one row
+        assert sheet.width > 2 * 480
+        assert sheet.height < 2 * 480
 
 
 def test_bad_recipe_is_reported_without_a_traceback(files, capsys):

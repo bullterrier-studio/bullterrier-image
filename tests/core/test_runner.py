@@ -43,7 +43,9 @@ def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways
     with pytest.raises(ValueError) as raised:
         run(photo, recipe)
     message = str(raised.value)  # names the recipe and both ways to give the subject
-    assert f"'{recipe.name}'" in message and "`matte`" in message and "`find_subject`" in message
+    assert f"'{recipe.name}'" in message
+    assert "`matte`" in message
+    assert "`find_subject`" in message
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())

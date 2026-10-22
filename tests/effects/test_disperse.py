@@ -18,7 +18,9 @@ def test_disperse_is_the_untouched_picture_at_progress_zero_and_nothing_at_one(p
 
 def test_disperse_fades_steadily():
     means = [effects.apply("disperse", _lit(), progress=p, seed=1).mean() for p in (0.0, 0.25, 0.5, 0.75, 1.0)]
-    assert means == sorted(means, reverse=True) and means[0] > 0.99 and means[-1] == 0.0
+    assert means == sorted(means, reverse=True)
+    assert means[0] > 0.99
+    assert means[-1] == 0.0
 
 
 @pytest.mark.parametrize(
@@ -32,7 +34,8 @@ def test_disperse_sweep_chooses_which_side_goes_first(sweep, first_half, last_ha
 def test_disperse_reach_leaves_the_rest_standing():
     whole = effects.apply("disperse", _lit(), progress=1.0, reach=1.0, edge=0, seed=1)
     part = effects.apply("disperse", _lit(), progress=1.0, reach=0.4, edge=0, seed=1)
-    assert whole.mean() == 0.0 and 0.4 < part.mean() < 0.8
+    assert whole.mean() == 0.0
+    assert 0.4 < part.mean() < 0.8
 
 
 def test_disperse_wind_carries_pieces_in_its_direction():

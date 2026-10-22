@@ -23,25 +23,32 @@ def test_random_points_differ_across_seeds():
 
 def test_random_points_have_shape_dtype_and_stay_inside_a_non_square_picture():
     pts = voronoi.random_points((30, 80), 500, seed=1)  # h=30, w=80
-    assert pts.shape == (500, 2) and pts.dtype == np.float32
-    assert pts[:, 0].min() >= 0 and pts[:, 0].max() < 80
-    assert pts[:, 1].min() >= 0 and pts[:, 1].max() < 30
+    assert pts.shape == (500, 2)
+    assert pts.dtype == np.float32
+    assert pts[:, 0].min() >= 0
+    assert pts[:, 0].max() < 80
+    assert pts[:, 1].min() >= 0
+    assert pts[:, 1].max() < 30
     # x spans the width and y the height: a swapped (h, w) or (x, y) would break one of these
-    assert pts[:, 0].max() > 30 and pts[:, 1].max() > 20
+    assert pts[:, 0].max() > 30
+    assert pts[:, 1].max() > 20
 
 
 def test_random_points_never_reach_the_far_edge_even_when_rounding_to_float32_would_put_them_on_it():
     # Among numpy's draws for seed 177 is 1 - 3e-8 (point 59228). Scaled by 17 and rounded to float32 it is exactly
     # 17.0, on the far edge, outside the picture. Found by searching seeds; a draw that large is a one-in-10^7 event.
     pts = voronoi.random_points((17, 17), 59_229, seed=177)
-    assert pts.max() < 17 and pts.min() >= 0
+    assert pts.max() < 17
+    assert pts.min() >= 0
     assert pts.max() > 16.99999  # the draw really came that close to the edge
 
 
 def test_random_points_stay_in_half_open_bounds_for_many_seeds():
     for seed in range(300):
         pts = voronoi.random_points((7, 3), 200, seed=seed)
-        assert (pts >= 0).all() and (pts[:, 0] < 3).all() and (pts[:, 1] < 7).all()
+        assert (pts >= 0).all()
+        assert (pts[:, 0] < 3).all()
+        assert (pts[:, 1] < 7).all()
 
 
 def test_random_points_cover_the_picture_uniformly():
@@ -83,22 +90,26 @@ def test_cell_labels_pick_the_nearest_point_for_every_pixel():
 
 def test_cell_labels_with_one_point_are_all_zero():
     labels = voronoi.cell_labels((7, 11), np.array([[3.0, 2.0]], dtype=np.float32))
-    assert labels.shape == (7, 11) and (labels == 0).all()
+    assert labels.shape == (7, 11)
+    assert (labels == 0).all()
 
 
 def test_cell_labels_give_every_pixel_one_valid_int32_label():
     shape = (37, 53)
     points = voronoi.random_points(shape, 12, seed=5)
     labels = voronoi.cell_labels(shape, points)
-    assert labels.dtype == np.int32 and labels.shape == shape
-    assert labels.min() >= 0 and labels.max() < 12
+    assert labels.dtype == np.int32
+    assert labels.shape == shape
+    assert labels.min() >= 0
+    assert labels.max() < 12
 
 
 def test_cell_labels_follow_point_order_not_position():
     # left point listed second: a mix-up of the point index with its sort order would flip the labels
     points = np.array([[15.0, 2.0], [5.0, 2.0]], dtype=np.float32)
     labels = voronoi.cell_labels((4, 20), points)
-    assert (labels[:, :10] == 1).all() and (labels[:, 10:] == 0).all()
+    assert (labels[:, :10] == 1).all()
+    assert (labels[:, 10:] == 0).all()
 
 
 def test_cell_labels_reject_no_points():
@@ -129,8 +140,10 @@ def test_cell_means_of_a_two_colour_image_split_on_a_voronoi_boundary_give_both_
     colour_b = np.array([0.9, 0.1, 0.6], dtype=np.float32)
     image = np.where(labels[:, :, None] == 0, colour_a, colour_b).astype(np.float32)
     means = voronoi.cell_means(image, labels, 2)
-    assert means.shape == (2, 3) and means.dtype == np.float32
-    assert np.array_equal(means[0], colour_a) and np.array_equal(means[1], colour_b)
+    assert means.shape == (2, 3)
+    assert means.dtype == np.float32
+    assert np.array_equal(means[0], colour_a)
+    assert np.array_equal(means[1], colour_b)
 
 
 def test_cell_means_weighted_by_cell_size_equal_the_image_mean():
@@ -155,7 +168,8 @@ def test_cell_means_of_a_cell_without_pixels_are_zero():
     labels = np.zeros((4, 4), dtype=np.int32)
     image = np.full((4, 4, 3), 0.5, dtype=np.float32)
     means = voronoi.cell_means(image, labels, 3)
-    assert np.array_equal(means[0], [0.5, 0.5, 0.5]) and (means[1:] == 0).all()
+    assert np.array_equal(means[0], [0.5, 0.5, 0.5])
+    assert (means[1:] == 0).all()
 
 
 def test_cell_means_of_a_grayscale_image_have_one_channel():
@@ -238,15 +252,19 @@ def test_relax_keeps_points_inside_the_picture_even_from_the_corner():
     shape = (30, 80)
     points = np.vstack([voronoi.random_points(shape, 40, seed=1), [[0.0, 0.0]]]).astype(np.float32)
     relaxed = voronoi.relax(points, shape, iterations=5)
-    assert relaxed.shape == points.shape and relaxed.dtype == np.float32
-    assert relaxed[:, 0].min() >= 0 and relaxed[:, 0].max() < 80
-    assert relaxed[:, 1].min() >= 0 and relaxed[:, 1].max() < 30
+    assert relaxed.shape == points.shape
+    assert relaxed.dtype == np.float32
+    assert relaxed[:, 0].min() >= 0
+    assert relaxed[:, 0].max() < 80
+    assert relaxed[:, 1].min() >= 0
+    assert relaxed[:, 1].max() < 30
 
 
 def test_relax_with_zero_iterations_returns_the_input_values_in_a_new_array():
     points = voronoi.random_points((30, 80), 10, seed=1)
     result = voronoi.relax(points, (30, 80), iterations=0)
-    assert np.array_equal(result, points) and result is not points
+    assert np.array_equal(result, points)
+    assert result is not points
 
 
 def test_relax_is_deterministic_and_leaves_its_input_untouched():
@@ -254,7 +272,8 @@ def test_relax_is_deterministic_and_leaves_its_input_untouched():
     before = points.copy()
     first = voronoi.relax(points, (30, 80))
     second = voronoi.relax(points, (30, 80))
-    assert np.array_equal(first, second) and np.array_equal(points, before)
+    assert np.array_equal(first, second)
+    assert np.array_equal(points, before)
     assert not np.array_equal(first, points)
 
 
@@ -274,7 +293,8 @@ def test_relax_leaves_a_point_whose_cell_has_no_pixels_where_it_was():
     points = np.array([[5.0, 10.0], [5.0, 10.0], [31.0, 10.0]], dtype=np.float32)  # the first two coincide
     relaxed = voronoi.relax(points, (20, 40), iterations=1)
     assert np.isfinite(relaxed).all()
-    assert 5.0 in relaxed[:, 0] and np.isclose(relaxed[:, 0], 9.0).any()
+    assert 5.0 in relaxed[:, 0]
+    assert np.isclose(relaxed[:, 0], 9.0).any()
 
 
 def test_relax_rejects_negative_iterations():
@@ -347,7 +367,8 @@ def test_triangulate_rejects_points_that_are_not_an_n_by_2_array(points):
 def test_triangulate_ignores_a_repeated_point():
     points = np.array([[0, 0], [1, 0], [0, 1], [0, 0]], dtype=np.float32)
     triangles = voronoi.triangulate(points)
-    assert len(triangles) == 1 and len({0, 3} & set(triangles[0].tolist())) == 1
+    assert len(triangles) == 1
+    assert len({0, 3} & set(triangles[0].tolist())) == 1
 
 
 def test_triangulate_rejects_fewer_than_three_distinct_points():
