@@ -64,10 +64,9 @@ def test_disperse_a_piece_pulls_back_against_the_wind_before_it_goes_with_it(win
     single = np.zeros((120, 400, 3), np.float32)
     single[5 * cell_h : 6 * cell_h, 40 * cell_w : 41 * cell_w] = 1.0  # exactly one piece, in the middle
     xs = []
-    for progress in np.arange(0.0, 0.6, 0.004):
-        columns = np.nonzero(
-            effects.apply("disperse", single, progress=progress, wind=wind, angle=0, seed=3).max(axis=(0, 2)) > 0.05
-        )[0]
+    for progress in np.arange(0.0, 0.2, 0.004):  # with no jitter it winds up from 0 and leaves at 0.06 (`anticipation`)
+        frame = effects.apply("disperse", single, progress=progress, wind=wind, angle=0, jitter=0.0, seed=3)
+        columns = np.nonzero(frame.max(axis=(0, 2)) > 0.05)[0]
         if len(columns):
             xs.append(columns.mean())
     start = xs[0]
@@ -77,16 +76,24 @@ def test_disperse_a_piece_pulls_back_against_the_wind_before_it_goes_with_it(win
 
 
 def _one_piece(height=240, width=400):
+    """Exactly one lit piece, near the middle, and its centre (y, x) in px."""
     cell_w, cell_h = cell_size(5)
+    row, col = height // cell_h // 2, width // cell_w // 2
     img = np.zeros((height, width, 3), np.float32)
-    img[12 * cell_h : 13 * cell_h, 40 * cell_w : 41 * cell_w] = 1.0  # exactly one piece, in the middle
-    return img, (12.5 * cell_h, 40.5 * cell_w)
+    img[row * cell_h : (row + 1) * cell_h, col * cell_w : (col + 1) * cell_w] = 1.0
+    return img, ((row + 0.5) * cell_h, (col + 0.5) * cell_w)
 
 
-def _track(img, until=0.7, step=0.004, **params):
+def _centre(frame: np.ndarray) -> tuple[float, float]:
+    """(x, y) of the centre of the visible pixels, in pixel-centre coordinates (+0.5)."""
+    ys, xs = np.nonzero(frame.max(axis=2) > 0.05)
+    return xs.mean() + 0.5, ys.mean() + 0.5
+
+
+def _track(img, until=0.7, step=0.004, since=0.0, **params):
     """Where the lit pixels' centre is at each moment of the dispersal: [(progress, x, y), ...]."""
     out = []
-    for progress in np.arange(0.0, until, step):
+    for progress in np.arange(since, until, step):
         shown = effects.apply("disperse", img, progress=progress, **params).max(axis=2) > 0.05
         if shown.any():
             ys, xs = np.nonzero(shown)
@@ -94,12 +101,23 @@ def _track(img, until=0.7, step=0.004, **params):
     return out
 
 
+# A known schedule for a lone piece: with no jitter it leaves at `anticipation` (0.1) and, with no variation, vanishes
+# `flight` (0.2) later, so at progress 0.1 + 0.2 t it is a share t through its flight; with no fade it stays visible.
+_TIMED = {"anticipation": 0.1, "flight": 0.2, "flight_variation": 0.0, "jitter": 0.0, "falloff": 0.0}
+
+
+def _through_flight(share: float) -> float:
+    return 0.1 + 0.2 * share
+
+
 @pytest.mark.parametrize(("wind", "angle"), [(0.3, 30), (0.3, 0), (-0.3, 30), (0.25, 60)])
 def test_disperse_wind_blows_at_the_given_angle_above_the_horizontal(wind, angle):
     img, (y0, x0) = _one_piece()
-    track = _track(img, wind=wind, angle=angle, seed=3, sweep=-1.0)
-    farthest = max(track, key=lambda step: abs(step[1] - x0) + abs(step[2] - y0))
-    dx, rise = farthest[1] - x0, y0 - farthest[2]  # rise is positive for upward
+    late = effects.apply(
+        "disperse", img, progress=_through_flight(0.95), wind=wind, angle=angle, sway=0.0, seed=3, **_TIMED
+    )
+    x, y = _centre(late)
+    dx, rise = x - x0, y0 - y  # rise is positive for upward
     assert np.sign(dx) == np.sign(wind) or angle == 90  # to the right for positive wind, to the left for negative
     measured = np.degrees(np.arctan2(rise, abs(dx)))
     assert abs(measured - angle) < 9  # the pieces' own angles differ from the wind's by up to 6 degrees
@@ -334,13 +352,19 @@ def test_disperse_without_wind_or_sway_pieces_fade_where_they_are():
 
 
 def test_disperse_acceleration_holds_a_piece_back_early_in_its_flight():
-    img, _ = _one_piece()
-    kwargs = {"wind": 0.3, "angle": 0, "pullback": 0.0, "angle_spread": 0.0, "sway": 0.0, "falloff": 0.0, "seed": 3}
-    x = lambda acceleration: _track(img, step=0.01, acceleration=acceleration, **kwargs)  # noqa: E731  (a one-line helper)
-    eager, steady = {p: x_ for p, x_, _ in x(5.0)}, {p: x_ for p, x_, _ in x(0.0)}
-    both = [p for p in steady if p in eager]
-    assert all(eager[p] <= steady[p] for p in both)  # at every moment of the flight it is no further along...
-    assert max(steady[p] - eager[p] for p in both) > 10  # ...and mid-flight well behind
+    img, (_, x0) = _one_piece()
+    level = {"wind": 0.3, "angle": 0, "pullback": 0.0, "angle_spread": 0.0, "sway": 0.0, "seed": 3}
+
+    def halfway(acceleration: float) -> float:
+        """How far the piece has moved half-way through its flight, in px."""
+        frame = effects.apply(
+            "disperse", img, progress=_through_flight(0.5), acceleration=acceleration, **level, **_TIMED
+        )
+        return _centre(frame)[0] - x0
+
+    # half-way through its flight a steady piece has covered half its journey; an accelerating one less
+    assert halfway(5.0) < halfway(0.0) - 10
+    assert halfway(0.0) > 0
 
 
 def test_disperse_hover_without_spread_floats_the_whole_figure_at_once():
@@ -414,35 +438,47 @@ def _reversals(values: list[float]) -> int:
 
 
 def test_disperse_bob_cycles_is_how_often_a_hovering_piece_bobs():
-    img, _ = _one_piece()
+    img, _ = _one_piece(height=120, width=200)
+    # it hovers from the start until it leaves at `anticipation` (0.2), level with the wind, so it only bobs up and down
     settings = {"wind": 0.3, "angle": 0, "angle_spread": 0.0, "hover": 0.3, "bob": 0.05, "jitter": 0.0, "seed": 3}
     bobbing = lambda cycles: [  # noqa: E731  (a one-line helper)
-        y for _, _, y in _track(img, until=0.2, step=0.002, anticipation=0.2, bob_cycles=cycles, **settings)
+        y for _, _, y in _track(img, until=0.2, step=0.005, anticipation=0.2, bob_cycles=cycles, **settings)
     ]
-    assert _reversals(bobbing(6.0)) > _reversals(bobbing(1.0)) + 4
+    assert _reversals(bobbing(0.0)) <= 1  # one rise and fall at most
+    assert _reversals(bobbing(4.0)) >= 6
 
 
 def test_disperse_sway_cycles_is_how_often_a_flying_piece_wobbles():
-    img, _ = _one_piece()
-    settings = {"wind": 0.0, "sway": 0.1, "falloff": 0.0, "flight_variation": 0.0, "jitter": 0.0, "seed": 3}
-    wobbling = lambda cycles: [x for _, x, _ in _track(img, until=0.3, step=0.002, sway_cycles=cycles, **settings)]  # noqa: E731  (a one-line helper)
-    assert _reversals(wobbling(8.0)) > _reversals(wobbling(1.0)) + 6
+    img, _ = _one_piece(height=120, width=200)
+    settings = {"wind": 0.0, "sway": 0.2, "seed": 3, **_TIMED}
+    wobbling = lambda cycles: [  # noqa: E731  (a one-line helper)
+        x for _, x, _ in _track(img, since=0.1, until=0.3, step=0.005, sway_cycles=cycles, **settings)
+    ]
+    assert _reversals(wobbling(0.0)) == 0  # it drifts to one side and does not come back
+    assert _reversals(wobbling(4.0)) >= 6
 
 
 @pytest.mark.parametrize("seed", range(4))
 def test_disperse_without_angle_spread_every_piece_flies_at_the_wind_angle(seed):
     img, (y0, x0) = _one_piece()
-    track = _track(img, step=0.01, wind=0.3, angle=30, angle_spread=0.0, sway=0.0, falloff=0.0, seed=seed)
-    farthest = max(track, key=lambda step: abs(step[1] - x0))
-    assert np.degrees(np.arctan2(y0 - farthest[2], farthest[1] - x0)) == pytest.approx(30, abs=1.5)
+    settings = {"wind": 0.3, "angle": 30, "angle_spread": 0.0, "sway": 0.0, "seed": seed, **_TIMED}
+    x, y = _centre(effects.apply("disperse", img, progress=_through_flight(0.95), **settings))
+    assert np.degrees(np.arctan2(y0 - y, x - x0)) == pytest.approx(30, abs=1.5)
 
 
-@pytest.mark.parametrize("seed", range(4))
-def test_disperse_distance_minimum_one_carries_every_piece_the_whole_wind(seed):
-    img, (_, x0) = _one_piece()
-    settings = {"wind": 0.3, "angle": 0, "angle_spread": 0.0, "sway": 0.0, "falloff": 0.0, "pullback": 0.0}
-    track = _track(img, until=1.0, step=0.005, distance_minimum=1.0, seed=seed, **settings)
-    assert max(x for _, x, _ in track) - x0 > 0.9 * 0.3 * 400  # nearly all of it by its last visible moment
+def test_disperse_distance_minimum_one_carries_every_piece_the_whole_wind():
+    """Eight pieces, each in its own row of pieces, blown level: each one's own random speed no longer matters."""
+    cell_w, cell_h = cell_size(5)
+    img = np.zeros((16 * cell_h, 400, 3), np.float32)
+    for row in range(0, 16, 2):
+        img[row * cell_h : (row + 1) * cell_h, :cell_w] = 1.0
+    level = {"wind": 0.3, "angle": 0, "angle_spread": 0.0, "sway": 0.0, "pullback": 0.0, "top": 0, "edge": 0}
+    late = effects.apply(
+        "disperse", img, progress=_through_flight(0.98), distance_minimum=1.0, seed=1, **level, **_TIMED
+    )
+    for row in range(0, 16, 2):
+        columns = np.nonzero(late[row * cell_h : (row + 1) * cell_h].max(axis=(0, 2)) > 0.05)[0]
+        assert columns.min() > 0.9 * 0.3 * 400, row  # nearly the whole journey (it ends at 1 as it vanishes)
 
 
 def test_disperse_edge_depth_is_how_deep_closeness_to_the_edge_decides_the_order():
