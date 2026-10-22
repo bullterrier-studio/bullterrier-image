@@ -13,7 +13,8 @@ class ${Name}Params(EffectParams):
     # what raising it does. A number also has a unit and an inclusive min and max that hold the default. Names are
     # the field's own terms (radius, amount, threshold, angle, seed...), never strength, intensity or factor.
     # bool, Literal[...], str and Color fields take no unit, min or max. Options of every library call are fields
-    # too; constants are allowed only for standards (Rec. 709, sRGB...), each cited in a comment.
+    # too; constants are allowed only for standards (Rec. 709, sRGB...) and pure guards (an epsilon), each with a
+    # `# constant: <citation or reason>` comment on its line or the line before (a test fails on any other number).
     amount: float = param(
         1.0,
         unit="fraction",

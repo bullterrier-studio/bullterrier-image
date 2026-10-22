@@ -8,7 +8,7 @@ from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.color import luminance
 
-# Only keeps a flat picture (every pixel equally bright) from dividing by zero: such a picture maps to the first stop.
+# constant: only keeps a flat picture (every pixel equally bright) from dividing by zero; it maps to the first stop.
 _FLAT = 1e-6
 
 
