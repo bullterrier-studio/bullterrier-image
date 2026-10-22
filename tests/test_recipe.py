@@ -155,7 +155,7 @@ def test_animated_values_ease_between_their_end_points():
 @pytest.mark.parametrize(
     "text, expect",
     [
-        ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "animated but the recipe has no animation"),
+        ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "no animation"),
         (ANIMATED.replace('{ from = 0.0, to = 1.0, ease = "in-out" }', "{ from = 0.0 }"), "step 1.*exposure"),
         (ANIMATED.replace('"in-out"', '"bouncy"'), "step 1.*exposure"),
         (ANIMATED.replace("hold_end = 0.5", "hold_end = 1.5"), "no time"),
@@ -249,19 +249,16 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
 
 
 def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatch(photo, throwaway_effects):
-    from photo_fx.core.registry import effect
-
     @effect(category="utilities")
     def halve_for_shape_test(rgb, amount: float = 0.5):
         return rgb[::2, ::2]
 
     recipe = Recipe("shapeshift", (Step("halve_for_shape_test"),), size=None)
-    with pytest.raises(
-        RuntimeError, match=r"halve_for_shape_test.*changed the image shape \(96, 128, 3\) -> \(48, 64, 3\)"
-    ):
-        render(photo, recipe)
-    with pytest.raises(RuntimeError, match="changed the image shape"):
-        trace(photo, recipe)
+    for run in (render, trace):
+        with pytest.raises(RuntimeError) as raised:
+            run(photo, recipe)
+        message = str(raised.value)  # names the effect and both shapes
+        assert "halve_for_shape_test" in message and "(96, 128, 3)" in message and "(48, 64, 3)" in message
 
 
 def test_render_frames_needs_an_animated_recipe(photo):

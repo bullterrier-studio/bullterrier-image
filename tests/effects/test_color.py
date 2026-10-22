@@ -21,7 +21,7 @@ def test_gradient_map_end_points_use_first_and_last_stop():
 
 
 def test_gradient_map_needs_two_stops(photo):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="stops"):
         effects.apply("gradient_map", photo, stops=["#000000"])
 
 

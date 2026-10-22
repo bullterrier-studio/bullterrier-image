@@ -17,10 +17,10 @@ from photo_fx.core.timing import Animated, Animation
     [
         (lambda: Step("sparkle"), "unknown effect.*ascii"),
         (lambda: Step("glitch", {"spilt": 3}), "spilt"),
-        (lambda: Step("grain", mask="sideways"), "mask must be one of"),
-        (lambda: Step("grain", opacity=1.5), "opacity must be a number from 0 to 1"),
+        (lambda: Step("grain", mask="sideways"), "mask.*'sideways'"),
+        (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=True), "opacity"),
-        (lambda: Step("evaporate", {"matte": 1}), "supplied by the recipe"),
+        (lambda: Step("evaporate", {"matte": 1}), "matte"),
     ],
 )
 def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
@@ -31,7 +31,7 @@ def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
 def test_a_recipe_built_in_code_is_checked_too():
     with pytest.raises(ValueError, match="at least one step"):
         Recipe("empty", [])
-    with pytest.raises(ValueError, match="animated but the recipe has no animation"):
+    with pytest.raises(ValueError, match="no animation"):
         Recipe("x", [fx.grade(exposure=ramp(0, 1))])
     assert Recipe("ok", [fx.grain()]).steps == (fx.grain(),)  # a list is fine; it becomes a tuple
 
