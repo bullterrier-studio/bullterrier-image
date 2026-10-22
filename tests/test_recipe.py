@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from portrait_fx import Recipe, Step, load_recipe, render, render_all
-from portrait_fx.matte import _refine_edge
-from portrait_fx.recipe import Animated, Animation, render_frames
+from photo_fx import Recipe, Step, load_recipe, render, render_all
+from photo_fx.matte import _refine_edge
+from photo_fx.recipe import Animated, Animation, render_frames
 
 
 def write(tmp_path, text, name="r.toml"):
@@ -83,7 +83,7 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
 
 
 def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, monkeypatch):
-    from portrait_fx.effects import _registry
+    from photo_fx.effects import _registry
 
     seen = []
     monkeypatch.setitem(_registry._EFFECTS, "spy", lambda rgb, matte=None: seen.append(matte) or rgb)
@@ -210,9 +210,9 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
     r = load_recipe(write(tmp_path, ANIMATED.replace("[[step]]", '[[step]]\neffect="grain"\n[[step]]', 1)))
     r = Recipe(r.name, r.steps, size=None, animation=r.animation)
     calls = []
-    real = effects_apply = __import__("portrait_fx").recipe.effects.apply
+    real = effects_apply = __import__("photo_fx").recipe.effects.apply
     monkeypatch.setattr(
-        "portrait_fx.recipe.effects.apply", lambda name, *a, **k: calls.append(name) or real(name, *a, **k)
+        "photo_fx.recipe.effects.apply", lambda name, *a, **k: calls.append(name) or real(name, *a, **k)
     )
     frames = list(render_frames(photo, r))
     assert len(frames) == 20 and calls.count("grain") == 1 and calls.count("grade") == 20
@@ -244,7 +244,7 @@ def test_shipped_recipes_all_load():
 
 def test_render_all_finds_the_person_once_and_only_if_needed(photo, matte, monkeypatch):
     calls = []
-    monkeypatch.setattr("portrait_fx.recipe.subject_matte", lambda rgb: calls.append(1) or matte)
+    monkeypatch.setattr("photo_fx.recipe.subject_matte", lambda rgb: calls.append(1) or matte)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     plain = Recipe("p", (Step("grade", {"exposure": 0.5}),), size=None)
 

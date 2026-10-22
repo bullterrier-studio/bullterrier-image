@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from portrait_fx import effects
-from portrait_fx.effects._common import parse_color
-from portrait_fx.effects.ascii import _glyph_atlas, cell_size
+from photo_fx import effects
+from photo_fx.effects._common import parse_color
+from photo_fx.effects.ascii import _glyph_atlas, cell_size
 
 ALL = sorted(effects.describe())
 
@@ -66,7 +66,7 @@ def test_hue_shift_full_turn_is_identity(photo):
 
 
 def test_hue_shift_keeps_brightness_and_moves_colour():
-    from portrait_fx.effects._common import luminance
+    from photo_fx.effects._common import luminance
 
     skin_and_wall = np.array([[[0.8, 0.6, 0.5], [0.5, 0.35, 0.3], [0.6, 0.4, 0.4]]], np.float32)  # in-gamut colours
     out = effects.apply("hue_shift", skin_and_wall, degrees=120)
@@ -75,7 +75,7 @@ def test_hue_shift_keeps_brightness_and_moves_colour():
 
 
 def test_split_tone_tints_without_changing_brightness(photo):
-    from portrait_fx.effects._common import luminance
+    from photo_fx.effects._common import luminance
 
     midtones = 0.25 + photo * 0.5  # away from pure black and white, where a tint would clip and change brightness
     out = effects.apply("split_tone", midtones, amount=0.2)
@@ -470,7 +470,7 @@ def test_disperse_ambient_shimmer_is_small_runs_with_the_clock_and_travels_again
 
 @pytest.mark.parametrize("reach", [0.5, 1.0])
 def test_disperse_keeps_the_pieces_in_flight_at_once_to_a_third_or_less(reach):
-    from portrait_fx.effects.disperse import _schedule
+    from photo_fx.effects.disperse import _schedule
 
     rng = np.random.default_rng(0)
     order, spread = rng.random(20000), rng.random(20000)

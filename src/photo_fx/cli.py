@@ -1,4 +1,4 @@
-"""Command line: `portrait-fx render|sheet|cutout|effects`. A thin layer over the library; no logic of its own."""
+"""Command line: `photo-fx render|sheet|cutout|effects`. A thin layer over the library; no logic of its own."""
 
 import argparse
 import sys
@@ -13,7 +13,7 @@ from .sheet import contact_sheet
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="portrait-fx", description="Cut out a portrait and style it with effects.")
+    parser = argparse.ArgumentParser(prog="photo-fx", description="Cut out a portrait and style it with effects.")
     commands = parser.add_subparsers(dest="command", required=True)
 
     p = commands.add_parser("render", help="render a photo through one or more recipes, one file each")

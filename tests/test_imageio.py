@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from portrait_fx import imageio
+from photo_fx import imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):

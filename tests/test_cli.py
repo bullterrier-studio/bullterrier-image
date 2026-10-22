@@ -3,8 +3,8 @@ import sys
 import pytest
 from PIL import Image
 
-from portrait_fx import imageio
-from portrait_fx.cli import main
+from photo_fx import imageio
+from photo_fx.cli import main
 
 
 @pytest.fixture

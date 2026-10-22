@@ -1,6 +1,6 @@
-"""portrait-fx: cut a person out of a photo and style the result with composable effects.
+"""photo-fx: cut a person out of a photo and style the result with composable effects.
 
-    from portrait_fx import imageio, load_recipe, render
+    from photo_fx import imageio, load_recipe, render
 
     photo = imageio.load("me.jpg")
     imageio.save(render(photo, load_recipe("recipes/ascii-green.toml")), "me-ascii.png")
@@ -11,7 +11,7 @@ Modules, each owning one decision:
     effects   the effect library: pure functions image -> image
     recipe    effect lists in TOML, and running them (with optional person masks)
     sheet     comparison images
-    cli       the `portrait-fx` command
+    cli       the `photo-fx` command
 """
 
 from . import imageio

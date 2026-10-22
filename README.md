@@ -1,20 +1,23 @@
-# portrait-fx
+# photo-fx
 
-Cut a person out of a photo and style the result with composable effects: clean black background, ASCII art,
-halftone, glitch, colour schemes. Built for profile pictures; written as a small library so other apps can reuse it.
+Style photos with composable effects (ASCII art, halftone, glitch, colour schemes, evaporating particles) and animate
+them. A look is a short TOML recipe, made of effects that are small reusable functions, so the same recipe runs on any
+photo. It can also cut a person out first and put them on a clean background (handy for profile pictures). A small
+library with a command-line tool, so other apps can reuse it.
 
 ```bash
-uv sync                                                    # once
-uv run portrait-fx cutout  inputs/me.jpg                   # just you, transparent background -> out/cutout.png
-uv run portrait-fx render  inputs/me.jpg recipes           # every recipe in the folder -> out/me__<recipe>.png
-uv run portrait-fx sheet   inputs/me.jpg recipes           # all of them side by side -> out/sheet.png
-uv run portrait-fx animate inputs/me.jpg recipes/36-anim-right-to-right.toml   # an animated recipe -> out/me__<name>.mp4 (add --max-side 1080 for a smaller copy)
-uv run portrait-fx effects                                 # what effects exist and their parameters
-uv run pytest                                              # tests
+uv sync                                                                  # once
+uv run photo-fx cutout  inputs/me.jpg                                    # just the person, transparent -> out/cutout.png
+uv run photo-fx render  inputs/me.jpg recipes                            # every recipe in the folder -> out/me__<recipe>.png
+uv run photo-fx sheet   inputs/me.jpg recipes                            # all of them side by side -> out/sheet.png
+uv run photo-fx animate inputs/me.jpg recipes/36-anim-right-to-right.toml   # an animated recipe -> out/me__<name>.mp4
+                                                                         #   (add --max-side 1080 for a smaller copy)
+uv run photo-fx effects                                                  # what effects exist and their parameters
+uv run pytest                                                            # tests
 ```
 
-The person is found with Apple Vision, so cutouts and anything using `mask` need **macOS**. Effects without a mask
-work anywhere.
+The person is found with Apple Vision's person segmentation, so cutouts and anything using `mask` (or `edge`, which
+needs the silhouette) need **macOS and a person in the photo**. Every other effect works on any photo, anywhere.
 
 ## Recipes
 
@@ -25,7 +28,7 @@ name = "ascii-green"
 size = 1024                  # longest side in px; effect sizes are relative to this
 
 [[step]]
-effect = "ascii"             # any effect from `portrait-fx effects`; other keys are its parameters
+effect = "ascii"             # any effect from `photo-fx effects`; other keys are its parameters
 cell = 5
 fg = "#00ff9c"
 
@@ -40,7 +43,7 @@ or parameter names are reported at load time, with the file and step number.
 
 ## Animation
 
-Add an `[animation]` table to a recipe and any numeric parameter can change over the clip. `portrait-fx animate` renders
+Add an `[animation]` table to a recipe and any numeric parameter can change over the clip. `photo-fx animate` renders
 it to .mp4 (needs ffmpeg) or .gif; `render` shows a still of an animated recipe at its start.
 
 ```toml
@@ -81,7 +84,7 @@ plays almost everywhere.
 ## Layout
 
 ```
-src/portrait_fx/
+src/photo_fx/
   imageio.py     file formats, EXIF/colour profiles, resizing; defines the one in-memory image type
   matte.py       subject_matte(rgb) -> alpha. Which model finds the person is hidden here
   effects/       the effect library: pure functions (rgb, **params) -> rgb
@@ -93,7 +96,7 @@ src/portrait_fx/
     disperse.py    disperse (the same idea over time: for animations)
   recipe.py      TOML recipes; render(), render_all()
   sheet.py       comparison sheets
-  cli.py         the `portrait-fx` command (no logic of its own)
+  cli.py         the `photo-fx` command (no logic of its own)
 recipes/         example looks (data, not code)
 tests/
 inputs/ out/     your photos and the renders; git-ignored
@@ -106,7 +109,7 @@ mattes or recipes.
 ## Using it from another app
 
 ```python
-from portrait_fx import imageio, load_recipe, render_all
+from photo_fx import imageio, load_recipe, render_all
 
 photo = imageio.load("me.jpg")
 looks = [load_recipe(p) for p in ("recipes/01-clean-black.toml", "recipes/06-glitch.toml")]
@@ -114,13 +117,13 @@ for look, image in zip(looks, render_all(photo, looks)):  # finds the person onc
     imageio.save(image, f"me-{look.name}.png")
 ```
 
-Add it to another uv project with `uv add --editable ../portrait-fx`.
+Add it to another uv project with `uv add --editable ../photo-fx`.
 
 ## Adding an effect
 
 Write a function in any module under `effects/` and decorate it with `@effect`; import the module in
 `effects/__init__.py`. It takes the image and keyword parameters (with defaults) and returns an image of the same
-shape. Its docstring is what `portrait-fx effects` shows, so describe every parameter there. The shared tests
+shape. Its docstring is what `photo-fx effects` shows, so describe every parameter there. The shared tests
 automatically check that it keeps the shape, dtype and 0..1 range, is deterministic and does not modify its input.
 
 ## Tips from tuning
@@ -130,7 +133,7 @@ automatically check that it keeps the shape, dtype and 0..1 range, is determinis
 - A faint coloured fringe along the hair after replacing the background means the matte is too generous: raise
   `shrink` in `subject_matte` (default 1.5 px).
 - `glitch` with `ascii_share` turns some of the sliding strips into text in the photo's colours. `seed` decides where
-  the strips land, so try several seeds (`portrait-fx sheet` makes that quick) until none cut across the eyes or mouth.
+  the strips land, so try several seeds (`photo-fx sheet` makes that quick) until none cut across the eyes or mouth.
   Put the colour scheme (`gradient_map`, `hue_shift`) *before* the glitch and the glow *after* it.
 - `evaporate` moves whole characters, so give it the same `cell` as the `ascii` step before it. It needs a cut-out on
   black (put the background `fill` before it) and only uses the room already in the frame: pieces that rise or drift

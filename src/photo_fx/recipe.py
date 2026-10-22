@@ -4,7 +4,7 @@
     size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
 
     [[step]]
-    effect = "ascii"               # any effect from portrait_fx.effects; the other keys are its parameters
+    effect = "ascii"               # any effect from photo_fx.effects; the other keys are its parameters
     cell = 9
     fg = "#00ff9c"
 

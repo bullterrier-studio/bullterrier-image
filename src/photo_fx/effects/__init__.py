@@ -18,5 +18,5 @@ def apply(name: str, rgb: np.ndarray, **params) -> np.ndarray:
 
 
 def describe() -> dict[str, str]:
-    """Effect name -> its documentation, for `portrait-fx effects`."""
+    """Effect name -> its documentation, for `photo-fx effects`."""
     return {name: (fn.__doc__ or "").strip() for name, fn in sorted(all_effects().items())}
