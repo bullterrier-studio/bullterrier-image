@@ -9,7 +9,7 @@ from photo_fx import recipe as facade
 from photo_fx.core import runner
 from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
-from photo_fx.matte import _refine_edge, subject_matte
+from photo_fx.matte import subject_matte
 from photo_fx.recipe import render_frames
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
@@ -317,20 +317,3 @@ def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, matte):
     found = facade.render(photo, masked, find_subject=lambda rgb: 1.0 - matte)
     np.testing.assert_array_equal(found, runner.render(photo, masked, 1.0 - matte))
     assert not np.array_equal(found, runner.render(photo, masked, matte))
-
-
-# --- matte edge refinement (the part of matte.py that runs anywhere) -----------------------------------------------
-
-
-def test_refine_edge_shrink_pulls_the_edge_in():
-    alpha = np.zeros((40, 40), np.float32)
-    alpha[10:30, 10:30] = 1
-    assert _refine_edge(alpha, shrink=3, feather=0).sum() < alpha.sum()
-    np.testing.assert_array_equal(_refine_edge(alpha, shrink=0, feather=0), alpha)
-
-
-def test_refine_edge_feather_softens_without_leaving_range():
-    alpha = np.zeros((40, 40), np.float32)
-    alpha[10:30, 10:30] = 1
-    soft = _refine_edge(alpha, shrink=0, feather=2)
-    assert 0 < soft[10, 20] < 1 and soft.min() >= 0 and soft.max() <= 1

@@ -36,11 +36,17 @@ def subject_matte(rgb: np.ndarray, *, shrink: float = 1.5, feather: float = 1.0)
     if mask is None or not (mask >= 128).any():
         raise RuntimeError("no subject found in the picture (no person, pet or object stood out)")
     mask = np.asarray(Image.fromarray(mask).resize((width, height), Image.Resampling.BILINEAR))
-    return _refine_edge(mask.astype(np.float32) / 255.0, shrink, feather)
+    return refine_edge(mask.astype(np.float32) / 255.0, shrink, feather)
 
 
-def _refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:
-    """Erode by `shrink` px (pulls the edge back inside the body), then blur by `feather` px (sigma)."""
+def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:
+    """Clean up the edge of a matte (height, width, 0..1): returns a new float32 matte of the same size, in 0..1.
+
+    `shrink` (px) pulls the edge in: a pixel keeps the lowest value within a disc of that radius around it, so a halo
+    up to `shrink` px wide is cut away; the picture's own border does not count as an edge. Then `feather` (px) blurs
+    the edge with a Gaussian of that sigma, which softens it without changing the matte's total. 0 turns either off.
+    `subject_matte` applies this to the model's answer; use it on a matte from anywhere else for the same clean cut.
+    """
     if shrink > 0:
         r = int(np.ceil(shrink))
         y, x = np.ogrid[-r : r + 1, -r : r + 1]
