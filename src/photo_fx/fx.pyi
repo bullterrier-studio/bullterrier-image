@@ -4,16 +4,42 @@ from typing import Literal
 
 from .recipe import Step
 
-def ascii(cell: int = 10, chars: str = ' .:-=+*#%@', fg: str | list[float] | tuple[float, float, float] | None = None, bg: str | list[float] | tuple[float, float, float] = '#000000', gamma: float = 1.0, photo: float = 0.0, font: str | None = None) -> Step:
-    """Redraw the picture as text. `cell` is the character width in px (smaller = finer detail).
+def ascii(cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, paper: str | list[float] | tuple[float, float, float] = '#000000', gamma: float = 1.0, photo: float = 0.0, font: str | None = None) -> Step:
+    """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 
-`chars` is the palette in any order; it is sorted by how much ink each glyph actually puts on the page, so
-'@' is used for the brightest areas on a dark `bg` and the darkest on a light one. Try " .:-=+*#%@", " .oO0@",
-"01", or block characters like " ░▒▓█" (the font must have them). `fg` = one colour for all text; leave it
-out to colour each character from the photo. `gamma` > 1 darkens the midtones.
-`photo` (0..1) is how much of the original picture shows through behind the characters: 0 = text on a flat `bg`
-(fine detail is lost to the character grid), 1 = text laid over the untouched photo, so every detail stays visible.
-`font` = path to a monospaced .ttf/.ttc if you do not want the system one."""
+Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
+tones survive as denser and lighter characters. A font that cannot be opened raises OSError.
+
+Parameters
+----------
+cell : whole number, px, 1 to 200, default 10
+    Width of one character, 1 to 200 px; the height follows from the font. Smaller =
+    finer detail, more characters. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+chars : text, default ' .:-=+*#%@'
+    The character palette, in any order, at least two different characters. It is sorted
+    by how much ink each glyph puts down, so the densest is used for the brightest areas
+    on dark paper and the darkest on light paper (see `paper`). Try ' .:-=+*#%@', '
+    .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).
+ink : colour or none, default None
+    The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
+    default) colours each character from the average colour of the photo under it,
+    brightened so thin strokes stay readable: scaled until its strongest channel is
+    full, or by 1 / 0.35 if that channel is below 0.35 (never darkened).
+paper : colour, default '#000000'
+    The paper colour behind the characters. Paper darker than mid grey (Rec. 709
+    luminance below 0.5) puts dense characters on bright areas; lighter paper puts them
+    on dark areas.
+gamma : number, ratio, 0.1 to 10, default 1.0
+    Exponent on the amount of ink each character puts down, 0.1 to 10: 1 = linear, above
+    1 lighter midtones (less ink), below 1 more ink.
+photo : number, fraction, 0 to 1, default 0.0
+    How much of the original picture shows through the paper behind the characters, 0 to
+    1: 0 = text on flat `paper` (fine detail is lost to the grid), 1 = text laid over
+    the untouched photo.
+font : text or none, default None
+    Path to a monospaced .ttf/.ttc font; none (the default) uses the first system
+    monospaced font found."""
     ...
 
 def clarity(radius: float = 30.0, amount: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
@@ -42,60 +68,222 @@ constant_value : number, fraction, 0 to 1, default 0.0
     otherwise."""
     ...
 
-def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, edge: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0) -> Step:
+def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, edge: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, edge_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0) -> Step:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. Animate `progress`.
 
-The picture is cut into character-sized pieces (`cell` = character width in px: use the same value as the
-`ascii` step before this one). Black is background, so use it on a cut-out on black. Each piece has a fixed,
-random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches, drifts,
-wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
+The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
+has a fixed, random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches,
+drifts, wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
 
-When a piece detaches is set by where it is. `top` makes pieces higher up go first, `edge` makes pieces near
-the outline of the figure go before the middle, and `sweep` (-1..1) makes one side go before the other: positive
-starts at the left, negative at the right (how strongly it matters, relative to the other two). `reach` (0..1)
-is how much of the figure ever goes: at 0.4 the outer 40% disperses and the rest stays, at 1 everything goes.
+When a piece detaches is set by where it is (`top`, `edge`, `sweep`, with `jitter`); `reach` is how much of the
+figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
+makes the edges loosen all round first; `ambient` with `clock` keeps the pieces that stay alive.
 
-Where a piece goes: the wind blows at `angle` degrees above the horizontal, to the right when `wind` is positive
-and to the left when it is negative. `wind` is also the farthest any piece is carried by the time it vanishes, as
-a fraction of the picture width (others go a third to all of that, so speeds differ); keep it under a third, or
-pieces cross too much of the picture in one go. `outward` (0..1) additionally throws a piece away from the edge
-it came from; it makes pieces fly in different directions, so leave it at 0 when everything should travel
-together on the wind.
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `edge`.
 
-`hover` (0..~0.3) makes pieces float slowly along the wind's direction before they go, by that share of their
-journey. The pieces on the outline (and along the picture's left, right and top borders) start at once, deeper
-ones later, so the edges loosen all round first and each piece lets go when the front reaches it. 0 = off.
-
-`ambient` (0..~0.1) is the strength of the slow shimmer of the pieces that stay, and `clock` the time in seconds
-it runs on: animate `clock` over the whole clip (`over = "clip"`) so the picture is alive even while nothing
-detaches. The shimmer travels against the wind, which balances the motion of the pieces.
-
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `edge`."""
+Parameters
+----------
+cell : whole number, px, 1 to 64, default 5
+    Character width in px; a piece is one character (its height comes from `font`). Use
+    the same value as the ascii step before this one, so whole characters move.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+font : text or none, default None
+    Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None
+    for the system font; use the same as the ascii step. A path that cannot be opened
+    fails when the effect runs.
+progress : number, fraction, 0 to 1, default 0.0
+    The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).
+    Animate it.
+top : number, ratio, 0 to 10, default 1.0
+    Weight of height in the order pieces leave: higher pieces go first. 0 = height does
+    not matter.
+edge : number, ratio, 0 to 10, default 1.0
+    Weight of closeness to the outline (and the left, right and top borders) in the
+    order: pieces near the edge go before the middle. 0 = closeness does not matter.
+sweep : number, ratio, -1 to 1, default 0.0
+    Weight of side in the order: positive starts at the left, negative at the right; its
+    size is how much it matters next to `top` and `edge`.
+reach : number, fraction, 0 to 1, default 1.0
+    How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses
+    and the rest stays, 1 = everything goes.
+wind : number, fraction, -1 to 1, default 0.2
+    The farthest any piece is carried by the time it vanishes, as a fraction of the
+    picture width: positive blows right, negative left. Keep it under a third, or pieces
+    cross too much of the picture in one go.
+angle : number, degrees, -180 to 180, default 10.0
+    Direction of the wind above the horizontal (on the side `wind` blows to); negative
+    blows downward.
+hover : number, fraction, 0 to 1, default 0.0
+    Share of its journey a piece floats slowly along the wind before it goes (about
+    0..0.3 looks right). The outline starts at once, deeper pieces later (see
+    `hover_spread`). 0 = off.
+outward : number, fraction, 0 to 1, default 0.0
+    How much a piece is also thrown away from the edge it came from (by up to
+    `outward_distance`); pieces then fly in different directions, so leave it at 0 when
+    everything should travel together on the wind.
+ambient : number, ratio, 0 to 1, default 0.0
+    Depth of the slow shimmer of the pieces that stay, as a share of their brightness
+    (about 0..0.1 looks right; brightening stops at white). 0 = off.
+clock : number, seconds, 0 to 3600, default 0.0
+    The time the shimmer runs on: animate it over the whole clip (`over = "clip"`) so
+    the picture is alive even while nothing detaches.
+seed : whole number, count, 0 to 2147483647, default 0
+    Random seed: each piece's fate is fixed by it, so every frame of one seed fits
+    together. Animated, it moves in whole steps (rounded to the nearest whole number).
+edge_depth : number, fraction, 0.01 to 1, default 0.15
+    Distance from the outline (fraction of the picture width) beyond which a piece
+    counts as fully inside, for `edge` and `hover_spread`. Raising it makes closeness to
+    the edge matter deeper in.
+jitter : number, fraction, 0 to 1, default 0.2
+    Random share of each piece's place in the leaving order: 0 = a clean front, raising
+    it makes it ragged.
+anticipation : number, fraction, 0.01 to 0.2, default 0.06
+    Wind-up time before a piece goes, as a share of the clip: it eases back by
+    `pullback` over this time. The first piece goes only after it, so every piece has
+    one.
+pullback : number, fraction, 0 to 1, default 0.15
+    How far a piece eases back against its journey before it goes (anticipation), as a
+    share of the journey. 0 = no wind-up.
+flight : number, fraction, 0.01 to 0.5, default 0.2
+    Average time from detaching to vanishing, as a share of the clip. Shorter flights
+    keep fewer pieces in the air at once (about 0.1 keeps it to a third on a side-to-
+    side sweep).
+flight_variation : number, fraction, 0 to 0.9, default 0.4
+    How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all
+    the same.
+finish : number, fraction, 0.5 to 1, default 0.98
+    The progress by which the last piece has vanished (a little under 1 gives a clean
+    last frame). If `anticipation` and the longest flight do not fit before it, all
+    pieces go at once.
+hover_spread : number, fraction, 0 to 1, default 0.45
+    With `hover`: how far into the clip a piece `edge_depth` inside starts to float (the
+    outline starts at 0). 0 = everything floats at once.
+bob : number, fraction, 0 to 0.05, default 0.004
+    Height of the gentle up-and-down of a hovering piece, as a fraction of the picture
+    height.
+bob_cycles : number, cycles, 0 to 20, default 3.0
+    Number of ups and downs while a piece hovers.
+angle_spread : number, degrees, 0 to 180, default 12.0
+    Range of each piece's own direction around the wind's `angle` (it differs by up to
+    half of this).
+distance_minimum : number, fraction, 0 to 1, default 0.35
+    The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all
+    travel equally far.
+outward_distance : number, fraction, 0 to 1, default 0.12
+    How far `outward` 1 throws a piece away from its edge, as a fraction of the
+    picture's width (sideways) and height (up and down).
+acceleration : number, ratio, 0 to 10, default 0.5
+    How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration
+    times as fast as it starts. 0 = steady speed.
+sway : number, fraction, 0 to 0.2, default 0.012
+    Largest sideways wobble of a flying piece, as a fraction of the picture width; it
+    grows during the flight. 0 = none.
+sway_cycles : number, cycles, 0 to 20, default 1.5
+    Number of wobbles during a piece's flight.
+falloff : number, ratio, 0 to 10, default 1.5
+    How a flying piece fades: brightness is (1 - share of flight)^falloff. 0 = no fade
+    (it just vanishes at the end), 1 = even, above 1 fades quickly at first.
+flare : number, ratio, 0 to 2, default 0.4
+    Extra brightness at the peak of the glow as a piece leaves (0.4 = 1.4x); brightening
+    stops at white. 0 = no glow.
+flare_span : number, fraction, 0.01 to 1, default 0.2
+    Share of a piece's flight that the glow lasts; it peaks halfway through that.
+ambient_period : number, seconds, 0.1 to 60, default 3.0
+    Seconds per shimmer cycle (breathing is 2-4 s).
+ambient_wavelength : number, fraction, 0.01 to 2, default 0.2
+    Length of one shimmer wave as a fraction of the picture width; with the period it
+    sets how fast the wave travels (against the wind).
+open_bottom : true or false, default True
+    True: the bottom border is not an edge for `edge` and `hover` (a portrait is cut off
+    there). False: it counts like the other borders.
+normal_smoothing : number, count, 0 to 10, default 1.0
+    Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
+    direction: raising it makes neighbouring pieces fly in more similar directions; 0
+    uses the raw outline."""
     ...
 
-def evaporate(cell: int = 5, start: float = 0.6, end: float = 0.3, edge: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0) -> Step:
+def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, end: float = 0.3, edge: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
-The picture is cut into character-sized pieces (`cell` = character width in px: use the same value as the
-`ascii` step before this one, so whole characters fly away). Black is background, so use it on a cut-out on
-black. Two things make pieces detach, at random and more often the stronger they act (the stronger of the two
-wins at any spot):
+The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
+make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
+the top down, between `start` and `end`; and from the outline, within `edge` of the edge of the figure and of the
+left, right and top borders of the picture (and the bottom unless `open_bottom`).
 
-- from the top down: above `start` (a fraction of the height, 0 = top) pieces begin to detach and by `end`
-  every piece is gone from its place. `start` = 0 switches this off.
-- from the outline: within `edge` (a fraction of the width) of the edge of the figure, and of the left, right
-  and top borders of the picture (not the bottom, where a portrait is simply cut off). 0 switches this off.
-
-A detached piece rises up to `rise` (fraction of the height), the further the sparser and dimmer, and sways
-sideways. `outward` (0..1) turns it away from the edge it came from, so the left side of the head sheds to the
-left and the right side to the right; 0 sends everything straight up. `wind` pushes everything right (positive)
-or left (negative), in characters per row risen. `vanish` (0..1) is the share of detached pieces already gone.
-Pieces leaving the picture are gone. With `edge` and `outward` at 0 pieces only move up, so everything more than
-one character row below `start` is untouched. The same `seed` always gives the same dissolve.
+A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
+sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
+leaving the picture are gone. With `edge` and `outward` at 0 pieces only move up, so everything more than one
+character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
 `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
 "the edge of the figure". Dark parts of the picture (eyes, shadows) are then still part of the figure. Without
-a matte the lit pieces are used, with enclosed dark gaps filled in."""
+a matte the lit pieces are used, with enclosed dark gaps filled in.
+
+Parameters
+----------
+cell : whole number, px, 1 to 64, default 5
+    Character width in px; a piece is one character (its height comes from `font`). Use
+    the same value as the ascii step before this one, so whole characters fly away.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+font : text or none, default None
+    Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None
+    for the system font; use the same as the ascii step. A path that cannot be opened
+    fails when the effect runs.
+start : number, fraction, 0 to 1, default 0.6
+    Height (fraction of the picture, 0 = top) above which pieces begin to detach from
+    the top down. 0 switches the top-down dissolve off.
+end : number, fraction, 0 to 1, default 0.3
+    Height (fraction of the picture, 0 = top) above which every piece has detached.
+    Between `end` and `start` the chance rises smoothly.
+edge : number, fraction, 0 to 1, default 0.0
+    Width of the band (fraction of the picture width) along the figure's outline, and
+    the left, right and top borders, where pieces detach; stronger nearer the edge. 0
+    switches it off. Raising it eats further in.
+outward : number, fraction, 0 to 1, default 0.0
+    How much a piece turns away from the edge it came from (the left of the head sheds
+    to the left): 0 = straight up, 1 = as much sideways as up.
+rise : number, fraction, 0 to 1, default 0.3
+    Farthest a piece climbs, as a fraction of the picture height (at least one character
+    row). Raising it spreads the smoke higher.
+wind : number, ratio, -5 to 5, default 0.0
+    Sideways drift in characters per row climbed: positive to the right, negative to the
+    left.
+vanish : number, fraction, 0 to 1, default 0.3
+    Share of detached pieces already gone before they climb (0..1); `thinning` removes
+    more with height.
+seed : whole number, count, 0 to 2147483647, default 0
+    Random seed: the same seed always gives the same dissolve, another seed another one.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+rise_gamma : number, ratio, 0 to 5, default 0.6
+    Gamma of the climb against how strongly a piece is pulled away (0..1): a piece
+    climbs up to `rise` x pull^rise_gamma. Below 1 even weakly pulled pieces climb far,
+    above 1 only the strongly pulled ones.
+rise_minimum : number, fraction, 0 to 1, default 0.1
+    Shortest climb as a share of a piece's longest one; 1 makes every piece climb the
+    full way.
+rise_skew : number, ratio, 0 to 5, default 1.5
+    Exponent on each piece's random share of its climb: above 1 most pieces stay low and
+    a few go high, 1 spreads them evenly, below 1 most go high.
+thinning : number, fraction, 0 to 1, default 0.5
+    Extra share of pieces gone by the time they climb the full `rise` (on top of
+    `vanish`): raising it makes the smoke sparser higher up.
+falloff : number, ratio, 0 to 5, default 1.5
+    How fast a piece dims as it climbs: brightness is (1 - climbed share of
+    `rise`)^falloff. 0 keeps full brightness, 1 dims evenly, above 1 dims quickly at
+    first.
+sway : number, ratio, 0 to 1, default 0.12
+    Random sideways sway in characters per row climbed (a standard deviation): raising
+    it makes the smoke spread wider the higher it goes.
+sway_minimum : number, count, 0 to 5, default 0.3
+    Sideways sway every detached piece has, however little it climbs, in characters (a
+    standard deviation).
+open_bottom : true or false, default True
+    True: the bottom border is not an edge for `edge` (a portrait is simply cut off
+    there). False: it sheds like the other borders.
+normal_smoothing : number, count, 0 to 10, default 1.0
+    Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
+    direction: raising it makes neighbouring pieces fly in more similar directions; 0
+    uses the raw outline."""
     ...
 
 def fill(color: str | list[float] | tuple[float, float, float] = '#000000') -> Step:
@@ -107,19 +295,104 @@ color : colour, default '#000000'
     The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
-def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, ascii_share: float = 0.0, ascii_cell: int = 9, ascii_photo: float = 0.0, seed: int = 0) -> Step:
+def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, ascii_share: float = 0.0, ascii_cell: int = 9, ascii_photo: float = 0.0, seed: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, ascii_rows: int = 3, ascii_gamma: float = 0.55, ascii_chars: str = ' .:-=+*#%@', ascii_ink: str | list[float] | tuple[float, float, float] | None = None, ascii_paper: str | list[float] | tuple[float, float, float] = '#000000', ascii_font: str | None = None) -> Step:
     """`bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed
-`split` px apart. The same `seed` always gives the same damage.
+`split` px apart.
 
-`ascii_share` (0..1) is the fraction of the strips that also dissolve into text, drawn in the photo's own
-colours with characters `ascii_cell` px wide. Text needs room to be legible, so such a strip is widened to
-hold at least three rows of characters. `ascii_photo` (0..1) keeps that much of the photo visible behind the
-text; at 1 the strips keep all their detail and the characters sit on top. The colour split runs last, so the
-text gets the same red and blue fringes as the rest of the damage. With `ascii_share` 0 there is no text."""
+The same `seed` always gives the same damage. `ascii_share` of the strips also dissolve into text drawn with the
+`ascii_*` settings; the text has its own random stream, so the sliding is identical whether or not text is on. The
+colour split runs last, so the text gets the same red and blue fringes as the rest of the damage. A text font that
+cannot be opened raises OSError.
+
+Parameters
+----------
+split : whole number, px, -500 to 500, default 10
+    How far red is pushed right and blue left, -500 to 500 px (negative swaps the
+    directions); 0 = no colour split. The picture wraps around at the edges. Animated,
+    it moves in whole steps (rounded to the nearest whole number).
+bands : whole number, count, 0 to 500, default 7
+    How many random horizontal strips slide sideways, 0 to 500; 0 = none. Animated, it
+    moves in whole steps (rounded to the nearest whole number).
+shift : number, fraction, 0 to 1, default 0.06
+    The furthest a strip slides, as a fraction 0 to 1 of the picture's width; each strip
+    slides a random distance up to this, left or right, wrapping around.
+ascii_share : number, fraction, 0 to 1, default 0.0
+    The fraction 0 to 1 of the strips that also dissolve into text (rounded up to whole
+    strips); 0 = no text.
+ascii_cell : whole number, px, 1 to 200, default 9
+    Width of one character of the text strips, 1 to 200 px. Larger = bigger, fewer
+    characters. Animated, it moves in whole steps (rounded to the nearest whole number).
+ascii_photo : number, fraction, 0 to 1, default 0.0
+    How much of the strip shows through behind its characters, 0 to 1: 0 = text on flat
+    `ascii_paper`, 1 = text laid over the strip, keeping all its detail.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same damage; any other gives different
+    strips. Animated, it moves in whole steps (rounded to the nearest whole number).
+band_min_height : number, fraction, 0 to 1, default 0.01
+    The lowest a strip can be, as a fraction 0 to 1 of the picture's height (never below
+    1 px). Each strip's height is drawn at random between this and `band_max_height`
+    (set above it, the two swap roles).
+band_max_height : number, fraction, 0 to 1, default 0.06
+    The tallest a strip can be, as a fraction 0 to 1 of the picture's height. Raising it
+    gives taller strips.
+ascii_rows : whole number, count, 1 to 100, default 3
+    The fewest rows of characters a text strip holds, 1 to 100: a thinner strip is
+    widened (each row counted as twice `ascii_cell` tall) so its text stays legible, up
+    to the whole picture. Animated, it moves in whole steps (rounded to the nearest
+    whole number).
+ascii_gamma : number, ratio, 0.1 to 10, default 0.55
+    Exponent on the amount of ink each character puts down, 0.1 to 10: below 1 (the
+    default) more ink, so the text carries enough light to read against dark paper;
+    above 1 less.
+ascii_chars : text, default ' .:-=+*#%@'
+    The character palette of the text strips, in any order, at least two different
+    characters; sorted by how much ink each glyph puts down, so the densest is used for
+    the brightest areas on dark paper and the darkest on light paper (see
+    `ascii_paper`).
+ascii_ink : colour or none, default None
+    The ink colour of the text strips ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
+    default) colours each character from the average colour of the strip under it,
+    brightened as in the ascii effect (strongest channel scaled to full, or by 1 / 0.35
+    if below 0.35).
+ascii_paper : colour, default '#000000'
+    The paper colour behind the text strips' characters. Paper darker than mid grey
+    (Rec. 709 luminance below 0.5) puts dense characters on bright areas; lighter paper
+    puts them on dark areas.
+ascii_font : text or none, default None
+    Path to a monospaced .ttf/.ttc font for the text strips; none (the default) uses the
+    first system monospaced font found."""
     ...
 
-def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55) -> Step:
-    """Soft bloom around the bright parts. `radius` in px, `amount` 0..1+, `threshold` = where glow starts."""
+def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+    """Soft bloom around the bright parts: what is brighter than `threshold` is blurred by `radius` px and screened
+over the picture by `amount`.
+
+Glow only ever brightens, and keeps the colour of the light: each channel glows on its own.
+
+Parameters
+----------
+radius : number, px, 0 to 500, default 24.0
+    Gaussian sigma of the halo in px at the recipe's size: larger spreads the light
+    further and softer (and takes longer); 0 keeps the light on the bright parts
+    themselves.
+amount : number, ratio, 0 to 10, default 0.6
+    How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
+    brightness; above 1 it saturates to white sooner.
+threshold : number, fraction, 0 to 0.99, default 0.55
+    The brightness (0..1, per channel) where the glow starts: only values above it light
+    the halo, rising to full at 1. Raising it limits the glow to the brightest
+    highlights.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the halo's Gaussian is cut off, in sigmas: the halo reaches truncate x radius
+    px. Larger is more exact and slower.
+mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the glow fades
+    toward the edge when it is 0).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The highlight (0..1) assumed beyond the edge when mode is 'constant'; ignored
+    otherwise."""
     ...
 
 def grade(exposure: float = 0.0, contrast: float = 1.0, pivot: float = 0.5, saturation: float = 1.0) -> Step:
@@ -170,16 +443,75 @@ quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'in
     Only visible on small or flat pictures."""
     ...
 
-def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0) -> Step:
-    """Film grain: brightness noise of strength `amount` (0.08 is visible, 0.2 is heavy), clumped to `size` px.
+def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px.
 
-The same `seed` always gives the same grain, so renders are repeatable."""
+The same noise is added to every channel, so the grain is monochrome; the result is clipped to 0..1. The same
+`seed` always gives the same grain, so renders are repeatable.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.08
+    Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is
+    visible, 0.2 is heavy.
+size : number, px, 0 to 50, default 1.0
+    Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is
+    blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its
+    standard deviation. Larger = coarser, softer grain.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same grain, another seed a different
+    pattern. Animated, it moves in whole steps (rounded to the nearest whole number).
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1).
+    Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the clumping blur sees beyond the picture's edge (only when size > 1):
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
+    seamlessly)."""
     ...
 
-def halftone(cell: int = 14, angle: float = 45.0, fg: str | list[float] | tuple[float, float, float] | None = None, bg: str | list[float] | tuple[float, float, float] = '#000000') -> Step:
+def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, paper: str | list[float] | tuple[float, float, float] = '#000000', sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Print-style dot screen: tone becomes dot size. `cell` = distance between dots in px, `angle` = screen rotation.
 
-`fg` = one colour for every dot; leave it out to take each dot's colour from the photo."""
+A dot's area is proportional to the ink its tone needs, so the screen keeps the picture's tones; dots touch at
+half tone and fill their cell at full tone. `ink` = one colour for every dot; leave it out to take each dot's
+colour from the photo.
+
+Parameters
+----------
+cell : whole number, px, 1 to 200, default 14
+    Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
+    bigger dots, a coarser print. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+angle : number, degrees, -360 to 360, default 45.0
+    Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many
+    degrees below the x axis (negative = above). The grid is square, so 90 degrees on
+    looks the same; 45 is the classic screen angle for one ink.
+ink : colour or none, default None
+    The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave
+    it out to give each dot the colour of the photo under it, brightened so small dots
+    stay visible.
+paper : colour, default '#000000'
+    The paper colour between the dots. On a dark paper bright tones get the ink; on a
+    light one, dark tones.
+sigma : number, ratio, 0 to 5, default 0.5
+    Gaussian sigma, in cells, of the blur that averages the tone each dot stands for: 0
+    = each dot sees only the pixel at its centre (detail, but noisy), larger = smoother
+    tone that spreads into neighbouring dots.
+feather : number, px, 0.1 to 50, default 1.0
+    Width of each dot's soft edge in px (anti-aliasing): small = crisp dots, larger =
+    blurrier dots. The ink stays the same.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma
+    cells. Larger is more exact and slower.
+mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (constant_value).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored
+    otherwise."""
     ...
 
 def hue_shift(hue: float = 90.0) -> Step:
