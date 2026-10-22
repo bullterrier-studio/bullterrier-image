@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pytest
 
@@ -45,3 +47,55 @@ def test_random_points_zero_count_is_empty():
 def test_random_points_reject_negative_count():
     with pytest.raises(ValueError):
         voronoi.random_points((10, 10), -1, seed=0)
+
+
+# ---------------------------------------------------------------- cell_labels
+
+
+def _pixel_distances(shape, points):
+    """(h, w, n) distance from every pixel centre to every point, by brute force."""
+    h, w = shape
+    ys, xs = np.mgrid[0:h, 0:w]
+    centres = np.stack([xs + 0.5, ys + 0.5], axis=-1).astype(np.float64)
+    return np.linalg.norm(centres[:, :, None, :] - points[None, None, :, :].astype(np.float64), axis=-1)
+
+
+def test_cell_labels_pick_the_nearest_point_for_every_pixel():
+    shape = (37, 53)
+    points = voronoi.random_points(shape, 12, seed=5)
+    labels = voronoi.cell_labels(shape, points)
+    dist = _pixel_distances(shape, points)
+    chosen = np.take_along_axis(dist, labels[:, :, None].astype(np.intp), axis=2)[:, :, 0]
+    assert np.allclose(chosen, dist.min(axis=2))
+
+
+def test_cell_labels_with_one_point_are_all_zero():
+    labels = voronoi.cell_labels((7, 11), np.array([[3.0, 2.0]], dtype=np.float32))
+    assert labels.shape == (7, 11) and (labels == 0).all()
+
+
+def test_cell_labels_give_every_pixel_one_valid_int32_label():
+    shape = (37, 53)
+    points = voronoi.random_points(shape, 12, seed=5)
+    labels = voronoi.cell_labels(shape, points)
+    assert labels.dtype == np.int32 and labels.shape == shape
+    assert labels.min() >= 0 and labels.max() < 12
+
+
+def test_cell_labels_follow_point_order_not_position():
+    # left point listed second: a mix-up of the point index with its sort order would flip the labels
+    points = np.array([[15.0, 2.0], [5.0, 2.0]], dtype=np.float32)
+    labels = voronoi.cell_labels((4, 20), points)
+    assert (labels[:, :10] == 1).all() and (labels[:, 10:] == 0).all()
+
+
+def test_cell_labels_reject_no_points():
+    with pytest.raises(ValueError):
+        voronoi.cell_labels((5, 5), np.zeros((0, 2), dtype=np.float32))
+
+
+def test_cell_labels_of_a_large_picture_are_fast():
+    points = voronoi.random_points((1600, 1600), 2000, seed=0)
+    start = time.perf_counter()
+    voronoi.cell_labels((1600, 1600), points)
+    assert time.perf_counter() - start < 1.5
