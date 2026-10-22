@@ -5,6 +5,9 @@ import sees.
     adapters   imageio, matte
     effects    one module per effect; never import each other
     core | ops siblings: neither imports the other; neither imports anything else from photo_fx
+
+These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
+unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
 """
 
 import ast

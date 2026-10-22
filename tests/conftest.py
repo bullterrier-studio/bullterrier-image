@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from photo_fx import effects
-from photo_fx.core import registry as _registry
+from photo_fx.core import registry
 from photo_fx.core.registry import unregister
 
 
@@ -10,8 +10,8 @@ from photo_fx.core.registry import unregister
 def fresh_registry(monkeypatch):
     """An empty effect registry for one test, so it can build exactly the effects and categories it needs, whatever
     real effects exist. The real registry comes back afterwards, untouched."""
-    monkeypatch.setattr(_registry, "_EFFECTS", {})
-    monkeypatch.setattr(_registry, "_CATEGORY", {})
+    monkeypatch.setattr(registry, "_EFFECTS", {})
+    monkeypatch.setattr(registry, "_CATEGORY", {})
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def register_probe():
 
         probe.__name__ = probe.__qualname__ = name
         probe.__doc__ = f"The {name} probe."
-        _registry.effect(category=category)(probe)
+        registry.effect(category=category)(probe)
 
     return register
 

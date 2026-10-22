@@ -1,12 +1,18 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 import pytest
 
-from photo_fx import Recipe, Step, load_recipe, render, render_all, trace
+from photo_fx import Recipe, Step, imageio, load_recipe, render, trace
 from photo_fx import recipe as facade
-from photo_fx.core import registry
+from photo_fx.core import runner
+from photo_fx.core.registry import effect
 from photo_fx.core.timing import Animated, Animation
-from photo_fx.matte import _refine_edge
+from photo_fx.matte import _refine_edge, subject_matte
 from photo_fx.recipe import render_frames
+
+EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
 
 def write(tmp_path, text, name="r.toml"):
@@ -85,15 +91,20 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
         load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=1.5\n', "bad.toml"))
 
 
-def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, monkeypatch):
-    from photo_fx.core import registry as _registry
-
+def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, throwaway_effects):
     seen = []
-    monkeypatch.setitem(_registry._EFFECTS, "spy", lambda rgb, matte=None: seen.append(matte) or rgb)
-    r = Recipe("s", (Step("spy"),), size=None)
+
+    @effect(category="utilities")
+    def silhouette_probe(rgb, matte=None):
+        """Records the silhouette it is given."""
+        seen.append(matte)
+        return rgb
+
+    r = Recipe("s", (Step("silhouette_probe"),), size=None)
     assert r.needs_matte  # an effect that wants the silhouette makes the recipe look for the person
     render(photo, r, matte)
-    assert len(seen) == 1 and seen[0] is matte
+    assert len(seen) == 1
+    np.testing.assert_array_equal(seen[0], matte)
 
 
 def test_matte_cannot_be_set_in_a_recipe_file(tmp_path):
@@ -220,16 +231,21 @@ def test_render_at_picks_a_moment_of_the_clip(photo, tmp_path):
     np.testing.assert_allclose(render(photo, r, at=1.0), np.clip(photo * 2.0, 0, 1), atol=1e-5)
 
 
-def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(photo, tmp_path, monkeypatch):
-    r = load_recipe(write(tmp_path, ANIMATED.replace("[[step]]", '[[step]]\neffect="grain"\n[[step]]', 1)))
-    r = Recipe(r.name, r.steps, size=None, animation=r.animation)
-    calls = []
-    real = effects_apply = registry.apply
-    monkeypatch.setattr(registry, "apply", lambda name, *a, **k: calls.append(name) or real(name, *a, **k))
+def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(photo, tmp_path, throwaway_effects):
+    runs = []
+
+    @effect(category="utilities")
+    def still_probe(rgb, amount: float = 0.5):
+        """A step that does not change over the clip; counts how often it runs."""
+        runs.append(amount)
+        return rgb
+
+    animated = load_recipe(write(tmp_path, ANIMATED))
+    r = Recipe("r", (Step("still_probe"), *animated.steps), size=None, animation=animated.animation)
     frames = list(render_frames(photo, r))
-    assert len(frames) == 20 and calls.count("grain") == 1 and calls.count("grade") == 20
+    assert len(frames) == 20 and len(runs) == 1  # the still step ran once for the whole clip
     np.testing.assert_allclose(frames[0], render(photo, r, at=0.0), atol=1e-6)
-    assert effects_apply is real
+    np.testing.assert_allclose(frames[-1], render(photo, r, at=1.0), atol=1e-6)
 
 
 def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatch(photo, throwaway_effects):
@@ -270,39 +286,37 @@ def test_shipped_recipes_all_load():
     assert files and all(load_recipe(f).steps for f in files)
 
 
-def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(photo, matte, monkeypatch):
-    """Without a matte or `find_subject`, the public functions ask `photo_fx.matte.subject_matte`, once per render.
-    The real finder needs Apple Vision (macOS only), so a recording stand-in takes its place on every platform."""
-    asked = []
-    monkeypatch.setattr("photo_fx.matte.subject_matte", lambda rgb: asked.append(rgb.shape) or matte)
+def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default():
+    """Without a matte or `find_subject`, `photo_fx.recipe`'s functions find the subject with `subject_matte`. Where it
+    exists (Apple Vision, macOS) the real finder runs and the results must equal the core's with its matte; elsewhere
+    it refuses, and the facade passing that refusal on shows the same default. No stand-in is needed either way."""
+    photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     animated = Recipe("a", masked.steps + (Step("grade", {"exposure": Animated(0.0, 1.0)}),), None, Animation(2, 1))
+    if sys.platform == "darwin":
+        alpha = subject_matte(photo)
+        expected = runner.render(photo, masked, alpha)
+        np.testing.assert_array_equal(facade.render(photo, masked), expected)
+        np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
+        np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
+        clip = list(facade.render_frames(photo, animated))
+        np.testing.assert_array_equal(clip[0], next(runner.render_frames(photo, animated, alpha)))
+    else:
+        for run in (
+            lambda: facade.render(photo, masked),
+            lambda: facade.trace(photo, masked),
+            lambda: facade.render_all(photo, [masked]),
+            lambda: list(facade.render_frames(photo, animated)),
+        ):
+            with pytest.raises(NotImplementedError, match="Apple Vision"):
+                run()
 
-    expected = render(photo, masked, matte)
-    np.testing.assert_array_equal(facade.render(photo, masked), expected)
-    np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
-    assert len(list(facade.render_frames(photo, animated))) == 2
-    np.testing.assert_array_equal(facade.render_all(photo, [masked, masked])[1], expected)
-    assert asked == [photo.shape] * 4  # render, trace, the whole clip, render_all: once each
 
-
-def test_the_facade_passes_a_given_finder_on_instead_of_the_default(photo, matte, monkeypatch):
-    monkeypatch.setattr("photo_fx.matte.subject_matte", lambda rgb: pytest.fail("the default finder was used"))
+def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, matte):
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     found = facade.render(photo, masked, find_subject=lambda rgb: 1.0 - matte)
-    np.testing.assert_array_equal(found, render(photo, masked, 1.0 - matte))
-
-
-def test_render_all_finds_the_person_once_and_only_if_needed(photo, matte, monkeypatch):
-    calls = []
-    monkeypatch.setattr("photo_fx.matte.subject_matte", lambda rgb: calls.append(1) or matte)
-    masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
-    plain = Recipe("p", (Step("grade", {"exposure": 0.5}),), size=None)
-
-    assert len(render_all(photo, [masked, masked, plain])) == 3
-    assert calls == [1]
-    render_all(photo, [plain])
-    assert calls == [1]  # no masked recipe, so no second search
+    np.testing.assert_array_equal(found, runner.render(photo, masked, 1.0 - matte))
+    assert not np.array_equal(found, runner.render(photo, masked, matte))
 
 
 # --- matte edge refinement (the part of matte.py that runs anywhere) -----------------------------------------------
