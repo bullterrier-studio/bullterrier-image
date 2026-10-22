@@ -7,13 +7,16 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 
 A **microkernel**: a small stable `core` (contracts, registry, recipe engine) and many **plugins** (effects) that register themselves and are found by
 **auto-discovery**. The engine is a **pipes-and-filters pipeline**: a recipe is an ordered list of steps, each step is a pure filter `image -> image`.
-Code is organised as **vertical slices**, one per effect. Today an effect is a module in `src/photo_fx/effects/`, its test in `tests/effects/` and its example
-recipe in `examples/effects/`; F1b moves each effect's files into one folder. Shared numeric code lives in `ops/`, named by concept.
+Code is organised as **vertical slices**, one per effect, held together by its name and a `tests/` tree that mirrors `src/`: its code is the package
+`src/photo_fx/effects/<name>/` (`effect.py`, `__init__.py`; code only), its tests `tests/effects/<name>/test_<name>.py`, its example recipe
+`examples/effects/<name>.toml` and its gallery picture `docs/gallery/<name>.jpg` (artifacts stay out of `src/`); `gallery.effect_files(name)` is the one
+place that knows these paths. TRANSITIONAL: effects not migrated yet are loose modules, tested in `tests/effects/test_<module>.py`. Shared numeric code lives
+in `ops/`, named by concept.
 
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
 adapters   imageio (files), matte (finding the subject)               (may import core, ops)
-effects    one module (after F1b: one folder) per effect family       (may import core, ops; never other effects)
+effects    one package per effect                                      (may import core, ops; never other effects)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
 ops        pure numeric primitives                                    (imports nothing from photo_fx)
 ```
@@ -27,7 +30,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before.
 2. **Presets are data, not code**: a preset is a recipe fragment (TOML), so it never needs to import effects.
 3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects.md`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
-4. **Open/closed:** adding an effect creates new files only (today three: the module, its test, its example recipe; after F1b one folder) and modifies no existing file. If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects.md`, stop: something is wrong.
+4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects.md`, stop: something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
@@ -61,15 +64,17 @@ older keyword-argument style through a marked legacy path in the registry; F1b m
 
 ## Adding an effect (the recipe)
 
-The reference is `src/photo_fx/effects/color.py` (until F1b introduces the folder layout and `photo-fx new-effect`). An effect is three new files:
-1. `src/photo_fx/effects/<name>.py`: copy one effect from `color.py`, i.e. its `EffectParams` model (every value that shapes the result is a `param` field,
-   library options included) and its function `(rgb, params) -> rgb` registered with `@effect(category=..., params=...)`, whose docstring's first sentence is
-   its summary.
-2. `tests/effects/test_<name>.py`: properties of the behaviour (the contract tests already cover ranges, schema and call styles for every effect).
-3. `examples/effects/<name>.toml`: a short recipe showing it (`name = "<name>"`, `size = 480`, 1 to 3 steps).
-
-`uv run photo-fx regenerate` is run by the integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`. Gate: `uv run poe check`; nothing but the
-three new files should appear in `git status`.
+What a new effect looks like is defined once, by the template in `src/photo_fx/effects/_template/` (the colour effects, `effects/grade/`,
+`effects/clarity/`... are worked examples of it). Three steps:
+1. **Scaffold:** `uv run photo-fx new-effect <name> --category <category>` writes `src/photo_fx/effects/<name>/__init__.py` and `effect.py` (the
+   `EffectParams` model with one documented example field and the registered function), `tests/effects/<name>/test_<name>.py` and
+   `examples/effects/<name>.toml`. It works and passes the gate as written.
+2. **Fill in:** in `effect.py` replace the example field with the effect's own (every value that shapes the result is a `param` field, library options
+   included) and the function body with the effect, whose docstring's first sentence is its summary; in the test file the properties of the behaviour (the
+   contract tests already cover ranges, schema and call styles for every effect); in the example recipe a short recipe showing it (`size = 480`, 1 to 3
+   steps). Then `uv run photo-fx gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`.
+3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run photo-fx regenerate` is run by the
+   integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`.
 
 ## Lint and types
 
@@ -133,6 +138,9 @@ The target above is being introduced in small steps; until a step lands, the old
 - [x] recipe engine split into `timing`, `steps`, `loader`, `runner` (CT1)
 - [x] M1: `core/` package (registry, types, vocabulary, steps, timing, loader, runner; the Params base follows in F1a); runner takes photo and subject by injection; `effects/_common.py` moved into `ops/color`, with `ops/resample` (from `imageio`) and `ops/textart` (from `ascii`); import-linter contracts
 - [x] F1a: Pydantic params model pattern in `core/params.py` (`EffectParams`, `param`, `Color`); Step/Recipe/Animated/Animation as Pydantic models; `color.py` migrated
-- [ ] F1b: creates the folder-per-effect layout (each effect a folder with params, tests and example); migrates `ascii`, `texture`, `glitch`, `evaporate`, `disperse` to parameter models and deletes the TRANSITIONAL legacy path
+- [x] F1b-0: one package per effect, found by discovery (and, TRANSITIONAL, loose modules); tests in `tests/effects/<name>/`, recipes and pictures by name
+  (`gallery.effect_files`); the colour effects as six packages; `photo-fx new-effect` from `effects/_template/`; the rule-4 tests
+- [ ] F1b: migrates `ascii`, `texture`, `glitch`, `evaporate`, `disperse` to packages with parameter models, and deletes the TRANSITIONAL legacy path and
+  loose-module discovery
 - [x] T1b: lint rules, mypy and fixes (ruff rule set and mypy in `pyproject.toml`, run by `poe check` and the pre-push hook)
-- [ ] `photo-fx new-effect`, CI workflow (macOS and Linux)
+- [ ] CI workflow (macOS and Linux)

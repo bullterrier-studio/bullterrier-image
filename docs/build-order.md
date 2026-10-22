@@ -8,18 +8,20 @@ every new effect would collide, (1) settle the shared contract and build the sha
 
 ## 0. Make adding an effect conflict-free
 
-**Status: implemented.** Adding an effect now means adding exactly three files and editing no shared file:
-`src/photo_fx/effects/<module>.py` (the effect), `tests/effects/test_<module>.py` (its tests) and
-`examples/effects/<effect>.toml` (its example recipe). Each row was something every new effect had to touch.
+**Status: implemented.** Adding an effect now means adding new files named for it and editing no shared file:
+`src/photo_fx/effects/<effect>/` (its package: `effect.py` and `__init__.py`), `tests/effects/<effect>/test_<effect>.py`
+(its tests; `tests/` mirrors `src/`), `examples/effects/<effect>.toml` (its example recipe) and later
+`docs/gallery/<effect>.jpg` (its picture). `uv run photo-fx new-effect <effect> --category <category>` writes the first
+three from the template in `src/photo_fx/effects/_template/`. Each row was something every new effect had to touch.
 
 | Was | Problem | Now |
 | --- | --- | --- |
-| `effects/__init__.py` listed every module | Everyone edits the same line. | Every module in the package whose name does not start with `_` is imported automatically, in sorted order. |
+| `effects/__init__.py` listed every module | Everyone edits the same line. | Every effect package (folder) in `effects/` whose name does not start with `_` is imported automatically, in sorted order (and, until the last ones are migrated, every loose module); a folder that does not register exactly one effect named like it fails the import. |
 | The registry stored `_EFFECTS[name] = fn` | Two effects with the same name silently replace each other. | A second, different function under an existing name raises `ValueError` naming both modules (a module reload is allowed). |
 | `fx.pyi` was committed and a test failed if it was stale | Every branch changes it; every merge conflicts. | Still committed, but regenerated only at integration; the test checks that the generator's output is valid Python with one function per effect. |
 | The README effect table was test-enforced | Every effect edits the README. | `docs/effects.md`, generated from the effects, one table per category with picture, summary, parameters and example recipe; the README links to it. |
-| `tests/test_effects.py` held the per-effect tests | One shared file. | One test file per module, `tests/effects/test_<module>.py`; the generic contract tests are in `tests/effects/test_contract.py` and apply to every effect automatically. |
-| Example pictures regenerated whenever any code changed | Binary merge conflicts. | One gallery picture per effect, `docs/gallery/<effect>.jpg`, rendered from its example recipe; only missing pictures are rendered unless forced. |
+| `tests/test_effects.py` held the per-effect tests | One shared file. | One test file per effect, `tests/effects/<effect>/test_<effect>.py`; the generic contract tests are in `tests/effects/test_contract.py` and apply to every effect automatically. |
+| Example pictures regenerated whenever any code changed | Binary merge conflicts. | One gallery picture per effect, `docs/gallery/<effect>.jpg`, rendered from its example recipe; only missing pictures are rendered unless forced. `gallery.effect_files(name)` is the one place that says where an effect's files are. |
 | An effect declared nothing about itself | Docs, gallery and checks cannot be generated. | `@effect(category="...")`, one of the categories in `effects.CATEGORIES`; every parameter must have a default; the example recipe is found by name. All checked when the effect registers, or by a test. |
 | Parameter names were free-form | Independent authors drift: `strength`, `amount`, `intensity`. | `effects/_vocabulary.py` (now `core/vocabulary.py`) lists discouraged names and the name to use instead (`strength` -> `amount`, `rng` -> `seed`, ...); a contract test flags them. `glow(strength=)` became `glow(amount=)`. |
 
@@ -65,7 +67,8 @@ Deliberately not here: blur and convolution. `scipy.ndimage` already is that mod
 
 ## 3. Independent streams
 
-One module per stream, owned by one worker. Within a stream, build primitives first and presets last.
+One set of effects per stream, owned by one worker; each effect is its own package, tests, recipe and picture, so streams
+share no file. Within a stream, build primitives first and presets last.
 
 | Stream | Effects | Can start |
 | --- | --- | --- |
@@ -93,8 +96,9 @@ it is what stops 150 independent efforts from diverging.
 
 An effect is done when:
 
-- it lives in its stream's module, with its metadata (category, example);
-- `tests/effects/test_<module>.py` tests its defining property (for example, `pixel_sort` keeps every column's set of pixels; `mirror` is symmetric), not a golden image;
+- it was started with `photo-fx new-effect` and lives in its own package, `src/photo_fx/effects/<effect>/`, with its
+  metadata (category, example);
+- `tests/effects/<effect>/test_<effect>.py` tests its defining property (for example, `pixel_sort` keeps every column's set of pixels; `mirror` is symmetric), not a golden image;
 - its example recipe renders, and its gallery image is generated;
 - the generic contract tests pass (shape, range, determinism, does not modify its input);
 - no shared file was edited.

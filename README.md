@@ -210,26 +210,9 @@ recipes can be handed straight to the pipeline: `run(Project(photos=(...), recip
 Every effect declares its parameters once, as a frozen Pydantic model in which each field has a description, a unit, a
 range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `photo-fx effects` and
 [docs/effects.md](docs/effects.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
-field, the limit and the value. Writing an effect follows the same pattern ([`effects/color.py`](src/photo_fx/effects/color.py)
-is the worked example):
-
-```python
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
-
-
-class GlowParams(EffectParams):
-    """Bloom around the bright parts of the picture."""
-
-    radius: float = param(24.0, unit="px", min=0, max=500, doc="Gaussian sigma of the halo. Larger = wider, softer.")
-    amount: float = param(0.6, unit="ratio", min=0, max=2, doc="How strongly the halo is screened over the picture.")
-
-
-@effect(category="light", params=GlowParams)
-def glow(rgb, params: GlowParams):
-    """Make the bright parts bloom."""
-    ...  # use params.radius and params.amount; return a new image of the same shape
-```
+field, the limit and the value. Writing an effect follows the same pattern: `uv run photo-fx new-effect <name>
+--category <category>` starts one from the template, and [`effects/grade/effect.py`](src/photo_fx/effects/grade/effect.py)
+is a worked example.
 
 ## Seeing what each step does
 
@@ -287,14 +270,16 @@ particles, grouped by category. **[The effect catalogue](docs/effects.md)** show
 one-line description, its parameters and defaults, and the example recipe that made the picture.
 `uv run photo-fx effects` prints the full documentation of every parameter.
 
-Adding an effect adds three files and edits none:
+Adding an effect adds files named for it and edits none. `uv run photo-fx new-effect my_effect --category light` writes
+them from the template, working as written:
 
-- `src/photo_fx/effects/<module>.py`: a pure function `def my_effect(rgb, ...) -> rgb` with the decorator
-  `@effect(category="...")` (from `photo_fx.core.registry`), every parameter with a default. Its docstring becomes its
-  documentation. Any module in [`src/photo_fx/effects/`](src/photo_fx/effects) is found automatically. Effects never
+- `src/photo_fx/effects/my_effect/effect.py` (and `__init__.py`): its parameter model and a pure function
+  `def my_effect(rgb, params) -> rgb` with the decorator `@effect(category="...", params=...)`. Its docstring becomes its
+  documentation. Every package in [`src/photo_fx/effects/`](src/photo_fx/effects) is found automatically. Effects never
   import each other: what two of them share goes to `src/photo_fx/ops/`.
-- `tests/effects/test_<module>.py`: tests of the property that defines it.
-- `examples/effects/<effect>.toml`: a short example recipe (size 480), which also makes its picture in the catalogue.
+- `tests/effects/my_effect/test_my_effect.py`: tests of the property that defines it.
+- `examples/effects/my_effect.toml`: a short example recipe (size 480), which makes its picture in the catalogue,
+  `docs/gallery/my_effect.jpg` (`uv run photo-fx gallery --only my_effect`).
 
 The shared tests then check automatically that it keeps the image's shape and range, is deterministic, does not modify
 its input, has a category, a docstring, defaults and an example recipe, and uses the shared parameter names (`amount`,
@@ -317,24 +302,25 @@ never block an export, and `--strict` turns them into a failing exit code:
 src/photo_fx/                  layers, top to bottom; each imports only from the layers below it
   cli.py         app       the `photo-fx` command (no logic of its own)
   pipeline.py              many photos x many recipes: cache, checks, export, report
-  gallery.py               what is generated from the effects: the catalogue page, its pictures, fx.pyi
+  gallery.py               what is generated from the effects (catalogue page, pictures, fx.pyi); new-effect
   sheet.py                 contact sheets and step sheets
   checks.py                automatic quality checks
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
   imageio.py     adapters  file formats, EXIF and colour profiles, video; defines the one in-memory image type
   matte.py                 subject_matte(rgb) -> alpha. Which model finds the subject is hidden here
-  effects/       effects   the effect library: pure functions (rgb, **params) -> rgb, found automatically
+  effects/       effects   the effect library, one package per effect (code only), found automatically;
+                           _template/ is what `photo-fx new-effect` copies
   core/          core      registry.py (effects register here), types.py, vocabulary.py, and the recipe engine:
                            timing.py (easing, `ramp`, `Animation`), steps.py (`Step`, `Recipe`), loader.py (TOML),
                            runner.py (render, render_frames, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: colorspace, color, resample, textart, glyphs,
                            cells, distance, warp, voronoi... (core may import ops; ops imports nothing above it)
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
-  effects/       one short example recipe per effect
-docs/            the effect catalogue (effects.md, generated) and its pictures, the roadmap and build order
+  effects/       one short example recipe per effect, <effect>.toml
+docs/            the effect catalogue (effects.md, generated) and its pictures (gallery/<effect>.jpg), roadmap, build order
 recipes/         a larger set of experiments
-tests/
+tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
 ```
 
 Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
@@ -348,6 +334,7 @@ uv sync
 uv run poe setup       # once per clone: installs the git hooks and the commit-message template
 uv run poe check       # before every push or merge: format check, lint (ruff), types (mypy), the test suite
 uv run poe fix         # applies the automatic lint and format fixes
+uv run photo-fx new-effect my_effect --category light   # a new effect's files, from the template
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
 uv run photo-fx regenerate   # at integration: fx.pyi, docs/effects.md, missing pictures
 ```
@@ -355,8 +342,8 @@ uv run photo-fx regenerate   # at integration: fx.pyi, docs/effects.md, missing 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): imperative subject`, header at
 most 72 characters, body explaining why); a `commit-msg` hook checks it. The details are in [CLAUDE.md](CLAUDE.md#git-conventions).
 
-Generated files (`src/photo_fx/fx.pyi`, `docs/effects.md`, `docs/gallery/`) are not updated on feature branches, so
-branches that add effects never conflict over them. After merging, `photo-fx regenerate` brings them up to date in one
+Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects.md`) are not updated on feature branches, so branches that
+add effects never conflict over them; each effect's picture is a file of its own. After merging, `photo-fx regenerate` brings them up to date in one
 commit. Pictures that exist are kept (`photo-fx gallery --force` renders them again).
 
 Lint rules (ruff) and the type check (mypy) are configured in `pyproject.toml`; `uv run mypy` runs the type check alone,
