@@ -88,6 +88,7 @@ Tests must follow the testing-best-practices skill, no exceptions. A test that i
 - Behaviour through the public contract; **property tests, not golden images** (a golden written by the same author as the code proves nothing and churns binary diffs). Examples of properties: `pixel_sort` keeps every column's set of pixels; `mirror` is symmetric; a blur never leaves the input's range.
 - Expected values come from an independent oracle (a standard, a hand computation, a brute-force reference), never from the code's own formula.
 - Every checker/validator gets a known-good and a known-bad input. Determinism pinned by seeds. No sleeps, no live network, no wall-clock assertions.
+- Tests run in a random order (pytest-randomly; the seed is printed, rerun with `-p randomly --randomly-seed=N`, turn off with `-p no:randomly`), so no test may depend on another.
 - **Mutation-check your own tests**: break the code on purpose (a sign, a boundary, an ignored argument) and make sure a test fails. Surviving mutants on core behaviour are review findings.
 - Refactors prove behaviour is preserved by comparing outputs before and after (byte-identical), recorded in the report, not committed.
 
