@@ -5,6 +5,7 @@ handler counts the requests it answers. Expected digests are computed here with 
 
 import hashlib
 import os
+import re
 import socket
 import stat
 import sys
@@ -32,6 +33,7 @@ class Server:
     url: str
     body: bytes = PAYLOAD
     announce: int | None = None  # Content-Length to claim; more than len(body) cuts the transfer short
+    redirects: dict[str, str] = field(default_factory=dict)  # request path -> where it redirects to
     requests: list[str] = field(default_factory=list)
 
 
@@ -42,6 +44,12 @@ def server() -> Iterator[Server]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             state.requests.append(self.path)
+            if self.path in state.redirects:
+                self.send_response(302)
+                self.send_header("Location", state.redirects[self.path])
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             self.send_response(200)
             self.send_header("Content-Length", str(state.announce or len(state.body)))
             self.end_headers()
@@ -128,6 +136,44 @@ def test_offline_explains_how_to_download_by_hand(tmp_path):
     assert url in message
     assert str(target) in message  # where to save a copy downloaded by hand
     assert files_in(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # .invalid never resolves (RFC 2606), so not even a refused check could reach a real host
+        "http://models.example.invalid/model.onnx",  # plain http to another computer: no TLS
+        "ftp://models.example.invalid/model.onnx",
+        "data:application/octet-stream;base64,AAAA",
+    ],
+)
+def test_a_url_to_another_computer_must_be_secure(tmp_path, url):
+    with pytest.raises(DownloadError, match="only https") as caught:
+        fetch(url, sha256(PAYLOAD), tmp_path / "model.onnx")
+    assert url.split(":")[0] in str(caught.value)  # names the scheme it refused
+    assert files_in(tmp_path) == []
+
+
+@pytest.mark.parametrize("host", ["localhost", "[::1]"])
+def test_plain_http_to_this_computer_is_allowed(tmp_path, host):
+    """Loopback names other than 127.0.0.1 pass the check; nothing listens there, so the download itself fails."""
+    with pytest.raises(DownloadError) as caught:
+        fetch(f"http://{host}:9/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx")
+    assert "only https" not in str(caught.value)
+
+
+def test_a_redirect_away_from_https_is_refused(server, tmp_path):
+    server.redirects["/model.onnx"] = "http://example.invalid/model.onnx"
+    with pytest.raises(DownloadError, match=re.escape("redirected to http://example.invalid")):
+        fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+    assert files_in(tmp_path) == []
+
+
+def test_a_redirect_that_stays_on_this_computer_is_followed(server, tmp_path):
+    server.redirects["/model.onnx"] = "/moved/model.onnx"
+    target = fetch(server.url, sha256(PAYLOAD), tmp_path / "model.onnx")
+    assert target.read_bytes() == PAYLOAD
+    assert server.requests == ["/model.onnx", "/moved/model.onnx"]
 
 
 def test_a_file_url_is_fetched_like_any_other(tmp_path):

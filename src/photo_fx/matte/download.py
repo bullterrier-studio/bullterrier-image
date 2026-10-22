@@ -3,7 +3,8 @@
 `fetch(url, sha256, target)` promises that it returns only a file whose SHA-256 is the one asked for, and that it
 never leaves a partial or unverified file at `target` (or beside it), whatever goes wrong: a dropped connection, a
 full disk, a server sending something else. A file already at `target` with the right digest is used without touching
-the network. Nothing here runs at import time.
+the network. It talks to other computers over https only, redirects included; plain http and `file://` are for this
+computer (tests, a local mirror). Nothing here runs at import time.
 
 `user_cache_dir()` is where such files belong on each platform.
 """
@@ -13,13 +14,17 @@ import http.client
 import os
 import sys
 import tempfile
+import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
+from typing import IO
 
 APP = "photo-fx"
 _CHUNK = 1 << 20  # bytes read at a time: memory use only, the result does not depend on it
 _TIMEOUT = 60.0  # seconds a stalled connection may stay silent before the download fails
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}  # this computer: the IPv4 and IPv6 loopback addresses and their name
 _NEW_FILE = 0o666  # the permissions a new file asks for before the umask (POSIX open())
 
 # (path, size, modification time, digest) of files already verified in this process: a 180 MB model is hashed once,
@@ -34,22 +39,27 @@ class DownloadError(RuntimeError):
 def fetch(url: str, sha256: str, target: Path) -> Path:
     """Return `target`, downloading it from `url` first unless it is already there with SHA-256 `sha256`.
 
-    url: where the file is (`https://`, `http://` or `file://`). sha256: its expected SHA-256, lowercase hex.
+    url: where the file is: `https://`, or `http://` to this computer (127.0.0.1, ::1, localhost), or `file://`.
+    A redirect may lead only to https or to http on this computer. sha256: its expected SHA-256, lowercase hex.
     target: where it is kept; missing folders are created. A file at `target` with another digest (an earlier broken
     copy) is replaced. Raises DownloadError, naming `url` and `target` so the file can be fetched by hand, when the
-    download fails or what arrived has another digest; `target` is then left as it was and no temporary file remains.
+    download fails, the URL or a redirect is not allowed, or what arrived has another digest; `target` is then left as
+    it was and no temporary file remains.
     """
     target = Path(target)
     if _is_verified(target, sha256):
         return target
-    target.parent.mkdir(parents=True, exist_ok=True)
     by_hand = f"download {url} by hand and save it as {target}"
+    scheme = urllib.parse.urlsplit(url).scheme
+    if scheme != "file" and not _secure_or_local(url):
+        raise DownloadError(f"only https downloads are allowed from other computers, not {scheme}: {url}; {by_hand}")
+    target.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".part", dir=target.parent)
     try:
         digest = hashlib.sha256()
         with os.fdopen(descriptor, "wb") as out:  # closed before the rename below, which Windows requires
             try:
-                with urllib.request.urlopen(url, timeout=_TIMEOUT) as response:
+                with urllib.request.build_opener(_SecureRedirects).open(url, timeout=_TIMEOUT) as response:
                     expected_size = response.headers.get("Content-Length")
                     received = 0
                     while chunk := response.read(_CHUNK):
@@ -95,6 +105,29 @@ def user_cache_dir(
         local = environ.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
         return Path(local) / APP / "Cache"
     return Path(environ.get("XDG_CACHE_HOME") or home / ".cache") / APP
+
+
+def _secure_or_local(url: str) -> bool:
+    """https anywhere, or http to this computer."""
+    parts = urllib.parse.urlsplit(url)
+    return parts.scheme == "https" or (parts.scheme == "http" and parts.hostname in _LOOPBACK)
+
+
+class _SecureRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to https, or to http on this computer: never down to plain http across the network."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: http.client.HTTPMessage,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        if not _secure_or_local(newurl):
+            raise urllib.error.URLError(f"redirected to {newurl}, which is not https")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _is_verified(path: Path, sha256: str) -> bool:
