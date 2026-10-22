@@ -5,6 +5,7 @@ conftest), whose answer follows from the documented model contract, so the expec
 Apple Vision runs for real where it exists (macOS). Expected values for `refine_edge` are worked out by hand: erosion
 by a disc on axis-aligned shapes, and the normal distribution for a blurred straight edge."""
 
+import hashlib
 import math
 import sys
 from pathlib import Path
@@ -160,11 +161,28 @@ def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatc
     assert onnx_model_path() == tmp_path / "mine.onnx"
 
 
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(1 << 20):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+# the published SHA-256 of the IS-Net general-use ONNX file: the model this test is about
+ISNET_SHA256 = "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a"
+
+
 def test_the_real_model_finds_the_dog(monkeypatch):
-    """The pinned model itself, when it has been downloaded before (tests never download it)."""
+    """The pinned model itself, when it has been downloaded before. The test never downloads: it uses the cached file
+    only if it is the right one, and through `PHOTO_FX_MODEL`, which is never fetched."""
     monkeypatch.delenv("PHOTO_FX_MODEL")
-    if not onnx_model_path().exists():
-        pytest.skip(f"the portable model is not in the cache ({onnx_model_path()}); `photo-fx cutout` downloads it")
+    cached = onnx_model_path()
+    if not cached.is_file():
+        pytest.skip(f"the portable model is not in the cache ({cached}); `photo-fx cutout` downloads it")
+    if sha256_of(cached) != ISNET_SHA256:
+        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(cached))
     photo = imageio.resize(imageio.load(EXAMPLE_PHOTO), 320)
     alpha = subject_matte(photo, segmenter="onnx")
     height, width = alpha.shape
