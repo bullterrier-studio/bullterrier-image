@@ -8,6 +8,7 @@ output size. (`worley` sizes its cells relative to the canvas and so does not pr
 """
 
 import math
+import operator
 from typing import Literal
 
 import numpy as np
@@ -28,6 +29,26 @@ _GRADIENT_Y = np.sin(_ANGLES).astype(np.float32)
 # Largest possible value of 2-D gradient noise built from unit gradients: sqrt(2) / 2. Dividing by this fixed bound
 # (not by the data's own extremes) keeps a field independent of how much of it is visible.
 _GRADIENT_BOUND = 0.5 * np.sqrt(2.0)
+
+
+def _check_shape(shape: tuple[int, int]) -> tuple[int, int]:
+    try:
+        height, width = (operator.index(n) for n in shape)
+    except (TypeError, ValueError):
+        raise ValueError(f"shape must be (height, width), two integers; got {shape!r}") from None
+    if height < 1 or width < 1:
+        raise ValueError(f"shape must have a positive height and width; got {shape!r}")
+    return height, width
+
+
+def _check_positive(name: str, value: float) -> None:
+    if not (math.isfinite(value) and value > 0):
+        raise ValueError(f"{name} must be a positive, finite number; got {value!r}")
+
+
+def _check_choice(name: str, value: str, allowed: tuple[str, ...]) -> None:
+    if value not in allowed:
+        raise ValueError(f"{name} must be one of {', '.join(allowed)}; got {value!r}")
 
 
 def _mix(z: np.ndarray) -> np.ndarray:
@@ -112,20 +133,27 @@ def fractal_noise(
 
     Args:
         shape: `(height, width)` of the result in pixels, both positive.
-        scale: size in pixels of the largest feature (the lattice spacing of the first octave), a positive number.
-        seed: any integer; each seed gives an unrelated field.
+        scale: size in pixels of the largest feature (the lattice spacing of the first octave), positive and finite.
+            Below 1 it acts as 1.
+        seed: any integer (taken modulo 2**64); each seed gives an unrelated field.
         octaves: number of layers, at least 1. Each extra octave has features half the size of the previous one
             and `persistence` times its weight. Octaves whose features would be under one pixel are left out
             (they only add aliasing), so very fine scales may use fewer octaves than asked.
-        persistence: weight of each octave relative to the previous one, positive; below 1 the fine detail is
-            fainter than the coarse shape.
+        persistence: weight of each octave relative to the previous one, positive and finite; below 1 the fine
+            detail is fainter than the coarse shape.
         kind: "gradient" for Perlin-style noise (zero-mean ripples, no visible grid), "value" for interpolated
             random lattice values (blobbier, with plateaus).
 
     Returns:
         float32 array of `shape` with values in [0, 1].
     """
-    height, width = shape
+    height, width = _check_shape(shape)
+    _check_positive("scale", scale)
+    _check_positive("persistence", persistence)
+    _check_choice("kind", kind, ("gradient", "value"))
+    if octaves < 1:
+        raise ValueError(f"octaves must be at least 1; got {octaves!r}")
+
     total = np.zeros((height, width), dtype=np.float32)
     weight_sum = 0.0
     for octave in range(octaves):
@@ -133,7 +161,9 @@ def fractal_noise(
         if octave > 0 and spacing < 1.0:
             break
         weight = persistence**octave
-        total += np.float32(weight) * _octave(shape, spacing, seed, octave, kind)
+        # A lattice finer than the pixel grid is just white noise, and a table of it would be bigger than the image:
+        # so the first octave's features are never smaller than one pixel either.
+        total += np.float32(weight) * _octave((height, width), max(spacing, 1.0), seed, octave, kind)
         weight_sum += weight
 
     if kind == "gradient":
@@ -158,9 +188,10 @@ def worley(
 
     Args:
         shape: `(height, width)` of the result in pixels, both positive.
-        cells: approximate number of cells across the longer side, a positive number (below 1 means a cell larger
-            than the canvas). The canvas holds about `cells` squared feature points when it is square.
-        seed: any integer; each seed gives a different scatter of points.
+        cells: approximate number of cells across the longer side, positive and finite (below 1 means a cell larger
+            than the canvas; more than the longer side in pixels acts as one cell per pixel). A square canvas holds
+            about `cells` squared feature points.
+        seed: any integer (taken modulo 2**64); each seed gives a different scatter of points.
         metric: "f1" is the distance to the nearest feature point: 0 at every point, brightening away from it
             (cells look like round blobs). "f2-f1" is the distance to the second nearest minus that to the nearest:
             0 along the borders between cells, bright at their centres (cells look like tiles with dark seams).
@@ -169,8 +200,11 @@ def worley(
         float32 array of `shape` with values in [0, 1]. Distances are measured in cell widths, so 1.0 is one cell
         and the few larger values (about 1 pixel in 1000) are clipped. The scale does not depend on the data.
     """
-    height, width = shape
-    cell = max(height, width) / cells
+    height, width = _check_shape(shape)
+    _check_positive("cells", cells)
+    _check_choice("metric", metric, ("f1", "f2-f1"))
+    # More cells than pixels would only build a table far bigger than the image; a cell is never under one pixel.
+    cell = max(1.0, max(height, width) / cells)
     rows, columns = math.ceil(height / cell), math.ceil(width / cell)
 
     # One point per grid cell, for a ring of two extra cells around the canvas so that points just outside it

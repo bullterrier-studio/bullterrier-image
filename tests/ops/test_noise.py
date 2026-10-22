@@ -1,6 +1,7 @@
 """Properties of the seeded noise fields: determinism, range, crop consistency, feature size, no lattice artefacts."""
 
 import time
+import warnings
 
 import numpy as np
 import pytest
@@ -242,3 +243,96 @@ class TestWorleyCells:
         gap = worley((128, 128), 6, 3, metric="f2-f1")
         assert gap.min() >= 0.0
         assert not np.allclose(f1, gap)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# invalid input and edge cases
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+class TestInvalidArguments:
+    @pytest.mark.parametrize("scale", [0, -1, -0.5, float("nan"), float("inf")])
+    def test_fractal_noise_rejects_a_scale_that_is_not_positive_and_finite(self, scale):
+        with pytest.raises(ValueError, match="scale"):
+            fractal_noise((8, 8), scale, 1)
+
+    @pytest.mark.parametrize("octaves", [0, -1])
+    def test_fractal_noise_rejects_fewer_than_one_octave(self, octaves):
+        with pytest.raises(ValueError, match="octaves"):
+            fractal_noise((8, 8), 4, 1, octaves=octaves)
+
+    @pytest.mark.parametrize("persistence", [0, -0.5, float("nan")])
+    def test_fractal_noise_rejects_a_persistence_that_is_not_positive(self, persistence):
+        with pytest.raises(ValueError, match="persistence"):
+            fractal_noise((8, 8), 4, 1, octaves=2, persistence=persistence)
+
+    def test_fractal_noise_rejects_an_unknown_kind(self):
+        with pytest.raises(ValueError, match="kind"):
+            fractal_noise((8, 8), 4, 1, kind="simplex")  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("cells", [0, -3, float("nan"), float("inf")])
+    def test_worley_rejects_cells_that_are_not_positive_and_finite(self, cells):
+        with pytest.raises(ValueError, match="cells"):
+            worley((8, 8), cells, 1)
+
+    def test_worley_rejects_an_unknown_metric(self):
+        with pytest.raises(ValueError, match="metric"):
+            worley((8, 8), 2, 1, metric="f3")  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("shape", [(0, 5), (5, 0), (-3, 5), (5,), (4, 4, 3), (2.5, 4)])
+    def test_both_reject_a_shape_that_is_not_two_positive_integers(self, shape):
+        with pytest.raises(ValueError, match="shape"):
+            fractal_noise(shape, 4, 1)
+        with pytest.raises(ValueError, match="shape"):
+            worley(shape, 2, 1)
+
+    def test_valid_arguments_are_not_rejected(self):
+        # The known-good side of every check above, with numpy integers for the shape.
+        assert fractal_noise((np.int64(8), np.int32(9)), 4, 1, octaves=2, persistence=2.0, kind="value").shape == (8, 9)
+        assert worley((8, 9), 0.5, 1, metric="f2-f1").shape == (8, 9)
+
+
+class TestEdgeCases:
+    def test_any_integer_seed_works_without_overflow_warnings_and_gives_distinct_fields(self):
+        seeds = [0, 1, -1, 2**31, 2**63, 2**64 - 2]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            fields = [fractal_noise((32, 32), 8, seed, octaves=2) for seed in seeds]
+            cells = [worley((32, 32), 4, seed) for seed in seeds]
+        for group in (fields, cells):
+            for i in range(len(seeds)):
+                for j in range(i):
+                    assert not np.array_equal(group[i], group[j])
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize("scale", [1e-9, 0.3, 1e9])
+    def test_scales_outside_the_useful_range_still_give_a_valid_field(self, kind, scale):
+        # Features smaller than a pixel behave as one pixel features; a feature far larger than the canvas is flat-ish.
+        field = fractal_noise((24, 40), scale, 2, octaves=3, kind=kind)
+        assert field.shape == (24, 40)
+        assert field.dtype == np.float32
+        assert 0.0 <= field.min() and field.max() <= 1.0
+
+    @pytest.mark.parametrize("persistence", [0.01, 1.0, 5.0])
+    def test_persistence_beyond_the_usual_range_stays_in_0_1(self, persistence):
+        field = fractal_noise((64, 64), 16, 2, octaves=4, persistence=persistence)
+        assert 0.0 <= field.min() and field.max() <= 1.0
+
+    def test_many_octaves_are_cheap_and_in_range(self):
+        start = time.perf_counter()
+        field = fractal_noise((200, 200), 64, 2, octaves=1000)
+        assert time.perf_counter() - start < 1.0
+        assert 0.0 <= field.min() and field.max() <= 1.0
+
+    @pytest.mark.parametrize("shape", [(1, 1), (1, 50), (50, 1)])
+    def test_single_row_column_or_pixel_canvases(self, shape):
+        for field in (fractal_noise(shape, 8, 3, octaves=2), worley(shape, 3, 3), worley(shape, 3, 3, metric="f2-f1")):
+            assert field.shape == shape
+            assert 0.0 <= field.min() and field.max() <= 1.0
+
+    @pytest.mark.parametrize("cells", [0.2, 1e7])
+    def test_worley_with_one_giant_cell_or_more_cells_than_pixels(self, cells):
+        for metric in METRICS:
+            field = worley((30, 50), cells, 4, metric=metric)
+            assert field.shape == (30, 50)
+            assert 0.0 <= field.min() and field.max() <= 1.0
