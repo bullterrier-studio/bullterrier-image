@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from photo_fx import imageio, pipeline
+from photo_fx import imageio
 from photo_fx.cli import main
 from photo_fx.pipeline import init_project, load_project, run
 
@@ -45,27 +45,40 @@ def test_run_exports_every_photo_with_every_recipe_and_writes_the_manifest_and_r
     assert "a.png" in page and "grainy" in page and "4 done" in page
 
 
-def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder, monkeypatch):
+SENTINEL = b"left alone"
+
+
+def mark_outputs(folder) -> None:
+    """Overwrite every exported file with a sentinel: a file that still holds it afterwards was not made again."""
+    for path in (folder / "out").glob("*/*.*"):
+        path.write_bytes(SENTINEL)
+
+
+def remade(folder) -> list[tuple[str, str]]:
+    """(photo, file) of every exported file that no longer holds the sentinel."""
+    return sorted((p.parent.name, p.name) for p in (folder / "out").glob("*/*.*") if p.read_bytes() != SENTINEL)
+
+
+def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     project = load_project(folder / "photo-fx.toml")
     run(project)
-    calls = []
-    real = pipeline.render
-    monkeypatch.setattr(pipeline, "render", lambda *a, **k: calls.append(1) or real(*a, **k))
-
-    assert {i.status for i in run(project)} == {"skipped"} and calls == []  # nothing changed: nothing rendered
+    mark_outputs(folder)
+    assert {i.status for i in run(project)} == {"skipped"} and remade(folder) == []  # nothing changed: nothing made
 
     (folder / "recipes" / "warm.toml").write_text(
         'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.9\n'
     )
     items = run(project)
     assert sorted((i.recipe, i.status) for i in items) == [("grainy", "skipped")] * 2 + [("warm", "done")] * 2
-    assert len(calls) == 2  # both photos with the changed recipe, and nothing else
+    assert remade(folder) == [("a", "warm.jpg"), ("a", "warm.png"), ("b", "warm.jpg"), ("b", "warm.png")]
 
+    mark_outputs(folder)
     imageio.save(imageio.load(folder / "photos" / "a.png")[:, ::-1], folder / "photos" / "a.png")
     assert sorted((i.photo, i.status) for i in run(project)) == [("a.png", "done")] * 2 + [("b.png", "skipped")] * 2
+    assert remade(folder) == [("a", "grainy.jpg"), ("a", "grainy.png"), ("a", "warm.jpg"), ("a", "warm.png")]
 
-    calls.clear()
-    assert {i.status for i in run(project, force=True)} == {"done"} and len(calls) == 4
+    mark_outputs(folder)
+    assert {i.status for i in run(project, force=True)} == {"done"} and len(remade(folder)) == 8
 
 
 def test_a_missing_output_file_is_made_again(folder):
@@ -83,7 +96,8 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
         ("b.png", "done"),
         ("broken.png", "failed"),
     ]
-    assert "broken.png" in next(i.error or "" for i in items if i.status == "failed") or True
+    failed = [i for i in items if i.status == "failed"]
+    assert len(failed) == 2 and all("broken.png" in i.error for i in failed)  # it says which file could not be read
     assert main(["run", str(folder / "photo-fx.toml")]) == 1  # a failure is reported in the exit code
     assert "failed" in (folder / "out" / "index.html").read_text()
 
@@ -231,9 +245,10 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     target = init_project(tmp_path / "new")
     assert target.name == "photo-fx.toml" and (tmp_path / "new" / "photos").is_dir()
     imageio.save(photo, tmp_path / "new" / "photos" / "one.jpg")
-    items = run(load_project(target))  # the starter recipes: glitch needs no subject; cutout-black needs Vision
-    assert {i.recipe for i in items} == {"glitch", "cutout-black"}
-    assert next(i for i in items if i.recipe == "glitch").status == "done"
+    finder = StandInFinder()  # cutout-black needs the subject; the stand-in keeps the model out of the test
+    items = run(load_project(target), find_subject=finder)
+    assert sorted((i.recipe, i.status) for i in items) == [("cutout-black", "done"), ("glitch", "done")]
+    assert len(finder.seen) == 1
     with pytest.raises(FileExistsError):
         init_project(tmp_path / "new")
 
