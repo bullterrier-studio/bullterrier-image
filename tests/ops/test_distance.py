@@ -130,30 +130,47 @@ def test_open_bottom_depends_on_the_last_row_even_when_it_differs_from_the_row_a
     assert closed_bottom[HEIGHT - 1, 35] == 1.0  # the bottom border is nearer
 
 
-@pytest.mark.parametrize(
-    ("sampling", "expected_x", "expected_y"),
-    [((1.0, 1.0), 0.951306, 0.308249), ((2.0, 1.0), 0.987129, 0.159928), ((1.0, 3.0), 0.717045, 0.697026)],
-)
-def test_smoothing_and_sampling_decide_the_direction_beside_a_lone_element(sampling, expected_x, expected_y):
-    # One element inside: after smoothing with a Gaussian of sigma 1 (radius 4, in elements) the distance is
-    # G(dy) * G(dx), with G the normalised kernel exp(-k^2 / 2) / 2.5066. At 1 down and 2 right of the element the
-    # slope per element is gx = (G(1)G(3) - G(1)G(1)) / 2, gy = (G(2)G(2) - G(0)G(2)) / 2; per px it is gx / col
-    # width and gy / row height. The normal is that, negated and made unit length. The numbers are worked out from it.
-    shape = np.zeros((15, 15), dtype=bool)
-    shape[7, 7] = True
-    field = edge_distance(shape, sampling)
-    assert field.normal_x[8, 9] == pytest.approx(expected_x, abs=1e-5)
-    assert field.normal_y[8, 9] == pytest.approx(expected_y, abs=1e-5)
+def lone_element(size: int = 15) -> np.ndarray:
+    shape = np.zeros((size, size), dtype=bool)
+    shape[size // 2, size // 2] = True
+    return shape
 
 
-def test_normals_follow_the_faintest_slope_but_are_flat_beyond_the_reach_of_smoothing():
-    shape = np.zeros((15, 15), dtype=bool)
-    shape[7, 7] = True
+# offsets (rows down, columns right) from a lone element, within the 1-element smoothing's reach
+NEIGHBOURS = [(dy, dx) for dy in (-2, -1, 0, 1, 2) for dx in (-2, -1, 0, 1, 2) if (dy, dx) != (0, 0)]
+
+
+@pytest.mark.parametrize("sampling", [(1.0, 1.0), (2.0, 1.0), (1.0, 3.0)])
+def test_beside_a_lone_element_the_normal_points_away_from_it(sampling):
+    field = edge_distance(lone_element(), sampling)
+    for dy, dx in NEIGHBOURS:
+        nx, ny = field.normal_x[7 + dy, 7 + dx], field.normal_y[7 + dy, 7 + dx]
+        assert (np.sign(nx), np.sign(ny)) == (np.sign(dx), np.sign(dy)), (dy, dx)  # out: right/left, down/up
+        if dy == 0:
+            assert (nx, ny) == pytest.approx((np.sign(dx), 0.0), abs=1e-9)  # straight along the row
+        if dx == 0:
+            assert (nx, ny) == pytest.approx((0.0, np.sign(dy)), abs=1e-9)  # straight along the column
+
+
+@pytest.mark.parametrize("sampling", [(2.0, 1.0), (1.0, 3.0), (7.0, 5.0)])
+def test_stretched_elements_tilt_the_normal_as_a_gradient_in_px_does(sampling):
+    # The normal is the negative gradient per px. Smoothing is over elements whatever their size, so stretching the
+    # elements divides the x slope by the column width and the y slope by the row height: the ratio of the normal's
+    # components changes by row height / column width. Taller elements tilt it towards x, wider ones towards y.
+    row_height, col_width = sampling
+    square, stretched = edge_distance(lone_element()), edge_distance(lone_element(), sampling)
+    for dy, dx in [(1, 2), (-2, 1), (1, -1), (-1, -2)]:
+        y, x = 7 + dy, 7 + dx
+        expected = square.normal_x[y, x] / square.normal_y[y, x] * row_height / col_width
+        assert stretched.normal_x[y, x] / stretched.normal_y[y, x] == pytest.approx(expected, rel=1e-6), (dy, dx)
+
+
+def test_far_beyond_a_shape_the_distance_is_flat_so_the_normal_points_up():
+    shape = np.zeros((20, 60), dtype=bool)
+    shape[10, 2] = True
     field = edge_distance(shape)
-    # 5 to the right the smoothed distance is still 0 but rises 5e-5 per 2 elements to the left: a real direction.
-    assert (field.normal_x[7, 12], field.normal_y[7, 12]) == pytest.approx((1.0, 0.0), abs=1e-9)
-    # 6 to the right nothing reaches: flat, so up.
-    assert (field.normal_x[7, 13], field.normal_y[7, 13]) == (0.0, -1.0)
+    # 1-element smoothing does not reach 30 elements away: no direction there, so up
+    assert np.all(field.normal_x[:, 32:] == 0.0) and np.all(field.normal_y[:, 32:] == -1.0)
 
 
 def test_a_shape_that_is_all_true_has_edges_at_its_borders_but_not_below():
