@@ -15,7 +15,10 @@ from .sheet import contact_sheet, write_stages
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="photo-fx", description="Cut out a portrait and style it with effects.")
+    parser = argparse.ArgumentParser(
+        prog="photo-fx",
+        description="Style photos with composable effects, optionally on a cut-out subject, and animate them.",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     p = commands.add_parser("render", help="render a photo through one or more recipes, one file each")

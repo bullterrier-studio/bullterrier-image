@@ -4,7 +4,21 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 dist/
+# generated animations stay out of git: a filmstrip picture of each one is saved next to it
+*.mp4
+*.mov
+*.webm
+*.gif
+
 # photos are inputs and renders are outputs: personal, large and reproducible, so they stay out of git
 inputs/*
 !inputs/README.md
 out/
+
+# the demo's results are committed (they are the README's pictures); the pipeline's bookkeeping and the
+# intermediate pictures of each step are not (the one steps sheet per recipe is)
+examples/output/.cache/
+examples/output/manifest.json
+examples/output/index.html
+examples/output/steps/*/[0-9]*.jpg
+examples/output/python-api/

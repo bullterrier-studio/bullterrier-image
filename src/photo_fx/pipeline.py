@@ -49,7 +49,7 @@ from . import imageio
 from .checks import MotionMeter, matte_warnings, still_warnings
 from .matte import subject_matte
 from .recipe import Recipe, load_recipe, render, render_frames, trace
-from .sheet import write_stages
+from .sheet import contact_sheet, write_stages
 
 _FORMATS = ("jpg", "png", "webp")
 _PROJECT_FILE = "photo-fx.toml"
@@ -349,20 +349,32 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
     return outputs
 
 
+_FILMSTRIP_FRAMES = 6  # how many frames of an animation go into its preview picture
+
+
 def _export_animation(
     project: Project, photo: _Photo, recipe: Recipe, matte, folder: Path, warnings: list[str]
 ) -> list[Path]:
+    """Render the clip to video, plus a filmstrip picture of a few of its frames, and check its motion."""
     meter = MotionMeter()
+    fps = recipe.animation.fps
+    total = len(recipe.animation.frames())
+    keep = {int(i) for i in np.linspace(0, total - 1, _FILMSTRIP_FRAMES).round()}
+    strip: list[tuple[str, np.ndarray]] = []
 
     def frames():
-        for frame in render_frames(photo.rgb(), recipe, matte):  # style
+        for number, frame in enumerate(render_frames(photo.rgb(), recipe, matte)):  # style
             meter.add(frame)  # check
+            if number in keep:
+                strip.append((f"t = {number / fps:.1f} s", frame))
             yield frame
 
     native = folder / f"{recipe.name}.mp4"
-    imageio.save_video(frames(), native, fps=recipe.animation.fps)  # export
+    imageio.save_video(frames(), native, fps=fps)  # export
     warnings += meter.warnings(project.frozen_tail)
-    outputs = [native]
+    filmstrip = folder / f"{recipe.name}.frames.png"  # a picture of the animation, for places a video cannot go
+    imageio.save(contact_sheet(strip, columns=len(strip), tile=340), filmstrip)
+    outputs = [native, filmstrip]
     for size in _sizes(project, max(meter.shape)):
         if size is not None:
             smaller = folder / f"{recipe.name}_{size}.mp4"
@@ -422,6 +434,8 @@ def _card(item: Item) -> str:
     if item.error:
         notes += f'<p class="error">{html.escape(item.error)}</p>'
     link = f' <a href="{html.escape(item.steps)}">steps</a>' if item.steps else ""
+    for strip in (o for o in item.outputs if o.endswith(".frames.png")):
+        link += f' <a href="{html.escape(strip)}">frames</a>'
     caption = f"<b>{html.escape(item.recipe)}</b> <span>{item.status}</span>{link}{notes}"
     return f'<figure class="{item.status}">{media}<figcaption>{caption}</figcaption></figure>'
 

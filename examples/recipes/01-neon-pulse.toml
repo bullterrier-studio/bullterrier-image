@@ -1,0 +1,28 @@
+# Hot magenta and cyan on black, split into a faint chromatic fringe, with a glow that spills onto the dark.
+name = "neon-pulse"
+size = 1024
+
+[[step]]
+effect = "clarity"          # bring out the fur and the face before the colours go on
+radius = 40
+amount = 0.6
+
+[[step]]
+effect = "gradient_map"
+stops = ["#0a0020", "#6a1bff", "#ff2bd6", "#00f0ff"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"         # only the subject stays
+
+[[step]]
+effect = "glitch"           # no sliding bands, only the red/blue split
+bands = 0
+split = 9
+
+[[step]]
+effect = "glow"
+radius = 28
+strength = 0.8
+threshold = 0.45

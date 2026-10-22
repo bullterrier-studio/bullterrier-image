@@ -254,4 +254,7 @@ def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
     out = folder / "out" / "a"
     assert (out / "steady.mp4").stat().st_size > 0 and (out / "steady_24.mp4").stat().st_size > 0  # and a smaller copy
     assert items["steady"].warnings == () and "motion stops early" in items["stalls"].warnings[0]
-    assert "<video" in (folder / "out" / "index.html").read_text()
+    page = (folder / "out" / "index.html").read_text()
+    assert "<video" in page and 'href="a/steady.frames.png"' in page
+    with Image.open(out / "steady.frames.png") as strip:  # a picture of the animation: six frames side by side
+        assert strip.size[0] > 5 * 24 and strip.format == "PNG"

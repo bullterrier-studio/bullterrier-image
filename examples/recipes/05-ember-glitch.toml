@@ -1,0 +1,33 @@
+# A fire palette, then glitch where some of the torn strips dissolve into text laid over the picture.
+name = "ember-glitch"
+size = 1024
+
+[[step]]
+effect = "gradient_map"
+stops = ["#0a0000", "#e0261b", "#ffb347", "#fff3d6"]
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 10
+bands = 10
+shift = 0.05
+ascii_share = 0.5
+ascii_cell = 9
+ascii_photo = 1.0
+seed = 4
+
+[[step]]
+effect = "glow"
+radius = 22
+strength = 0.55
+threshold = 0.5
+
+[[step]]
+effect = "grain"
+amount = 0.05
+size = 1.4

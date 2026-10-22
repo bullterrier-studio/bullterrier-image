@@ -1,0 +1,19 @@
+# A newsprint dot screen: tone becomes dot size, in warm white ink on black.
+name = "halftone-print"
+size = 1024
+
+[[step]]
+effect = "clarity"
+radius = 40
+amount = 0.5
+
+[[step]]
+effect = "halftone"
+cell = 10
+angle = 45
+fg = "#fff1de"
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"

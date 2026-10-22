@@ -1,0 +1,20 @@
+# The classic: the subject on black, digitally damaged, with film grain.
+name = "glitch"
+size = 1024
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "glitch"
+split = 9
+bands = 9
+shift = 0.05
+seed = 11
+
+[[step]]
+effect = "grain"
+amount = 0.06
+size = 1.6
