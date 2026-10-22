@@ -5,6 +5,7 @@ bilinear sampling and a choice of what lies beyond the picture's edge. Fields ar
 produced, so an all-zero field is the identity and a constant field is a translation.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 import numpy as np
@@ -49,10 +50,10 @@ def remap(
             exactly like one channel of a colour picture. Not modified.
         dx: ``(h, w)`` horizontal displacement in pixels (fractions allowed, any magnitude, must be finite).
         dy: ``(h, w)`` vertical displacement in pixels (same rules as ``dx``).
-        mode: what lies outside the picture. ``"clamp"`` repeats the nearest edge pixel, ``"mirror"`` reflects the picture
-            about its edge (edge pixel repeated, like ``np.pad(mode="symmetric")``), ``"wrap"`` tiles it periodically
-            (like ``np.roll``), ``"fill"`` is the constant ``fill``. Near an edge, fractional positions blend smoothly
-            with whatever lies beyond it.
+        mode: what lies outside the picture. ``"clamp"`` repeats the nearest edge pixel, ``"mirror"`` reflects the
+            picture about its edge (edge pixel repeated, like ``np.pad(mode="symmetric")``), ``"wrap"`` tiles it
+            periodically (like ``np.roll``), ``"fill"`` is the constant ``fill``. Near an edge, fractional positions
+            blend smoothly with whatever lies beyond it.
         fill: value outside the picture for ``mode="fill"``, in the units of ``image``; ignored by the other modes.
 
     Returns:
@@ -85,4 +86,8 @@ def remap(
 
     if image.ndim == 2:
         return sample(image.astype(np.float32, copy=False))
-    return np.stack([sample(image[..., c].astype(np.float32)) for c in range(image.shape[2])], axis=-1)
+    # scipy releases the GIL, so the channels are resampled side by side; each lands in its own plane, so the result is
+    # independent of scheduling.
+    planes = [np.ascontiguousarray(image[..., c], dtype=np.float32) for c in range(image.shape[2])]
+    with ThreadPoolExecutor(max_workers=max(1, len(planes))) as pool:
+        return np.stack(list(pool.map(sample, planes)), axis=-1)

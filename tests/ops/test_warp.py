@@ -1,4 +1,4 @@
-"""Behaviour of photo_fx.ops.warp, checked against independent oracles (np.roll, np.pad, hand-computed bilinear values)."""
+"""Behaviour of photo_fx.ops.warp, checked against independent oracles (np.roll, np.pad, hand-computed values)."""
 
 import numpy as np
 import pytest
@@ -126,3 +126,117 @@ def test_huge_displacements_stay_periodic_in_wrap_and_reflected_in_mirror():
     np.testing.assert_array_equal(_shift(image, 2 * w * 1000, 2 * h * 1000, mode="mirror"), image)
     far = _shift(image, 10**6, 10**6, mode="clamp")
     np.testing.assert_array_equal(far, np.broadcast_to(image[0, 0], image.shape))
+
+
+def test_half_pixel_shift_in_x_is_the_mean_of_horizontal_neighbours():
+    image = _picture(7, 9)
+    half = np.full((7, 9), 0.5, np.float32)
+    out = remap(image, half, np.zeros_like(half))
+    np.testing.assert_allclose(out[:, :-1], (image[:, :-1] + image[:, 1:]) / 2, atol=1e-6)
+
+
+def test_quarter_pixel_displacement_on_a_2x2_patch_matches_the_hand_computed_bilinear_value():
+    a, b, c, d = 0.0, 1.0, 0.5, 0.25  # [[a, b], [c, d]], all different so any swap shows
+    patch = np.array([[a, b], [c, d]], np.float32)
+    dx = np.full((2, 2), 0.25, np.float32)
+    dy = np.full((2, 2), 0.125, np.float32)  # different from dx: a swapped dx/dy gives another number
+
+    out = remap(patch, dx, dy)
+
+    # top-left pixel samples (x=0.25, y=0.125): blend along x within each row, then down the rows
+    top = a * 0.75 + b * 0.25
+    bottom = c * 0.75 + d * 0.25
+    assert out[0, 0] == pytest.approx(top * 0.875 + bottom * 0.125, abs=1e-6)
+    swapped = remap(patch, dy, dx)
+    assert out[0, 0] != pytest.approx(swapped[0, 0], abs=1e-3)
+
+
+def test_displacement_in_dx_alone_moves_content_only_along_x():
+    image = _picture(7, 9)
+    zero = np.zeros((7, 9), np.float32)
+    out_x = remap(image, np.full((7, 9), 2.0, np.float32), zero, mode="wrap")
+    np.testing.assert_array_equal(out_x, np.roll(image, -2, axis=1))
+    out_y = remap(image, zero, np.full((7, 9), 2.0, np.float32), mode="wrap")
+    np.testing.assert_array_equal(out_y, np.roll(image, -2, axis=0))
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("seed", range(3))
+def test_constant_image_stays_constant_under_any_field(mode, seed):
+    rng = np.random.default_rng(seed)
+    image = np.full((20, 30, 3), 0.6, np.float32)
+    dx, dy = (rng.normal(0, 12, (20, 30)).astype(np.float32) for _ in range(2))
+    out = remap(image, dx, dy, mode=mode, fill=0.6)
+    np.testing.assert_allclose(out, 0.6, atol=1e-6)
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("seed", range(3))
+def test_output_never_leaves_the_input_range(mode, seed):
+    rng = np.random.default_rng(seed)
+    image = rng.random((30, 40, 3), dtype=np.float32) * 0.5 + 0.25  # in [0.25, 0.75]
+    dx, dy = (rng.normal(0, 8, (30, 40)).astype(np.float32) for _ in range(2))
+    out = remap(image, dx, dy, mode=mode, fill=0.5)
+    assert out.min() >= image.min() - 1e-6
+    assert out.max() <= image.max() + 1e-6
+
+
+def test_warping_then_unwarping_a_smooth_image_returns_it_in_the_interior():
+    h, w = 64, 80
+    y, x = np.mgrid[0:h, 0:w].astype(np.float32)
+    image = (0.5 + 0.3 * np.sin(x / 40) * np.cos(y / 30))[..., None] * np.ones(3, np.float32)
+    dx = (2.0 * np.sin(y / 9)).astype(np.float32)
+    dy = (1.5 * np.cos(x / 11)).astype(np.float32)
+
+    # sampling at p + d(p) and then at p - d(p) only inverts exactly for a constant field; with a smooth one the
+    # error is the field's gradient times its size, which stays small for a low-frequency picture
+    out = remap(remap(image, dx, dy), -dx, -dy)
+
+    interior = (slice(8, -8), slice(8, -8))
+    assert np.abs(out[interior] - image[interior]).max() < 1e-2
+
+
+def test_a_2d_matte_warps_exactly_like_one_channel_of_a_colour_picture():
+    rng = np.random.default_rng(5)
+    rgb = _picture(20, 30)
+    dx, dy = (rng.normal(0, 3, (20, 30)).astype(np.float32) for _ in range(2))
+    for mode in MODES:
+        warped_rgb = remap(rgb, dx, dy, mode=mode, fill=0.2)
+        for ch in range(3):
+            np.testing.assert_array_equal(remap(rgb[..., ch], dx, dy, mode=mode, fill=0.2), warped_rgb[..., ch])
+
+
+def test_single_channel_and_single_pixel_pictures_work():
+    rng = np.random.default_rng(6)
+    image = _picture(10, 12, channels=None)
+    dx, dy = (rng.normal(0, 3, (10, 12)).astype(np.float32) for _ in range(2))
+    np.testing.assert_array_equal(
+        remap(image[..., None], dx, dy, mode="mirror")[..., 0], remap(image, dx, dy, mode="mirror")
+    )
+
+    one = np.array([[0.7]], np.float32)
+    shift = np.full((1, 1), 3.3, np.float32)
+    for mode in ("clamp", "mirror", "wrap"):
+        np.testing.assert_allclose(remap(one, shift, shift, mode=mode), one, atol=1e-6)
+    np.testing.assert_allclose(remap(one, shift, shift, mode="fill", fill=0.1), 0.1, atol=1e-6)
+
+
+def test_float64_and_non_contiguous_inputs_give_the_same_float32_result():
+    rng = np.random.default_rng(7)
+    big = rng.random((30, 40, 3))  # float64
+    view = big[::2, ::2]  # non-contiguous, shape (15, 20, 3)
+    dx, dy = (rng.normal(0, 3, (15, 20)).astype(np.float32) for _ in range(2))
+
+    out = remap(view, dx, dy, mode="wrap")
+    reference = remap(np.ascontiguousarray(view, dtype=np.float32), dx, dy, mode="wrap")
+
+    assert out.dtype == np.float32
+    np.testing.assert_array_equal(out, reference)
+
+
+def test_fill_blends_smoothly_across_the_picture_edge():
+    image = np.full((4, 5), 0.8, np.float32)
+    dx = np.full((4, 5), 0.5, np.float32)  # the last column samples half way between the edge pixel and outside
+    out = remap(image, dx, np.zeros_like(dx), mode="fill", fill=0.2)
+    assert out[:, -1] == pytest.approx(np.full(4, (0.8 + 0.2) / 2), abs=1e-6)
+    np.testing.assert_allclose(out[:, :-1], 0.8, atol=1e-6)
