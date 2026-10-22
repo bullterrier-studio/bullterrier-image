@@ -93,7 +93,7 @@ def test_save_video_mp4_has_a_keyframe_every_second_so_it_is_seekable(tmp_path):
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 @pytest.mark.parametrize(
-    "shape, expected",  # shape is (height, width); the result is (width, height), rounded to even numbers
+    ("shape", "expected"),  # shape is (height, width); the result is (width, height), rounded to even numbers
     [((120, 160), (100, 76)), ((160, 120), (76, 100)), ((60, 80), (80, 60))],
 )
 def test_save_video_max_side_shrinks_big_frames_only_and_keeps_the_aspect(tmp_path, shape, expected):

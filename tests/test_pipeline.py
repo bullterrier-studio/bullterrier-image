@@ -233,7 +233,7 @@ def test_the_report_escapes_what_it_shows(folder):
 
 
 @pytest.mark.parametrize(
-    "text, expect",
+    ("text", "expect"),
     [
         ('[export]\nformats = ["tiff"]\n', "formats"),
         ("[export]\nsizes = [4]\n", "sizes"),

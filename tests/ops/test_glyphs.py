@@ -84,7 +84,7 @@ def test_paint_places_glyph_i_in_cell_r_c():
             )
 
 
-@pytest.mark.parametrize("rows, cols", [(1, 5), (4, 1), (3, 2)])
+@pytest.mark.parametrize(("rows", "cols"), [(1, 5), (4, 1), (3, 2)])
 def test_paint_output_shape_follows_rows_and_columns(rows, cols):
     atlas = glyph_atlas(" .#", 7)
     height, width = atlas.shape[1:]

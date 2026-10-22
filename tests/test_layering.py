@@ -84,7 +84,7 @@ FORBIDDEN = {
 }
 
 
-@pytest.mark.parametrize("module, line, importer, contract", FORBIDDEN.values(), ids=FORBIDDEN.keys())
+@pytest.mark.parametrize(("module", "line", "importer", "contract"), FORBIDDEN.values(), ids=FORBIDDEN.keys())
 def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract, tmp_path):
     result = lint_a_copy_with(tmp_path, module, line)
     assert result.returncode != 0

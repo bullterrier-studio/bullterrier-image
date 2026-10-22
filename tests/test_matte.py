@@ -29,7 +29,7 @@ def normal_cdf(x: float) -> float:
 
 
 @pytest.mark.parametrize(
-    "shrink, pulled_in",
+    ("shrink", "pulled_in"),
     [
         (3.0, 3),  # a disc of radius 3 reaches 3 px along each axis
         (2.5, 2),  # x^2 + y^2 <= 6.25 holds for (2, 1) but not for (3, 0)

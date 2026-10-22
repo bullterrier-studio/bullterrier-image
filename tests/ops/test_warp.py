@@ -79,13 +79,13 @@ def _shift(image, sx, sy, **kwargs):
     return remap(image, np.full((h, w), -sx, np.float32), np.full((h, w), -sy, np.float32), **kwargs)
 
 
-@pytest.mark.parametrize("sx, sy", [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
+@pytest.mark.parametrize(("sx", "sy"), [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
 def test_wrap_integer_shift_equals_np_roll(sx, sy):
     image = _picture(7, 9)
     np.testing.assert_array_equal(_shift(image, sx, sy, mode="wrap"), np.roll(image, (sy, sx), axis=(0, 1)))
 
 
-@pytest.mark.parametrize("sx, sy", [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
+@pytest.mark.parametrize(("sx", "sy"), [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
 def test_clamp_integer_shift_equals_a_window_of_the_edge_padded_input(sx, sy):
     image = _picture(7, 9)
     h, w = image.shape[:2]
@@ -94,7 +94,7 @@ def test_clamp_integer_shift_equals_a_window_of_the_edge_padded_input(sx, sy):
     np.testing.assert_array_equal(_shift(image, sx, sy, mode="clamp"), expected)
 
 
-@pytest.mark.parametrize("sx, sy", [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
+@pytest.mark.parametrize(("sx", "sy"), [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3), (-5, 6)])
 def test_mirror_integer_shift_equals_a_window_of_the_symmetric_padded_input(sx, sy):
     image = _picture(7, 9)
     h, w = image.shape[:2]
@@ -103,7 +103,7 @@ def test_mirror_integer_shift_equals_a_window_of_the_symmetric_padded_input(sx, 
     np.testing.assert_array_equal(_shift(image, sx, sy, mode="mirror"), expected)
 
 
-@pytest.mark.parametrize("sx, sy", [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3)])
+@pytest.mark.parametrize(("sx", "sy"), [(2, 0), (0, 3), (-3, 0), (0, -2), (4, -3)])
 def test_fill_integer_shift_keeps_shifted_input_and_fills_exactly_the_uncovered_border(sx, sy):
     image = _picture(7, 9)
     h, w = image.shape[:2]
@@ -154,8 +154,8 @@ def test_quarter_pixel_displacement_on_a_2x2_patch_matches_the_hand_computed_bil
     assert np.abs(remap(patch, dy, dx) - expected).max() > 1e-2  # the swapped field is a different picture
 
 
-@pytest.mark.parametrize("pad_mode, mode", [("symmetric", "mirror"), ("wrap", "wrap")])
-@pytest.mark.parametrize("sx, sy", [(3.25, 0.0), (-2.75, 0.0), (0.0, 4.5), (-3.5, 2.25)])
+@pytest.mark.parametrize(("pad_mode", "mode"), [("symmetric", "mirror"), ("wrap", "wrap")])
+@pytest.mark.parametrize(("sx", "sy"), [(3.25, 0.0), (-2.75, 0.0), (0.0, 4.5), (-3.5, 2.25)])
 def test_fractional_shift_across_the_edge_interpolates_with_what_lies_beyond(pad_mode, mode, sx, sy):
     image = _picture(7, 9)
     h, w = image.shape[:2]

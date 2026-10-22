@@ -36,7 +36,7 @@ def test_recipe_name_defaults_to_the_file_name(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "text, expect",
+    ("text", "expect"),
     [
         ('[[step]]\neffect="sparkle"\n', "step 1.*unknown effect"),
         ('[[step]]\neffect="grain"\nbogus=1\n', "step 1.*bogus"),
@@ -160,7 +160,7 @@ def test_animated_values_ease_between_their_end_points():
 
 
 @pytest.mark.parametrize(
-    "text, expect",
+    ("text", "expect"),
     [
         ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "no animation"),
         (ANIMATED.replace('{ from = 0.0, to = 1.0, ease = "in-out" }', "{ from = 0.0 }"), "step 1.*exposure"),

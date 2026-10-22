@@ -13,7 +13,7 @@ from photo_fx.core.timing import Animated, Animation
 
 
 @pytest.mark.parametrize(
-    "make, expect",
+    ("make", "expect"),
     [
         (lambda: Step("sparkle"), "unknown effect.*ascii"),
         (lambda: Step("glitch", {"spilt": 3}), "spilt"),

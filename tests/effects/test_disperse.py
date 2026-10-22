@@ -24,7 +24,7 @@ def test_disperse_fades_steadily():
 
 
 @pytest.mark.parametrize(
-    "sweep, first_half, last_half", [(1.0, slice(0, 80), slice(80, 160)), (-1.0, slice(80, 160), slice(0, 80))]
+    ("sweep", "first_half", "last_half"), [(1.0, slice(0, 80), slice(80, 160)), (-1.0, slice(80, 160), slice(0, 80))]
 )
 def test_disperse_sweep_chooses_which_side_goes_first(sweep, first_half, last_half):
     out = effects.apply("disperse", _lit(), progress=0.5, top=0, edge=0, sweep=sweep, wind=0, angle=0, seed=1)
@@ -57,7 +57,7 @@ def test_disperse_neighbouring_frames_look_alike_so_the_motion_is_continuous():
     assert continuous < re_rolled / 2
 
 
-@pytest.mark.parametrize("wind, sign", [(0.3, 1), (-0.3, -1)])
+@pytest.mark.parametrize(("wind", "sign"), [(0.3, 1), (-0.3, -1)])
 def test_disperse_a_piece_pulls_back_against_the_wind_before_it_goes_with_it(wind, sign):
     cell_w, cell_h = cell_size(5)
     single = np.zeros((120, 400, 3), np.float32)
@@ -93,7 +93,7 @@ def _track(img, **params):
     return out
 
 
-@pytest.mark.parametrize("wind, angle", [(0.3, 30), (0.3, 0), (-0.3, 30), (0.25, 60)])
+@pytest.mark.parametrize(("wind", "angle"), [(0.3, 30), (0.3, 0), (-0.3, 30), (0.25, 60)])
 def test_disperse_wind_blows_at_the_given_angle_above_the_horizontal(wind, angle):
     img, (y0, x0) = _one_piece()
     track = _track(img, wind=wind, angle=angle, seed=3, sweep=-1.0)
@@ -189,7 +189,7 @@ def _share_in_flight(frame: np.ndarray) -> float:
     return flying / (GRID_ROWS * GRID_COLS)
 
 
-@pytest.mark.parametrize("reach, goes", [(0.5, 0.5), (1.0, 1.0)])
+@pytest.mark.parametrize(("reach", "goes"), [(0.5, 0.5), (1.0, 1.0)])
 def test_disperse_sweeping_across_keeps_fewer_than_half_of_the_pieces_in_flight_and_uses_the_whole_clip(reach, goes):
     """With the order set by a side-to-side sweep alone. The share depends on the order: other mixes of `top`, `edge`
     and `sweep` on a fragmented picture reach more than half, so this is not a promise for every setting."""

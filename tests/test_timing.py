@@ -24,7 +24,7 @@ PRESETS = {
 }
 
 
-@pytest.mark.parametrize("name, at_quarter, at_half, at_three_quarters", SIMPLE_EASES)
+@pytest.mark.parametrize(("name", "at_quarter", "at_half", "at_three_quarters"), SIMPLE_EASES)
 def test_simple_eases_have_their_textbook_values(name, at_quarter, at_half, at_three_quarters):
     curve = Animated(2.0, 6.0, name)  # a start and an end that are not 0 and 1: a swapped argument would show
     for t, expected in [(0.25, at_quarter), (0.5, at_half), (0.75, at_three_quarters)]:
@@ -56,7 +56,7 @@ def test_a_custom_cubic_bezier_follows_the_same_definition():
 
 
 @pytest.mark.parametrize(
-    "seconds, fps, frames",
+    ("seconds", "fps", "frames"),
     [
         (1.27, 10, 13),  # 12.7 frames: rounded to the nearest, not cut down
         (0.29, 10, 3),  # 2.9
