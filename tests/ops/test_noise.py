@@ -341,12 +341,13 @@ class TestEdgeCases:
         assert 0.0 <= field.min() and field.max() <= 1.0
 
     @pytest.mark.parametrize("lacunarity", [1.0, 2.0])
-    def test_more_than_32_octaves_are_rejected_at_once(self, lacunarity):
-        # With lacunarity 1 no octave ever falls under a pixel, so without a cap this would loop for ever.
-        with pytest.raises(ValueError, match="octaves"):
-            fractal_noise((8, 8), 4, 1, octaves=10**9, lacunarity=lacunarity)
-        with pytest.raises(ValueError, match="octaves"):
-            fractal_noise((8, 8), 4, 1, octaves=33, lacunarity=lacunarity)
+    def test_more_than_32_octaves_are_rejected(self, lacunarity):
+        # With lacunarity 1 no octave ever falls under a pixel, so a cap is the only bound on the work.
+        # 33 and 64 are small enough that, without the cap, the call returns quickly and this test fails instead of
+        # hanging (a huge count would loop for ever and stall CI rather than fail it).
+        for octaves in (33, 64):
+            with pytest.raises(ValueError, match="octaves"):
+                fractal_noise((8, 8), 4, 1, octaves=octaves, lacunarity=lacunarity)
 
     @pytest.mark.parametrize("shape", [(1, 1), (1, 50), (50, 1)])
     def test_single_row_column_or_pixel_canvases(self, shape):
@@ -417,8 +418,8 @@ class TestOctaveFeatureSize:
         # Lacunarity 1 gives both octaves the same feature size, where shared randomness would make them identical
         # (at other sizes shared hashes happen to land on different lattice points and hide the fault). Scale 4 gives
         # ~1000 features, so the correlation of independent fields is ~0.02 whatever the interpolation curve: over
-        # 240 seeds the mean |r| was 0.016 (gradient) and 0.024 (value), the worst 40-seed mean 0.027 and the worst
-        # pair 0.087. The bound is more than twice the worst mean; shared randomness gives 1.0.
+        # 800 seeds the mean |r| was about 0.016 (gradient) and 0.024 (value), the worst 40-seed mean 0.030 and the
+        # worst pair 0.099. The bound is twice the worst mean; shared randomness gives 1.0.
         correlations = []
         for seed in range(40):
             coarse = fractal_noise((128, 128), 4, seed, octaves=2, persistence=1e-6, lacunarity=1, kind=kind)
@@ -485,3 +486,25 @@ def test_extreme_scale_and_lacunarity_do_not_overflow():
     field = fractal_noise((8, 8), 1e308, 1, octaves=3, lacunarity=1e300)
     assert field.shape == (8, 8)
     assert 0.0 <= field.min() and field.max() <= 1.0
+
+
+class TestExtremePersistence:
+    # Weights are persistence ** octave, which leaves the float range for large persistence: the documented
+    # promise (finite, in [0, 1]) must hold for every accepted value, and 1e6 is what the tests above use.
+
+    @pytest.mark.parametrize("kind", KINDS)
+    @pytest.mark.parametrize("persistence", [1e-300, 1e-6, 1e6, 1e300, 1e308])
+    def test_field_is_finite_and_in_range_with_the_most_octaves(self, kind, persistence):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            field = fractal_noise((24, 40), 1e9, 3, octaves=32, persistence=persistence, kind=kind)
+        assert np.isfinite(field).all()
+        assert field.min() >= 0.0
+        assert field.max() <= 1.0
+
+    def test_a_dominant_last_octave_still_looks_like_that_octave(self):
+        # With persistence 1e300 the finest octave carries the whole field, as with 1e6 (the field is finite, not
+        # a NaN or a constant): its roughness matches a single octave at the finest scale.
+        dominant = fractal_noise((128, 128), 64, 4, octaves=3, persistence=1e300)
+        reference = fractal_noise((128, 128), 16, 4)
+        assert _relative_roughness(dominant) == pytest.approx(_relative_roughness(reference), rel=0.35)

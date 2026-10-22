@@ -154,7 +154,8 @@ def fractal_noise(
             whose features would be under one pixel are left out (they only add aliasing), so very fine scales may
             use fewer octaves than asked.
         persistence: weight of each octave relative to the previous one, positive and finite; below 1 the fine
-            detail is fainter than the coarse shape.
+            detail is fainter than the coarse shape, above 1 it dominates. Any positive finite value is
+            accepted, however extreme; the result is always finite and within [0, 1] (only the ratios matter).
         lacunarity: factor by which the feature size shrinks from one octave to the next, at least 1 and finite.
             2 (the default) halves it; larger values spread the octaves further apart in size, 1 stacks
             independent layers of the same size. Only matters when `octaves` is above 1.
@@ -180,20 +181,26 @@ def fractal_noise(
     if not 1 <= octaves <= _MAX_OCTAVES:
         raise ValueError(f"octaves must be between 1 and {_MAX_OCTAVES}; got {octaves!r}")
 
+    spacings = [scale]
+    while len(spacings) < octaves:
+        spacings.append(spacings[-1] / lacunarity)  # step by step: lacunarity ** octave can overflow where this cannot
+        if spacings[-1] < 1.0:
+            spacings.pop()  # this octave and every finer one would only add aliasing
+            break
+
+    # Weights are persistence ** octave, scaled so the largest is exactly 1 (the first octave when persistence <= 1,
+    # the last one above 1): only the ratios matter, and this keeps every power in the float range. The tiny
+    # weights that underflow to 0 then belong to octaves that contribute nothing anyway.
+    exponents = range(len(spacings)) if persistence <= 1 else range(1 - len(spacings), 1)
+    weights = [persistence**exponent for exponent in exponents]
+
     total = np.zeros((height, width), dtype=np.float32)
-    weight_sum = 0.0
-    spacing = scale
-    for octave in range(octaves):
-        if octave > 0:
-            spacing /= lacunarity  # divide step by step: lacunarity ** octave can overflow where the quotient is fine
-            if spacing < 1.0:
-                break  # this octave and every finer one would only add aliasing
-        weight = persistence**octave
+    for octave, (spacing, weight) in enumerate(zip(spacings, weights, strict=True)):
         # A lattice finer than the pixel grid is just white noise, and a table of it would be bigger than the image:
-        # so the first octave's features are never smaller than one pixel either. (Later octaves that fine were
-        # dropped above, so only the first can need the clamp.)
+        # so the first octave's features are never smaller than one pixel either (later octaves that fine were
+        # dropped above, so only the first can need the clamp).
         total += np.float32(weight) * _octave((height, width), max(spacing, 1.0), seed, octave, kind)
-        weight_sum += weight
+    weight_sum = sum(weights)
 
     if kind == "gradient":
         total = total * np.float32(0.5 / (_GRADIENT_BOUND * weight_sum)) + np.float32(0.5)
