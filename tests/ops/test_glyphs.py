@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -245,3 +246,67 @@ def test_cell_height_is_between_one_and_a_fifth_and_two_and_a_half_widths(cell):
     assert 1.2 <= height / width <= 2.6
     assert cell_size(cell) == (width, height)  # deterministic
     assert glyph_atlas(" .", cell).shape[1] == height
+
+
+# --- a host without any monospaced font (a slim Linux container): Pillow's own font, block elements as geometry -------
+
+
+@pytest.fixture
+def no_system_font(monkeypatch):
+    """The list of font files to look for is empty, as on a host that has none of them."""
+    monkeypatch.setenv("PHOTO_FX_FONTS", "")
+
+
+def test_without_a_system_font_cells_keep_the_asked_width_and_grow_with_it(no_system_font):
+    sizes = [cell_size(c) for c in CELLS]
+    assert [w for w, _ in sizes] == CELLS
+    heights = [h for _, h in sizes]
+    assert heights == sorted(set(heights))  # strictly increasing
+    assert all(h > 0 for h in heights)
+
+
+@pytest.mark.parametrize("cell", CELLS)
+def test_without_a_system_font_the_block_elements_keep_their_nominal_ink(no_system_font, cell):
+    """Unicode names them FULL BLOCK and DARK, MEDIUM, LIGHT SHADE: 100, 75, 50 and 25 % of the cell inked."""
+    shares = {ch: glyph_atlas(f" {ch}", cell)[1].mean() for ch in "░▒▓█"}  # each beside a space, so known by name
+    assert shares == pytest.approx({"░": 0.25, "▒": 0.5, "▓": 0.75, "█": 1.0}, abs=1e-6)
+    assert glyph_atlas(" █", cell)[1].min() == 1.0  # the full block covers every pixel, so the darkest level is exact
+
+
+def test_without_a_system_font_letters_are_drawn_with_pillows_own_font(no_system_font):
+    atlas = glyph_atlas(" .IM", 10)
+    totals = ink(atlas)
+    assert totals[0] == 0.0
+    assert np.all(np.diff(totals) > 0)  # dot, I and M: real, different letters, not one missing-glyph box
+    assert atlas.max() > 0.5
+
+
+def test_the_space_and_the_full_block_bound_the_ink_without_a_system_font_too(no_system_font):
+    atlas = glyph_atlas(" .:#█", 10)
+    totals = ink(atlas)
+    assert totals[0] == 0.0
+    assert totals[-1] > totals[:-1].max()
+
+
+@host_fonts
+def test_the_listed_fonts_are_tried_in_order_and_missing_ones_skipped(font, tmp_path, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_FONTS", os.pathsep.join([str(tmp_path / "missing.ttf"), font]))
+    np.testing.assert_array_equal(glyph_atlas(" .#M", 10), glyph_atlas(" .#M", 10, font))
+    assert cell_size(10) == cell_size(10, font)
+
+
+def _has_glyph(font: str, ch: str) -> bool:
+    """Whether the font file draws `ch` itself, judged by Pillow alone: not the box it draws for U+FFFF, which no font
+    has (a Unicode noncharacter)."""
+    face = ImageFont.truetype(font, 40)
+    return bytes(face.getmask(ch)) != bytes(face.getmask("\uffff")) or face.getbbox(ch) != face.getbbox("\uffff")
+
+
+SHADED_FONTS = [font for font in HOST_FONTS if _has_glyph(font, "░")]
+
+
+@pytest.mark.skipif(not SHADED_FONTS, reason="no monospaced font on this host draws the shade characters")
+def test_a_font_that_has_the_shade_characters_draws_them_itself():
+    """Only a missing glyph is replaced: a real font's light shade is its own dot pattern, not an even grey."""
+    light = glyph_atlas(" ░", 10, SHADED_FONTS[0])[1]
+    assert light.std() > 0.05
