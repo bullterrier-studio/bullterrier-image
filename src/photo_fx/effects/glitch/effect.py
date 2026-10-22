@@ -103,7 +103,8 @@ class GlitchParams(EffectParams):
     ascii_chars: Palette = param(
         " .:-=+*#%@",
         doc="The character palette of the text strips, in any order, at least two different characters; sorted by how "
-        "much ink each glyph puts down, so the densest is used for the brightest areas on dark paper.",
+        "much ink each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest "
+        "on light paper (see `ascii_paper`).",
     )
     ascii_ink: Color | None = param(
         None,
@@ -112,7 +113,8 @@ class GlitchParams(EffectParams):
     )
     ascii_paper: Color = param(
         "#000000",
-        doc="The paper colour behind the text strips' characters. Dark paper puts dense characters on bright areas.",
+        doc="The paper colour behind the text strips' characters. Paper darker than mid grey (Rec. 709 luminance "
+        "below 0.5) puts dense characters on bright areas; lighter paper puts them on dark areas.",
     )
     ascii_font: str | None = param(
         None,

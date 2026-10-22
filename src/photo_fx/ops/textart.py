@@ -35,18 +35,21 @@ def text_art(
 
     cell: character width in px (the height follows from the font, see `glyphs.cell_size`).
     chars: the palette, in any order, at least two distinct characters; each cell gets the one whose ink matches the
-        cell's brightness: the densest for bright cells on dark paper, for dark cells on light paper (`ink_amount`).
+        cell's brightness: the densest for bright cells on dark paper, for dark cells on light paper (`ink_amount`;
+        paper is dark below mid grey, Rec. 709 luminance 0.5).
     ink: the ink colour, float32 RGB 0..1; None colours each character from the picture under it, brightened so
         thin strokes stay readable (`ops.color.vivid`). paper: the paper colour, float32 RGB 0..1.
     gamma: exponent on the ink amount, > 0; above 1 puts down less ink in the midtones, below 1 more.
     photo: 0..1, how much of the picture shows through the paper behind the characters (0 = flat paper colour).
     font: path to a monospaced .ttf/.ttc, or None for the first system font found.
+    A cell cut off by the picture's right or bottom edge is measured as if the border pixels continued.
     Raises ValueError if `chars` has fewer than two distinct characters.
     """
     atlas = glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
     n, cell_h, cell_w = atlas.shape
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)
+    # constant: repeat the border pixels, so a partial edge cell averages real picture, not black
     padded = np.pad(rgb, ((0, rows * cell_h - height), (0, cols * cell_w - width), (0, 0)), mode="edge")
 
     # The colour and brightness of each character cell is the average of the pixels it covers.

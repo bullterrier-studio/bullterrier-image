@@ -28,7 +28,7 @@ class AsciiParams(EffectParams):
         " .:-=+*#%@",
         doc="The character palette, in any order, at least two different characters. It is sorted by how much ink "
         "each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest on light "
-        "paper. Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).",
+        "paper (see `paper`). Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).",
     )
     ink: Color | None = param(
         None,
@@ -37,8 +37,8 @@ class AsciiParams(EffectParams):
     )
     paper: Color = param(
         "#000000",
-        doc="The paper colour behind the characters. Dark paper puts dense characters on bright areas, light paper on "
-        "dark ones.",
+        doc="The paper colour behind the characters. Paper darker than mid grey (Rec. 709 luminance below 0.5) puts "
+        "dense characters on bright areas; lighter paper puts them on dark areas.",
     )
     gamma: float = param(
         1.0,
