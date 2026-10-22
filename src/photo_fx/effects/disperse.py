@@ -71,7 +71,7 @@ def disperse(
     it runs on: animate `clock` over the whole clip (`over = "clip"`) so the picture is alive even while nothing
     detaches. The shimmer travels against the wind, which balances the motion of the pieces.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the person's silhouette, used for `edge`.
+    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `edge`.
     """
     height, width = rgb.shape[:2]
     if progress <= 0.0 and ambient <= 0.0:

@@ -39,7 +39,7 @@ def evaporate(
     Pieces leaving the picture are gone. With `edge` and `outward` at 0 pieces only move up, so everything more than
     one character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the person's silhouette, which defines
+    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
     "the edge of the figure". Dark parts of the picture (eyes, shadows) are then still part of the figure. Without
     a matte the lit pieces are used, with enclosed dark gaps filled in.
     """

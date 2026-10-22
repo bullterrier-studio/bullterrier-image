@@ -33,9 +33,9 @@ def lit(pieces: np.ndarray) -> np.ndarray:
 def figure(
     lit_pieces: np.ndarray, matte: np.ndarray | None, cell_w: int, cell_h: int, height: int, width: int
 ) -> np.ndarray:
-    """(rows, cols) bool: the pieces that belong to the person.
+    """(rows, cols) bool: the pieces that belong to the subject.
 
-    From the person `matte` when there is one, so dark parts of the figure (eyes, shadows) still count. Without
+    From the subject `matte` when there is one, so dark parts of the figure (eyes, shadows) still count. Without
     one, the lit pieces with enclosed gaps filled in.
     """
     if matte is None:

@@ -141,7 +141,7 @@ def test_animated_values_ease_between_their_end_points():
 @pytest.mark.parametrize(
     "text, expect",
     [
-        ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "no \\[animation\\] table"),
+        ('[[step]]\neffect="grade"\nexposure={from=0, to=1}\n', "animated but the recipe has no animation"),
         (ANIMATED.replace('{ from = 0.0, to = 1.0, ease = "in-out" }', "{ from = 0.0 }"), "step 1.*exposure"),
         (ANIMATED.replace('"in-out"', '"bouncy"'), "step 1.*exposure"),
         (ANIMATED.replace("hold_end = 0.5", "hold_end = 1.5"), "no time"),
@@ -221,7 +221,7 @@ def test_render_frames_yields_every_frame_and_computes_the_still_steps_once(phot
 
 
 def test_render_frames_needs_an_animated_recipe(photo):
-    with pytest.raises(ValueError, match="no \\[animation\\]"):
+    with pytest.raises(ValueError, match="no animation"):
         list(render_frames(photo, Recipe("still", (Step("grain"),), size=None)))
 
 

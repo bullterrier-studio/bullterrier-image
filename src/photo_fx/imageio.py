@@ -42,8 +42,11 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
     With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp.
     """
     img = to_pil(rgb, alpha)
-    if alpha is None and Path(path).suffix.lower() in {".jpg", ".jpeg"}:
+    suffix = Path(path).suffix.lower()
+    if alpha is None and suffix in {".jpg", ".jpeg"}:
         img.save(path, quality=quality, subsampling=0)
+    elif suffix == ".webp":
+        img.save(path, quality=quality)
     else:
         img.save(path)
 
@@ -81,6 +84,25 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
     if suffix in {".mp4", ".mov"}:
         return _save_with_ffmpeg(frames, path, fps, max_side)
     raise ValueError(f"cannot write {suffix!r} videos: use .mp4, .mov or .gif")
+
+
+def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
+    """Write a copy of the video `source` whose longest side is `max_side` px (same settings as `save_video`).
+
+    Cheaper than rendering an animation again at a second size.
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise RuntimeError("resizing a video needs ffmpeg on the PATH (brew install ffmpeg)")
+    shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
+    result = subprocess.run(
+        [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", shrink,
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
+         "-g", "30", str(target)],
+        capture_output=True, text=True,
+    )  # fmt: skip
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()}")
 
 
 def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_side: int | None) -> int:

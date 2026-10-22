@@ -11,7 +11,7 @@
     [[step]]
     effect = "fill"
     color = "#000000"
-    mask = "background"            # "subject" or "background": apply only there (needs a person in the photo)
+    mask = "background"            # "subject" or "background": apply only there (needs a clear subject in the photo)
     opacity = 0.3                  # optional, 0..1: blend the effect in partway (default 1 = fully)
 
 Removing the background is not a feature of its own: it is a `fill` step masked to the background.
@@ -38,8 +38,9 @@ for ambient motion.
 
 import inspect
 import tomllib
+from collections import deque
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -105,6 +106,11 @@ class Animated:
         return self.start + (self.end - self.start) * _easing(self.ease)(t)
 
 
+def ramp(start: float, end: float, ease="linear", over: str = "motion") -> Animated:
+    """A parameter that changes over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`."""
+    return Animated(float(start), float(end), tuple(ease) if isinstance(ease, list) else ease, over)
+
+
 @dataclass(frozen=True)
 class Animation:
     seconds: float
@@ -133,10 +139,40 @@ class Animation:
 
 @dataclass(frozen=True)
 class Step:
+    """One effect with its parameters, optionally limited to the subject or the background and blended in partway.
+
+    Steps are checked when they are made, wherever they come from (a recipe file, `fx`, or your own code): an unknown
+    effect, a misspelt parameter or an out-of-range opacity fails at once with a message saying what is valid.
+    """
+
     effect: str
     params: dict = field(default_factory=dict)
     mask: str | None = None
     opacity: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.mask is not None and self.mask not in _MASKS:
+            raise ValueError(f"mask must be one of {_MASKS}, got {self.mask!r}")
+        if (
+            not isinstance(self.opacity, int | float)
+            or isinstance(self.opacity, bool)
+            or not 0.0 <= self.opacity <= 1.0
+        ):
+            raise ValueError(f"opacity must be a number from 0 to 1, got {self.opacity!r}")
+        if "matte" in self.params:
+            raise ValueError("`matte` is supplied by the recipe itself and cannot be set")
+        try:
+            inspect.signature(effects.get(self.effect)).bind(None, **self.params_at(0.0))
+        except (KeyError, TypeError) as error:
+            raise ValueError(str(error.args[0]) if isinstance(error, KeyError) else str(error)) from None
+
+    def where(self, region: str) -> "Step":
+        """The same step applied only to the "subject" or only to the "background" of the photo."""
+        return replace(self, mask=region)
+
+    def blend(self, amount: float) -> "Step":
+        """The same step mixed in partway: 0 = no effect, 1 = fully (the default)."""
+        return replace(self, opacity=amount)
 
     @property
     def animated(self) -> bool:
@@ -146,6 +182,25 @@ class Step:
         """The parameters with every animated value worked out for a moment of the clip (see `Animated.at`)."""
         return {k: v.at(position, clip) if isinstance(v, Animated) else v for k, v in self.params.items()}
 
+    def describe(self, width: int = 56) -> str:
+        """A short readable form, e.g. `fill(color='#000000') on background`, cut to `width` characters."""
+        shown = ", ".join(f"{k}={_short(v)}" for k, v in self.params.items())
+        text = f"{self.effect}({shown})"
+        if self.mask:
+            text += f" on {self.mask}"
+        if self.opacity < 1.0:
+            text += f" x{self.opacity:g}"
+        return text if len(text) <= width else text[: width - 1] + "…"
+
+    __str__ = describe
+
+
+def _short(value) -> str:
+    if isinstance(value, Animated):
+        return f"{value.start:g}->{value.end:g}"
+    text = repr(value)
+    return text if len(text) <= 18 else text[:15] + "..."
+
 
 @dataclass(frozen=True)
 class Recipe:
@@ -154,14 +209,23 @@ class Recipe:
     size: int | None = 1024
     animation: Animation | None = None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "steps", tuple(self.steps))  # a list is fine when building one in code
+        if not self.steps:
+            raise ValueError("a recipe needs at least one step")
+        if self.animation is None and any(step.animated for step in self.steps):
+            raise ValueError(
+                "a parameter is animated but the recipe has no animation: add an [animation] table (seconds, fps)"
+            )
+
     @property
     def needs_matte(self) -> bool:
-        """True if any step is masked, i.e. rendering must find the person first (the slow part)."""
+        """True if any step is masked, i.e. rendering must find the subject first (the slow part)."""
         return any(step.mask or _wants_matte(step.effect) for step in self.steps)
 
 
 def _wants_matte(effect_name: str) -> bool:
-    """True for effects that take the person's silhouette: they declare a parameter called `matte`."""
+    """True for effects that take the subject's silhouette: they declare a parameter called `matte`."""
     return "matte" in inspect.signature(effects.get(effect_name)).parameters
 
 
@@ -212,7 +276,7 @@ def _load_animation(table: dict, filename: str) -> Animation:
 
 
 def load_recipe(path: str | Path) -> Recipe:
-    """Read and validate a recipe file. Errors name the file, the step and the offending key."""
+    """Read a recipe file. Errors name the file, the step and the offending key."""
     path = Path(path)
     with open(path, "rb") as f:
         raw = tomllib.load(f)
@@ -222,37 +286,27 @@ def load_recipe(path: str | Path) -> Recipe:
         where = f"{path.name}, step {i}"
         entry = dict(entry)
         name = entry.pop("effect", None)
-        mask = entry.pop("mask", None)
-        opacity = entry.pop("opacity", 1.0)
         if name is None:
             raise ValueError(f"{where}: missing `effect`")
-        if mask is not None and mask not in _MASKS:
-            raise ValueError(f"{where}: mask must be one of {_MASKS}, got {mask!r}")
-        if not isinstance(opacity, int | float) or not 0.0 <= opacity <= 1.0:
-            raise ValueError(f"{where}: opacity must be a number from 0 to 1, got {opacity!r}")
-        if "matte" in entry:
-            raise ValueError(f"{where}: `matte` is supplied by the recipe itself and cannot be set")
+        mask, opacity = entry.pop("mask", None), entry.pop("opacity", 1.0)
         params = {key: _animated_value(value, where, key) for key, value in entry.items()}
-        step = Step(name, params, mask, float(opacity))
-        if step.animated and animation is None:
-            raise ValueError(f"{where}: a parameter is animated but the recipe has no [animation] table")
         try:
-            inspect.signature(effects.get(name)).bind(None, **step.params_at(0.0))  # unknown or missing parameters
-        except (KeyError, TypeError) as error:
+            steps.append(Step(name, params, mask, opacity if isinstance(opacity, int | float) else opacity))
+        except ValueError as error:
             raise ValueError(f"{where}: {error}") from None
-        steps.append(step)
-    if not steps:
-        raise ValueError(f"{path.name}: a recipe needs at least one [[step]]")
-    return Recipe(name=raw.get("name", path.stem), steps=tuple(steps), size=raw.get("size", 1024), animation=animation)
+    try:
+        return Recipe(raw.get("name", path.stem), tuple(steps), raw.get("size", 1024), animation)
+    except ValueError as error:
+        raise ValueError(f"{path.name}: {error}") from None
 
 
 def render(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None, at: float = 0.0) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
     The photo is first scaled to `recipe.size`. Steps run in order, each on the previous step's output. A masked
-    step is blended in through the person matte, so only the subject or only the background changes.
-    Effects that declare a `matte` parameter (see `evaporate`) get the person's silhouette automatically.
-    `matte` (alpha for `rgb`, any size) can be passed in to avoid finding the person again when rendering several
+    step is blended in through the subject matte, so only the subject or only the background changes.
+    Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically.
+    `matte` (alpha for `rgb`, any size) can be passed in to avoid finding the subject again when rendering several
     recipes from one photo; if a masked step needs it and it is missing, it is computed here.
 
     For an animated recipe this is one still: the frame at position `at` (0..1) of the clip.
@@ -267,7 +321,7 @@ def render_frames(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = No
     The steps before the first animated one cannot change between frames, so they run once for the whole clip.
     """
     if recipe.animation is None:
-        raise ValueError(f"recipe {recipe.name!r} has no [animation] table")
+        raise ValueError(f"recipe {recipe.name!r} has no animation: add an [animation] table (seconds, fps)")
     rgb, matte = _prepare(rgb, recipe, matte)
     first_moving = next(i for i, step in enumerate(recipe.steps) if step.animated)
     still = _run(rgb, recipe.steps[:first_moving], matte, 0.0, 0.0)
@@ -275,14 +329,38 @@ def render_frames(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = No
         yield _finish(_run(still, recipe.steps[first_moving:], matte, motion, clip))
 
 
+@dataclass(frozen=True)
+class Stage:
+    """One picture from inside a render: what the photo looked like at some point on its way through the recipe."""
+
+    label: str
+    image: np.ndarray
+
+
+def trace(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None, at: float = 0.0) -> list[Stage]:
+    """Every stage of a render, so you can see what each step did and where something went wrong.
+
+    The stages are the photo as the recipe receives it, the subject matte if the recipe uses one (white = subject),
+    and the image after each step, in order. The last stage is exactly what `render` returns, because both run the
+    same code. For an animated recipe the stages are for the frame at position `at` (0..1) of the clip.
+    """
+    rgb, matte = _prepare(rgb, recipe, matte)
+    stages = [Stage("input", rgb)]
+    if recipe.needs_matte:
+        stages.append(Stage("subject matte (white = subject)", np.repeat(matte[..., None], 3, axis=2)))
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, at, at), start=1):
+        stages.append(Stage(f"{number}. {step.describe()}", _finish(image)))
+    return stages
+
+
 def render_all(rgb: np.ndarray, recipes: list[Recipe]) -> list[np.ndarray]:
-    """Run several recipes on one photo; the person is found at most once, however many recipes need them."""
+    """Run several recipes on one photo; the subject is found at most once, however many recipes need it."""
     matte = subject_matte(rgb) if any(r.needs_matte for r in recipes) else None
     return [render(rgb, recipe, matte) for recipe in recipes]
 
 
 def _prepare(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None) -> tuple[np.ndarray, np.ndarray | None]:
-    """Scale the photo and matte to the recipe's size, and find the person if a step needs them."""
+    """Scale the photo and matte to the recipe's size, and find the subject if a step needs it."""
     if matte is not None and matte.shape[:2] != rgb.shape[:2]:
         raise ValueError(f"matte is {matte.shape[:2]} but the photo is {rgb.shape[:2]}")
     if recipe.size:
@@ -294,6 +372,12 @@ def _prepare(rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None) -> tuple
 
 
 def _run(out: np.ndarray, steps: tuple[Step, ...], matte: np.ndarray | None, motion: float, clip: float) -> np.ndarray:
+    last = deque(_stages(out, steps, matte, motion, clip), maxlen=1)  # only the final stage is kept in memory
+    return last[0][1] if last else out
+
+
+def _stages(out, steps, matte, motion, clip) -> Iterator[tuple[Step, np.ndarray]]:
+    """Run the steps in order, yielding each step with the image after it. The one place a step is applied."""
     for step in steps:
         extra = {"matte": matte} if _wants_matte(step.effect) else {}
         result = effects.apply(step.effect, out, **step.params_at(motion, clip), **extra)
@@ -305,7 +389,7 @@ def _run(out: np.ndarray, steps: tuple[Step, ...], matte: np.ndarray | None, mot
                 alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]
             result = out + (result - out) * alpha
         out = result
-    return out
+        yield step, out
 
 
 def _finish(out: np.ndarray) -> np.ndarray:

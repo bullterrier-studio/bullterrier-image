@@ -1,10 +1,11 @@
-"""Finding the person in a picture.
+"""Finding the subject of a picture: the person, pet or object that stands out.
 
-One question, one answer: `subject_matte(rgb)` returns how much each pixel belongs to the person (1) or
-to the background (0). Which model produces that is this module's business; callers never see it.
+One question, one answer: `subject_matte(rgb)` returns how much each pixel belongs to the subject (1) or to the
+background (0). Which model produces that is this module's business; callers never see it.
 
-Today the model is Apple Vision's person segmentation: macOS only, runs on the Neural Engine, no download.
-Another backend (for Linux, or for non-person subjects) would be selected inside `subject_matte`.
+Today the model is Apple Vision's foreground-subject segmentation (the "lift subject" feature): macOS only, runs on the
+Neural Engine, no download, and works for people, pets and objects alike. On macOS before 14 it falls back to Vision's
+older people-only model. Another backend (for Linux) would be selected inside `subject_matte`.
 """
 
 import io
@@ -18,18 +19,22 @@ from . import imageio
 
 
 def subject_matte(rgb: np.ndarray, *, shrink: float = 1.5, feather: float = 1.0) -> np.ndarray:
-    """Alpha matte (height, width, float32 0..1) for the main person in `rgb`, same size as `rgb`.
+    """Alpha matte (height, width, float32 0..1) for the main subject of `rgb`, same size as `rgb`.
 
     The segmenter's edge is soft and slightly generous, which shows as a coloured halo once the background is
     replaced. `shrink` pulls the edge in by that many pixels and `feather` blurs it by that many pixels,
-    both measured in `rgb`'s own pixels; the defaults give a clean, slightly soft cut for a 1000-1600 px portrait.
+    both measured in `rgb`'s own pixels; the defaults give a clean, slightly soft cut for a 1000-1600 px photo.
 
-    Raises RuntimeError if no person is found, NotImplementedError off macOS.
+    Raises RuntimeError if nothing stands out, NotImplementedError off macOS.
     """
     if sys.platform != "darwin":
         raise NotImplementedError("subject_matte needs Apple Vision, which is macOS only")
     height, width = rgb.shape[:2]
-    mask = _vision_person_mask(rgb)
+    mask = _vision_foreground_mask(rgb)
+    if mask is None:  # macOS before 14: only the people model exists
+        mask = _vision_person_mask(rgb)
+    if mask is None or not (mask >= 128).any():
+        raise RuntimeError("no subject found in the picture (no person, pet or object stood out)")
     mask = np.asarray(Image.fromarray(mask).resize((width, height), Image.Resampling.BILINEAR))
     return _refine_edge(mask.astype(np.float32) / 255.0, shrink, feather)
 
@@ -45,34 +50,59 @@ def _refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray
     return np.clip(alpha, 0.0, 1.0).astype(np.float32)
 
 
-def _vision_person_mask(rgb: np.ndarray) -> np.ndarray:
-    """uint8 mask (0..255) from Vision, at Vision's own resolution, covering the whole picture."""
-    # Imported here so the rest of the package (and its tests) work on machines without pyobjc.
+def _vision_handler(rgb: np.ndarray):
+    """A Vision request handler for `rgb` (imported here so the rest of the package works without pyobjc)."""
     import Foundation
-    import Quartz
     import Vision
 
     png = io.BytesIO()
     imageio.to_pil(rgb).save(png, format="PNG")
     data = Foundation.NSData.dataWithBytes_length_(png.getvalue(), len(png.getvalue()))
+    return Vision.VNImageRequestHandler.alloc().initWithData_options_(data, {})
 
-    request = Vision.VNGeneratePersonSegmentationRequest.alloc().initWithCompletionHandler_(None)
-    request.setQualityLevel_(Vision.VNGeneratePersonSegmentationRequestQualityLevelAccurate)
-    request.setOutputPixelFormat_(Quartz.kCVPixelFormatType_OneComponent8)
-    handler = Vision.VNImageRequestHandler.alloc().initWithData_options_(data, {})
-    ok, error = handler.performRequests_error_([request], None)
-    if not ok or not request.results():
-        raise RuntimeError(f"Vision person segmentation failed: {error}")
 
-    buffer = request.results()[0].pixelBuffer()
+def _read_mask(buffer) -> np.ndarray:
+    """uint8 mask (0..255) from a Vision pixel buffer holding one 8-bit or 32-bit float channel."""
+    import Quartz
+
     Quartz.CVPixelBufferLockBaseAddress(buffer, 1)
     try:
         w, h = Quartz.CVPixelBufferGetWidth(buffer), Quartz.CVPixelBufferGetHeight(buffer)
         stride = Quartz.CVPixelBufferGetBytesPerRow(buffer)
         raw = Quartz.CVPixelBufferGetBaseAddress(buffer).as_buffer(stride * h)
-        mask = np.frombuffer(raw, dtype=np.uint8).reshape(h, stride)[:, :w].copy()
+        if Quartz.CVPixelBufferGetPixelFormatType(buffer) == Quartz.kCVPixelFormatType_OneComponent32Float:
+            values = np.frombuffer(raw, dtype=np.float32).reshape(h, stride // 4)[:, :w]
+            return (np.clip(values, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+        return np.frombuffer(raw, dtype=np.uint8).reshape(h, stride)[:, :w].copy()
     finally:
         Quartz.CVPixelBufferUnlockBaseAddress(buffer, 1)
-    if not (mask >= 128).any():
-        raise RuntimeError("no person found in the picture")
-    return mask
+
+
+def _vision_foreground_mask(rgb: np.ndarray) -> np.ndarray | None:
+    """uint8 mask of every foreground subject (people, pets, objects), or None if Vision found none or is too old."""
+    import Vision
+
+    if not hasattr(Vision, "VNGenerateForegroundInstanceMaskRequest"):  # macOS 14 and later
+        return None
+    handler = _vision_handler(rgb)
+    request = Vision.VNGenerateForegroundInstanceMaskRequest.alloc().init()
+    ok, _ = handler.performRequests_error_([request], None)
+    if not ok or not request.results():
+        return None
+    observation = request.results()[0]
+    buffer, _ = observation.generateScaledMaskForImageForInstances_fromRequestHandler_error_(
+        observation.allInstances(), handler, None
+    )
+    return None if buffer is None else _read_mask(buffer)
+
+
+def _vision_person_mask(rgb: np.ndarray) -> np.ndarray | None:
+    """uint8 mask (0..255) of the people in the picture from Vision, or None. The older, people-only model."""
+    import Quartz
+    import Vision
+
+    request = Vision.VNGeneratePersonSegmentationRequest.alloc().initWithCompletionHandler_(None)
+    request.setQualityLevel_(Vision.VNGeneratePersonSegmentationRequestQualityLevelAccurate)
+    request.setOutputPixelFormat_(Quartz.kCVPixelFormatType_OneComponent8)
+    ok, _ = _vision_handler(rgb).performRequests_error_([request], None)
+    return _read_mask(request.results()[0].pixelBuffer()) if ok and request.results() else None

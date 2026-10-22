@@ -3,13 +3,15 @@
 import argparse
 import sys
 import textwrap
+from dataclasses import replace
 from pathlib import Path
 
 from . import effects, imageio
 from .imageio import save_video
 from .matte import subject_matte
-from .recipe import Recipe, load_recipe, render_all, render_frames
-from .sheet import contact_sheet
+from .pipeline import init_project, load_project, run
+from .recipe import Recipe, load_recipe, render_all, render_frames, trace
+from .sheet import contact_sheet, write_stages
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
     p.add_argument("--columns", type=int, default=3)
 
-    p = commands.add_parser("cutout", help="save just the person on a transparent background")
+    p = commands.add_parser("cutout", help="save just the subject on a transparent background")
     p.add_argument("photo")
     p.add_argument("-o", "--out", default="out/cutout.png")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
@@ -40,14 +42,43 @@ def main(argv: list[str] | None = None) -> int:
         "--max-side", type=int, help="shrink the video so its longest side is at most this many px (e.g. 1080)"
     )
 
+    p = commands.add_parser(
+        "run", help="process every photo of a project with every recipe: cached, checked, with a report"
+    )
+    p.add_argument("project", nargs="?", default="photo-fx.toml", help="project file (default: photo-fx.toml)")
+    p.add_argument("--force", action="store_true", help="redo everything, even what is up to date")
+    p.add_argument("--dry-run", action="store_true", help="show what would be done and write nothing")
+    p.add_argument("--only", metavar="PATTERN", help="only the photos whose file name matches, e.g. 'dog*.jpg'")
+    p.add_argument("--strict", action="store_true", help="exit with an error if any result has a warning")
+
+    p.add_argument("--steps", action="store_true", help="also save the picture after every step of every recipe")
+
+    p = commands.add_parser("steps", help="show what every step of a recipe does to a photo: one picture per step")
+    p.add_argument("photo")
+    p.add_argument("recipe")
+    p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
+    p.add_argument(
+        "--at", type=float, default=0.5, help="for an animated recipe: the moment of the clip, 0..1 (default 0.5)"
+    )
+
+    p = commands.add_parser("init", help="create a starter photo-fx.toml, a photos/ folder and two recipes")
+    p.add_argument("directory", nargs="?", default=".")
+
     commands.add_parser("effects", help="list the available effects and their parameters")
 
     args = parser.parse_args(argv)
     try:
-        return {"render": _render, "sheet": _sheet, "cutout": _cutout, "animate": _animate, "effects": _effects}[
-            args.command
-        ](args)
-    except (ValueError, RuntimeError, FileNotFoundError, NotImplementedError) as error:
+        return {
+            "render": _render,
+            "sheet": _sheet,
+            "cutout": _cutout,
+            "animate": _animate,
+            "run": _run,
+            "steps": _steps,
+            "init": _init,
+            "effects": _effects,
+        }[args.command](args)
+    except (ValueError, RuntimeError, FileNotFoundError, FileExistsError, NotImplementedError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
@@ -124,6 +155,40 @@ def _animate(args) -> int:
         max_side=args.max_side,
     )
     print(target)
+    return 0
+
+
+def _run(args) -> int:
+    project = load_project(args.project)
+    if args.steps:
+        project = replace(project, steps=True)
+    items = run(
+        project,
+        force=args.force,
+        dry_run=args.dry_run,
+        only=args.only,
+        log=lambda message: print(message, file=sys.stderr),
+    )
+    failed = [i for i in items if i.status == "failed"]
+    flagged = [i for i in items if i.warnings]
+    print(f"{len(items)} results: {len(failed)} failed, {len(flagged)} with warnings", file=sys.stderr)
+    if not args.dry_run:
+        print(project.output / "index.html")
+    return 1 if failed or (args.strict and flagged) else 0
+
+
+def _steps(args) -> int:
+    recipe = load_recipe(args.recipe)
+    folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
+    stages = trace(imageio.load(args.photo), recipe, at=args.at)
+    for stage in stages:
+        print(f"  {stage.label}", file=sys.stderr)
+    print(write_stages(stages, folder))
+    return 0
+
+
+def _init(args) -> int:
+    print(init_project(args.directory))
     return 0
 
 

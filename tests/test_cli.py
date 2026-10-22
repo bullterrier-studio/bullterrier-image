@@ -40,11 +40,11 @@ def test_bad_recipe_is_reported_without_a_traceback(files, capsys):
     assert not (files / "o").exists()  # failed before doing any work
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="the person matte needs Apple Vision")
-def test_photo_without_a_person_is_reported_clearly(files, capsys):
+@pytest.mark.skipif(sys.platform != "darwin", reason="the subject matte needs Apple Vision")
+def test_photo_without_a_subject_is_reported_clearly(files, capsys):
     (files / "recipes" / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n')
     assert main(["render", str(files / "me.png"), str(files / "recipes" / "m.toml")]) == 1
-    assert "no person" in capsys.readouterr().err.lower()
+    assert "no subject" in capsys.readouterr().err.lower()
 
 
 def test_animate_writes_the_clip(files):
