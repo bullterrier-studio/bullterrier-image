@@ -20,6 +20,7 @@ from typing import Any, overload
 
 import numpy as np
 
+from .errors import RecipeError, UnknownEffectError
 from .params import EffectParams
 
 Effect = Callable[..., np.ndarray]
@@ -44,8 +45,9 @@ class ModelledEffect[P: EffectParams]:
 
     Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
     `glow(rgb)` (the defaults), `glow(rgb, radius=30)`, or `glow(rgb, GlowParams(radius=30))`. Giving both a model and
-    keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `ValueError` naming
-    the effect, the field, the constraint and the value. Injected inputs (`matte`) are passed by keyword in every form.
+    keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
+    naming the effect, the field, the constraint and the value. Injected inputs (`matte`) are passed by keyword in every
+    form.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
@@ -84,7 +86,7 @@ class ModelledEffect[P: EffectParams]:
         return self._function(rgb, params, **given)
 
     def validate(self, values: Mapping[str, object]) -> P:
-        """The model for `values` (parameter name -> value); ValueError naming the effect and every problem."""
+        """The model for `values` (parameter name -> value); RecipeError naming the effect and every problem."""
         return self.params_model.parse(values, f"effect {self.__name__!r}")
 
 
@@ -127,12 +129,14 @@ def effect(fn: Any = None, *, category: str | None = None, params: Any = None) -
 
 
 def unregister(name: str) -> None:
-    """Remove the effect called `name` (KeyError if there is none). For tests that register throwaway effects."""
+    """Remove the effect called `name` (UnknownEffectError if there is none). For tests that register throwaway
+    effects."""
+    _entry(name)
     del _EFFECTS[name]
 
 
 def get(name: str) -> Effect:
-    """The effect called `name`; KeyError listing the available ones if there is none."""
+    """The effect called `name`; UnknownEffectError (a KeyError) listing the available ones if there is none."""
     return _entry(name).function
 
 
@@ -169,7 +173,7 @@ def inputs(name: str) -> tuple[str, ...]:
 
 
 def validate(name: str, values: Mapping[str, object]) -> EffectParams | None:
-    """Check `values` (parameter name -> value) for the effect called `name`: its model, or ValueError naming the
+    """Check `values` (parameter name -> value) for the effect called `name`: its model, or RecipeError naming the
     effect, each field, the constraint and the value. TRANSITIONAL: for a legacy effect only the names are checked
     against its signature, and the result is None."""
     entry = _entry(name)
@@ -178,7 +182,7 @@ def validate(name: str, values: Mapping[str, object]) -> EffectParams | None:
     try:  # TRANSITIONAL: the legacy check, by binding the names to the function's signature
         inspect.signature(entry.function).bind(None, **values)
     except TypeError as error:
-        raise ValueError(f"effect {name!r}: {error}") from None
+        raise RecipeError(f"effect {name!r}: {error}") from None
     return None
 
 
@@ -212,7 +216,7 @@ def _entry(name: str) -> _Entry:
     try:
         return _EFFECTS[name]
     except KeyError:
-        raise KeyError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
+        raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
 
 
 def _register(fn: Any, category: str | None, params: Any) -> Any:

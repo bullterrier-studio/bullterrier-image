@@ -15,8 +15,9 @@ Promises:
   (a bool or a numeric-looking string for a number, a string for a switch, a number for a choice) and values out of
   range are rejected; a whole number is fine for a decimal field, a list (or numpy array) for a list field. Models are
   frozen.
-- `ValidatedModel.parse` is the one way callers validate: a mapping in, the model out, or one plain `ValueError` naming
-  the owner, each field, the constraint and the value (`describe_error` is its wording).
+- `ValidatedModel.parse` is the one way callers validate: a mapping in, the model out, or one `RecipeError` (a
+  `ValueError`) naming the owner, each field, the constraint and the value (`describe_error` is its wording). A more
+  specific `RecipeError` raised by a validator (an `UnknownEffectError`) keeps its class when it is the only problem.
 - `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
   command line, in a caller's types (a `Color` is shown as the forms one may write).
 """
@@ -38,6 +39,7 @@ from pydantic import AllowInfNan, BaseModel, BeforeValidator, ConfigDict, Field,
 
 from photo_fx.ops.color import parse_color
 
+from .errors import RecipeError
 from .types import Color as ColorForms
 
 UNITS = ("px", "fraction", "degrees", "stops", "seconds", "count", "ratio", "cycles")
@@ -137,20 +139,30 @@ def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> 
     return f"{owner}: {problems}" if owner else problems
 
 
+def _invalid(error: ValidationError, owner: str, valid: Iterable[str]) -> RecipeError:
+    """The `RecipeError` for a failed validation, in the wording of `describe_error`. Pydantic wraps a `ValueError`
+    raised inside a validator; when that is the only problem and it is a more specific `RecipeError` (an unknown effect
+    is also a `KeyError`), the caller gets that class back, so `except UnknownEffectError` works on a `Step` too."""
+    problems = [detail.get("ctx", {}).get("error") for detail in error.errors()]
+    single = problems[0] if len(problems) == 1 else None
+    kind = type(single) if isinstance(single, RecipeError) else RecipeError
+    return kind(describe_error(error, owner, valid))
+
+
 class ValidatedModel(BaseModel):
     """Base of photo-fx's validated values (effect parameters, recipe steps, recipes): frozen, unknown fields refused,
-    and every validation failure reported as one plain `ValueError` in the wording of `describe_error`."""
+    and every validation failure reported as one `RecipeError` in the wording of `describe_error`."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
     def parse(cls, values: Mapping[str, object], owner: str = "") -> Self:
-        """The model for `values` (field name -> value); ValueError naming `owner` (e.g. "effect 'glow'"), each bad
+        """The model for `values` (field name -> value); RecipeError naming `owner` (e.g. "effect 'glow'"), each bad
         field, the constraint and the value, and listing the fields when an unknown one was given."""
         try:
             return cls.model_validate(dict(values))
         except ValidationError as error:
-            raise ValueError(describe_error(error, owner, cls.field_names())) from None
+            raise _invalid(error, owner, cls.field_names()) from None
 
     @classmethod
     def field_names(cls) -> tuple[str, ...]:
@@ -163,12 +175,12 @@ class ValidatedModel(BaseModel):
         return cls.model_json_schema()
 
     def _init_checked(self, owner: str, **values: Any) -> None:
-        """For a subclass's own (positional) constructor: validate `values` into this instance; ValueError like
+        """For a subclass's own (positional) constructor: validate `values` into this instance; RecipeError like
         `parse`."""
         try:
             BaseModel.__init__(self, **values)
         except ValidationError as error:
-            raise ValueError(describe_error(error, owner, type(self).field_names())) from None
+            raise _invalid(error, owner, type(self).field_names()) from None
 
 
 class FieldDoc(NamedTuple):

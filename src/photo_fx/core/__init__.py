@@ -1,5 +1,6 @@
 """The kernel: the effect registry, the contract types every effect is written against, and the recipe engine.
 
+    errors      `PhotoFxError` and its subclasses: the exceptions the library raises on purpose
     registry    effects register here (`@effect`); everything else looks them up here
     params      `EffectParams`, `param`, `Color`: how an effect declares its validated, documented parameters
     types       the forms a colour may be written in
@@ -14,6 +15,14 @@ effects, adapters and the app change around it.
 Users import from `photo_fx` / `photo_fx.recipe`, whose `render` & co. also know how to find the subject.
 """
 
+from .errors import (
+    BackendUnavailableError,
+    ImageReadError,
+    PhotoFxError,
+    RecipeError,
+    SubjectNotFoundError,
+    UnknownEffectError,
+)
 from .loader import load_recipe
 from .params import UNITS, Color, EffectParams, param
 from .registry import (
@@ -41,8 +50,10 @@ from .timing import Animated, Animation, ramp
 from .vocabulary import DISCOURAGED
 
 __all__ = [
-    "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "Color", "Effect", "EffectParams",
-    "ModelledEffect", "Recipe", "Stage", "Step", "SubjectFinder", "all_effects", "apply", "categories", "category",
+    "CATEGORIES", "DISCOURAGED", "INPUTS", "UNITS", "Animated", "Animation", "BackendUnavailableError", "Color",
+    "Effect", "EffectParams", "ImageReadError", "ModelledEffect", "PhotoFxError", "Recipe", "RecipeError", "Stage",
+    "Step", "SubjectFinder", "SubjectNotFoundError", "UnknownEffectError", "all_effects", "apply", "categories",
+    "category",
     "describe", "documentation", "effect", "get", "inputs", "load_recipe", "param", "parameters", "ramp", "render",
     "render_all", "render_frames", "schema", "summary", "trace", "unregister",
 ]  # fmt: skip

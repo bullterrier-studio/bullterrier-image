@@ -187,7 +187,7 @@ containers = ["photo_fx.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
 # (types). Both edges point down, so each gets a layer of its own; nothing else changes.
-layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types"]
+layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types | errors"]
 
 [[tool.importlinter.contracts]]
 name = "loader imports only steps and timing from core"

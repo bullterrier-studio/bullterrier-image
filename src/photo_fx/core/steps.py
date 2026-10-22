@@ -4,7 +4,8 @@ ordered tuple of steps with an output size and an optional animation).
 Promises:
 - Everything is validated when it is made, wherever it comes from (a TOML file, `fx`, or your own code): an unknown
   effect, a misspelt or out-of-range parameter, a bad mask or opacity, an animated parameter without an animation, or
-  an empty recipe fails at once with a `ValueError` saying what is valid. A step's parameters are checked by its
+  an empty recipe fails at once with a `RecipeError` (a `ValueError`; an unknown effect is an `UnknownEffectError`,
+  also a `KeyError`) saying what is valid. A step's parameters are checked by its
   effect's own parameter model. An animated parameter is checked by a step at both ends of its movement and at 9
   moments between, and by its recipe at every frame that will be rendered, because an easing curve can overshoot its
   ends: a bad animation fails when the recipe is made, not at some frame later. An animated whole-number parameter
@@ -13,8 +14,8 @@ Promises:
   keeps its parameters as they were written, so `describe` shows them that way.
 - `Step.params_at` works out animated parameters for a moment of the clip; `Step.describe` gives a short readable form.
 
-Dependency direction: imports `timing`, the effect registry and `params` only. `loader` (TOML to `Recipe`) and `runner`
-(running a `Recipe` on a photo) both build on this module and do not know each other.
+Dependency direction: imports `timing`, the effect registry, `params` and `errors` only. `loader` (TOML to `Recipe`)
+and `runner` (running a `Recipe` on a photo) both build on this module and do not know each other.
 """
 
 from collections.abc import Mapping, Sequence
@@ -23,6 +24,7 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from . import registry
+from .errors import RecipeError
 from .params import ValidatedModel
 from .timing import Animated, Animation
 
@@ -57,7 +59,7 @@ class Step(ValidatedModel):
         opacity: float = 1.0,
         **unknown: Any,
     ) -> None:
-        """Validate and make the step; ValueError saying what is wrong and what is valid (`unknown` keywords, which
+        """Validate and make the step; RecipeError saying what is wrong and what is valid (`unknown` keywords, which
         pydantic's own validation may pass, are refused by name)."""
         self._init_checked("", effect=effect, params=dict(params or {}), mask=mask, opacity=opacity, **unknown)
 
@@ -66,18 +68,15 @@ class Step(ValidatedModel):
         """The parameters, checked by the effect itself, at every checked moment of any animation."""
         for name in registry.INPUTS:
             if name in self.params:
-                raise ValueError(f"`{name}` is supplied by the recipe itself and cannot be set")
-        try:
-            registry.inputs(self.effect)
-        except KeyError as error:  # an unknown effect: the message lists the known ones
-            raise ValueError(error.args[0]) from None
+                raise RecipeError(f"`{name}` is supplied by the recipe itself and cannot be set")
+        registry.inputs(self.effect)  # an unknown effect: UnknownEffectError listing the known ones
         registry.validate(self.effect, self.params_at(0.0))
         if self.animated:
             for moment in _CHECKED_MOMENTS:
                 try:
                     registry.validate(self.effect, self.params_at(moment, moment))
-                except ValueError as error:
-                    raise ValueError(f"{error} (animated: at {moment:.0%} of its movement)") from None
+                except RecipeError as error:
+                    raise RecipeError(f"{error} (animated: at {moment:.0%} of its movement)") from None
         return self
 
     def where(self, region: str) -> "Step":
@@ -157,15 +156,15 @@ class Recipe(ValidatedModel):
         animation: Animation | None = None,
         **unknown: Any,
     ) -> None:
-        """Validate and make the recipe; ValueError saying what is wrong (unknown keywords are refused by name)."""
+        """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name)."""
         self._init_checked("", name=name, steps=tuple(steps), size=size, animation=animation, **unknown)
 
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":
         if not self.steps:
-            raise ValueError("a recipe needs at least one step")
+            raise RecipeError("a recipe needs at least one step")
         if self.animation is None and any(step.animated for step in self.steps):
-            raise ValueError(
+            raise RecipeError(
                 "a parameter is animated but the recipe has no animation: add an [animation] table (seconds, fps)"
             )
         if self.animation is not None:
@@ -182,9 +181,9 @@ class Recipe(ValidatedModel):
             for index, (motion, clip) in enumerate(frames):
                 try:
                     registry.validate(step.effect, step.params_at(motion, clip))
-                except ValueError as error:
+                except RecipeError as error:
                     where = f"frame {index} at {index / animation.fps:.2f} s"
-                    raise ValueError(f"step {number}: {error} (animated: {where})") from None
+                    raise RecipeError(f"step {number}: {error} (animated: {where})") from None
 
     @property
     def needs_matte(self) -> bool:

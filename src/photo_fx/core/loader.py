@@ -45,8 +45,16 @@ Dependency direction: imports `steps` and `timing` only; it does not know `runne
 import tomllib
 from pathlib import Path
 
+from .errors import RecipeError
 from .steps import Recipe, Step
 from .timing import EASE_NAMES, Animated, Animation
+
+
+def _located(error: ValueError, where: str) -> RecipeError:
+    """`error` with `where` (the file, and the step) in front; a `RecipeError` keeps its class (an unknown effect stays
+    an `UnknownEffectError`), anything else (timing's plain `ValueError`) becomes a `RecipeError`."""
+    kind = type(error) if isinstance(error, RecipeError) else RecipeError
+    return kind(f"{where}: {error}")
 
 
 def _animated_value(value: object, where: str, key: str) -> object:
@@ -54,26 +62,26 @@ def _animated_value(value: object, where: str, key: str) -> object:
     if not isinstance(value, dict):
         return value
     if set(value) - {"from", "to", "ease", "over"} or not {"from", "to"} <= set(value):
-        raise ValueError(
+        raise RecipeError(
             f"{where}: `{key}` must be {{ from = number, to = number, ease = one of {', '.join(EASE_NAMES)} or "
             f'[x1, y1, x2, y2] with x1, x2 in 0..1, over = "motion" or "clip" }}'
         )
     try:
         return Animated(value["from"], value["to"], value.get("ease", "linear"), value.get("over", "motion"))
     except ValueError as error:
-        raise ValueError(f"{where}: `{key}`: {error}") from None
+        raise _located(error, f"{where}: `{key}`") from None
 
 
 def _load_animation(table: dict, filename: str) -> Animation:
     unknown = set(table) - {"seconds", "fps", "hold_start", "hold_end", "loop"}
     if unknown or "seconds" not in table:
-        raise ValueError(
+        raise RecipeError(
             f"{filename}: [animation] needs `seconds`; allowed keys: seconds, fps, hold_start, hold_end, loop"
         )
     try:
         return Animation(**table)
     except ValueError as error:
-        raise ValueError(f"{filename}: [animation] {error}") from None
+        raise _located(error, f"{filename}: [animation]") from None
 
 
 def load_recipe(path: str | Path) -> Recipe:
@@ -92,14 +100,14 @@ def load_recipe(path: str | Path) -> Recipe:
         entry = dict(entry)
         name = entry.pop("effect", None)
         if name is None:
-            raise ValueError(f"{where}: missing `effect`")
+            raise RecipeError(f"{where}: missing `effect`")
         mask, opacity = entry.pop("mask", None), entry.pop("opacity", 1.0)
         params = {key: _animated_value(value, where, key) for key, value in entry.items()}
         try:
             steps.append(Step(name, params, mask, opacity))
         except ValueError as error:
-            raise ValueError(f"{where}: {error}") from None
+            raise _located(error, where) from None
     try:
         return Recipe(raw.get("name", path.stem), tuple(steps), raw.get("size", 1024), animation)
     except ValueError as error:
-        raise ValueError(f"{path.name}: {error}") from None
+        raise _located(error, path.name) from None
