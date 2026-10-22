@@ -108,7 +108,9 @@ An effect is done when:
 1. **Section 0**, all of it. It is the only thing that has to come before everything else.
 2. **In parallel** with each other:
    - ~~split `recipe.py`~~ (done), then contract steps 1 and 2, one after the other;
-   - the toolbox modules, each as its own task, starting with `colorspace`, `noise`, `edges`, `warp`;
+   - the toolbox modules, each as its own task, starting with `colorspace`, `noise`, `edges`, `warp`; built once, then
+     removed as unused (W1): `colorspace`, `noise`, `edges`, `warp`, `sprites` and `voronoi` return from commit 3b9b2ed
+     (`git show 3b9b2ed:src/photo_fx/ops/<module>.py`, tests in `tests/ops/`) together with their first consumer, never ahead;
    - two streams that need nothing, to prove the workflow: Colour and tone (the "now" group) and Glitch and signal.
 3. The remaining streams as their toolbox modules land. Presets last.
 
