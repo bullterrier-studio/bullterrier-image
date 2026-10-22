@@ -77,7 +77,7 @@ FORBIDDEN = {
         "photo_fx.effects.glitch.effect",
         EFFECTS_APART,
     ),
-    "ops to core": ("ops/warp.py", "import photo_fx.core.timing", "photo_fx.ops.warp", OPS_ALONE),
+    "ops to core": ("ops/cells.py", "import photo_fx.core.timing", "photo_fx.ops.cells", OPS_ALONE),
     "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
     "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
     "effects to imageio": (
@@ -101,7 +101,7 @@ FORBIDDEN = {
     "loader to registry": ("core/loader.py", "import photo_fx.core.registry", "photo_fx.core.loader", LOADER_DIRECT),
     "params to registry": ("core/params.py", "import photo_fx.core.registry", "photo_fx.core.params", CORE_ORDER),
     "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", CORE_ORDER),
-    "timing to ops": ("core/timing.py", "import photo_fx.ops.warp", "photo_fx.core.timing", TIMING_ALONE),
+    "timing to ops": ("core/timing.py", "import photo_fx.ops.cells", "photo_fx.core.timing", TIMING_ALONE),
 }
 
 
@@ -115,7 +115,7 @@ def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract
 
 def test_core_may_import_ops(tmp_path):
     """Owner ruling: the layers are linear, app > adapters > effects > core > ops, so core may use ops."""
-    result = lint_a_copy_with(tmp_path, "core/steps.py", "import photo_fx.ops.warp")
+    result = lint_a_copy_with(tmp_path, "core/steps.py", "import photo_fx.ops.cells")
     assert result.returncode == 0, result.stdout + result.stderr
     for name in CONTRACTS:
         assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"

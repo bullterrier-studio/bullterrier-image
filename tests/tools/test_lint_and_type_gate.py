@@ -115,7 +115,7 @@ OFFENCES = {
     ),
     "a test importing a private name": (
         TEST_MODULE,
-        "from photo_fx.ops.edges import _sobel\n\n\ndef test_probe():\n    assert callable(_sobel)\n",
+        "from photo_fx.ops.glyphs import _load_font\n\n\ndef test_probe():\n    assert callable(_load_font)\n",
         ruff,
         "PLC2701",
     ),
