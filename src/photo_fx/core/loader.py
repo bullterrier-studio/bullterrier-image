@@ -47,7 +47,7 @@ from .steps import Recipe, Step
 from .timing import EASE_NAMES, Animated, Animation
 
 
-def _animated_value(value, where: str, key: str):
+def _animated_value(value: object, where: str, key: str) -> object:
     """Turn `{ from, to, ease, over }` into an Animated; any other value is returned unchanged."""
     if not isinstance(value, dict):
         return value
@@ -113,7 +113,7 @@ def load_recipe(path: str | Path) -> Recipe:
         mask, opacity = entry.pop("mask", None), entry.pop("opacity", 1.0)
         params = {key: _animated_value(value, where, key) for key, value in entry.items()}
         try:
-            steps.append(Step(name, params, mask, opacity if isinstance(opacity, int | float) else opacity))
+            steps.append(Step(name, params, mask, opacity))
         except ValueError as error:
             raise ValueError(f"{where}: {error}") from None
     try:

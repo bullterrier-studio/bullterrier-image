@@ -13,6 +13,7 @@ Dependency direction: imports `timing` (and the effect registry) only. `loader` 
 """
 
 import inspect
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 
 from . import registry
@@ -85,7 +86,7 @@ class Step:
     __str__ = describe
 
 
-def _short(value) -> str:
+def _short(value: object) -> str:
     if isinstance(value, Animated):
         return f"{value.start:g}->{value.end:g}"
     text = repr(value)
@@ -102,7 +103,7 @@ class Recipe:
     """
 
     name: str
-    steps: tuple[Step, ...]
+    steps: Sequence[Step]  # stored as a tuple, whatever sequence it was given as
     size: int | None = 1024
     animation: Animation | None = None
 

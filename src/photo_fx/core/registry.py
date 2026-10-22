@@ -9,6 +9,7 @@ registers, so a broken effect fails at import, naming itself, instead of in some
 import inspect
 import re
 from collections.abc import Callable
+from typing import Any, overload
 
 import numpy as np
 
@@ -28,7 +29,11 @@ _CATEGORY: dict[str, str] = {}
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")
 
 
-def effect(fn: Effect | None = None, *, category: str | None = None):
+@overload
+def effect[F: Effect](fn: F, *, category: str | None = None) -> F: ...
+@overload
+def effect[F: Effect](fn: None = None, *, category: str | None = None) -> Callable[[F], F]: ...
+def effect[F: Effect](fn: F | None = None, *, category: str | None = None) -> F | Callable[[F], F]:
     """Decorator: `@effect(category="colour")` makes `fn(rgb, **params) -> rgb` available under its own name to recipes,
     `fx` and the command line. The function itself is returned unchanged.
 
@@ -72,7 +77,7 @@ def categories() -> dict[str, list[str]]:
     return {c: sorted(name for name, of in _CATEGORY.items() if of == c) for c in CATEGORIES}
 
 
-def apply(name: str, rgb: np.ndarray, **params) -> np.ndarray:
+def apply(name: str, rgb: np.ndarray, **params: Any) -> np.ndarray:
     """Run the effect called `name` with `params`; unknown names and parameters raise with the valid choices."""
     return get(name)(rgb, **params)
 
@@ -89,7 +94,7 @@ def summary(name: str) -> str:
     return text[: end.end()] if end else text
 
 
-def _register(fn: Effect, category: str | None) -> Effect:
+def _register[F: Effect](fn: F, category: str | None) -> F:
     name = fn.__name__
     if category not in CATEGORIES:
         given = "has no category" if category is None else f"has the unknown category {category!r}"

@@ -9,6 +9,7 @@ Promises:
 Dependency direction: this module imports nothing from photo_fx. `steps` builds on it, `loader` and `runner` on `steps`.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 _SIMPLE_EASES = {
@@ -27,7 +28,7 @@ _CURVES = {  # cubic-bezier (x1, y1, x2, y2), as in the motion-design skill's ea
 }
 
 
-def _cubic_bezier(x1: float, y1: float, x2: float, y2: float):
+def _cubic_bezier(x1: float, y1: float, x2: float, y2: float) -> Callable[[float], float]:
     """The CSS-style easing function for a cubic-bezier curve: time (0..1) -> progress (0..1)."""
 
     def coordinate(a: float, b: float, t: float) -> float:
@@ -45,7 +46,7 @@ def _cubic_bezier(x1: float, y1: float, x2: float, y2: float):
     return ease
 
 
-def _easing(spec):
+def _easing(spec: str | tuple[float, ...]) -> Callable[[float], float]:
     """The easing function for a name or a four-number cubic-bezier."""
     if isinstance(spec, str):
         return _SIMPLE_EASES[spec] if spec in _SIMPLE_EASES else _cubic_bezier(*_CURVES[spec])
@@ -67,7 +68,7 @@ class Animated:
 
     start: float
     end: float
-    ease: str | tuple[float, float, float, float] = "linear"
+    ease: str | tuple[float, ...] = "linear"  # a name, or the four numbers x1, y1, x2, y2
     over: str = "motion"
 
     def at(self, position: float, clip: float | None = None) -> float:
@@ -77,7 +78,9 @@ class Animated:
         return self.start + (self.end - self.start) * _easing(self.ease)(t)
 
 
-def ramp(start: float, end: float, ease="linear", over: str = "motion") -> Animated:
+def ramp(
+    start: float, end: float, ease: str | tuple[float, ...] | list[float] = "linear", over: str = "motion"
+) -> Animated:
     """A parameter that changes over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`.
 
     start, end: the value at the start and at the end of the movement. ease: a name from `EASE_NAMES`, or a cubic-bezier
