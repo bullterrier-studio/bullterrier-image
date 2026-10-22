@@ -78,10 +78,9 @@ def scatter(
     return Placement(f32(x, w), f32(y, h), f32(lo + (hi - lo) * depth), f32(depth), f32(phase, 1.0))
 
 
-# Memory bounds only; they never change the result (a test compares batched and one-by-one drawing).
+# Memory bounds only; they never change the result.
 _MAX_PATCH_ELEMENTS = 2_000_000  # pixels evaluated at once for a batch of sprites
 _BLOCK = 1_000_000  # pixels converted from sums to colours at a time
-_MAX_PENDING_ENTRIES = 4_000_000  # drawn pixels the sparse strategy holds before it sums equal pixels
 # Numerical guard, not a look parameter: keeps log(1 - a) finite for a fully opaque sprite. It moves the result by
 # less than 1e-7, below the resolution of the float32 output.
 _ALMOST_ONE = 1.0 - 1e-7
@@ -164,18 +163,17 @@ def _checked(canvas, placement, color, opacity, shape, angle, length, blend, fea
     return x, y, size, depth, color_arr
 
 
-# How the per-pixel sums of overlapping sprites are accumulated is a private performance detail, not a parameter: both
-# strategies return exactly the same (pixel, sum) pairs (a test forces each and compares the pictures byte for byte).
-#   sparse: remember only the pixels that were drawn on; memory follows the area drawn. Best when the sprites cover a
-#           small part of the picture (the usual case: rain, snow, sparkles).
+# How the per-pixel sums of overlapping sprites are accumulated is a private performance detail, not a parameter:
+# both strategies give exactly the same (pixel, sum) pairs.
+#   sparse: remember only the pixels that were drawn on, then sort and sum equal pixels. Best when the sprites cover a
+#           small part of the picture (the usual case: rain, snow, sparkles). Sparse is only chosen when the sprites'
+#           bounding boxes add up to at most `_DENSE_WHEN_SPRITE_AREA_EXCEEDS` of the picture, so the entries held
+#           are bounded by that fraction of the picture's pixels (32 bytes each at most: 2.6 bytes per pixel of the
+#           picture). Sorting needs a few times that briefly: measured worst case about 9 bytes per pixel on top of
+#           the 12 of the returned float32 picture, a peak of 1.8 times the picture.
 #   dense:  one running total per pixel of the picture, updated in place; no sorting. Best when the sprites cover much
 #           of the picture many times over (lens drops, bokeh), where sorting millions of entries is the slow part.
-_DENSE_WHEN_DRAWN_AREA_EXCEEDS = 0.08  # fraction of the picture's pixels; crossover measured on 6000x4000
-
-
-def _prefers_dense(drawn_area: float, n_pixels: int) -> bool:
-    """Whether to accumulate per pixel of the picture (dense) rather than per drawn pixel (sparse)."""
-    return drawn_area > _DENSE_WHEN_DRAWN_AREA_EXCEEDS * n_pixels
+_DENSE_WHEN_SPRITE_AREA_EXCEEDS = 0.08  # fraction of the picture's pixels; crossover measured on 6000x4000
 
 
 def _window(centre: np.ndarray, half_width: int, n: int) -> np.ndarray:
@@ -192,28 +190,19 @@ def _window(centre: np.ndarray, half_width: int, n: int) -> np.ndarray:
     return centre[:, None] + np.arange(-half_width, half_width + 1)
 
 
-def _sum_equal_pixels(pixels: list[np.ndarray], terms: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    """Sum the terms of entries that fall on the same pixel; returns sorted unique pixel indices and their sums."""
-    flat, t = np.concatenate(pixels), np.concatenate(terms)
+def _accumulate_sparse(batches: Iterator[tuple[np.ndarray, np.ndarray]]) -> tuple[np.ndarray, np.ndarray] | None:
+    """Sum `(pixel indices, terms)` batches per pixel, holding only drawn pixels; None if nothing was drawn."""
+    batch_pixels, batch_terms = [], []
+    for pixels, terms in batches:
+        batch_pixels.append(pixels)
+        batch_terms.append(terms)
+    flat, t = np.concatenate(batch_pixels), np.concatenate(batch_terms)
+    if not len(flat):
+        return None
     order = np.argsort(flat, kind="stable")
     flat, t = flat[order], t[order]
     first = np.flatnonzero(np.r_[True, flat[1:] != flat[:-1]])
-    return flat[first], np.add.reduceat(t, first, axis=0)
-
-
-def _accumulate_sparse(batches: Iterator[tuple[np.ndarray, np.ndarray]]) -> tuple[np.ndarray, np.ndarray] | None:
-    """Sum `(pixel indices, terms)` batches per pixel, holding only drawn pixels; None if nothing was drawn."""
-    entry_pixels, entry_terms, entries = [], [], 0
-    for pixels, terms in batches:
-        entry_pixels.append(pixels)
-        entry_terms.append(terms)
-        entries += len(pixels)
-        if entries >= _MAX_PENDING_ENTRIES:  # bound the memory by summing equal pixels now and then
-            merged_pixels, merged_terms = _sum_equal_pixels(entry_pixels, entry_terms)
-            entry_pixels, entry_terms, entries = [merged_pixels], [merged_terms], len(merged_pixels)
-    if not entries:
-        return None
-    touched, sums = _sum_equal_pixels(entry_pixels, entry_terms)
+    touched, sums = flat[first], np.add.reduceat(t, first, axis=0)
     lit = sums.any(axis=1)  # a black sprite adds nothing under `add`: such pixels must stay exactly as they were
     return touched[lit], sums[lit]
 
@@ -366,9 +355,10 @@ def stamp(
                 pixel = np.broadcast_to(rows[:, :, None] * w + cols[:, None, :], alpha.shape)
                 yield pixel[inside], terms(alpha[inside])
 
-    # Upper bound of the area drawn, counting overlaps: each sprite's ellipse, at most the whole picture.
-    drawn_area = np.minimum(np.pi * reach**2 * stretch, h * w)[visible].sum()
-    if _prefers_dense(drawn_area, h * w):
+    # Pixels in the sprites' bounding boxes (a pixel under several sprites counts once per sprite), no more than the
+    # whole picture per sprite: an upper bound on how many (pixel, sprite) entries there will be.
+    sprite_area = np.minimum((2 * ex + 1) * (2 * ey + 1), h * w)[visible].sum()
+    if sprite_area > _DENSE_WHEN_SPRITE_AREA_EXCEEDS * h * w:
         summed = _accumulate_dense(drawn_batches(), h * w)
     else:
         summed = _accumulate_sparse(drawn_batches())

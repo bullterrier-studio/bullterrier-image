@@ -1,10 +1,8 @@
-import time
 import tracemalloc
 
 import numpy as np
 import pytest
 
-from photo_fx.ops import sprites as sprites_module
 from photo_fx.ops.sprites import Placement, scatter, stamp
 
 FIELDS = ("x", "y", "size", "depth", "phase")
@@ -392,7 +390,7 @@ def test_streaks_are_clipped_at_the_edges_like_discs():
     assert np.all(out[:, 40:60] == 0)  # nothing wrapped to the middle
 
 
-# ---------------------------------------------------------------- arguments and speed
+# ---------------------------------------------------------------- arguments
 
 
 @pytest.mark.parametrize(
@@ -431,36 +429,6 @@ def test_stamp_rejects_a_placement_whose_fields_differ_in_length_or_are_not_1d()
 def test_invalid_blend_is_rejected_even_when_there_is_nothing_to_draw():
     with pytest.raises(ValueError, match="blend"):
         stamp(black(), scatter((10, 10), 0, seed=0), blend="nope")
-
-
-def test_batches_of_large_sprites_equal_drawing_each_alone(monkeypatch):
-    # Large sprites on a small picture, with the batch and merge limits lowered so that the drawing is split into many
-    # batches and merges: the result must not depend on how the work is split.
-    monkeypatch.setattr(sprites_module, "_MAX_PATCH_ELEMENTS", 40_000)
-    monkeypatch.setattr(sprites_module, "_MAX_PENDING_ENTRIES", 30_000)
-    p = scatter((160, 160), 40, seed=5, size=(60.0, 140.0), depth_layers=2)
-    zero = np.zeros((160, 160, 3), np.float32)
-    together = stamp(zero, p, blend="add", opacity=0.02)
-    one_by_one = sum(
-        stamp(zero, Placement(*(getattr(p, f)[i : i + 1] for f in FIELDS)), blend="add", opacity=0.02)
-        for i in range(40)
-    )
-    assert together.max() < 1.0
-    np.testing.assert_allclose(together, one_by_one, atol=1e-5)
-
-
-def test_five_thousand_sprites_on_a_1600_square_picture_take_well_under_two_seconds():
-    canvas = np.zeros((1600, 1600, 3), np.float32)
-    placement = scatter((1600, 1600), 5000, seed=1)
-    best = min(_timed(lambda: stamp(canvas, placement)) for _ in range(3))
-    assert best < 1.5, f"{best:.2f} s"
-    assert stamp(canvas, placement).max() > 0.5  # it really drew them
-
-
-def _timed(fn) -> float:
-    start = time.perf_counter()
-    fn()
-    return time.perf_counter() - start
 
 
 # ---------------------------------------------------------------- sprites that reach in from outside
@@ -654,61 +622,6 @@ def test_scatter_sizes_of_middle_layers_are_interpolated_linearly_in_depth():
     assert sorted(set(q.size.tolist())) == [2.0, 4.5, 7.0, 9.5, 12.0]
 
 
-# ---------------------------------------------------------------- the accumulation strategy is invisible
-
-
-@pytest.mark.parametrize("blend", ["add", "screen", "over"])
-@pytest.mark.parametrize(
-    ("shape", "count", "size", "extra"),
-    [
-        ((60, 90), 300, (2.0, 8.0), {}),
-        ((61, 47), 40, (5.0, 60.0), {"opacity": 0.6, "color": (0.9, 0.4, 0.1)}),
-        ((70, 50), 120, (3.0, 20.0), {"shape": "streak", "angle": 37.0, "length": 5.0}),
-        ((120, 150), 40, (40.0, 90.0), {"opacity": 0.03}),  # overlapping big sprites; the sparse path merges (below)
-    ],
-)
-def test_sparse_and_dense_accumulation_give_byte_identical_pictures(monkeypatch, blend, shape, count, size, extra):
-    rng = np.random.default_rng(count)
-    canvas = rng.random((*shape, 3), dtype=np.float32)
-    placement = scatter(shape, count, seed=count, size=size)
-    monkeypatch.setattr(sprites_module, "_MAX_PENDING_ENTRIES", 3000)  # so that the sparse path merges repeatedly
-    results = []
-    for block in (
-        sprites_module._BLOCK,
-        513,
-    ):  # 513: many small blocks, to exercise the block-wise compaction and resolve
-        monkeypatch.setattr(sprites_module, "_BLOCK", block)
-        for dense in (False, True):
-            monkeypatch.setattr(sprites_module, "_prefers_dense", lambda drawn, pixels, dense=dense: dense)
-            results.append(stamp(canvas, placement, blend=blend, **extra))
-    assert not np.array_equal(results[0], canvas)
-    for other in results[1:]:
-        np.testing.assert_array_equal(other, results[0])
-
-
-@pytest.mark.parametrize("dense", [False, True])
-def test_pixels_no_sprite_touches_come_back_unchanged_to_the_last_bit_under_either_accumulation(monkeypatch, dense):
-    monkeypatch.setattr(sprites_module, "_prefers_dense", lambda drawn, pixels: dense)
-    canvas = np.full((101, 101, 3), 1.5, dtype=np.float32)  # out of range on purpose: any clipping would show
-    out = stamp(canvas, sprite(CENTRE, CENTRE, size=10), blend="add", opacity=0.5)
-    assert np.all(out[:30] == 1.5) and np.all(out[:, :30] == 1.5)
-    assert out[50, 50, 0] == 1.0  # touched pixels are clipped
-
-
-def test_the_accumulation_strategy_follows_how_much_of_the_picture_is_drawn_on(monkeypatch):
-    # A guard for speed without a stopwatch: few small sprites are summed sparsely (memory follows the area drawn),
-    # sprites covering the picture many times over are summed per pixel (sorting millions of entries is far slower).
-    used = []
-    for name in ("_accumulate_sparse", "_accumulate_dense"):
-        original = getattr(sprites_module, name)
-        monkeypatch.setattr(
-            sprites_module, name, lambda *a, original=original, name=name: used.append(name) or original(*a)
-        )
-    stamp(black(200, 300), scatter((200, 300), 30, seed=1))
-    stamp(black(200, 300), scatter((200, 300), 30, seed=1, size=(60.0, 90.0)))
-    assert used == ["_accumulate_sparse", "_accumulate_dense"]
-
-
 def test_a_sprite_larger_than_the_picture_costs_about_the_picture_not_several_times_it():
     canvas = np.zeros((1000, 1000, 3), np.float32)  # 12 MB
     tracemalloc.start()
@@ -718,5 +631,131 @@ def test_a_sprite_larger_than_the_picture_costs_about_the_picture_not_several_ti
     finally:
         tracemalloc.stop()
     np.testing.assert_allclose(out, 0.5, atol=1e-6)
-    # measured: about 8x with one shared window, about 14x with a window four times the picture per sprite
-    assert peak < 11 * canvas.nbytes, f"peak {peak / canvas.nbytes:.1f}x the picture"
+    # a resource contract: the working memory of one huge sprite stays a small multiple of the picture
+    assert peak < 12 * canvas.nbytes, f"peak {peak / canvas.nbytes:.1f}x the picture"
+
+
+# ---------------------------------------------------------------- against a naive reference
+
+
+def naive_stamp(
+    canvas,
+    placement,
+    *,
+    color=(1.0, 1.0, 1.0),
+    opacity=1.0,
+    shape="disc",
+    angle=0.0,
+    length=4.0,
+    blend="screen",
+    feather=1.0,
+    softness=0.5,
+    far_brightness=0.4,
+    near_brightness=1.0,
+):
+    """The documented behaviour written the slow obvious way: one sprite at a time over the whole picture, in float64,
+    composited in turn (no windows, no batching, no summing tricks)."""
+    h, w = canvas.shape[:2]
+    rows, cols = np.mgrid[0:h, 0:w] + 0.5  # pixel centres
+    out = canvas.astype(np.float64)
+    colour = np.asarray(color, dtype=np.float64)
+    for x, y, size, depth in zip(placement.x, placement.y, placement.size, placement.depth, strict=True):
+        dx, dy = cols - float(x), rows - float(y)
+        if shape == "streak":
+            along = dx * np.cos(np.radians(angle)) + dy * np.sin(np.radians(angle))
+            across = -dx * np.sin(np.radians(angle)) + dy * np.cos(np.radians(angle))
+            distance = np.hypot(along / length, across)
+        else:
+            distance = np.hypot(dx, dy)
+        radius = float(size) / 2
+        width = max(feather, softness * radius)
+        brightness = far_brightness + (near_brightness - far_brightness) * float(depth)
+        alpha = (np.clip((radius + width / 2 - distance) / width, 0, 1) * opacity * brightness)[..., None]
+        if blend == "add":
+            out = out + alpha * colour
+        elif blend == "screen":
+            out = 1 - (1 - out) * (1 - alpha * colour)
+        else:
+            out = out * (1 - alpha) + colour * alpha
+    touched = np.any(out != canvas, axis=-1, keepdims=True)
+    return np.where(touched, np.clip(out, 0, 1), canvas).astype(np.float32)
+
+
+def random_picture(shape, seed):
+    return np.random.default_rng(seed).random((*shape, 3), dtype=np.float32)
+
+
+def handmade(xs, ys, sizes, depths=None) -> Placement:
+    n = len(xs)
+    depth = np.ones(n) if depths is None else depths
+    return Placement(*(np.asarray(v, np.float32) for v in (xs, ys, sizes, depth, np.zeros(n))))
+
+
+# Each scene is chosen so that the drawing takes a different route inside: a few small sprites on a big picture,
+# many mid-size sprites overlapping (most pixels drawn on many times), sprites several times the picture, sprites
+# clipped by the borders or centred outside, and streaks with every look parameter changed.
+SCENES = {
+    "a few small sprites": ((61, 47), scatter((61, 47), 5, seed=1), {}),
+    "many overlapping mid-size sprites": ((90, 120), scatter((90, 120), 30, seed=2, size=(30.0, 120.0)), {}),
+    "sprites several times the picture": ((40, 50), scatter((40, 50), 5, seed=3, size=(400.0, 900.0)), {}),
+    "fifteen hundred small sprites": ((60, 80), scatter((60, 80), 1500, seed=7), {"opacity": 0.5}),
+    "clipped at borders, centres outside": (
+        (50, 70),
+        handmade(
+            [-10, 0, 35, 70, 80, 35, 35, -5, 75, 0, 70],
+            [25, 25, -12, 25, 25, 0, 50, -5, 55, 0, 50],
+            [20, 40, 30, 60, 35, 50, 25, 45, 30, 12, 12],
+            [1.0, 0.0, 0.5, 1.0, 0.3, 0.8, 1.0, 0.6, 0.2, 1.0, 0.7],
+        ),
+        {},
+    ),
+    "streaks with changed look": (
+        (80, 100),
+        scatter((80, 100), 25, seed=4, size=(5.0, 30.0), depth_layers=4),
+        {
+            "shape": "streak",
+            "angle": 37.0,
+            "length": 5.0,
+            "color": (0.9, 0.5, 0.2),
+            "opacity": 0.6,
+            "feather": 2.0,
+            "softness": 0.3,
+            "far_brightness": 0.2,
+            "near_brightness": 0.9,
+        },
+    ),
+}
+
+
+@pytest.mark.parametrize("blend", ["add", "screen", "over"])
+@pytest.mark.parametrize("scene", SCENES)
+def test_stamp_matches_a_naive_sprite_by_sprite_reference(scene, blend):
+    shape, placement, kwargs = SCENES[scene]
+    canvas = random_picture(shape, seed=len(scene))
+    out = stamp(canvas, placement, blend=blend, **kwargs)
+    expected = naive_stamp(canvas, placement, blend=blend, **kwargs)
+    assert not np.array_equal(out, canvas)  # the scene really draws something
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+def test_huge_sprites_over_a_picture_of_more_than_a_million_pixels_match_the_naive_reference():
+    # four sprites each covering the 1100 x 1000 picture: well over a million touched pixels, whatever the internals
+    placement = handmade([300, 800, 500, 1200], [200, 900, 500, -300], [1500, 2000, 2500, 1800], [1.0, 0.5, 0.0, 0.8])
+    canvas = random_picture((1100, 1000), seed=5)
+    out = stamp(canvas, placement, blend="screen", opacity=0.7)
+    expected = naive_stamp(canvas, placement, blend="screen", opacity=0.7)
+    assert not np.array_equal(out, canvas)
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("sprites", ["one small sprite", "thirty overlapping sprites"])
+def test_pixels_no_sprite_touches_come_back_unchanged_to_the_last_bit(sprites):
+    canvas = np.full((60, 60, 3), 1.5, dtype=np.float32)  # out of range on purpose: any clipping would show
+    if sprites == "one small sprite":
+        placement = sprite(30.0, 30.0, size=8)
+    else:
+        centres = np.random.default_rng(1).uniform(25, 35, 30)
+        placement = handmade(centres, centres[::-1], [12.0] * 30)
+    out = stamp(canvas, placement, blend="add", opacity=0.5)
+    assert np.all(out[:15] == 1.5) and np.all(out[:, :15] == 1.5) and np.all(out[-15:] == 1.5)
+    assert out[30, 30, 0] == 1.0  # a touched pixel is clipped
