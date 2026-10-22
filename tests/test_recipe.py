@@ -88,7 +88,7 @@ def test_opacity_is_read_from_the_file_and_validated(tmp_path):
     ok = load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=0.4\n'))
     assert ok.steps[0].opacity == 0.4
     assert "opacity" not in ok.steps[0].params
-    with pytest.raises(ValueError, match="step 1.*opacity"):
+    with pytest.raises(ValueError, match=r"step 1.*opacity"):
         load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=1.5\n', "bad.toml"))
 
 
@@ -214,7 +214,7 @@ def test_exit_and_entrance_curves_accelerate_and_decelerate():
 )
 def test_bad_easing_is_rejected_when_loading(tmp_path, ease):
     text = ANIMATED.replace('ease = "in-out"', f"ease = {ease}")
-    with pytest.raises(ValueError, match="step 1.*exposure"):
+    with pytest.raises(ValueError, match=r"step 1.*exposure"):
         load_recipe(write(tmp_path, text))
 
 
@@ -237,7 +237,7 @@ def test_over_clip_keeps_running_through_the_holds():
 
 
 def test_over_must_be_motion_or_clip(tmp_path):
-    with pytest.raises(ValueError, match="step 1.*exposure"):
+    with pytest.raises(ValueError, match=r"step 1.*exposure"):
         load_recipe(write(tmp_path, ANIMATED.replace('ease = "in-out"', 'over = "forever"')))
 
 

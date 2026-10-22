@@ -52,7 +52,7 @@ def test_save_video_mp4_streams_frames_and_copes_with_odd_sizes(tmp_path):
 
 
 def test_save_video_rejects_unknown_formats_and_no_frames(tmp_path):
-    with pytest.raises(ValueError, match="use .mp4"):
+    with pytest.raises(ValueError, match=r"use \.mp4"):
         imageio.save_video(_frames(), tmp_path / "a.avi")
     with pytest.raises(ValueError, match="no frames"):
         imageio.save_video([], tmp_path / "a.gif")

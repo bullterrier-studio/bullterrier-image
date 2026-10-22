@@ -41,9 +41,9 @@ def test_steps_can_be_limited_to_a_region_and_blended_without_changing_the_origi
     masked = base.where("background").blend(0.5)
     assert (masked.mask, masked.opacity) == ("background", 0.5)
     assert (base.mask, base.opacity) == (None, 1.0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="left half"):
         base.where("left half")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="opacity"):
         base.blend(2)
 
 
@@ -66,7 +66,7 @@ def test_fx_builds_steps_from_keyword_or_positional_arguments():
 def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
     with pytest.raises(TypeError, match=r"fx\.glitch\(\).*spilt"):
         fx.glitch(spilt=3)
-    with pytest.raises(AttributeError, match="available: .*ascii"):
+    with pytest.raises(AttributeError, match=r"available: .*ascii"):
         fx.sparkle  # noqa: B018
 
 

@@ -40,7 +40,7 @@ RUNS = {
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways(run, photo):
     recipe = CLIP if run is RUNS["render_frames"] else MASKED
-    with pytest.raises(ValueError) as raised:
+    with pytest.raises(ValueError, match="needs the subject") as raised:
         run(photo, recipe)
     message = str(raised.value)  # names the recipe and both ways to give the subject
     assert f"'{recipe.name}'" in message

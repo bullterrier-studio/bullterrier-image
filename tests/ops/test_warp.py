@@ -50,7 +50,7 @@ def test_field_of_the_wrong_shape_is_rejected_naming_the_mismatch():
 
 def test_unknown_mode_is_rejected_listing_the_valid_ones():
     zero = np.zeros((7, 9), np.float32)
-    with pytest.raises(ValueError, match="clamp.*mirror.*wrap.*fill"):
+    with pytest.raises(ValueError, match=r"clamp.*mirror.*wrap.*fill"):
         remap(_picture(7, 9), zero, zero, mode="bounce")
 
 

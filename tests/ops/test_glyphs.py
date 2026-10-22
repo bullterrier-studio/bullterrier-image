@@ -66,7 +66,7 @@ def test_atlas_is_cached_and_cannot_be_modified_in_place():
     first = glyph_atlas(" .:#", 9)
     assert glyph_atlas(" .:#", 9) is first
     assert not first.flags.writeable
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="read-only"):
         first[0, 0, 0] = 1.0
 
 
@@ -170,9 +170,9 @@ def _real_font_sizes(font: str, cell: int) -> list[ImageFont.FreeTypeFont]:
 
 def test_a_font_that_does_not_exist_raises_oserror():
     missing = "/no/such/dir/NoSuchFont.ttf"
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="cannot open resource"):
         cell_size(8, missing)
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="cannot open resource"):
         glyph_atlas(" .#", 8, missing)
 
 

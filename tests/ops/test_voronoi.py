@@ -64,7 +64,7 @@ def test_random_points_zero_count_is_empty():
 
 
 def test_random_points_reject_negative_count():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"count.*-1"):
         voronoi.random_points((10, 10), -1, seed=0)
 
 
@@ -113,7 +113,7 @@ def test_cell_labels_follow_point_order_not_position():
 
 
 def test_cell_labels_reject_no_points():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="at least one point"):
         voronoi.cell_labels((5, 5), np.zeros((0, 2), dtype=np.float32))
 
 
@@ -190,7 +190,7 @@ def test_cell_means_reject_an_image_whose_size_differs_from_the_labels():
 
 def test_cell_means_reject_labels_outside_the_cell_count():
     labels = np.array([[0, 3]], dtype=np.int32)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="labels must lie in"):
         voronoi.cell_means(np.zeros((1, 2, 3), dtype=np.float32), labels, 3)
 
 
@@ -298,7 +298,7 @@ def test_relax_leaves_a_point_whose_cell_has_no_pixels_where_it_was():
 
 
 def test_relax_rejects_negative_iterations():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"iterations.*-1"):
         voronoi.relax(voronoi.random_points((10, 10), 3, seed=0), (10, 10), iterations=-1)
 
 
@@ -338,13 +338,13 @@ def test_triangulate_of_a_regular_grid_has_no_zero_area_triangles():
 
 @pytest.mark.parametrize("count", [0, 1, 2])
 def test_triangulate_rejects_fewer_than_three_points(count):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=f"at least 3 points, got {count}"):
         voronoi.triangulate(voronoi.random_points((10, 10), count, seed=0))
 
 
 def test_triangulate_rejects_collinear_points():
     points = np.array([[0, 0], [1, 1], [2, 2], [5, 5]], dtype=np.float32)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="collinear"):
         voronoi.triangulate(points)
 
 
@@ -372,5 +372,5 @@ def test_triangulate_ignores_a_repeated_point():
 
 
 def test_triangulate_rejects_fewer_than_three_distinct_points():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="collinear"):
         voronoi.triangulate(np.array([[0, 0], [0, 0], [1, 1]], dtype=np.float32))

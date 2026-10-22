@@ -113,7 +113,7 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
 
 def test_a_broken_recipe_fails_before_any_work_is_done(folder):
     (folder / "recipes" / "typo.toml").write_text('name = "typo"\n[[step]]\neffect = "nope"\n')
-    with pytest.raises(ValueError, match="typo.toml"):
+    with pytest.raises(ValueError, match=r"typo\.toml"):
         run(load_project(folder / "photo-fx.toml"))
     assert not (folder / "out").exists()
 

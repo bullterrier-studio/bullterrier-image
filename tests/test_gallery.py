@@ -166,7 +166,7 @@ def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_reci
 
 
 def test_gallery_rejects_an_unknown_effect_before_rendering(tmp_path, checkout, probe):
-    with pytest.raises(ValueError) as raised:
+    with pytest.raises(ValueError, match="nope") as raised:
         gallery.render_gallery(tmp_path / "out", only=[probe, "nope"], checkout=checkout)
     # the name, and the choices
     assert "'nope'" in str(raised.value)
