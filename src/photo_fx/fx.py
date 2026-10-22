@@ -23,7 +23,7 @@ from collections.abc import Callable
 from functools import cache
 
 from . import effects
-from .steps import Step
+from .core.steps import Step
 
 
 def __getattr__(name: str) -> Callable[..., Step]:

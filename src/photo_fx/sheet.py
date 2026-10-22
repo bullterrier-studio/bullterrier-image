@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from . import imageio
-from .runner import Stage
+from .recipe import Stage
 
 
 def contact_sheet(tiles: list[tuple[str, np.ndarray]], columns: int = 3, tile: int = 480) -> np.ndarray:

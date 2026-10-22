@@ -3,7 +3,7 @@ cubic-bezier definition), never against the module's own formulas."""
 
 import pytest
 
-from photo_fx.timing import Animated, Animation
+from photo_fx.core.timing import Animated, Animation
 
 # (name, value of the ease at t = 0.25, 0.5, 0.75), worked out by hand from the definitions
 SIMPLE_EASES = [

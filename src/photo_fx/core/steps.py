@@ -15,7 +15,7 @@ Dependency direction: imports `timing` (and the effect registry) only. `loader` 
 import inspect
 from dataclasses import dataclass, field, replace
 
-from . import effects
+from . import registry
 from .timing import Animated, Animation
 
 _MASKS = ("subject", "background")
@@ -46,7 +46,7 @@ class Step:
         if "matte" in self.params:
             raise ValueError("`matte` is supplied by the recipe itself and cannot be set")
         try:
-            inspect.signature(effects.get(self.effect)).bind(None, **self.params_at(0.0))
+            inspect.signature(registry.get(self.effect)).bind(None, **self.params_at(0.0))
         except (KeyError, TypeError) as error:
             raise ValueError(str(error.args[0]) if isinstance(error, KeyError) else str(error)) from None
 
@@ -66,7 +66,7 @@ class Step:
     @property
     def wants_matte(self) -> bool:
         """True for an effect that takes the subject's silhouette: it declares a parameter called `matte`."""
-        return "matte" in inspect.signature(effects.get(self.effect)).parameters
+        return "matte" in inspect.signature(registry.get(self.effect)).parameters
 
     def params_at(self, position: float, clip: float | None = None) -> dict:
         """The parameters with every animated value worked out for a moment of the clip (see `Animated.at`)."""

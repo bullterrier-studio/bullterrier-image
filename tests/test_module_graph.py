@@ -149,8 +149,13 @@ def test_a_cycle_is_reported_even_when_the_table_is_edited_to_allow_its_edges(gr
     assert expect in violations(graph)
 
 
-def test_the_real_modules_depend_on_each_other_in_the_stated_direction_only():
-    graph = {name: internal_imports((PACKAGE / f"{name}.py").read_text()) for name in ALLOWED}
+def test_the_real_modules_depend_on_each_other_in_the_stated_direction_only(monkeypatch):
+    # M1 moved the four engine modules into core/ (which now holds the registry) and made the runner take the subject
+    # by injection; the import-linter contracts that replace this table follow in the next commit.
+    monkeypatch.setitem(ALLOWED, "steps", {"timing", "registry"})
+    monkeypatch.setitem(ALLOWED, "runner", {"steps", "registry", "ops"})
+    monkeypatch.delitem(ALLOWED, "recipe")
+    graph = {name: internal_imports((PACKAGE / "core" / f"{name}.py").read_text()) for name in ALLOWED}
     assert violations(graph) == []
     assert graph["steps"] >= {"timing"} and graph["runner"] >= {"steps"} and graph["loader"] >= {"steps"}  # not vacuous
 
