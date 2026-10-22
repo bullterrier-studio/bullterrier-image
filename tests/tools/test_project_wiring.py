@@ -25,7 +25,15 @@ REMOTE_HOOK_IDS = {
     "check-added-large-files",
     "detect-private-key",
 }
-LOCAL_HOOK_IDS = {"ruff-format", "ruff-check", "commit-message", "tests"}
+LOCAL_HOOK_IDS = {"ruff-format", "ruff-check", "commit-message", "tests", "mypy"}
+# what each local hook prints on failure (pre-commit shows the hook name): the command that fixes or reproduces it
+FIX_COMMANDS = {
+    "ruff-format": "uv run poe fix",
+    "ruff-check": "uv run poe fix",
+    "commit-message": "uv run python tools/check_commit_message.py",
+    "tests": "uv run poe test",
+    "mypy": "uv run mypy",
+}
 
 
 @pytest.fixture(scope="module")
@@ -57,13 +65,13 @@ def test_commit_message_settings_are_the_documented_ones(pyproject):
     }
 
 
-def test_poe_tasks_exist_and_the_gate_runs_format_lint_tests_in_order(pyproject):
+def test_poe_tasks_exist_and_the_gate_runs_format_lint_types_tests_in_order(pyproject):
     tasks = pyproject["tool"]["poe"]["tasks"]
     assert {"check", "fix", "test", "setup"} <= tasks.keys()
     assert poe_commands(tasks["test"]) == ["pytest -q"]
     assert poe_commands(tasks["fix"]) == ["ruff check --fix .", "ruff format ."]
     # the test command is defined once (task `test`) and the gate refers to it
-    assert tasks["check"]["sequence"] == ["ruff format --check .", "ruff check .", {"ref": "test"}]
+    assert tasks["check"]["sequence"] == ["ruff format --check .", "ruff check .", "mypy", {"ref": "test"}]
     assert poe_commands(tasks["setup"]) == [
         "pre-commit install --install-hooks",
         "git config --local commit.template .gitmessage",
@@ -75,7 +83,7 @@ def test_poe_tasks_exist_and_the_gate_runs_format_lint_tests_in_order(pyproject)
     [
         ("test", ["pytest -q"]),
         ("fix", ["ruff check --fix .", "ruff format ."]),
-        ("check", ["ruff format --check .", "ruff check .", "pytest -q"]),
+        ("check", ["ruff format --check .", "ruff check .", "mypy", "pytest -q"]),
         ("setup", ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"]),
     ],
 )
@@ -99,7 +107,9 @@ def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject):
 
 
 def test_dev_group_names_the_tools_the_tasks_and_tests_use(pyproject):
-    assert {"pytest", "ruff", "pre-commit", "poethepoet", "pyyaml"} <= dev_dependency_names(pyproject)
+    assert {"pytest", "ruff", "mypy", "pre-commit", "poethepoet", "pyyaml", "types-pyyaml"} <= dev_dependency_names(
+        pyproject
+    )
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -166,10 +176,29 @@ def test_hooks_run_at_the_documented_stages(precommit):
         assert "stages" not in hook, hook_id
     local = hooks_by_id(precommit, "local")
     assert local["commit-message"]["stages"] == ["commit-msg"]
-    assert local["tests"]["stages"] == ["pre-push"]  # the full suite runs on push and in `poe check`, not on commit
+    # the whole-repository checks run on push and in `poe check`, not on every commit: commits stay fast
+    assert local["tests"]["stages"] == ["pre-push"]
     assert local["tests"]["entry"] == "uv run pytest -q"
+    assert local["mypy"]["stages"] == ["pre-push"]
+    assert local["mypy"]["entry"] == "uv run mypy"
     for hook_id in ("ruff-format", "ruff-check"):
         assert "stages" not in local[hook_id]  # default stage: pre-commit
+
+
+@pytest.mark.parametrize("hook_id", ["tests", "mypy"])
+def test_whole_repository_hooks_run_on_every_push_over_everything(precommit, hook_id):
+    # pass_filenames: false, or pre-commit would hand over only the pushed files and the check would see a part;
+    # always_run: true, or a push that touches no Python file would skip it
+    hook = hooks_by_id(precommit, "local")[hook_id]
+    assert hook["pass_filenames"] is False
+    assert hook["always_run"] is True
+
+
+def test_every_local_hook_failure_says_how_to_fix_or_reproduce_it(precommit):
+    local = hooks_by_id(precommit, "local")
+    assert set(FIX_COMMANDS) == set(local)  # a new hook must say its command too
+    for hook_id, command in FIX_COMMANDS.items():
+        assert f"`{command}" in local[hook_id]["name"], hook_id  # pre-commit prints the name on the failure line
 
 
 def test_no_hook_rewrites_files(precommit):

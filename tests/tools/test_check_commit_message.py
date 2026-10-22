@@ -247,7 +247,7 @@ def test_main_uses_the_pyproject_it_is_pointed_at(tmp_path, capsys):
         "zero limit",
         "boolean limit",
         "bad regex",
-    ],  # fmt: skip
+    ],
 )
 def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, capsys):
     pyproject = tmp_path / "pyproject.toml"

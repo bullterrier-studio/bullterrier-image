@@ -25,8 +25,8 @@ Layers, each importing only from the ones below it (import-linter checks this in
 
 # First, before anything else: importing the effect library registers every effect, so whichever photo_fx module is
 # imported (even `photo_fx.core.runner` alone, since Python runs this file first), every effect is there.
-from . import effects  # noqa: I001, F401  (a statement of its own, so no import sorting can move another before it)
-from . import fx, imageio, recipe  # noqa: F401  (binds `photo_fx.recipe`, which callers use as a namespace)
+from . import effects  # noqa: I001  (a statement of its own, so no import sorting can move another before it)
+from . import fx, imageio, recipe  # binds `photo_fx.recipe`, which callers use as a namespace
 from .matte import subject_matte
 from .pipeline import Project, load_project, run
 from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace

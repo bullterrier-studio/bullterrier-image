@@ -32,14 +32,22 @@ repos:
         language: system
         types: [python]
       - id: commit-message
-        name: commit-message (Conventional Commits, see CLAUDE.md)
+        name: commit-message (see CLAUDE.md; check with `uv run python tools/check_commit_message.py <file>`)
         entry: uv run python tools/check_commit_message.py
         language: system
         stages: [commit-msg]
-      # The whole suite runs on push (and in `uv run poe check`), not on every commit.
+      # The whole-repository checks run on push (and in `uv run poe check`), not on every commit, so commits stay
+      # fast. They check everything, whatever the push touched: no file names, and they run even without .py changes.
       - id: tests
         name: tests (reproduce with `uv run poe test`)
         entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: mypy
+        name: mypy (reproduce with `uv run mypy`)
+        entry: uv run mypy
         language: system
         pass_filenames: false
         always_run: true
