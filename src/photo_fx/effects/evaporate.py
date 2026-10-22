@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from . import _pieces
+from ..ops import cells, distance
 from ._registry import effect
+from .ascii import cell_size
 
 
 @effect(category="animation")
@@ -44,9 +45,10 @@ def evaporate(
     a matte the lit pieces are used, with enclosed dark gaps filled in.
     """
     height, width = rgb.shape[:2]
-    pieces, cell_w, cell_h = _pieces.cut(rgb, cell)
+    cell_w, cell_h = cell_size(cell)
+    pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
-    lit = _pieces.lit(pieces)
+    lit = cells.lit(pieces)
 
     rng = np.random.default_rng(seed)
     u = rng.random((3, rows, cols))
@@ -55,8 +57,9 @@ def evaporate(
     centre = (np.arange(rows) + 0.5) * cell_h / height  # each row's height in the picture, 0 = top
     t = np.clip((start - centre) / max(start - end, 1e-6), 0.0, 1.0)
     strength = np.broadcast_to((t * t * (3.0 - 2.0 * t))[:, None], (rows, cols))
-    figure = _pieces.figure(lit, matte, cell_w, cell_h, height, width)
-    inside, normal_x, normal_y = _pieces.outline(figure, cell_w, cell_h)  # px from the nearest edge; direction out
+    figure = cells.figure(lit, matte, cell_w, cell_h, height, width)
+    edges = distance.edge_distance(figure, sampling=(cell_h, cell_w))  # px from the nearest edge; direction out
+    inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
     if edge > 0:
         t = np.clip(1.0 - inside / max(edge * width, 1.0), 0.0, 1.0)
         strength = np.maximum(strength, t * t * (3.0 - 2.0 * t))
@@ -81,4 +84,4 @@ def evaporate(
     dim = (1.0 - height_share[alive]) ** 1.5
     np.maximum.at(out, (new_row[alive], new_col[alive]), pieces[row[alive], col[alive]] * dim[:, None, None, None])
 
-    return _pieces.join(out, height, width)
+    return cells.join(out, height, width)

@@ -8,8 +8,9 @@ travelling against the wind.
 
 import numpy as np
 
-from . import _pieces
+from ..ops import cells, distance
 from ._registry import effect
+from .ascii import cell_size
 
 # All times are shares of the moving part of the clip (progress 0..1), so they scale with the clip's length.
 _ANTICIPATE = 0.06  # wind-up before a piece goes; the first piece detaches only after this, so every piece has one
@@ -76,11 +77,13 @@ def disperse(
     height, width = rgb.shape[:2]
     if progress <= 0.0 and ambient <= 0.0:
         return rgb.copy()
-    pieces, cell_w, cell_h = _pieces.cut(rgb, cell)
+    cell_w, cell_h = cell_size(cell)
+    pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
-    present = _pieces.lit(pieces)
-    figure = _pieces.figure(present, matte, cell_w, cell_h, height, width)
-    inside, normal_x, normal_y = _pieces.outline(figure, cell_w, cell_h)
+    present = cells.lit(pieces)
+    figure = cells.figure(present, matte, cell_w, cell_h, height, width)
+    edges = distance.edge_distance(figure, sampling=(cell_h, cell_w))
+    inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
     rng = np.random.default_rng(seed)
     u = rng.random((6, rows, cols))
 
@@ -156,7 +159,7 @@ def disperse(
     shaded = pieces[row, col] * brightness[:, None, None, None]
     np.maximum.at(canvas, (yy[on_canvas], xx[on_canvas]), shaded[on_canvas])
 
-    kept = _pieces.join(out, canvas.shape[0], canvas.shape[1])
+    kept = cells.join(out, canvas.shape[0], canvas.shape[1])
     return np.maximum(kept, canvas)[:height, :width].astype(np.float32)
 
 
