@@ -84,15 +84,41 @@ def test_every_effect_is_available_as_a_step_builder():
         assert getattr(fx, name)().effect == name
 
 
-def test_the_editor_stub_is_valid_python_with_one_function_per_effect():
+def test_the_editor_stub_is_valid_python_with_one_function_per_effect(throwaway_effects):
     """fx.pyi itself is regenerated at integration (`photo-fx regenerate`), so only its generator is checked here."""
     from photo_fx import effects
+    from photo_fx.effects._registry import effect
+
+    @effect(category="utilities")
+    def stub_probe(rgb, radius: float = 2.0, amount: float = 0.5, matte=None):
+        """Probe for the stub."""
+        return rgb
 
     tree = ast.parse(fx.stub_text())
-    functions = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
-    assert sorted(functions) == sorted(effects.describe()) and len(functions) == len(set(functions))
-    glow = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "glow")
-    assert [a.arg for a in glow.args.args] == ["radius", "amount", "threshold"]  # its parameters, without the image
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    assert sorted(functions) == sorted(effects.describe())  # one per effect, no more, no less
+    assert [a.arg for a in functions["stub_probe"].args.args] == ["radius", "amount"]  # no image, no matte
+    assert ast.get_docstring(functions["stub_probe"]) == "Probe for the stub."
+
+
+def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
+    from photo_fx.effects._registry import effect, unregister
+
+    @effect(category="utilities")
+    def renamed_probe(rgb, old: float = 1.0):
+        """First version."""
+        return rgb
+
+    assert list(inspect.signature(fx.renamed_probe).parameters) == ["old"]
+    unregister("renamed_probe")
+
+    @effect(category="utilities")
+    def renamed_probe(rgb, new: float = 1.0):  # noqa: F811  (a different effect under the same name)
+        """Second version."""
+        return rgb
+
+    assert list(inspect.signature(fx.renamed_probe).parameters) == ["new"]
+    assert fx.renamed_probe(new=2.0) == Step("renamed_probe", {"new": 2.0})
 
 
 def test_python_and_toml_recipes_are_the_same_thing(tmp_path):

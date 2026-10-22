@@ -30,19 +30,19 @@ def __getattr__(name: str) -> Callable[..., Step]:
     if name.startswith("_"):
         raise AttributeError(name)
     try:
-        return _builder(name)
+        function = effects.get(name)
     except KeyError:
         raise AttributeError(f"fx has no effect {name!r}; available: {', '.join(sorted(effects.describe()))}") from None
+    return _builder(name, function)
 
 
 def __dir__() -> list[str]:
     return sorted(effects.describe())
 
 
-@cache
-def _builder(name: str) -> Callable[..., Step]:
+@cache  # keyed by the function too, so an effect replaced under the same name (a reload) gets a new builder
+def _builder(name: str, function: Callable) -> Callable[..., Step]:
     """The function behind `fx.<name>`: takes the effect's parameters (not the image) and returns a Step."""
-    function = effects.get(name)
     signature = inspect.signature(function)
     image_parameter = next(iter(signature.parameters))
 
