@@ -295,6 +295,15 @@ class DisperseParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    background_threshold: float = param(
+        0.02,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
+        "background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has "
+        "begun. Raising it drops dim, noisy pieces; without a matte it also decides the figure's outline.",
+    )
 
 
 @effect(category="animation", params=DisperseParams)
@@ -318,7 +327,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     cell_w, cell_h = cell_size(p.cell, p.font)
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
-    present = cells.lit(pieces)
+    present = cells.lit(pieces, threshold=p.background_threshold)
     figure = cells.figure(present, matte, cell_w, cell_h, height, width)
     edges = distance.edge_distance(
         figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing

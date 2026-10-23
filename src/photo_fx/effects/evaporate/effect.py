@@ -152,6 +152,15 @@ class EvaporateParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    background_threshold: float = param(
+        0.02,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
+        "background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, "
+        "noisy pieces behind; without a matte it also decides the figure's outline.",
+    )
 
 
 @effect(category="animation", params=EvaporateParams)
@@ -177,7 +186,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     cell_w, cell_h = cell_size(p.cell, p.font)
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
-    lit = cells.lit(pieces)
+    lit = cells.lit(pieces, threshold=p.background_threshold)
 
     rng = np.random.default_rng(p.seed)
     u = rng.random((3, rows, cols))  # constant: one random field per use below (fixed, so a seed keeps its look)

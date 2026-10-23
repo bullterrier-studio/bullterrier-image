@@ -53,9 +53,7 @@ BOUND_CALLS = {
 # Known findings whose fix needs new effect parameters (a change of each effect's interface, not of its look). Key:
 # (module relative to photo_fx, literal); value: where it is used and what it does. One entry per line, so removals
 # merge cleanly; an entry that no longer matches anything fails, so it is removed with its finding.
-EXEMPT: dict[tuple[str, float], str] = {
-    ("ops/cells.py", 0.02): "evaporate and disperse: `lit`'s brightness threshold for a visible piece",
-}
+EXEMPT: dict[tuple[str, float], str] = {}
 
 
 def hidden_tunables(source: str) -> list[tuple[int, float]]:

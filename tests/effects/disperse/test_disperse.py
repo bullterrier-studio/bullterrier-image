@@ -224,6 +224,15 @@ def test_disperse_sweeping_across_keeps_fewer_than_half_of_the_pieces_in_flight_
     assert gone[img[..., 0] == 1].mean() == pytest.approx(goes, abs=0.05)  # and `reach` of them have gone at the end
 
 
+def test_disperse_background_threshold_is_how_bright_a_piece_must_be_to_fly():
+    dim = np.zeros((120, 200, 3), np.float32)
+    dim[40:80, 60:100] = 0.1  # a dim block on black; everything right of it is empty
+    blown_right = {"progress": 0.5, "wind": 0.3, "angle": 0, "seed": 1}
+    assert registry.apply("disperse", dim, **blown_right)[:, 100:].max() > 0.0  # by default (0.02) it is carried
+    right = registry.apply("disperse", dim, background_threshold=0.2, **blown_right)[:, 100:]
+    assert right.max() == 0.0  # no brighter than the threshold: background, nothing flies
+
+
 def test_disperse_seed_changes_the_motion_and_repeats_exactly():
     a = registry.apply("disperse", _lit(), progress=0.5, seed=1)
     np.testing.assert_array_equal(a, registry.apply("disperse", _lit(), progress=0.5, seed=1))

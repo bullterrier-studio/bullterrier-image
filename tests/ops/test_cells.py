@@ -64,7 +64,7 @@ def test_lit_is_true_exactly_for_pieces_with_a_value_above_threshold():
     pieces[1, 0] = 0.5
     pieces[1, 2, 2, 3, 0] = 1.0
     expected = np.array([[True, False, False], [True, False, True]])
-    result = lit(pieces)
+    result = lit(pieces, threshold=0.02)
     assert result.dtype == bool
     np.testing.assert_array_equal(result, expected)
 
@@ -72,7 +72,7 @@ def test_lit_is_true_exactly_for_pieces_with_a_value_above_threshold():
 def test_lit_follows_the_image_through_cut():
     image = np.zeros((20, 30, 3), dtype=np.float32)
     image[13, 22] = 0.9  # row 13 // 5 = 2, col 22 // 6 = 3
-    result = lit(cut(image, cell_w=6, cell_h=5))
+    result = lit(cut(image, cell_w=6, cell_h=5), threshold=0.02)
     assert result.shape == (4, 5)
     assert np.argwhere(result).tolist() == [[2, 3]]
 

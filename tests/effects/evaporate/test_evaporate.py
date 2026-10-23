@@ -117,6 +117,15 @@ def test_evaporate_takes_its_edge_from_the_matte_when_given():
     assert without[150:, 20:60].min() == 1.0  # with no matte there is no such outline (only the picture borders)
 
 
+def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift():
+    dim = np.zeros((120, 160, 3), np.float32)
+    dim[60:100, 60:100] = 0.1  # a dim block on black; everything above it is empty
+    everything_detaches = {"start": 1.0, "end": 0.99, "vanish": 0.0, "thinning": 0.0, "seed": 1}
+    assert registry.apply("evaporate", dim, **everything_detaches)[:60].max() > 0.0  # by default (0.02) it drifts up
+    above = registry.apply("evaporate", dim, background_threshold=0.2, **everything_detaches)[:60]
+    assert above.max() == 0.0  # no brighter than the threshold: background, nothing drifts
+
+
 def test_evaporate_seed_controls_the_dissolve(photo):
     a, b = registry.apply("evaporate", photo, seed=1), registry.apply("evaporate", photo, seed=2)
     assert not np.array_equal(a, b)

@@ -35,12 +35,12 @@ def join(pieces: np.ndarray, height: int, width: int) -> np.ndarray:
     return pieces.transpose(0, 2, 1, 3, 4).reshape(rows * cell_h, cols * cell_w, 3)[:height, :width].astype(np.float32)
 
 
-def lit(pieces: np.ndarray) -> np.ndarray:
-    """(rows, cols) bool: the pieces that have any content, meaning some value above 0.02 (on a 0..1 scale).
+def lit(pieces: np.ndarray, *, threshold: float) -> np.ndarray:
+    """(rows, cols) bool: the pieces that have any content, meaning some value above `threshold` (on a 0..1 scale).
 
     `pieces` is a grid from `cut`. Pieces of black background are not worth moving.
     """
-    return pieces.max(axis=(2, 3, 4)) > 0.02
+    return pieces.max(axis=(2, 3, 4)) > threshold
 
 
 def figure(
