@@ -48,6 +48,8 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 - The library never prints and never configures logging; only the CLI writes to the terminal.
 - Output files carry no EXIF or GPS data from the input.
 - Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
+- Security gates: ruff's `S` (bandit), `PGH` and `LOG` rules run in `poe check` (a subprocess call carries `# noqa: S603  <why its argv is safe>`);
+  `uv run poe audit` runs pip-audit on `uv.lock` (needs the network, so not in `check`: before a release and in CI, which runs `uv run --locked poe check` so a stale `uv.lock` fails).
 - The gates (`uv run poe check`) are the review: reviewers check behaviour and the rules in this file, nothing else. A defect a review finds twice
   becomes a gate.
 - Design decisions and their reasons are in `docs/design-decisions.md`; a new one goes there, not in this file.

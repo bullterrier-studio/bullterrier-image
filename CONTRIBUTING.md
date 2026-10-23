@@ -20,6 +20,7 @@ uv run poe setup       # once per clone: the git hooks and the commit-message te
 ```bash
 uv run poe check       # every gate: format, lint, dead code, dependencies, build, types, tests
 uv run poe fix         # repairs what lint and format can repair by themselves
+uv run poe audit       # known vulnerabilities in the locked dependencies (pip-audit; needs the network)
 ```
 
 `poe check` is the review: a change that passes it and follows the rules in CLAUDE.md is ready. Tests describe

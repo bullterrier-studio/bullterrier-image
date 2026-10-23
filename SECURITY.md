@@ -27,5 +27,8 @@ photo-fx is before 1.0: only the latest release receives security fixes.
 - **Untrusted pictures.** Pillow's decompression-bomb limit stays on, and a damaged file raises `ImageReadError`.
 - **Cached data** is read without pickle, so a planted cache file cannot run code.
 - **Outputs** carry no EXIF or GPS data from the input photo.
+- **Audited code and dependencies.** ruff's security rules (flake8-bandit) are part of every `poe check`, and
+  `uv run poe audit` checks every release pinned in `uv.lock` with pip-audit. No known advisory is open; one that has no
+  fixed release yet would be listed here by its id.
 - **Plugins** are Python packages: installing one runs its code, as with any package. `PHOTO_FX_PLUGINS=builtin` loads
   only photo-fx's own effects.
