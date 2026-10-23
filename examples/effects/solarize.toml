@@ -1,0 +1,7 @@
+# Darkroom solarization: the highlights fold back to dark.
+name = "solarize"
+size = 480
+
+[[step]]
+effect = "solarize"
+threshold = 0.55
