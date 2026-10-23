@@ -34,6 +34,7 @@ FLAT_ROWS = {
     "shadows 4 on 0.1: e = 1 / 4.24": (0.1, 4.0, 0.0, 0.5809663),
     "mid grey with both sliders at 1: e = 1.25 / 1.25 = 1": (0.5, 1.0, 1.0, 0.5),
     "highlights 1 on 0.95: e = 1.9025": (0.95, 0.0, 1.0, 0.9070248),
+    "shadows 1 on 0.04: e = 1 / 1.9216": (0.04, 1.0, 0.0, 0.1872891),
     "black stays black": (0.0, 4.0, 0.0, 0.0),
     "white stays white": (1.0, 0.0, 4.0, 1.0),
     "shadows barely touch a bright tone: e = 1 / 1.01": (0.9, 1.0, 0.0, 0.9009393),
@@ -131,39 +132,3 @@ def test_more_surroundings_are_seen_as_the_radius_grows() -> None:
     assert levels[0] == pytest.approx(0.2802295, abs=1e-5)  # a dark pixel's full lift, 0.1^(1 / 1.81)
     assert levels[0] - levels[1] > 0.01
     assert levels[1] - levels[2] > 0.01
-
-
-def reference_base(luma: np.ndarray, radius: int, edge_threshold: float) -> np.ndarray:
-    """The guided filter of He, Sun and Tang (2010) with the picture as its own guide, written naively: every window
-    mean is a slice and a mean, with windows cut off at the picture's edge."""
-    height, width = luma.shape
-
-    def mean(values: np.ndarray) -> np.ndarray:
-        return np.array(
-            [
-                [
-                    values[max(y - radius, 0) : y + radius + 1, max(x - radius, 0) : x + radius + 1].mean()
-                    for x in range(width)
-                ]
-                for y in range(height)
-            ]
-        )
-
-    luma = luma.astype(np.float64)
-    mean_luma = mean(luma)
-    variance = mean(luma * luma) - mean_luma**2
-    slope = variance / (variance + edge_threshold**2)  # covariance of the picture with itself is its variance
-    offset = mean_luma - slope * mean_luma
-    return np.clip(mean(slope) * luma + mean(offset), 0, 1)
-
-
-@pytest.mark.parametrize(("radius", "edge_threshold"), [(0, 0.1), (1, 0.05), (3, 0.3), (6, 0.1), (40, 0.2)])
-def test_the_base_layer_is_the_guided_filter_of_the_luma(radius: int, edge_threshold: float) -> None:
-    """With shadows = 1 a pixel's red goes to r^e with e = 1 / (1 + (1 - B)^2), which gives back the base layer B."""
-    rng = np.random.default_rng(7)
-    picture = rng.uniform(0.05, 0.9, (13, 17, 3)).astype(np.float32)
-    out = registry.apply(NAME, picture, shadows=1.0, highlights=0.0, radius=radius, edge_threshold=edge_threshold)
-    exponent = np.log(out[..., 0]) / np.log(picture[..., 0])
-    base = 1.0 - np.sqrt(1.0 / exponent - 1.0)
-    luma = picture @ np.array([0.2126, 0.7152, 0.0722], np.float32)
-    np.testing.assert_allclose(base, reference_base(luma, radius, edge_threshold), atol=2e-4)

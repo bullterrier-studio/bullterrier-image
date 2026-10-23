@@ -5,6 +5,7 @@ import numpy as np
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.color import luminance
+from photo_fx.ops.guided import guided_filter
 
 
 class ShadowsHighlightsParams(EffectParams):
@@ -62,37 +63,6 @@ def shadows_highlights(rgb: np.ndarray, params: ShadowsHighlightsParams) -> np.n
     `highlights` only raises it (pulling c towards 0), black and white stay where they are, and 0..1 maps into 0..1.
     """
     luma = luminance(rgb)
-    base = np.clip(_guided_filter(luma, luma, radius=round(params.radius), epsilon=params.edge_threshold**2), 0.0, 1.0)
+    base = np.clip(guided_filter(luma, luma, radius=round(params.radius), epsilon=params.edge_threshold**2), 0.0, 1.0)
     exponent = (1.0 + params.highlights * base**2) / (1.0 + params.shadows * (1.0 - base) ** 2)
     return (rgb ** exponent[..., None]).astype(np.float32)
-
-
-def _guided_filter(guide: np.ndarray, source: np.ndarray, *, radius: int, epsilon: float) -> np.ndarray:
-    """`source` smoothed by the guided filter (He, Sun, Tang 2010) with the grey `guide`: a local linear model
-    source ~ a * guide + b fitted in each (2 x `radius` + 1) px square window, a = cov / (var + `epsilon`), the
-    model parameters averaged over the windows that hold each pixel. Box means come from cumulative sums."""
-    mean_guide = _box_mean(guide, radius)
-    mean_source = _box_mean(source, radius)
-    covariance = _box_mean(guide * source, radius) - mean_guide * mean_source
-    variance = _box_mean(guide * guide, radius) - mean_guide * mean_guide
-    slope = covariance / (variance + epsilon)
-    del covariance, variance  # float64 pictures: free them before the next ones
-    offset = mean_source - slope * mean_guide
-    del mean_source, mean_guide
-    return (_box_mean(slope, radius) * guide + _box_mean(offset, radius)).astype(np.float32)
-
-
-def _box_mean(values: np.ndarray, radius: int) -> np.ndarray:
-    """The mean of `values` over the (2 x `radius` + 1) px square around each pixel, cut off at the picture's edge."""
-    return _window_mean(_window_mean(np.asarray(values, np.float64), radius, axis=0), radius, axis=1)
-
-
-def _window_mean(values: np.ndarray, radius: int, *, axis: int) -> np.ndarray:
-    """The mean of `values` over the 2 x `radius` + 1 values around each one along `axis`, cut off at the ends."""
-    total = np.cumsum(values, axis=axis)  # total[k] is the sum of the values up to and including k
-    index = np.arange(values.shape[axis])
-    last, first = np.minimum(index + radius, index.size - 1), np.maximum(index - radius, 0)
-    before = np.where(
-        np.expand_dims(first > 0, 1 - axis), total.take(first - 1, axis=axis), 0.0
-    )  # the sum of the values before the window
-    return (total.take(last, axis=axis) - before) / np.expand_dims(last - first + 1, 1 - axis)
