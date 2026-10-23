@@ -4,7 +4,10 @@ Every effect here is the test's own (`throwaway_effects` removes it again), so n
 """
 
 import importlib
+import json
+import subprocess
 import sys
+import textwrap
 from typing import Any
 
 import numpy as np
@@ -287,3 +290,51 @@ def test_queries_about_an_unknown_effect_list_the_known_ones(gain):
     for query in (registry.parameters, registry.schema, registry.inputs):
         with pytest.raises(KeyError, match="gain_probe"):
             query("no_such_effect")
+
+
+# --- ordering and loading ------------------------------------------------------------------------------------------
+
+
+def test_every_listing_is_sorted_by_name_whatever_the_order_of_registration(throwaway_effects):
+    def zz_order_probe(rgb, params):
+        """Registered first."""
+        return rgb
+
+    def aa_order_probe(rgb, params):
+        """Registered second."""
+        return rgb
+
+    effect(category="utilities", params=GainParams)(zz_order_probe)
+    effect(category="utilities", params=GainParams)(aa_order_probe)
+    for listing in (list(registry.all_effects()), list(registry.describe()), registry.categories()["utilities"]):
+        assert listing == sorted(listing)
+        assert listing.index("aa_order_probe") < listing.index("zz_order_probe")
+
+
+def test_threads_making_the_first_query_together_all_see_every_effect():
+    """The first query loads the effects once, under a lock: no thread sees a half-loaded table. Run in a fresh
+    interpreter, where nothing has been loaded yet; loading takes long enough for an unlocked race to show."""
+    code = textwrap.dedent("""
+        import json, sys, threading
+        from photo_fx.core import registry
+
+        start = threading.Barrier(16)
+        seen = []
+
+        def first_query():
+            start.wait()
+            seen.append(sorted(registry.all_effects()))
+
+        threads = [threading.Thread(target=first_query) for _ in range(16)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        json.dump(seen, sys.stdout)
+    """)
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout)
+    assert len(seen) == 16
+    assert {"glow", "grade", "halftone"} <= set(seen[0])  # the real effects, loaded by the first query
+    assert all(names == seen[0] for names in seen)

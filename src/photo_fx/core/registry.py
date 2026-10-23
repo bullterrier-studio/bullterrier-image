@@ -1,9 +1,21 @@
 """The table of effects, the rules for getting into it, and the queries over it.
 
 Effect modules register themselves here with `@effect(category=..., params=XParams)`; recipes, `fx`, the catalogue and
-the command line look effects up here. The registry knows nothing about where effects live: the app layer imports the
-effect library (`photo_fx.effects`), which registers every effect, before anything asks. Every rule is checked when an
-effect registers, so a broken effect fails at import, naming itself, instead of in some recipe much later.
+the command line look effects up here. Every rule is checked when an effect registers, so a broken effect fails when its
+module is imported, naming itself, instead of in some recipe much later.
+
+Where the effects come from: the first query (`get`, `all_effects`, `describe`, `categories`, any of them) loads every
+installed effect package, once. An effect package is an entry point of the group `photo_fx.effects` naming a module
+whose import registers its effects: photo-fx's own effects are one (`photo_fx.effects`, declared in photo-fx's
+`pyproject.toml`) and are loaded first; a third-party package declares its own (see `photo_fx.plugin`). With the
+environment variable `PHOTO_FX_PLUGINS=builtin` only photo-fx's own are loaded. A package that fails to load raises
+`PhotoFxError` naming its entry point, and the next query tries again. The registry names no effect package itself, so
+`core` never imports `effects`, and importing photo-fx loads no effect at all.
+
+Ordering and threads: every listing is sorted by effect name. Loading happens once, under a lock: threads that make the
+first query together wait for it and all see the whole table. After that, queries only read, so rendering from several
+threads at once is safe. Registering is for import time: registering or unregistering while other threads query is not
+supported.
 
 An effect is written `def glow(rgb, params: GlowParams, *, matte=None) -> rgb` and registered with its parameter model
 (see `photo_fx.core.params`); the decorator returns a `ModelledEffect`, which validates its values through the model
@@ -12,14 +24,17 @@ whichever way it is called.
 
 import functools
 import inspect
+import os
 import re
+import threading
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from importlib import metadata
 from typing import Any
 
 import numpy as np
 
-from .errors import UnknownEffectError
+from .errors import PhotoFxError, UnknownEffectError
 from .params import EffectParams
 
 # The sections of the effect catalogue (docs/effects.md is laid out in this order). Every effect is in exactly one.
@@ -98,6 +113,24 @@ class _Entry:
 
 _EFFECTS: dict[str, _Entry] = {}
 
+# The effect packages: entry points of this group, each naming a module whose import registers effects.
+_GROUP = "photo_fx.effects"
+# Set to "builtin" to load only photo-fx's own effect package, e.g. to get past a broken third-party one.
+_PLUGINS_VARIABLE = "PHOTO_FX_PLUGINS"
+
+
+@dataclass
+class _Loading:
+    """Whether the effect packages are loaded. `running` is set while the thread holding `lock` loads them: its own
+    queries meanwhile (photo-fx's folder checks make some) see the table as it is, instead of loading again."""
+
+    lock: threading.RLock = field(default_factory=threading.RLock)
+    done: bool = False
+    running: bool = False
+
+
+_LOADING = _Loading()
+
 
 def effect[P: EffectParams](
     *, category: str, params: type[P]
@@ -128,8 +161,9 @@ def get(name: str) -> ModelledEffect:
 
 
 def all_effects() -> dict[str, ModelledEffect]:
-    """Every registered effect by name (a copy)."""
-    return {name: entry.function for name, entry in _EFFECTS.items()}
+    """Every registered effect by name, sorted by name (a copy)."""
+    _load_effect_packages()
+    return {name: _EFFECTS[name].function for name in sorted(_EFFECTS)}
 
 
 def category(name: str) -> str:
@@ -139,6 +173,7 @@ def category(name: str) -> str:
 
 def categories() -> dict[str, list[str]]:
     """Every category, in the order of `CATEGORIES`, with the sorted names of its effects (empty if it has none)."""
+    _load_effect_packages()
     return {c: sorted(name for name, entry in _EFFECTS.items() if entry.category == c) for c in CATEGORIES}
 
 
@@ -171,6 +206,7 @@ def apply(name: str, rgb: np.ndarray, **params: Any) -> np.ndarray:
 
 def describe() -> dict[str, str]:
     """Effect name -> its documentation (see `documentation`), sorted by name."""
+    _load_effect_packages()
     return {name: documentation(name) for name in sorted(_EFFECTS)}
 
 
@@ -189,10 +225,62 @@ def summary(name: str) -> str:
 
 
 def _entry(name: str) -> _Entry:
+    _load_effect_packages()
     try:
         return _EFFECTS[name]
     except KeyError:
         raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
+
+
+def _load_effect_packages() -> None:
+    """Import every effect package, the first time any query asks; see the module documentation."""
+    if _LOADING.done:
+        return
+    with _LOADING.lock:
+        if _LOADING.done or _LOADING.running:  # another thread loaded them meanwhile, or this one is loading them
+            return
+        _LOADING.running = True
+        try:
+            for entry_point in _effect_packages():
+                try:
+                    entry_point.load()
+                # A package's import can fail in any way (a missing module, a broken effect, a duplicate name); each is
+                # reported the same way, naming the package, with the original error chained.
+                except Exception as error:
+                    raise PhotoFxError(_failure(entry_point, error)) from error
+            _LOADING.done = True
+        finally:
+            _LOADING.running = False
+
+
+def _effect_packages() -> list[metadata.EntryPoint]:
+    """The entry points to load: photo-fx's own first, then the others by name (unless PHOTO_FX_PLUGINS=builtin)."""
+    setting = os.environ.get(_PLUGINS_VARIABLE, "")
+    if setting not in {"", "builtin"}:
+        raise PhotoFxError(
+            f"{_PLUGINS_VARIABLE}={setting!r} is not a setting: leave it unset to load every installed effect package, "
+            f"or set it to 'builtin' to load only photo-fx's own effects"
+        )
+    found = sorted(metadata.entry_points(group=_GROUP), key=lambda entry_point: entry_point.name)
+    own = [entry_point for entry_point in found if _is_photo_fx(entry_point)]
+    others = [entry_point for entry_point in found if not _is_photo_fx(entry_point)]
+    return own if setting == "builtin" else own + others
+
+
+def _is_photo_fx(entry_point: metadata.EntryPoint) -> bool:
+    return entry_point.module.partition(".")[0] == __name__.partition(".")[0]
+
+
+def _failure(entry_point: metadata.EntryPoint, error: Exception) -> str:
+    """What to say when the effect package of `entry_point` failed to load with `error`."""
+    origin = f"distribution {entry_point.dist.name!r}, " if entry_point.dist is not None else ""
+    message = (
+        f"the effect package {entry_point.name!r} ({origin}entry point {entry_point.value!r} in the group {_GROUP!r}) "
+        f"failed to load: {type(error).__name__}: {error}"
+    )
+    if _is_photo_fx(entry_point):
+        return message
+    return f"{message}; fix or uninstall it, or set {_PLUGINS_VARIABLE}=builtin to load only photo-fx's own effects"
 
 
 def _register(fn: Any, category: str, params: Any) -> ModelledEffect:

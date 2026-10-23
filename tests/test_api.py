@@ -9,6 +9,7 @@ import pytest
 
 import photo_fx
 import photo_fx.core.runner
+import photo_fx.effects
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
 from photo_fx.core import registry

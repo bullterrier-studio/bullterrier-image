@@ -44,6 +44,11 @@ Issues = "https://github.com/jcakstins/photo-fx/issues"
 [project.scripts]
 photo-fx = "photo_fx.cli:main"
 
+# Effect packages: the registry imports every module of this group on its first query (photo_fx.core.registry). photo-fx's
+# own effects come in the way a third party's do; an editable install (`uv sync`) provides this entry point too.
+[project.entry-points."photo_fx.effects"]
+photo_fx = "photo_fx.effects"
+
 [project.optional-dependencies]
 # a static ffmpeg for macOS, Linux and Windows, used when no ffmpeg is on the PATH (only .mp4 / .mov need it)
 video = [

@@ -1,6 +1,6 @@
-"""Discovery of effect folders: `src/photo_fx/effects/<name>/` holds one effect's code, and importing the package finds
-it with no other edit. Every rule is tried on a copy of the package, from a fresh interpreter, so the real
-package is never touched; each known-bad tree must stop the import with a message naming the folder and the rule.
+"""Discovery of effect folders: `src/photo_fx/effects/<name>/` holds one effect's code, and the registry's first query
+finds it with no other edit. Every rule is tried on a copy of the package, from a fresh interpreter, so the real
+package is never touched; each known-bad tree must stop that first query with a message naming the folder and the rule.
 """
 
 import json
@@ -62,9 +62,10 @@ _REPORT = """
 """
 
 
-def _import_a_copy_with(
-    tmp_path: Path, files: dict[str, str], code: str = "import photo_fx"
-) -> subprocess.CompletedProcess:
+FIRST_QUERY = "from photo_fx.core import registry\nregistry.describe()\n"  # loads the effects
+
+
+def _import_a_copy_with(tmp_path: Path, files: dict[str, str], code: str = FIRST_QUERY) -> subprocess.CompletedProcess:
     """Copy the package, add `files` (paths relative to its effects/ folder; a path ending in / makes an empty folder),
     then run `code` in a fresh interpreter that imports the copy."""
     package = tmp_path / "photo_fx"
@@ -171,9 +172,9 @@ KNOWN_BAD = {
 
 
 @pytest.mark.parametrize(("files", "named"), KNOWN_BAD.values(), ids=KNOWN_BAD.keys())
-def test_a_broken_effect_folder_stops_the_import_naming_the_folder_and_the_rule(tmp_path, files, named):
+def test_a_broken_effect_folder_stops_the_first_query_naming_the_folder_and_the_rule(tmp_path, files, named):
     done = _import_a_copy_with(tmp_path, files)
     assert done.returncode != 0
-    assert "ValueError" in done.stderr
+    assert "PhotoFxError" in done.stderr
     for text in named:
         assert text in done.stderr, done.stderr

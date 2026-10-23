@@ -13,9 +13,12 @@ gallery picture live outside the package under the same name (`tests/effects/<na
 <category>` writes all of them from the template in `_template/`. Nothing else needs editing: importing this package
 imports every folder whose name does not start with `_`, in sorted order. A folder that registers no effect, or
 another number, or an effect named otherwise or registered outside `effect.py`, a folder without `__init__.py`, and a
-loose module (`effects/<name>.py`) are each a `ValueError` at import, naming the folder or file.
-Effects never import each other: shared code lives in `photo_fx.ops`. This package only finds the effects; look them
-up in `photo_fx.core.registry` (`get`, `apply`, `describe`...).
+loose module (`effects/<name>.py`) are each a `ValueError` at import, naming the folder or file (the registry reports
+it as a `PhotoFxError` naming this package's entry point).
+Effects never import each other: shared code lives in `photo_fx.ops`. This package only finds the effects; the
+registry imports it on its first query, through photo-fx's entry point in the group `photo_fx.effects`
+(`pyproject.toml`), exactly as it imports a third party's effect package. Look effects up in
+`photo_fx.core.registry` (`get`, `apply`, `describe`...).
 """
 
 import importlib
