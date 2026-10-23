@@ -42,14 +42,14 @@ def fresh_python(code: str) -> subprocess.CompletedProcess:
     neither the current directory nor the user's site on its path."""
     environment = {**os.environ, "PYTHONPATH": str(PACKAGE.parent)}
     return subprocess.run(
-        [sys.executable, "-P", "-s", "-c", code], env=environment, capture_output=True, text=True, check=False
+        [sys.executable, "-P", "-s", "-c", code], env=environment, capture_output=True, encoding="utf-8", check=False
     )
 
 
 def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProcess:
     environment = {**os.environ, "PYTHONPATH": str(pythonpath)} if pythonpath else None
     return subprocess.run(
-        [str(LINT_IMPORTS), "--no-cache"], cwd=cwd, env=environment, capture_output=True, text=True, check=False
+        [str(LINT_IMPORTS), "--no-cache"], cwd=cwd, env=environment, capture_output=True, encoding="utf-8", check=False
     )
 
 
@@ -58,7 +58,7 @@ def lint_a_copy_with(tmp_path: Path, module: str, line: str) -> subprocess.Compl
     shutil.copytree(PACKAGE, tmp_path / "photo_fx", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy(ROOT / "pyproject.toml", tmp_path)
     target = tmp_path / "photo_fx" / module
-    target.write_text(target.read_text() + f"\n{line}  # injected by the test\n")
+    target.write_text(target.read_text(encoding="utf-8") + f"\n{line}  # injected by the test\n", encoding="utf-8")
     return lint(tmp_path, pythonpath=tmp_path)
 
 
@@ -141,7 +141,7 @@ def _effects_declared_in_the_source() -> set[str]:
     for path in sorted(effects.glob("*/effect.py")):
         if path.relative_to(effects).parts[0].startswith("_"):
             continue
-        for node in ast.walk(ast.parse(path.read_text())):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.FunctionDef) and any(
                 isinstance(d, ast.Call) and getattr(d.func, "id", None) == "effect" for d in node.decorator_list
             ):

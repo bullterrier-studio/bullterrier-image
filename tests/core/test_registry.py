@@ -204,7 +204,8 @@ def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, t
         "class ReloadParams(EffectParams):\n"
         '    """None."""\n\n'
         '@effect(category="utilities", params=ReloadParams)\n'
-        'def reload_probe(rgb, params):\n    """Reloaded."""\n    return rgb\n'
+        'def reload_probe(rgb, params):\n    """Reloaded."""\n    return rgb\n',
+        encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.delitem(sys.modules, "reload_probe_module", raising=False)  # and removed again afterwards
@@ -332,7 +333,7 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
             thread.join()
         json.dump(seen, sys.stdout)
     """)
-    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, encoding="utf-8", check=False)
     assert done.returncode == 0, done.stderr
     seen = json.loads(done.stdout)
     assert len(seen) == 16

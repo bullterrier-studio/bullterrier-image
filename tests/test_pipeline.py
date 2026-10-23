@@ -23,11 +23,13 @@ def folder(tmp_path, photo):
     imageio.save(photo, tmp_path / "photos" / "a.png")
     imageio.save(photo[::-1], tmp_path / "photos" / "b.png")
     (tmp_path / "recipes").mkdir()
-    (tmp_path / "recipes" / "grainy.toml").write_text('name = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n')
-    (tmp_path / "recipes" / "warm.toml").write_text(
-        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.3\n'
+    (tmp_path / "recipes" / "grainy.toml").write_text(
+        'name = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
     )
-    (tmp_path / "photo-fx.toml").write_text('[export]\nformats = ["jpg", "png"]\n')
+    (tmp_path / "recipes" / "warm.toml").write_text(
+        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.3\n', encoding="utf-8"
+    )
+    (tmp_path / "photo-fx.toml").write_text('[export]\nformats = ["jpg", "png"]\n', encoding="utf-8")
     return tmp_path
 
 
@@ -43,10 +45,10 @@ def test_run_exports_every_photo_with_every_recipe_and_writes_the_manifest_and_r
         for recipe in ("grainy", "warm"):
             assert (folder / "out" / photo / f"{recipe}.jpg").is_file()
             assert (folder / "out" / photo / f"{recipe}.png").is_file()
-    manifest = json.loads((folder / "out" / "manifest.json").read_text())
+    manifest = json.loads((folder / "out" / "manifest.json").read_text(encoding="utf-8"))
     assert len(manifest["items"]) == 4
     assert manifest["items"][0]["status"] == "done"
-    page = (folder / "out" / "index.html").read_text()
+    page = (folder / "out" / "index.html").read_text(encoding="utf-8")
     assert "a.png" in page
     assert "grainy" in page
     assert "4 done" in page
@@ -75,7 +77,7 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     assert remade(folder) == []
 
     (folder / "recipes" / "warm.toml").write_text(
-        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.9\n'
+        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.9\n', encoding="utf-8"
     )
     items = run(project)
     assert sorted((i.recipe, i.status) for i in items) == [("grainy", "skipped")] * 2 + [("warm", "done")] * 2
@@ -111,18 +113,20 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
     assert len(failed) == 2
     assert all("broken.png" in str(i.error) for i in failed)
     assert main(["run", str(folder / "photo-fx.toml")]) == 1  # a failure is reported in the exit code
-    assert "failed" in (folder / "out" / "index.html").read_text()
+    assert "failed" in (folder / "out" / "index.html").read_text(encoding="utf-8")
 
 
 def test_a_broken_recipe_fails_before_any_work_is_done(folder):
-    (folder / "recipes" / "typo.toml").write_text('name = "typo"\n[[step]]\neffect = "nope"\n')
+    (folder / "recipes" / "typo.toml").write_text('name = "typo"\n[[step]]\neffect = "nope"\n', encoding="utf-8")
     with pytest.raises(ValueError, match=r"typo\.toml"):
         run(load_project(folder / "photo-fx.toml"))
     assert not (folder / "out").exists()
 
 
 def test_two_recipes_with_the_same_name_are_refused(folder):
-    (folder / "recipes" / "again.toml").write_text('name = "warm"\nsize = 64\n[[step]]\neffect = "grain"\n')
+    (folder / "recipes" / "again.toml").write_text(
+        'name = "warm"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
+    )
     with pytest.raises(ProjectError, match="same"):
         run(load_project(folder / "photo-fx.toml"))
 
@@ -135,7 +139,7 @@ def disc_matte(shape=(96, 128), radius=30):
 def masked_recipes(folder):
     for name in ("cut1", "cut2"):
         (folder / "recipes" / f"{name}.toml").write_text(
-            f'name = "{name}"\nsize = 64\n[[step]]\neffect = "fill"\nmask = "background"\n'
+            f'name = "{name}"\nsize = 64\n[[step]]\neffect = "fill"\nmask = "background"\n', encoding="utf-8"
         )
 
 
@@ -291,11 +295,11 @@ def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(fol
 
 def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):
     (folder / "recipes" / "black.toml").write_text(
-        'name = "black"\nsize = 64\n[[step]]\neffect = "fill"\ncolor = "#000000"\n'
+        'name = "black"\nsize = 64\n[[step]]\neffect = "fill"\ncolor = "#000000"\n', encoding="utf-8"
     )
     flagged = [i for i in run(load_project(folder / "photo-fx.toml")) if i.recipe == "black"]
     assert all(i.warnings and "blank" in i.warnings[0] for i in flagged)
-    assert "blank" in (folder / "out" / "index.html").read_text()
+    assert "blank" in (folder / "out" / "index.html").read_text(encoding="utf-8")
     assert main(["run", str(folder / "photo-fx.toml"), "--strict"]) == 1  # strict: warnings fail the run
 
 
@@ -308,7 +312,7 @@ def test_dry_run_writes_nothing_and_says_what_would_happen(folder):
 
 
 def test_sizes_make_smaller_copies_and_never_enlarge(folder):
-    (folder / "photo-fx.toml").write_text('[export]\nformats = ["jpg"]\nsizes = [40, 500]\n')
+    (folder / "photo-fx.toml").write_text('[export]\nformats = ["jpg"]\nsizes = [40, 500]\n', encoding="utf-8")
     run(load_project(folder / "photo-fx.toml"))
     out = folder / "out" / "a"
     assert sorted(p.name for p in out.glob("grainy*")) == ["grainy.jpg", "grainy_40.jpg"]  # 500 > 64: as rendered
@@ -322,7 +326,7 @@ def test_only_limits_the_run_to_some_photos_without_forgetting_the_others(folder
     run(project)
     items = run(project, only="a.*", force=True)
     assert {i.photo for i in items} == {"a.png"}  # the return value is what this run did
-    manifest = json.loads((folder / "out" / "manifest.json").read_text())
+    manifest = json.loads((folder / "out" / "manifest.json").read_text(encoding="utf-8"))
     assert {i["photo"] for i in manifest["items"]} == {"a.png", "b.png"}  # b.png's earlier results are still on record
     with pytest.raises(ProjectError, match="--only"):
         run(project, only="nothing*")
@@ -332,7 +336,7 @@ def test_the_report_escapes_what_it_shows(folder, photo):
     # a photo's file name may hold markup (a recipe name may not: it must be a safe file name)
     imageio.save(photo, folder / "photos" / "<i>x&y.png")
     run(load_project(folder / "photo-fx.toml"))
-    page = (folder / "out" / "index.html").read_text()
+    page = (folder / "out" / "index.html").read_text(encoding="utf-8")
     assert "<i>x&y" not in page
     assert "&lt;i&gt;x&amp;y" in page
 
@@ -381,13 +385,13 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
     ],
 )
 def test_a_bad_project_file_is_explained(folder, text, expect):
-    (folder / "photo-fx.toml").write_text(text)
+    (folder / "photo-fx.toml").write_text(text, encoding="utf-8")
     with pytest.raises(ProjectError, match=expect):
         load_project(folder / "photo-fx.toml")
 
 
 def test_a_project_file_that_is_not_toml_is_named_in_the_error(folder):
-    (folder / "photo-fx.toml").write_text('output = "out"\nrecipes = = ["recipes"]\n')
+    (folder / "photo-fx.toml").write_text('output = "out"\nrecipes = = ["recipes"]\n', encoding="utf-8")
     with pytest.raises(ProjectError, match=r"photo-fx\.toml.*line 2"):
         load_project(folder / "photo-fx.toml")
 
@@ -479,7 +483,7 @@ def video_size(path) -> tuple[int, int]:
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0",
          str(path)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, encoding="utf-8", check=True,
     ).stdout  # fmt: skip
     width, height = map(int, out.strip().split(","))
     return width, height
@@ -487,16 +491,20 @@ def video_size(path) -> tuple[int, int]:
 
 @FFMPEG
 def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
-    (folder / "recipes" / "steady.toml").write_text(ANIMATED.format(hold_end=0.0).replace('"move"', '"steady"'))
-    (folder / "recipes" / "stalls.toml").write_text(ANIMATED.format(hold_end=0.7).replace('"move"', '"stalls"'))
-    (folder / "photo-fx.toml").write_text("[export]\nsizes = [24]\n")
+    (folder / "recipes" / "steady.toml").write_text(
+        ANIMATED.format(hold_end=0.0).replace('"move"', '"steady"'), encoding="utf-8"
+    )
+    (folder / "recipes" / "stalls.toml").write_text(
+        ANIMATED.format(hold_end=0.7).replace('"move"', '"stalls"'), encoding="utf-8"
+    )
+    (folder / "photo-fx.toml").write_text("[export]\nsizes = [24]\n", encoding="utf-8")
     items = {i.recipe: i for i in run(load_project(folder / "photo-fx.toml")) if i.photo == "a.png"}
     out = folder / "out" / "a"
     assert video_size(out / "steady.mp4") == (48, 36)  # the recipe's 48 px, from the 128x96 photo
     assert video_size(out / "steady_24.mp4") == (24, 18)  # and a smaller copy
     assert items["steady"].warnings == ()
     assert "motion stops early" in items["stalls"].warnings[0]
-    page = (folder / "out" / "index.html").read_text()
+    page = (folder / "out" / "index.html").read_text(encoding="utf-8")
     assert "<video" in page
     assert 'href="a/steady.frames.png"' in page
     with Image.open(out / "steady.frames.png") as strip:  # a picture of the animation: six frames side by side

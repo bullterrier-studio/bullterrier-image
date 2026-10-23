@@ -64,7 +64,7 @@ def run_dev_script(checkout: Path, *args: str) -> subprocess.CompletedProcess:
         cwd=checkout,
         env=environment,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
 
 
@@ -77,10 +77,10 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     assert sorted(checkout / path for path in set(after) - set(before)) == written  # it reports what it wrote
     for path in written:
         assert path.is_relative_to(files.package) or path in (files.tests, files.example), path
-        assert "$" not in path.read_text(), f"{path.name} still holds a template placeholder"
+        assert "$" not in path.read_text(encoding="utf-8"), f"{path.name} still holds a template placeholder"
     assert (files.package / "effect.py") in written
     assert files.tests in written
-    recipe = tomllib.loads(files.example.read_text())
+    recipe = tomllib.loads(files.example.read_text(encoding="utf-8"))
     assert recipe["name"] == "lamp_probe"
     assert recipe["size"] == 480
     assert [step["effect"] for step in recipe["step"]] == ["lamp_probe"]
@@ -96,7 +96,9 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
         "json.dump([registry.category('lamp_probe'), float(out.max())], sys.stdout)\n"
     )
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
-    done = subprocess.run([sys.executable, "-c", code], env=environment, capture_output=True, text=True, check=False)
+    done = subprocess.run(
+        [sys.executable, "-c", code], env=environment, capture_output=True, encoding="utf-8", check=False
+    )
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout) == ["light", 0.75]  # the template's effect: the negative at amount 1
 
@@ -121,7 +123,7 @@ def test_the_name_of_an_existing_effect_is_refused_and_nothing_is_written(checko
 )
 def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     (checkout / existing).parent.mkdir(parents=True, exist_ok=True)
-    (checkout / existing).write_text("")
+    (checkout / existing).write_text("", encoding="utf-8")
     before = _tree(checkout)
     with pytest.raises(ProjectError, match="lamp_probe"):
         gallery.new_effect("lamp_probe", "light", checkout=checkout)
@@ -199,7 +201,7 @@ def _copy_of_the_tree(destination: Path) -> Path:
     """A copy, at `destination`, of every file git tracks or has staged, as it is in the working tree (so a change not
     yet committed is in it, a stray untracked file is not)."""
     listed = subprocess.run(
-        ["git", "ls-files", "--cached", "-z"], cwd=ROOT, capture_output=True, text=True, check=True
+        ["git", "ls-files", "--cached", "-z"], cwd=ROOT, capture_output=True, encoding="utf-8", check=True
     ).stdout
     for relative in filter(None, listed.split("\0")):
         if (ROOT / relative).is_file():  # a file deleted but not yet staged is listed too
@@ -240,7 +242,7 @@ def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as
         [sys.executable, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", *contract_and_own],
     ]
     for command in checks:
-        done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, text=True, check=False)
+        done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
         assert done.returncode == 0, f"{' '.join(command[2:5])} failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
     assert f"PASSED tests/effects/{PROBE}/test_{PROBE}.py::" in done.stdout  # its own tests ran, and passed
     assert f"[{PROBE}]" in done.stdout  # the contract tests ran over it too

@@ -251,7 +251,8 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
 def test_python_and_toml_recipes_are_the_same_thing(tmp_path):
     (tmp_path / "r.toml").write_text(
         'name = "r"\nsize = 64\n[[step]]\neffect = "fill"\ncolor = "#000000"\nmask = "background"\n'
-        '[[step]]\neffect = "glitch"\nsplit = 4\nseed = 1\n[[step]]\neffect = "glow"\nopacity = 0.5\n'
+        '[[step]]\neffect = "glitch"\nsplit = 4\nseed = 1\n[[step]]\neffect = "glow"\nopacity = 0.5\n',
+        encoding="utf-8",
     )
     built = Recipe(
         "r", size=64, steps=[fx.fill("#000000").where("background"), fx.glitch(split=4, seed=1), fx.glow().blend(0.5)]
@@ -333,8 +334,8 @@ def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_rep
     assert item.steps == "one/steps/look/_sheet.jpg"
     final = imageio.load(tmp_path / "out" / "one" / "look.jpg")
     assert np.abs(final - imageio.load(folder / "02-glitch.jpg")).max() < 0.03  # the last step is the exported result
-    assert 'href="one/steps/look/_sheet.jpg"' in (tmp_path / "out" / "index.html").read_text()
-    manifest = json.loads((tmp_path / "out" / "manifest.json").read_text())
+    assert 'href="one/steps/look/_sheet.jpg"' in (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+    manifest = json.loads((tmp_path / "out" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["items"][0]["steps"] == "one/steps/look/_sheet.jpg"
 
 
@@ -347,7 +348,8 @@ def test_turning_steps_on_redoes_finished_work_so_the_pictures_exist(tmp_path, p
 def test_the_steps_command_writes_one_picture_per_step_and_a_sheet(tmp_path, photo, capsys):
     imageio.save(photo, tmp_path / "p.png")
     (tmp_path / "r.toml").write_text(
-        'name = "r"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.2\n[[step]]\neffect = "grain"\n'
+        'name = "r"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.2\n[[step]]\neffect = "grain"\n',
+        encoding="utf-8",
     )
     assert main(["steps", str(tmp_path / "p.png"), str(tmp_path / "r.toml"), "-o", str(tmp_path / "s")]) == 0
     assert sorted(p.name for p in (tmp_path / "s").iterdir()) == [

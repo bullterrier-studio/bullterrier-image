@@ -209,7 +209,7 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
 def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, monkeypatch):
     """The user's cache folder lies under a file, so it cannot be made: the advice comes before any download."""
     blocker = tmp_path / "not-a-home"
-    blocker.write_text("a file where the home folder should be")
+    blocker.write_text("a file where the home folder should be", encoding="utf-8")
     for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
         monkeypatch.setenv(variable, str(blocker))
     monkeypatch.delenv("PHOTO_FX_MODEL")

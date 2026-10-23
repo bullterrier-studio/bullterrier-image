@@ -49,7 +49,8 @@ def test_a_narrow_overshoot_passes_the_steps_own_check_but_fails_the_recipe_at_t
     path = tmp_path / "narrow.toml"
     path.write_text(
         "[animation]\nseconds = 4\nfps = 30\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'split_tone'\n"
-        "amount = { from = 0, to = 1, ease = [0.95, 1.0, 1.0, 1.08] }\n"
+        "amount = { from = 0, to = 1, ease = [0.95, 1.0, 1.0, 1.08] }\n",
+        encoding="utf-8",
     )
     frame = _first_frame_past_one(4, 30)
     with pytest.raises(ValueError, match=r"narrow\.toml.*step 2.*split_tone.*`amount`.*\b1\b.*\b1\.00\d*") as raised:
@@ -62,10 +63,11 @@ def test_a_narrow_overshoot_passes_the_steps_own_check_but_fails_the_recipe_at_t
 def test_every_error_about_a_step_in_a_file_names_the_file_and_the_step_the_same_way(gain, tmp_path):
     """A step's own check and the recipe's frame check report in one form, so a reader (or a tool) finds both alike."""
     plain, framed = tmp_path / "plain.toml", tmp_path / "framed.toml"
-    plain.write_text("[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\ngain = 7.5\n")
+    plain.write_text("[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\ngain = 7.5\n", encoding="utf-8")
     framed.write_text(
         "[animation]\nseconds = 4\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\n"
-        "gain = { from = 0, to = 4, ease = [0.95, 1.0, 1.0, 1.08] }\n"
+        "gain = { from = 0, to = 4, ease = [0.95, 1.0, 1.0, 1.08] }\n",
+        encoding="utf-8",
     )
     prefixes = []
     for path in (plain, framed):
@@ -183,7 +185,8 @@ def test_an_animation_that_overshoots_in_a_recipe_file_names_the_file_step_and_f
     path = tmp_path / "bouncy.toml"
     path.write_text(
         "[animation]\nseconds = 2\n\n[[step]]\neffect = 'grade'\n\n[[step]]\neffect = 'gain_probe'\n"
-        "gain = { from = 0, to = 4, ease = [0.3, 1.6, 0.7, 1.0] }\n"
+        "gain = { from = 0, to = 4, ease = [0.3, 1.6, 0.7, 1.0] }\n",
+        encoding="utf-8",
     )
     with pytest.raises(ValueError, match=r"bouncy\.toml.*step 2.*`gain`.*\b4\b"):
         load_recipe(path)
@@ -191,7 +194,7 @@ def test_an_animation_that_overshoots_in_a_recipe_file_names_the_file_step_and_f
 
 def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_value(gain, tmp_path):
     path = tmp_path / "hot.toml"
-    path.write_text("[[step]]\neffect = 'gain_probe'\ngain = 7.5\n")
+    path.write_text("[[step]]\neffect = 'gain_probe'\ngain = 7.5\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"hot\.toml.*step 1.*gain_probe.*`gain`.*\b4\b.*7\.5"):
         load_recipe(path)
 

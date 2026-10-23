@@ -28,7 +28,7 @@ class Verdict:
 
 def ruff(checkout: Path) -> Verdict:
     command = [sys.executable, "-m", "ruff", "check", "--no-cache", "--output-format=json", "."]
-    result = subprocess.run(command, cwd=checkout, capture_output=True, text=True)
+    result = subprocess.run(command, cwd=checkout, capture_output=True, encoding="utf-8")
     findings = json.loads(result.stdout) if result.stdout.strip() else []
     report = "\n".join(f"{Path(f['filename']).relative_to(checkout)}: {f['code']} {f['message']}" for f in findings)
     return Verdict(result.returncode, report + result.stderr)
@@ -36,7 +36,7 @@ def ruff(checkout: Path) -> Verdict:
 
 def mypy(checkout: Path) -> Verdict:
     # incremental, with its cache in the copy: after the first run only the probe file is checked again
-    result = subprocess.run([sys.executable, "-m", "mypy"], cwd=checkout, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "-m", "mypy"], cwd=checkout, capture_output=True, encoding="utf-8")
     return Verdict(result.returncode, result.stdout + result.stderr)  # "path:line: error: message  [code]"
 
 
@@ -57,7 +57,7 @@ def with_file(checkout) -> Iterator:
 
     def write(relative: str, source: str) -> Path:
         path = checkout / relative
-        path.write_text(source)
+        path.write_text(source, encoding="utf-8")
         written.append(path)
         return path
 

@@ -76,10 +76,14 @@ def _import_a_copy_with(tmp_path: Path, files: dict[str, str], code: str = FIRST
             target.mkdir(parents=True, exist_ok=True)
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(source)
+        target.write_text(source, encoding="utf-8")
     environment = {**os.environ, "PYTHONPATH": str(tmp_path)}
     return subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(code)], env=environment, capture_output=True, text=True, check=False
+        [sys.executable, "-c", textwrap.dedent(code)],
+        env=environment,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
     )
 
 

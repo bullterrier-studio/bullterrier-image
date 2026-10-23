@@ -24,7 +24,11 @@ def checkout(tmp_path) -> Path:
 
 def deptry(checkout: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "deptry", "--no-ansi", "."], cwd=checkout, capture_output=True, text=True, check=False
+        [sys.executable, "-m", "deptry", "--no-ansi", "."],
+        cwd=checkout,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
     )
 
 

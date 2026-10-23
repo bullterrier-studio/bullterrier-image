@@ -44,7 +44,7 @@ def test_the_repository_has_no_stray_tool_config():
 
 
 def test_ruff_pytest_poe_and_commit_message_are_configured_in_pyproject():
-    tool = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]
+    tool = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]
     assert {"ruff", "pytest", "poe", "commit-message"} <= tool.keys()
     assert "ini_options" in tool["pytest"]  # pytest reads this table, so no pytest.ini is needed
 
@@ -53,31 +53,33 @@ def test_ruff_pytest_poe_and_commit_message_are_configured_in_pyproject():
 @pytest.mark.parametrize("folder", ["", "src", "tests", "src/photo_fx/deep", "tests/effects"])
 def test_a_stray_config_is_reported_by_name(tmp_path, name, folder):
     (tmp_path / folder).mkdir(parents=True, exist_ok=True)
-    (tmp_path / folder / name).write_text("")
+    (tmp_path / folder / name).write_text("", encoding="utf-8")
     assert checker.find_stray_configs(tmp_path) == [Path(folder) / name]
 
 
 def test_every_stray_config_is_reported_not_just_the_first(tmp_path):
     for name in ("tox.ini", ".flake8"):
-        (tmp_path / name).write_text("")
+        (tmp_path / name).write_text("", encoding="utf-8")
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "mypy.ini").write_text("")
+    (tmp_path / "src" / "mypy.ini").write_text("", encoding="utf-8")
     assert sorted(checker.find_stray_configs(tmp_path)) == [Path(".flake8"), Path("src/mypy.ini"), Path("tox.ini")]
 
 
 def test_files_with_other_names_and_files_elsewhere_are_not_reported(tmp_path):
-    (tmp_path / "pyproject.toml").write_text("")
-    (tmp_path / ".editorconfig").write_text("")
-    (tmp_path / ".pre-commit-config.yaml").write_text("")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    (tmp_path / ".editorconfig").write_text("", encoding="utf-8")
+    (tmp_path / ".pre-commit-config.yaml").write_text("", encoding="utf-8")
     (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "tox.ini").write_text("")  # outside the scanned places: documentation may mention anything
+    (tmp_path / "docs" / "tox.ini").write_text(
+        "", encoding="utf-8"
+    )  # outside the scanned places: documentation may mention anything
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "ruff.toml.md").write_text("")  # similar name, different file
+    (tmp_path / "src" / "ruff.toml.md").write_text("", encoding="utf-8")  # similar name, different file
     assert checker.find_stray_configs(tmp_path) == []
 
 
 def test_main_reports_each_stray_file_and_fails(tmp_path, capsys):
-    (tmp_path / "setup.cfg").write_text("")
+    (tmp_path / "setup.cfg").write_text("", encoding="utf-8")
     assert checker.main([str(tmp_path)]) == 1
     err = capsys.readouterr().err
     assert "setup.cfg" in err

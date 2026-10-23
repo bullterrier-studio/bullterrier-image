@@ -36,7 +36,9 @@ def checkout(tmp_path) -> Path:
 
 def vulture(checkout: Path) -> subprocess.CompletedProcess:
     # no arguments: the paths and every setting come from pyproject.toml, as in the gate
-    return subprocess.run([sys.executable, "-m", "vulture"], cwd=checkout, capture_output=True, text=True, check=False)
+    return subprocess.run(
+        [sys.executable, "-m", "vulture"], cwd=checkout, capture_output=True, encoding="utf-8", check=False
+    )
 
 
 def test_the_package_as_it_is_has_no_dead_code(checkout):

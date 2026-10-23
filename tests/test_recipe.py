@@ -24,7 +24,7 @@ class AmountParams(EffectParams):
 
 def write(tmp_path, text, name="r.toml"):
     path = tmp_path / name
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
     return path
 
 

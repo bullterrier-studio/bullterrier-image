@@ -172,7 +172,7 @@ def probe(checkout, throwaway_effects):
         return (rgb * params.amount).astype(np.float32)
 
     (checkout / "examples" / "effects" / "gallery_probe.toml").write_text(
-        'name = "gallery_probe"\nsize = 300\n[[step]]\neffect = "gallery_probe"\n'
+        'name = "gallery_probe"\nsize = 300\n[[step]]\neffect = "gallery_probe"\n', encoding="utf-8"
     )
     return "gallery_probe"
 
@@ -300,7 +300,7 @@ def dev_command(checkout: Path, *args: str) -> subprocess.CompletedProcess:
     """`tools/dev.py ARGS`, run from the copy of the package in `checkout`."""
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
     return subprocess.run(
-        [sys.executable, str(DEV_SCRIPT), *args], cwd=checkout, env=environment, capture_output=True, text=True
+        [sys.executable, str(DEV_SCRIPT), *args], cwd=checkout, env=environment, capture_output=True, encoding="utf-8"
     )
 
 
@@ -309,8 +309,8 @@ def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(doc
     assert done.returncode == 0, done.stderr
     stub, page = docs / "src" / "photo_fx" / "fx.pyi", docs / "docs" / "effects.md"
     assert done.stdout.split() == [str(stub), str(page)]  # written into the scratch checkout, nowhere else
-    assert stub.read_text() == fx.stub_text()
-    assert page.read_text() == gallery.render_effects_page()
+    assert stub.read_text(encoding="utf-8") == fx.stub_text()
+    assert page.read_text(encoding="utf-8") == gallery.render_effects_page()
     pictures = [gallery.effect_files(name, checkout=docs).picture for name in registry.describe()]
     assert {picture.read_bytes() for picture in pictures} == {b"existing"}
 
@@ -319,7 +319,7 @@ def test_the_gallery_command_writes_the_page_too(docs):
     done = dev_command(docs, "gallery")
     assert done.returncode == 0, done.stderr
     assert done.stdout.split() == [str(docs / "docs" / "effects.md")]
-    assert (docs / "docs" / "effects.md").read_text() == gallery.render_effects_page()
+    assert (docs / "docs" / "effects.md").read_text(encoding="utf-8") == gallery.render_effects_page()
     assert not (docs / "src" / "photo_fx" / "fx.pyi").exists()
 
 

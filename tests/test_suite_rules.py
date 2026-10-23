@@ -93,7 +93,7 @@ def unexplained(root: Path, allowed: dict[tuple[str, str], str]) -> list[str]:
         relative = path.relative_to(root).as_posix()
         problems.extend(
             f"{relative} {problem}"
-            for problem in violations(path.read_text())
+            for problem in violations(path.read_text(encoding="utf-8"))
             if not any(file == relative and name in problem for (file, name) in allowed)
         )
     return problems
@@ -106,7 +106,7 @@ def stale(root: Path, allowed: dict[tuple[str, str], str]) -> list[str]:
         for (file, name), reason in allowed.items()
         if not reason.strip()
         or not (root / file).is_file()
-        or not any(name in problem for problem in violations((root / file).read_text()))
+        or not any(name in problem for problem in violations((root / file).read_text(encoding="utf-8")))
     ]
 
 
@@ -118,7 +118,9 @@ def test_no_test_reaches_into_or_patches_photo_fx():
 
 
 def test_an_allowed_entry_silences_exactly_its_violation_and_a_stale_one_is_reported(tmp_path):
-    (tmp_path / "test_a.py").write_text("from photo_fx.matte import _one\nfrom photo_fx.matte import _two\n")
+    (tmp_path / "test_a.py").write_text(
+        "from photo_fx.matte import _one\nfrom photo_fx.matte import _two\n", encoding="utf-8"
+    )
     allowed = {("test_a.py", "_one"): "a reason", ("test_a.py", "_gone"): "it was removed", ("test_b.py", "_x"): "?"}
     assert unexplained(tmp_path, allowed) == ["test_a.py line 2: imports private photo_fx.matte._two"]
     assert stale(tmp_path, allowed) == ["test_a.py: _gone", "test_b.py: _x"]

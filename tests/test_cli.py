@@ -24,8 +24,8 @@ def files(photo, tmp_path):
     imageio.save(photo, tmp_path / "me.png")
     recipes = tmp_path / "recipes"
     recipes.mkdir()
-    (recipes / "a.toml").write_text('name="a"\nsize=64\n[[step]]\neffect="grain"\n')
-    (recipes / "b.toml").write_text('name="b"\nsize=64\n[[step]]\neffect="glitch"\n')
+    (recipes / "a.toml").write_text('name="a"\nsize=64\n[[step]]\neffect="grain"\n', encoding="utf-8")
+    (recipes / "b.toml").write_text('name="b"\nsize=64\n[[step]]\neffect="glitch"\n', encoding="utf-8")
     return tmp_path
 
 
@@ -69,7 +69,7 @@ def test_sheet_combines_recipes_into_one_image(files):
 
 
 def test_bad_recipe_is_reported_without_a_traceback(files, capsys):
-    (files / "recipes" / "c.toml").write_text('[[step]]\neffect="nope"\n')
+    (files / "recipes" / "c.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
     assert main(["render", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "o")]) == 1
     assert "c.toml" in capsys.readouterr().err
     assert not (files / "o").exists()  # failed before doing any work
@@ -77,7 +77,7 @@ def test_bad_recipe_is_reported_without_a_traceback(files, capsys):
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="the subject matte needs Apple Vision")
 def test_photo_without_a_subject_is_reported_clearly(files, capsys):
-    (files / "recipes" / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n')
+    (files / "recipes" / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n', encoding="utf-8")
     assert main(["render", str(files / "me.png"), str(files / "recipes" / "m.toml")]) == 1
     assert "no subject" in capsys.readouterr().err.lower()
 
@@ -85,7 +85,8 @@ def test_photo_without_a_subject_is_reported_clearly(files, capsys):
 def test_animate_writes_the_clip(files):
     recipe = files / "recipes" / "anim.toml"
     recipe.write_text(
-        'name="anim"\nsize=48\n[animation]\nseconds=0.5\nfps=8\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n'
+        'name="anim"\nsize=48\n[animation]\nseconds=0.5\nfps=8\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n',
+        encoding="utf-8",
     )
     target = files / "clip.gif"
     assert main(["animate", str(files / "me.png"), str(recipe), "-o", str(target)]) == 0
@@ -108,7 +109,7 @@ CUT = '[[step]]\neffect="fill"\ncolor="#000000"\nmask="background"\n'  # black w
 def cut(files):
     """A recipe that blacks out the background, at the photo's own 128x96 size, and a matte file for that photo: the
     left half background, the right half subject."""
-    (files / "cut.toml").write_text(f'name="cut"\nsize=128\n{CUT}')
+    (files / "cut.toml").write_text(f'name="cut"\nsize=128\n{CUT}', encoding="utf-8")
     halves = np.zeros((96, 128), np.uint8)
     halves[:, 64:] = 255
     Image.fromarray(halves, "L").save(files / "matte.png")
@@ -139,7 +140,7 @@ def test_a_matte_file_of_another_size_is_refused(cut, capsys):
 
 
 def test_animate_and_steps_take_a_matte_file_too(cut):
-    (cut / "anim.toml").write_text(f'name="anim"\nsize=48\n[animation]\nseconds=0.25\nfps=8\n{CUT}')
+    (cut / "anim.toml").write_text(f'name="anim"\nsize=48\n[animation]\nseconds=0.25\nfps=8\n{CUT}', encoding="utf-8")
     target = cut / "clip.gif"
     assert main(["animate", str(cut / "me.png"), str(cut / "anim.toml"), "-o", str(target), "--matte",
                  str(cut / "matte.png")]) == 0  # fmt: skip
@@ -173,13 +174,17 @@ def test_an_unknown_segmenter_is_a_usage_error(cut, capsys):
 def test_run_finds_subjects_with_the_chosen_segmenter(cut, echo_model, monkeypatch):
     monkeypatch.setenv("PHOTO_FX_SEGMENTER", "nonsense")
     monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
-    (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
+    (cut / "photo-fx.toml").write_text(
+        'photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n', encoding="utf-8"
+    )
     assert main(["run", str(cut / "photo-fx.toml"), "--segmenter", "onnx"]) == 0
     assert (cut / "done" / "me" / "cut.jpg").exists()
 
 
 def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo_model, monkeypatch):
-    (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
+    (cut / "photo-fx.toml").write_text(
+        'photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n', encoding="utf-8"
+    )
     command = ["run", str(cut / "photo-fx.toml"), "--segmenter", "onnx", "-q"]
     monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))  # the subject is where the photo is red
     assert main(command) == 0
@@ -254,7 +259,9 @@ def test_an_unknown_segmenter_in_the_environment_ends_in_one_error_line(cut, cap
     last_line = capsys.readouterr().err.strip().splitlines()[-1]
     assert last_line.startswith("error: ")
     assert "PHOTO_FX_SEGMENTER" in last_line
-    (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
+    (cut / "photo-fx.toml").write_text(
+        'photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n', encoding="utf-8"
+    )
     assert main(["run", str(cut / "photo-fx.toml")]) == 1  # a project that needs the subject says so at once
     assert "PHOTO_FX_SEGMENTER" in capsys.readouterr().err.strip().splitlines()[-1]
 
@@ -321,7 +328,7 @@ def photo_fx_process(*args: str, **options) -> subprocess.Popen:
     """`python -m photo_fx ARGS` in a fresh interpreter (the way a user starts it), stderr and stdout as text."""
     environment = {key: value for key, value in os.environ.items() if key != "PHOTO_FX_DEBUG"}
     return subprocess.Popen(
-        [sys.executable, "-m", "photo_fx", *args], cwd=ROOT, env=environment, text=True,
+        [sys.executable, "-m", "photo_fx", *args], cwd=ROOT, env=environment, encoding="utf-8",
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options,
     )  # fmt: skip
 

@@ -73,7 +73,7 @@ def fresh_python(site: Path, code: str, *args: str) -> dict:
         [sys.executable, "-c", textwrap.dedent(code), *args],
         env=environment,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
     assert done.returncode == 0, done.stderr
@@ -83,7 +83,9 @@ def fresh_python(site: Path, code: str, *args: str) -> dict:
 def test_an_installed_plugin_effect_is_listed_and_runs_from_toml_and_from_fx(tmp_path):
     install(tmp_path, "zz-tint", "zz_tint", TINT_PACKAGE)
     recipe = tmp_path / "tinted.toml"
-    recipe.write_text('name = "tinted"\n\n[[step]]\neffect = "zz_tint"\ncolour = "#0000ff"\namount = 0.25\n')
+    recipe.write_text(
+        'name = "tinted"\n\n[[step]]\neffect = "zz_tint"\ncolour = "#0000ff"\namount = 0.25\n', encoding="utf-8"
+    )
     report = fresh_python(
         tmp_path,
         """

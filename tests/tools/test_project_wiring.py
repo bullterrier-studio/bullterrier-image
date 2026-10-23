@@ -56,7 +56,6 @@ def poe_runs(pyproject) -> dict[str, list[str]]:
             [sys.executable, "-m", "poethepoet", "--dry-run", task],
             cwd=ROOT,
             capture_output=True,
-            text=True,
             encoding="utf-8",
         )
         assert result.returncode == 0, f"poe rejects the task {task!r}:\n{result.stderr}"

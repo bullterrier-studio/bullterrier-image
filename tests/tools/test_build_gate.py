@@ -33,7 +33,7 @@ def build_check(project: Path) -> subprocess.CompletedProcess:
         cwd=project,
         env=environment,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
 
@@ -78,7 +78,9 @@ def _picture_in_the_package(project: Path) -> None:
 
 
 def _test_in_the_package(project: Path) -> None:
-    (project / "src" / "photo_fx" / "effects" / "grade" / "test_grade.py").write_text("def test_x(): ...\n")
+    (project / "src" / "photo_fx" / "effects" / "grade" / "test_grade.py").write_text(
+        "def test_x(): ...\n", encoding="utf-8"
+    )
 
 
 def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project):

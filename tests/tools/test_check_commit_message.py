@@ -198,7 +198,7 @@ def write_pyproject(path: Path, **overrides) -> Path:
         "scope-pattern": "'^[A-Z]+$'",
     } | overrides
     lines = "\n".join(f"{key} = {value}" for key, value in values.items())
-    path.write_text(f"[tool.commit-message]\n{lines}\n")
+    path.write_text(f"[tool.commit-message]\n{lines}\n", encoding="utf-8")
     return path
 
 
@@ -214,7 +214,7 @@ def test_the_checker_reads_every_limit_from_the_given_pyproject(tmp_path):
 
 def test_main_uses_the_pyproject_it_is_pointed_at(tmp_path, capsys):
     message = tmp_path / "COMMIT_EDITMSG"
-    message.write_text("wibble: do it\n")
+    message.write_text("wibble: do it\n", encoding="utf-8")
     assert checker.main([str(message)]) == 1  # not a type in the real pyproject
     assert checker.main([str(message), "--pyproject", str(write_pyproject(tmp_path / "pyproject.toml"))]) == 0
     capsys.readouterr()
@@ -251,9 +251,9 @@ def test_main_uses_the_pyproject_it_is_pointed_at(tmp_path, capsys):
 )
 def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, capsys):
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(content)
+    pyproject.write_text(content, encoding="utf-8")
     message = tmp_path / "msg"
-    message.write_text("feat: ok\n")
+    message.write_text("feat: ok\n", encoding="utf-8")
     assert checker.main([str(message), "--pyproject", str(pyproject)]) == 2
     assert "tool.commit-message" in capsys.readouterr().err
 
@@ -264,7 +264,7 @@ def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, cap
 
 def test_main_returns_zero_for_a_good_message_file_and_prints_nothing(tmp_path, capsys):
     message = tmp_path / "COMMIT_EDITMSG"
-    message.write_text("feat(glow): add a falloff parameter\n\nWhy: the halo had a hard edge.\n")
+    message.write_text("feat(glow): add a falloff parameter\n\nWhy: the halo had a hard edge.\n", encoding="utf-8")
     assert checker.main([str(message)]) == 0
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -273,7 +273,7 @@ def test_main_returns_zero_for_a_good_message_file_and_prints_nothing(tmp_path, 
 
 def test_main_returns_one_and_reports_every_problem_on_stderr(tmp_path, capsys):
     message = tmp_path / "COMMIT_EDITMSG"
-    message.write_text("Added glow.\n")
+    message.write_text("Added glow.\n", encoding="utf-8")
     assert checker.main([str(message)]) == 1
     err = capsys.readouterr().err
     assert "[header-format]" in err
@@ -284,7 +284,7 @@ def test_main_returns_one_and_reports_every_problem_on_stderr(tmp_path, capsys):
 
 def test_main_rejects_an_empty_message_file(tmp_path, capsys):
     message = tmp_path / "COMMIT_EDITMSG"
-    message.write_text("# only comments\n")
+    message.write_text("# only comments\n", encoding="utf-8")
     assert checker.main([str(message)]) == 1
     assert "[empty-message]" in capsys.readouterr().err
 
@@ -312,7 +312,7 @@ def test_an_unreadable_message_file_is_rejected_with_a_rule_not_a_traceback(tmp_
 
 
 def test_the_real_pyproject_table_matches_what_the_checker_loaded():
-    table = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["commit-message"]
+    table = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["commit-message"]
     assert CONFIG.types == tuple(table["types"])
     assert CONFIG.header_max_length == table["header-max-length"] == 72
     assert CONFIG.body_max_line_length == table["body-max-line-length"] == 100

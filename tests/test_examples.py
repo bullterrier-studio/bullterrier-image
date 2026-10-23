@@ -89,7 +89,7 @@ def test_the_python_example_runs(tmp_path, capsys):
 
 @needs_git
 def test_no_video_or_gif_is_checked_in():
-    listed = subprocess.run(["git", "ls-files"], cwd=EXAMPLES.parent, capture_output=True, text=True, check=True)
+    listed = subprocess.run(["git", "ls-files"], cwd=EXAMPLES.parent, capture_output=True, encoding="utf-8", check=True)
     tracked = listed.stdout.split()
     assert not [f for f in tracked if f.lower().endswith((".mp4", ".mov", ".webm", ".gif"))]
 
@@ -97,7 +97,7 @@ def test_no_video_or_gif_is_checked_in():
 def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists():
     import re
 
-    readme = (EXAMPLES.parent / "README.md").read_text()
+    readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
     assert re.search(r"\]\(docs/effects\.md\)", readme), "the README must link to docs/effects.md, the effect catalogue"
     assert (EXAMPLES.parent / "docs" / "effects.md").is_file()
     local = [p for p in re.findall(r'src="([^"]+)"', readme) if not p.startswith("http")]

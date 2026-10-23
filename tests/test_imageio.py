@@ -331,7 +331,7 @@ def _probe(path, entries):
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", entries, "-of", "csv=p=0:s=,", str(path)],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     ).stdout.strip()
     return out.split(",")
@@ -354,7 +354,7 @@ def test_save_video_mp4_has_a_keyframe_every_second_so_it_is_seekable(tmp_path):
             str(tmp_path / "k.mp4"),
         ],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     ).stdout.split()
     assert sum("K" in f for f in flags) >= 7  # 70 frames at 10 fps = 7 s: one keyframe per second, not one per clip
@@ -414,7 +414,7 @@ def test_an_ffmpeg_on_the_path_is_used_before_the_bundled_one(tmp_path, monkeypa
     folder = tmp_path / "bin"
     folder.mkdir()
     stand_in = folder / "ffmpeg"
-    stand_in.write_text("#!/bin/sh\necho 'the ffmpeg on the PATH ran' >&2\nexit 3\n")
+    stand_in.write_text("#!/bin/sh\necho 'the ffmpeg on the PATH ran' >&2\nexit 3\n", encoding="utf-8")
     stand_in.chmod(0o755)
     monkeypatch.setenv("PATH", str(folder))
     with pytest.raises(BackendUnavailableError, match="the ffmpeg on the PATH ran"):
