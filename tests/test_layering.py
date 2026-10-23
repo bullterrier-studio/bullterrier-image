@@ -138,8 +138,17 @@ def _effects_declared_in_the_source() -> set[str]:
     return names
 
 
-def test_importing_one_core_module_alone_registers_every_effect():
-    """`core` never imports `effects`; the package's `__init__`, which Python runs before any submodule, does."""
+def test_importing_the_package_loads_no_effect_and_no_heavy_library():
+    """`import photo_fx` stays fast: the effects, and the libraries they and the recipe engine need, load when used."""
+    heavy = ["photo_fx.effects", "scipy", "pydantic", "numpy", "PIL", "onnxruntime"]
+    code = f"import json, sys\nimport photo_fx\njson.dump([m for m in {heavy!r} if m in sys.modules], sys.stdout)\n"
+    result = fresh_python(code)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == []
+
+
+def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query():
+    """`core` never imports `effects`: the registry loads them through their entry point the first time it is asked."""
     code = (
         "import json, sys\n"
         "import photo_fx.core.runner\n"

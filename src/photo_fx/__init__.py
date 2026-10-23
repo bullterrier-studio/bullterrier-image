@@ -21,23 +21,59 @@ Layers, each importing only from the ones below it (import-linter checks this in
     effects    the effect library: pure functions image -> image, found automatically
     core       the registry and the recipe engine (timing, steps, loader, runner)
     ops        shared numeric primitives, named by concept
+
+Importing photo_fx is cheap: each public name loads its module the first time it is used, and the effects load on the
+registry's first query.
 """
 
-from importlib import metadata
+from importlib import import_module, metadata
+from typing import TYPE_CHECKING
 
-from . import fx, imageio, recipe  # binds `photo_fx.recipe`, which callers use as a namespace
-from .core.errors import (
-    BackendUnavailableError,
-    ImageReadError,
-    PhotoFxError,
-    ProjectError,
-    RecipeError,
-    SubjectNotFoundError,
-    UnknownEffectError,
-)
-from .matte import subject_matte
-from .pipeline import Project, load_project, run
-from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
+if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr__` imports each name on first use
+    from . import fx, imageio, recipe
+    from .core.errors import (
+        BackendUnavailableError,
+        ImageReadError,
+        PhotoFxError,
+        ProjectError,
+        RecipeError,
+        SubjectNotFoundError,
+        UnknownEffectError,
+    )
+    from .matte import subject_matte
+    from .pipeline import Project, load_project, run
+    from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
+
+# Each public name by the module it lives in ("." for the submodules themselves). Importing these eagerly would load
+# numpy, Pillow, pydantic and scipy for a bare `import photo_fx`, about 0.25 s, before anything is used (PEP 562).
+_HOMES = {
+    ".": ("fx", "imageio", "recipe"),
+    ".core.errors": (
+        "BackendUnavailableError", "ImageReadError", "PhotoFxError", "ProjectError", "RecipeError",
+        "SubjectNotFoundError", "UnknownEffectError",
+    ),
+    ".matte": ("subject_matte",),
+    ".pipeline": ("Project", "load_project", "run"),
+    ".recipe": (
+        "Animation", "Recipe", "Stage", "Step", "load_recipe", "ramp", "render", "render_all", "render_frames", "trace",
+    ),
+}  # fmt: skip
+_HOME = {name: module for module, names in _HOMES.items() for name in names}
+
+
+def __getattr__(name: str) -> object:
+    """A public name, imported from its module the first time it is asked for, then kept."""
+    home = _HOME.get(name)
+    if home is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = import_module(f".{name}", __name__) if home == "." else getattr(import_module(home, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted({*globals(), *__all__})
+
 
 try:
     __version__ = metadata.version("photo-fx")  # pyproject.toml is the one place the version is written
