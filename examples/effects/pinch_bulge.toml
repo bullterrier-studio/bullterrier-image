@@ -1,0 +1,10 @@
+# A bubble lens over the dog's face: the middle swells and the rim settles back to the photo.
+name = "pinch_bulge"
+size = 480
+
+[[step]]
+effect = "pinch_bulge"
+amount = 0.7
+radius = 0.5
+x = 0.5
+y = 0.4
