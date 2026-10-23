@@ -157,9 +157,9 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
     ffmpeg = _ffmpeg("resizing a video")
     shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
     result = subprocess.run(
-        [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", f"{shrink},{_BT709}",
+        [ffmpeg, "-y", "-loglevel", "error", "-i", _as_file(source), "-an", "-vf", f"{shrink},{_BT709}",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
-         "-g", "30", str(target)],
+         "-g", "30", _as_file(target)],
         capture_output=True, encoding="utf-8", errors="replace",
         check=False,  # the return code is checked below, with the message
     )  # fmt: skip
@@ -185,7 +185,7 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         "-an", "-vf", filters,
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "14", "-preset", "medium", "-movflags", "+faststart",
         "-g", str(max(1, fps)),  # a keyframe every second: seekable, and one bad frame cannot spoil the rest
-        str(path),
+        _as_file(path),
     ]  # fmt: skip
     # leaving the `with` closes both pipes and waits for ffmpeg, also when a frame cannot be written
     with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:
@@ -224,6 +224,12 @@ def _ffmpeg(task: str) -> str:
         "the PATH (macOS: brew install ffmpeg; Debian or Ubuntu: sudo apt install ffmpeg; Windows: winget install "
         "ffmpeg). Writing .gif needs neither."
     )
+
+
+def _as_file(path: str | Path) -> str:
+    """`path` as an ffmpeg argument that can only mean that file: absolute, so a name starting with `-` is not read as
+    an option, nor one starting with `name:` as a protocol (pipe:, http:, concat:...)."""
+    return str(Path(path).absolute())
 
 
 def from_pil(img: Image.Image) -> np.ndarray:

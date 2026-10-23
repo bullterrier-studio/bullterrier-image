@@ -468,6 +468,14 @@ def test_without_ffmpeg_on_the_path_the_video_extras_ffmpeg_writes_the_clip(tmp_
     assert is_mp4(tmp_path / "small.mp4")
 
 
+def test_a_video_whose_name_starts_with_a_dash_is_a_file_not_an_ffmpeg_option(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # relative names, as a user typing `-clip.mp4` in a shell gives them
+    assert imageio.save_video(iter(_frames(3)), "-clip.mp4", fps=10) == 3
+    assert is_mp4(tmp_path / "-clip.mp4")
+    imageio.resize_video("-clip.mp4", "-small.mp4", 16)
+    assert is_mp4(tmp_path / "-small.mp4")
+
+
 def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     monkeypatch.setenv("IMAGEIO_FFMPEG_EXE", str(tmp_path / "no-ffmpeg-here"))
