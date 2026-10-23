@@ -1,0 +1,8 @@
+# The dog repeated nine times: the whole photo, scaled down, in a three by three grid.
+name = "tile"
+size = 480
+
+[[step]]
+effect = "tile"
+columns = 3
+rows = 3
