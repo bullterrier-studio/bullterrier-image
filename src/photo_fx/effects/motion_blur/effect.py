@@ -3,14 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import fft
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-
-# scipy's edge-mode names for numpy's `pad`: scipy 'reflect' repeats the edge pixel, as numpy's 'symmetric' does; scipy
-# 'mirror' does not, as numpy's 'reflect' does not
-_PAD = {"reflect": "symmetric", "mirror": "reflect", "nearest": "edge", "wrap": "wrap"}
+from photo_fx.ops.convolve import convolve
 
 
 class MotionBlurParams(EffectParams):
@@ -69,24 +65,4 @@ def motion_blur(rgb: np.ndarray, params: MotionBlurParams) -> np.ndarray:
     """
     if params.length == 0:
         return rgb.copy()
-    height, width = rgb.shape[:2]
-    kernel = _line_kernel(params.angle, params.length)
-    reach = kernel.shape[0] // 2
-    padded = np.pad(rgb, ((reach, reach), (reach, reach), (0, 0)), mode=_PAD[params.mode])  # type: ignore[call-overload]
-    shape = (
-        fft.next_fast_len(height + 2 * reach, real=True),
-        fft.next_fast_len(width + 2 * reach, real=True),
-    )
-    # The kernel centred on sample (0, 0) of a circular buffer, so output sample i lines up with padded input sample i
-    # and, the picture being padded by the kernel's reach on every side, nothing wraps around into what is kept.
-    centred = np.zeros(shape)
-    offsets = np.arange(-reach, reach + 1)
-    centred[np.ix_(offsets % shape[0], offsets % shape[1])] = kernel
-    response = fft.rfft2(centred).astype(np.result_type(rgb.dtype, np.complex64))
-    spectrum = fft.rfft2(padded, s=shape, axes=(0, 1))
-    del padded
-    spectrum *= response[..., np.newaxis]
-    filtered = fft.irfft2(spectrum, s=shape, axes=(0, 1))[reach : reach + height, reach : reach + width]
-    # The weights are positive and sum to 1, so the true result lies within the range of what it averages: clipping
-    # to that range only moves float32 rounding error towards the truth.
-    return np.clip(filtered, rgb.min(), rgb.max()).astype(np.float32)
+    return convolve(rgb, _line_kernel(params.angle, params.length), mode=params.mode)
