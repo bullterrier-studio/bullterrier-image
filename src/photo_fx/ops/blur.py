@@ -9,9 +9,10 @@ Mode = Literal["reflect", "constant", "nearest", "mirror", "wrap"]
 
 # constant: kernel radius in px from which FFT beats direct convolution (measured: equal at 12 MP, FFT ahead at 1 MP)
 _FFT_FROM_RADIUS = 32
-# scipy's edge modes under numpy's names for the same extension (scipy 'reflect' repeats the edge pixel, as numpy's
-# 'symmetric' does; scipy 'mirror' does not, as numpy's 'reflect' does not)
-_NUMPY_PAD: dict[Mode, Literal["symmetric", "reflect", "edge", "wrap", "constant"]] = {
+# The one table of the edge modes: scipy's names under numpy's for the same extension (scipy 'reflect' repeats the edge
+# pixel, as numpy's 'symmetric' does; scipy 'mirror' does not, as numpy's 'reflect' does not). `photo_fx.ops.convolve`
+# reads it too, so the two modules cannot disagree about what an edge mode means.
+NUMPY_PAD: dict[Mode, Literal["symmetric", "reflect", "edge", "wrap", "constant"]] = {
     "reflect": "symmetric",
     "mirror": "reflect",
     "nearest": "edge",
@@ -71,7 +72,7 @@ def _convolve_axis(
     if mode == "constant" and constant_value is not None:
         padded = np.pad(array, widths, mode="constant", constant_values=constant_value)
     else:
-        padded = np.pad(array, widths, mode=_NUMPY_PAD[mode])
+        padded = np.pad(array, widths, mode=NUMPY_PAD[mode])
     size = fft.next_fast_len(length + 2 * radius, real=True)
     # The kernel centred on sample 0 of a circular buffer, so output sample i lines up with padded input sample i.
     centred = np.zeros(size)

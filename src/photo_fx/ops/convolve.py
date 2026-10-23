@@ -5,17 +5,9 @@ from typing import Literal
 import numpy as np
 from scipy import fft
 
-EdgeMode = Literal["reflect", "nearest", "mirror", "wrap"]
+from photo_fx.ops.blur import NUMPY_PAD
 
-# scipy's edge-mode names (as `photo_fx.ops.blur` and the effects use them) under numpy's names for the same extension:
-# scipy 'reflect' repeats the edge pixel, as numpy's 'symmetric' does; scipy 'mirror' does not, as numpy's 'reflect'
-# does not
-_NUMPY_PAD: dict[EdgeMode, Literal["symmetric", "reflect", "edge", "wrap"]] = {
-    "reflect": "symmetric",
-    "mirror": "reflect",
-    "nearest": "edge",
-    "wrap": "wrap",
-}
+EdgeMode = Literal["reflect", "nearest", "mirror", "wrap"]
 
 
 def convolve(image: np.ndarray, kernel: np.ndarray, *, mode: EdgeMode) -> np.ndarray:
@@ -41,7 +33,7 @@ def convolve(image: np.ndarray, kernel: np.ndarray, *, mode: EdgeMode) -> np.nda
     height, width = image.shape[:2]
     reach_y, reach_x = kernel.shape[0] // 2, kernel.shape[1] // 2
     widths = [(reach_y, reach_y), (reach_x, reach_x)] + [(0, 0)] * (image.ndim - 2)
-    padded = np.pad(image, widths, mode=_NUMPY_PAD[mode])
+    padded = np.pad(image, widths, mode=NUMPY_PAD[mode])
     shape = (
         fft.next_fast_len(height + 2 * reach_y, real=True),
         fft.next_fast_len(width + 2 * reach_x, real=True),
