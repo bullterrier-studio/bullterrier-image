@@ -53,6 +53,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
   `intensity` or `factor`. *Reason:* users bring vocabulary from Photoshop, Lightroom and shader literature.
   *Consequence:* a shared vocabulary table and a contract test flag discouraged names.
+- **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
+  nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
+  channel), not a `matrix` or a `points` list. *Reason:* only scalars can be animated with `ramp()`, become a slider
+  with a unit and range in the UI generated from the effect metadata, and carry their own documentation and error
+  message; a list is validated per item only, and a free-point curve needs a curve editor that sliders cannot give.
+  *Consequence:* a draggable-point curve or a free-length LUT is a separate, later effect (`point_curve`, `lut`) with
+  its own design; if a list parameter is ever added, any in-range list must be valid by construction (evenly spaced
+  output heights, not x/y pairs that must increase), and the contract's limits test then handles list fields.
 
 ## Recipes
 
