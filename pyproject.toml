@@ -86,6 +86,7 @@ dev = [
     "mypy>=2.4.0",
     "onnx>=1.23.2",
     "photo-fx[video]",
+    "pip-audit>=2.10.1",
     "poethepoet>=0.49.0",
     "pre-commit>=4.7.0",
     "pytest>=9.1.1",
@@ -109,6 +110,10 @@ test = { cmd = "pytest -q -n auto", env = { PYTHONWARNDEFAULTENCODING = "1" }, h
 # depends on numpy's own type annotations, which are not what this checks. No PYTHONWARNDEFAULTENCODING here: numpy 1.26
 # runs a text-mode subprocess when numpy.testing is imported, and the encoding of our own IO is `poe test`'s concern.
 check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto --ignore=tests/tools/test_lint_and_type_gate.py", help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
+# Not part of `check`: it asks the PyPI vulnerability database about every locked package (runtime, extras and dev
+# tools, pinned by hash), so it needs the network and its verdict changes as advisories are published. For CI and
+# before a release; an advisory with no fixed release is ignored with `--ignore-vuln ID` and listed in SECURITY.md.
+audit = { sequence = ["uv export --frozen --all-extras --all-groups --no-emit-project --quiet --output-file dist/audit/requirements.txt", "pip-audit --requirement dist/audit/requirements.txt --disable-pip --require-hashes --progress-spinner off"], default_item_type = "cmd", help = "Check every locked dependency against known vulnerabilities (needs the network)" }
 fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
 # The sdist and wheel as PyPI would get them, built into dist/check (git-ignored, emptied first) and checked by twine
 # (metadata, rendered README; the quoted glob is twine's to expand) and check-wheel-contents (stray or unimportable files)
