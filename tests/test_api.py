@@ -10,6 +10,7 @@ import pytest
 import photo_fx
 import photo_fx.core.runner
 import photo_fx.effects
+import photo_fx.plugin
 from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
 from photo_fx.cli import main
 from photo_fx.core import registry
@@ -21,7 +22,9 @@ from photo_fx.core.timing import Animated, Animation
 
 
 @pytest.mark.parametrize(
-    "module", [photo_fx, photo_fx.fx, photo_fx.imageio, photo_fx.recipe, photo_fx.core], ids=lambda m: m.__name__
+    "module",
+    [photo_fx, photo_fx.fx, photo_fx.imageio, photo_fx.recipe, photo_fx.plugin, photo_fx.core],
+    ids=lambda m: m.__name__,
 )
 def test_every_public_module_lists_what_it_exports_and_has_it(module):
     assert isinstance(module.__all__, list)

@@ -260,6 +260,7 @@ layers = [
     "recipe",
     "imageio : matte",  # adapters
     "effects",
+    "plugin",  # the effect-author API for other packages: core's names, so photo-fx's own effects may use it too
     "core",  # may import ops
     "ops",
 ]
