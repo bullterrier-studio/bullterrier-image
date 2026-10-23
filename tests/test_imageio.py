@@ -1,7 +1,10 @@
+import itertools
 import re
 import shutil
+import struct
 import subprocess
 import sys
+import warnings
 
 import numpy as np
 import pytest
@@ -91,6 +94,108 @@ def test_the_colour_under_a_transparent_pixel_never_shows(tmp_path):
     hidden[..., :3] = np.random.default_rng(3).integers(0, 256, (4, 6, 3))  # any colour, alpha 0 everywhere
     Image.fromarray(hidden, "RGBA").save(tmp_path / "clear.png")
     np.testing.assert_array_equal(imageio.load(tmp_path / "clear.png"), np.ones((4, 6, 3), np.float32))
+
+
+# --- colour profiles: converted to sRGB from the picture's own mode -----------------------------------------------
+# Real CMYK and greyscale profiles are large licensed files, so the tests build minimal ICC v2 profiles (ICC.1:2001)
+# by hand. The expected values come from the standards, not from littlecms: CIE L* to luminance Y (CIE 15) and the
+# sRGB transfer function (IEC 61966-2-1).
+
+D50 = (0.9642, 1.0, 0.8249)  # the ICC profile connection space white point
+
+
+def s15fixed16(value: float) -> bytes:
+    return struct.pack(">i", round(value * 65536))
+
+
+def minimal_profile(device_class: bytes, colour_space: bytes, pcs: bytes, tag: bytes, body: bytes) -> bytes:
+    """An ICC v2 profile with a white point and one transform tag: the 128-byte header, the tag table, the tags."""
+    tags = {b"wtpt": b"XYZ " + bytes(4) + b"".join(map(s15fixed16, D50)), tag: body}
+    start = 128 + 4 + 12 * len(tags)
+    table, data = b"", b""
+    for signature, content in tags.items():
+        padded = content + bytes(-len(content) % 4)
+        table += signature + struct.pack(">II", start + len(data), len(padded))
+        data += padded
+    header = (
+        struct.pack(">I", start + len(data)) + bytes(4) + bytes([2, 0x10, 0, 0]) + device_class + colour_space + pcs
+        + bytes(12) + b"acsp" + bytes(28) + b"".join(map(s15fixed16, D50)) + bytes(48)
+    )  # fmt: skip
+    return header + struct.pack(">I", len(tags)) + table + data
+
+
+def linear_grey_profile() -> bytes:
+    """A greyscale profile whose levels are linear light (tone curve gamma 1.0)."""
+    curve = b"curv" + bytes(4) + struct.pack(">IH", 1, 256)  # one entry: gamma as u8Fixed8, 1.0
+    return minimal_profile(b"mntr", b"GRAY", b"XYZ ", b"kTRC", curve)
+
+
+def cmyk_profile() -> bytes:
+    """A CMYK profile: no ink is white (L* 100), any K is black (L* 0), any other ink is neutral grey L* 128/255*100.
+
+    One 8-bit lookup table (lut8, 2 grid points per ink) from CMYK to CIELAB; a lut8 encodes L* as byte / 255 * 100
+    and a*, b* as byte - 128.
+    """
+    ramp = bytes(range(256))
+    grid = b""
+    for c, m, y, k in itertools.product((0, 1), repeat=4):  # the first ink varies slowest
+        lightness = 0 if k else 255 if not (c or m or y) else 128
+        grid += bytes([lightness, 128, 128])
+    identity = b"".join(map(s15fixed16, (1, 0, 0, 0, 1, 0, 0, 0, 1)))
+    lut = b"mft1" + bytes(4) + bytes([4, 3, 2, 0]) + identity + ramp * 4 + grid + ramp * 3
+    return minimal_profile(b"prtr", b"CMYK", b"Lab ", b"A2B0", lut)
+
+
+def srgb_encode(linear: float) -> float:
+    """The sRGB transfer function (IEC 61966-2-1): linear light to the encoded value, both 0..1."""
+    return 12.92 * linear if linear <= 0.0031308 else 1.055 * linear ** (1 / 2.4) - 0.055
+
+
+def luminance(lightness: float) -> float:
+    """CIE L* (0..100) to relative luminance Y (0..1), CIE 15 (L* above 8)."""
+    return ((lightness + 16) / 116) ** 3
+
+
+def test_a_greyscale_profile_is_applied_to_the_grey_levels(tmp_path):
+    grey = Image.fromarray(np.array([[128, 0]], np.uint8))
+    grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())
+    rgb = imageio.load(tmp_path / "linear.png")
+    np.testing.assert_allclose(rgb[0, 0], srgb_encode(128 / 255), atol=1 / 255)  # 0.735, not 0.502 as stored
+    np.testing.assert_allclose(rgb[0, 1], 0.0, atol=1 / 255)
+
+
+def test_a_greyscale_profile_is_applied_under_transparency_too(tmp_path):
+    grey = Image.fromarray(np.array([[(128, 255), (128, 0)]], np.uint8), "LA")
+    grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())
+    rgb = imageio.load(tmp_path / "linear.png")
+    np.testing.assert_allclose(rgb[0, 0], srgb_encode(128 / 255), atol=1 / 255)
+    np.testing.assert_allclose(rgb[0, 1], 1.0, atol=1e-6)  # transparent: white paper
+
+
+@pytest.mark.parametrize("suffix", [".tif", ".jpg"])
+def test_a_cmyk_profile_is_applied_to_the_inks_not_a_naive_conversion(tmp_path, suffix):
+    inks = np.array([[(0, 255, 255, 0), (0, 0, 0, 0), (0, 0, 0, 255)]], np.uint8)  # naively red, white, black
+    Image.fromarray(np.repeat(inks, 8, axis=1), "CMYK").save(tmp_path / f"cmyk{suffix}", icc_profile=cmyk_profile())
+    rgb = imageio.load(tmp_path / f"cmyk{suffix}")
+    grey = srgb_encode(luminance(128 / 255 * 100))  # 0.468: the profile's grey
+    np.testing.assert_allclose(rgb[0, 4], grey, atol=2 / 255)
+    np.testing.assert_allclose(rgb[0, 12], 1.0, atol=2 / 255)
+    np.testing.assert_allclose(rgb[0, 20], 0.0, atol=2 / 255)
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [b"not a profile at all", linear_grey_profile()],
+    ids=["unreadable", "for another colour space"],
+)
+def test_a_broken_or_mismatched_profile_is_ignored_quietly_and_the_pixels_taken_as_srgb(tmp_path, capfd, profile):
+    stored = np.array([[(255, 0, 0), (0, 102, 255)]], np.uint8)
+    Image.fromarray(stored).save(tmp_path / "odd.png", icc_profile=profile)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        rgb = imageio.load(tmp_path / "odd.png")
+    np.testing.assert_allclose(rgb, stored / 255, atol=1e-6)
+    assert capfd.readouterr() == ("", "")  # neither Python nor littlecms printed anything
 
 
 def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):

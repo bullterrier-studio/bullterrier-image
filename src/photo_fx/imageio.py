@@ -185,7 +185,10 @@ def from_pil(img: Image.Image) -> np.ndarray:
       read as 0..1. Values outside 0..1 are clipped.
     - Transparency (an alpha channel, a transparent palette entry or colour key) is composited over white, so a
       colour hidden under a transparent pixel never shows.
-    - An embedded ICC profile (`img.info["icc_profile"]`) is converted to sRGB; pixels without one are taken as sRGB.
+    - An embedded ICC profile (`img.info["icc_profile"]`, e.g. Display P3, a CMYK press profile or a grey gamma) is
+      converted to sRGB from the image's own mode. Pixels are taken as sRGB, the web's rule for untagged pictures,
+      when there is no profile, when it is unreadable or describes another colour space (quietly: no warning), and
+      for 16-bit and float greyscale, which littlecms cannot convert to 8-bit RGB.
     """
     colour, alpha = _split_alpha(img)
     rgb = _srgb(colour, img.info.get("icc_profile"))
@@ -217,14 +220,24 @@ def _srgb(colour: Image.Image, profile: bytes | None) -> np.ndarray:
         if colour.mode != "F":
             grey /= _SIXTEEN_BIT
         return np.repeat(np.clip(grey, 0.0, 1.0)[..., np.newaxis], 3, axis=2)
-    img = colour if colour.mode == "RGB" else colour.convert("RGB")
-    if profile:
-        try:
-            source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
-            # typed `Image | None` by Pillow, but None only with inPlace=True, which is not used here
-            img = cast(Image.Image, ImageCms.profileToProfile(img, source, _SRGB, outputMode="RGB"))
-        except ImageCms.PyCMSError:
-            pass  # unreadable profile: treat the pixels as sRGB, which is what most viewers do too
+    img = _profiled(colour, profile) if profile else None
+    if img is None:
+        img = colour if colour.mode == "RGB" else colour.convert("RGB")
     rgb = np.asarray(img, dtype=np.float32)
     rgb /= _EIGHT_BIT
     return rgb
+
+
+def _profiled(colour: Image.Image, profile: bytes) -> Image.Image | None:
+    """`colour` converted from its embedded `profile` to sRGB RGB, or None when the profile cannot be used.
+
+    The transform starts from the image's own mode (CMYK inks, grey levels or RGB), as ICC.1 colour management
+    requires: converting to RGB first would feed CMYK or grey data to a profile that describes something else.
+    An unreadable profile, or one for another colour space, leaves the pixels to be taken as sRGB, as most viewers do.
+    """
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
+        # typed `Image | None` by Pillow, but None only with inPlace=True, which is not used here
+        return cast(Image.Image, ImageCms.profileToProfile(colour, source, _SRGB, outputMode="RGB"))
+    except (OSError, ImageCms.PyCMSError):  # OSError: not a profile at all; PyCMSError: no transform for this mode
+        return None
