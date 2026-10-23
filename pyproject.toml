@@ -79,8 +79,10 @@ package_omit = ["__pycache__", "*.pyc", ".*", "_template", "*.jpg", "*.jpeg", "*
 
 [dependency-groups]
 dev = [
+    "actionlint-py>=1.7.12.25",
     "check-wheel-contents>=0.6.3",
     "deptry>=0.25.1",
+    "git-cliff>=2.14.2",
     "hypothesis>=6.170.8",
     "import-linter>=2.15",
     "mypy>=2.4.0",
@@ -97,6 +99,7 @@ dev = [
     "twine>=7.0.0",
     "types-pyyaml>=6.0.12.20260906",
     "vulture>=2.16",
+    "zizmor>=1.31.1",
 ]
 
 # One command for agents and humans: `uv run poe check` before every push, `uv run poe fix` when it complains.
@@ -337,6 +340,41 @@ type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
 # the layers contracts already keep it from everything above core; overlaps (timing itself) are skipped
 forbidden_modules = ["photo_fx.ops", "photo_fx.core.*"]
+
+# Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since
+# the last tag, grouped as Keep a Changelog does. A commit only appears if a parser below names its group; the rest
+# (docs, test, style, ci, build, chore, refactor: work a user of the library does not see) is left out, except a
+# breaking change, which always appears. The `<!-- n -->` prefixes put the groups in Keep a Changelog's order and are
+# stripped from the headings.
+[tool.git-cliff.changelog]
+body = """
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {% if commit.breaking %}**Breaking:** {% endif %}{% if commit.scope %}{{ commit.scope }}: {% endif %}\
+{{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+
+[tool.git-cliff.git]
+conventional_commits = true
+filter_unconventional = true
+filter_commits = true
+protect_breaking_commits = true
+tag_pattern = "^v[0-9]"
+sort_commits = "oldest"
+commit_parsers = [
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^[a-z]+\\(security\\)", group = "<!-- 5 -->Security" },
+    { message = "^(feat|fix|perf|refactor)(\\([^)]*\\))?!?: (remove|drop|delete) ", group = "<!-- 3 -->Removed" },
+    { field = "breaking", pattern = "true", group = "<!-- 1 -->Changed" },
+    { message = "^feat", group = "<!-- 0 -->Added" },
+    { message = "^fix", group = "<!-- 4 -->Fixed" },
+    { message = "^(perf|revert)", group = "<!-- 1 -->Changed" },
+]
 
 # the dev group installs this project's own `video` extra (so the bundled-ffmpeg fallback is tested)
 [tool.uv.sources]
