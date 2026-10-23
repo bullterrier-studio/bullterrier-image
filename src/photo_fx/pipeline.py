@@ -35,7 +35,6 @@ import glob
 import hashlib
 import html
 import json
-import os
 import time
 import tomllib
 from collections.abc import Callable, Iterator
@@ -177,8 +176,8 @@ def init_project(directory: str | Path = ".") -> Path:
     if not recipes.exists():
         recipes.mkdir()
         for name, text in _STARTER_RECIPES.items():
-            (recipes / name).write_text(text)
-    target.write_text(_STARTER_PROJECT)
+            (recipes / name).write_text(text, encoding="utf-8")
+    target.write_text(_STARTER_PROJECT, encoding="utf-8")
     return target
 
 
@@ -231,7 +230,7 @@ def run(
         for path, recipe in recipes:
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
             fingerprint = _fingerprint(
-                photo_hash, repr(path) if isinstance(path, Recipe) else path.read_text(), settings, code
+                photo_hash, repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8"), settings, code
             )
             old = previous.get((photo.name, recipe.name))
             if (
@@ -283,9 +282,10 @@ def run(
                     "items": [asdict(i) for i in record],
                 },
                 indent=2,
-            )
+            ),
+            encoding="utf-8",
         )
-        (project.output / "index.html").write_text(_report_html(project, record))
+        (project.output / "index.html").write_text(_report_html(project, record), encoding="utf-8")
     return items
 
 
@@ -424,7 +424,7 @@ def _code_fingerprint() -> str:
 
 def _read_manifest(output: Path) -> list[Item]:
     try:
-        raw = json.loads((output / "manifest.json").read_text())
+        raw = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
         return [Item(**{**i, "outputs": tuple(i["outputs"]), "warnings": tuple(i["warnings"])}) for i in raw["items"]]
     except (OSError, ValueError, KeyError, TypeError):
         return []  # no usable earlier run: everything is new
@@ -441,10 +441,19 @@ def _report_html(project: Project, items: list[Item]) -> str:
     for photo in dict.fromkeys(i.photo for i in items):
         source = next(p for p in project.photos if p.name == photo)
         cards = "".join(_card(item) for item in items if item.photo == photo)
-        thumbnail = html.escape(os.path.relpath(source, project.output))
+        thumbnail = html.escape(_link(source, project.output))
         heading = f'<img class="src" src="{thumbnail}" alt=""> {html.escape(photo)}'
         sections.append(f'<section><h2>{heading}</h2><div class="grid">{cards}</div></section>')
     return _PAGE.format(summary=summary, body="".join(sections))
+
+
+def _link(target: Path, folder: Path) -> str:
+    """How a page in `folder` refers to `target`: a relative path where there is one, else (on another drive, on
+    Windows) a `file:` URI."""
+    try:
+        return target.resolve().relative_to(folder.resolve(), walk_up=True).as_posix()
+    except ValueError:
+        return target.resolve().as_uri()
 
 
 def _card(item: Item) -> str:

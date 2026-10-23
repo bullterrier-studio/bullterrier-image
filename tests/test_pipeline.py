@@ -1,6 +1,8 @@
 import json
+import os
 import shutil
 import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -245,6 +247,36 @@ def test_the_report_escapes_what_it_shows(folder, photo):
     page = (folder / "out" / "index.html").read_text()
     assert "<i>x&y" not in page
     assert "&lt;i&gt;x&amp;y" in page
+
+
+RUN_IN_CHILD = """
+import json, locale, sys
+from photo_fx.pipeline import load_project, run
+print(locale.getencoding())
+print(json.dumps([[i.photo, i.status, i.error] for i in run(load_project(sys.argv[1]))]))
+"""
+
+
+def test_text_files_are_utf8_whatever_the_locale(folder, photo):
+    # Windows' default is cp1252, not UTF-8; a Latin-1 locale with UTF-8 mode off stands in for it on any system
+    imageio.save(photo, folder / "photos" / "Jānis-č.png")
+    (folder / "recipes" / "grainy.toml").write_text(
+        '# Jānis’ grain, fine as sand\nname = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
+    )
+    child = subprocess.run(
+        [sys.executable, "-c", RUN_IN_CHILD, str(folder / "photo-fx.toml")],
+        env={**os.environ, "LC_ALL": "en_US.ISO8859-1", "PYTHONUTF8": "0"},
+        capture_output=True,
+        check=False,
+    )
+    out, err = child.stdout.decode("ascii", "replace"), child.stderr.decode("latin-1")
+    encoding = out.splitlines()[0] if out else "?"
+    assert encoding.lower().replace("-", "") not in ("utf8", "?"), f"the child's locale is still {encoding}: {err}"
+    assert child.returncode == 0, err
+    assert {status for _, status, _ in json.loads(out.splitlines()[1])} == {"done"}
+    manifest = json.loads((folder / "out" / "manifest.json").read_text(encoding="utf-8"))
+    assert "Jānis-č.png" in {item["photo"] for item in manifest["items"]}
+    assert "Jānis-č" in (folder / "out" / "index.html").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
