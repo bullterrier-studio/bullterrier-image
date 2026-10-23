@@ -110,11 +110,6 @@ def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo,
     np.testing.assert_array_equal(seen[0], matte)
 
 
-def test_matte_cannot_be_set_in_a_recipe_file(tmp_path):
-    with pytest.raises(ValueError, match="matte"):
-        load_recipe(write(tmp_path, '[[step]]\neffect="evaporate"\nmatte=1\n'))
-
-
 ANIMATED = """
 [animation]
 seconds = 2

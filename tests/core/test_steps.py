@@ -275,13 +275,6 @@ def test_an_explicit_name_in_a_file_is_not_repaired(tmp_path):
         load_recipe(path)
 
 
-def test_a_step_needs_a_known_mask_and_an_opacity_from_0_to_1():
-    with pytest.raises(ValueError, match=r"mask.*'sideways'"):
-        Step("grade", mask="sideways")
-    with pytest.raises(ValueError, match="opacity"):
-        Step("grade", opacity=-0.1)
-
-
 def test_the_recipe_objects_are_frozen():
     step, animation = Step("grade"), Animation(seconds=1)
     with pytest.raises(ValueError, match="frozen"):

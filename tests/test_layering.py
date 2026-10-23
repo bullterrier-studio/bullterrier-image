@@ -175,19 +175,8 @@ def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query()
 
 def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
     """`import photo_fx; photo_fx.recipe` worked before the split, with every public name of the old module."""
-    names = [
-        "Animated",
-        "Animation",
-        "Recipe",
-        "Stage",
-        "Step",
-        "load_recipe",
-        "ramp",
-        "render",
-        "render_all",
-        "render_frames",
-        "trace",
-    ]
+    names = ["Animated", "Animation", "Recipe", "Stage", "Step", "load_recipe", "ramp", "render", "render_all",
+             "render_frames", "trace"]  # fmt: skip
     code = (
         "import photo_fx\n"
         f"names = {names!r}\n"

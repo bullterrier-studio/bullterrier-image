@@ -78,6 +78,7 @@ def test_effect_queries_live_only_in_the_registry(name):
         (lambda: Step("glitch", {"spilt": 3}), "spilt"),
         (lambda: Step("grain", mask="sideways"), "mask.*'sideways'"),
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
+        (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
         (lambda: Step("evaporate", {"matte": 1}), "matte"),
     ],
