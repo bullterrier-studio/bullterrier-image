@@ -1,0 +1,8 @@
+# Adaptive histogram equalisation: local contrast pulled out of a flat, hazy-grey photo.
+name = "equalize"
+size = 480
+
+[[step]]
+effect = "equalize"
+tiles = 8
+limit = 3.0
