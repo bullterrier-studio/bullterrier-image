@@ -50,8 +50,11 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 - Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
 - Security gates: ruff's `S` (bandit), `PGH` and `LOG` rules run in `poe check` (a subprocess call carries `# noqa: S603  <why its argv is safe>`);
   `uv run poe audit` runs pip-audit on `uv.lock` (needs the network, so not in `check`: before a release and in CI, which runs `uv run --locked poe check` so a stale `uv.lock` fails).
-- Versions are SemVer (a 0.x minor may break the API), written in `pyproject.toml` and changed only by `uv run poe release`,
-  which also writes the CHANGELOG.md section with git-cliff from the Conventional Commits; CONTRIBUTING.md, "Releasing".
+- Versions are SemVer (a 0.x minor may break the API), written in `pyproject.toml` and changed only by
+  `uv run poe release VERSION` (the owner picks VERSION, e.g. `0.1.0rc1` for TestPyPI, `0.1.0` for PyPI). That one command
+  checks, shows the plan, asks, then bumps, writes the CHANGELOG.md section with git-cliff from the Conventional Commits,
+  commits, tags and pushes main and the tag atomically; CONTRIBUTING.md, "Releasing". Tests never write the project's
+  version: they read it from `pyproject.toml` (a test fails otherwise).
 - CI is one workflow per concern in `.github/workflows/`, joined by `ci.yml`: the checks (lint, test, min-deps, security,
   pre-commit) run in parallel, then `build` runs only if all passed; `release.yml` calls `ci.yml` and publishes only
   what that build made, so nothing that fails a gate is built or released. `ci-ok` is the only required check: a new

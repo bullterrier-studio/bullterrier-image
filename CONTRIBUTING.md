@@ -61,37 +61,49 @@ again and publishes only the files its build made, so nothing that fails a check
 
 Versions follow [Semantic Versioning](https://semver.org/). Before 1.0 a minor release may change the public API (0.2.0
 may rename a parameter); a patch release never does. The version is written in `pyproject.toml` and changed only by
-the release command. Five commands, from a clone with the hooks installed:
+the release command, which takes the version you choose (nothing is bumped for you). One command per release, on
+`main`, from a clone with the hooks installed:
 
 ```bash
-git switch main && git pull --ff-only     # releases are cut from main, the same commit as origin/main
-uv run poe audit                          # no known vulnerability in the locked dependencies
-uv run poe release minor --dry-run        # every check, the gate included; shows the version and its changelog section
-uv run poe release minor                  # bumps pyproject.toml and uv.lock, writes CHANGELOG.md, commits, tags v0.2.0
-git push --atomic origin main v0.2.0      # the command it prints: nothing is published before this push
+uv run poe release 0.1.0rc1     # a release candidate: a trial on TestPyPI
+uv run poe release 0.1.0        # the release: PyPI
 ```
 
-`poe release` takes `major`, `minor`, `patch` or an explicit version, and never pushes. It refuses, changing nothing,
-on another branch, with uncommitted changes, when main differs from origin/main, when `poe check` fails, or when the
-version would go down or is tagged already. The changelog section is written by git-cliff from the Conventional Commits
-since the previous release: `feat` under Added, `fix` under Fixed, `perf` and `revert` under Changed, a subject starting
-with remove, drop or delete under Removed, the scope `security` under Security, and a breaking change (`!` or a
-`BREAKING CHANGE:` footer) under Changed, marked **Breaking**; `docs`, `test`, `style`, `ci`, `build`, `chore` and
-`refactor` commits are left out. To write the notes yourself, add a `## [0.2.0] - Unreleased` section before releasing:
-it is kept, and dated.
+**What it does.** First the checks, which change nothing: you are on main with a clean tree; after a fetch, main is not
+behind or diverged from origin/main (commits ahead of it are fine: they are pushed with the release); the version is a
+release version (MAJOR.MINOR.PATCH, optionally aN, bN or rcN) greater than the one in `pyproject.toml` and than every
+`v*` tag, and no test writes it; `ci-ok` has not failed on GitHub for the commit (asked through `gh`; if gh is missing
+or offline, or CI has not run on the commit yet, it only warns, as the tag runs the whole CI again); `poe check`
+passes. Then it prints the plan (old and new version, the changelog section, the commit, the tag, the remote and what
+the push carries) and asks `[y/N]`; `--dry-run` stops there, `--yes` does not ask. On yes: `uv version` writes
+`pyproject.toml` and `uv.lock`, the section goes into CHANGELOG.md, `chore(release): v0.1.0` is committed, the
+annotated tag `v0.1.0` is created and `git push --atomic origin main v0.1.0` pushes both, or neither.
 
-**Pre-releases** go to TestPyPI, not PyPI: `uv run poe release 0.2.0rc1` tags `v0.2.0rc1`, which publishes to
-test.pypi.org and creates a GitHub pre-release; try it with
-`pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ photo-fx==0.2.0rc1`.
-`uv run poe release 0.2.0` then makes the release (a bump from a pre-release goes past it: `minor` gives 0.3.0).
+**The changelog section** is written by git-cliff from the Conventional Commits since the previous release: `feat`
+under Added, `fix` under Fixed, `perf` and `revert` under Changed, a subject starting with remove, drop or delete under
+Removed, the scope `security` under Security, and a breaking change (`!` or a `BREAKING CHANGE:` footer) under
+Changed, marked **Breaking**; `docs`, `test`, `style`, `ci`, `build`, `chore` and `refactor` commits are left out. To
+write the notes yourself, add a `## [0.2.0] - Unreleased` section before releasing: the release keeps it and dates it,
+and its release candidates take its text.
+
+**Approving.** The command prints the link to the release workflow's runs. The run checks the tag, runs the whole CI,
+then waits at the `testpypi` job (a pre-release) or the `pypi` job (a release): open the run, choose *Review
+deployments*, tick the environment and *Approve and deploy*. Try a release candidate with
+`pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ photo-fx==0.1.0rc1`.
+
+**Recovering.** A refused or cancelled release changed nothing: fix what it names and run it again. If the push fails,
+the release commit and tag stay local, nothing reached origin, and the command prints both ways out: push again
+(`git push --atomic origin main v0.1.0`) or undo (`git tag -d v0.1.0` and `git reset --hard <the commit it names>`). If
+the workflow fails before the upload, nothing is published: delete the tag
+(`git push --delete origin v0.1.0rc1 && git tag -d v0.1.0rc1`), fix main and release the next version (main already
+holds the failed one, so after 0.1.0rc1 comes 0.1.0rc2); trying a release candidate first keeps that cheap.
 
 **What the tag starts** (`.github/workflows/release.yml`): `tools/check_release.py` checks that the tag is the version
 in `pyproject.toml`, that CHANGELOG.md has a dated section for it and that the tagged commit is on main; the whole CI
 runs (every check, then the build; the publish jobs need it, so any failure stops the release); after a reviewer
-approves the deployment, the distributions CI built and checked are uploaded through Trusted
-Publishing (no token is stored anywhere) with signed attestations; last, the GitHub Release gets the changelog section
-as its notes, the same files and a build-provenance attestation. If anything fails before the upload, nothing is
-published: delete the tag (`git push --delete origin v0.2.0 && git tag -d v0.2.0`), fix main, and release again.
+approves the deployment, the distributions CI built and checked are uploaded through Trusted Publishing (no token is
+stored anywhere) with signed attestations; last, the GitHub Release gets the changelog section as its notes, the same
+files and a build-provenance attestation.
 
 **One-time setup, by the owner:**
 - pypi.org, *Publishing*: add a pending publisher for the project `photo-fx`: owner `jcakstins`, repository
@@ -101,8 +113,8 @@ published: delete the tag (`git push --delete origin v0.2.0 && git tag -d v0.2.0
   limited to tags `v*`.
 - GitHub, *Settings > Rules*: a ruleset on `main` requiring the status check `ci-ok` (the one job that waits for all
   the others, so adding a job never changes the ruleset).
-- The first release is `uv run poe release 0.1.0`: the version is 0.1.0 already, and its changelog section is written
-  by hand.
+- The first release: `uv run poe release 0.1.0rc1`, then `uv run poe release 0.1.0`. The 0.1.0 section is written by
+  hand, so both use it.
 
 ## Design decisions
 
