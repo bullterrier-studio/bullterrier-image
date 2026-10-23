@@ -184,7 +184,7 @@ def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lante
 
 
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
-    """fx.pyi itself is regenerated at integration (`photo-fx regenerate`), so only its generator is checked here."""
+    """fx.pyi itself is regenerated at integration (`poe regenerate`), so only its generator is checked here."""
     tree = ast.parse(fx.stub_text())
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     assert "lantern_probe" in functions

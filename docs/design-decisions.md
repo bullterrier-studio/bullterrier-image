@@ -13,7 +13,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **A microkernel with plugins.** A small, stable `core` (registry, parameter models, recipe engine) and many effects that
   register themselves and are found by discovery. *Reason:* adding an effect must not edit shared files, so many effects
   can be written in parallel without conflicts. *Consequence:* an effect is new files named for it (its package, tests,
-  example recipe, gallery picture) and nothing else; `photo-fx new-effect` writes them from `effects/_template/`, and
+  example recipe, gallery picture) and nothing else; `poe new-effect` writes them from `effects/_template/`, and
   `gallery.effect_files(name)` is the one place that knows where they live.
 - **Effects are pure functions in packages.** `effect(rgb, params, *, matte=None) -> rgb` on float32 RGB `(h, w, 3)` in
   0..1, deterministic, never modifying its input, one package per effect holding code only; its tests mirror `src/`
