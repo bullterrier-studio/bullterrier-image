@@ -14,7 +14,9 @@ BLACK, WHITE = np.zeros(3, np.float32), np.ones(3, np.float32)
 
 
 def draw(rgb, *, ink=WHITE, paper=BLACK, photo=0.0, cell=8, chars=CHARS, gamma=1.0):
-    return text_art(rgb, cell=cell, chars=chars, ink=ink, paper=paper, gamma=gamma, photo=photo, font=None)
+    return text_art(
+        rgb, cell=cell, chars=chars, ink=ink, ink_floor=0.35, paper=paper, gamma=gamma, photo=photo, font=None
+    )
 
 
 def test_a_black_picture_on_black_paper_stays_blank():

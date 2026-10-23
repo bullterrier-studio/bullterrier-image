@@ -41,6 +41,11 @@ def ink_amount(lum: np.ndarray, background: np.ndarray) -> np.ndarray:
     return lum if float(luminance(background)) < 0.5 else 1.0 - lum
 
 
-def vivid(colors: np.ndarray) -> np.ndarray:
-    """Brighten colours sampled from a photo so thin marks drawn in them stay readable (never darkens)."""
-    return np.clip(colors / np.maximum(colors.max(axis=-1, keepdims=True), 0.35), 0.0, 1.0)
+def vivid(colors: np.ndarray, *, floor: float) -> np.ndarray:
+    """Brighten colours sampled from a photo so thin marks drawn in them stay readable (never darkens).
+
+    Each colour is scaled until its strongest channel is full, but by at most 1 / `floor` (0 < floor <= 1): a colour
+    whose strongest channel is below `floor` is scaled by 1 / `floor`, so near-black stays dark instead of turning into
+    a loud, noisy hue. A floor of 1 leaves every colour as it is.
+    """
+    return np.clip(colors / np.maximum(colors.max(axis=-1, keepdims=True), floor), 0.0, 1.0)

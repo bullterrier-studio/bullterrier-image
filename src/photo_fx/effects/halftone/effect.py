@@ -33,7 +33,16 @@ class HalftoneParams(EffectParams):
     ink: Color | None = param(
         None,
         doc="The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave it out to give each "
-        "dot the colour of the photo under it, brightened so small dots stay visible.",
+        "dot the colour of the photo under it, brightened so small dots stay visible (by at most 1 / `ink_floor`).",
+    )
+    ink_floor: float = param(
+        0.35,
+        unit="fraction",
+        min=0.01,
+        max=1,
+        doc="With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its strongest channel: a "
+        "colour whose strongest channel is below it is scaled by 1 / ink_floor instead of up to full, so dark areas "
+        "stay dark. Lowering it brightens dark colours more; 1 = colours as they are.",
     )
     paper: Color = param(
         "#000000",
@@ -124,5 +133,5 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     # own area.
     fade_in = np.clip(radius * cell / (params.feather / 2), 0.0, 1.0)
     coverage = (np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0) * fade_in)[..., None]
-    dots = vivid(sampled) if params.ink is None else np.asarray(params.ink, dtype=np.float32)
+    dots = vivid(sampled, floor=params.ink_floor) if params.ink is None else np.asarray(params.ink, dtype=np.float32)
     return (paper * (1.0 - coverage) + dots * coverage).astype(np.float32)

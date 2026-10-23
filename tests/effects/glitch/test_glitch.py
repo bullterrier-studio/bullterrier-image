@@ -150,6 +150,14 @@ def test_a_dark_strip_on_dark_paper_is_the_paper_colour() -> None:
     np.testing.assert_allclose(out, np.broadcast_to([0x33 / 255, 0x66 / 255, 0x99 / 255], out.shape), atol=1e-6)
 
 
+def test_ascii_ink_floor_caps_how_much_a_dark_text_colour_is_brightened() -> None:
+    width, height = cell_size(8)
+    dark = np.full((height, 2 * width, 3), (0.3, 0.15, 0.06), np.float32)
+    capped = _all_text(dark, 8, ascii_chars=CHARS, ascii_ink_floor=0.6)  # strongest channel 0.3: scaled by 1 / 0.6
+    np.testing.assert_allclose(capped, _all_text(dark, 8, ascii_chars=CHARS, ascii_ink=[0.5, 0.25, 0.1]), atol=1e-5)
+    assert capped[..., 0].max() > 0.25  # characters were drawn, so their colour was compared
+
+
 def test_a_lower_text_gamma_puts_down_more_ink() -> None:
     grey = np.full((48, 64, 3), 0.5, np.float32)
     light = _all_text(grey, 4, ascii_chars=CHARS, ascii_gamma=3.0)

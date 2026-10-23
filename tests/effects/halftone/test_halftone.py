@@ -100,6 +100,17 @@ def test_without_an_ink_the_dots_take_the_photo_colour_never_darker() -> None:
     assert out[..., 0].max() >= 0.8
 
 
+@pytest.mark.parametrize(
+    ("ink_floor", "ink"),
+    [(0.25, [0.8, 0.4, 0.16]), (1.0, [0.2, 0.1, 0.04])],  # strongest channel 0.2: scaled by 1 / 0.25, or not at all
+)
+def test_ink_floor_caps_how_much_a_dark_dot_colour_is_brightened(ink_floor: float, ink: list[float]) -> None:
+    dark = np.full((64, 64, 3), (0.2, 0.1, 0.04), np.float32)
+    out = registry.apply(NAME, dark, cell=8, ink_floor=ink_floor)
+    np.testing.assert_allclose(out, registry.apply(NAME, dark, cell=8, ink=ink), atol=1e-6)
+    assert out[..., 0].max() > ink[0] / 2  # the dots are there, so their colour was compared
+
+
 def test_dots_repeat_every_cell_px_along_an_upright_screen() -> None:
     out = registry.apply(NAME, flat(0.3), cell=12, angle=0.0, **WHITE_ON_BLACK)[..., 0]
     np.testing.assert_allclose(out[:, 12:], out[:, :-12], atol=1e-4)

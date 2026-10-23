@@ -34,7 +34,16 @@ class AsciiParams(EffectParams):
         None,
         doc="The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
         "character from the average colour of the photo under it, brightened so thin strokes stay readable: scaled "
-        "until its strongest channel is full, or by 1 / 0.35 if that channel is below 0.35 (never darkened).",
+        "until its strongest channel is full, by at most 1 / `ink_floor` (never darkened).",
+    )
+    ink_floor: float = param(
+        0.35,
+        unit="fraction",
+        min=0.01,
+        max=1,
+        doc="With no `ink`: the most a character's colour is brightened, as a floor 0.01 to 1 on its strongest "
+        "channel: a colour whose strongest channel is below it is scaled by 1 / ink_floor instead of up to full, so "
+        "dark areas stay dark. Lowering it brightens dark colours more (and their noise); 1 = colours as they are.",
     )
     paper: Color = param(
         "#000000",
@@ -75,6 +84,7 @@ def ascii(rgb: np.ndarray, params: AsciiParams) -> np.ndarray:
         cell=params.cell,
         chars=params.chars,
         ink=None if params.ink is None else np.asarray(params.ink, np.float32),
+        ink_floor=params.ink_floor,
         paper=np.asarray(params.paper, np.float32),
         gamma=params.gamma,
         photo=params.photo,

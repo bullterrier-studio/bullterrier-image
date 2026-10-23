@@ -62,6 +62,20 @@ def test_without_an_ink_each_character_takes_the_brightened_colour_under_it(colo
     np.testing.assert_allclose(out, coverage[..., None] * np.array(ink, np.float32), atol=1e-5)  # float32 sums
 
 
+@pytest.mark.parametrize(
+    ("ink_floor", "ink"),
+    [
+        (0.2, (1.0, 0.5, 0.2)),  # strongest channel 0.3 is above the floor: scaled to full, / 0.3
+        (0.6, (0.5, 0.25, 0.1)),  # 0.3 is below the floor: scaled by 1 / 0.6 only
+        (1.0, (0.3, 0.15, 0.06)),  # a floor of 1: the colour as it is
+    ],
+)
+def test_ink_floor_caps_how_much_a_dark_colour_is_brightened(ink_floor, ink) -> None:
+    coverage = glyph_atlas(CHARS, 8, None)[2]  # luminance 0.175 * 9 = 1.58 -> glyph 2, whatever the floor
+    out = registry.apply(NAME, _flat((0.3, 0.15, 0.06), 8), cell=8, chars=CHARS, paper="#000000", ink_floor=ink_floor)
+    np.testing.assert_allclose(out, coverage[..., None] * np.array(ink, np.float32), atol=1e-5)
+
+
 def test_cells_cut_off_by_the_edge_are_measured_like_whole_ones() -> None:
     # a flat white picture one and a half characters each way: the cut-off cells are as white as the whole one
     densest = glyph_atlas(CHARS, 8, None)[-1]

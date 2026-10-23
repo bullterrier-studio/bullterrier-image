@@ -110,7 +110,16 @@ class GlitchParams(EffectParams):
         None,
         doc="The ink colour of the text strips ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each "
         "character from the average colour of the strip under it, brightened as in the ascii effect (strongest "
-        "channel scaled to full, or by 1 / 0.35 if below 0.35).",
+        "channel scaled to full, by at most 1 / `ascii_ink_floor`).",
+    )
+    ascii_ink_floor: float = param(
+        0.35,
+        unit="fraction",
+        min=0.01,
+        max=1,
+        doc="With no `ascii_ink`: the most a character's colour is brightened, as a floor 0.01 to 1 on its strongest "
+        "channel: a colour whose strongest channel is below it is scaled by 1 / ascii_ink_floor instead of up to "
+        "full, so dark strips stay dark. Lowering it brightens dark colours more; 1 = colours as they are.",
     )
     ascii_paper: Color = param(
         "#000000",
@@ -164,6 +173,7 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
                 cell=params.ascii_cell,
                 chars=params.ascii_chars,
                 ink=None if params.ascii_ink is None else np.asarray(params.ascii_ink, np.float32),
+                ink_floor=params.ascii_ink_floor,
                 paper=np.asarray(params.ascii_paper, np.float32),
                 gamma=params.ascii_gamma,
                 photo=params.ascii_photo,

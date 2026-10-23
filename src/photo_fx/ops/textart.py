@@ -26,6 +26,7 @@ def text_art(
     cell: int,
     chars: str,
     ink: np.ndarray | None,
+    ink_floor: float,
     paper: np.ndarray,
     gamma: float,
     photo: float,
@@ -38,7 +39,8 @@ def text_art(
         cell's brightness: the densest for bright cells on dark paper, for dark cells on light paper (`ink_amount`;
         paper is dark below mid grey, Rec. 709 luminance 0.5).
     ink: the ink colour, float32 RGB 0..1; None colours each character from the picture under it, brightened so
-        thin strokes stay readable (`ops.color.vivid`). paper: the paper colour, float32 RGB 0..1.
+        thin strokes stay readable (`ops.color.vivid`): scaled until its strongest channel is full, by at most
+        1 / `ink_floor` (0 < ink_floor <= 1; ignored when `ink` is given). paper: the paper colour, float32 RGB 0..1.
     gamma: exponent on the ink amount, > 0; above 1 puts down less ink in the midtones, below 1 more.
     photo: 0..1, how much of the picture shows through the paper behind the characters (0 = flat paper colour).
     font: path to a monospaced .ttf/.ttc, or None for the first system font found.
@@ -59,7 +61,7 @@ def text_art(
     glyph = np.rint(amount * (n - 1)).astype(int)
 
     coverage = paint(glyph, atlas)[..., None]
-    text = np.repeat(np.repeat(vivid(cells), cell_h, axis=0), cell_w, axis=1) if ink is None else ink
+    text = np.repeat(np.repeat(vivid(cells, floor=ink_floor), cell_h, axis=0), cell_w, axis=1) if ink is None else ink
     base = paper * (1.0 - photo) + padded * photo
     out = base * (1.0 - coverage) + text * coverage
     return out[:height, :width].astype(np.float32)
