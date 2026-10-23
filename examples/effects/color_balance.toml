@@ -1,0 +1,10 @@
+# Teal shadows, warm highlights: the classic cinema colour split.
+name = "color_balance"
+size = 480
+
+[[step]]
+effect = "color_balance"
+shadows_red = -0.14
+shadows_blue = 0.12
+highlights_red = 0.14
+highlights_blue = -0.12
