@@ -267,6 +267,43 @@ field, the limit and the value. Writing an effect follows the same pattern: `uv 
 --category <category>` starts one from the template, and [`effects/grade/effect.py`](src/photo_fx/effects/grade/effect.py)
 is a worked example.
 
+Importing `photo_fx` is quick: the effects load the first time one is asked for, once, under a lock, so threads can
+render at the same time; register effects at import time only.
+
+### Writing a plugin
+
+Effects can live in your own package. Write them against `photo_fx.plugin`, which holds everything an effect author
+needs (`EffectParams`, `param`, `Color`, `effect`, `CATEGORIES`):
+
+```python
+import numpy as np
+from photo_fx.plugin import Color, EffectParams, effect, param
+
+
+class TintParams(EffectParams):
+    """Settings of the tint."""
+
+    colour: Color = param("#ff8800", doc="The colour mixed in.")
+    amount: float = param(0.3, unit="fraction", min=0, max=1, doc="How much of it, 0..1. Raising it tints more.")
+
+
+@effect(category="colour", params=TintParams)
+def tint(rgb: np.ndarray, params: TintParams) -> np.ndarray:
+    """Mixes a flat colour into the picture."""
+    return (rgb * (1 - params.amount) + np.asarray(params.colour, np.float32) * params.amount).astype(np.float32)
+```
+
+Declare the module as an entry point in your package's `pyproject.toml` and install the package; `tint` is then
+available by name in TOML recipes, as `fx.tint(...)` and in `photo-fx effects`:
+
+```toml
+[project.entry-points."photo_fx.effects"]
+my_effects = "my_package.effects"
+```
+
+A plugin that fails to load stops the first effect lookup with an error naming it; set `PHOTO_FX_PLUGINS=builtin` to
+load only photo-fx's own effects. Effect names must be unique across every installed package.
+
 ## Seeing what each step does
 
 When a look is not right, the cause is rarely the last step. Print the picture after every step:
@@ -365,6 +402,7 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
                            ONNX Runtime, downloaded on first use) is hidden here
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
+  plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, effect)
   core/          core      registry.py (effects register here), params.py (parameter models), errors.py, types.py,
                            vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
                            (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;

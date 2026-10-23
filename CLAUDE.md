@@ -16,13 +16,14 @@ place that knows these paths. Shared numeric code lives in `ops/`, named by conc
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
 adapters   imageio (files), matte (finding the subject)               (may import core, ops)
-effects    one package per effect                                      (may import core, ops; never other effects)
+effects    one package per effect                                      (may import plugin, core, ops; never other effects)
+plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
 ops        pure numeric primitives                                    (imports nothing from photo_fx)
 ```
 Imports flow **downward only**. `import-linter` enforces this in the test suite (contracts in `pyproject.toml`, run by `tests/test_layering.py`; `uv run lint-imports`).
 If you want an import the rules forbid, the code is in the wrong layer: move it.
-The app layer (`photo_fx/__init__`) imports `effects`, so importing any `photo_fx` module registers every effect; `core` never imports `effects`.
+Nothing imports `effects`: the registry loads every entry point of the group `photo_fx.effects` (ours is in `pyproject.toml`; third parties add theirs) on its first query, so `import photo_fx` stays fast. In a checkout, `uv sync` installs that entry point; without it no effect is found.
 The runner is given the subject (a `matte`, or a `find_subject` function); the public `photo_fx.recipe` binds `matte.subject_matte` as the default.
 
 ## The rules
@@ -39,7 +40,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 ## Standards
 
 - `src/` holds only code. Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
-- The public API is explicit: `photo_fx`, `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio`, each with `__all__`. Everything else is internal;
+- The public API is explicit: `photo_fx`, `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio`, `photo_fx.plugin`, each with `__all__`. Everything else is internal;
   `photo_fx.core` and `photo_fx.ops` are not API.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.
 - The library raises `PhotoFxError` subclasses; the CLI catches them and never prints a traceback for a user's mistake.

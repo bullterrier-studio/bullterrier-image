@@ -9,7 +9,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Reason:* one direction of dependency is the simplest rule that stays true as the project grows; a forbidden import
   means the code is in the wrong layer, so the fix is always a move, never an exception. *Consequence:* the rules are
   import-linter contracts in `pyproject.toml`, run by the test suite (`uv run lint-imports`); `core` never imports
-  `effects`, so the app's `photo_fx/__init__` imports the effect library to register it.
+  `effects`: the registry loads the effect library through an entry point (see "Effects are found through entry
+  points").
 - **A microkernel with plugins.** A small, stable `core` (registry, parameter models, recipe engine) and many effects that
   register themselves and are found by discovery. *Reason:* adding an effect must not edit shared files, so many effects
   can be written in parallel without conflicts. *Consequence:* an effect is new files named for it (its package, tests,
@@ -20,12 +21,20 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   (`tests/effects/<name>/`), its example and picture live outside the package. *Reason:* a pure function is trivially
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
   each other; shared numeric code goes to `ops/`, named by concept.
+- **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
+  `photo_fx.effects` the first time it is queried, once, under a lock; photo-fx's own effect library is one such entry
+  point and a third-party package declares its own, written against the public `photo_fx.plugin`. *Reason:* importing
+  every effect (and scipy, pydantic) made `import photo_fx` cost a quarter of a second before anything was used, and
+  left outside packages no way into recipes or the command line; entry points are PyPA's standard plugin mechanism
+  (pytest, Sphinx, flake8 use it). *Consequence:* a checkout needs `uv sync` to install the entry point; a plugin that
+  fails to import is a `PhotoFxError` naming it, `PHOTO_FX_PLUGINS=builtin` skips third-party packages, effect names
+  are unique across every installed package, and registering is for import time (queries are thread-safe once loaded).
 - **`ops` modules arrive with their first consumer.** *Reason:* code nothing uses is a cost with no benefit, and a
   primitive designed before its user is designed for the wrong user. *Consequence:* the dead-code gate fails on unused
   code; the removed primitives (`colorspace`, `noise`, `edges`, `warp`, `voronoi`, `sprites`) are restored from commit
   3b9b2ed (`git show 3b9b2ed:src/photo_fx/ops/<module>.py`) together with the effect that needs them.
 - **One public path per name.** The public API is `photo_fx` (with `render` & co. binding the default subject finder),
-  `photo_fx.recipe`, `photo_fx.fx` and `photo_fx.imageio`, each with `__all__`. *Reason:* two paths to one name with
+  `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio` and `photo_fx.plugin`, each with `__all__`. *Reason:* two paths to one name with
   different behaviour (a `render` that finds the subject and one that does not) is a trap. *Consequence:* `photo_fx.core`
   and `photo_fx.ops` are internal and re-export nothing; no compatibility shims before 1.0.
 
