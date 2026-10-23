@@ -1,0 +1,11 @@
+# Eyes and glints turn into four-pointed stars, tilted into an X.
+name = "starburst"
+size = 480
+
+[[step]]
+effect = "starburst"
+rays = 4
+angle = 45
+length = 0.1
+threshold = 0.96
+amount = 0.8

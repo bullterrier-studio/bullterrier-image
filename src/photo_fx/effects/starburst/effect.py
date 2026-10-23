@@ -1,0 +1,97 @@
+"""The `starburst` effect: diffraction spikes drawn through the bright points of a picture."""
+
+import numpy as np
+
+from photo_fx.core.params import Color, EffectParams, param
+from photo_fx.core.registry import effect
+from photo_fx.ops.convolve import convolve
+from photo_fx.ops.light import highlights, screen
+
+
+class StarburstParams(EffectParams):
+    """A starburst: the highlights are smeared into `rays` thin spikes of light that fade with distance, and screened
+    back over the picture."""
+
+    rays: int = param(
+        4,
+        unit="count",
+        min=1,
+        max=32,
+        doc="How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a six-pointed star, "
+        "1 = a single comet tail. Raising it makes a denser star.",
+    )
+    length: float = param(
+        0.1,
+        unit="fraction",
+        min=0.001,
+        max=1,
+        doc="How far each spike reaches, as a fraction of the picture's diagonal: it fades linearly from the point "
+        "to nothing at this distance. Raising it makes longer, fainter-tipped spikes.",
+    )
+    threshold: float = param(
+        0.95,
+        unit="fraction",
+        min=0,
+        max=0.99,
+        doc="The brightness (0..1, per channel) where a spike starts: only values above it make light, rising to "
+        "full at 1. Raising it limits the spikes to the brightest points; lowered, large bright areas flood the "
+        "picture with light.",
+    )
+    amount: float = param(
+        0.8,
+        unit="ratio",
+        min=0,
+        max=10,
+        doc="How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as bright as the point that "
+        "makes it, at the point; above 1 it saturates to white sooner.",
+    )
+    angle: float = param(
+        0.0,
+        unit="degrees",
+        min=0,
+        max=360,
+        doc="The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. "
+        "The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
+    )
+    color: Color = param(
+        "#ffffff",
+        doc="The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that "
+        "makes them.",
+    )
+
+
+@effect(category="light", params=StarburstParams)
+def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
+    """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
+    screened over the picture by `amount`.
+
+    Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
+    picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
+    inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays
+    black.
+    """
+    if params.amount == 0:
+        return rgb.copy()
+    reach = params.length * float(np.hypot(*rgb.shape[:2]))  # the spike fades to nothing at this distance, in px
+    half = int(np.ceil(reach))
+    # offsets (row, column) from the point, row growing downward and the angle counterclockwise on the picture
+    down, right = np.mgrid[-half : half + 1, -half : half + 1].astype(np.float64)
+    kernel = np.zeros(down.shape)
+    for spike in range(params.rays):
+        theta = np.radians(params.angle) + 2 * np.pi * spike / params.rays
+        along = right * np.cos(theta) - down * np.sin(theta)  # px out along the spike's direction
+        across = np.abs(right * np.sin(theta) + down * np.cos(theta))  # px sideways from its line
+        thin = np.clip(1.0 - across, 0.0, 1.0)  # a line one px wide, soft at its sides
+        fade = np.clip(1.0 - along / reach, 0.0, 1.0) * (along >= 0)
+        kernel = np.maximum(kernel, thin * fade)
+    total = kernel.sum()
+    kernel /= total  # `convolve` takes weights adding up to 1; the sum comes back below
+    bright = highlights(rgb, params.threshold)
+    # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own
+    # border: no light comes in from beyond the edge.
+    framed = np.pad(bright, ((1, 1), (1, 1), (0, 0)))
+    spikes = np.empty_like(bright)
+    for channel in range(rgb.shape[-1]):  # one channel at a time keeps the transforms' working memory to a third
+        spikes[..., channel] = total * convolve(framed[..., channel], kernel, mode="nearest")[1:-1, 1:-1]
+    tint = np.asarray(params.color, np.float32)
+    return screen(rgb, params.amount * spikes * tint)
