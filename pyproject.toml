@@ -8,8 +8,9 @@ license-files = ["LICENSE"]
 authors = [
     { name = "jcakstins", email = "janis.cakstins@gmail.com" }
 ]
-# 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12, 3.13
-# and 3.14 (`poe check-min-deps` runs it on 3.12)
+# 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12 and
+# 3.13. On 3.14 one pipeline test fails, because its premise (the stem of "...png" is "..") changed in 3.14's pathlib;
+# list 3.14 below once that test is written for both. 3.15 waits for onnxruntime wheels.
 requires-python = ">=3.12"
 keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "animation", "recipe"]
 classifiers = [
@@ -22,7 +23,6 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
     "Typing :: Typed",
