@@ -3,16 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-
-# scipy's names for what lies beyond the picture's edge, as `photo_fx.ops.blur` uses them, in `map_coordinates`'s own
-# spelling: for interpolation its 'wrap' does not repeat the picture but 'grid-wrap' does
-_BEYOND_THE_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
-# constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
-_SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
+from photo_fx.ops.radial import accumulate
 
 
 class RadialBlurParams(EffectParams):
@@ -86,27 +80,17 @@ def radial_blur(rgb: np.ndarray, params: RadialBlurParams) -> np.ndarray:
     if params.amount == 0:
         return rgb.copy()
     height, width = rgb.shape[:2]
-    centre = np.array([params.y * (height - 1), params.x * (width - 1)])  # (row, column) of the centre, in pixels
-    planes = [np.ascontiguousarray(rgb[..., channel]) for channel in range(rgb.shape[2])]
-    totals = [np.zeros_like(plane) for plane in planes]
-    for k in range(params.samples):
-        along = (k + 0.5) / params.samples - 0.5  # evenly spread over -1/2 .. 1/2, symmetric about the pixel itself
-        if params.mode == "zoom":
-            # the sample of a pixel p is centre + scale (p - centre): the picture scaled about the centre
-            matrix = np.full(2, 1.0 + params.amount * along)  # a diagonal matrix: scipy's fast path
-            offset = centre - matrix * centre
-        else:
-            # centre + R (p - centre), R the rotation of the pixel's offset (row, column) by the angle `turn` (a
-            # turn is 2 pi radians)
-            turn = 2 * np.pi * params.amount * along
-            matrix = np.array([[np.cos(turn), np.sin(turn)], [-np.sin(turn), np.cos(turn)]])
-            offset = centre - matrix @ centre
-        for total, plane in zip(totals, planes, strict=True):
-            total += ndimage.affine_transform(
-                plane,
-                matrix,
-                offset=offset,
-                order=_SPLINE_ORDER[params.interpolation],
-                mode=_BEYOND_THE_EDGE[params.edge],
-            )
-    return np.clip(np.stack(totals, axis=-1) / params.samples, rgb.min(), rgb.max()).astype(np.float32)
+    centre = (params.y * (height - 1), params.x * (width - 1))  # (row, column) of the centre, in pixels
+    along = (np.arange(params.samples) + 0.5) / params.samples - 0.5  # evenly spread over -1/2 .. 1/2, symmetric
+    # 'zoom': the picture's scales, 1 + this, about the centre; 'spin': its angles in radians (a turn is 2 pi)
+    offsets = params.amount * along if params.mode == "zoom" else 2 * np.pi * params.amount * along
+    summed = accumulate(
+        rgb,
+        centre=centre,
+        kind=params.mode,
+        offsets=offsets,
+        weights=[1.0] * params.samples,
+        interpolation=params.interpolation,
+        edge=params.edge,
+    )
+    return np.clip(summed / params.samples, rgb.min(), rgb.max()).astype(np.float32)
