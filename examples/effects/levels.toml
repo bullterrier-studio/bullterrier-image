@@ -1,0 +1,9 @@
+# Crisper blacks and whites, with the midtones lifted a touch: input points and gamma.
+name = "levels"
+size = 480
+
+[[step]]
+effect = "levels"
+black = 0.08
+white = 0.92
+gamma = 1.15
