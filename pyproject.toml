@@ -28,16 +28,16 @@ classifiers = [
     "Typing :: Typed",
 ]
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
-# exactly these). Below them: pydantic 2.7.0 fails at import, pyobjc 9.2 lacks the macOS 14 subject-lift bindings, and
-# the series of numpy 1.26, scipy 1.11, Pillow 10.1 and onnxruntime 1.17 are the first with Python 3.12 wheels. No upper
-# bounds: nothing is known to break on a newer release.
+# exactly these). Below them: Pillow 10.1.0 writes different JPEG bytes for the same pixels, pydantic 2.7.0 fails at
+# import, pyobjc 9.2 cannot read Vision's pixel buffer, and numpy 1.26, scipy 1.11 and onnxruntime 1.17 are the first
+# series with Python 3.12 wheels. No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
     "numpy>=1.26.4",
     # the portable subject finder. No release has Python 3.15 wheels yet: there photo-fx installs without it, and the
     # portable backend says onnxruntime is missing (Apple Vision and --matte still work)
     "onnxruntime>=1.17.0 ; python_version < '3.15'",
-    "pillow>=10.1.0",
+    "pillow>=10.2.0",
     "pydantic>=2.7.1",
     "pyobjc-framework-quartz>=10.0 ; sys_platform == 'darwin'",
     "pyobjc-framework-vision>=10.0 ; sys_platform == 'darwin'",
