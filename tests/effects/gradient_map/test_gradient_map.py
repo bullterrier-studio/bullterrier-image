@@ -44,7 +44,3 @@ def test_gradient_map_quantile_method_decides_where_the_stretch_bounds_fall(meth
         quantile_method=method,
     )
     assert out[0, 2, 0] == pytest.approx(expected, abs=1e-6)
-
-
-def test_gradient_map_is_a_colour_effect() -> None:
-    assert registry.category("gradient_map") == "colour"

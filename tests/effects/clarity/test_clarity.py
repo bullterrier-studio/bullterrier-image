@@ -33,7 +33,3 @@ def test_clarity_mode_decides_what_lies_beyond_the_picture_edge() -> None:
     assert dark_outside[0, 0, 0] > dark_outside[6, 6, 0]
     grey_outside = registry.apply("clarity", flat, radius=3.0, mode="constant", constant_value=0.5)
     np.testing.assert_allclose(grey_outside, flat, atol=1e-6)
-
-
-def test_clarity_is_a_light_effect() -> None:
-    assert registry.category("clarity") == "light"

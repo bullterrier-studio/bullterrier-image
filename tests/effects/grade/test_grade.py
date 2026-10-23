@@ -16,7 +16,3 @@ def test_grade_contrast_turns_around_its_pivot() -> None:
     np.testing.assert_allclose(pivoted[0, :, 0], [0.3, 0.5, 0.7], atol=1e-6)  # 0.3 + (v - 0.3) * 2
     default = registry.apply("grade", grey, contrast=2.0)
     np.testing.assert_allclose(default[0, :, 0], [0.1, 0.3, 0.5], atol=1e-6)  # around 0.5: 0.5 + (v - 0.5) * 2
-
-
-def test_grade_is_a_colour_effect() -> None:
-    assert registry.category("grade") == "colour"

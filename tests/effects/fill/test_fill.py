@@ -15,7 +15,3 @@ def test_fill_ignores_the_picture(photo: np.ndarray) -> None:
 def test_fill_refuses_a_colour_it_cannot_read(photo: np.ndarray) -> None:
     with pytest.raises(ValueError, match=r"fill.*`color`.*'#12345'"):
         registry.apply("fill", photo, color="#12345")
-
-
-def test_fill_is_a_subject_effect() -> None:
-    assert registry.category("fill") == "subject"

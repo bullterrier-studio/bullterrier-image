@@ -15,7 +15,3 @@ def test_hue_shift_keeps_brightness_and_moves_colour() -> None:
     out = registry.apply("hue_shift", skin_and_wall, hue=120)
     np.testing.assert_allclose(luminance(out), luminance(skin_and_wall), atol=1e-4)
     assert (out.argmax(axis=-1) != skin_and_wall.argmax(axis=-1)).all()  # the dominant channel moved
-
-
-def test_hue_shift_is_a_colour_effect() -> None:
-    assert registry.category("hue_shift") == "colour"

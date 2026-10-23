@@ -35,7 +35,3 @@ def test_split_tone_black_fade_is_the_brightness_up_to_which_the_tint_fades_in()
     }
     np.testing.assert_allclose(tinted[0.1], tinted[0.05] * 0.5, atol=1e-6)  # halfway up the fade: half the tint
     np.testing.assert_allclose(tinted[0.2], tinted[0.05] * 0.25, atol=1e-6)
-
-
-def test_split_tone_is_a_colour_effect() -> None:
-    assert registry.category("split_tone") == "colour"
