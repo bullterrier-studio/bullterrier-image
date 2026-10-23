@@ -103,13 +103,18 @@ def test_mode_constant_needs_the_value_beyond_the_edge():
 
 
 def cpu_seconds(image: np.ndarray, sigma: float) -> float:
-    """The least process CPU time of three blurs: the least is the one least disturbed by the rest of the machine."""
-    times = []
+    """Process CPU time per blur, the least of three measurements, each over as many blurs as take 50 ms or more.
+
+    The span is several ticks of the coarsest process clock (15.6 ms on Windows, where one blur can measure 0), and the
+    least measurement is the one least disturbed by the rest of the machine."""
+    per_blur = []
     for _ in range(3):
-        start = time.process_time()
-        gaussian_blur(image, sigma, truncate=4.0, mode="reflect")
-        times.append(time.process_time() - start)
-    return min(times)
+        blurs, start = 0, time.process_time()
+        while (spent := time.process_time() - start) < 0.05:
+            gaussian_blur(image, sigma, truncate=4.0, mode="reflect")
+            blurs += 1
+        per_blur.append(spent / blurs)
+    return min(per_blur)
 
 
 def test_a_large_blur_costs_a_few_times_a_small_one_not_a_hundred():
