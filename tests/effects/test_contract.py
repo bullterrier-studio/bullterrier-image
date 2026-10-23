@@ -1,5 +1,8 @@
 """Contract tests every effect must pass, whatever it does: shape, range, determinism, documentation, parameter names,
-categories, and every parameter across its documented range."""
+categories, every parameter across its documented range, and a time and memory budget on a real-sized photo."""
+
+import time
+import tracemalloc
 
 import numpy as np
 import pytest
@@ -294,3 +297,78 @@ def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     by_model = registry.get(name)(small, model(), **inputs)
     np.testing.assert_array_equal(registry.get(name)(small, **inputs), by_model)
     np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)
+
+
+# --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
+
+CPU_BUDGET = 1.0  # seconds of process CPU time per effect at 1 MP: about 10x the slowest measured (see test below)
+MEMORY_BUDGET = 12  # picture-sized buffers of working memory held at once; the most measured is 7.3 (gradient_map)
+
+
+@pytest.fixture(scope="module")
+def megapixel_photo() -> np.ndarray:
+    """A 1 MP picture (866 x 1155): gradients plus noise, like the small `photo` fixture but the size of a phone shot
+    shrunk for the web."""
+    rng = np.random.default_rng(1)
+    y, x = np.mgrid[0:866, 0:1155].astype(np.float32)
+    ramp = np.stack([x / 1154, y / 865, (x + y) / 2019], axis=-1)
+    return (ramp * 0.8 + rng.random((866, 1155, 3), dtype=np.float32) * 0.2).astype(np.float32)
+
+
+def _over_budget(name: str, rgb: np.ndarray) -> list[str]:
+    """What `name` at its defaults spends on `rgb` beyond the budgets: process CPU time (not wall time, so other work
+    on the machine barely matters) and the peak of memory allocated during the call (numpy reports its arrays to
+    `tracemalloc`), in picture-sized buffers."""
+    inputs = _inputs(name, rgb)
+    tracemalloc.start()
+    try:
+        held = tracemalloc.get_traced_memory()[0]
+        start = time.process_time()
+        registry.apply(name, rgb, **inputs)
+        cpu = time.process_time() - start
+        buffers = (tracemalloc.get_traced_memory()[1] - held) / rgb.nbytes
+    finally:
+        tracemalloc.stop()
+    problems = [f"{name}: {cpu:.2f} s of CPU time, budget {CPU_BUDGET} s"] if cpu > CPU_BUDGET else []
+    if buffers > MEMORY_BUDGET:
+        problems.append(f"{name}: {buffers:.1f} picture-sized buffers of memory, budget {MEMORY_BUDGET}")
+    return problems
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_every_effect_at_its_defaults_stays_within_the_time_and_memory_budget_on_a_1_mp_photo(name, megapixel_photo):
+    """Measured on an Apple M4 (load 4 to 18): the slowest effects take 0.1 s of CPU time, the hungriest holds 7.3
+    picture-sized buffers; the budgets leave room for a slower machine, never for a 10x regression."""
+    assert _over_budget(name, megapixel_photo) == []
+
+
+class _CostProbeParams(EffectParams):
+    """No settings that matter."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused.")
+
+
+def test_the_budget_flags_an_effect_that_spends_more_cpu_time_than_allowed(throwaway_effects, megapixel_photo):
+    @effect(category="utilities", params=_CostProbeParams)
+    def slow_probe(rgb, params):
+        """Busy for longer than the budget."""
+        start = time.process_time()
+        while time.process_time() - start <= CPU_BUDGET:
+            pass
+        return rgb
+
+    problems = _over_budget("slow_probe", megapixel_photo)
+    assert len(problems) == 1
+    assert "CPU time" in problems[0]
+
+
+def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwaway_effects, megapixel_photo):
+    @effect(category="utilities", params=_CostProbeParams)
+    def hungry_probe(rgb, params):
+        """Holds one more picture-sized buffer than the budget at once."""
+        copies = [rgb.copy() for _ in range(MEMORY_BUDGET + 1)]
+        return copies[-1]
+
+    problems = _over_budget("hungry_probe", megapixel_photo)
+    assert len(problems) == 1
+    assert "buffers of memory" in problems[0]
