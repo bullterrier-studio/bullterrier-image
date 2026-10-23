@@ -122,7 +122,10 @@ scope-pattern = "^[a-z0-9][a-z0-9/_-]*$"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # test files are named after the module they test, so equal names in different folders must never collide
-addopts = ["--import-mode=importlib"]
+# a misspelt marker or option is an error, not a silently ignored typo
+addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
+# an xfail that starts passing fails the run, so the marker cannot outlive the bug it names
+xfail_strict = true
 
 [tool.ruff]
 line-length = 120
