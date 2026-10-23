@@ -56,7 +56,7 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 from . import imageio
 from . import matte as finding
 from .checks import MotionMeter, matte_warnings, still_warnings
-from .core.errors import ProjectError
+from .core.errors import PhotoFxError, ProjectError
 from .core.params import describe_error
 from .core.runner import subject_from
 from .matte import MODEL_VARIABLE, SEGMENTER_VARIABLE, subject_matte
@@ -300,10 +300,12 @@ def run(
                 items.append(Item(photo.name, recipe.name, "would-run", fingerprint=fingerprint))
                 log(f"{label}: would run")
             else:
-                started = time.time()
+                started = time.perf_counter()
                 try:
                     item = _process(project, state, recipe, fingerprint)
-                except Exception as error:  # one bad photo or recipe must not stop the batch
+                # one bad photo or recipe must not stop the batch: whatever a photo, a recipe, the finder, ffmpeg or
+                # the disk can raise fails this pair (a photo too large for memory included); a bug still stops it
+                except (PhotoFxError, OSError, ValueError, RuntimeError, MemoryError) as error:
                     item = Item(
                         photo.name,
                         recipe.name,
@@ -311,7 +313,7 @@ def run(
                         error=f"{type(error).__name__}: {error}",
                         fingerprint=fingerprint,
                     )
-                item = replace(item, seconds=round(time.time() - started, 2))
+                item = replace(item, seconds=round(time.perf_counter() - started, 2))
                 items.append(item)
                 _write_record(project, items, previous, names, code)
                 log(

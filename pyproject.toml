@@ -157,9 +157,6 @@ convention = "google"
 "examples/*.py" = ["T20"]
 "src/photo_fx/effects/**" = ["A001"]  # the `ascii` effect function shadows a builtin by design
 "**/__init__.py" = ["F401"]
-# Known BLE and PTH findings, each to be fixed in its module and its line deleted (pipeline: a deliberate per-photo
-# catch-all wants a reasoned noqa)
-"src/photo_fx/pipeline.py" = ["BLE001"]
 
 # `uv run mypy` checks src and tests; the gate (`poe check`) and the pre-push hook run it.
 [tool.mypy]
