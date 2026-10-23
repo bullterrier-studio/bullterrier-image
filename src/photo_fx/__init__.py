@@ -26,7 +26,7 @@ Importing photo_fx is cheap: each public name loads its module the first time it
 registry's first query.
 """
 
-from importlib import import_module, metadata
+from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr__` imports each name on first use
@@ -43,6 +43,8 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .matte import subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
+
+    __version__: str
 
 # Each public name by the module it lives in ("." for the submodules themselves). Importing these eagerly would load
 # numpy, Pillow, pydantic and scipy for a bare `import photo_fx`, about 0.25 s, before anything is used (PEP 562).
@@ -62,11 +64,13 @@ _HOME = {name: module for module, names in _HOMES.items() for name in names}
 
 
 def __getattr__(name: str) -> object:
-    """A public name, imported from its module the first time it is asked for, then kept."""
-    home = _HOME.get(name)
-    if home is None:
+    """A public name (or `__version__`), imported from its module the first time it is asked for, then kept."""
+    if name == "__version__":
+        value: object = _installed_version()
+    elif (home := _HOME.get(name)) is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = import_module(f".{name}", __name__) if home == "." else getattr(import_module(home, __name__), name)
+    else:
+        value = import_module(f".{name}", __name__) if home == "." else getattr(import_module(home, __name__), name)
     globals()[name] = value
     return value
 
@@ -75,10 +79,16 @@ def __dir__() -> list[str]:
     return sorted({*globals(), *__all__})
 
 
-try:
-    __version__ = metadata.version("photo-fx")  # pyproject.toml is the one place the version is written
-except metadata.PackageNotFoundError:  # run from a source tree that was never installed
-    __version__ = "0+unknown"
+def _installed_version() -> str:
+    """The installed distribution's version; pyproject.toml is the one place it is written. Looked up on first use
+    because importlib.metadata alone costs more than the rest of `import photo_fx`."""
+    from importlib import metadata
+
+    try:
+        return metadata.version("photo-fx")
+    except metadata.PackageNotFoundError:  # run from a source tree that was never installed
+        return "0+unknown"
+
 
 __all__ = [
     "Animation", "BackendUnavailableError", "ImageReadError", "PhotoFxError", "Project", "ProjectError", "Recipe",

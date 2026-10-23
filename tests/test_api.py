@@ -2,6 +2,9 @@ import ast
 import inspect
 import json
 import pydoc
+import re
+import subprocess
+import sys
 from typing import Literal
 
 import numpy as np
@@ -31,6 +34,23 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
     assert module.__all__, f"{module.__name__} exports nothing"
     missing = [name for name in module.__all__ if not hasattr(module, name)]
     assert missing == []
+
+
+def test_the_version_is_looked_up_when_asked_for_not_on_import():
+    """Finding the installed version loads the packaging machinery (importlib.metadata), so `import photo_fx` waits
+    until `__version__` is read; it is then there like any other public name."""
+    code = (
+        "import json, sys\n"
+        "import photo_fx\n"
+        "on_import = 'importlib.metadata' in sys.modules\n"
+        "json.dump([on_import, photo_fx.__version__, '__version__' in dir(photo_fx)], sys.stdout)\n"
+    )
+    done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+    on_import, version, listed = json.loads(done.stdout)
+    assert on_import is False
+    assert re.fullmatch(r"\d+\.\d+\.\d+\S*", version)  # pyproject's version (tests/test_cli.py compares it exactly)
+    assert listed is True
 
 
 @pytest.mark.parametrize("name", ["render", "render_frames", "trace", "render_all"])
