@@ -17,7 +17,7 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.core.errors import ImageReadError
+from photo_fx.core.errors import BackendUnavailableError, ImageReadError
 from photo_fx.ops import resample
 
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
@@ -86,10 +86,15 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
     0..1 are clipped and NaN is written as 0 (black), silently. `quality` (1..100, default 95) sets JPEG and WebP
     compression; JPEGs keep full-resolution colour (4:4:4, no chroma subsampling) and PNG is lossless. The file
     embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the effects made, and carries no
-    other metadata: nothing from the photo it came from, so no EXIF and no GPS position.
+    other metadata: nothing from the photo it came from, so no EXIF and no GPS position. BackendUnavailableError,
+    naming the extension, when no writer exists for it.
     """
-    img = to_pil(rgb, alpha)
     suffix = Path(path).suffix.lower()
+    if Image.registered_extensions().get(suffix) not in Image.SAVE:
+        raise BackendUnavailableError(
+            f"cannot write {suffix or 'a file with no extension'!r} pictures: use .png, .jpg or .webp"
+        )
+    img = to_pil(rgb, alpha)
     if alpha is None and suffix in {".jpg", ".jpeg"}:
         img.save(path, quality=quality, subsampling=0, icc_profile=_SRGB_ICC)
     elif suffix == ".webp":
@@ -115,7 +120,8 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
     .mp4 / .mov: H.264 through ffmpeg (the one on the PATH, else the one the `[video]` extra installs:
     `pip install "photo-fx[video]"`); frames are streamed, so a long clip never has to fit in memory. .gif: no extra
     tools, but every frame is held in memory and colours are limited to 256, so use it for small, short clips.
-    Returns the number of frames written. RuntimeError when ffmpeg is needed and found nowhere, or fails.
+    Returns the number of frames written. BackendUnavailableError when the extension is none of those, or when
+    ffmpeg is needed and found nowhere, or fails.
 
     `max_side` shrinks frames larger than that (longest side, in px) while keeping the aspect ratio: 1600 px square
     needs an unusually high H.264 level that some players struggle with, 1080 is playable almost everywhere.
@@ -133,7 +139,7 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
         return len(images)
     if suffix in {".mp4", ".mov"}:
         return _save_with_ffmpeg(frames, path, fps, max_side)
-    raise ValueError(f"cannot write {suffix!r} videos: use .mp4, .mov or .gif")
+    raise BackendUnavailableError(f"cannot write {suffix!r} videos: use .mp4, .mov or .gif")
 
 
 def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
@@ -151,7 +157,7 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
         check=False,  # the return code is checked below, with the message
     )  # fmt: skip
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()}")
+        raise BackendUnavailableError(f"ffmpeg failed: {result.stderr.strip()}")
 
 
 def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_side: int | None) -> int:
@@ -188,7 +194,7 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         stdin.close()
     error = stderr.read().decode(errors="replace").strip()
     if process.wait() != 0:
-        raise RuntimeError(f"ffmpeg failed: {error}")
+        raise BackendUnavailableError(f"ffmpeg failed: {error}")
     return count
 
 
@@ -205,7 +211,7 @@ def _ffmpeg(task: str) -> str:
         bundled = None
     if bundled is not None and Path(bundled).is_file():
         return bundled
-    raise RuntimeError(
+    raise BackendUnavailableError(
         f'{task} needs ffmpeg: install the video extra (pip install "photo-fx[video]"), or install ffmpeg so it is on '
         "the PATH (macOS: brew install ffmpeg; Debian or Ubuntu: sudo apt install ffmpeg; Windows: winget install "
         "ffmpeg). Writing .gif needs neither."

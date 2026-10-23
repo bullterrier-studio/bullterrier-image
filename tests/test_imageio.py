@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image, ImageCms
 
-from photo_fx import ImageReadError, imageio
+from photo_fx import BackendUnavailableError, ImageReadError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -312,10 +312,19 @@ def test_save_video_mp4_streams_frames_and_copes_with_odd_sizes(tmp_path):
 
 
 def test_save_video_rejects_unknown_formats_and_no_frames(tmp_path):
-    with pytest.raises(ValueError, match=r"use \.mp4"):
+    with pytest.raises(BackendUnavailableError, match=r"\.avi.*use \.mp4"):
         imageio.save_video(_frames(), tmp_path / "a.avi")
     with pytest.raises(ValueError, match="no frames"):
         imageio.save_video([], tmp_path / "a.gif")
+
+
+def test_save_names_a_file_type_it_cannot_write_and_writes_a_known_one(tmp_path):
+    rgb = np.full((4, 5, 3), 0.5, np.float32)
+    with pytest.raises(BackendUnavailableError, match=r"\.xyz"):
+        imageio.save(rgb, tmp_path / "a.xyz")
+    assert not (tmp_path / "a.xyz").exists()
+    imageio.save(rgb, tmp_path / "a.png")  # the known-good side
+    assert imageio.load(tmp_path / "a.png").shape == (4, 5, 3)
 
 
 def _probe(path, entries):
@@ -408,7 +417,7 @@ def test_an_ffmpeg_on_the_path_is_used_before_the_bundled_one(tmp_path, monkeypa
     stand_in.write_text("#!/bin/sh\necho 'the ffmpeg on the PATH ran' >&2\nexit 3\n")
     stand_in.chmod(0o755)
     monkeypatch.setenv("PATH", str(folder))
-    with pytest.raises(RuntimeError, match="the ffmpeg on the PATH ran"):
+    with pytest.raises(BackendUnavailableError, match="the ffmpeg on the PATH ran"):
         imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
 
 
@@ -424,9 +433,9 @@ def test_without_ffmpeg_on_the_path_the_video_extras_ffmpeg_writes_the_clip(tmp_
 def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
     monkeypatch.setenv("IMAGEIO_FFMPEG_EXE", str(tmp_path / "no-ffmpeg-here"))
-    with pytest.raises(RuntimeError, match=re.escape('pip install "photo-fx[video]"')):
+    with pytest.raises(BackendUnavailableError, match=re.escape('pip install "photo-fx[video]"')):
         imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
-    with pytest.raises(RuntimeError, match=re.escape("photo-fx[video]")):
+    with pytest.raises(BackendUnavailableError, match=re.escape("photo-fx[video]")):
         imageio.resize_video(tmp_path / "a.mp4", tmp_path / "b.mp4", 32)
     assert not (tmp_path / "a.mp4").exists()
     assert imageio.save_video(iter(_frames(3)), tmp_path / "a.gif", fps=10) == 3
