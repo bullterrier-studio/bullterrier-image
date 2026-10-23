@@ -1,5 +1,5 @@
 """No test hard-codes the project's version: the version changes with every release, so a test that writes it (a built
-file name such as `photo_fx-0.1.0-py3-none-any.whl`) breaks the build on the next release. Tests read the version
+file name such as `photo_fx-<version>-py3-none-any.whl`) breaks the build on the next release. Tests read the version
 from pyproject.toml instead.
 
 The scan is `tools/release.py`'s `literal_versions`, the same one the release command uses to refuse a version that a
@@ -46,3 +46,9 @@ def test_the_version_is_found_in_any_spelling_and_only_that_version(release_tool
     found = release_tool.literal_versions("7.3.0rc1", tmp_path)
 
     assert found == ["tools/test_build.py:1: 7.3.0rc1", "tools/test_build.py:3: v7.3.0-RC.1"]
+
+
+def test_a_decimal_number_is_not_the_version_it_equals_in_pep_440(release_tool, tmp_path):
+    (tmp_path / "test_numbers.py").write_text('AMOUNT = 7.3\nSDIST = "demo-7.3.0.tar.gz"\n', encoding="utf-8")
+
+    assert release_tool.literal_versions("7.3.0", tmp_path) == ["test_numbers.py:2: 7.3.0"]

@@ -54,8 +54,9 @@ VERSION_LITERAL = re.compile(VERSION_PATTERN, re.VERBOSE | re.IGNORECASE)
 
 
 def literal_versions(version: str, folder: Path) -> list[str]:
-    """Where the text files under `folder` write `version`, in any PEP 440 spelling: `path:line: literal` each, the
-    path relative to `folder` with forward slashes, in path then line order; an empty list if nowhere."""
+    """Where the text files under `folder` write `version`, in any PEP 440 spelling with as many release numbers as
+    `version` has (so the number 0.1 is not the version 0.1.0): `path:line: literal` each, the path relative to
+    `folder` with forward slashes, in path then line order; an empty list if nowhere."""
     wanted = Version(version)
     found = []
     for path in sorted(folder.rglob("*")):
@@ -66,7 +67,7 @@ def literal_versions(version: str, folder: Path) -> list[str]:
             f"{path.relative_to(folder).as_posix()}:{number}: {match.group()}"
             for number, line in lines
             for match in VERSION_LITERAL.finditer(line)
-            if Version(match.group()) == wanted
+            if Version(match.group()) == wanted and len(Version(match.group()).release) == len(wanted.release)
         ]
     return found
 
