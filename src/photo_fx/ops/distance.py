@@ -9,6 +9,8 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
+from photo_fx.ops.blur import NUMPY_PAD, Mode
+
 
 @dataclass(frozen=True)
 class EdgeField:
@@ -30,6 +32,8 @@ def edge_distance(
     *,
     open_bottom: bool = True,
     smoothing: float = 1.0,  # constant: light smoothing, one element; effects expose it as a parameter
+    truncate: float = 4.0,  # constant: scipy's own cutoff, which keeps all but 0.006% of the kernel's weight
+    mode: Mode = "reflect",  # constant: the shape carries on past the open bottom as the rows above it do
 ) -> EdgeField:
     """Distance to the nearest edge, and the outward direction, for every element of a 2-D bool mask.
 
@@ -43,7 +47,10 @@ def edge_distance(
 
     The direction is the negative gradient of the distance after a Gaussian blur of `smoothing` elements (sigma, >= 0,
     else ValueError; 0 = none), so that it varies gently across a ridge instead of flipping. More smoothing turns the
-    direction more gradually, and lets it reach further beyond the shape (up to 4 sigma).
+    direction more gradually, and lets it reach further beyond the shape (up to `truncate` sigma). `truncate` (> 0, else
+    ValueError) is where the blur's kernel is cut off, in sigmas: smaller is faster and shorter-reaching, larger is
+    more exact. `mode` is what the blur sees beyond the array, as in `photo_fx.ops.blur`: with the default 'reflect'
+    the field is mirrored, so a border edge stays an edge (ValueError for a name that module does not know).
     """
     if not isinstance(shape, np.ndarray) or shape.dtype != bool or shape.ndim != 2 or shape.size == 0:
         raise ValueError("shape must be a non-empty 2-D bool array")
@@ -51,6 +58,10 @@ def edge_distance(
         raise ValueError(f"sampling must be two positive numbers (row height, column width), got {sampling!r}")
     if not (np.isfinite(smoothing) and smoothing >= 0):
         raise ValueError(f"smoothing must be a number >= 0 (elements), got {smoothing!r}")
+    if not (np.isfinite(truncate) and truncate > 0):
+        raise ValueError(f"truncate must be a number > 0 (sigmas), got {truncate!r}")
+    if mode not in NUMPY_PAD:
+        raise ValueError(f"mode must be one of {', '.join(NUMPY_PAD)}, got {mode!r}")
     row_height, col_width = sampling
 
     # A border is an edge by putting a row/column of "outside" next to it. Leaving the bottom unpadded is what makes it
@@ -59,12 +70,8 @@ def edge_distance(
     distance = ndimage.distance_transform_edt(grid, sampling=sampling)[1 : 1 + shape.shape[0], 1:-1]
 
     # Smoothing is in elements (not px), the same for every sampling. A gradient under 1e-6 per px is float noise or
-    # beyond the reach of the smoothing (4 sigma from the nearest inside element): there is no direction there.
-    # The blur's two other options are fixed on purpose, not tunables: beyond the array the field is mirrored (the
-    # shape carries on past the open bottom as the rows above it do, and a border edge stays an edge), and the kernel
-    # stops at 4 sigma, a numerical cutoff that keeps all but 0.006% of its weight.
-    # constant: scipy's reflect mode and 4-sigma truncate, as reasoned above
-    smooth = ndimage.gaussian_filter(distance, smoothing, mode="reflect", truncate=4.0)
+    # beyond the reach of the smoothing (`truncate` sigma from the nearest inside element): there is no direction there.
+    smooth = ndimage.gaussian_filter(distance, smoothing, mode=mode, truncate=truncate)
     grad_y = np.gradient(smooth, row_height, axis=0) if shape.shape[0] > 1 else np.zeros_like(smooth)
     grad_x = np.gradient(smooth, col_width, axis=1) if shape.shape[1] > 1 else np.zeros_like(smooth)
     length = np.hypot(grad_x, grad_y)

@@ -175,9 +175,8 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
 
     if params.ascii_share > 0 and strips:
         # constant: the id of a second random stream, independent of the band offsets drawn above
-        chosen = np.random.default_rng([params.seed, 1]).choice(
-            len(strips), math.ceil(params.ascii_share * len(strips)), replace=False
-        )
+        text_rng = np.random.default_rng([params.seed, 1])
+        chosen = text_rng.choice(len(strips), math.ceil(params.ascii_share * len(strips)), replace=False)
         # sized before any font is measured, so the strip height is an estimate
         row_height = 2 * params.ascii_cell  # constant: a monospaced character is about twice as tall as wide
         text_height = min(height, params.ascii_rows * row_height)

@@ -249,3 +249,33 @@ def test_more_smoothing_gives_a_direction_further_beyond_the_shape():
 def test_smoothing_must_be_a_non_negative_number(smoothing):
     with pytest.raises(ValueError, match="smoothing"):
         edge_distance(rectangle(), smoothing=smoothing)
+
+
+def test_a_shorter_cutoff_shortens_the_reach_of_the_smoothing():
+    # Column 14 is 6 elements left of the strip: a blur of sigma 3 reaches it when cut off at 4 sigma, not at 1.
+    reaching = edge_distance(_tall_strip(), smoothing=3.0, truncate=4.0)
+    cut_short = edge_distance(_tall_strip(), smoothing=3.0, truncate=1.0)
+    assert (reaching.normal_x[45, 14], reaching.normal_y[45, 14]) == pytest.approx((-1.0, 0.0), abs=1e-6)
+    assert (cut_short.normal_x[45, 14], cut_short.normal_y[45, 14]) == (0.0, -1.0)  # out of reach: flat, so up
+
+
+def test_mode_sets_what_the_smoothing_sees_beyond_the_array():
+    # A shape in the leftmost columns and a thin one near the right border. Seen as the picture wrapped round, the left
+    # shape lies one element from the last column, so the direction away from it there points left; mirrored, the
+    # nearest shape is the thin one and the direction points right.
+    shape = np.zeros((60, 60), dtype=bool)
+    shape[:, 0:10] = True
+    shape[:, 50:52] = True
+    mirrored = edge_distance(shape, smoothing=3.0, mode="reflect")
+    wrapped = edge_distance(shape, smoothing=3.0, mode="wrap")
+    assert mirrored.normal_x[45, 59] == pytest.approx(1.0)
+    assert wrapped.normal_x[45, 59] == pytest.approx(-1.0)
+
+
+@pytest.mark.parametrize(
+    ("option", "bad"),
+    [("truncate", 0.0), ("truncate", -4.0), ("truncate", float("nan")), ("mode", "bogus")],
+)
+def test_the_blurs_cutoff_and_edge_rule_must_be_valid(option, bad):
+    with pytest.raises(ValueError, match=option):
+        edge_distance(rectangle(), **{option: bad})

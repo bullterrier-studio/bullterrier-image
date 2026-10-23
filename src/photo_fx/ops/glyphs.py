@@ -32,6 +32,7 @@ _FONTS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     "C:/Windows/Fonts/consola.ttf",
 ]
+_FULL_INK = 255  # constant: full scale of an 8-bit grey canvas, where a glyph is drawn white on black
 # The Unicode block elements U+2588 FULL BLOCK and U+2593..2591 DARK, MEDIUM, LIGHT SHADE, drawn as such when the
 # font has no glyph for them
 # constant: the share of the cell each one's Unicode name gives it
@@ -77,9 +78,9 @@ def _atlas(chars: str, cell: int, font: str | None) -> np.ndarray:
             bitmaps.append(np.full((cell_h, cell_w), _BLOCK_INK[ch], dtype=np.float32))
             continue
         canvas = Image.new("L", (cell_w, cell_h), 0)  # constant: 8-bit grey, no ink
-        # constant: full 8-bit ink, the glyph centred in its cell
-        ImageDraw.Draw(canvas).text((cell_w / 2, cell_h / 2), ch, fill=255, font=glyph_font, anchor="mm")
-        bitmaps.append(np.asarray(canvas, dtype=np.float32) / 255.0)
+        # the glyph is centred in its cell (anchor "mm": middle of the text, horizontally and vertically)
+        ImageDraw.Draw(canvas).text((cell_w / 2, cell_h / 2), ch, fill=_FULL_INK, font=glyph_font, anchor="mm")
+        bitmaps.append(np.asarray(canvas, dtype=np.float32) / float(_FULL_INK))
     if len(bitmaps) < 2:
         raise ValueError("glyph_atlas needs at least two different characters in `chars`")
     bitmaps.sort(key=lambda b: float(b.mean()))

@@ -53,7 +53,7 @@ def text_art(
     n, cell_h, cell_w = atlas.shape
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)
-    # constant: repeat the border pixels, so a partial edge cell averages real picture, not black
+    # the border pixels are repeated (mode "edge"), so a partial edge cell averages real picture, not black
     padded = np.pad(rgb, ((0, rows * cell_h - height), (0, cols * cell_w - width), (0, 0)), mode="edge")
 
     # The colour and brightness of each character cell is the average of the pixels it covers.
