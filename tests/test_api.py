@@ -187,13 +187,18 @@ def test_a_modelled_effects_builder_takes_positional_and_keyword_values(lantern)
         fx.lantern_probe(30, radius=31)
 
 
-def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lantern):
-    with pytest.raises(ValueError, match=r"lantern_probe.*`raduis`.*radius, style, tint"):
-        fx.lantern_probe(raduis=3)
-    with pytest.raises(ValueError, match=r"lantern_probe.*`radius`.*>= 0.*-1"):
-        fx.lantern_probe(radius=-1)
-    with pytest.raises(ValueError, match=r"`tint`.*'#zz0000'"):
-        fx.lantern_probe(tint="#zz0000")
+@pytest.mark.parametrize(
+    ("values", "complaint"),
+    [
+        ({"raduis": 3}, r"`raduis`.*radius, style, tint"),
+        ({"radius": -1}, r"`radius`.*>= 0.*-1"),
+        ({"tint": "#zz0000"}, r"`tint`.*'#zz0000'"),
+    ],
+    ids=["unknown", "out of range", "malformed colour"],
+)
+def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lantern, values, complaint):
+    with pytest.raises(ValueError, match=f"lantern_probe.*{complaint}"):
+        fx.lantern_probe(**values)
 
 
 def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lantern):
@@ -269,11 +274,6 @@ def test_ramp_makes_an_animated_value():
 # --- trace: the picture after every step -----------------------------------------------------------------------
 
 
-def disc(shape, radius=25):
-    y, x = np.mgrid[0 : shape[0], 0 : shape[1]]
-    return (np.hypot(x - shape[1] / 2, y - shape[0] / 2) <= radius).astype(np.float32)
-
-
 def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     look = Recipe("t", size=None, steps=[fx.grade(exposure=0.5), fx.glitch(seed=1), fx.grain(seed=2)])
     stages = trace(photo, look)
@@ -283,14 +283,12 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     assert not np.array_equal(stages[3].image, stages[2].image)
 
 
-def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo):
-    matte = disc(photo.shape[:2])
+def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, matte):
     look = Recipe("t", size=64, steps=[fx.gradient_map(), fx.fill("#102030").where("background"), fx.glow().blend(0.7)])
     np.testing.assert_array_equal(trace(photo, look, matte)[-1].image, render(photo, look, matte))
 
 
-def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo):
-    matte = disc(photo.shape[:2])
+def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, matte):
     stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000").where("background")]), matte)
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], matte)  # white where the subject is
