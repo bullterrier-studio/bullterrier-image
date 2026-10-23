@@ -1,0 +1,12 @@
+# Turn the pink cushion toward orange and deepen it, leaving the rest of the picture alone.
+name = "selective_color"
+size = 480
+
+[[step]]
+effect = "selective_color"
+hue = 340
+width = 50
+feather = 30
+hue_shift = 40
+saturation = 1.3
+lightness = -0.1
