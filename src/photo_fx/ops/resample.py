@@ -17,6 +17,7 @@ def resize(array: np.ndarray, longest_side: int) -> np.ndarray:
         return array
     resample = Image.Resampling.LANCZOS if scale < 1 else Image.Resampling.BICUBIC
     channels = [array] if array.ndim == 2 else [array[..., c] for c in range(array.shape[2])]
-    scaled = [np.asarray(Image.fromarray(c, mode="F").resize(size, resample)) for c in channels]
+    # a float32 (height, width) array is Pillow's 32-bit float mode "F" by its dtype
+    scaled = [np.asarray(Image.fromarray(c.astype(np.float32, copy=False)).resize(size, resample)) for c in channels]
     out = scaled[0] if array.ndim == 2 else np.dstack(scaled)
     return np.clip(out, 0.0, 1.0).astype(np.float32)
