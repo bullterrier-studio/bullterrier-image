@@ -16,7 +16,7 @@ import numpy as np
 
 from . import __version__, imageio
 from .core import registry
-from .core.errors import PhotoFxError, RecipeError
+from .core.errors import PhotoFxError, RecipeError, SubjectNotFoundError
 from .imageio import save_video
 from .matte import SEGMENTERS, refine_edge, subject_matte
 from .pipeline import init_project, load_project, run
@@ -48,10 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     debug = args.debug or os.environ.get(_DEBUG_VARIABLE) == "1"
     try:
         return args.handler(args)
-    # TRANSITIONAL: pipeline, runner, matte and imageio still raise a plain ValueError, RuntimeError or
-    # NotImplementedError for some mistakes of the user. Once they raise only PhotoFxError subclasses, this narrows
-    # to (PhotoFxError, OSError).
-    except (PhotoFxError, OSError, ValueError, RuntimeError, NotImplementedError) as error:
+    # Nothing wider: a plain ValueError or the like is a bug, and its traceback is what the developer needs.
+    except (PhotoFxError, OSError) as error:
         if debug:
             raise
         print(f"error: {error}", file=sys.stderr)
@@ -114,7 +112,7 @@ def _parser() -> argparse.ArgumentParser:
     _photo_and_recipes(p)
     _subject_options(p)
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
-    p.add_argument("--columns", type=int, default=3, help="pictures per row (default: 3)")
+    p.add_argument("--columns", type=_positive_int, default=3, help="pictures per row (default: 3)")
 
     p = command(
         "cutout",
@@ -155,7 +153,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--strict", action="store_true", help="exit with an error if any result has a warning")
 
     p.add_argument("--steps", action="store_true", help="also save the picture after every step of every recipe")
-    _segmenter_option(p, " (subjects found before are remembered in the output's .cache: delete it after switching)")
+    _segmenter_option(p)
 
     p = command(
         "steps",
@@ -183,6 +181,13 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _positive_int(text: str) -> int:
+    """An argparse type: a whole number of 1 or more."""
+    if not text.isdigit() or int(text) < 1:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of 1 or more")
+    return int(text)
+
+
 def _progress(args: argparse.Namespace, message: str) -> None:
     """Tell the person watching what is going on (stderr), unless they asked for quiet with -q."""
     if not args.quiet:
@@ -201,15 +206,15 @@ def _subject_options(p: argparse.ArgumentParser) -> None:
         help="the subject's matte, the photo's size: a cut-out PNG (its transparency) or a black-and-white mask "
         "(white = subject); no model is used",
     )
-    _segmenter_option(p, "")
+    _segmenter_option(p)
 
 
-def _segmenter_option(p: argparse.ArgumentParser, note: str) -> None:
+def _segmenter_option(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--segmenter",
         choices=SEGMENTERS,
         help="what finds the subject: vision (Apple Vision, macOS) or onnx (a portable model, downloaded on first "
-        f"use); default: $PHOTO_FX_SEGMENTER, else vision where available{note}",
+        "use); default: $PHOTO_FX_SEGMENTER, else vision where available",
     )
 
 
@@ -224,7 +229,7 @@ def _load_recipes(paths: list[str]) -> list[Recipe]:
     for path in map(Path, paths):
         files += sorted(path.glob("*.toml")) if path.is_dir() else [path]
     if not files:
-        raise FileNotFoundError("no recipe files found")
+        raise RecipeError(f"no recipe files found in {', '.join(paths)}")
     return [load_recipe(f) for f in files]
 
 
@@ -266,7 +271,7 @@ def _cutout(args: argparse.Namespace) -> int:
         alpha = find(photo, **options)
     elif matte.shape != photo.shape[:2]:
         (mh, mw), (ph, pw) = matte.shape, photo.shape[:2]
-        raise PhotoFxError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
+        raise SubjectNotFoundError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
     else:  # a matte given is used as it is, unless an edge clean-up is asked for
         alpha = refine_edge(matte, args.shrink or 0.0, args.feather or 0.0)
     target = Path(args.out)

@@ -203,6 +203,9 @@ def user_mistakes(files):
     (files / "broken.toml").write_text("[[step]\neffect=", encoding="utf-8")
     (files / "unknown.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
     out = ["-o", str(files / "out")]
+    (files / "empty").mkdir(exist_ok=True)
+    (files / "cut.toml").write_text(f'name="cut"\nsize=64\n{CUT}', encoding="utf-8")  # needs the subject
+    (files / "clip.toml").write_text('name="clip"\nsize=32\n[animation]\nseconds=0.2\nfps=5\n' + CUT, encoding="utf-8")
     return {
         "a file that is not an image": (["render", str(files / "notimage.png"), recipe, *out], "notimage.png"),
         "a folder instead of the photo": (["render", str(files), recipe, *out], str(files)),
@@ -212,13 +215,25 @@ def user_mistakes(files):
         "an unknown effect": (["render", photo, str(files / "unknown.toml"), *out], "nope"),
         "a project file that does not exist": (["run", str(files / "gone.toml")], "gone.toml"),
         "a matte that is not an image": (["cutout", photo, *out, "--matte", str(files / "notimage.png")], "notimage"),
+        "a folder with no recipe in it": (["render", photo, str(files / "empty"), *out], "empty"),
+        "a picture type nothing can write": (["sheet", photo, recipe, "-o", str(files / "sheet.xyz")], ".xyz"),
+        "a video type nothing can write": (
+            ["animate", photo, str(files / "clip.toml"), "-o", str(files / "c.avi")],
+            ".avi",
+        ),
+        # (the suite's PHOTO_FX_MODEL names no file, so the portable model cannot run)
+        "a segmenter that cannot run": (
+            ["render", photo, str(files / "cut.toml"), *out, "--segmenter", "onnx"],
+            "no-such-model",
+        ),
     }
 
 
 MISTAKES = [
     "a file that is not an image", "a folder instead of the photo", "a photo that does not exist",
     "an output below a file", "a recipe with a syntax error", "an unknown effect",
-    "a project file that does not exist", "a matte that is not an image",
+    "a project file that does not exist", "a matte that is not an image", "a folder with no recipe in it",
+    "a picture type nothing can write", "a video type nothing can write", "a segmenter that cannot run",
 ]  # fmt: skip
 
 
@@ -232,6 +247,47 @@ def test_a_user_mistake_ends_in_one_error_line_on_stderr_and_exit_1(files, capsy
     assert offender in last_line
     assert "Traceback" not in shown.err
     assert shown.out == ""  # results go to stdout, errors only to stderr
+
+
+def test_an_unknown_segmenter_in_the_environment_ends_in_one_error_line(cut, capsys, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
+    assert main(["render", str(cut / "me.png"), str(cut / "cut.toml"), "-o", str(cut / "out")]) == 1
+    last_line = capsys.readouterr().err.strip().splitlines()[-1]
+    assert last_line.startswith("error: ")
+    assert "PHOTO_FX_SEGMENTER" in last_line
+    (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
+    assert main(["run", str(cut / "photo-fx.toml")]) == 1  # a project that needs the subject says so at once
+    assert "PHOTO_FX_SEGMENTER" in capsys.readouterr().err.strip().splitlines()[-1]
+
+
+class WrongParams(EffectParams):
+    """A probe effect without settings."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused.")
+
+
+def test_a_bug_in_an_effect_is_not_dressed_up_as_a_mistake_of_the_user(files, throwaway_effects):
+    """The command line catches `PhotoFxError` and `OSError`, nothing wider: a plain ValueError out of an effect is a
+    bug, and the developer needs its traceback."""
+
+    @effect(category="utilities", params=WrongParams)
+    def buggy_probe(rgb, params):
+        """Fails with a plain ValueError, as a bug would."""
+        raise ValueError("a bug, not a user mistake")
+
+    (files / "buggy.toml").write_text('name="buggy"\nsize=32\n[[step]]\neffect="buggy_probe"\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="a bug"):
+        main(["render", str(files / "me.png"), str(files / "buggy.toml"), "-o", str(files / "out")])
+
+
+@pytest.mark.parametrize("columns", ["0", "-2", "many"])
+def test_sheet_columns_must_be_a_positive_whole_number(files, capsys, columns):
+    command = ["sheet", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "s.png")]
+    with pytest.raises(SystemExit) as caught:
+        main([*command, "--columns", columns])
+    assert caught.value.code == 2
+    assert "--columns" in capsys.readouterr().err
+    assert main([*command, "--columns", "2"]) == 0  # the known-good side
 
 
 def test_the_same_commands_with_valid_input_succeed(files):
