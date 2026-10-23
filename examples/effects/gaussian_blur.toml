@@ -1,0 +1,8 @@
+# A soft background behind a sharp subject, the way a wide aperture would draw it.
+name = "gaussian_blur"
+size = 480
+
+[[step]]
+effect = "gaussian_blur"
+radius = 7
+mask = "background"
