@@ -169,4 +169,5 @@ def test_each_rule_family_fails_the_gate_naming_the_rule(checkout, with_file, re
     verdict = tool(checkout)
     assert verdict.returncode != 0, verdict.report
     [finding] = [line for line in verdict.report.splitlines() if code in line]  # exactly this offence, once
-    assert finding.startswith(relative), verdict.report  # pointing at the offending file
+    # pointing at the offending file: compared as paths, since the tools print `\` on Windows
+    assert Path(finding.split(":", 1)[0]) == Path(relative), verdict.report
