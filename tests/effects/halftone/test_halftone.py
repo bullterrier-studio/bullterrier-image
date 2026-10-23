@@ -122,7 +122,9 @@ def test_ink_floor_caps_how_much_a_dark_dot_colour_is_brightened(ink_floor: floa
 
 
 def test_dots_repeat_every_cell_px_along_an_upright_screen() -> None:
-    out = registry.apply(NAME, flat(0.3), cell=12, angle=0.0, **WHITE_ON_BLACK)[..., 0]
+    # 600 x 600, a third of a megapixel: large enough that the screen is not drawn all at once, and the repeat must
+    # hold across wherever it was split.
+    out = registry.apply(NAME, flat(0.3, 600), cell=12, angle=0.0, **WHITE_ON_BLACK)[..., 0]
     np.testing.assert_allclose(out[:, 12:], out[:, :-12], atol=1e-4)
     np.testing.assert_allclose(out[12:], out[:-12], atol=1e-4)
     assert np.abs(out[:, 6:] - out[:, :-6]).max() > 0.5  # half a cell along, it is not the same
