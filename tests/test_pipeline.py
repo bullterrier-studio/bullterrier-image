@@ -8,8 +8,9 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from photo_fx import imageio
+from photo_fx import Project, imageio
 from photo_fx.cli import main
+from photo_fx.core.errors import ProjectError
 from photo_fx.pipeline import init_project, load_project, run
 
 FFMPEG = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
@@ -122,7 +123,7 @@ def test_a_broken_recipe_fails_before_any_work_is_done(folder):
 
 def test_two_recipes_with_the_same_name_are_refused(folder):
     (folder / "recipes" / "again.toml").write_text('name = "warm"\nsize = 64\n[[step]]\neffect = "grain"\n')
-    with pytest.raises(ValueError, match="same"):
+    with pytest.raises(ProjectError, match="same"):
         run(load_project(folder / "photo-fx.toml"))
 
 
@@ -236,7 +237,7 @@ def test_only_limits_the_run_to_some_photos_without_forgetting_the_others(folder
     assert {i.photo for i in items} == {"a.png"}  # the return value is what this run did
     manifest = json.loads((folder / "out" / "manifest.json").read_text())
     assert {i["photo"] for i in manifest["items"]} == {"a.png", "b.png"}  # b.png's earlier results are still on record
-    with pytest.raises(ValueError, match="--only"):
+    with pytest.raises(ProjectError, match="--only"):
         run(project, only="nothing*")
 
 
@@ -294,14 +295,47 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
 )
 def test_a_bad_project_file_is_explained(folder, text, expect):
     (folder / "photo-fx.toml").write_text(text)
-    with pytest.raises(ValueError, match=expect):
+    with pytest.raises(ProjectError, match=expect):
+        load_project(folder / "photo-fx.toml")
+
+
+def test_a_project_file_that_is_not_toml_is_named_in_the_error(folder):
+    (folder / "photo-fx.toml").write_text('output = "out"\nrecipes = = ["recipes"]\n')
+    with pytest.raises(ProjectError, match=r"photo-fx\.toml.*line 2"):
         load_project(folder / "photo-fx.toml")
 
 
 def test_two_photos_with_the_same_name_are_refused(folder):
     (folder / "photos" / "a.jpg").write_bytes((folder / "photos" / "a.png").read_bytes())
-    with pytest.raises(ValueError, match="share a file name"):
+    with pytest.raises(ProjectError, match="share a file name"):
         load_project(folder / "photo-fx.toml")
+
+
+@pytest.mark.parametrize(
+    ("option", "expect"),
+    [
+        ({"quality": 500}, "quality.*500"),
+        ({"formats": ("bmp",)}, "formats.*bmp"),
+        ({"formats": ()}, "formats"),
+        ({"sizes": (4,)}, "sizes.*4"),
+        ({"subject_share": (0.9, 0.1)}, "subject_share"),
+        ({"frozen_tail": 0.0}, "frozen_tail.*0"),
+        ({"steps_at": 2.0}, "steps_at.*2"),
+        ({"steps": "yes"}, "steps.*yes"),
+        ({"colour": "red"}, "colour"),
+    ],
+)
+def test_a_project_built_in_code_is_checked_like_a_project_file(folder, option, expect):
+    with pytest.raises(ProjectError, match=expect):
+        Project(photos=(folder / "photos" / "a.png",), recipes=(folder / "recipes" / "warm.toml",), output=folder / "o",
+                **option)  # fmt: skip
+
+
+def test_a_project_needs_a_photo_and_a_recipe(folder):
+    with pytest.raises(ProjectError, match="photos"):
+        Project(photos=(), recipes=(folder / "recipes" / "warm.toml",), output=folder / "o")
+    with pytest.raises(ProjectError, match="recipes"):
+        Project(photos=(folder / "photos" / "a.png",), recipes=(), output=folder / "o")
 
 
 def test_init_writes_a_working_starter_project(tmp_path, photo):

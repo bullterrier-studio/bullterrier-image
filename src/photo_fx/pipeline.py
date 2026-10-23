@@ -31,6 +31,7 @@ A pipeline is described by a small project file, `photo-fx.toml` (`init_project`
 """
 
 import fnmatch
+import functools
 import glob
 import hashlib
 import html
@@ -38,44 +39,98 @@ import json
 import time
 import tomllib
 from collections.abc import Callable, Iterator
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated, Any, Literal
 
 import numpy as np
+from pydantic import AfterValidator, ConfigDict, Field, ValidationError, model_validator
+from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import imageio
 from .checks import MotionMeter, matte_warnings, still_warnings
+from .core.errors import ProjectError
+from .core.params import describe_error
 from .core.runner import subject_from
 from .matte import subject_matte
 from .ops.resample import resize
 from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
 from .sheet import contact_sheet, write_stages
 
-_FORMATS = ("jpg", "png", "webp")
 _PROJECT_FILE = "photo-fx.toml"
+# The project file's tables and the `Project` fields each one holds (top-level keys map to fields of their own name).
+_TABLES = {"export": ("formats", "sizes", "quality", "steps", "steps_at"), "checks": ("subject_share", "frozen_tail")}
+_DEFAULT_PHOTOS = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.webp"]
+
+_Share = Annotated[float, Field(strict=True, ge=0, le=1)]
 
 
-@dataclass(frozen=True)
+def _checked_as_project[T](cls: type[T]) -> type[T]:
+    """Make `cls` (a pydantic dataclass) report a failed validation as a `ProjectError` in the project's wording.
+
+    Pydantic writes the dataclass's `__init__` itself (one written in the class body is ignored), so it is wrapped
+    here; `dataclasses.replace` goes through it too, so a changed copy is checked like a new one."""
+    generated = cls.__init__
+    names = [f.name for f in fields(cls)]  # type: ignore[arg-type]  # a pydantic dataclass is a dataclass
+
+    @functools.wraps(generated)
+    def checked_init(self: object, *args: Any, **kwargs: Any) -> None:
+        try:
+            generated(self, *args, **kwargs)
+        except ValidationError as error:
+            raise ProjectError(describe_error(error, "", names)) from None
+
+    cls.__init__ = checked_init  # type: ignore[method-assign]  # replacing pydantic's generated constructor on purpose
+    return cls
+
+
+@_checked_as_project
+@validated_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class Project:
     """A pipeline as `photo-fx.toml` describes it (see the module documentation; `load_project` reads one).
 
-    photos: the photo files. recipes: recipe files, or `Recipe` objects built in code. output: the folder everything is
-    written to. formats, sizes, quality: how stills are exported (sizes = longest side in px; empty = as rendered).
-    subject_share, frozen_tail: the limits of the automatic checks. steps, steps_at: also save the picture after every
-    step, taken at that moment (0..1) of an animated recipe.
+    Every value is checked when the project is made, however it is made (a file, code, `dataclasses.replace`); a bad
+    one raises `ProjectError` naming the setting and the value.
+    photos: the photo files, at least one, no two with the same file name without its extension (each gets the output
+        folder of that name). recipes: recipe files, or `Recipe` objects built in code, at least one. output: the folder
+        everything is written to.
+    formats: how stills are saved, one or more of jpg, png, webp. sizes: longest sides in px (each >= 16) of smaller
+        copies; empty = as rendered. quality: 1..100, for jpg and webp.
+    subject_share: (low, high), within 0..1: a cut-out covering less or more of the photo is flagged. frozen_tail: above
+        0 and up to 1: an animation frozen for more than this share of its length is flagged.
+    steps: also save the picture after every step; steps_at: the moment (0..1) of an animated recipe they are taken at.
     """
 
-    photos: tuple[Path, ...]
-    recipes: tuple[Path | Recipe, ...]  # recipe files, or Recipe objects built in code
+    photos: Annotated[tuple[Path, ...], Field(min_length=1)]
+    recipes: Annotated[tuple[Path | Recipe, ...], Field(min_length=1)]  # files, or Recipe objects built in code
     output: Path
-    formats: tuple[str, ...] = ("jpg",)
-    sizes: tuple[int, ...] = ()
-    quality: int = 92
-    subject_share: tuple[float, float] = (0.02, 0.97)
-    frozen_tail: float = 0.3
-    steps: bool = False  # also save the picture after every step of every recipe
-    steps_at: float = 0.5  # for animated recipes: the moment of the clip (0..1) those pictures are from
+    formats: tuple[Literal["jpg", "png", "webp"], ...] = ("jpg",)
+    # largest first, so equal settings written in another order are the same settings
+    sizes: Annotated[
+        tuple[Annotated[int, Field(strict=True, ge=16)], ...], AfterValidator(lambda s: tuple(sorted(s, reverse=True)))
+    ] = ()
+    quality: int = Field(default=92, strict=True, ge=1, le=100)
+    subject_share: tuple[_Share, _Share] = (0.02, 0.97)
+    frozen_tail: float = Field(default=0.3, strict=True, gt=0, le=1)
+    steps: bool = Field(default=False, strict=True)  # also save the picture after every step of every recipe
+    steps_at: float = Field(
+        default=0.5, strict=True, ge=0, le=1
+    )  # for animated recipes: the moment (0..1) of those pictures
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "Project":
+        """The rules across values: at least one format (checked here: a bad item would also report the length),
+        a share range that is a range, and one output folder per photo."""
+        if not self.formats:
+            raise ValueError("formats must name at least one of jpg, png, webp")
+        low, high = self.subject_share
+        if not low < high:
+            raise ValueError(f"subject_share must be (low, high) with low < high, got {self.subject_share}")
+        stems = [p.stem for p in self.photos]
+        if len(set(stems)) != len(stems):
+            raise ValueError(f"two photos share a file name ({sorted({s for s in stems if stems.count(s) > 1})})")
+        return self
 
     @property
     def cache(self) -> Path:
@@ -83,86 +138,73 @@ class Project:
         return self.output / ".cache"
 
 
-@dataclass(frozen=True)
+@validated_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class Item:
-    """What happened to one photo x recipe pair."""
+    """What happened to one photo x recipe pair.
+
+    photo, recipe: their names. status: done, skipped (up to date), failed or would-run (a dry run). outputs: the files
+    written, relative to the output folder. warnings: what the automatic checks flagged. error: why it failed. steps:
+    the contact sheet of every step, relative to the output folder. seconds: how long it took. fingerprint: the hash of
+    everything that shaped the result, compared on the next run.
+    """
 
     photo: str
     recipe: str
-    status: str  # done | skipped | failed | would-run
-    outputs: tuple[str, ...] = ()  # paths relative to the output folder
+    status: Literal["done", "skipped", "failed", "would-run"]
+    outputs: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     error: str | None = None
-    steps: str | None = None  # the contact sheet of every step, relative to the output folder
+    steps: str | None = None
     seconds: float = 0.0
     fingerprint: str = ""
 
 
 def load_project(path: str | Path) -> Project:
-    """Read a project file; globs and folders are resolved relative to the file. Errors say what is wrong."""
+    """Read a project file; globs and folders are resolved relative to the file.
+
+    Raises ProjectError, starting with the file's name, for a file that is not TOML (with its line and column), an
+    unknown key, globs that match no photo, no recipe file, or a value `Project` refuses; OSError if it cannot be read.
+    """
     path = Path(path)
     root = path.parent
-    with open(path, "rb") as f:
-        raw = tomllib.load(f)
-    unknown = set(raw) - {"photos", "recipes", "output", "export", "checks"}
+    try:
+        with path.open("rb") as f:
+            raw = tomllib.load(f)
+    except tomllib.TOMLDecodeError as error:  # its message keeps the line and column
+        raise ProjectError(f"{path.name}: {error}") from None
+    except UnicodeDecodeError as error:
+        raise ProjectError(f"{path.name}: not UTF-8 text ({error.reason} at byte {error.start})") from None
+    unknown = set(raw) - {"photos", "recipes", "output", *_TABLES}
     if unknown:
-        raise ValueError(f"{path.name}: unknown keys {sorted(unknown)}")
-    export, checks = raw.get("export", {}), raw.get("checks", {})
-    for table, allowed in (
-        (export, {"formats", "sizes", "quality", "steps", "steps_at"}),
-        (checks, {"subject_share", "frozen_tail"}),
-    ):
-        if set(table) - allowed:
-            raise ValueError(f"{path.name}: unknown keys {sorted(set(table) - allowed)}; allowed: {sorted(allowed)}")
+        raise ProjectError(f"{path.name}: unknown keys {sorted(unknown)}")
+    settings: dict[str, Any] = {}
+    for name, keys in _TABLES.items():
+        table = raw.get(name, {})
+        if not isinstance(table, dict):
+            raise ProjectError(f"{path.name}: write `{name}` as a [{name}] table")
+        if set(table) - set(keys):
+            raise ProjectError(f"{path.name}: unknown keys {sorted(set(table) - set(keys))}; allowed: {sorted(keys)}")
+        settings |= table
 
-    photo_globs = raw.get("photos", ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.webp"])
-    photos = tuple(
-        sorted(
-            {
-                Path(p)
-                for pattern in photo_globs
-                for p in glob.glob(str(root / pattern), recursive=True)
-                if Path(p).is_file()
-            }
-        )
-    )
+    photo_globs = raw.get("photos", _DEFAULT_PHOTOS)
+    found = {
+        Path(p)
+        for pattern in photo_globs
+        for p in glob.glob(str(root / pattern), recursive=True)  # noqa: PTH207  (skips hidden ._x.jpg copies; Path.glob does not)
+    }
+    photos = tuple(sorted(p for p in found if p.is_file()))
     if not photos:
-        raise ValueError(f"{path.name}: no photos match {photo_globs} (looked relative to {root.resolve()})")
-    stems = [p.stem for p in photos]
-    if len(set(stems)) != len(stems):
-        raise ValueError(
-            f"{path.name}: two photos share a file name ({sorted({s for s in stems if stems.count(s) > 1})})"
-        )
-
+        raise ProjectError(f"{path.name}: no photos match {photo_globs} (looked relative to {root.resolve()})")
     recipes: list[Path] = []
     for entry in raw.get("recipes", ["recipes"]):
         target = root / entry
         recipes += sorted(target.glob("*.toml")) if target.is_dir() else [target]
     if not recipes or not all(r.is_file() for r in recipes):
-        raise ValueError(f"{path.name}: no recipe files found in {raw.get('recipes', ['recipes'])}")
-
-    formats = tuple(export.get("formats", ["jpg"]))
-    if not formats or any(f not in _FORMATS for f in formats):
-        raise ValueError(f"{path.name}: [export] formats must be a list from {_FORMATS}, got {list(formats)}")
-    sizes = tuple(export.get("sizes", []))
-    if any(not isinstance(s, int) or isinstance(s, bool) or s < 16 for s in sizes):
-        raise ValueError(f"{path.name}: [export] sizes must be whole numbers of at least 16 (px), got {list(sizes)}")
-    quality = export.get("quality", 92)
-    if not isinstance(quality, int) or not 1 <= quality <= 100:
-        raise ValueError(f"{path.name}: [export] quality must be 1 to 100, got {quality!r}")
-    share = tuple(checks.get("subject_share", (0.02, 0.97)))
-    if len(share) != 2 or not 0 <= share[0] < share[1] <= 1:
-        raise ValueError(f"{path.name}: [checks] subject_share must be two numbers, low < high, within 0..1")
-    frozen = checks.get("frozen_tail", 0.3)
-    if not isinstance(frozen, int | float) or not 0 < frozen <= 1:
-        raise ValueError(f"{path.name}: [checks] frozen_tail must be a share of the clip, above 0 and up to 1")
-    steps, steps_at = export.get("steps", False), export.get("steps_at", 0.5)
-    if not isinstance(steps, bool) or not isinstance(steps_at, int | float) or not 0 <= steps_at <= 1:
-        raise ValueError(f"{path.name}: [export] steps must be true or false and steps_at a number from 0 to 1")
-    return Project(
-        photos, tuple(recipes), root / raw.get("output", "out"), formats, tuple(sorted(sizes, reverse=True)),
-        quality, share, frozen, steps, float(steps_at),
-    )  # fmt: skip
+        raise ProjectError(f"{path.name}: no recipe files found in {raw.get('recipes', ['recipes'])}")
+    try:
+        return Project(photos=photos, recipes=tuple(recipes), output=root / raw.get("output", "out"), **settings)
+    except ProjectError as error:
+        raise ProjectError(f"{path.name}: {error}") from None
 
 
 def init_project(directory: str | Path = ".") -> Path:
@@ -194,7 +236,8 @@ def run(
 
     Pairs whose photo, recipe, export settings and the tool's own code are unchanged since the last run, and whose
     files still exist, are skipped unless `force`. `only` is a file-name pattern selecting some of the photos.
-    `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once.
+    `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
+    (RecipeError); two recipes with one name, or an `only` that matches no photo, raise ProjectError.
     `find_subject(rgb) -> matte` finds the subject of a photo for the recipes that need it (default: `subject_matte`).
     It is asked at most once per photo, and never again for a photo whose subject is remembered in the project's
     cache from an earlier run; if it raises, the recipes of that photo that need the subject fail, and the rest run.
@@ -204,10 +247,10 @@ def run(
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
     names = [recipe.name for _, recipe in recipes]
     if len(set(names)) != len(names):
-        raise ValueError(f"two recipes are called the same: {sorted({n for n in names if names.count(n) > 1})}")
+        raise ProjectError(f"two recipes are called the same: {sorted({n for n in names if names.count(n) > 1})}")
     photos = [p for p in project.photos if only is None or fnmatch.fnmatch(p.name, only)]
     if not photos:
-        raise ValueError(f"no photos match --only {only!r}")
+        raise ProjectError(f"no photos match --only {only!r}")
 
     previous = {(item.photo, item.recipe): item for item in _read_manifest(project.output)}
     settings = repr(
@@ -425,7 +468,7 @@ def _code_fingerprint() -> str:
 def _read_manifest(output: Path) -> list[Item]:
     try:
         raw = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
-        return [Item(**{**i, "outputs": tuple(i["outputs"]), "warnings": tuple(i["warnings"])}) for i in raw["items"]]
+        return [Item(**item) for item in raw["items"]]  # validated: a damaged record is no record
     except (OSError, ValueError, KeyError, TypeError):
         return []  # no usable earlier run: everything is new
 

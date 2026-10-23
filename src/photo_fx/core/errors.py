@@ -8,7 +8,7 @@ Dependency direction: imports nothing, so every layer may raise them.
 """
 
 __all__ = [
-    "BackendUnavailableError", "ImageReadError", "PhotoFxError", "RecipeError", "SubjectNotFoundError",
+    "BackendUnavailableError", "ImageReadError", "PhotoFxError", "ProjectError", "RecipeError", "SubjectNotFoundError",
     "UnknownEffectError",
 ]  # fmt: skip
 
@@ -21,6 +21,12 @@ class RecipeError(PhotoFxError, ValueError):
     """A recipe, a step, an animation or an effect's parameters are invalid: a misspelt or out-of-range value, an unsafe
     recipe name, a broken or unsupported recipe file. Raised when the value is made or the file is read, wherever it
     comes from (a TOML file, `fx`, a direct call), naming what is wrong and what is valid."""
+
+
+class ProjectError(PhotoFxError, ValueError):
+    """A pipeline project is invalid: a project file that is not TOML or has unknown keys, globs that match no photo,
+    two photos with one file name, an out-of-range export or check setting. Raised when the project is made or read,
+    naming the file (if any), the setting and the value."""
 
 
 class UnknownEffectError(RecipeError, KeyError):
