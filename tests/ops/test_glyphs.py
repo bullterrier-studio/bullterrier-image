@@ -15,7 +15,15 @@ def ink(atlas: np.ndarray) -> np.ndarray:
     return atlas.sum(axis=(1, 2))
 
 
-def test_cell_width_is_the_requested_width_and_height_grows_with_it():
+@pytest.fixture(params=["system font", "no system font"])
+def any_host(request, monkeypatch):
+    """Runs a test twice: with the host's fonts, and as on a host without any monospaced font (a slim Linux container),
+    where the list of font files to look for is empty and Pillow's own font draws."""
+    if request.param == "no system font":
+        monkeypatch.setenv("PHOTO_FX_FONTS", "")
+
+
+def test_cell_width_is_the_requested_width_and_height_grows_with_it(any_host):
     sizes = [cell_size(c) for c in CELLS]
     assert [w for w, _ in sizes] == CELLS
     heights = [h for _, h in sizes]
@@ -53,7 +61,7 @@ def test_fewer_than_two_distinct_characters_raises(chars):
         glyph_atlas(chars, 8)
 
 
-def test_space_has_no_ink_and_the_full_block_has_the_most():
+def test_space_has_no_ink_and_the_full_block_has_the_most(any_host):
     atlas = glyph_atlas(" .:#█", 10)
     totals = ink(atlas)
     assert totals[0] == 0.0  # the space sorts first
@@ -99,30 +107,28 @@ def test_paint_of_an_empty_grid_is_empty():
     assert paint(np.zeros((0, 3), dtype=int), atlas).shape == (0, 3 * atlas.shape[2])
 
 
-@pytest.mark.parametrize("bad", [3, 8, -1])
-def test_paint_rejects_indices_outside_the_atlas(bad):
-    atlas = glyph_atlas(" .#", 7)  # 3 glyphs: valid indices are 0..2, and -1 must not wrap to the last glyph
-    with pytest.raises(IndexError):
-        paint(np.array([[0, bad]]), atlas)
+THREE_GLYPHS = glyph_atlas(" .#", 7)  # valid indices are 0..2, and -1 must not wrap to the last glyph
 
 
-@pytest.mark.parametrize("shape", [(3,), (1, 2, 3)])
-def test_paint_rejects_indices_that_are_not_a_grid(shape):
-    atlas = glyph_atlas(" .#", 7)
-    with pytest.raises(ValueError, match="2-D"):
-        paint(np.zeros(shape, dtype=int), atlas)
-
-
-def test_paint_rejects_non_integer_indices():
-    atlas = glyph_atlas(" .#", 7)
-    with pytest.raises(ValueError, match="integer"):
-        paint(np.array([[0.0, 1.0]]), atlas)
-
-
-@pytest.mark.parametrize("shape", [(7, 4), (2, 7, 4, 1)])
-def test_paint_rejects_an_atlas_that_is_not_a_stack_of_glyphs(shape):
-    with pytest.raises(ValueError, match="atlas"):
-        paint(np.zeros((1, 1), dtype=int), np.zeros(shape, dtype=np.float32))
+@pytest.mark.parametrize(
+    ("indices", "atlas", "error", "match"),
+    [
+        (np.array([[0, 3]]), THREE_GLYPHS, IndexError, None),
+        (np.array([[0, 8]]), THREE_GLYPHS, IndexError, None),
+        (np.array([[0, -1]]), THREE_GLYPHS, IndexError, None),
+        (np.zeros((3,), int), THREE_GLYPHS, ValueError, "2-D"),
+        (np.zeros((1, 2, 3), int), THREE_GLYPHS, ValueError, "2-D"),
+        (np.array([[0.0, 1.0]]), THREE_GLYPHS, ValueError, "integer"),
+        (np.zeros((1, 1), int), np.zeros((7, 4), np.float32), ValueError, "atlas"),
+        (np.zeros((1, 1), int), np.zeros((2, 7, 4, 1), np.float32), ValueError, "atlas"),
+    ],
+    ids=["index 3", "index 8", "index -1", "1-D", "3-D", "not integer", "2-D atlas", "4-D atlas"],
+)
+def test_paint_rejects_indices_outside_the_atlas_or_not_a_grid_and_an_atlas_not_a_stack_of_glyphs(
+    indices, atlas, error, match
+):
+    with pytest.raises(error, match=match):
+        paint(indices, atlas)
 
 
 # --- fonts and glyph geometry -----------------------------------------------------------------------------------
@@ -274,14 +280,6 @@ def no_system_font(monkeypatch):
     monkeypatch.setenv("PHOTO_FX_FONTS", "")
 
 
-def test_without_a_system_font_cells_keep_the_asked_width_and_grow_with_it(no_system_font):
-    sizes = [cell_size(c) for c in CELLS]
-    assert [w for w, _ in sizes] == CELLS
-    heights = [h for _, h in sizes]
-    assert heights == sorted(set(heights))  # strictly increasing
-    assert all(h > 0 for h in heights)
-
-
 @pytest.mark.parametrize("cell", CELLS)
 def test_without_a_system_font_the_block_elements_keep_their_nominal_ink(no_system_font, cell):
     """Unicode names them FULL BLOCK and DARK, MEDIUM, LIGHT SHADE: 100, 75, 50 and 25 % of the cell inked."""
@@ -296,13 +294,6 @@ def test_without_a_system_font_letters_are_drawn_with_pillows_own_font(no_system
     assert totals[0] == 0.0
     assert np.all(np.diff(totals) > 0)  # dot, I and M: real, different letters, not one missing-glyph box
     assert atlas.max() > 0.5
-
-
-def test_the_space_and_the_full_block_bound_the_ink_without_a_system_font_too(no_system_font):
-    atlas = glyph_atlas(" .:#█", 10)
-    totals = ink(atlas)
-    assert totals[0] == 0.0
-    assert totals[-1] > totals[:-1].max()
 
 
 def test_without_a_font_file_or_freetype_the_error_says_how_to_give_a_font(no_system_font, monkeypatch):
