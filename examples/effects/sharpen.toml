@@ -1,0 +1,9 @@
+# Crisp fur and whiskers; the threshold keeps the smooth fur on the cheeks from turning grainy.
+name = "sharpen"
+size = 480
+
+[[step]]
+effect = "sharpen"
+radius = 2
+amount = 1.6
+threshold = 0.02
