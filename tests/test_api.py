@@ -45,7 +45,7 @@ def test_the_version_is_looked_up_when_asked_for_not_on_import():
         "on_import = 'importlib.metadata' in sys.modules\n"
         "json.dump([on_import, photo_fx.__version__, '__version__' in dir(photo_fx)], sys.stdout)\n"
     )
-    done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, text=True, check=False)
+    done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, encoding="utf-8", check=False)
     assert done.returncode == 0, done.stderr
     on_import, version, listed = json.loads(done.stdout)
     assert on_import is False

@@ -381,7 +381,9 @@ def test_help_and_version_load_no_image_library(option):
         f"try:\n    main([{option!r}])\nexcept SystemExit:\n    pass\n"
         f"json.dump([m for m in {heavy!r} if m in sys.modules], sys.stderr)\n"
     )
-    done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, text=True, check=False, cwd=ROOT)
+    done = subprocess.run(
+        [sys.executable, "-P", "-c", code], capture_output=True, encoding="utf-8", check=False, cwd=ROOT
+    )
     assert done.returncode == 0, done.stderr
     assert done.stdout.startswith(("usage: photo-fx", "photo-fx "))  # it really answered
     assert done.stderr == "[]"
