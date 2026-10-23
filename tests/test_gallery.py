@@ -34,7 +34,7 @@ class AmountParams(EffectParams):
 
 def _row(page: str, name: str) -> str:
     """The table row of effect `name` on a category page (the rows start with its picture)."""
-    (row,) = [line for line in page.splitlines() if line.startswith("| <img") and f"`{name}`" in line]
+    (row,) = [line for line in page.splitlines() if line.startswith("| <img") and f'alt="{name}"> | `{name}` |' in line]
     return row
 
 
