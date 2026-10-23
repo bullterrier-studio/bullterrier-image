@@ -4,9 +4,10 @@ A thin layer over the library; no logic of its own.
 """
 
 import argparse
+import os
 import sys
 import textwrap
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
@@ -15,46 +16,94 @@ import numpy as np
 
 from . import __version__, imageio
 from .core import registry
+from .core.errors import PhotoFxError, RecipeError
 from .imageio import save_video
 from .matte import SEGMENTERS, refine_edge, subject_matte
 from .pipeline import init_project, load_project, run
 from .recipe import Recipe, SubjectFinder, load_recipe, render_all, render_frames, trace
 from .sheet import contact_sheet, write_stages
 
+_DEBUG_VARIABLE = "PHOTO_FX_DEBUG"
+
+_EXIT_CODES = """\
+exit codes:
+  0    success
+  1    the command failed (reason after "error:" on stderr); for `run`: a failed result, or with --strict a warning
+  2    wrong usage: an unknown command or option (argparse explains)
+  130  interrupted with Ctrl-C
+
+`photo-fx COMMAND --help` shows a command's options and an example. Errors go to stderr, results to stdout.
+"""
+
 
 def main(argv: list[str] | None = None) -> int:
     """Run the command line with `argv` (default: `sys.argv[1:]`) and return the exit code.
 
-    0 on success; 1 when a command fails (the reason is printed to stderr as `error: ...`, never as a traceback), when
-    `run` has a failed result, or with `run --strict` a warning. A usage error exits through argparse with code 2.
+    Results go to stdout, progress and errors to stderr. A mistake of the user (a file that is not an image, a recipe
+    that does not exist, an output folder that cannot be written) prints `error: <what is wrong>` and returns 1; Ctrl-C
+    prints `interrupted` and returns 130. With `--debug` (or `PHOTO_FX_DEBUG=1`) the exception is raised instead, for
+    developers. See the exit codes in `--help`.
     """
+    args = _parser().parse_args(argv)
+    debug = args.debug or os.environ.get(_DEBUG_VARIABLE) == "1"
+    try:
+        return args.handler(args)
+    # TRANSITIONAL: pipeline, runner, matte and imageio still raise a plain ValueError, RuntimeError or
+    # NotImplementedError for some mistakes of the user. Once they raise only PhotoFxError subclasses, this narrows
+    # to (PhotoFxError, OSError).
+    except (PhotoFxError, OSError, ValueError, RuntimeError, NotImplementedError) as error:
+        if debug:
+            raise
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        if debug:
+            raise
+        print("interrupted", file=sys.stderr)
+        return 130
+
+
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="photo-fx",
         description="Style photos with composable effects, optionally on a cut-out subject, and animate them.",
+        epilog=_EXIT_CODES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"photo-fx {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    p = commands.add_parser("render", help="render a photo through one or more recipes, one file each")
+    # Every subcommand takes --debug and -q, so they are spelt once, as a parent of each.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--debug", action="store_true", help=f"show the full traceback of an error (also: {_DEBUG_VARIABLE}=1)"
+    )
+
+    def command(name: str, handler: Callable[[argparse.Namespace], int], *, summary: str) -> argparse.ArgumentParser:
+        p = commands.add_parser(name, help=summary, description=summary, parents=[common])
+        p.set_defaults(handler=handler)
+        return p
+
+    p = command("render", _render, summary="render a photo through one or more recipes, one file each")
     _photo_and_recipes(p)
     _subject_options(p)
     p.add_argument("-o", "--out", default="out", help="output folder (default: out)")
     p.add_argument("--format", default="png", choices=["png", "jpg", "webp"])
 
-    p = commands.add_parser("sheet", help="render recipes and put them side by side in one comparison image")
+    p = command("sheet", _sheet, summary="render recipes and put them side by side in one comparison image")
     _photo_and_recipes(p)
     _subject_options(p)
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
     p.add_argument("--columns", type=int, default=3)
 
-    p = commands.add_parser("cutout", help="save just the subject on a transparent background")
+    p = command("cutout", _cutout, summary="save just the subject on a transparent background")
     p.add_argument("photo")
     p.add_argument("-o", "--out", default="out/cutout.png")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
     _subject_options(p)
 
-    p = commands.add_parser("animate", help="render an animated recipe to a video (.mp4, .mov) or a .gif")
+    p = command("animate", _animate, summary="render an animated recipe to a video (.mp4, .mov) or a .gif")
     p.add_argument("photo")
     p.add_argument("recipe", help="a recipe .toml with an [animation] table")
     p.add_argument("-o", "--out", help="output file (default: out/<photo>__<recipe>.mp4)")
@@ -63,8 +112,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     _subject_options(p)
 
-    p = commands.add_parser(
-        "run", help="process every photo of a project with every recipe: cached, checked, with a report"
+    p = command(
+        "run", _run, summary="process every photo of a project with every recipe: cached, checked, with a report"
     )
     p.add_argument("project", nargs="?", default="photo-fx.toml", help="project file (default: photo-fx.toml)")
     p.add_argument("--force", action="store_true", help="redo everything, even what is up to date")
@@ -75,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--steps", action="store_true", help="also save the picture after every step of every recipe")
     _segmenter_option(p, " (subjects found before are remembered in the output's .cache: delete it after switching)")
 
-    p = commands.add_parser("steps", help="show what every step of a recipe does to a photo: one picture per step")
+    p = command("steps", _steps, summary="show what every step of a recipe does to a photo: one picture per step")
     p.add_argument("photo")
     p.add_argument("recipe")
     p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
@@ -84,26 +133,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     _subject_options(p)
 
-    p = commands.add_parser("init", help="create a starter photo-fx.toml, a photos/ folder and two recipes")
+    p = command("init", _init, summary="create a starter photo-fx.toml, a photos/ folder and two recipes")
     p.add_argument("directory", nargs="?", default=".")
 
-    commands.add_parser("effects", help="list the available effects and their parameters")
-
-    args = parser.parse_args(argv)
-    try:
-        return {
-            "render": _render,
-            "sheet": _sheet,
-            "cutout": _cutout,
-            "animate": _animate,
-            "run": _run,
-            "steps": _steps,
-            "init": _init,
-            "effects": _effects,
-        }[args.command](args)
-    except (ValueError, RuntimeError, FileNotFoundError, FileExistsError, NotImplementedError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 1
+    command("effects", _effects, summary="list the available effects and their parameters")
+    return parser
 
 
 def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
@@ -183,7 +217,7 @@ def _cutout(args: argparse.Namespace) -> int:
         alpha = find(photo, **options)
     elif matte.shape != photo.shape[:2]:
         (mh, mw), (ph, pw) = matte.shape, photo.shape[:2]
-        raise ValueError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
+        raise PhotoFxError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
     else:  # a matte given is used as it is, unless an edge clean-up is asked for
         alpha = refine_edge(matte, args.shrink or 0.0, args.feather or 0.0)
     target = Path(args.out)
@@ -196,7 +230,7 @@ def _cutout(args: argparse.Namespace) -> int:
 def _animate(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     if recipe.animation is None:
-        raise ValueError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
+        raise RecipeError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
     target = Path(args.out) if args.out else Path("out") / f"{Path(args.photo).stem}__{recipe.name}.mp4"
     target.parent.mkdir(parents=True, exist_ok=True)
     total = len(recipe.animation.positions())

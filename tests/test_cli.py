@@ -1,5 +1,6 @@
 import os
 import re
+import signal
 import subprocess
 import sys
 import tomllib
@@ -10,7 +11,7 @@ import pytest
 from PIL import GifImagePlugin, Image
 
 import photo_fx
-from photo_fx import imageio
+from photo_fx import PhotoFxError, imageio
 from photo_fx.cli import main
 from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
@@ -183,6 +184,73 @@ def test_run_finds_subjects_with_the_chosen_segmenter(cut, echo_model, monkeypat
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def user_mistakes(files):
+    """Commands a user can get wrong, each with a word the error message must contain."""
+    photo, recipe = str(files / "me.png"), str(files / "recipes" / "a.toml")
+    (files / "notimage.png").write_text("this is text, not a picture", encoding="utf-8")
+    (files / "blocker").write_text("a file where a folder is wanted", encoding="utf-8")
+    (files / "broken.toml").write_text("[[step]\neffect=", encoding="utf-8")
+    (files / "unknown.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
+    out = ["-o", str(files / "out")]
+    return {
+        "a file that is not an image": (["render", str(files / "notimage.png"), recipe, *out], "notimage.png"),
+        "a folder instead of the photo": (["render", str(files), recipe, *out], str(files)),
+        "a photo that does not exist": (["render", str(files / "gone.png"), recipe, *out], "gone.png"),
+        "an output below a file": (["render", photo, recipe, "-o", str(files / "blocker" / "sub")], "blocker"),
+        "a recipe with a syntax error": (["render", photo, str(files / "broken.toml"), *out], "broken.toml"),
+        "an unknown effect": (["render", photo, str(files / "unknown.toml"), *out], "nope"),
+        "a project file that does not exist": (["run", str(files / "gone.toml")], "gone.toml"),
+        "a matte that is not an image": (["cutout", photo, *out, "--matte", str(files / "notimage.png")], "notimage"),
+    }
+
+
+MISTAKES = [
+    "a file that is not an image", "a folder instead of the photo", "a photo that does not exist",
+    "an output below a file", "a recipe with a syntax error", "an unknown effect",
+    "a project file that does not exist", "a matte that is not an image",
+]  # fmt: skip
+
+
+@pytest.mark.parametrize("mistake", MISTAKES)
+def test_a_user_mistake_ends_in_one_error_line_on_stderr_and_exit_1(files, capsys, mistake):
+    command, offender = user_mistakes(files)[mistake]
+    assert main(command) == 1
+    shown = capsys.readouterr()
+    last_line = shown.err.strip().splitlines()[-1]  # progress lines may come first
+    assert last_line.startswith("error: ")
+    assert offender in last_line
+    assert "Traceback" not in shown.err
+    assert shown.out == ""  # results go to stdout, errors only to stderr
+
+
+def test_the_same_commands_with_valid_input_succeed(files):
+    """The known-good side of the table above: only the mistake makes the difference."""
+    assert main(["render", str(files / "me.png"), str(files / "recipes" / "a.toml"), "-o", str(files / "out")]) == 0
+
+
+def test_render_prints_each_file_it_wrote_to_stdout(files, capsys):
+    main(["render", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "out")])
+    assert capsys.readouterr().out.split("\n")[:-1] == [str(files / "out" / f"me__{n}.png") for n in "ab"]
+
+
+def test_debug_lets_the_original_exception_through(files):
+    command, _ = user_mistakes(files)["a photo that does not exist"]
+    with pytest.raises(OSError, match=r"gone\.png"):
+        main([*command, "--debug"])
+    command, _ = user_mistakes(files)["an unknown effect"]
+    with pytest.raises(PhotoFxError, match="nope"):
+        main([*command, "--debug"])
+
+
+def test_photo_fx_debug_in_the_environment_does_the_same(files, monkeypatch):
+    command, offender = user_mistakes(files)["an unknown effect"]
+    monkeypatch.setenv("PHOTO_FX_DEBUG", "1")
+    with pytest.raises(PhotoFxError, match=offender):
+        main(command)
+    monkeypatch.setenv("PHOTO_FX_DEBUG", "0")  # anything but 1 leaves the friendly error on
+    assert main(command) == 1
+
+
 def photo_fx_process(*args: str, **options) -> subprocess.Popen:
     """`python -m photo_fx ARGS` in a fresh interpreter (the way a user starts it), stderr and stdout as text."""
     environment = {key: value for key, value in os.environ.items() if key != "PHOTO_FX_DEBUG"}
@@ -190,6 +258,26 @@ def photo_fx_process(*args: str, **options) -> subprocess.Popen:
         [sys.executable, "-m", "photo_fx", *args], cwd=ROOT, env=environment, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options,
     )  # fmt: skip
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the test interrupts the process with SIGINT")
+def test_ctrl_c_stops_with_one_line_and_exit_130(files):
+    (files / "long.toml").write_text(
+        'name="long"\nsize=32\n[animation]\nseconds=600\nfps=30\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n',
+        encoding="utf-8",
+    )
+    process = photo_fx_process("animate", str(files / "me.png"), str(files / "long.toml"), "-o", str(files / "c.gif"))
+    assert process.stderr is not None
+    for line in process.stderr:  # the first progress line says the render is running, so the signal arrives inside main
+        if line.startswith("frame"):
+            break
+    else:
+        pytest.fail(f"the process ended before it reported progress (exit {process.wait()})")
+    process.send_signal(signal.SIGINT)
+    _, rest = process.communicate(timeout=60)
+    assert process.returncode == 130
+    assert "interrupted" in rest
+    assert "Traceback" not in rest
 
 
 # --- the program itself: --version, python -m photo_fx, the exit codes in --help --------------------------------------
@@ -209,6 +297,22 @@ def test_python_dash_m_photo_fx_runs_the_command_line():
     out, err = process.communicate(timeout=60)
     assert process.returncode == 0, err
     assert out.startswith("photo-fx ")
+
+
+def test_python_dash_m_photo_fx_reports_an_error_with_exit_1_and_no_traceback(tmp_path):
+    process = photo_fx_process("render", str(tmp_path / "gone.png"), str(tmp_path / "r.toml"))
+    _, err = process.communicate(timeout=60)
+    assert process.returncode == 1
+    assert err.startswith("error: ")
+    assert "Traceback" not in err
+
+
+def test_the_top_level_help_documents_the_exit_codes(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    text = capsys.readouterr().out
+    for code in ("0", "1", "2", "130"):
+        assert re.search(rf"^\s+{code}\s+\S", text, re.MULTILINE), f"exit code {code} is not explained:\n{text}"
 
 
 def commands_in_help(capsys) -> list[str]:
