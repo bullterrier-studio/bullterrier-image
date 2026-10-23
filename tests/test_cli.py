@@ -323,6 +323,17 @@ def commands_in_help(capsys) -> list[str]:
     return listed.group(1).split(",")
 
 
+def test_every_command_has_a_help_with_an_example(capsys):
+    commands = commands_in_help(capsys)
+    assert {"render", "run", "effects"} <= set(commands)
+    for command in commands:
+        with pytest.raises(SystemExit) as caught:
+            main([command, "--help"])
+        assert caught.value.code == 0
+        text = capsys.readouterr().out
+        assert re.search(rf"^example: photo-fx {command}\b", text, re.MULTILINE), f"{command}: no example in\n{text}"
+
+
 @pytest.mark.parametrize("command", ["gallery", "regenerate", "new-effect"])
 def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
     """They need a source checkout, so `poe` runs them from `tools/dev.py`."""
@@ -331,3 +342,14 @@ def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
         main([command])
     assert caught.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_quiet_hides_the_progress_lines_but_not_the_results(files, capsys):
+    command = ["render", str(files / "me.png"), str(files / "recipes"), "-o", str(files / "out")]
+    main(command)
+    loud = capsys.readouterr()
+    assert loud.err != ""  # progress is shown by default
+    assert main([*command, "-q"]) == 0
+    quiet = capsys.readouterr()
+    assert quiet.err == ""
+    assert quiet.out == loud.out

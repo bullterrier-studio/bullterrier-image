@@ -137,7 +137,7 @@ uv run photo-fx run my-project/photo-fx.toml
 `python -m photo_fx` is the same program for when the `photo-fx` script is not on your `PATH`. Results are printed to
 stdout and progress and errors to stderr. A mistake (a file that is not an image, an unknown effect in a recipe, an
 output folder that cannot be written) prints one line, `error: ...`, and exits with 1; usage mistakes exit with 2, Ctrl-C
-with 130. For a traceback, add `--debug` or set `PHOTO_FX_DEBUG=1`.
+with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `PHOTO_FX_DEBUG=1`.
 
 ## The pipeline
 

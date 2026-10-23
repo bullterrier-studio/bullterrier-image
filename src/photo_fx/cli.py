@@ -78,33 +78,63 @@ def _parser() -> argparse.ArgumentParser:
     common.add_argument(
         "--debug", action="store_true", help=f"show the full traceback of an error (also: {_DEBUG_VARIABLE}=1)"
     )
+    common.add_argument("-q", "--quiet", action="store_true", help="hide the progress lines (errors still show)")
 
-    def command(name: str, handler: Callable[[argparse.Namespace], int], *, summary: str) -> argparse.ArgumentParser:
-        p = commands.add_parser(name, help=summary, description=summary, parents=[common])
+    def command(
+        name: str, handler: Callable[[argparse.Namespace], int], *, summary: str, example: str
+    ) -> argparse.ArgumentParser:
+        p = commands.add_parser(
+            name,
+            help=summary,
+            description=summary,
+            epilog=f"example: photo-fx {name} {example}".rstrip(),
+            parents=[common],
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
         p.set_defaults(handler=handler)
         return p
 
-    p = command("render", _render, summary="render a photo through one or more recipes, one file each")
+    p = command(
+        "render",
+        _render,
+        summary="render a photo through one or more recipes, one file each",
+        example="examples/photos/bullterrier.jpeg examples/recipes -o out",
+    )
     _photo_and_recipes(p)
     _subject_options(p)
     p.add_argument("-o", "--out", default="out", help="output folder (default: out)")
-    p.add_argument("--format", default="png", choices=["png", "jpg", "webp"])
+    p.add_argument("--format", default="png", choices=["png", "jpg", "webp"], help="image format (default: png)")
 
-    p = command("sheet", _sheet, summary="render recipes and put them side by side in one comparison image")
+    p = command(
+        "sheet",
+        _sheet,
+        summary="render recipes and put them side by side in one comparison image",
+        example="examples/photos/bullterrier.jpeg examples/recipes -o out/sheet.png",
+    )
     _photo_and_recipes(p)
     _subject_options(p)
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
-    p.add_argument("--columns", type=int, default=3)
+    p.add_argument("--columns", type=int, default=3, help="pictures per row (default: 3)")
 
-    p = command("cutout", _cutout, summary="save just the subject on a transparent background")
-    p.add_argument("photo")
-    p.add_argument("-o", "--out", default="out/cutout.png")
+    p = command(
+        "cutout",
+        _cutout,
+        summary="save just the subject on a transparent background",
+        example="examples/photos/bullterrier.jpeg -o out/cutout.png --feather 2",
+    )
+    p.add_argument("photo", help="the photo to cut the subject out of")
+    p.add_argument("-o", "--out", default="out/cutout.png", help="output file, a PNG (default: out/cutout.png)")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
     _subject_options(p)
 
-    p = command("animate", _animate, summary="render an animated recipe to a video (.mp4, .mov) or a .gif")
-    p.add_argument("photo")
+    p = command(
+        "animate",
+        _animate,
+        summary="render an animated recipe to a video (.mp4, .mov) or a .gif",
+        example="examples/photos/bullterrier.jpeg examples/recipes/06-evaporate.toml -o out/evaporate.mp4",
+    )
+    p.add_argument("photo", help="the photo to animate")
     p.add_argument("recipe", help="a recipe .toml with an [animation] table")
     p.add_argument("-o", "--out", help="output file (default: out/<photo>__<recipe>.mp4)")
     p.add_argument(
@@ -113,7 +143,10 @@ def _parser() -> argparse.ArgumentParser:
     _subject_options(p)
 
     p = command(
-        "run", _run, summary="process every photo of a project with every recipe: cached, checked, with a report"
+        "run",
+        _run,
+        summary="process every photo of a project with every recipe: cached, checked, with a report",
+        example="examples/photo-fx.toml --dry-run",
     )
     p.add_argument("project", nargs="?", default="photo-fx.toml", help="project file (default: photo-fx.toml)")
     p.add_argument("--force", action="store_true", help="redo everything, even what is up to date")
@@ -124,24 +157,40 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--steps", action="store_true", help="also save the picture after every step of every recipe")
     _segmenter_option(p, " (subjects found before are remembered in the output's .cache: delete it after switching)")
 
-    p = command("steps", _steps, summary="show what every step of a recipe does to a photo: one picture per step")
-    p.add_argument("photo")
-    p.add_argument("recipe")
+    p = command(
+        "steps",
+        _steps,
+        summary="show what every step of a recipe does to a photo: one picture per step",
+        example="examples/photos/bullterrier.jpeg examples/recipes/05-ember-glitch.toml",
+    )
+    p.add_argument("photo", help="the photo to run the recipe on")
+    p.add_argument("recipe", help="the recipe .toml to look into")
     p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
     p.add_argument(
         "--at", type=float, default=0.5, help="for an animated recipe: the moment of the clip, 0..1 (default 0.5)"
     )
     _subject_options(p)
 
-    p = command("init", _init, summary="create a starter photo-fx.toml, a photos/ folder and two recipes")
-    p.add_argument("directory", nargs="?", default=".")
+    p = command(
+        "init",
+        _init,
+        summary="create a starter photo-fx.toml, a photos/ folder and two recipes",
+        example="my-project",
+    )
+    p.add_argument("directory", nargs="?", default=".", help="where to create the project (default: here)")
 
-    command("effects", _effects, summary="list the available effects and their parameters")
+    command("effects", _effects, summary="list the available effects and their parameters", example="")
     return parser
 
 
+def _progress(args: argparse.Namespace, message: str) -> None:
+    """Tell the person watching what is going on (stderr), unless they asked for quiet with -q."""
+    if not args.quiet:
+        print(message, file=sys.stderr)
+
+
 def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
-    p.add_argument("photo")
+    p.add_argument("photo", help="the photo to style")
     p.add_argument("recipes", nargs="+", help="recipe .toml files, or folders of them")
 
 
@@ -181,7 +230,7 @@ def _load_recipes(paths: list[str]) -> list[Recipe]:
 
 def _render_all(args: argparse.Namespace) -> tuple[list[Recipe], list[np.ndarray]]:
     recipes = _load_recipes(args.recipes)  # validated before any slow work starts
-    print(f"rendering {len(recipes)} recipe(s)...", file=sys.stderr)
+    _progress(args, f"rendering {len(recipes)} recipe(s)...")
     matte, find = _subject(args)
     if matte is not None:
         given = matte
@@ -238,7 +287,7 @@ def _animate(args: argparse.Namespace) -> int:
     def with_progress(frames: Iterable[np.ndarray]) -> Iterator[np.ndarray]:
         for i, frame in enumerate(frames, start=1):
             if i % 10 == 0 or i == total:
-                print(f"frame {i}/{total}", file=sys.stderr)
+                _progress(args, f"frame {i}/{total}")
             yield frame
 
     matte, find = _subject(args)
@@ -261,12 +310,15 @@ def _run(args: argparse.Namespace) -> int:
         force=args.force,
         dry_run=args.dry_run,
         only=args.only,
-        log=lambda message: print(message, file=sys.stderr),
+        log=lambda message: _progress(args, message),
         find_subject=partial(subject_matte, segmenter=args.segmenter),
     )
     failed = [i for i in items if i.status == "failed"]
     flagged = [i for i in items if i.warnings]
-    print(f"{len(items)} results: {len(failed)} failed, {len(flagged)} with warnings", file=sys.stderr)
+    if failed or flagged:  # -q hides a clean summary, never a problem
+        print(f"{len(items)} results: {len(failed)} failed, {len(flagged)} with warnings", file=sys.stderr)
+    else:
+        _progress(args, f"{len(items)} results: 0 failed, 0 with warnings")
     if not args.dry_run:
         print(project.output / "index.html")
     return 1 if failed or (args.strict and flagged) else 0
@@ -278,7 +330,7 @@ def _steps(args: argparse.Namespace) -> int:
     matte, find = _subject(args)
     stages = trace(imageio.load(args.photo), recipe, matte, at=args.at, find_subject=find)
     for stage in stages:
-        print(f"  {stage.label}", file=sys.stderr)
+        _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))
     return 0
 
