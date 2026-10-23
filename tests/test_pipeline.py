@@ -331,6 +331,21 @@ def test_a_project_built_in_code_is_checked_like_a_project_file(folder, option, 
                 **option)  # fmt: skip
 
 
+def test_a_photo_name_cannot_carry_files_out_of_the_output_folder(folder):
+    # "...png" is a legal file name whose stem, "..", would make the photo's output folder the output's parent
+    (folder / "photos" / "...png").write_bytes((folder / "photos" / "a.png").read_bytes())
+    project = Project(
+        photos=(folder / "photos" / "...png", folder / "photos" / "a.png"),
+        recipes=(folder / "recipes" / "grainy.toml",),
+        output=folder / "out",
+    )
+    by_photo = {i.photo: i for i in run(project)}
+    assert by_photo["...png"].status == "failed"
+    assert "outside the output folder" in str(by_photo["...png"].error)
+    assert by_photo["a.png"].status == "done"  # the other photos still run
+    assert sorted(p.name for p in folder.iterdir()) == ["out", "photo-fx.toml", "photos", "recipes"]
+
+
 def test_a_project_needs_a_photo_and_a_recipe(folder):
     with pytest.raises(ProjectError, match="photos"):
         Project(photos=(), recipes=(folder / "recipes" / "warm.toml",), output=folder / "o")

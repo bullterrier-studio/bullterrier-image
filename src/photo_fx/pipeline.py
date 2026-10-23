@@ -374,7 +374,7 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
     if recipe.needs_matte:
         matte = photo.matte()
         warnings += matte_warnings(matte, project.subject_share)
-    folder = project.output / photo.path.stem
+    folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
     stages = trace(photo.rgb(), recipe, matte, at=project.steps_at) if project.steps else None
     if recipe.animation is not None:
@@ -385,13 +385,23 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
         outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None
     if stages:
-        sheet = write_stages(stages, folder / "steps" / recipe.name, project.quality)
+        sheet = write_stages(stages, _inside(project.output, folder / "steps" / recipe.name), project.quality)
         outputs.append(sheet)
     relative = tuple(str(Path(o).relative_to(project.output)) for o in outputs)
     sheet_path = str(sheet.relative_to(project.output)) if sheet else None
     return Item(
         photo.path.name, recipe.name, "done", relative, tuple(warnings), steps=sheet_path, fingerprint=fingerprint
     )
+
+
+def _inside(output: Path, target: Path) -> Path:
+    """`target`, once it is known to lie inside `output`: every file the pipeline writes goes through here.
+
+    A photo's file name becomes a folder name, and a name such as `...png` (stem `..`) or a link inside the output
+    folder would otherwise carry the writes elsewhere; ProjectError if it does."""
+    if not target.resolve().is_relative_to(output.resolve()):
+        raise ProjectError(f"{target} is outside the output folder {output}: rename the photo")
+    return target
 
 
 def _sizes(project: Project, native: int) -> list[int | None]:
@@ -405,7 +415,7 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
     for size in _sizes(project, max(image.shape[:2])):
         picture = image if size is None else resize(image, size)
         for fmt in project.formats:
-            target = folder / (f"{name}.{fmt}" if size is None else f"{name}_{size}.{fmt}")
+            target = _inside(project.output, folder / (f"{name}.{fmt}" if size is None else f"{name}_{size}.{fmt}"))
             imageio.save(picture, target, quality=project.quality)
             outputs.append(target)
     return outputs
@@ -438,16 +448,18 @@ def _export_animation(
                 strip.append((f"t = {number / fps:.1f} s", frame))
             yield frame
 
-    native = folder / f"{recipe.name}.mp4"
+    native = _inside(project.output, folder / f"{recipe.name}.mp4")
     imageio.save_video(frames(), native, fps=fps)  # export
     warnings += meter.warnings(project.frozen_tail)
-    filmstrip = folder / f"{recipe.name}.frames.png"  # a picture of the animation, for places a video cannot go
+    filmstrip = _inside(
+        project.output, folder / f"{recipe.name}.frames.png"
+    )  # a picture of the animation, for places a video cannot go
     imageio.save(contact_sheet(strip, columns=len(strip), tile=340), filmstrip)
     outputs = [native, filmstrip]
     # (an empty clip leaves no measured size; `save_video` refuses one first, but then there is nothing to shrink)
     for size in _sizes(project, max(meter.shape) if meter.shape is not None else 0):
         if size is not None:
-            smaller = folder / f"{recipe.name}_{size}.mp4"
+            smaller = _inside(project.output, folder / f"{recipe.name}_{size}.mp4")
             imageio.resize_video(native, smaller, size)
             outputs.append(smaller)
     return outputs
