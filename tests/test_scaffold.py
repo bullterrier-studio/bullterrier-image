@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 import photo_fx
-from photo_fx import gallery
+from photo_fx import ProjectError, gallery
 from photo_fx.core import registry
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,7 +104,7 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
 @pytest.mark.parametrize("name", ["grade", "glitch"])
 def test_the_name_of_an_existing_effect_is_refused_and_nothing_is_written(checkout, name):
     before = _tree(checkout)
-    with pytest.raises(FileExistsError, match=f"'{name}'"):
+    with pytest.raises(ProjectError, match=f"'{name}'"):
         gallery.new_effect(name, "light", checkout=checkout)
     assert _tree(checkout) == before
 
@@ -123,7 +123,7 @@ def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     (checkout / existing).parent.mkdir(parents=True, exist_ok=True)
     (checkout / existing).write_text("")
     before = _tree(checkout)
-    with pytest.raises(FileExistsError, match="lamp_probe"):
+    with pytest.raises(ProjectError, match="lamp_probe"):
         gallery.new_effect("lamp_probe", "light", checkout=checkout)
     assert _tree(checkout) == before
 
@@ -131,7 +131,7 @@ def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
 @pytest.mark.parametrize("name", ["Lamp", "2lamp", "lamp-probe", "class", "_lamp", ""])
 def test_a_name_that_is_no_lowercase_identifier_is_refused(checkout, name):
     before = _tree(checkout)
-    with pytest.raises(ValueError, match=repr(name)):
+    with pytest.raises(ProjectError, match=repr(name)):
         gallery.new_effect(name, "light", checkout=checkout)
     assert _tree(checkout) == before
 
@@ -149,7 +149,7 @@ def test_a_name_that_is_no_lowercase_identifier_is_refused(checkout, name):
 )
 def test_a_name_the_generated_effect_or_fx_already_uses_is_refused_saying_why(checkout, name, why):
     before = _tree(checkout)
-    with pytest.raises(ValueError, match=repr(name)) as raised:
+    with pytest.raises(ProjectError, match=repr(name)) as raised:
         gallery.new_effect(name, "light", checkout=checkout)
     assert why in str(raised.value)
     assert _tree(checkout) == before
@@ -163,7 +163,7 @@ def test_a_name_shared_with_some_other_module_is_fine_when_neither_effect_py_nor
 
 def test_an_unknown_category_is_refused_listing_the_categories(checkout):
     before = _tree(checkout)
-    with pytest.raises(ValueError, match="'lights'") as raised:
+    with pytest.raises(ProjectError, match="'lights'") as raised:
         gallery.new_effect("lamp_probe", "lights", checkout=checkout)
     assert ", ".join(registry.CATEGORIES) in str(raised.value)
     assert _tree(checkout) == before

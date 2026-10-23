@@ -30,7 +30,8 @@ from importlib import metadata  # noqa: I001  (the next statement must stay the 
 from . import effects
 from . import fx, imageio, recipe  # binds `photo_fx.recipe`, which callers use as a namespace
 from .core.errors import (
-    BackendUnavailableError, ImageReadError, PhotoFxError, RecipeError, SubjectNotFoundError, UnknownEffectError,
+    BackendUnavailableError, ImageReadError, PhotoFxError, ProjectError, RecipeError, SubjectNotFoundError,
+    UnknownEffectError,
 )  # fmt: skip
 from .matte import subject_matte
 from .pipeline import Project, load_project, run
@@ -42,7 +43,8 @@ except metadata.PackageNotFoundError:  # run from a source tree that was never i
     __version__ = "0+unknown"
 
 __all__ = [
-    "Animation", "BackendUnavailableError", "ImageReadError", "PhotoFxError", "Project", "Recipe", "RecipeError",
-    "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "__version__", "fx", "imageio", "load_project",
-    "load_recipe", "ramp", "recipe", "render", "render_all", "render_frames", "run", "subject_matte", "trace",
+    "Animation", "BackendUnavailableError", "ImageReadError", "PhotoFxError", "Project", "ProjectError", "Recipe",
+    "RecipeError", "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "__version__", "fx", "imageio",
+    "load_project", "load_recipe", "ramp", "recipe", "render", "render_all", "render_frames", "run", "subject_matte",
+    "trace",
 ]  # fmt: skip

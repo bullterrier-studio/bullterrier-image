@@ -9,6 +9,7 @@ from photo_fx import (
     BackendUnavailableError,
     ImageReadError,
     PhotoFxError,
+    ProjectError,
     RecipeError,
     SubjectNotFoundError,
     UnknownEffectError,
@@ -59,6 +60,7 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
     ("error", "builtin"),
     [
         (RecipeError, ValueError),
+        (ProjectError, ValueError),
         (UnknownEffectError, KeyError),
         (UnknownEffectError, RecipeError),
         (SubjectNotFoundError, RuntimeError),

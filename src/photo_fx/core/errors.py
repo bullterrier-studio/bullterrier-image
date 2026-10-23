@@ -24,10 +24,12 @@ class RecipeError(PhotoFxError, ValueError):
 
 
 class ProjectError(PhotoFxError, ValueError):
-    """A pipeline project is invalid: a project file that is not TOML or has unknown keys, globs that match no photo,
-    two photos with one file name, an out-of-range export or check setting, or a photo whose name would put its files
-    outside the output folder. Raised when the project is made or read (or, for that photo, when it is processed),
-    naming the file (if any), the setting and the value."""
+    """A pipeline project, or the source checkout the developer commands work on, is invalid: a project file that is
+    not TOML or has unknown keys, globs that match no photo, two photos with one file name, an out-of-range export or
+    check setting, a photo whose name would put its files outside the output folder, or (developer commands) a
+    checkout without the template or an example recipe, an effect name that is taken or cannot be one. Raised when
+    the project is made or read (or, for that photo, when it is processed), naming the file (if any), the setting and
+    the value."""
 
 
 class UnknownEffectError(RecipeError, KeyError):

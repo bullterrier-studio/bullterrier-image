@@ -18,7 +18,7 @@ import pytest
 from PIL import Image, JpegImagePlugin
 
 import photo_fx
-from photo_fx import fx, gallery, imageio
+from photo_fx import ProjectError, UnknownEffectError, fx, gallery, imageio
 from photo_fx.core import registry
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
@@ -245,7 +245,7 @@ def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_reci
 
 
 def test_gallery_rejects_an_unknown_effect_before_rendering(checkout, probe):
-    with pytest.raises(ValueError, match="nope") as raised:
+    with pytest.raises(UnknownEffectError, match="nope") as raised:
         gallery.render_gallery(only=[probe, "nope"], checkout=checkout)
     # the name, and the choices
     assert "'nope'" in str(raised.value)
@@ -259,21 +259,21 @@ def test_gallery_needs_an_example_recipe_for_each_effect_it_renders(checkout, pr
         """Has no example recipe."""
         return rgb
 
-    with pytest.raises(FileNotFoundError, match=r"recipe_less\.toml"):
+    with pytest.raises(ProjectError, match=r"recipe_less\.toml"):
         gallery.render_gallery(only=[probe, "recipe_less"], checkout=checkout)
     assert not gallery.effect_files(probe, checkout=checkout).picture.exists()
 
 
 def test_regenerate_checks_the_checkout_before_writing_anything(checkout):
     gallery.effect_files("grain", checkout=checkout).example.unlink()  # one effect without its example recipe
-    with pytest.raises(FileNotFoundError, match="grain"):
+    with pytest.raises(ProjectError, match="grain"):
         gallery.regenerate(checkout=checkout)
     assert not (checkout / "src" / "photo_fx" / "fx.pyi").exists()
     assert not (checkout / "docs" / "effects.md").exists()
 
 
 def test_gallery_outside_a_source_checkout_says_it_needs_one(tmp_path):
-    with pytest.raises(FileNotFoundError, match="source checkout"):
+    with pytest.raises(ProjectError, match="source checkout"):
         gallery.render_gallery(only=["grain"], checkout=tmp_path / "not-a-checkout")
     assert not (tmp_path / "not-a-checkout").exists()
 
