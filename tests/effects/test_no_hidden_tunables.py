@@ -13,6 +13,12 @@ Anything else fails, whatever its value: an option of a call, by keyword or posi
 `gaussian_filter(x, 2)`), a default of a function, a value assigned to a name, an element of a list that is not an
 index.
 There is no list of exemptions: a finding is fixed (a parameter, or a cited constant), never waved through.
+
+A `# constant:` marker excuses a number, never a library's option: a keyword with a literal value (`order=1`,
+`mode="reflect"`, `truncate=4.0`, `size=(3, 3)`) or a library's own named choice (`resample=Image.BICUBIC`) in a call
+through a name imported from numpy, scipy or PIL fails when it sits in a statement a marker covers. Such an option
+shapes the result, so it is a documented parameter, whatever reasoning the comment gives (batch 2 shipped
+`order=1  # constant:` in `radial_blur`). Array axes (`axis=`, `axes=`) and `dtype=` are plumbing, not options.
 """
 
 import ast
@@ -31,6 +37,9 @@ SCANNED = sorted([*(PACKAGE / "effects").glob("*/effect.py"), *(PACKAGE / "ops")
 TRIVIAL = {0, 1, 2, 0.5, 255}
 MARKER = re.compile(r"#\s*constant:(.*)")
 MIN_REASON_WORDS = 3
+LIBRARIES = {"numpy", "scipy", "PIL"}
+# keywords that are plumbing, not a choice: array axes, and the type an array is made in
+PLUMBING_KEYWORDS = {"axis", "axes", "dtype"}
 # calls whose positional numbers are array axes (exempt, like `axis=`)
 AXIS_CALLS = {"transpose", "moveaxis", "swapaxes"}
 # calls whose trivial positional numbers are bounds, fills or matrix entries, never a library's option: in any other
@@ -112,6 +121,54 @@ def _covered_lines(source: str, tree: ast.Module) -> set[int]:
         for start, end in chosen:
             covered.update(range(start, end + 1))
     return covered
+
+
+def library_options_behind_a_constant(source: str) -> list[tuple[int, str]]:
+    """(line, keyword) of each option of a numpy, scipy or PIL call that a `# constant:` marker in `source` covers."""
+    tree = ast.parse(source)
+    libraries = _library_names(tree)
+    covered = _covered_lines(source, tree)
+    return sorted(
+        (keyword.value.lineno, name)
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call) and _root_name(call.func) in libraries
+        for keyword in call.keywords
+        if (name := keyword.arg)
+        and name not in PLUMBING_KEYWORDS
+        and keyword.value.lineno in covered
+        and _is_a_choice(keyword.value, libraries)
+    )
+
+
+def _library_names(tree: ast.Module) -> set[str]:
+    """The names the module binds to numpy, scipy or PIL, or to anything inside them."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update((alias.asname or alias.name).split(".")[0] for alias in node.names if _is_library(alias.name))
+        elif isinstance(node, ast.ImportFrom) and node.module and _is_library(node.module):
+            names.update(alias.asname or alias.name for alias in node.names)
+    return names
+
+
+def _is_library(module: str) -> bool:
+    return module.split(".")[0] in LIBRARIES
+
+
+def _root_name(func: ast.expr) -> str | None:
+    """The name a call's function hangs from: `ndimage` for `ndimage.gaussian_filter` and for `Image.open(f).resize`."""
+    while isinstance(func, ast.Attribute | ast.Call):
+        func = func.value if isinstance(func, ast.Attribute) else func.func
+    return func.id if isinstance(func, ast.Name) else None
+
+
+def _is_a_choice(value: ast.expr, libraries: set[str]) -> bool:
+    """A literal (number, string, bool, None, or a tuple of them), or a library's own named value (`Image.BICUBIC`)."""
+    try:
+        ast.literal_eval(value)
+    except ValueError:
+        return isinstance(value, ast.Attribute) and _root_name(value) in libraries
+    return True
 
 
 def _called_name(func: ast.expr) -> str | None:
@@ -225,3 +282,91 @@ MARKED = {  # module source -> the literals still found
 @pytest.mark.parametrize(("source", "found"), MARKED.values(), ids=MARKED.keys())
 def test_a_constant_marker_with_a_reason_covers_its_statement_and_a_param_declaration_needs_none(source, found):
     assert scan(source) == found
+
+
+# --- library options behind a `# constant:` marker ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", SCANNED, ids=[_module_name(path) for path in SCANNED])
+def test_no_library_option_hides_behind_a_constant_marker(path):
+    assert library_options_behind_a_constant(path.read_text(encoding="utf-8")) == []
+
+
+HEADER = "import numpy as np\nfrom PIL import Image\nfrom scipy import ndimage\n\n\n"
+
+OPTIONS = {  # module body -> (line, keyword) of each library option a marker excuses; the header is 5 lines
+    "the batch 2 shape: order=1 behind a marker on its own line": (
+        "def probe(plane, matrix, offset):\n"
+        "    # constant: linear sampling is enough here\n"
+        "    return ndimage.affine_transform(plane, matrix, offset=offset, order=1)\n",
+        [(8, "order")],
+    ),
+    "a trailing marker excuses a string option": (
+        'def probe(x):\n    return np.pad(x, 2, mode="edge")  # constant: the picture carries on past its edge\n',
+        [(7, "mode")],
+    ),
+    "each option of a call that runs over several lines": (
+        "def probe(distance, sigma):\n"
+        "    # constant: scipy's reflect mode and 4-sigma truncate\n"
+        "    return ndimage.gaussian_filter(\n"
+        "        distance,\n"
+        "        sigma,\n"
+        '        mode="reflect",\n'
+        "        truncate=4.0,\n"
+        "    )\n",
+        [(11, "mode"), (12, "truncate")],
+    ),
+    "a tuple option": (
+        "def probe(x):\n    return ndimage.uniform_filter(x, size=(3, 3))  # constant: a small box is enough\n",
+        [(7, "size")],
+    ),
+    "a library's named choice in a call chain that starts at the library": (
+        "def probe(path):\n"
+        "    return Image.open(path).resize((8, 8), resample=Image.BICUBIC)  # constant: bicubic looks best\n",
+        [(7, "resample")],
+    ),
+    "a name imported from the library": (
+        "from scipy.ndimage import gaussian_filter\n\n\n"
+        "def probe(x):\n    return gaussian_filter(x, 2.0, truncate=4.0)  # constant: a standard cutoff\n",
+        [(10, "truncate")],
+    ),
+}
+
+
+@pytest.mark.parametrize(("body", "found"), OPTIONS.values(), ids=OPTIONS.keys())
+def test_a_constant_marker_never_excuses_the_option_of_a_library_call(body, found):
+    assert library_options_behind_a_constant(HEADER + body) == found
+
+
+NOT_OPTIONS = {  # module body: nothing to report
+    "a mathematical constant behind a marker": (
+        "def probe(angle):\n    return np.cos(angle * 2.3999632)  # constant: the golden angle in radians\n"
+    ),
+    "a guard value passed by position": (
+        "def probe(x):\n    # constant: an epsilon that only keeps a flat picture from dividing by zero\n"
+        "    return np.maximum(x, 1e-9)\n"
+    ),
+    "array axes and a dtype behind a marker": (
+        "def probe(x):\n    return np.sum(x, axis=(0, 1), dtype=np.float64)  # constant: sum in double\n"
+    ),
+    "an option that is a parameter": (
+        "def probe(plane, matrix, params):\n"
+        "    # constant: the field already names the order\n"
+        "    return ndimage.affine_transform(plane, matrix, order=params.order)\n"
+    ),
+    "a keyword of the module's own function": (
+        "def blend(a, b, weight):\n    return a\n\n\n"
+        "def probe(a, b):\n    return blend(a, b, weight=0.5)  # constant: an even mix of the two\n"
+    ),
+    "a library option in a statement no marker covers": (
+        "def probe(plane, matrix):\n"
+        "    # constant: guard against a zero\n"
+        "    safe = np.maximum(plane, 1e-9)\n"
+        "    return ndimage.affine_transform(safe, matrix, order=1)\n"
+    ),
+}
+
+
+@pytest.mark.parametrize("body", NOT_OPTIONS.values(), ids=NOT_OPTIONS.keys())
+def test_the_option_check_passes_constants_axes_parameters_and_options_no_marker_covers(body):
+    assert library_options_behind_a_constant(HEADER + body) == []
