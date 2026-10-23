@@ -1,6 +1,8 @@
-# Every gate, on every push to main, pull request and merge-queue entry, and for every release (release.yml calls it).
-# Branch protection requires one check only, `ci-ok`, so adding or renaming a job never touches the repository
-# settings. No path filters: a required check that does not run blocks the merge.
+# Every gate, on every push to main, pull request and merge-queue entry, by hand (Actions tab, "Run workflow"), and for
+# every release (release.yml calls it). Stage 1 runs every check in parallel; stage 2 builds the distributions only once
+# all of them passed, so nothing that fails a check is ever built, let alone published. Branch protection requires one
+# check only, `ci-ok`, so adding or renaming a job never touches the repository settings. No path filters: a required
+# check that does not run blocks the merge.
 name: CI
 
 on:
@@ -9,6 +11,7 @@ on:
   pull_request:
   merge_group:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,22 +26,35 @@ concurrency:
 # `./` and not GitHub's newer `$/` self-repository form, which zizmor prefers: actionlint 1.7.12 rejects `$/`, and a
 # job-level `uses: ./` already resolves to this repository at the running commit (no checkout is involved).
 jobs:
+  # stage 1: the checks
   lint:
     uses: ./.github/workflows/lint.yml # zizmor: ignore[self-repository] (see the note above)
   test:
     uses: ./.github/workflows/test.yml # zizmor: ignore[self-repository] (see the note above)
   min-deps:
     uses: ./.github/workflows/min-deps.yml # zizmor: ignore[self-repository] (see the note above)
+  security:
+    permissions:
+      contents: read
+      security-events: write # CodeQL uploads its findings to code scanning
+    uses: ./.github/workflows/security.yml # zizmor: ignore[self-repository] (see the note above)
+  pre-commit:
+    uses: ./.github/workflows/pre-commit.yml # zizmor: ignore[self-repository] (see the note above)
+
+  # stage 2: the distributions, from a commit that passed every check (release.yml publishes these files)
   build:
+    needs: [lint, test, min-deps, security, pre-commit]
     uses: ./.github/workflows/build.yml # zizmor: ignore[self-repository] (see the note above)
 
   ci-ok:
     name: ci-ok
     if: always() # report a result even when a job it needs failed or was skipped
-    needs: [lint, test, min-deps, build]
+    needs: [lint, test, min-deps, security, pre-commit, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # every job above always runs, so anything but success (failure, cancelled, or build skipped because a check
+      # failed) fails this one
       - name: Every needed job succeeded
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}

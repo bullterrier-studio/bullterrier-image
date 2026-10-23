@@ -1,9 +1,10 @@
 # The suite on the oldest supported Python against the lowest release each dependency's floor allows, so the floors in
-# pyproject.toml stay true. Called by ci.yml.
+# pyproject.toml stay true. Called by ci.yml; can also be started by hand.
 name: Minimum dependencies
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read

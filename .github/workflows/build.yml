@@ -1,9 +1,11 @@
 # Build the sdist and wheel once, check them as PyPI would, keep them as the `dist` artifact (release.yml publishes
-# exactly these files), and prove the wheel works when installed on its own, away from the checkout. Called by ci.yml.
+# exactly these files), and prove the wheel works when installed on its own, away from the checkout. Called by ci.yml
+# once every check passed; can also be started by hand (only release.yml publishes, and only what its own CI built).
 name: Build
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read

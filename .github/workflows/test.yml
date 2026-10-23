@@ -1,8 +1,10 @@
-# The test suite and the import contracts on every supported operating system and Python. Called by ci.yml.
+# The test suite and the import contracts on every supported operating system and Python.
+# Called by ci.yml; can also be started by hand.
 name: Test
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
