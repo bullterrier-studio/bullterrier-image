@@ -121,7 +121,12 @@ fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = 
 # The sdist and wheel as PyPI would get them, built into dist/check (git-ignored, emptied first) and checked by twine
 # (metadata, rendered README; the quoted glob is twine's to expand) and check-wheel-contents (stray or unimportable files)
 build-check = { sequence = ["uv build --quiet --clear --no-create-gitignore --out-dir dist/check", "twine check --strict 'dist/check/*'", "check-wheel-contents dist/check"], default_item_type = "cmd", help = "Build the sdist and wheel and check what would be uploaded" }
-check = { sequence = ["ruff format --check .", "ruff check .", "vulture", "deptry .", { ref = "build-check" }, "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, dead code, dependencies, distributions, types, tests); stops at the first failure" }
+# The GitHub workflows and dependabot.yml: actionlint (syntax, expressions, job wiring; it also runs shellcheck on the
+# `run:` scripts when shellcheck is installed, as on GitHub's runners) and zizmor (unpinned actions, template
+# injection, persisted credentials, over-broad permissions). `uv run`, because the actionlint-py distribution names
+# its program differently. zizmor stays offline so the gate needs no network; its online audits need a GitHub token.
+lint-workflows = { sequence = ["uv run actionlint", "zizmor --offline .github"], default_item_type = "cmd", help = "Lint the GitHub workflows (actionlint, zizmor)" }
+check = { sequence = ["ruff format --check .", "ruff check .", { ref = "lint-workflows" }, "vulture", "deptry .", { ref = "build-check" }, "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, workflows, dead code, dependencies, distributions, types, tests); stops at the first failure" }
 # Developer commands that need a source checkout (tools/dev.py); extra arguments go to the script, e.g. `poe gallery --only grain`.
 gallery = { cmd = "uv run python tools/dev.py gallery", help = "Render the missing gallery pictures and write docs/effects.md (--only NAME..., --force)" }
 regenerate = { cmd = "uv run python tools/dev.py regenerate", help = "After adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures" }

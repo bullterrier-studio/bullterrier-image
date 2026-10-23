@@ -1,0 +1,28 @@
+# The suite on the oldest supported Python against the lowest release each dependency's floor allows, so the floors in
+# pyproject.toml stay true. Called by ci.yml.
+name: Minimum dependencies
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  min-deps:
+    name: Lowest dependencies on Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install a monospaced font
+        run: >-
+          test -f /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
+          || (sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends fonts-dejavu-core)
+      - run: uv run --locked poe check-min-deps

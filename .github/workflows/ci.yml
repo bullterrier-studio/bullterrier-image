@@ -1,0 +1,49 @@
+# Every gate, on every push to main, pull request and merge-queue entry, and for every release (release.yml calls it).
+# Branch protection requires one check only, `ci-ok`, so adding or renaming a job never touches the repository
+# settings. No path filters: a required check that does not run blocks the merge.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request cancels the older run; runs on main and on tags all finish. The group starts with a
+# fixed name, not the workflow's: when release.yml calls this file, `github.workflow` is the caller's name, and a group
+# shared with the caller would cancel or block it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# `./` and not GitHub's newer `$/` self-repository form, which zizmor prefers: actionlint 1.7.12 rejects `$/`, and a
+# job-level `uses: ./` already resolves to this repository at the running commit (no checkout is involved).
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml # zizmor: ignore[self-repository] (see the note above)
+  test:
+    uses: ./.github/workflows/test.yml # zizmor: ignore[self-repository] (see the note above)
+  min-deps:
+    uses: ./.github/workflows/min-deps.yml # zizmor: ignore[self-repository] (see the note above)
+  build:
+    uses: ./.github/workflows/build.yml # zizmor: ignore[self-repository] (see the note above)
+
+  ci-ok:
+    name: ci-ok
+    if: always() # report a result even when a job it needs failed or was skipped
+    needs: [lint, test, min-deps, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every needed job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = success ] || exit 1
+          done
