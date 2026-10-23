@@ -21,7 +21,7 @@ def _load():
 pre_push = _load()
 
 
-@pytest.mark.parametrize("ref", ["refs/heads/main", "refs/tags/v0.1.0", "refs/tags/v0.1.0rc1", "", "main"])
+@pytest.mark.parametrize("ref", ["refs/heads/main", "refs/tags/v1.2.3", "refs/tags/v1.2.3rc1", "", "main"])
 def test_main_tags_and_anything_unclear_must_pass_the_gate(ref):
     assert pre_push.must_run(ref)
 
