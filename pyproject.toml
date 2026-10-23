@@ -293,6 +293,7 @@ name = "timing imports nothing else from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
 forbidden_modules = ["photo_fx.*", "photo_fx.core.*"]  # overlaps (core itself, timing itself) are skipped
+ignore_imports = ["photo_fx.core.timing -> photo_fx.core.errors"]  # the exceptions every layer may raise
 
 # the dev group installs this project's own `video` extra (so the bundled-ffmpeg fallback is tested)
 [tool.uv.sources]
