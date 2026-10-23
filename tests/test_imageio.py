@@ -26,6 +26,73 @@ def test_load_applies_exif_rotation(tmp_path):
     assert imageio.load(tmp_path / "r.jpg").shape[:2] == (40, 20)
 
 
+# --- every pixel format loads as sRGB float RGB 0..1 ----------------------------------------------------------------
+# Each case is a one-row picture Pillow writes in that mode, with the RGB values (0..1) a viewer shows for each pixel,
+# worked out by hand: a grey level v is (v, v, v); a 16-bit level is level / 65535; a pixel with alpha a over the
+# white background is colour * a + 1 * (1 - a).
+
+
+def palette_row(indices, colours, **info) -> Image.Image:
+    img = Image.new("P", (len(indices), 1))
+    img.putpalette([channel for colour in colours for channel in colour])
+    img.putdata(indices)
+    img.info.update(info)
+    return img
+
+
+def row(pixels, dtype, mode=None) -> Image.Image:
+    return Image.fromarray(np.array([pixels], dtype), mode)
+
+
+PIXEL_FORMATS = [  # (file suffix, picture, keyword arguments for saving it, expected RGB per pixel)
+    pytest.param(".png", row([0, 51, 204, 255], np.uint8), {}, [0, 0.2, 0.8, 1], id="L 8-bit grey"),
+    pytest.param(".png", row([False, True], bool), {}, [0, 1], id="1-bit"),
+    pytest.param(".png", row([0, 16384, 65535], np.uint16), {}, [0, 16384 / 65535, 1], id="I;16 PNG"),
+    pytest.param(".tif", row([0, 16384, 65535], np.uint16), {}, [0, 16384 / 65535, 1], id="I;16 TIFF"),
+    pytest.param(".tif", row([0, 32768, 65535], np.int32), {}, [0, 32768 / 65535, 1], id="I 32-bit TIFF"),
+    pytest.param(".tif", row([0.25, 1.5, -0.5], np.float32), {}, [0.25, 1, 0], id="F float TIFF, clipped"),
+    pytest.param(".png", palette_row([0, 1], [(255, 0, 0), (0, 0, 255)]), {}, [(1, 0, 0), (0, 0, 1)], id="P"),
+    pytest.param(
+        ".png", palette_row([0, 1], [(0, 255, 0), (255, 0, 0)]), {"transparency": 0}, [1, (1, 0, 0)],
+        id="P, transparent index over white",
+    ),
+    pytest.param(
+        ".png", row([(0, 0), (0, 255), (0, 51)], np.uint8, "LA"), {}, [1, 0, 0.8], id="LA over white",
+    ),
+    pytest.param(
+        ".png", row([(0, 255, 0, 0), (255, 0, 0, 128), (0, 0, 255, 255)], np.uint8, "RGBA"), {},
+        [1, (1, 127 / 255, 127 / 255), (0, 0, 1)], id="RGBA over white",
+    ),
+    pytest.param(
+        ".png", row([(0, 255, 0), (255, 0, 0)], np.uint8), {"transparency": (0, 255, 0)}, [1, (1, 0, 0)],
+        id="RGB, transparent colour key",
+    ),
+    pytest.param(".png", row([0, 102], np.uint8), {"transparency": 0}, [1, 0.4], id="L, transparent grey key"),
+    pytest.param(
+        ".tif", row([(0, 255, 255, 0), (0, 0, 0, 255), (0, 0, 0, 0)], np.uint8, "CMYK"), {}, [(1, 0, 0), 0, 1],
+        id="CMYK without a profile",
+    ),
+    pytest.param(".png", row([(255, 0, 0), (0, 102, 255)], np.uint8), {}, [(1, 0, 0), (0, 0.4, 1)], id="RGB"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("suffix", "picture", "save", "expected"), PIXEL_FORMATS)
+def test_every_pixel_format_loads_as_the_colours_a_viewer_shows(tmp_path, suffix, picture, save, expected):
+    path = tmp_path / f"picture{suffix}"
+    picture.save(path, **save)
+    rgb = imageio.load(path)
+    assert rgb.dtype == np.float32
+    assert rgb.shape == (1, len(expected), 3)
+    np.testing.assert_allclose(rgb[0], [np.broadcast_to(value, 3) for value in expected], atol=1e-6)
+
+
+def test_the_colour_under_a_transparent_pixel_never_shows(tmp_path):
+    hidden = np.zeros((4, 6, 4), np.uint8)
+    hidden[..., :3] = np.random.default_rng(3).integers(0, 256, (4, 6, 3))  # any colour, alpha 0 everywhere
+    Image.fromarray(hidden, "RGBA").save(tmp_path / "clear.png")
+    np.testing.assert_array_equal(imageio.load(tmp_path / "clear.png"), np.ones((4, 6, 3), np.float32))
+
+
 def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
     imageio.save(photo, tmp_path / "cut.png", alpha=matte)
     with Image.open(tmp_path / "cut.png") as img:

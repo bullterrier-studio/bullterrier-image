@@ -27,23 +27,13 @@ _ALPHA = 3  # the alpha channel of RGBA
 
 
 def load(path: str | Path) -> np.ndarray:
-    """Read a photo as RGB float32 0..1, upright and in sRGB.
+    """Read a photo as RGB float32 0..1, upright and in sRGB: what a viewer shows (see `from_pil` for every format).
 
     Phone photos carry an EXIF rotation and often a Display P3 profile; both are applied here so that
     what you see in Preview is what the effects get.
     """
     with Image.open(path) as opened:
-        img = ImageOps.exif_transpose(opened)
-        profile = img.info.get("icc_profile")
-        if profile:
-            try:
-                source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
-                # typed `Image | None` by Pillow, but None only with inPlace=True, which is not used here
-                converted = ImageCms.profileToProfile(img.convert("RGB"), source, _SRGB, outputMode="RGB")
-                img = cast(Image.Image, converted)
-            except ImageCms.PyCMSError:
-                pass  # unreadable profile: treat the pixels as sRGB, which is what most viewers do too
-        return from_pil(img)
+        return from_pil(ImageOps.exif_transpose(opened))
 
 
 def load_matte(path: str | Path) -> np.ndarray:
@@ -188,5 +178,53 @@ def _ffmpeg(task: str) -> str:
 
 
 def from_pil(img: Image.Image) -> np.ndarray:
-    """Convert a Pillow image to RGB float32 0..1 (transparency is dropped)."""
-    return np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
+    """Convert a Pillow image of any mode to RGB float32 0..1 in sRGB: the colours a viewer shows.
+
+    - 8-bit modes (RGB, greyscale L, 1-bit, palette P, CMYK) give level / 255. 16-bit greyscale (I;16 and its byte
+      orders, and I, which Pillow uses for 16-bit TIFFs) keeps its precision: level / 65535. Float greyscale (F) is
+      read as 0..1. Values outside 0..1 are clipped.
+    - Transparency (an alpha channel, a transparent palette entry or colour key) is composited over white, so a
+      colour hidden under a transparent pixel never shows.
+    - An embedded ICC profile (`img.info["icc_profile"]`) is converted to sRGB; pixels without one are taken as sRGB.
+    """
+    colour, alpha = _split_alpha(img)
+    rgb = _srgb(colour, img.info.get("icc_profile"))
+    if alpha is not None:  # straight alpha over white paper: colour * alpha + 1 * (1 - alpha)
+        rgb *= alpha
+        rgb += 1.0 - alpha
+    return rgb
+
+
+def _split_alpha(img: Image.Image) -> tuple[Image.Image, np.ndarray | None]:
+    """The colour channels of `img`, and its opacity as (height, width, 1) float32 0..1 (None when it is opaque)."""
+    if img.mode == "1":
+        img = img.convert("L")
+    if img.mode in {"P", "PA"} or "transparency" in img.info:
+        img = img.convert("LA" if img.mode == "L" else "RGBA")
+    elif img.mode in {"La", "RGBa"}:  # premultiplied: Pillow un-premultiplies on conversion
+        img = img.convert("LA" if img.mode == "La" else "RGBA")
+    if img.mode not in {"LA", "RGBA"}:
+        return img, None
+    alpha = np.asarray(img.getchannel("A"), dtype=np.float32)[..., np.newaxis]
+    alpha /= _EIGHT_BIT
+    return img.convert(img.mode[:-1]), alpha
+
+
+def _srgb(colour: Image.Image, profile: bytes | None) -> np.ndarray:
+    """The opaque image `colour` as RGB float32 0..1 in sRGB, its embedded `profile` applied."""
+    if colour.mode.startswith("I") or colour.mode == "F":
+        grey = np.asarray(colour, dtype=np.float32)
+        if colour.mode != "F":
+            grey /= _SIXTEEN_BIT
+        return np.repeat(np.clip(grey, 0.0, 1.0)[..., np.newaxis], 3, axis=2)
+    img = colour if colour.mode == "RGB" else colour.convert("RGB")
+    if profile:
+        try:
+            source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
+            # typed `Image | None` by Pillow, but None only with inPlace=True, which is not used here
+            img = cast(Image.Image, ImageCms.profileToProfile(img, source, _SRGB, outputMode="RGB"))
+        except ImageCms.PyCMSError:
+            pass  # unreadable profile: treat the pixels as sRGB, which is what most viewers do too
+    rgb = np.asarray(img, dtype=np.float32)
+    rgb /= _EIGHT_BIT
+    return rgb
