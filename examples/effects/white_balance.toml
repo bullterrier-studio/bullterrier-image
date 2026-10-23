@@ -1,0 +1,8 @@
+# Warm a cool, overcast scene and add a touch of magenta, as if shot with an 85 filter.
+name = "white_balance"
+size = 480
+
+[[step]]
+effect = "white_balance"
+temperature = 0.8
+tint = 0.15
