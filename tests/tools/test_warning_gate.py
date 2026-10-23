@@ -24,7 +24,9 @@ def poe_test(tmp_path: Path, probe: str) -> subprocess.CompletedProcess:
     shutil.copy(ROOT / "pyproject.toml", tmp_path)
     (tmp_path / "test_probe.py").write_text(probe, encoding="utf-8")
     # the `simple` executor runs the task's command from this environment (the copy is no uv project of its own);
-    # extra arguments go to pytest after the task's own: only the probe, in one process (`-n 0`), so it stays fast
+    # extra arguments go to pytest after the task's own: only the probe, in one process (`-n 0`), so it stays fast.
+    # The child writes in its own console encoding (cp1252 on Windows, where the probe's `é` is one byte that is not
+    # UTF-8): undecodable bytes are replaced, so the output is always text; the verdicts are ASCII words
     environment = {**os.environ, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ["PATH"]])}
     return subprocess.run(
         [sys.executable, "-m", "poethepoet", "-e", "simple", "test", "test_probe.py", "-n", "0", "-p", "no:randomly"],
@@ -32,6 +34,7 @@ def poe_test(tmp_path: Path, probe: str) -> subprocess.CompletedProcess:
         env=environment,
         capture_output=True,
         encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
