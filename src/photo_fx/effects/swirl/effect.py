@@ -3,16 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-
-# scipy's names for what lies beyond the picture's edge, in `map_coordinates`'s own spelling: for interpolation its
-# 'wrap' does not repeat the picture but 'grid-wrap' does
-_BEYOND_THE_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
-# constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
-_SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
+from photo_fx.ops.warp import Centre, remap
 
 
 class SwirlParams(EffectParams):
@@ -81,23 +75,7 @@ def swirl(rgb: np.ndarray, params: SwirlParams) -> np.ndarray:
     reach = params.radius * (min(height, width) - 1)  # in pixels
     if params.angle == 0 or reach == 0:
         return rgb.copy()
-    dr = np.arange(height, dtype=np.float64)[:, None] - params.y * (height - 1)  # offsets from the centre, in pixels
-    dc = np.arange(width, dtype=np.float64)[None, :] - params.x * (width - 1)
-    distance = np.hypot(dr, dc)
-    turn = np.radians(params.angle) * np.clip(1 - distance / reach, 0, 1) ** 2
-    rows = params.y * (height - 1) + dr * np.cos(turn) - dc * np.sin(turn)
-    cols = params.x * (width - 1) + dr * np.sin(turn) + dc * np.cos(turn)
-    where = np.stack([rows, cols])
-    out = np.stack(
-        [
-            ndimage.map_coordinates(
-                np.ascontiguousarray(rgb[..., channel]),
-                where,
-                order=_SPLINE_ORDER[params.interpolation],
-                mode=_BEYOND_THE_EDGE[params.edge],
-            )
-            for channel in range(rgb.shape[2])
-        ],
-        axis=-1,
-    )
-    return np.clip(out, 0, 1).astype(np.float32)
+    centre = Centre(height, width, x=params.x, y=params.y)
+    turn = np.radians(params.angle) * np.clip(1 - centre.distance / reach, 0, 1) ** 2
+    rows, cols = centre.sources(turn=turn)
+    return remap(rgb, rows, cols, interpolation=params.interpolation, edge=params.edge)
