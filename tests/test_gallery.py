@@ -128,7 +128,8 @@ def test_every_category_has_a_description_in_the_index(fresh_registry, register_
 def test_every_real_effect_is_listed_once_in_its_own_category_page():
     pages = gallery.render_effects_pages()
     for name in registry.describe():
-        homes = [filename for filename, text in pages.items() if f"| `{name}` |" in text]
+        # an effect's row in the catalogue table: its picture, then its name (a parameter row starts with its name)
+        homes = [filename for filename, text in pages.items() if f'alt="{name}"> | `{name}` |' in text]
         assert homes == [f"{registry.category(name)}.md"], name
 
 
