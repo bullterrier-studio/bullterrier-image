@@ -1,3 +1,4 @@
+import io
 import itertools
 import re
 import shutil
@@ -8,7 +9,7 @@ import warnings
 
 import numpy as np
 import pytest
-from PIL import GifImagePlugin, Image
+from PIL import GifImagePlugin, Image, ImageCms
 
 from photo_fx import ImageReadError, imageio
 
@@ -248,6 +249,36 @@ def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
         alpha = np.asarray(img)[..., 3]
         assert alpha[0, 0] == 0
         assert alpha[48, 64] == 255
+
+
+# --- what saved files carry: an sRGB profile, nothing from the input's metadata ------------------------------------
+
+GPS_INFO = 0x8825  # the EXIF tag pointing to the GPS block (EXIF 2.32)
+
+
+@pytest.mark.parametrize("name", ["a.jpg", "a.png", "a.webp", "cut.png"])
+def test_a_saved_still_says_it_is_srgb_with_a_small_embedded_profile(photo, matte, tmp_path, name):
+    imageio.save(photo, tmp_path / name, alpha=matte if name.startswith("cut") else None)
+    with Image.open(tmp_path / name) as img:
+        profile = img.info["icc_profile"]
+    assert "sRGB" in ImageCms.getProfileDescription(ImageCms.ImageCmsProfile(io.BytesIO(profile)))
+    assert len(profile) < 1024  # small: under a kilobyte per picture
+
+
+def test_a_saved_picture_never_carries_the_inputs_exif_or_gps(tmp_path):
+    exif = Image.Exif()
+    exif[0x010F] = "PhoneMaker"  # Make
+    exif.get_ifd(GPS_INFO).update({1: "N", 2: (51.0, 30.0, 0.0), 3: "W", 4: (0.0, 7.0, 0.0)})
+    Image.new("RGB", (16, 12), (200, 120, 40)).save(tmp_path / "phone.jpg", exif=exif)
+    with Image.open(tmp_path / "phone.jpg") as original:
+        assert original.getexif().get_ifd(GPS_INFO)[1] == "N"  # the input really is geotagged
+    photo = imageio.load(tmp_path / "phone.jpg")
+    for name in ("out.jpg", "out.png", "out.webp"):
+        imageio.save(photo, tmp_path / name)
+        with Image.open(tmp_path / name) as saved:
+            assert dict(saved.getexif()) == {}
+            assert "exif" not in saved.info
+        assert b"PhoneMaker" not in (tmp_path / name).read_bytes()
 
 
 def _frames(count=4, height=47, width=63):

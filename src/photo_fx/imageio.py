@@ -23,6 +23,7 @@ from photo_fx.ops import resample
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
+_SRGB_ICC = ImageCms.ImageCmsProfile(_SRGB).tobytes()  # littlecms's built-in sRGB profile, 588 bytes
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _SIXTEEN_BIT = 65535.0  # the largest 16-bit value
 _ALPHA = 3  # the alpha channel of RGBA
@@ -75,15 +76,19 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
     """Write `rgb` to `path`; the extension picks the format.
 
     With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp.
+    `quality` (1..100, default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no
+    chroma subsampling) and PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer
+    shows the colours the effects made, and carries no other metadata: nothing from the photo it came from, so no
+    EXIF and no GPS position.
     """
     img = to_pil(rgb, alpha)
     suffix = Path(path).suffix.lower()
     if alpha is None and suffix in {".jpg", ".jpeg"}:
-        img.save(path, quality=quality, subsampling=0)
+        img.save(path, quality=quality, subsampling=0, icc_profile=_SRGB_ICC)
     elif suffix == ".webp":
-        img.save(path, quality=quality)
+        img.save(path, quality=quality, icc_profile=_SRGB_ICC)
     else:
-        img.save(path)
+        img.save(path, icc_profile=_SRGB_ICC)
 
 
 def to_pil(rgb: np.ndarray, alpha: np.ndarray | None = None) -> Image.Image:
