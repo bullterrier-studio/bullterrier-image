@@ -1,0 +1,10 @@
+# An S-curve for contrast, with a warm cast: red up and blue down in the midtones.
+name = "curves"
+size = 480
+
+[[step]]
+effect = "curves"
+shadows = 0.18
+highlights = 0.82
+red_midtones = 0.55
+blue_midtones = 0.45

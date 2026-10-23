@@ -1,11 +1,14 @@
 """Tone remaps: how brightness values are moved onto other brightness values, the same way for every effect that
 reshapes tones (`levels`, `auto_levels`, `curves`).
 
-Promises: every function takes a float32 picture whose last axis is the colour channels, returns a new float32 picture
-of the same shape (the input is never modified), and a value in 0..1 comes out in 0..1.
+Promises: every function takes a float32 array (a picture, whose last axis is the colour channels, or any shape),
+returns a new float32 array of the same shape (the input is never modified), and values in 0..1 come out in 0..1.
 """
 
+from collections.abc import Sequence
+
 import numpy as np
+from scipy.interpolate import PchipInterpolator
 
 # constant: only keeps equal or crossed input points from dividing by zero; the span then counts as this tiny, so the
 # picture is cut at the black point into the two output ends (a threshold).
@@ -36,3 +39,19 @@ def remap_levels(
     start = np.asarray(output_black, np.float32)
     reach = (np.asarray(output_white, np.float64) - np.asarray(output_black, np.float64)).astype(np.float32)
     return (start + x * reach).astype(np.float32)
+
+
+def monotone_curve(inputs: Sequence[float], outputs: Sequence[float], values: np.ndarray) -> np.ndarray:
+    """The tone curve through the control points (`inputs[i]`, `outputs[i]`), read at `values`.
+
+    The curve is the piecewise cubic Hermite interpolant with Fritsch-Carlson slopes (PCHIP, the monotone cubic of
+    Fritsch and Carlson, 1980; the same as `scipy.interpolate.PchipInterpolator`): smooth, passing exactly through every
+    point, and never overshooting. Between two points it stays between their outputs, so where the outputs rise the
+    curve rises (a brighter value is never mapped darker) and a bump or dip is never invented. With two points it is a
+    straight line. Below the first input and above the last the curve is held at that point's output. `inputs` must
+    strictly increase (a ValueError says so otherwise) and all `inputs` and `outputs` are in 0..1.
+    """
+    curve = PchipInterpolator(np.asarray(inputs, np.float64), np.asarray(outputs, np.float64))
+    low, high = inputs[0], inputs[-1]
+    # the clip on the way out only removes rounding error, so the promise above holds exactly
+    return np.clip(curve(np.clip(values, low, high)), min(outputs), max(outputs)).astype(np.float32)
