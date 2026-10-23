@@ -190,8 +190,11 @@ def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_val
         (lambda: Animated(0.0, 1.0, (0.4, 0.0, 0.2)), "ease"),  # three numbers
         (lambda: Animated(0.0, 1.0, (0.4, 0.0, 0.2, 1.0, 0.5)), "ease"),  # five
         (lambda: Animated(0.0, 1.0, (1.5, 0.0, 0.2, 1.0)), "ease"),  # x1 beyond 0..1
+        (lambda: Animated(0.0, 1.0, (-0.1, 0.0, 0.2, 1.0)), "ease"),
         (lambda: Animated(0.0, 1.0, (0.4, 0.0, -0.1, 1.0)), "ease"),  # x2 beyond 0..1
+        (lambda: Animated(0.0, 1.0, (0.4, 0.0, 1.5, 1.0)), "ease"),
         (lambda: Animated(0.0, 1.0, (True, 0.0, 0.2, 1.0)), "ease"),
+        (lambda: Animated(0.0, 1.0, (0.4, 0.0, "x", 1.0)), "ease"),  # type: ignore[arg-type]  # the point of the test
         (lambda: Animated(0.0, 1.0, "wobbly"), "wobbly"),
         (lambda: Animated(0.0, 1.0, over="forever"), "over"),
         (lambda: Animated(True, 1.0), "start"),

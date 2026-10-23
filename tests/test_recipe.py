@@ -57,19 +57,14 @@ def test_bad_recipes_fail_at_load_time_and_name_the_problem(tmp_path, text, expe
         load_recipe(write(tmp_path, text))
 
 
-def test_masked_step_changes_only_the_masked_region(photo, matte):
-    r = Recipe("bg", (Step("fill", {"color": "#000000"}, "background"),), size=None)
-    out = render(photo, r, matte)
-    inside, outside = matte == 1, matte == 0
-    np.testing.assert_allclose(out[inside], photo[inside], atol=1e-6)
-    assert np.allclose(out[outside], 0.0)
-
-
-def test_subject_mask_is_the_mirror_image(photo, matte):
-    r = Recipe("s", (Step("fill", {"color": "#ffffff"}, "subject"),), size=None)
-    out = render(photo, r, matte)
-    np.testing.assert_allclose(out[matte == 0], photo[matte == 0], atol=1e-6)
-    assert np.allclose(out[matte == 1], 1.0)
+@pytest.mark.parametrize(
+    ("mask", "color", "filled", "region"), [("background", "#000000", 0.0, 0), ("subject", "#ffffff", 1.0, 1)]
+)
+def test_a_masked_step_changes_only_its_region(photo, matte, mask, color, filled, region):
+    """`region` is the matte value of the pixels the mask selects."""
+    out = render(photo, Recipe("m", (Step("fill", {"color": color}, mask),), size=None), matte)
+    np.testing.assert_allclose(out[matte == 1 - region], photo[matte == 1 - region], atol=1e-6)
+    assert np.allclose(out[matte == region], filled)
 
 
 def test_steps_run_in_order(photo):
@@ -175,9 +170,13 @@ def test_animated_values_ease_between_their_end_points():
         (ANIMATED.replace("hold_end = 0.5", "hold_end = 1.5"), "no time"),
         (ANIMATED.replace("seconds = 2", "speed = 2"), "needs `seconds`"),
         (ANIMATED.replace("hold_end = 0.5", 'loop = "spiral"'), "loop"),
+        (ANIMATED.replace('ease = "in-out"', 'over = "forever"'), "step 1.*exposure"),
+        (ANIMATED.replace('ease = "in-out"', "ease = [0.4, 0.0, 0.2]"), "step 1.*exposure"),
     ],
 )
 def test_bad_animations_fail_at_load_time(tmp_path, text, expect):
+    """Each is refused naming the step and the field; every rule of an easing curve is checked where `Animated` is
+    made in code (tests/core/test_steps.py), the one model both paths go through."""
     with pytest.raises(ValueError, match=expect):
         load_recipe(write(tmp_path, text))
 
@@ -207,24 +206,6 @@ def test_exit_and_entrance_curves_accelerate_and_decelerate():
     assert Animated(0, 1, "accelerate").at(0.3) < 0.3 < Animated(0, 1, "decelerate").at(0.3)
 
 
-@pytest.mark.parametrize(
-    "ease",
-    [
-        "[0.4, 0.0, 0.2]",
-        "[1.5, 0.0, 0.2, 1.0]",
-        "[0.4, 0.0, 1.5, 1.0]",  # x2 out of 0..1, like x1 above
-        "[0.4, 0.0, -0.1, 1.0]",
-        "[-0.1, 0.0, 0.2, 1.0]",
-        '"wobbly"',
-        '[0.4, 0.0, "x", 1.0]',
-    ],
-)
-def test_bad_easing_is_rejected_when_loading(tmp_path, ease):
-    text = ANIMATED.replace('ease = "in-out"', f"ease = {ease}")
-    with pytest.raises(ValueError, match=r"step 1.*exposure"):
-        load_recipe(write(tmp_path, text))
-
-
 def test_a_custom_cubic_bezier_can_be_written_as_four_numbers(tmp_path):
     r = load_recipe(write(tmp_path, ANIMATED.replace('ease = "in-out"', "ease = [0.4, 0.0, 0.2, 1.0]")))
     assert r.steps[0].params["exposure"].ease == (0.4, 0.0, 0.2, 1.0)
@@ -243,13 +224,8 @@ def test_over_clip_keeps_running_through_the_holds():
     assert [clip for _, clip in frames] == sorted(clip for _, clip in frames)
 
 
-def test_over_must_be_motion_or_clip(tmp_path):
-    with pytest.raises(ValueError, match=r"step 1.*exposure"):
-        load_recipe(write(tmp_path, ANIMATED.replace('ease = "in-out"', 'over = "forever"')))
-
-
 def test_render_at_picks_a_moment_of_the_clip(photo, tmp_path):
-    r = load_recipe(write(tmp_path, ANIMATED.replace("size", "size")))
+    r = load_recipe(write(tmp_path, ANIMATED))
     r = Recipe(r.name, r.steps, size=None, animation=r.animation)
     np.testing.assert_allclose(render(photo, r, at=0.0), photo, atol=1e-6)
     np.testing.assert_allclose(render(photo, r, at=1.0), np.clip(photo * 2.0, 0, 1), atol=1e-5)
@@ -305,8 +281,6 @@ def test_matte_of_the_wrong_size_is_rejected(photo):
 
 
 def test_shipped_recipes_all_load():
-    from pathlib import Path
-
     files = sorted((Path(__file__).parent.parent / "recipes").glob("*.toml"))
     assert files
     assert all(load_recipe(f).steps for f in files)
