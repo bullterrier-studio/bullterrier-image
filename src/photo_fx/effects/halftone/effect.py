@@ -9,6 +9,9 @@ from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.color import ink_amount, luminance, vivid
 
+# constant: pixels drawn at once; bounds the working memory and never changes the result
+_BAND_PIXELS = 2**18
+
 
 class HalftoneParams(EffectParams):
     """A dot screen: a rotated square grid of dots, each as large as the ink its patch of the picture needs."""
@@ -121,30 +124,37 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
         ],
         axis=-1,
     )
-
-    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
     cos, sin = np.cos(np.radians(params.angle)), np.sin(np.radians(params.angle))
-    u, v = (x * cos + y * sin) / cell, (-x * sin + y * cos) / cell  # position in the rotated dot grid, in cells
-    cu, cv = np.floor(u) + 0.5, np.floor(v) + 0.5  # centre of the dot this pixel belongs to
-    dist = np.hypot(u - cu, v - cv)
-
-    # Look the picture up at the dot's centre, mapped back to image coordinates.
-    sx = np.clip(np.rint((cu * cos - cv * sin) * cell), 0, width - 1).astype(int)
-    sy = np.clip(np.rint((cu * sin + cv * cos) * cell), 0, height - 1).astype(int)
-    sampled = smooth[sy, sx]
-
-    # A dot's area follows the ink. At full ink it is the circle around its square cell, radius half the diagonal,
-    # so it covers the cell; dots touch their neighbours at half ink.
+    x = np.arange(width, dtype=np.float32)
+    ink = None if params.ink is None else np.asarray(params.ink, dtype=np.float32)
+    # The radius of a dot at full ink: half the diagonal of its square cell, so dots touch their neighbours at half ink.
     full_ink_radius = 0.7071  # constant: sqrt(2) / 2 to four places, the half-diagonal of a unit cell
-    radius = (
-        np.sqrt(np.clip(ink_amount(luminance(sampled), paper, threshold=params.paper_threshold), 0, 1))
-        * full_ink_radius
-    )
-    # The soft edge is a ramp `feather` px wide centred on the dot's edge. A dot narrower than the ramp would still
-    # print its inner half (half strength at the centre even at zero ink), so the ramp fades in with the dot: in full
-    # once the radius reaches half the feather, gone at zero. Zero ink is bare paper, and a tiny dot prints about its
-    # own area.
-    fade_in = np.clip(radius * cell / (params.feather / 2), 0.0, 1.0)
-    coverage = (np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0) * fade_in)[..., None]
-    dots = vivid(sampled, floor=params.ink_floor) if params.ink is None else np.asarray(params.ink, dtype=np.float32)
-    return (paper * (1.0 - coverage) + dots * coverage).astype(np.float32)
+    screen = np.empty(smooth.shape, dtype=np.float32)
+    # Every pixel of the screen depends only on its own position and the blurred picture, so it is drawn a band of
+    # rows at a time: the same result as all at once, with the temporaries of one band instead of the whole picture.
+    rows = max(1, _BAND_PIXELS // width)
+    for top in range(0, height, rows):
+        y = np.arange(top, min(top + rows, height), dtype=np.float32)[:, None]
+        u, v = (x * cos + y * sin) / cell, (-x * sin + y * cos) / cell  # position in the rotated dot grid, in cells
+        cu, cv = np.floor(u) + 0.5, np.floor(v) + 0.5  # centre of the dot this pixel belongs to
+        dist = np.hypot(u - cu, v - cv)
+
+        # Look the picture up at the dot's centre, mapped back to image coordinates.
+        sx = np.clip(np.rint((cu * cos - cv * sin) * cell), 0, width - 1).astype(int)
+        sy = np.clip(np.rint((cu * sin + cv * cos) * cell), 0, height - 1).astype(int)
+        sampled = smooth[sy, sx]
+
+        # A dot's area follows the ink: at full ink it is the circle around its square cell, so it covers the cell.
+        radius = (
+            np.sqrt(np.clip(ink_amount(luminance(sampled), paper, threshold=params.paper_threshold), 0, 1))
+            * full_ink_radius
+        )
+        # The soft edge is a ramp `feather` px wide centred on the dot's edge. A dot narrower than the ramp would
+        # still print its inner half (half strength at the centre even at zero ink), so the ramp fades in with the
+        # dot: in full once the radius reaches half the feather, gone at zero. Zero ink is bare paper, and a tiny dot
+        # prints about its own area.
+        fade_in = np.clip(radius * cell / (params.feather / 2), 0.0, 1.0)
+        coverage = (np.clip((radius - dist) * cell / params.feather + 0.5, 0.0, 1.0) * fade_in)[..., None]
+        dots = vivid(sampled, floor=params.ink_floor) if ink is None else ink
+        screen[top : top + rows] = paper * (1.0 - coverage) + dots * coverage
+    return screen
