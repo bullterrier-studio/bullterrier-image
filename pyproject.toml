@@ -100,6 +100,11 @@ dev = [
 # One command for agents and humans: `uv run poe check` before every push, `uv run poe fix` when it complains.
 [tool.poe.tasks]
 test = { cmd = "pytest -q -n auto", help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
+# Not part of `check`: the suite on the oldest Python and the lowest release each direct dependency's floor allows, in a
+# throwaway environment (uv.lock and the project environment stay as they are; the first run downloads the old
+# releases). It is for CI. tests/tools/test_lint_and_type_gate.py is left out because mypy's verdict on our source
+# depends on numpy's own type annotations, which are not what this checks.
+check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto --ignore=tests/tools/test_lint_and_type_gate.py", help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
 fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
 # The sdist and wheel as PyPI would get them, built into dist/check (git-ignored, emptied first) and checked by twine
 # (metadata, rendered README; the quoted glob is twine's to expand) and check-wheel-contents (stray or unimportable files)
