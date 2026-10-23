@@ -43,7 +43,7 @@ class GrainParams(EffectParams):
         doc="Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1). Larger is more exact and "
         "slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge "
         "pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the "
@@ -60,6 +60,6 @@ def grain(rgb: np.ndarray, params: GrainParams) -> np.ndarray:
     """
     noise = np.random.default_rng(params.seed).standard_normal(rgb.shape[:2]).astype(np.float32)
     if params.size > 1.0:  # a speck of 1 px or less is a single pixel: nothing to clump
-        noise = gaussian_blur(noise, params.size / 2.0, truncate=params.truncate, mode=params.mode)
+        noise = gaussian_blur(noise, params.size / 2.0, truncate=params.truncate, mode=params.edge)
         noise /= max(float(noise.std()), 1e-6)  # constant: guard against dividing by zero on a 1-pixel picture
     return np.clip(rgb + params.amount * noise[..., None], 0.0, 1.0).astype(np.float32)

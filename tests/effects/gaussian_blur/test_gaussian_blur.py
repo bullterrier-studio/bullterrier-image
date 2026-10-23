@@ -33,21 +33,21 @@ def test_an_impulse_becomes_the_gaussian_of_that_sigma(radius: float) -> None:
     reach = len(weights) // 2
     expected = np.zeros((size, size))
     expected[centre - reach : centre + reach + 1, centre - reach : centre + reach + 1] = np.outer(weights, weights)
-    out = registry.apply(NAME, impulse(size), radius=radius, truncate=4.0, mode="constant")
+    out = registry.apply(NAME, impulse(size), radius=radius, truncate=4.0, edge="constant")
     for channel in range(3):
         np.testing.assert_allclose(out[..., channel], expected, atol=2e-6)
 
 
-@pytest.mark.parametrize("mode", ["reflect", "mirror", "nearest", "wrap", "constant"])
-def test_a_constant_picture_stays_as_it_is_whatever_lies_beyond_its_edge(mode: str) -> None:
+@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap", "constant"])
+def test_a_constant_picture_stays_as_it_is_whatever_lies_beyond_its_edge(edge: str) -> None:
     grey = np.full((21, 34, 3), 0.4, np.float32)
-    out = registry.apply(NAME, grey, radius=6.0, mode=mode, constant_value=0.4)
+    out = registry.apply(NAME, grey, radius=6.0, edge=edge, constant_value=0.4)
     np.testing.assert_allclose(out, 0.4, atol=1e-6)
 
 
 def test_the_blur_keeps_the_mean_when_the_picture_wraps_around(photo: np.ndarray) -> None:
     """With 'wrap' nothing leaves or enters the picture, so the weights summing to 1 keep each channel's mean."""
-    out = registry.apply(NAME, photo, radius=5.0, mode="wrap")
+    out = registry.apply(NAME, photo, radius=5.0, edge="wrap")
     np.testing.assert_allclose(out.mean(axis=(0, 1)), photo.mean(axis=(0, 1)), atol=1e-5)
     assert out.std() < photo.std()  # and it did blur
 
@@ -66,7 +66,7 @@ def test_each_colour_channel_is_blurred_on_its_own() -> None:
 
 def test_radius_sets_the_standard_deviation_of_the_spread() -> None:
     """The variance of the blurred impulse along a row is sigma^2 (a Gaussian well inside the picture)."""
-    out = registry.apply(NAME, impulse(121), radius=5.0, truncate=4.0, mode="constant")
+    out = registry.apply(NAME, impulse(121), radius=5.0, truncate=4.0, edge="constant")
     row = out[60, :, 0].astype(np.float64)
     offsets = np.arange(121) - 60
     variance = float((row * offsets**2).sum() / row.sum())
@@ -80,7 +80,7 @@ def test_truncate_sets_where_the_kernel_is_cut_off() -> None:
 
 
 @pytest.mark.parametrize(
-    ("mode", "constant_value", "beyond"),
+    ("edge", "constant_value", "beyond"),
     [
         ("constant", 0.0, 0.0),
         ("constant", 1.0, 1.0),
@@ -91,11 +91,11 @@ def test_truncate_sets_where_the_kernel_is_cut_off() -> None:
     ids=["dark beyond", "light beyond", "grey beyond", "reflect repeats the grey", "nearest repeats the grey"],
 )
 def test_mode_and_constant_value_set_what_the_blur_sees_beyond_the_edge(
-    mode: str, constant_value: float, beyond: float
+    edge: str, constant_value: float, beyond: float
 ) -> None:
     """On a 0.5 grey the corner pixel sees the picture only in one quadrant, whose share of the kernel is the square
     of the 1-D weights at offsets 0 and up; the rest of its neighbourhood is `beyond`."""
     quadrant = kernel_1d(4.0, truncate=4.0)[16:].sum() ** 2
     grey = np.full((41, 41, 3), 0.5, np.float32)
-    out = registry.apply(NAME, grey, radius=4.0, mode=mode, constant_value=constant_value)
+    out = registry.apply(NAME, grey, radius=4.0, edge=edge, constant_value=constant_value)
     np.testing.assert_allclose(out[0, 0], beyond + (0.5 - beyond) * quadrant, atol=1e-5)

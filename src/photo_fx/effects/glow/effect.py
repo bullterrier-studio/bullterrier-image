@@ -45,7 +45,7 @@ class GlowParams(EffectParams):
         doc="Where the halo's Gaussian is cut off, in sigmas: the halo reaches truncate x radius px. Larger is more "
         "exact and slower.",
     )
-    mode: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
@@ -56,7 +56,7 @@ class GlowParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The highlight (0..1) assumed beyond the edge when mode is 'constant'; ignored otherwise.",
+        doc="The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
     )
 
 
@@ -69,6 +69,6 @@ def glow(rgb: np.ndarray, params: GlowParams) -> np.ndarray:
     """
     bright = highlights(rgb, params.threshold)
     halo = gaussian_blur(
-        bright, params.radius, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
+        bright, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
     )
     return screen(rgb, params.amount * halo)

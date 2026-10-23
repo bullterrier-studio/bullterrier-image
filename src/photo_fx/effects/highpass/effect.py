@@ -31,7 +31,7 @@ class HighpassParams(EffectParams):
         doc="Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more "
         "exact and slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
@@ -45,5 +45,5 @@ def highpass(rgb: np.ndarray, params: HighpassParams) -> np.ndarray:
     A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each
     colour channel is filtered on its own and the result is kept within 0..1.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.mode)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
     return np.clip(rgb - blurred + MID_GREY, 0.0, 1.0).astype(np.float32)

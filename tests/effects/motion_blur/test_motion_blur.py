@@ -39,7 +39,7 @@ LENGTHS = [1.0, 4.0, 5.0, 7.5, 12.0]
 def test_angle_0_averages_each_row_over_the_length(length: float) -> None:
     rng = np.random.default_rng(3)
     stripes = np.repeat(rng.random((9, 40, 1), dtype=np.float32), 3, axis=2)
-    out = registry.apply(NAME, stripes, angle=0.0, length=length, mode="reflect")
+    out = registry.apply(NAME, stripes, angle=0.0, length=length, edge="reflect")
     for y in range(9):
         np.testing.assert_allclose(out[y, :, 0], row_average(stripes[y, :, 0], length), atol=2e-6)
 
@@ -48,7 +48,7 @@ def test_angle_0_averages_each_row_over_the_length(length: float) -> None:
 def test_angle_90_averages_each_column_over_the_length(length: float) -> None:
     rng = np.random.default_rng(4)
     stripes = np.repeat(rng.random((40, 9, 1), dtype=np.float32), 3, axis=2)
-    out = registry.apply(NAME, stripes, angle=90.0, length=length, mode="reflect")
+    out = registry.apply(NAME, stripes, angle=90.0, length=length, edge="reflect")
     for x in range(9):
         np.testing.assert_allclose(out[:, x, 0], row_average(stripes[:, x, 0], length), atol=2e-6)
 
@@ -102,14 +102,14 @@ def test_the_line_has_the_length_and_direction_asked_for(angle: float) -> None:
     assert (out * across**2).sum() < 0.2
 
 
-@pytest.mark.parametrize("mode", ["reflect", "mirror", "nearest", "wrap"])
-def test_a_constant_picture_stays_as_it_is(mode: str) -> None:
+@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
+def test_a_constant_picture_stays_as_it_is(edge: str) -> None:
     grey = np.full((21, 34, 3), 0.4, np.float32)
-    np.testing.assert_allclose(registry.apply(NAME, grey, angle=37.0, length=9.0, mode=mode), 0.4, atol=1e-6)
+    np.testing.assert_allclose(registry.apply(NAME, grey, angle=37.0, length=9.0, edge=edge), 0.4, atol=1e-6)
 
 
 def test_the_blur_keeps_the_mean_when_the_picture_wraps_around(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, angle=25.0, length=11.0, mode="wrap")
+    out = registry.apply(NAME, photo, angle=25.0, length=11.0, edge="wrap")
     np.testing.assert_allclose(out.mean(axis=(0, 1)), photo.mean(axis=(0, 1)), atol=1e-5)
     assert out.std() < photo.std()
 
@@ -149,7 +149,7 @@ def test_each_colour_channel_is_blurred_on_its_own() -> None:
 
 
 @pytest.mark.parametrize(
-    ("mode", "bright_column", "expected"),
+    ("edge", "bright_column", "expected"),
     [
         ("reflect", 0, 0.4),  # the edge pixel is repeated once beyond the edge: 2 of the 5 samples
         ("mirror", 0, 0.2),  # the pixel is the mirror's axis: it is seen once
@@ -161,12 +161,12 @@ def test_each_colour_channel_is_blurred_on_its_own() -> None:
         ("wrap", 2, 0.2),
     ],
 )
-def test_mode_sets_what_the_blur_sees_beyond_the_edge(mode: str, bright_column: int, expected: float) -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge(edge: str, bright_column: int, expected: float) -> None:
     """One bright pixel in a dark row, blurred along the row by 5 px; the first pixel of the row is read at offsets
-    -2 to 2, whose beyond-the-edge samples each mode fills differently."""
+    -2 to 2, whose beyond-the-edge samples each edge rule fills differently."""
     dark = np.zeros((9, 21, 3), np.float32)
     dark[4, bright_column] = 1.0
-    out = registry.apply(NAME, dark, angle=0.0, length=5.0, mode=mode)
+    out = registry.apply(NAME, dark, angle=0.0, length=5.0, edge=edge)
     assert out[4, 0, 0] == pytest.approx(expected, abs=1e-6)
 
 

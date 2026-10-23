@@ -3,6 +3,7 @@ categories, every parameter across its documented range, and a time and memory b
 
 import time
 import tracemalloc
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -129,6 +130,87 @@ def test_the_vocabulary_check_flags_discouraged_field_names_and_passes_preferred
         "effect 'bad_probe': parameter `rng` should be called `seed`",
     ]
     assert _naming_problems("good_probe") == []
+
+
+def _edge_naming_problems(name: str) -> list[str]:
+    """Every choice field of the effect `name` that offers edge rules ('reflect' or 'mirror' among its choices, so it
+    decides what lies beyond the picture's edge) under a name other than `edge`."""
+    return [
+        f"effect {name!r}: field `{field}` chooses an edge rule and should be called `edge`"
+        for field, spec in registry.schema(name)["properties"].items()
+        if field != "edge" and {"reflect", "mirror"} & set(spec.get("enum", ()))
+    ]
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_what_lies_beyond_the_picture_edge_is_always_a_field_called_edge(name):
+    assert _edge_naming_problems(name) == []
+
+
+class ModeAsEdgeRule(EffectParams):
+    """The old name: `mode` choosing edge rules."""
+
+    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+        "reflect", doc="Edge rule: 'reflect', 'nearest', 'mirror' or 'wrap'."
+    )
+
+
+class BorderWithMirror(EffectParams):
+    """Another name, recognised by 'mirror' alone."""
+
+    border: Literal["nearest", "mirror"] = param("nearest", doc="Edge rule: 'nearest' or 'mirror'.")
+
+
+class BeyondWithReflect(EffectParams):
+    """Another name, recognised by 'reflect' alone, beside 'constant'."""
+
+    beyond: Literal["constant", "reflect"] = param("reflect", doc="Edge rule: 'constant' or 'reflect'.")
+
+
+class EdgeNamedEdge(EffectParams):
+    """The right name."""
+
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+        "reflect", doc="Edge rule: 'reflect', 'nearest', 'mirror' or 'wrap'."
+    )
+
+
+class ModeOfSomethingElse(EffectParams):
+    """`mode` is free for choices that are no edge rules."""
+
+    mode: Literal["spin", "zoom"] = param("spin", doc="'spin' or 'zoom'.")
+
+
+class InterpolationChoice(EffectParams):
+    """The sampling of a warp, whose choices share 'nearest' with the edge rules."""
+
+    interpolation: Literal["nearest", "bilinear", "bicubic"] = param(
+        "bilinear", doc="'nearest', 'bilinear' or 'bicubic'."
+    )
+
+
+EDGE_PROBES: dict[str, tuple[type[EffectParams], str | None]] = {
+    "the old name `mode` for the edge rules": (ModeAsEdgeRule, "mode"),
+    "any other name, found by 'mirror' alone": (BorderWithMirror, "border"),
+    "any other name, found by 'reflect' alone": (BeyondWithReflect, "beyond"),
+    "the name `edge`": (EdgeNamedEdge, None),
+    "`mode` for choices that are no edge rule": (ModeOfSomethingElse, None),
+    "`interpolation` for the sampling of a warp": (InterpolationChoice, None),
+}
+
+
+@pytest.mark.parametrize(("params", "misnamed"), EDGE_PROBES.values(), ids=EDGE_PROBES.keys())
+def test_the_edge_naming_check_flags_edge_rules_under_another_name_and_passes_the_rest(
+    params, misnamed, throwaway_effects
+):
+    @effect(category="light", params=params)
+    def edge_probe(rgb, params):
+        """Has one choice field."""
+        return rgb
+
+    problems = _edge_naming_problems("edge_probe")
+    assert len(problems) == (misnamed is not None)
+    assert all(f"`{misnamed}`" in problem for problem in problems)
 
 
 # --- categories --------------------------------------------------------------------------------------------------

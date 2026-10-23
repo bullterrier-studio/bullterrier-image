@@ -44,7 +44,7 @@ class SharpenParams(EffectParams):
         doc="Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more "
         "exact and slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
@@ -58,7 +58,7 @@ def sharpen(rgb: np.ndarray, params: SharpenParams) -> np.ndarray:
     Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
     kept within 0..1.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.mode)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
     detail = rgb - blurred
     detail *= np.abs(detail) >= params.threshold  # smaller differences count for nothing
     return np.clip(rgb + params.amount * detail, 0.0, 1.0).astype(np.float32)

@@ -77,9 +77,9 @@ def test_truncate_sets_where_the_halo_is_cut_off() -> None:
 
 def test_mode_constant_lets_the_glow_fade_toward_the_edge_and_reflect_does_not() -> None:
     bright = flat(0.8)
-    reflected = registry.apply(NAME, bright, radius=4.0, mode="reflect")
+    reflected = registry.apply(NAME, bright, radius=4.0, edge="reflect")
     np.testing.assert_allclose(reflected[0, 0], reflected[16, 16], atol=1e-6)  # an even picture stays even
-    dark_beyond = registry.apply(NAME, bright, radius=4.0, mode="constant", constant_value=0.0)
-    lit_beyond = registry.apply(NAME, bright, radius=4.0, mode="constant", constant_value=1.0)
+    dark_beyond = registry.apply(NAME, bright, radius=4.0, edge="constant", constant_value=0.0)
+    lit_beyond = registry.apply(NAME, bright, radius=4.0, edge="constant", constant_value=1.0)
     assert dark_beyond[0, 0, 0] < dark_beyond[16, 16, 0] - 0.01
     assert lit_beyond[0, 0, 0] > dark_beyond[0, 0, 0]

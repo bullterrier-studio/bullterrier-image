@@ -63,7 +63,7 @@ class BloomParams(EffectParams):
         doc="Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma px. Larger is more "
         "exact and slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), "
         "'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).",
@@ -84,5 +84,5 @@ def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
     halo = np.zeros_like(bright)
     for octave, weight in enumerate(weights):
         sigma = params.radius / 2.0**octave
-        halo += float(weight) * gaussian_blur(bright, sigma, truncate=params.truncate, mode=params.mode)
+        halo += float(weight) * gaussian_blur(bright, sigma, truncate=params.truncate, mode=params.edge)
     return screen(rgb, params.amount * halo)

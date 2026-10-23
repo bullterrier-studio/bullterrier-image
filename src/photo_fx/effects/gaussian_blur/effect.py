@@ -28,7 +28,7 @@ class GaussianBlurParams(EffectParams):
         doc="Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more exact "
         "and slower; below 3 the blur turns visibly boxy.",
     )
-    mode: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
@@ -39,7 +39,7 @@ class GaussianBlurParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The brightness (0..1, every channel) assumed beyond the edge when mode is 'constant': 0 darkens the "
+        doc="The brightness (0..1, every channel) assumed beyond the edge when edge is 'constant': 0 darkens the "
         "edge, 1 lightens it; ignored otherwise.",
     )
 
@@ -50,4 +50,4 @@ def gaussian_blur(rgb: np.ndarray, params: GaussianBlurParams) -> np.ndarray:
 
     Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
     """
-    return blur(rgb, params.radius, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value)
+    return blur(rgb, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value)

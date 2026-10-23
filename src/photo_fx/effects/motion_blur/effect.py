@@ -28,7 +28,7 @@ class MotionBlurParams(EffectParams):
         doc="How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster "
         "motion; 0 leaves the picture unchanged.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
@@ -65,4 +65,4 @@ def motion_blur(rgb: np.ndarray, params: MotionBlurParams) -> np.ndarray:
     """
     if params.length == 0:
         return rgb.copy()
-    return convolve(rgb, _line_kernel(params.angle, params.length), mode=params.mode)
+    return convolve(rgb, _line_kernel(params.angle, params.length), mode=params.edge)

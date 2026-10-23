@@ -37,7 +37,7 @@ class SoftFocusParams(EffectParams):
         doc="Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x radius px. Larger is more exact "
         "and slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).",
@@ -52,5 +52,5 @@ def soft_focus(rgb: np.ndarray, params: SoftFocusParams) -> np.ndarray:
     and a blurred exposure of the same scene stacked). The picture only ever gets
     brighter, detail stays under the glow, and black stays black.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.mode)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
     return (rgb * (1.0 - params.opacity) + screen(rgb, blurred) * params.opacity).astype(np.float32)

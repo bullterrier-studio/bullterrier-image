@@ -28,8 +28,8 @@ def test_clarity_truncate_limits_how_far_the_surroundings_reach() -> None:
 def test_clarity_mode_decides_what_lies_beyond_the_picture_edge() -> None:
     flat = np.full((12, 12, 3), 0.5, np.float32)
     np.testing.assert_array_equal(registry.apply("clarity", flat, radius=3.0), flat)  # reflect: the edge sees grey
-    dark_outside = registry.apply("clarity", flat, radius=3.0, mode="constant", constant_value=0.0)
+    dark_outside = registry.apply("clarity", flat, radius=3.0, edge="constant", constant_value=0.0)
     assert dark_outside[0, 0, 0] > 0.5  # darkness beyond the edge makes the border stand out brighter
     assert dark_outside[0, 0, 0] > dark_outside[6, 6, 0]
-    grey_outside = registry.apply("clarity", flat, radius=3.0, mode="constant", constant_value=0.5)
+    grey_outside = registry.apply("clarity", flat, radius=3.0, edge="constant", constant_value=0.5)
     np.testing.assert_allclose(grey_outside, flat, atol=1e-6)

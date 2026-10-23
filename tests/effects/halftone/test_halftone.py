@@ -198,9 +198,9 @@ def test_mode_and_constant_value_set_what_lies_beyond_the_edge() -> None:
         out = registry.apply(NAME, picture, cell=10, angle=0.0, sigma=2.0, **WHITE_ON_BLACK, **params)
         return float(out[border].mean())
 
-    assert ink(mode="reflect") == 0.0
-    assert ink(mode="constant", constant_value=1.0) > 0.05  # white beyond the edge bleeds in
-    assert ink(mode="constant", constant_value=0.0) == 0.0
+    assert ink(edge="reflect") == 0.0
+    assert ink(edge="constant", constant_value=1.0) > 0.05  # white beyond the edge bleeds in
+    assert ink(edge="constant", constant_value=0.0) == 0.0
 
 
 def test_feather_softens_the_dot_edges_without_changing_the_ink() -> None:

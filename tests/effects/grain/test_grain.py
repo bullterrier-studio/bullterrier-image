@@ -64,7 +64,7 @@ def test_mode_changes_the_clumped_grain_only_near_the_border() -> None:
     Grain is rescaled to its standard deviation after the blur, so the interior agrees up to a scale: compare by
     correlation."""
     params = {"amount": 0.01, "size": 4.0, "truncate": 2.0, "seed": 9}  # the blur reaches 2 x 2 = 4 px
-    reflect, wrap = added_noise({**params, "mode": "reflect"}), added_noise({**params, "mode": "wrap"})
+    reflect, wrap = added_noise({**params, "edge": "reflect"}), added_noise({**params, "edge": "wrap"})
     inner = (slice(5, -5), slice(5, -5))
     assert np.corrcoef(reflect[inner].ravel(), wrap[inner].ravel())[0, 1] > 1 - 1e-9
     assert np.corrcoef(reflect[:, :2].ravel(), wrap[:, :2].ravel())[0, 1] < 0.99
@@ -76,8 +76,8 @@ def test_truncate_sets_how_far_the_border_reaches() -> None:
 
     def disagreement(truncate: float) -> float:
         """1 - correlation of the band under two edge modes: ~0 (float rounding) where the border does not reach."""
-        reflect = added_noise({**params, "truncate": truncate, "mode": "reflect"})
-        wrap = added_noise({**params, "truncate": truncate, "mode": "wrap"})
+        reflect = added_noise({**params, "truncate": truncate, "edge": "reflect"})
+        wrap = added_noise({**params, "truncate": truncate, "edge": "wrap"})
         return 1.0 - float(np.corrcoef(reflect[band].ravel(), wrap[band].ravel())[0, 1])
 
     assert disagreement(2.0) < 1e-9

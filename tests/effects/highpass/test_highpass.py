@@ -83,12 +83,12 @@ def test_radius_sets_which_detail_is_kept() -> None:
     assert np.abs(kept_ramp).max() < 0.02
 
 
-def test_mode_sets_what_the_blur_sees_beyond_the_edge() -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge() -> None:
     """In a picture that rises from dark to bright, 'wrap' puts the bright end beside the dark one, so the blur at the
     dark edge is brighter than the picture there: the detail dips below mid-grey. Reflecting does not."""
     ramp = np.tile(np.linspace(0.0, 1.0, 64, dtype=np.float32)[None, :, None], (8, 1, 3))
-    reflected = registry.apply(NAME, ramp, radius=4.0, mode="reflect")[4, 0, 0]
-    wrapped = registry.apply(NAME, ramp, radius=4.0, mode="wrap")[4, 0, 0]
+    reflected = registry.apply(NAME, ramp, radius=4.0, edge="reflect")[4, 0, 0]
+    wrapped = registry.apply(NAME, ramp, radius=4.0, edge="wrap")[4, 0, 0]
     assert reflected == pytest.approx(MID_GREY, abs=0.1)
     assert wrapped < MID_GREY - 0.1
 

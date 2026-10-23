@@ -50,16 +50,16 @@ def test_a_larger_radius_spreads_the_light_further_and_thinner() -> None:
     assert large[40, 40] < small[40, 40]
 
 
-@pytest.mark.parametrize("mode", ["reflect", "mirror", "nearest", "wrap"])
+@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
 @pytest.mark.parametrize("highlights", [0.0, 3.0])
-def test_a_constant_picture_stays_as_it_is(mode: str, highlights: float) -> None:
+def test_a_constant_picture_stays_as_it_is(edge: str, highlights: float) -> None:
     grey = np.full((21, 34, 3), 0.4, np.float32)
-    out = registry.apply(NAME, grey, radius=6.0, highlights=highlights, mode=mode)
+    out = registry.apply(NAME, grey, radius=6.0, highlights=highlights, edge=edge)
     np.testing.assert_allclose(out, 0.4, atol=1e-6)
 
 
 def test_the_blur_keeps_the_mean_when_the_picture_wraps_around_and_there_are_no_highlights(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, radius=5.0, highlights=0.0, mode="wrap")
+    out = registry.apply(NAME, photo, radius=5.0, highlights=0.0, edge="wrap")
     np.testing.assert_allclose(out.mean(axis=(0, 1)), photo.mean(axis=(0, 1)), atol=1e-5)
     assert out.std() < photo.std()
 
@@ -112,25 +112,25 @@ def test_highlights_brighten_the_glow_around_a_light_without_adding_light_elsewh
     assert max(high[40, 40 + 9], low[40, 40 + 9]) < 1e-6  # beyond the disc nothing was ever reached
 
 
-def test_mode_sets_what_the_blur_sees_beyond_the_edge() -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge() -> None:
     """One bright pixel in the first column of a dark picture, radius 2: 'nearest' repeats it beyond the edge so the
     pixel itself is brighter than 'wrap' makes it (the opposite edge is 30 px away)."""
     dark = np.zeros((31, 31, 3), np.float32)
     dark[15, 0] = 1.0
-    nearest = registry.apply(NAME, dark, radius=2.0, mode="nearest")[15, 0, 0]
-    wrapped = registry.apply(NAME, dark, radius=2.0, mode="wrap")[15, 0, 0]
+    nearest = registry.apply(NAME, dark, radius=2.0, edge="nearest")[15, 0, 0]
+    wrapped = registry.apply(NAME, dark, radius=2.0, edge="wrap")[15, 0, 0]
     assert nearest > wrapped * 1.5
 
 
-@pytest.mark.parametrize("mode", ["reflect", "mirror", "nearest", "wrap"])
-def test_highlights_weigh_the_light_beyond_the_edge_as_well(mode: str) -> None:
-    """With a share s of the average from the lone light (what the plain blur says at that pixel in this mode), the
-    light counts 1 + g times a black pixel and so reaches s (1 + g) / (1 + s g) once the light beyond the edge, which
-    each mode shows differently, is weighed in the total too."""
+@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
+def test_highlights_weigh_the_light_beyond_the_edge_as_well(edge: str) -> None:
+    """With a share s of the average from the lone light (what the plain blur says at that pixel with this edge rule),
+    the light counts 1 + g times a black pixel and so reaches s (1 + g) / (1 + s g) once the light beyond the
+    edge, which each edge rule shows differently, is weighed in the total too."""
     dark = np.zeros((31, 31, 3), np.float32)
     dark[15, 0] = 1.0
-    share = registry.apply(NAME, dark, radius=3.0, highlights=0.0, mode=mode)[15, 0, 0]
-    out = registry.apply(NAME, dark, radius=3.0, highlights=6.0, mode=mode)[15, 0, 0]
+    share = registry.apply(NAME, dark, radius=3.0, highlights=0.0, edge=edge)[15, 0, 0]
+    out = registry.apply(NAME, dark, radius=3.0, highlights=6.0, edge=edge)[15, 0, 0]
     assert out == pytest.approx(share * 7.0 / (1.0 + share * 6.0), rel=1e-4)
 
 

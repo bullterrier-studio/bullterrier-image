@@ -35,7 +35,7 @@ class ClarityParams(EffectParams):
         doc="Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more exact "
         "and slower.",
     )
-    mode: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
@@ -46,7 +46,7 @@ class ClarityParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored otherwise.",
+        doc="The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
     )
 
 
@@ -57,6 +57,6 @@ def clarity(rgb: np.ndarray, params: ClarityParams) -> np.ndarray:
     Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
     """
     blurred = gaussian_blur(
-        rgb, params.radius, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
+        rgb, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
     )
     return np.clip(rgb + params.amount * (rgb - blurred), 0.0, 1.0).astype(np.float32)

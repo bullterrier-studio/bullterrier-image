@@ -106,11 +106,11 @@ def test_truncate_sets_where_each_octave_is_cut_off() -> None:
     assert registry.apply(NAME, dark, radius=2.0, octaves=1, threshold=0.5, truncate=2.0)[at_six_px][0] == 0
 
 
-def test_mode_sets_what_the_blur_sees_beyond_the_edge() -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge() -> None:
     lit_edge = flat(0.0, 41)
     lit_edge[20, 0] = 1.0  # a bright pixel on the left edge
     far_side = (20, 40)  # the right edge of the same row, one pixel away round the back
-    wrapped = registry.apply(NAME, lit_edge, radius=3.0, threshold=0.5, mode="wrap")
-    reflected = registry.apply(NAME, lit_edge, radius=3.0, threshold=0.5, mode="reflect")
+    wrapped = registry.apply(NAME, lit_edge, radius=3.0, threshold=0.5, edge="wrap")
+    reflected = registry.apply(NAME, lit_edge, radius=3.0, threshold=0.5, edge="reflect")
     assert wrapped[far_side][0] > 0.01
     assert reflected[far_side][0] == 0.0

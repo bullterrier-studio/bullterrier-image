@@ -50,7 +50,7 @@ class HalationParams(EffectParams):
         doc="Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x radius px. Larger is more exact "
         "and slower.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the glow's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), "
         "'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).",
@@ -67,6 +67,6 @@ def halation(rgb: np.ndarray, params: HalationParams) -> np.ndarray:
     brightens and leaves black black.
     """
     brightest = highlights(rgb.max(axis=-1), params.threshold)
-    halo = gaussian_blur(brightest, params.radius, truncate=params.truncate, mode=params.mode)
+    halo = gaussian_blur(brightest, params.radius, truncate=params.truncate, mode=params.edge)
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, (params.amount * halo)[..., None] * tint)

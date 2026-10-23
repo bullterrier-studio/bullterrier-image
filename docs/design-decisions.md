@@ -53,6 +53,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
   `intensity` or `factor`. *Reason:* users bring vocabulary from Photoshop, Lightroom and shader literature.
   *Consequence:* a shared vocabulary table and a contract test flag discouraged names.
+- **What lies beyond the picture's edge is always a field named `edge`** (reflect, nearest, mirror, wrap, and constant
+  where supported), in every effect that looks past the border. *Reason:* one concept, one name; `mode` is often taken
+  by an effect's own choice (`radial_blur`: spin or zoom). *Consequence:* a contract test fails an effect field whose
+  choices are edge rules but whose name is not `edge`.
 - **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
   nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
   channel), not a `matrix` or a `points` list. *Reason:* only scalars can be animated with `ramp()`, become a slider

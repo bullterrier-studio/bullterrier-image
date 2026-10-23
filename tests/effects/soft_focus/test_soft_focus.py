@@ -84,9 +84,9 @@ def test_truncate_sets_where_the_blur_is_cut_off() -> None:
     assert registry.apply(NAME, dark, radius=2.0, truncate=2.0)[at_six_px][0] == 0
 
 
-def test_mode_sets_what_the_blur_sees_beyond_the_edge() -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge() -> None:
     lit_edge = flat(0.0, 41)
     lit_edge[20, 0] = 1.0
     far_side = (20, 40)
-    assert registry.apply(NAME, lit_edge, radius=3.0, opacity=1.0, mode="wrap")[far_side][0] > 0.01
-    assert registry.apply(NAME, lit_edge, radius=3.0, opacity=1.0, mode="reflect")[far_side][0] == 0.0
+    assert registry.apply(NAME, lit_edge, radius=3.0, opacity=1.0, edge="wrap")[far_side][0] > 0.01
+    assert registry.apply(NAME, lit_edge, radius=3.0, opacity=1.0, edge="reflect")[far_side][0] == 0.0

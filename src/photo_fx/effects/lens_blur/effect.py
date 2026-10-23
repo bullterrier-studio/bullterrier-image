@@ -30,7 +30,7 @@ class LensBlurParams(EffectParams):
         "times as much as a black one, so with 0 every pixel counts the same (a plain average), and raising it turns "
         "bright lights into distinct, luminous discs (bokeh) while dark areas hardly bleed into them.",
     )
-    mode: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
@@ -55,8 +55,8 @@ def lens_blur(rgb: np.ndarray, params: LensBlurParams) -> np.ndarray:
     disc = np.clip(params.radius + 0.5 - distance, 0.0, 1.0)
     disc /= disc.sum()
     if params.highlights == 0:
-        return convolve(rgb, disc, mode=params.mode)
+        return convolve(rgb, disc, mode=params.edge)
     weight = 1.0 + params.highlights * luminance(rgb)
-    weighted = convolve(rgb * weight[..., np.newaxis], disc, mode=params.mode)
-    total = convolve(weight, disc, mode=params.mode)[..., np.newaxis]
+    weighted = convolve(rgb * weight[..., np.newaxis], disc, mode=params.edge)
+    total = convolve(weight, disc, mode=params.edge)[..., np.newaxis]
     return np.clip(weighted / total, rgb.min(), rgb.max()).astype(np.float32)

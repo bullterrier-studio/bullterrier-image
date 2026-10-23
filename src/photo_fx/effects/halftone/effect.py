@@ -85,7 +85,7 @@ class HalftoneParams(EffectParams):
         doc="Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma cells. Larger is more "
         "exact and slower.",
     )
-    mode: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
@@ -96,7 +96,7 @@ class HalftoneParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored otherwise.",
+        doc="The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
     )
 
 
@@ -112,7 +112,7 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     cell = params.cell
     paper = np.asarray(params.paper, dtype=np.float32)
     smooth = gaussian_blur(
-        rgb, cell * params.sigma, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
+        rgb, cell * params.sigma, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
     )
     cos, sin = np.cos(np.radians(params.angle)), np.sin(np.radians(params.angle))
     x = np.arange(width, dtype=np.float32)

@@ -106,7 +106,7 @@ CENTRE = len(SIGMA_1_5) // 2
 
 
 @pytest.mark.parametrize(
-    ("mode", "edge_pixel_weight"),
+    ("edge", "edge_pixel_weight"),
     [
         ("reflect", SIGMA_1_5[CENTRE] + SIGMA_1_5[CENTRE + 1]),  # one offset beyond the edge shows the edge pixel
         ("nearest", SIGMA_1_5[CENTRE] + SIGMA_1_5[:CENTRE].sum()),  # every offset beyond the edge does
@@ -114,14 +114,14 @@ CENTRE = len(SIGMA_1_5) // 2
     ],
     ids=["reflect repeats the edge pixel once", "nearest repeats it throughout", "wrap never"],
 )
-def test_mode_sets_what_the_blur_sees_beyond_the_edge(mode: str, edge_pixel_weight: float) -> None:
+def test_edge_sets_what_the_blur_sees_beyond_the_edge(edge: str, edge_pixel_weight: float) -> None:
     """A bump in the left-edge column of a grey picture: the blur there is the bump times the weight of the bump's own
     pixel along the row (`edge_pixel_weight`, worked out from the Gaussian weights) times the centre weight along the
     column."""
     height = 0.1
     grey = np.full((21, 21, 3), 0.5, np.float32)
     grey[10, 0] += height
-    out = registry.apply(NAME, grey, radius=1.5, amount=1.0, threshold=0.0, mode=mode)
+    out = registry.apply(NAME, grey, radius=1.5, amount=1.0, threshold=0.0, edge=edge)
     blur_rise = height * SIGMA_1_5[CENTRE] * edge_pixel_weight
     assert out[10, 0, 0] == pytest.approx(0.5 + 2 * height - blur_rise, abs=2e-6)
 
