@@ -213,6 +213,21 @@ def _bound_value(name: str, field: str, side: str, beyond: bool = False) -> floa
     return int(value) if isinstance(doc.default, int) else float(value)
 
 
+def _setting(name: str, field: str, value: float) -> dict[str, float]:
+    """`field` set to `value`. When the field is one side of a min/max pair (`band_min_height` and `band_max_height`:
+    the same name with `min` and `max` swapped), the other side moves to the same value if its default would leave
+    the pair the wrong way round, so each side still reaches its whole range."""
+    fields = registry.parameters(name).model_fields
+    words = field.split("_")
+    for side, other_side in (("min", "max"), ("max", "min")):
+        other = "_".join(other_side if word == side else word for word in words)
+        if side in words and other in fields:
+            partner = fields[other].default
+            if (value > partner) if side == "min" else (value < partner):
+                return {field: value, other: value}
+    return {field: value}
+
+
 @pytest.mark.parametrize("name", ALL)
 def test_every_parameter_is_described_and_has_a_unit_entry(name):
     schema = registry.schema(name)
@@ -226,7 +241,7 @@ def test_every_parameter_is_described_and_has_a_unit_entry(name):
 @pytest.mark.parametrize(("name", "field", "side"), _bounds())
 def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
     small = _small(photo)
-    out = registry.apply(name, small, **{field: _bound_value(name, field, side)}, **_inputs(name, small))
+    out = registry.apply(name, small, **_setting(name, field, _bound_value(name, field, side)), **_inputs(name, small))
     assert out.shape == small.shape
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6
@@ -252,7 +267,7 @@ def _interior_values() -> list[tuple[str, str, float]]:
 @pytest.mark.parametrize(("name", "field", "value"), _interior_values())
 def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, field, value, photo):
     small = _small(photo)
-    out = registry.apply(name, small, **{field: value}, **_inputs(name, small))
+    out = registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small))
     assert out.shape == small.shape
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6

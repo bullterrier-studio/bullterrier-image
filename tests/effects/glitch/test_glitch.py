@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx import fx
+from photo_fx import RecipeError, fx
 from photo_fx.core import registry
 from photo_fx.ops.glyphs import cell_size, glyph_atlas
 
@@ -84,11 +84,11 @@ def test_a_strip_slides_sideways_up_to_shift_of_the_width_either_way(photo: np.n
     assert max(abs(d) for d in slides) > 0.75 * limit  # and the slides reach most of the way to the limit
 
 
-def test_band_height_limits_given_the_wrong_way_round_mean_the_same_range(photo: np.ndarray) -> None:
-    swapped = registry.apply(NAME, photo, band_min_height=0.2, band_max_height=0.05, seed=6)
-    in_order = registry.apply(NAME, photo, band_min_height=0.05, band_max_height=0.2, seed=6)
-    np.testing.assert_array_equal(swapped, in_order)
-    assert not np.array_equal(swapped, registry.apply(NAME, photo, seed=6))  # and the limits are really used
+def test_band_height_limits_given_the_wrong_way_round_are_refused_naming_both() -> None:
+    with pytest.raises(RecipeError, match="band_min_height") as raised:
+        fx.glitch(band_min_height=0.2, band_max_height=0.05)
+    assert "band_max_height" in str(raised.value)
+    assert fx.glitch(band_min_height=0.2, band_max_height=0.2).params["band_min_height"] == 0.2  # equal is a range
 
 
 def test_text_strips_cover_only_some_rows(photo: np.ndarray) -> None:

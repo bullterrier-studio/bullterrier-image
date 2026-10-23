@@ -1,10 +1,10 @@
 """The `glitch` effect: colour channels pulled apart, horizontal bands knocked sideways, some of them turned to text."""
 
 import math
-from typing import Annotated
+from typing import Annotated, Self
 
 import numpy as np
-from pydantic import AfterValidator
+from pydantic import AfterValidator, model_validator
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
@@ -75,7 +75,7 @@ class GlitchParams(EffectParams):
         min=0,
         max=1,
         doc="The lowest a strip can be, as a fraction 0 to 1 of the picture's height (never below 1 px). Each strip's "
-        "height is drawn at random between this and `band_max_height` (set above it, the two swap roles).",
+        "height is drawn at random between this and `band_max_height`, which it may not exceed.",
     )
     band_max_height: float = param(
         0.06,
@@ -141,6 +141,16 @@ class GlitchParams(EffectParams):
         "monospaced font found.",
     )
 
+    @model_validator(mode="after")
+    def _band_heights_in_order(self) -> Self:
+        """The band height limits are a range: refused, naming both, when the lowest is above the tallest."""
+        if self.band_min_height > self.band_max_height:
+            raise ValueError(
+                f"`band_min_height` ({self.band_min_height}) must not exceed `band_max_height` "
+                f"({self.band_max_height}): they are the lowest and the tallest a strip can be"
+            )
+        return self
+
 
 @effect(category="glitch", params=GlitchParams)
 def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
@@ -156,10 +166,8 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
     height, width = rgb.shape[:2]
     out = rgb.copy()
     strips = []
-    # each limit can be set alone over its whole range, so a pair given the wrong way round is read as the same range
-    lowest, tallest = sorted((params.band_min_height, params.band_max_height))
     for _ in range(params.bands):
-        band_height = max(1, int(rng.uniform(lowest, tallest) * height))
+        band_height = max(1, int(rng.uniform(params.band_min_height, params.band_max_height) * height))
         top = int(rng.uniform(0, height - band_height))
         dx = int(rng.uniform(-params.shift, params.shift) * width)
         out[top : top + band_height] = np.roll(out[top : top + band_height], dx, axis=1)
