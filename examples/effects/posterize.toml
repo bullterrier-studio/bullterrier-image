@@ -1,0 +1,7 @@
+# Poster look: four tones per colour channel.
+name = "posterize"
+size = 480
+
+[[step]]
+effect = "posterize"
+levels = 4
