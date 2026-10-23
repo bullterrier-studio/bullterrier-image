@@ -11,7 +11,8 @@ from photo_fx.ops.color import parse_color
 from photo_fx.ops.colorspace import srgb_to_linear
 
 # The named palettes are data, as their authors publish them (sRGB hex):
-# - gameboy: the four greens of the Nintendo Game Boy (DMG) screen, darkest to lightest.
+# - gameboy: the four greens widely used to draw a Game Boy screen, darkest to lightest (a community palette; the real
+#   DMG panel's colours differ and depend on the display).
 # - cga: IBM CGA graphics mode 4, palette 1, high intensity: black, cyan, magenta, white.
 # - ega: the 16 default colours of the IBM EGA (and VGA text mode).
 # - pico8: the 16 colours of the PICO-8 fantasy console.
@@ -35,9 +36,9 @@ class PaletteQuantizeParams(EffectParams):
     palette: Literal["photo", "gameboy", "cga", "ega", "pico8"] = param(
         "photo",
         doc="Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); the others "
-        "are fixed palettes: 'gameboy' (the 4 greens of the Game Boy screen), 'cga' (black, cyan, magenta, white), "
-        "'ega' (the 16 IBM EGA colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in "
-        "Oklab, a space where equal distances look equally different.",
+        "are fixed palettes: 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga' (black, cyan, "
+        "magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the "
+        "nearest colour in Oklab, a space where equal distances look equally different.",
     )
     colors: int = param(
         8,

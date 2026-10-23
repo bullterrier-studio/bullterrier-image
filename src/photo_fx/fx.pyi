@@ -783,10 +783,10 @@ Parameters
 ----------
 palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
-    (k-means); the others are fixed palettes: 'gameboy' (the 4 greens of the Game Boy
-    screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and
-    'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in Oklab, a
-    space where equal distances look equally different.
+    (k-means); the others are fixed palettes: 'gameboy' (the 4 greens widely used to
+    draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA
+    colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in
+    Oklab, a space where equal distances look equally different.
 colors : whole number, count, 2 to 256, default 8
     How many colours to find when `palette` is 'photo' (ignored for a fixed palette).
     Raising it keeps more detail and gradation; fewer than this many are used if the
