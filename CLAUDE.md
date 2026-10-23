@@ -53,7 +53,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 - Versions are SemVer (a 0.x minor may break the API), written in `pyproject.toml` and changed only by
   `uv run poe release VERSION` (the owner picks VERSION, e.g. `0.1.0rc1` for TestPyPI, `0.1.0` for PyPI). That one command
   checks, shows the plan, asks, then bumps, writes the CHANGELOG.md section with git-cliff from the Conventional Commits,
-  commits, tags and pushes main and the tag atomically; CONTRIBUTING.md, "Releasing". Tests never write the project's
+  commits, tags and pushes main and the tag atomically; docs/releasing.md. Tests never write the project's
   version: they read it from `pyproject.toml` (a test fails otherwise).
 - CI is one workflow per concern in `.github/workflows/`, joined by `ci.yml`: the checks (lint, test, min-deps, security,
   pre-commit) run in parallel, then `build` runs only if all passed; `release.yml` calls `ci.yml` and publishes only
