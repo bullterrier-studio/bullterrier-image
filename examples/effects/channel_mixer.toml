@@ -1,0 +1,10 @@
+# Trade some red for blue and some blue for red: a cooler, dreamier colour swap.
+name = "channel_mixer"
+size = 480
+
+[[step]]
+effect = "channel_mixer"
+red_from_red = 0.6
+red_from_blue = 0.4
+blue_from_red = 0.4
+blue_from_blue = 0.6
