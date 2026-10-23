@@ -85,7 +85,8 @@ uv run photo-fx effects
 
 ## Platforms
 
-photo-fx runs on macOS, Linux and Windows. Every effect works everywhere; two things depend on the machine.
+photo-fx runs on macOS, Linux and Windows, on Python 3.12, 3.13 and 3.14. Every effect works everywhere; three things
+depend on the machine.
 
 **Finding the subject** (cut-outs, `mask = "background"`, anything that needs a silhouette) has two backends:
 
@@ -95,8 +96,8 @@ photo-fx runs on macOS, Linux and Windows. Every effect works everywhere; two th
 | `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default elsewhere. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
 
 The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
-folder (`~/Library/Caches/photo-fx` on macOS, `~/.cache/photo-fx` on Linux, `%LOCALAPPDATA%\photo-fx\Cache` on
-Windows), checks its SHA-256 and keeps it; nothing is downloaded when photo-fx is imported. Offline, or where the download
+folder (`~/Library/Caches/photo-fx` on macOS, `$XDG_CACHE_HOME/photo-fx` or else `~/.cache/photo-fx` on Linux,
+`%LOCALAPPDATA%\photo-fx\Cache` on Windows), checks its SHA-256 against the one pinned in the code and keeps it; nothing is downloaded when photo-fx is imported. Offline, or where the download
 is blocked, download the file the error message names by hand and save it where it says, or point `PHOTO_FX_MODEL` at a
 copy (`PHOTO_FX_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
@@ -104,7 +105,14 @@ Choose the backend with `--segmenter vision|onnx` (or `subject_matte(rgb, segmen
 with `PHOTO_FX_SEGMENTER=onnx`; the option wins over the variable. No model is needed at all if you have the subject's
 matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
 the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
-in [`matte/`](src/photo_fx/matte), so a further backend is added there without touching the rest.
+in [`matte/`](src/photo_fx/matte), so a further backend is added there without touching the rest. On Python versions
+newer than 3.14 ONNX Runtime has no release yet, so photo-fx installs without it there: the `onnx` backend then says
+it is missing, and Apple Vision and `--matte` still work.
+
+**Text effects** (`ascii`, `disperse`, `evaporate` and the text strips of `glitch`) draw with a monospaced font: the first that exists of the
+files listed in `PHOTO_FX_FONTS` (paths separated like `PATH`), or else of the usual system fonts (Menlo, Monaco or
+Courier on macOS, DejaVu Sans Mono on Linux, Consolas on Windows). A machine with none of them, such as a slim Linux
+container, still works with Pillow's built-in font, which is not monospaced.
 
 **Video** (`.mp4`, `.mov`) needs ffmpeg: the one on your `PATH` if there is one, otherwise the one
 `pip install "photo-fx[video]"` brings along. GIF export needs neither.
@@ -115,10 +123,11 @@ The repository ships a demo: one photo and six looks (five stills and an animati
 
 ```bash
 uv run photo-fx run examples/photo-fx.toml
-open examples/output/index.html
+open examples/output/index.html            # macOS; xdg-open on Linux, start on Windows
 ```
 
-That processes `examples/photos/bullterrier.jpeg` with every recipe in `examples/recipes/` (about 45 s the first time). Run it
+That processes `examples/photos/bullterrier.jpeg` with every recipe in `examples/recipes/` (about ten seconds on a
+recent Mac; the first run elsewhere also downloads the subject model). Run it
 again and finished work is skipped; edit one recipe and only that one is redone. Add photos to `examples/photos/` and
 they join the batch.
 
@@ -173,8 +182,11 @@ with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `
 - **Errors.** A missing, non-image, truncated or oversized file raises `ImageReadError` naming it. Pillow's
   decompression-bomb limit is kept: pictures over about 179 megapixels (twice `PIL.Image.MAX_IMAGE_PIXELS`) are
   refused; raise that limit yourself for bigger files you trust.
-- **Writing.** Stills embed a small sRGB profile and nothing else: no EXIF and no GPS position from your photo. JPEGs
-  use quality 95 (the `quality` export setting) with full-resolution colour. Videos are H.264 in BT.709, tagged so.
+- **Writing.** Stills embed a small sRGB profile and nothing else: no EXIF and no GPS position from your photo, and no
+  timestamp, so the same picture always gives the same file. JPEG and WebP quality is the project's `quality` export
+  setting (92 unless set; also used by `photo-fx steps`), or 95 for `imageio.save`, `photo-fx render`, `sheet` and
+  `cutout`; JPEGs keep full-resolution colour.
+  Videos are H.264 in BT.709, tagged so.
 
 Good batch behaviour is built in, and tested:
 
@@ -246,7 +258,7 @@ neon_glitch = Recipe(
     "neon-glitch",
     size=1024,
     steps=[
-        fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
+        fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
         fx.fill("#000000").where("background"),  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
         fx.glow(radius=26, amount=0.65).blend(0.8),  # mixed in at 80%
@@ -316,8 +328,8 @@ uv run photo-fx steps examples/photos/bullterrier.jpeg examples/recipes/05-ember
   <img src="examples/output/steps/ember-glitch/_sheet.jpg" alt="Every step of the ember-glitch recipe">
 </p>
 
-The sheet shows the photo, the subject cut-out (white = subject), and the result of each step, with the exact parameters. In
-Python it is `trace(photo, recipe)`, and `photo-fx run --steps` does it for a whole batch (linked from the report).
+The sheet (written to `out/steps/<photo>__<recipe>/`, with one picture per step) shows the photo, the subject cut-out
+(white = subject), and the result of each step, with the exact parameters. In Python it is `trace(photo, recipe)`, and `photo-fx run --steps` does it for a whole batch (linked from the report).
 The last picture is exactly what `render` returns, because both run the same code.
 
 ## Animation
@@ -407,8 +419,8 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
                            vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
                            (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;
                            given the photo and the subject)
-  ops/           ops       shared numeric primitives named by concept: color, resample, textart, glyphs, cells,
-                           distance (internal; core may import ops; ops imports nothing above it)
+  ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
+                           glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
   errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect, <effect>.toml
@@ -437,6 +449,8 @@ uv run poe regenerate   # at integration: fx.pyi, docs/effects.md, missing pictu
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): imperative subject`, header at
 most 72 characters, body explaining why); a `commit-msg` hook checks it. The details are in [CLAUDE.md](CLAUDE.md#git-conventions).
+How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md), what changed in each release in [CHANGELOG.md](CHANGELOG.md),
+and how to report a security problem privately in [SECURITY.md](SECURITY.md).
 
 Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects.md`) are not updated on feature branches, so branches that
 add effects never conflict over them; each effect's picture is a file of its own. After merging, `uv run poe regenerate` brings them up to date in one
@@ -445,8 +459,8 @@ commit. Pictures that exist are kept (`uv run poe gallery --force` renders them 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); the pre-push hook runs mypy, vulture and the tests.
 
-Tests that need Apple Vision are skipped off macOS, and tests that read videos back with a system `ffprobe` are skipped
-when it is missing. The portable backend is tested with tiny stand-in models built in the tests: the suite never
+Tests that need Apple Vision are skipped off macOS, and tests that read videos back with `ffprobe` are skipped when no
+ffmpeg is on the `PATH`. The portable backend is tested with tiny stand-in models built in the tests: the suite never
 downloads the real model, and its one test of the real model runs only when the model is already in the cache.
 
 ## License
