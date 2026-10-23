@@ -5,6 +5,7 @@ RGB, values 0..1, sRGB-encoded (display-referred, not linear). This module is th
 about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of that leaks into effects.
 """
 
+import contextlib
 import io
 import shutil
 import struct
@@ -200,7 +201,10 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         except BrokenPipeError:
             pass  # ffmpeg stopped early; its error message below says why
         finally:
-            stdin.close()  # end of input: ffmpeg finishes the file and exits
+            # end of input: ffmpeg finishes the file and exits. Flushing the last buffered frame can find ffmpeg
+            # already gone; its error message below says why
+            with contextlib.suppress(BrokenPipeError):
+                stdin.close()
         error = stderr.read().decode(errors="replace").strip()
     if process.returncode != 0:
         raise BackendUnavailableError(f"ffmpeg failed: {error}")
