@@ -72,7 +72,8 @@ Requires Python 3.12+. As a package:
 ```bash
 pip install photo-fx               # everything but .mp4 / .mov export (unless ffmpeg is already installed)
 pip install "photo-fx[video]"      # also a bundled ffmpeg, for video on any OS
-photo-fx effects                   # lists every effect and its parameters
+photo-fx effects                   # lists every effect and its parameters (--category NAME: one category;
+                                   # --list-categories: the categories with their number of effects)
 ```
 
 From a checkout, with [uv](https://docs.astral.sh/uv/) (installs the `video` extra too):

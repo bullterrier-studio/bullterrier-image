@@ -76,6 +76,63 @@ def test_effects_prints_every_parameter_of_a_modelled_effect(capsys, throwaway_e
     assert "Length of the candle wick, a rather distinctive phrase." in entry
 
 
+def _headings(out: str) -> list[str]:
+    """The effect names `photo-fx effects` printed: the unindented lines."""
+    return [line for line in out.splitlines() if line and not line.startswith(" ")]
+
+
+def test_effects_category_lists_only_the_effects_of_that_category(fresh_registry, register_probe, capsys):
+    for name, category in [("lamp", "light"), ("tint", "colour"), ("beam", "light")]:
+        register_probe(name, category)
+    assert cli("effects --category light") == 0
+    out = capsys.readouterr().out
+    assert _headings(out) == ["beam", "lamp"]  # sorted, and not the colour effect
+    assert "    The beam probe." in out  # with the same documentation the plain call prints
+
+
+@pytest.mark.parametrize(
+    "option",
+    [
+        pytest.param("--category distortion", id="known-category-without-effects"),
+        pytest.param("--category nonsense", id="unknown-category"),
+    ],
+)
+def test_effects_category_without_effects_is_an_error_naming_it_and_the_choices(
+    option, fresh_registry, register_probe, capsys
+):
+    register_probe("lamp", "light")
+    assert cli(f"effects {option}") == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert option.split()[1] in captured.err
+    assert "light" in captured.err  # the categories that do have effects
+
+
+def test_effects_list_categories_gives_each_category_with_effects_its_count_and_description(
+    fresh_registry, register_probe, capsys
+):
+    for name, category in [("drift", "animation"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
+        register_probe(name, category)
+    assert cli("effects --list-categories") == 0
+    rows = [line.split(maxsplit=2) for line in capsys.readouterr().out.splitlines()]
+    assert [(category, count) for category, count, _ in rows] == [("colour", "2"), ("light", "1"), ("animation", "1")]
+    assert all(description for _, _, description in rows)
+
+
+def test_effects_help_documents_the_category_options(capsys):
+    with pytest.raises(SystemExit):
+        cli("effects --help")
+    help_text = capsys.readouterr().out
+    assert "--category" in help_text
+    assert "--list-categories" in help_text
+
+
+def test_effects_category_and_list_categories_exclude_each_other(capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli("effects --category light --list-categories")
+    assert caught.value.code == 2
+
+
 def test_render_writes_one_file_per_recipe_in_a_folder_and_prints_each_to_stdout(files, capsys):
     assert cli("render me.png recipes -o out") == 0
     assert sorted(p.name for p in (files / "out").iterdir()) == ["me__a.png", "me__b.png"]

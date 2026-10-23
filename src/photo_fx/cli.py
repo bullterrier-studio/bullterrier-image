@@ -175,7 +175,21 @@ def _parser() -> argparse.ArgumentParser:
     )
     p.add_argument("directory", nargs="?", default=".", help="where to create the project (default: here)")
 
-    command("effects", _effects, summary="list the available effects and their parameters", example="")
+    p = command(
+        "effects",
+        _effects,
+        summary="list the available effects and their parameters",
+        example="--category light",
+    )
+    which = p.add_mutually_exclusive_group()
+    which.add_argument(
+        "--category", metavar="NAME", help="list only the effects of this category (see --list-categories)"
+    )
+    which.add_argument(
+        "--list-categories",
+        action="store_true",
+        help="list the categories that have effects, with their number of effects and what each holds",
+    )
     return parser
 
 
@@ -399,7 +413,20 @@ def _init(args: argparse.Namespace) -> int:
 
 def _effects(args: argparse.Namespace) -> int:
     from .core import registry
+    from .errors import RecipeError
 
-    for name, doc in registry.describe().items():  # line by line, so the parameter list stays a list
-        print(f"{name}\n{textwrap.indent(doc, '    ')}\n")
+    used = {category: names for category, names in registry.categories().items() if names}
+    if args.list_categories:
+        width = max((len(category) for category in used), default=0)
+        for category, names in used.items():
+            print(f"{category:<{width}}  {len(names):>3}  {registry.CATEGORY_DESCRIPTIONS[category]}")
+        return 0
+    if args.category is None:
+        names = sorted(registry.describe())
+    elif args.category in used:
+        names = used[args.category]
+    else:
+        raise RecipeError(f"no effects in category {args.category!r}; categories with effects: {', '.join(used)}")
+    for name in names:  # line by line, so the parameter list stays a list
+        print(f"{name}\n{textwrap.indent(registry.documentation(name), '    ')}\n")
     return 0
