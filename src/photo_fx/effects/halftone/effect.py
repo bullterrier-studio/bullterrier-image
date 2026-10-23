@@ -10,7 +10,7 @@ from photo_fx.ops.blur import gaussian_blur
 from photo_fx.ops.color import ink_amount, luminance, vivid
 
 # constant: pixels drawn at once; bounds the working memory and never changes the result
-_BAND_PIXELS = 2**18
+_BAND_PIXELS = 2**16
 
 
 class HalftoneParams(EffectParams):
