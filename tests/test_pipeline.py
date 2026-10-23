@@ -3,7 +3,6 @@ import os
 import shutil
 import subprocess
 import sys
-from functools import partial
 
 import numpy as np
 import pytest
@@ -11,7 +10,7 @@ from PIL import Image
 
 from photo_fx import Project, imageio
 from photo_fx.cli import main
-from photo_fx.core.errors import ProjectError
+from photo_fx.core.errors import BackendUnavailableError, ProjectError
 from photo_fx.pipeline import init_project, load_project, run
 
 FFMPEG = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
@@ -180,20 +179,59 @@ def test_a_damaged_remembered_subject_is_found_again_even_when_forcing(folder):
     assert len(finder.seen) == 4  # and what was found again is remembered
 
 
-def finds_disc(rgb, radius):
-    """A subject finder taking an option, bound with functools.partial as the command line binds `--segmenter`."""
-    return disc_matte(rgb.shape[:2], radius)
+def finds_a_wide_disc(rgb):
+    return disc_matte(rgb.shape[:2], 30)
+
+
+def finds_a_narrow_disc(rgb):
+    return disc_matte(rgb.shape[:2], 3)
 
 
 def test_switching_the_subject_finder_finds_the_subjects_again(folder):
     masked_recipes(folder)
     project = load_project(folder / "photo-fx.toml")
-    run(project, find_subject=partial(finds_disc, radius=30))
-    items = run(project, find_subject=partial(finds_disc, radius=3))
+    run(project, find_subject=finds_a_wide_disc)
+    items = run(project, find_subject=finds_a_narrow_disc)
     assert sorted((i.recipe, i.status) for i in items if i.photo == "a.png") == [
         ("cut1", "done"), ("cut2", "done"), ("grainy", "skipped"), ("warm", "skipped"),
     ]  # fmt: skip
     assert all("covers only" in i.warnings[0] for i in items if i.recipe == "cut1")  # the new finder's small disc
+
+
+def recipes_redone(items):
+    return sorted({i.recipe for i in items if i.status == "done"})
+
+
+def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(folder, echo_model, monkeypatch):
+    masked_recipes(folder)
+    project = load_project(folder / "photo-fx.toml")
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    assert recipes_redone(run(project, segmenter="onnx")) == ["cut1", "cut2", "grainy", "warm"]
+    assert recipes_redone(run(project, segmenter="onnx")) == []  # same segmenter and model: everything is up to date
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))  # another model finds other subjects
+    assert recipes_redone(run(project, segmenter="onnx")) == ["cut1", "cut2"]  # only what uses the subject is redone
+
+
+def test_the_segmenter_chosen_by_the_environment_is_part_of_what_is_remembered(folder, echo_model, monkeypatch):
+    masked_recipes(folder)
+    project = load_project(folder / "photo-fx.toml")
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    run(project)
+    assert recipes_redone(run(project)) == []
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "nonsense")  # not a segmenter: refused, not mistaken for the old one
+    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_SEGMENTER"):
+        run(project)
+
+
+def test_a_segmenter_setting_nobody_uses_does_not_stop_a_project_without_masked_recipes(folder, monkeypatch):
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "nonsense")
+    assert {i.status for i in run(load_project(folder / "photo-fx.toml"))} == {"done"}
+
+
+def test_a_finder_and_a_segmenter_together_are_refused(folder):
+    with pytest.raises(ValueError, match="segmenter"):
+        run(load_project(folder / "photo-fx.toml"), find_subject=finds_a_wide_disc, segmenter="onnx")
 
 
 def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):

@@ -18,7 +18,9 @@ No model at all is needed when the caller already has the subject's matte: every
 black-and-white or transparent PNG with `imageio.load_matte`, or pass `--matte` on the command line).
 """
 
+import hashlib
 import os
+import platform
 from pathlib import Path
 
 import numpy as np
@@ -48,9 +50,8 @@ def subject_matte(
     `segmenter` is `"vision"` or `"onnx"`; None leaves the choice to `PHOTO_FX_SEGMENTER`, then to what this computer
     has (see the module documentation).
 
-    Raises ValueError for an unknown segmenter name, SubjectNotFoundError if nothing stands out, and
-    BackendUnavailableError if the chosen backend cannot run
-    here (the message says what was tried and what to do instead).
+    Raises SubjectNotFoundError if nothing stands out, and BackendUnavailableError for a segmenter name that is
+    unknown, or if the chosen backend cannot run here (the message says what was tried and what to do instead).
     """
     name, why = _choose(segmenter)
     mask = _vision_mask(rgb, why) if name == "vision" else _onnx_mask(rgb, why)
@@ -73,39 +74,73 @@ def onnx_model_path() -> Path:
     return Path(local) if local else user_cache_dir() / _onnx.MODEL_FILE
 
 
+def segmenter_identity(segmenter: str | None = None) -> str:
+    """Which segmenter would run, as text that changes exactly when its answers could: the backend and its model.
+
+    `segmenter` is as for `subject_matte`, and is chosen the same way (the argument, then `PHOTO_FX_SEGMENTER`, then the
+    computer). For the portable model that is a hash of the model: the pinned one when the standard model is meant (it
+    is not downloaded to find out), else of the file `PHOTO_FX_MODEL` names, so the same model at another path is the
+    same segmenter; for Apple Vision it is the macOS version, whose release brings the model. Use it to remember
+    subjects between runs. Raises BackendUnavailableError exactly where `subject_matte` would, naming what was tried.
+    """
+    name, why = _choose(segmenter)
+    if name == "vision":
+        _require_vision(why)
+        return f"vision:macOS {platform.mac_ver()[0]}"
+    custom = _local_model(f"cannot find the subject with the portable model (onnx, chosen by {why})")
+    if custom is None:
+        return f"onnx:sha256 {_onnx.MODEL_SHA256}"
+    with custom.open("rb") as file:
+        return f"onnx:sha256 {hashlib.file_digest(file, 'sha256').hexdigest()}"
+
+
 def _choose(segmenter: str | None) -> tuple[str, str]:
     """(backend name, how it was chosen, for error messages)."""
     if segmenter is not None:
         if segmenter not in SEGMENTERS:
-            raise ValueError(f"unknown segmenter {segmenter!r}: choose one of {', '.join(SEGMENTERS)}")
+            raise BackendUnavailableError(f"unknown segmenter {segmenter!r}: choose one of {', '.join(SEGMENTERS)}")
         return segmenter, f"segmenter={segmenter!r}"
     named = os.environ.get(SEGMENTER_VARIABLE, "").strip().lower()
     if named:
         if named not in SEGMENTERS:
             choices = ", ".join(SEGMENTERS)
-            raise ValueError(f"{SEGMENTER_VARIABLE}={named!r} is not a segmenter: set one of {choices}, or unset it")
+            raise BackendUnavailableError(
+                f"{SEGMENTER_VARIABLE}={named!r} is not a segmenter: set one of {choices}, or unset it"
+            )
         return named, f"{SEGMENTER_VARIABLE}={named}"
     reason = _vision.unavailable_reason()
     return ("vision", "the automatic choice") if reason is None else ("onnx", f"the automatic choice ({reason})")
 
 
-def _vision_mask(rgb: np.ndarray, why: str) -> np.ndarray | None:
+def _require_vision(why: str) -> None:
     reason = _vision.unavailable_reason()
     if reason is not None:
         raise BackendUnavailableError(
             f"cannot find the subject with Apple Vision, chosen by {why}: {reason}. Choose the portable model "
             f"instead (segmenter 'onnx', or {SEGMENTER_VARIABLE}=onnx), or give the subject's matte yourself (--matte)"
         )
+
+
+def _local_model(tried: str) -> Path | None:
+    """The model file `PHOTO_FX_MODEL` names, which must exist; None when the standard model is meant."""
+    if not os.environ.get(MODEL_VARIABLE):
+        return None
+    model = onnx_model_path()
+    if not model.is_file():
+        raise BackendUnavailableError(f"{tried}: {MODEL_VARIABLE} names {model}, which is not a file")
+    return model
+
+
+def _vision_mask(rgb: np.ndarray, why: str) -> np.ndarray | None:
+    _require_vision(why)
     return _vision.subject_mask(rgb)
 
 
 def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
     tried = f"cannot find the subject with the portable model (onnx, chosen by {why})"
-    model = onnx_model_path()
-    if os.environ.get(MODEL_VARIABLE):
-        if not model.is_file():
-            raise BackendUnavailableError(f"{tried}: {MODEL_VARIABLE} names {model}, which is not a file")
-    else:
+    model = _local_model(tried)
+    if model is None:
+        model = onnx_model_path()
         try:
             fetch(_onnx.MODEL_URL, _onnx.MODEL_SHA256, model, size=_onnx.MODEL_SIZE)
         except DownloadError as error:

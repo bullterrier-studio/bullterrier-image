@@ -311,7 +311,7 @@ def _run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         only=args.only,
         log=lambda message: _progress(args, message),
-        find_subject=partial(subject_matte, segmenter=args.segmenter),
+        segmenter=args.segmenter,
     )
     failed = [i for i in items if i.status == "failed"]
     flagged = [i for i in items if i.warnings]

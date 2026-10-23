@@ -179,6 +179,17 @@ def test_run_finds_subjects_with_the_chosen_segmenter(cut, echo_model, monkeypat
     assert (cut / "done" / "me" / "cut.jpg").exists()
 
 
+def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo_model, monkeypatch):
+    (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
+    command = ["run", str(cut / "photo-fx.toml"), "--segmenter", "onnx", "-q"]
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))  # the subject is where the photo is red
+    assert main(command) == 0
+    first = (cut / "done" / "me" / "cut.jpg").read_bytes()
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))  # and now where it is green: another cut-out
+    assert main(command) == 0
+    assert (cut / "done" / "me" / "cut.jpg").read_bytes() != first
+
+
 # --- user mistakes are reported, not thrown at the user ------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from photo_fx import BackendUnavailableError, SubjectNotFoundError, imageio
-from photo_fx.matte import onnx_model_path, refine_edge, subject_matte
+from photo_fx.matte import onnx_model_path, refine_edge, segmenter_identity, subject_matte
 from photo_fx.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
@@ -100,7 +100,7 @@ def test_the_environment_variable_chooses_when_no_segmenter_is_given(echo_red, m
 
 
 def test_an_unknown_segmenter_is_refused_naming_the_known_ones():
-    with pytest.raises(ValueError, match="coreml") as caught:
+    with pytest.raises(BackendUnavailableError, match="coreml") as caught:
         subject_matte(ramp(), segmenter="coreml")
     assert "vision" in str(caught.value)
     assert "onnx" in str(caught.value)
@@ -108,10 +108,72 @@ def test_an_unknown_segmenter_is_refused_naming_the_known_ones():
 
 def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(monkeypatch):
     monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
-    with pytest.raises(ValueError, match="PHOTO_FX_SEGMENTER") as caught:
+    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_SEGMENTER") as caught:
         subject_matte(ramp())
     assert "coreml" in str(caught.value)
     assert "onnx" in str(caught.value)
+
+
+# --- the identity of the segmenter that would run: what the pipeline remembers subjects by -------------------------
+
+
+def test_the_identity_follows_the_content_of_the_model_not_its_place(echo_model, monkeypatch, tmp_path):
+    red = echo_model(0)
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(red))
+    identity = segmenter_identity("onnx")
+    assert segmenter_identity("onnx") == identity  # same inputs, same identity
+    copy = tmp_path / "elsewhere.onnx"
+    copy.write_bytes(red.read_bytes())
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(copy))
+    assert segmenter_identity("onnx") == identity  # the same model at another path is the same segmenter
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))
+    assert segmenter_identity("onnx") != identity  # another model, another identity
+
+
+def test_the_standard_model_has_an_identity_of_its_own_without_being_downloaded(echo_model, monkeypatch, tmp_path):
+    home = tmp_path / "home"  # where the standard model would be fetched to: it must stay empty
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(home / "cache"))
+    monkeypatch.setenv("LOCALAPPDATA", str(home / "local"))
+    monkeypatch.delenv("PHOTO_FX_MODEL")
+    standard = segmenter_identity("onnx")
+    assert standard == segmenter_identity("onnx")
+    assert not any(home.rglob("*"))  # nothing was fetched to find out
+    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    assert segmenter_identity("onnx") != standard
+
+
+def test_the_identity_is_chosen_like_the_backend_is(echo_red, monkeypatch):
+    explicit = segmenter_identity("onnx")
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    assert segmenter_identity() == explicit  # the environment variable chooses when nothing is given
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
+    assert segmenter_identity("onnx") == explicit  # and an explicit choice wins over it
+    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_SEGMENTER"):
+        segmenter_identity()
+
+
+def test_the_identity_of_a_segmenter_that_cannot_run_says_why_as_subject_matte_does():
+    with pytest.raises(BackendUnavailableError, match="coreml"):
+        segmenter_identity("coreml")
+    with pytest.raises(BackendUnavailableError, match="no-such-model"):  # the suite's PHOTO_FX_MODEL names no file
+        segmenter_identity("onnx")
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="Apple Vision exists only on macOS")
+def test_on_macos_vision_and_the_portable_model_have_different_identities(echo_red, monkeypatch):
+    assert segmenter_identity("vision") != segmenter_identity("onnx")
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "vision")
+    assert segmenter_identity() == segmenter_identity("vision")
+    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    assert segmenter_identity() == segmenter_identity("onnx")
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
+def test_off_macos_the_identity_of_apple_vision_is_refused_like_its_use():
+    with pytest.raises(BackendUnavailableError, match="macOS"):
+        segmenter_identity("vision")
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="the automatic choice is Apple Vision only where Vision exists")
