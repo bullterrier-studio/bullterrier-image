@@ -125,26 +125,29 @@ def test_an_animated_whole_number_is_checked_after_rounding(levels):
         Step("levels_probe", {"levels": Animated(2, 16.6)})  # ends at 17
 
 
-# --- values through the model ----------------------------------------------------------------------------------------
+# --- values through the model, animated values at both ends and on the way between ----------------------------------
 
 
-def test_a_value_out_of_range_names_the_effect_the_field_the_limit_and_the_value(gain):
-    with pytest.raises(ValueError, match="gain_probe") as raised:
-        Step("gain_probe", {"gain": 9})
-    message = str(raised.value)
-    assert "`gain`" in message
-    assert "<= 4" in message
-    assert "9" in message
+@pytest.mark.parametrize(
+    ("values", "complaint"),
+    [
+        ({"gain": 9}, r"`gain`.*<= 4.*\b9\b"),  # the field, the limit and the value
+        ({"gian": 2}, r"`gian`.*gain, offset"),  # an unknown value lists the valid ones
+        ({"gain": "2"}, r"`gain`.*number"),
+        ({"gain": Animated(1.0, 9.0)}, r"`gain`.*<= 4.*9"),  # ending out of range
+        ({"offset": Animated(-3.0, 0.0)}, r"`offset`.*>= -1"),  # starting out of range
+        # both ends (0 and 4) are allowed, but the curve passes 4 on the way: frames in the middle would be invalid
+        ({"gain": Animated(0.0, 4.0, OVERSHOOT)}, r"`gain`.*<= 4"),
+    ],
+    ids=["out of range", "unknown", "wrong kind", "animation ends out", "animation starts out", "curve overshoots"],
+)
+def test_a_bad_value_is_refused_naming_the_effect_and_the_problem(gain, values, complaint):
+    with pytest.raises(ValueError, match=f"gain_probe.*{complaint}"):
+        Step("gain_probe", values)
 
 
-def test_an_unknown_value_lists_the_valid_ones(gain):
-    with pytest.raises(ValueError, match=r"`gian`.*gain, offset"):
-        Step("gain_probe", {"gian": 2})
-
-
-def test_a_value_of_the_wrong_kind_is_refused(gain):
-    with pytest.raises(ValueError, match=r"`gain`.*number"):
-        Step("gain_probe", {"gain": "2"})
+def test_the_overshoot_premise_holds():
+    assert Animated(0.0, 4.0, OVERSHOOT).at(0.5) > 4.0  # the curve refused above really leaves 0..4
 
 
 def test_valid_values_make_a_step_that_keeps_them_as_written(gain):
@@ -153,32 +156,11 @@ def test_valid_values_make_a_step_that_keeps_them_as_written(gain):
     assert step.describe() == "gain_probe(gain=2)"
 
 
-# --- animated values: both ends and the way between ------------------------------------------------------------------
-
-
-def test_an_animation_inside_the_range_is_accepted(gain):
-    assert Step("gain_probe", {"gain": Animated(0.0, 4.0, "gentle")}).animated
-
-
-def test_an_animation_ending_out_of_range_is_refused(gain):
-    with pytest.raises(ValueError, match=r"`gain`.*<= 4.*9"):
-        Step("gain_probe", {"gain": Animated(1.0, 9.0)})
-
-
-def test_an_animation_starting_out_of_range_is_refused(gain):
-    with pytest.raises(ValueError, match=r"`offset`.*>= -1"):
-        Step("gain_probe", {"offset": Animated(-3.0, 0.0)})
-
-
-def test_an_easing_curve_that_overshoots_the_range_between_its_ends_is_refused(gain):
-    """Both ends (0 and 4) are allowed; the curve passes 4 on the way, so frames in the middle would be invalid."""
-    assert Animated(0.0, 4.0, OVERSHOOT).at(0.5) > 4.0  # the premise: it really overshoots
-    with pytest.raises(ValueError, match=r"`gain`.*<= 4"):
-        Step("gain_probe", {"gain": Animated(0.0, 4.0, OVERSHOOT)})
-
-
-def test_an_overshooting_curve_that_stays_inside_the_range_is_accepted(gain):
-    assert Step("gain_probe", {"gain": Animated(0.0, 2.0, OVERSHOOT)}).animated  # peaks below 4
+@pytest.mark.parametrize(
+    "animated", [Animated(0.0, 4.0, "gentle"), Animated(0.0, 2.0, OVERSHOOT)], ids=["inside", "overshoot peaks below 4"]
+)
+def test_an_animation_inside_the_range_all_the_way_is_accepted(gain, animated):
+    assert Step("gain_probe", {"gain": animated}).animated
 
 
 def test_an_animation_that_overshoots_in_a_recipe_file_names_the_file_step_and_field(gain, tmp_path):
@@ -262,11 +244,6 @@ def test_a_recipe_name_that_is_not_a_safe_file_name_is_refused_naming_it_and_the
     assert "A-Za-z0-9" in message  # the pattern a name must match
 
 
-@pytest.mark.parametrize("name", ["my-look", "look_2.v1", "a" * 64, "7", "Neon.Pulse-2"])
-def test_a_safe_file_name_is_kept_as_the_recipe_name(name):
-    assert Recipe(name, [Step("grade")]).name == name
-
-
 # Windows reserves these device names in any case, with or without an extension: a file so named cannot be made there.
 @pytest.mark.parametrize(
     "name", ["CON", "con", "Prn", "AUX", "nul", "COM1", "com9", "LPT1", "lpt9", "CON.png", "nul.tar.gz", "Aux.v2"]
@@ -277,8 +254,14 @@ def test_a_name_windows_reserves_for_a_device_is_refused_naming_it(name):
     assert repr(name) in str(raised.value)
 
 
-@pytest.mark.parametrize("name", ["CONSOLE", "com10", "nullify", "aux-look", "my.con", "LPT", "printer"])
-def test_a_name_that_only_resembles_a_device_name_is_kept(name):
+@pytest.mark.parametrize(
+    "name",
+    [
+        *("my-look", "look_2.v1", "a" * 64, "7", "Neon.Pulse-2"),  # safe file names
+        *("CONSOLE", "com10", "nullify", "aux-look", "my.con", "LPT", "printer"),  # only resembling a device name
+    ],
+)
+def test_a_safe_name_is_kept_as_the_recipe_name(name):
     assert Recipe(name, [Step("grade")]).name == name
 
 

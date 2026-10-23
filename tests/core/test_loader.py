@@ -17,14 +17,6 @@ def _write(tmp_path, text, name="look.toml"):
     return path
 
 
-def test_a_toml_syntax_error_names_the_file_and_keeps_the_line_and_column(tmp_path):
-    path = _write(tmp_path, "name = 'ok'\nsize = 64\ncolor = '#fff\n" + STEP, "broken.toml")
-    with pytest.raises(RecipeError, match=r"^broken\.toml: ") as raised:
-        load_recipe(path)
-    assert "line 3" in str(raised.value)
-    assert "column" in str(raised.value)
-
-
 def test_a_file_that_is_not_utf8_names_the_file(tmp_path):
     path = tmp_path / "latin.toml"
     path.write_bytes("name = 'café'\n".encode("latin-1") + STEP.encode())
@@ -75,23 +67,20 @@ def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_relea
     assert re.search(r"reads\D*\b1\b", message)  # the format this release reads
 
 
-@pytest.mark.parametrize("key", ["sise", "formt", "steps", "animations"])
-def test_a_misspelt_top_level_key_is_refused_naming_it(tmp_path, key):
-    path = _write(tmp_path, f"{key} = 2\n" + STEP, "typo.toml")
-    with pytest.raises(RecipeError, match=rf"^typo\.toml: .*`{key}`"):
-        load_recipe(path)
+# A broken file: each is refused with a RecipeError that starts with the file's name and says what is wrong.
+BROKEN = {
+    "TOML syntax error, with its line and column": ("name = 'ok'\nsize = 64\ncolor = '#fff\n" + STEP, "line 3, column"),
+    "misspelt size": ("sise = 2\n" + STEP, "`sise`"),
+    "misspelt format": ("formt = 2\n" + STEP, "`formt`"),
+    "steps for step": ("steps = 2\n" + STEP, "`steps`"),
+    "animations for animation": ("animations = 2\n" + STEP, "`animations`"),
+    "a single [step] table instead of a list": ("[step]\neffect = 'grade'\n", r"\[\[step\]\]"),
+    "a bad animation": ("[animation]\nseconds = -1\n" + STEP, "seconds"),
+    "a bad easing": (STEP + "exposure = { from = 0, to = 1, ease = 'wobbly' }\n", "step 1: .*ease"),
+}
 
 
-def test_a_single_step_table_instead_of_a_list_of_steps_is_refused_naming_the_file(tmp_path):
-    path = _write(tmp_path, "[step]\neffect = 'grade'\n", "single.toml")
-    with pytest.raises(RecipeError, match=r"^single\.toml: .*\[\[step\]\]"):
-        load_recipe(path)
-
-
-def test_an_animation_error_is_a_recipe_error_naming_the_file(tmp_path):
-    path = _write(tmp_path, "[animation]\nseconds = -1\n" + STEP, "clip.toml")
-    with pytest.raises(RecipeError, match=r"^clip\.toml: .*seconds"):
-        load_recipe(path)
-    path = _write(tmp_path, STEP + "exposure = { from = 0, to = 1, ease = 'wobbly' }\n", "ease.toml")
-    with pytest.raises(RecipeError, match=r"^ease\.toml: step 1: .*ease"):
-        load_recipe(path)
+@pytest.mark.parametrize(("text", "complaint"), BROKEN.values(), ids=BROKEN.keys())
+def test_a_broken_file_is_a_recipe_error_naming_the_file_and_the_problem(tmp_path, text, complaint):
+    with pytest.raises(RecipeError, match=rf"^broken\.toml: .*{complaint}"):
+        load_recipe(_write(tmp_path, text, "broken.toml"))

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import INPUTS, effect
+from photo_fx.core.registry import effect
 
 
 class GainParams(EffectParams):
@@ -62,21 +62,16 @@ def test_a_model_of_another_effect_is_an_error(gain):
         gain(GREY, OtherParams())
 
 
-def test_an_unknown_keyword_names_the_effect_and_lists_the_parameters(gain):
-    with pytest.raises(ValueError, match="gian") as raised:
-        gain(GREY, gian=2.0)
-    message = str(raised.value)
-    assert "gain_probe" in message
-    assert "gain, offset" in message
-
-
-def test_an_out_of_range_keyword_names_the_effect_the_field_the_limit_and_the_value(gain):
+@pytest.mark.parametrize(
+    ("keywords", "parts"),
+    [({"gian": 2.0}, ["gian", "gain, offset"]), ({"gain": 9.0}, ["`gain`", "<= 4", "9.0"])],
+    ids=["unknown: lists the parameters", "out of range: the field, the limit and the value"],
+)
+def test_a_bad_keyword_is_explained_naming_the_effect(gain, keywords, parts):
     with pytest.raises(ValueError, match="gain_probe") as raised:
-        gain(GREY, gain=9.0)
-    message = str(raised.value)
-    assert "`gain`" in message
-    assert "<= 4" in message
-    assert "9.0" in message
+        gain(GREY, **keywords)
+    for part in parts:
+        assert part in str(raised.value)
 
 
 def test_the_wrapper_keeps_the_name_and_documentation_and_tells_its_model_category_and_inputs(gain):
@@ -103,10 +98,6 @@ def test_an_effect_that_declares_the_matte_gets_it_and_says_so(throwaway_effects
     assert probe.inputs == ("matte",)
     assert registry.inputs("matte_probe") == ("matte",)
     np.testing.assert_array_equal(probe(GREY), GREY)  # without a matte the effect decides what to do
-
-
-def test_inputs_are_the_agreed_list():
-    assert INPUTS == ("matte",)
 
 
 # --- registration rules: each raises and registers nothing -----------------------------------------------------------

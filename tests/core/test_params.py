@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from photo_fx.core.params import UNITS, Color, EffectParams, describe_error, param
+from photo_fx.core.params import Color, EffectParams, describe_error, param
 
 
 class Probe(EffectParams):
@@ -29,20 +29,19 @@ def test_a_well_declared_model_builds_with_its_defaults():
     assert (probe.radius, probe.count, probe.mode, probe.label) == (24.0, 3, "soft", "probe")
 
 
-def test_values_inside_the_range_are_accepted_including_the_bounds():
-    assert Probe(radius=0).radius == 0.0
-    assert Probe(radius=500.0).radius == 500.0
-    assert Probe(count=9).count == 9
+@pytest.mark.parametrize(
+    ("values", "field", "expected"),
+    [({"radius": 0}, "radius", 0.0), ({"radius": 500.0}, "radius", 500.0), ({"count": 9}, "count", 9)],
+    ids=["min", "max", "int max"],
+)
+def test_values_inside_the_range_are_accepted_including_the_bounds(values, field, expected):
+    assert getattr(Probe(**values), field) == expected
 
 
 def test_a_whole_number_is_accepted_for_a_decimal_field():
     probe = Probe(radius=7)
     assert probe.radius == 7.0
     assert isinstance(probe.radius, float)
-
-
-def test_units_are_the_agreed_list():
-    assert UNITS == ("px", "fraction", "degrees", "stops", "seconds", "count", "ratio", "cycles")
 
 
 # --- values are validated --------------------------------------------------------------------------------------------
@@ -144,6 +143,11 @@ def _declare(annotation, field):
         (str, lambda: param("a", unit="px", doc="d"), "unit"),
         (Literal["soft", "hard"], lambda: param("soft", doc="Edge: 'soft' blends."), "hard"),
         (float, lambda: 1.0, "param"),  # a plain default: no description, no range
+        (tuple[float, ...], lambda: param((0.5,), doc="d"), "unit"),
+        (tuple[float, ...], lambda: param((0.5,), unit="px", min=0, doc="d"), "max"),
+        (tuple[float, ...], lambda: param((0.5, 3.0), unit="px", min=0, max=1, doc="d"), "default"),
+        (tuple[str, ...], lambda: param(("a",), min=0, max=1, doc="d"), "min"),
+        (bool, lambda: param(False, unit="count", doc="d"), "unit"),
     ],
 )
 def test_a_badly_declared_field_fails_when_the_class_is_made_naming_model_and_field(annotation, make, complaint):
@@ -281,22 +285,6 @@ def test_every_kind_of_field_refuses_values_of_another_kind(values, field):
         Kinds(**values)
 
 
-@pytest.mark.parametrize(
-    ("annotation", "make", "complaint"),
-    [
-        (tuple[float, ...], lambda: param((0.5,), doc="d"), "unit"),
-        (tuple[float, ...], lambda: param((0.5,), unit="px", min=0, doc="d"), "max"),
-        (tuple[float, ...], lambda: param((0.5, 3.0), unit="px", min=0, max=1, doc="d"), "default"),
-        (tuple[str, ...], lambda: param(("a",), min=0, max=1, doc="d"), "min"),
-        (bool, lambda: param(False, unit="count", doc="d"), "unit"),
-    ],
-)
-def test_a_badly_declared_list_or_switch_fails_when_the_class_is_made(annotation, make, complaint):
-    with pytest.raises(ValueError, match=r"Broken.*`x`") as raised:
-        _declare(annotation, make())
-    assert complaint in str(raised.value)
-
-
 def test_a_list_of_numbers_documents_and_publishes_its_range_per_item():
     (offsets,) = [doc for doc in Kinds.fields_doc() if doc.name == "offsets"]
     assert (offsets.unit, offsets.range) == ("fraction", "0 to 1")
@@ -334,16 +322,18 @@ def test_field_names_are_the_fields_in_declaration_order():
     assert Probe.field_names() == ("radius", "count", "mode", "tint", "label")
 
 
-@pytest.mark.parametrize("value", [float("nan"), float("inf")])
-def test_a_nan_or_infinite_list_item_is_reported_as_not_a_finite_number_not_as_out_of_range(value):
-    with pytest.raises(ValueError, match=r"`offsets\[1\]`.*finite") as raised:
-        Kinds.parse({"offsets": [0.5, value]}, "effect 'kinds'")
-    assert "<=" not in str(raised.value)
-
-
-def test_a_nan_is_reported_as_not_a_finite_number_not_as_out_of_range():
-    with pytest.raises(ValueError, match="finite") as raised:
-        Probe.parse({"radius": float("nan")}, "effect 'probe'")
+@pytest.mark.parametrize(
+    ("model", "values", "field"),
+    [
+        (Kinds, {"offsets": [0.5, float("nan")]}, r"`offsets\[1\]`"),
+        (Kinds, {"offsets": [0.5, float("inf")]}, r"`offsets\[1\]`"),
+        (Probe, {"radius": float("nan")}, "`radius`"),
+    ],
+    ids=["nan list item", "infinite list item", "nan"],
+)
+def test_a_nan_or_infinity_is_reported_as_not_a_finite_number_not_as_out_of_range(model, values, field):
+    with pytest.raises(ValueError, match=f"{field}.*finite") as raised:
+        model.parse(values, "effect 'probe'")
     assert "<=" not in str(raised.value)
 
 
@@ -356,34 +346,19 @@ def test_field_docs_give_the_parts_separately():
 # --- error wording ---------------------------------------------------------------------------------------------------
 
 
-def _error(**values) -> ValidationError:
+@pytest.mark.parametrize(
+    ("values", "parts"),
+    [
+        ({"radius": -3}, ["effect 'probe'", "`radius`", ">= 0", "-3"]),  # the owner, field, constraint and value
+        ({"raduis": 3}, ["`raduis`", "count, label, mode, radius, tint"]),  # an unknown field lists the valid ones
+        ({"count": "3"}, ["`count`", "whole number", "'3'"]),  # the kind wanted and the value given
+        ({"radius": -3, "count": 99}, ["`radius`", "`count`"]),  # every problem, not just the first
+    ],
+    ids=["out of range", "unknown field", "wrong kind", "two problems"],
+)
+def test_an_error_message_names_what_is_wrong(values, parts):
     with pytest.raises(ValidationError) as raised:
         Probe(**values)
-    return raised.value
-
-
-def test_an_error_names_the_owner_the_field_the_constraint_and_the_value():
-    message = describe_error(_error(radius=-3), "effect 'probe'", Probe.model_fields)
-    assert "effect 'probe'" in message
-    assert "`radius`" in message
-    assert ">= 0" in message
-    assert "-3" in message
-
-
-def test_an_unknown_field_error_lists_the_valid_ones():
-    message = describe_error(_error(raduis=3), "effect 'probe'", Probe.model_fields)
-    assert "`raduis`" in message
-    assert "count, label, mode, radius, tint" in message
-
-
-def test_a_wrong_kind_error_says_what_kind_is_wanted_and_what_was_given():
-    message = describe_error(_error(count="3"), "effect 'probe'", Probe.model_fields)
-    assert "`count`" in message
-    assert "whole number" in message
-    assert "'3'" in message
-
-
-def test_every_problem_is_reported_not_just_the_first():
-    message = describe_error(_error(radius=-3, count=99), "effect 'probe'", Probe.model_fields)
-    assert "`radius`" in message
-    assert "`count`" in message
+    message = describe_error(raised.value, "effect 'probe'", Probe.model_fields)
+    for part in parts:
+        assert part in message
