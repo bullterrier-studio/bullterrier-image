@@ -334,12 +334,13 @@ def test_only_limits_the_run_to_some_photos_without_forgetting_the_others(folder
 
 
 def test_the_report_escapes_what_it_shows(folder, photo):
-    # a photo's file name may hold markup (a recipe name may not: it must be a safe file name)
-    imageio.save(photo, folder / "photos" / "<i>x&y.png")
+    # a photo's file name may hold characters HTML gives a meaning (a recipe name may not: it must be a safe file
+    # name); `&` and `'` are legal file-name characters on every system, `<` and `>` are not on Windows
+    imageio.save(photo, folder / "photos" / "Tom's x&y.png")
     run(load_project(folder / "photo-fx.toml"))
     page = (folder / "out" / "index.html").read_text(encoding="utf-8")
-    assert "<i>x&y" not in page
-    assert "&lt;i&gt;x&amp;y" in page
+    assert "x&y" not in page
+    assert "Tom&#x27;s x&amp;y" in page
 
 
 RUN_IN_CHILD = """
