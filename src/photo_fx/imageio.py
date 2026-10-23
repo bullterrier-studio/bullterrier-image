@@ -180,20 +180,21 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         "-g", str(max(1, fps)),  # a keyframe every second: seekable, and one bad frame cannot spoil the rest
         str(path),
     ]  # fmt: skip
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    # typed `IO[bytes] | None`, but always open: both were asked for with PIPE
-    stdin, stderr = cast(IO[bytes], process.stdin), cast(IO[bytes], process.stderr)
-    count = 0
-    try:
-        for frame in chain([first], frames):
-            stdin.write(_to_uint8(frame).tobytes())
-            count += 1
-    except BrokenPipeError:
-        pass  # ffmpeg stopped early; its error message below says why
-    finally:
-        stdin.close()
-    error = stderr.read().decode(errors="replace").strip()
-    if process.wait() != 0:
+    # leaving the `with` closes both pipes and waits for ffmpeg, also when a frame cannot be written
+    with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        # typed `IO[bytes] | None`, but always open: both were asked for with PIPE
+        stdin, stderr = cast(IO[bytes], process.stdin), cast(IO[bytes], process.stderr)
+        count = 0
+        try:
+            for frame in chain([first], frames):
+                stdin.write(_to_uint8(frame).tobytes())
+                count += 1
+        except BrokenPipeError:
+            pass  # ffmpeg stopped early; its error message below says why
+        finally:
+            stdin.close()  # end of input: ffmpeg finishes the file and exits
+        error = stderr.read().decode(errors="replace").strip()
+    if process.returncode != 0:
         raise BackendUnavailableError(f"ffmpeg failed: {error}")
     return count
 
