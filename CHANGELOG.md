@@ -4,7 +4,11 @@ All notable changes to photo-fx are listed here. The format follows [Keep a Chan
 and the version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0, a minor release
 may change the public API.
 
-## [Unreleased]
+`uv run poe release` writes each release's section from the Conventional Commits since the previous release (see
+"Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)); a section already written by hand for that version is kept, and
+its `Unreleased` becomes the release date.
+
+## [0.1.0] - Unreleased
 
 The first release, 0.1.0.
 
@@ -35,4 +39,4 @@ The first release, 0.1.0.
   prints one line for it, never a traceback.
 - Python 3.12, 3.13 and 3.14 on macOS, Linux and Windows.
 
-[Unreleased]: https://github.com/jcakstins/photo-fx/commits/main
+[0.1.0]: https://github.com/jcakstins/photo-fx/releases/tag/v0.1.0

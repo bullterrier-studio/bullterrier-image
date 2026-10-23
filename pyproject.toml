@@ -126,6 +126,8 @@ check = { sequence = ["ruff format --check .", "ruff check .", "vulture", "deptr
 gallery = { cmd = "uv run python tools/dev.py gallery", help = "Render the missing gallery pictures and write docs/effects.md (--only NAME..., --force)" }
 regenerate = { cmd = "uv run python tools/dev.py regenerate", help = "After adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures" }
 new-effect = { cmd = "uv run python tools/dev.py new-effect", help = "Create a new effect's files from the template (NAME --category CATEGORY)" }
+# Cut a release on main: version bump, changelog section, commit and annotated tag; it never pushes (CONTRIBUTING.md)
+release = { cmd = "uv run python tools/release.py", help = "Release from main: minor|patch|major|VERSION [--dry-run] (never pushes)" }
 # `default_install_hook_types` in .pre-commit-config.yaml names the three hook types, so a bare `install` covers them
 setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage"], default_item_type = "cmd", help = "Install the git hooks and the commit-message template (once per clone)" }
 
@@ -275,7 +277,8 @@ ignore_names = [
 # transitive-only or development-only dependency fails. tests/ is not scanned (deptry's default): tests may use the
 # development tools.
 [tool.deptry]
-known_first_party = ["photo_fx"]
+# check_release: tools/release.py imports its sibling script (a script's own folder is first on sys.path)
+known_first_party = ["photo_fx", "check_release"]
 # pyobjc is not installed off macOS, so deptry cannot read which module each framework provides: say it
 package_module_name_map = { "pyobjc-framework-quartz" = "Quartz", "pyobjc-framework-vision" = "Vision" }
 
@@ -365,6 +368,8 @@ filter_unconventional = true
 filter_commits = true
 protect_breaking_commits = true
 tag_pattern = "^v[0-9]"
+# a release lists every change since the previous release, not since its own pre-releases (v0.2.0rc1 ...)
+ignore_tags = "^v[0-9]+\\.[0-9]+\\.[0-9]+(a|b|rc)[0-9]+$"
 sort_commits = "oldest"
 commit_parsers = [
     { message = "^chore\\(release\\)", skip = true },

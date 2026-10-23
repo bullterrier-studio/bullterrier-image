@@ -63,6 +63,11 @@ class GitRepo:
     def push(self) -> None:
         self.git("push", "-q", "origin", "main")
 
+    def run_uv(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["uv", *args], cwd=self.path, env=self.env, capture_output=True, encoding="utf-8", check=False
+        )
+
     def run_tool(self, script: str, *args: str) -> subprocess.CompletedProcess:
         """Run `tools/<script>` from this checkout with the repository as its working directory."""
         return subprocess.run(
