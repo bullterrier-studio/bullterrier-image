@@ -1,0 +1,14 @@
+# Highlights bleed into a soft halo with a bright core, on a dimmed picture so the light stands out.
+name = "bloom"
+size = 480
+
+[[step]]
+effect = "levels"
+gamma = 0.8
+
+[[step]]
+effect = "bloom"
+radius = 28
+threshold = 0.5
+amount = 0.9
+octaves = 4
