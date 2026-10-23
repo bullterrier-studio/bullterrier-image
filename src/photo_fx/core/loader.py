@@ -83,7 +83,7 @@ def _animated_value(value: object, where: str, key: str) -> object:
 def _read(path: Path) -> dict:
     """The file's top-level table, checked: UTF-8 TOML, a format this release reads, and only the known keys."""
     try:
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             raw = tomllib.load(f)
     except tomllib.TOMLDecodeError as error:  # its message keeps the line and column
         raise RecipeError(f"{path.name}: {error}") from None
