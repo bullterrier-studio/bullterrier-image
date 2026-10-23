@@ -17,6 +17,8 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+# one xdist worker runs this module, so its fixture (a poe dry run of every task) is built once
+pytestmark = pytest.mark.xdist_group("project-wiring")
 # the only commands that are not dev dependencies: tools every machine that can clone the repository already has
 SYSTEM_COMMANDS = {"git", "uv"}
 # tool settings must live in pyproject.toml, never in the hook wiring

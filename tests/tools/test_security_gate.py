@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+# one xdist worker runs this module, so its fixture (one ruff run over every probe) is built once
+pytestmark = pytest.mark.xdist_group("security-gate")
 LIBRARY = "src/photo_fx/ops"  # library code, under no per-file exemption
 DOC = '"""Probe."""\n\n'
 

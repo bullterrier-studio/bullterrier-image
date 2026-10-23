@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+# one xdist worker runs this module, so its fixture (a copy of the project and a cold mypy cache) is built once
+pytestmark = pytest.mark.xdist_group("lint-and-type-gate")
 LIBRARY_MODULE = "src/photo_fx/ops/probe.py"  # a module of the package, under no per-file exemption
 TEST_MODULE = "tests/test_probe.py"
 
@@ -74,20 +76,12 @@ def scale(value: float, factor: float = 2.0) -> float:
     return value * factor
 '''
 
+UNTYPED = '"""Probe."""\n\n\ndef double(value) -> float:\n    """Twice `value`."""\n    return value * 2\n'
+
 # One offence each: (file, source, tool, the rule's code in that tool's output)
 OFFENCES = {
-    "public function without type hints (ruff)": (
-        LIBRARY_MODULE,
-        '"""Probe."""\n\n\ndef double(value) -> float:\n    """Twice `value`."""\n    return value * 2\n',
-        ruff,
-        "ANN001",
-    ),
-    "public function without type hints (mypy)": (
-        LIBRARY_MODULE,
-        '"""Probe."""\n\n\ndef double(value) -> float:\n    """Twice `value`."""\n    return value * 2\n',
-        mypy,
-        "[no-untyped-def]",
-    ),
+    "public function without type hints (ruff)": (LIBRARY_MODULE, UNTYPED, ruff, "ANN001"),
+    "public function without type hints (mypy)": (LIBRARY_MODULE, UNTYPED, mypy, "[no-untyped-def]"),
     "public function without a docstring": (
         LIBRARY_MODULE,
         '"""Probe."""\n\n\ndef scale(value: float) -> float:\n    return value * 2\n',

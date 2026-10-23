@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+# one xdist worker runs this module, so its fixture (poe's dry run of the task) is built once
+pytestmark = pytest.mark.xdist_group("workflow-gate")
 
 
 @pytest.fixture(scope="module")
