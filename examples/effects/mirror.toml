@@ -1,0 +1,8 @@
+# The left half of the dog's face made symmetric: the right half is replaced by the reflection of the left.
+name = "mirror"
+size = 480
+
+[[step]]
+effect = "mirror"
+axis = "vertical"
+keep = "first"
