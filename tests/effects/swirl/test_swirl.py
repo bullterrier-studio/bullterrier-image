@@ -31,7 +31,9 @@ def impulse(size: int, row: int, col: int) -> np.ndarray:
 def test_a_swirl_of_no_angle_or_no_reach_leaves_the_picture_unchanged(
     settings: dict[str, float], interpolation: str, photo: np.ndarray
 ) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, interpolation=interpolation, **settings), photo)
+    out = registry.apply(NAME, photo, interpolation=interpolation, **settings)
+    np.testing.assert_array_equal(out, photo)
+    assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
 
 
 @pytest.mark.parametrize("interpolation", ["nearest", "bilinear", "bicubic"])
@@ -43,7 +45,7 @@ def test_a_swirl_of_no_angle_or_no_reach_leaves_the_picture_unchanged(
 def test_the_centre_pixel_does_not_move(interpolation: str, x: float, y: float, pixel: tuple[int, int]) -> None:
     """The centre is at fraction x of the way across from the first pixel column to the last (y: down the rows)."""
     noise = np.random.default_rng(2).random((61, 81, 3), dtype=np.float32)
-    out = registry.apply(NAME, noise, angle=300.0, radius=0.6, x=x, y=y, interpolation=interpolation)
+    out = registry.apply(NAME, noise, angle=300.0, radius=1.5, x=x, y=y, interpolation=interpolation)
     np.testing.assert_allclose(out[pixel], noise[pixel], atol=1e-6)
     assert np.abs(out - noise).max() > 0.05  # and the rest of the picture is twisted
 
