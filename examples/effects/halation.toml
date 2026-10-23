@@ -1,0 +1,9 @@
+# A film-style red-orange glow around the brightest highlights.
+name = "halation"
+size = 480
+
+[[step]]
+effect = "halation"
+radius = 22
+threshold = 0.6
+amount = 0.9
