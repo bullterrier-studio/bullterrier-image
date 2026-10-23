@@ -11,6 +11,8 @@ from photo_fx.core.registry import effect
 # scipy's names for what lies beyond the picture's edge, as `photo_fx.ops.blur` uses them, in `map_coordinates`'s own
 # spelling: for interpolation its 'wrap' does not repeat the picture but 'grid-wrap' does
 _BEYOND_THE_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
+# constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
+_SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
 
 
 class RadialBlurParams(EffectParams):
@@ -55,8 +57,15 @@ class RadialBlurParams(EffectParams):
         min=1,
         max=256,
         doc="How many points along each arc or ray are averaged, spread evenly over its length and read from the "
-        "picture by bilinear interpolation: more is smoother and slower (the time grows with it), and a smear of "
+        "picture by the chosen interpolation: more is smoother and slower (the time grows with it), and a smear of "
         "more than a few pixels per sample shows as separate ghost copies. With 1 the picture is unchanged.",
+    )
+    interpolation: Literal["nearest", "bilinear", "bicubic"] = param(
+        "bilinear",
+        doc="How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps "
+        "every value exactly as it is but steps and ghosts show in smooth areas), 'bilinear' blends the four pixels "
+        "around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest "
+        "and most exact on smooth gradients, a little slower, and may ring beside hard edges).",
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
@@ -71,7 +80,7 @@ def radial_blur(rgb: np.ndarray, params: RadialBlurParams) -> np.ndarray:
     """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
 
     Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the
-    pixel), each read by bilinear interpolation, each colour channel on its own. The centre stays sharp, flat areas
+    pixel), each read by `interpolation`, each colour channel on its own. The centre stays sharp, flat areas
     stay flat and the result never leaves the picture's own range.
     """
     if params.amount == 0:
@@ -93,6 +102,11 @@ def radial_blur(rgb: np.ndarray, params: RadialBlurParams) -> np.ndarray:
             matrix = np.array([[np.cos(turn), np.sin(turn)], [-np.sin(turn), np.cos(turn)]])
             offset = centre - matrix @ centre
         for total, plane in zip(totals, planes, strict=True):
-            # constant: order 1 is bilinear interpolation: the weighted mean of the four pixels around the point
-            total += ndimage.affine_transform(plane, matrix, offset=offset, order=1, mode=_BEYOND_THE_EDGE[params.edge])
+            total += ndimage.affine_transform(
+                plane,
+                matrix,
+                offset=offset,
+                order=_SPLINE_ORDER[params.interpolation],
+                mode=_BEYOND_THE_EDGE[params.edge],
+            )
     return np.clip(np.stack(totals, axis=-1) / params.samples, rgb.min(), rgb.max()).astype(np.float32)

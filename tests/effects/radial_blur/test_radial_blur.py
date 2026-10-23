@@ -140,3 +140,70 @@ def test_the_result_never_leaves_the_range_of_the_picture(mode: str, photo: np.n
     out = registry.apply(NAME, photo, mode=mode, amount=0.7, samples=24, x=0.3)
     assert out.min() >= photo.min() - 1e-6
     assert out.max() <= photo.max() + 1e-6
+
+
+CHOICES = ["nearest", "bilinear", "bicubic"]
+
+
+@pytest.mark.parametrize("interpolation", CHOICES)
+@pytest.mark.parametrize("mode", MODES)
+def test_every_interpolation_runs_and_stays_within_the_picture_range(
+    interpolation: str, mode: str, photo: np.ndarray
+) -> None:
+    out = registry.apply(NAME, photo, mode=mode, amount=0.6, samples=9, interpolation=interpolation)
+    assert out.shape == photo.shape
+    assert out.min() >= 0.0
+    assert out.max() <= 1.0
+
+
+@pytest.mark.parametrize("interpolation", CHOICES)
+def test_a_constant_picture_stays_as_it_is_under_every_interpolation(interpolation: str) -> None:
+    flat = np.full((31, 47, 3), 0.4, np.float32)
+    out = registry.apply(NAME, flat, mode="spin", amount=0.8, samples=7, interpolation=interpolation)
+    np.testing.assert_allclose(out, 0.4, atol=1e-6)
+
+
+def test_nearest_reads_whole_pixels_so_values_are_exact_where_every_sample_rounds_to_the_pixel_itself() -> None:
+    """Zoom by 0.4 with two samples reads each pixel at 0.9 and 1.1 times its offset (rows and columns) from the
+    centre. Within 4 px of the centre both round to the pixel itself (0.9 x 4 = 3.6 and 1.1 x 4 = 4.4 are 4; smaller
+    offsets are the same), so 'nearest' returns the picture's own values there, while 'bilinear' blends neighbours."""
+    noise = np.random.default_rng(5).random((9, 101, 3), dtype=np.float32)  # centre pixel (4, 50)
+    settings = {"mode": "zoom", "amount": 0.4, "samples": 2, "x": 0.5, "y": 0.5}
+    nearest = registry.apply(NAME, noise, interpolation="nearest", **settings)
+    bilinear = registry.apply(NAME, noise, interpolation="bilinear", **settings)
+    near_the_centre = (slice(2, 7), slice(46, 55))  # rows 2..6 (offsets 2) and columns 46..54 (offsets 4)
+    np.testing.assert_array_equal(nearest[near_the_centre], noise[near_the_centre])
+    assert np.abs(bilinear[near_the_centre] - noise[near_the_centre]).max() > 0.05
+
+
+def test_nearest_averages_exact_pixels_where_the_samples_land_on_whole_pixels() -> None:
+    """Offsets of 10 k columns on the centre row are read at 9 k and 11 k columns: two whole pixels, averaged."""
+    noise = np.random.default_rng(6).random((3, 101, 3), dtype=np.float32)
+    out = registry.apply(NAME, noise, mode="zoom", amount=0.4, samples=2, interpolation="nearest")
+    for k in (-4, -2, 1, 3):
+        expected = (noise[1, 50 + 9 * k] + noise[1, 50 + 11 * k]) / 2
+        np.testing.assert_allclose(out[1, 50 + 10 * k], expected, atol=1e-6)
+
+
+def test_bicubic_reproduces_a_cubic_gradient_where_bilinear_and_quadratic_fits_do_not() -> None:
+    """A cubic picture 0.5 + 0.5 (offset / 20)^3 over 41 columns zoomed by 0.4 about the middle averages, on the centre
+    row, to 0.5 + 0.5 (offset / 20)^3 (1 + 0.4^2 / 4) (the mean of s^3 for scales s spread over 1 +- 0.2). A cubic
+    spline is exact on a cubic; the straight lines of bilinear interpolation are not."""
+    offsets = np.arange(41.0) - 20
+    cubic = np.tile(0.5 + 0.5 * (offsets / 20) ** 3, (3, 1))
+    expected = 0.5 + 0.5 * (offsets / 20) ** 3 * (1 + 0.4**2 / 4)
+    inside = slice(12, 29)  # offsets within 8: well away from the edge, whose mirrored fit is not exact on a cubic
+    errors = {
+        choice: np.abs(
+            registry.apply(NAME, grey(cubic), mode="zoom", amount=0.4, samples=256, interpolation=choice)[1, :, 0]
+            - expected
+        )[inside].max()
+        for choice in ("bilinear", "bicubic")
+    }
+    assert errors["bicubic"] < 4e-7
+    assert errors["bilinear"] > 1e-4
+
+
+def test_an_unknown_interpolation_is_refused(photo: np.ndarray) -> None:
+    with pytest.raises(ValueError, match="`interpolation`"):
+        registry.apply(NAME, photo, interpolation="lanczos")
