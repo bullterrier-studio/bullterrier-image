@@ -1,0 +1,10 @@
+# A twist about the dog's face: the picture spirals into the centre and settles back to normal at the radius.
+name = "swirl"
+size = 480
+
+[[step]]
+effect = "swirl"
+angle = 150
+radius = 0.6
+x = 0.5
+y = 0.4
