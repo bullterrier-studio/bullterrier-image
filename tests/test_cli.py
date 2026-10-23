@@ -1,6 +1,5 @@
 import os
 import re
-import signal
 import subprocess
 import sys
 import tomllib
@@ -327,24 +326,28 @@ def photo_fx_process(*args: str, **options) -> subprocess.Popen:
     )  # fmt: skip
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the test interrupts the process with SIGINT")
-def test_ctrl_c_stops_with_one_line_and_exit_130(files):
-    (files / "long.toml").write_text(
-        'name="long"\nsize=32\n[animation]\nseconds=600\nfps=30\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n',
-        encoding="utf-8",
-    )
-    process = photo_fx_process("animate", str(files / "me.png"), str(files / "long.toml"), "-o", str(files / "c.gif"))
-    assert process.stderr is not None
-    for line in process.stderr:  # the first progress line says the render is running, so the signal arrives inside main
-        if line.startswith("frame"):
-            break
-    else:
-        pytest.fail(f"the process ended before it reported progress (exit {process.wait()})")
-    process.send_signal(signal.SIGINT)
-    _, rest = process.communicate(timeout=60)
-    assert process.returncode == 130
-    assert "interrupted" in rest
-    assert "Traceback" not in rest
+class StopParams(EffectParams):
+    """The Ctrl-C probe's settings."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused: the probe stops the render first.")
+
+
+def test_ctrl_c_stops_with_one_line_and_exit_130(files, capsys, throwaway_effects):
+    """Ctrl-C reaches a running command as KeyboardInterrupt (Python's own translation of SIGINT); a step that raises
+    it stands in for the person, at a moment the test chooses, so there is no race with a real signal."""
+
+    @effect(category="utilities", params=StopParams)
+    def ctrl_c_probe(rgb, params):
+        """Stands in for the person pressing Ctrl-C while a picture renders."""
+        raise KeyboardInterrupt
+
+    (files / "stop.toml").write_text('name="stop"\nsize=32\n[[step]]\neffect="ctrl_c_probe"\n', encoding="utf-8")
+    command = ["render", str(files / "me.png"), str(files / "stop.toml"), "-o", str(files / "out"), "-q"]
+    assert main(command) == 130
+    assert capsys.readouterr().err == "interrupted\n"
+    assert not (files / "out" / "me__stop.png").exists()
+    with pytest.raises(KeyboardInterrupt):  # --debug lets it through, for developers
+        main([*command, "--debug"])
 
 
 # --- the program itself: --version, python -m photo_fx, the exit codes in --help --------------------------------------
