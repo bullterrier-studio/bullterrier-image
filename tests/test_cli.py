@@ -359,6 +359,24 @@ def test_version_is_the_one_in_pyproject(capsys):
     assert photo_fx.__version__ == declared
 
 
+@pytest.mark.parametrize("option", ["--help", "--version"])
+def test_help_and_version_load_no_image_library(option):
+    """`photo-fx --help` and `--version` answer at once: the libraries that render pictures (numpy, scipy, Pillow,
+    pydantic, the effects, the subject finder, the pipeline) load only when a command needs them."""
+    heavy = ["numpy", "scipy", "PIL", "pydantic", "photo_fx.core", "photo_fx.effects", "photo_fx.matte",
+             "photo_fx.pipeline"]  # fmt: skip
+    code = (
+        "import json, sys\n"
+        "from photo_fx.cli import main\n"
+        f"try:\n    main([{option!r}])\nexcept SystemExit:\n    pass\n"
+        f"json.dump([m for m in {heavy!r} if m in sys.modules], sys.stderr)\n"
+    )
+    done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, text=True, check=False, cwd=ROOT)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.startswith(("usage: photo-fx", "photo-fx "))  # it really answered
+    assert done.stderr == "[]"
+
+
 def test_python_dash_m_photo_fx_runs_the_command_line():
     process = photo_fx_process("--version")
     out, err = process.communicate(timeout=60)

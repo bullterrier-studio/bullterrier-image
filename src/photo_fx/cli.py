@@ -1,6 +1,9 @@
 """Command line: `photo-fx render|sheet|cutout|animate|run|steps|init|effects`.
 
 A thin layer over the library; no logic of its own.
+
+The parser is built from the standard library alone and each command imports the library parts it uses when it runs,
+so `--help`, `--version` and a usage error answer without loading numpy, scipy, Pillow or pydantic.
 """
 
 import argparse
@@ -8,20 +11,13 @@ import os
 import sys
 import textwrap
 from collections.abc import Callable, Iterable, Iterator
-from dataclasses import replace
-from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
+if TYPE_CHECKING:  # annotations only; the commands import what they use when they run
+    import numpy as np
 
-from . import __version__, imageio
-from .core import registry
-from .core.errors import PhotoFxError, RecipeError, SubjectNotFoundError
-from .imageio import save_video
-from .matte import SEGMENTERS, refine_edge, subject_matte
-from .pipeline import init_project, load_project, run
-from .recipe import Recipe, SubjectFinder, load_recipe, render_all, render_frames, trace
-from .sheet import contact_sheet, write_stages
+    from .recipe import Recipe, SubjectFinder
 
 _DEBUG_VARIABLE = "PHOTO_FX_DEBUG"
 
@@ -45,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
     developers. See the exit codes in `--help`.
     """
     args = _parser().parse_args(argv)
+    from .core.errors import PhotoFxError  # after parsing: `--help` and `--version` have exited by now
+
     debug = args.debug or os.environ.get(_DEBUG_VARIABLE) == "1"
     try:
         return args.handler(args)
@@ -68,7 +66,7 @@ def _parser() -> argparse.ArgumentParser:
         epilog=_EXIT_CODES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--version", action="version", version=f"photo-fx {__version__}")
+    parser.add_argument("--version", action=_Version, nargs=0, help="show the version of photo-fx and exit")
     commands = parser.add_subparsers(dest="command", required=True)
 
     # Every subcommand takes --debug and -q, so they are spelt once, as a parent of each.
@@ -181,6 +179,16 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+class _Version(argparse.Action):
+    """`--version`: looks the version up only when asked, since finding it loads the packaging machinery."""
+
+    def __call__(self, parser: argparse.ArgumentParser, *_args: object, **_kwargs: object) -> None:
+        from . import __version__
+
+        print(f"photo-fx {__version__}")
+        parser.exit()
+
+
 def _positive_int(text: str) -> int:
     """An argparse type: a whole number of 1 or more."""
     if not text.isdigit() or int(text) < 1:
@@ -212,19 +220,37 @@ def _subject_options(p: argparse.ArgumentParser) -> None:
 def _segmenter_option(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--segmenter",
-        choices=SEGMENTERS,
+        type=_segmenter,
         help="what finds the subject: vision (Apple Vision, macOS) or onnx (a portable model, downloaded on first "
         "use); default: $PHOTO_FX_SEGMENTER, else vision where available",
     )
 
 
-def _subject(args: argparse.Namespace) -> tuple[np.ndarray | None, SubjectFinder]:
+def _segmenter(name: str) -> str:
+    """An argparse type: a segmenter name `photo_fx.matte` knows, checked only when the option is given (the list
+    lives with the subject finder, which is slow to import)."""
+    from .matte import SEGMENTERS
+
+    if name not in SEGMENTERS:
+        raise argparse.ArgumentTypeError(f"invalid choice: {name!r} (choose from {', '.join(SEGMENTERS)})")
+    return name
+
+
+def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, SubjectFinder]":
     """The subject as the command line gives it: a matte file (--matte), and how to find it otherwise (--segmenter)."""
+    from functools import partial
+
+    from . import imageio
+    from .matte import subject_matte
+
     matte = imageio.load_matte(args.matte) if args.matte else None
     return matte, partial(subject_matte, segmenter=args.segmenter)
 
 
-def _load_recipes(paths: list[str]) -> list[Recipe]:
+def _load_recipes(paths: list[str]) -> "list[Recipe]":
+    from .core.errors import RecipeError
+    from .recipe import load_recipe
+
     files: list[Path] = []
     for path in map(Path, paths):
         files += sorted(path.glob("*.toml")) if path.is_dir() else [path]
@@ -233,7 +259,10 @@ def _load_recipes(paths: list[str]) -> list[Recipe]:
     return [load_recipe(f) for f in files]
 
 
-def _render_all(args: argparse.Namespace) -> tuple[list[Recipe], list[np.ndarray]]:
+def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarray]]":
+    from . import imageio
+    from .recipe import render_all
+
     recipes = _load_recipes(args.recipes)  # validated before any slow work starts
     _progress(args, f"rendering {len(recipes)} recipe(s)...")
     matte, find = _subject(args)
@@ -244,6 +273,8 @@ def _render_all(args: argparse.Namespace) -> tuple[list[Recipe], list[np.ndarray
 
 
 def _render(args: argparse.Namespace) -> int:
+    from . import imageio
+
     recipes, results = _render_all(args)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -255,6 +286,9 @@ def _render(args: argparse.Namespace) -> int:
 
 
 def _sheet(args: argparse.Namespace) -> int:
+    from . import imageio
+    from .sheet import contact_sheet
+
     recipes, results = _render_all(args)
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -264,6 +298,10 @@ def _sheet(args: argparse.Namespace) -> int:
 
 
 def _cutout(args: argparse.Namespace) -> int:
+    from . import imageio
+    from .core.errors import SubjectNotFoundError
+    from .matte import refine_edge
+
     photo = imageio.load(args.photo)
     matte, find = _subject(args)
     if matte is None:
@@ -282,6 +320,10 @@ def _cutout(args: argparse.Namespace) -> int:
 
 
 def _animate(args: argparse.Namespace) -> int:
+    from . import imageio
+    from .core.errors import RecipeError
+    from .recipe import load_recipe, render_frames
+
     recipe = load_recipe(args.recipe)
     if recipe.animation is None:
         raise RecipeError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
@@ -289,14 +331,14 @@ def _animate(args: argparse.Namespace) -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     total = len(recipe.animation.positions())
 
-    def with_progress(frames: Iterable[np.ndarray]) -> Iterator[np.ndarray]:
+    def with_progress(frames: "Iterable[np.ndarray]") -> "Iterator[np.ndarray]":
         for i, frame in enumerate(frames, start=1):
             if i % 10 == 0 or i == total:
                 _progress(args, f"frame {i}/{total}")
             yield frame
 
     matte, find = _subject(args)
-    save_video(
+    imageio.save_video(
         with_progress(render_frames(imageio.load(args.photo), recipe, matte, find_subject=find)),
         target,
         fps=recipe.animation.fps,
@@ -307,6 +349,10 @@ def _animate(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    from dataclasses import replace
+
+    from .pipeline import load_project, run
+
     project = load_project(args.project)
     if args.steps:
         project = replace(project, steps=True)
@@ -330,6 +376,10 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _steps(args: argparse.Namespace) -> int:
+    from . import imageio
+    from .recipe import load_recipe, trace
+    from .sheet import write_stages
+
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
     matte, find = _subject(args)
@@ -341,11 +391,15 @@ def _steps(args: argparse.Namespace) -> int:
 
 
 def _init(args: argparse.Namespace) -> int:
+    from .pipeline import init_project
+
     print(init_project(args.directory))
     return 0
 
 
 def _effects(args: argparse.Namespace) -> int:
+    from .core import registry
+
     for name, doc in registry.describe().items():  # line by line, so the parameter list stays a list
         print(f"{name}\n{textwrap.indent(doc, '    ')}\n")
     return 0
