@@ -162,6 +162,20 @@ with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `
 | **export** | Writes every format and size you asked for (animations as `.mp4`, plus a filmstrip PNG). |
 | **report** | `manifest.json` (machine-readable) and `index.html` (browse everything, warnings included). |
 
+**Image files in and out** (`photo_fx.imageio`):
+
+- **Reading.** Anything Pillow opens: JPEG, PNG, WebP, TIFF, GIF, BMP... in any mode: 8-bit RGB, greyscale, 1-bit,
+  palette and CMYK; 16-bit greyscale at full precision. Transparency is composited over white, so a colour hidden under
+  a transparent pixel never shows. An animation (GIF, APNG) gives its first frame.
+- **Colour.** An embedded ICC profile (Display P3, a CMYK press profile, a grey gamma) is converted to sRGB from the
+  picture's own colour space. Pictures without a usable profile, and 16-bit greyscale, are taken as sRGB, the web's
+  rule for untagged images.
+- **Errors.** A missing, non-image, truncated or oversized file raises `ImageReadError` naming it. Pillow's
+  decompression-bomb limit is kept: pictures over about 179 megapixels (twice `PIL.Image.MAX_IMAGE_PIXELS`) are
+  refused; raise that limit yourself for bigger files you trust.
+- **Writing.** Stills embed a small sRGB profile and nothing else: no EXIF and no GPS position from your photo. JPEGs
+  use quality 95 (the `quality` export setting) with full-resolution colour. Videos are H.264 in BT.709, tagged so.
+
 Good batch behaviour is built in, and tested:
 
 - **Incremental.** Each result is fingerprinted from the photo, the recipe, the export settings and the tool's own code. Unchanged work is skipped, and a missing output file is made again.
