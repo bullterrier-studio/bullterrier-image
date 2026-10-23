@@ -60,7 +60,11 @@ def edge_distance(
 
     # Smoothing is in elements (not px), the same for every sampling. A gradient under 1e-6 per px is float noise or
     # beyond the reach of the smoothing (4 sigma from the nearest inside element): there is no direction there.
-    smooth = ndimage.gaussian_filter(distance, smoothing)
+    # The blur's two other options are fixed on purpose, not tunables: beyond the array the field is mirrored (the
+    # shape carries on past the open bottom as the rows above it do, and a border edge stays an edge), and the kernel
+    # stops at 4 sigma, a numerical cutoff that keeps all but 0.006% of its weight.
+    # constant: scipy's reflect mode and 4-sigma truncate, as reasoned above
+    smooth = ndimage.gaussian_filter(distance, smoothing, mode="reflect", truncate=4.0)
     grad_y = np.gradient(smooth, row_height, axis=0) if shape.shape[0] > 1 else np.zeros_like(smooth)
     grad_x = np.gradient(smooth, col_width, axis=1) if shape.shape[1] > 1 else np.zeros_like(smooth)
     length = np.hypot(grad_x, grad_y)
