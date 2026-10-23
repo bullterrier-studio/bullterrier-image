@@ -111,11 +111,13 @@ def test_the_three_git_hook_types_are_installed_by_a_bare_install(precommit):
     assert precommit["default_install_hook_types"] == ["pre-commit", "commit-msg", "pre-push"]
 
 
-def test_every_remote_hook_repository_is_pinned_to_a_release_tag(precommit):
+def test_every_remote_hook_repository_is_pinned_to_a_commit(precommit):
     remotes = [repo for repo in precommit["repos"] if repo["repo"] != "local"]
     assert remotes
     for remote in remotes:
-        assert re.fullmatch(r"v\d+\.\d+\.\d+", remote["rev"]), remote  # a tag, never a branch such as main
+        # a tag can be moved to other code and a branch moves by itself; a commit hash cannot (OpenSSF Scorecard,
+        # "Pinned-Dependencies"). `pre-commit autoupdate --freeze` writes it with the release tag in a comment.
+        assert re.fullmatch(r"[0-9a-f]{40}", remote["rev"]), remote
 
 
 def test_local_hooks_run_the_projects_pinned_tools_through_uv(precommit, pyproject):
