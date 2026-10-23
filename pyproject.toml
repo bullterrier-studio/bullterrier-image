@@ -100,12 +100,12 @@ dev = [
 
 # One command for agents and humans: `uv run poe check` before every push, `uv run poe fix` when it complains.
 [tool.poe.tasks]
-test = { cmd = "pytest -q -n auto", help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
+test = { cmd = "pytest -q -n auto", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
 # Not part of `check`: the suite on the oldest Python and the lowest release each direct dependency's floor allows, in a
 # throwaway environment (uv.lock and the project environment stay as they are; the first run downloads the old
 # releases). It is for CI. tests/tools/test_lint_and_type_gate.py is left out because mypy's verdict on our source
 # depends on numpy's own type annotations, which are not what this checks.
-check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto --ignore=tests/tools/test_lint_and_type_gate.py", help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
+check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto --ignore=tests/tools/test_lint_and_type_gate.py", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
 fix = { sequence = ["ruff check --fix .", "ruff format ."], default_item_type = "cmd", help = "Apply every automatic lint and format fix" }
 # The sdist and wheel as PyPI would get them, built into dist/check (git-ignored, emptied first) and checked by twine
 # (metadata, rendered README; the quoted glob is twine's to expand) and check-wheel-contents (stray or unimportable files)
@@ -132,6 +132,16 @@ testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
 # an xfail that starts passing fails the run, so the marker cannot outlive the bug it names
 xfail_strict = true
+# Every warning fails the test that raised it: a leaked file or process (ResourceWarning), a deprecated call, and, when
+# PYTHONWARNDEFAULTENCODING=1 is set (`poe test` sets it), text IO that relies on the locale's encoding (EncodingWarning,
+# PEP 597). The ignores below are third-party code we cannot change, each matched by message, category and module.
+filterwarnings = [
+    "error",
+    # Pillow's ImageFile.load opens the image file in text mode only to memory-map it; no text is read
+    "ignore:'encoding' argument not specified:EncodingWarning:PIL.ImageFile",
+    # imageio-ffmpeg opens os.devnull in text mode to silence `ffmpeg -version` while it checks the bundled binary
+    "ignore:'encoding' argument not specified:EncodingWarning:imageio_ffmpeg._utils",
+]
 
 [tool.ruff]
 line-length = 120
