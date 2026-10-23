@@ -139,6 +139,15 @@ Rewrite patterns, when a test reaches inside (`tests/test_suite_rules.py` fails 
 - Effects of a test's own: `throwaway_effects`, or `fresh_registry` for an empty registry; both use only the registry's public interface.
 - "Work was skipped" is seen in the files (a sentinel left untouched), not by spying on a function. Errors: the type plus a short substring naming the argument or value.
 
+How a test file is written (`src/photo_fx/effects/_template/test_effect.py.tmpl` is the model):
+- **Parametrise by default:** cases that differ by literals are one test over a table (`pytest.param(..., id=...)`, or a dict of id to case) with known-good and known-bad rows side by side; the id states the rule.
+- **A new test file only for a new module**, at the mirror of its path (`tests/ops/test_blur.py` for `ops/blur.py`); anything else goes into the existing file.
+- **Shared helpers live in the nearest `conftest.py`**, as fixtures: `tests/conftest.py` (`photo`, `matte`, the registry helpers, `echo_model`, `tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). A helper one file uses stays in that file.
+- **DAMP, not DRY:** a reader sees each case and its expectation in the test; a helper builds input or names an assertion, never hides what is checked, and a table replaces loops and branches in a test body.
+- **No change-detectors:** test a rule with a known-bad input, never restate configuration (a category, a list of names, a pinned limit). Cross-effect rules live only in `tests/effects/test_contract.py`.
+- **Slow tests in groups:** a module whose module-scoped fixture spawns tools (ruff, mypy, poe, git) carries `pytestmark = pytest.mark.xdist_group("<module>")`, so with `--dist=loadgroup` one worker builds it once.
+- **Running:** one file or folder in one process with `uv run pytest tests/ops/test_blur.py -n 0` (add `-p no:randomly` for a fixed order); the whole suite with `uv run poe test`.
+
 ## Skills
 
 Use them; they are installed globally. `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion` for process; `testing-best-practices`
