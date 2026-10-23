@@ -1,11 +1,15 @@
 """Tests of `core/runner.py`: the runner is given the subject (a matte, or a function that finds it); it never looks
 for the subject itself."""
 
+import tracemalloc
+
 import numpy as np
 import pytest
 
 from photo_fx import SubjectNotFoundError
 from photo_fx.core import runner
+from photo_fx.core.params import EffectParams, param
+from photo_fx.core.registry import effect
 from photo_fx.core.steps import Recipe, Step
 from photo_fx.core.timing import Animated, Animation
 
@@ -99,3 +103,75 @@ def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     recipe = CLIP if run is RUNS["render_frames"] else MASKED
     with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
         run(photo, recipe, find_subject=lambda rgb: None)
+
+
+# --- memory: the runner keeps only the image the next step needs ---------------------------------------------------
+
+
+class ScratchParams(EffectParams):
+    """The memory probes' settings."""
+
+    copies: int = param(4, unit="count", min=1, max=8, doc="Picture-sized scratch buffers the step fills as it works.")
+
+
+SCRATCH_COPIES = 4  # each scratch step holds this many pictures, plus its output, at its peak
+
+
+def peak_pictures(photo: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None) -> float:
+    """The most memory `render` had allocated at once (beyond the photo and matte, which the caller holds), in pictures
+    of the working size."""
+    picture = runner.render(photo, recipe, matte).nbytes  # also warms up: one-time allocations stay out
+    tracemalloc.start()
+    try:
+        runner.render(photo, recipe, matte)
+        return tracemalloc.get_traced_memory()[1] / picture
+    finally:
+        tracemalloc.stop()
+
+
+@pytest.fixture
+def memory_probes(throwaway_effects):
+    """`scratch_probe` works in `copies` picture-sized buffers and returns a new picture; `hoarding_probe` returns a new
+    picture but keeps every picture it is given alive, the way a leaky runner would."""
+    hoard: list[np.ndarray] = []
+
+    @effect(category="utilities", params=ScratchParams)
+    def scratch_probe(rgb, params):
+        """Fills scratch pictures, then returns a copy of the input."""
+        scratch = np.repeat(rgb[None], params.copies, axis=0)
+        return scratch[-1].copy()
+
+    @effect(category="utilities", params=ScratchParams)
+    def hoarding_probe(rgb, params):
+        """Keeps its input alive and returns a copy of it."""
+        hoard.append(rgb)
+        return rgb.copy()
+
+    yield
+    hoard.clear()
+
+
+PHOTO = np.random.default_rng(3).random((210, 330, 3), dtype=np.float32)  # scaled to 320 px: a new picture
+SUBJECT = np.zeros((210, 330), np.float32)
+SUBJECT[50:150, 80:250] = 1.0
+
+
+@pytest.mark.parametrize(
+    ("mask", "matte", "kept"),
+    [
+        (None, None, 0.0),
+        ("subject", SUBJECT, 1 / 3),  # the scaled matte, one channel: a third of a picture, needed by every step
+        ("background", SUBJECT, 1 / 3),
+    ],
+    ids=["plain", "subject", "background"],
+)
+def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_output(memory_probes, mask, matte, kept):
+    """A step's input is released once the next step has run, and neither the scaled photo nor a masked step's blend
+    weights are kept for the rest of the chain: the peak is the busiest step's scratch, output and input (and the
+    scaled matte), whatever the number of steps."""
+    steps = tuple(Step("scratch_probe", {"copies": SCRATCH_COPIES}, mask) for _ in range(6))
+    bound = SCRATCH_COPIES + 1 + 1 + kept + 0.25  # scratch, output, input, matte, a quarter picture for small things
+    assert peak_pictures(PHOTO, Recipe("chain", steps, size=320), matte) <= bound
+    # known-bad: the same gauge sees a picture that something keeps alive
+    leaky = (*steps[:3], Step("hoarding_probe", {}, mask), *steps[3:])
+    assert peak_pictures(PHOTO, Recipe("leaky", leaky, size=320), matte) > bound

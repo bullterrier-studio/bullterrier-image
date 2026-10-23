@@ -3,10 +3,12 @@ on one photo) and `trace` (every intermediate picture, as `Stage`s).
 
 Promises: the input photo is never modified; the same photo, recipe and matte always give the same pixels; `trace`'s
 last stage is exactly what `render` returns, because both run the same code; an effect that changes the image shape is
-an error. The runner is given everything it uses: the photo, and the subject either as a `matte` or as a
-`find_subject` function, which it calls at most once per render (once per photo in `render_all`) and only if some step
-needs the subject. It never loads a file or looks for the subject on its own; `photo_fx.recipe` binds the default
-finder for users.
+an error; `render` and `render_frames` keep alive only the image the next step needs, so a render's memory peak is
+its busiest step's own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps,
+while `trace` keeps every stage. The runner is given everything it uses: the photo, and the subject either as a
+`matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
+only if some step needs the subject. It never loads a file or looks for the subject on its own; `photo_fx.recipe` binds
+the default finder for users.
 
 Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never `loader`, so recipes
 built in Python run without the TOML reader.
@@ -50,8 +52,10 @@ def render(
     was given. Raises SubjectNotFoundError when a step needs the subject and neither was given, the finder returns
     None, or the matte is not the photo's size.
     """
-    rgb, matte = _prepare(rgb, recipe, matte, find_subject)
-    return _finish(_run(rgb, recipe.steps, matte, at, at))
+    image, matte = _prepare(rgb, recipe, matte, find_subject)
+    stages = _stages(image, recipe.steps, matte, at, at)
+    del image  # the stages own the scaled photo now, and let it go once the first step has run
+    return _finish(_last(stages))
 
 
 def render_frames(
@@ -95,7 +99,8 @@ def trace(
 
     The stages are the photo as the recipe receives it, the subject matte if the recipe uses one (white = subject),
     and the image after each step, in order. The last stage is exactly what `render` returns, because both run the
-    same code. For an animated recipe the stages are for the frame at position `at` (0..1) of the clip.
+    same code. For an animated recipe the stages are for the frame at position `at` (0..1) of the clip. Every stage
+    stays in memory: one picture per step, plus the input and the matte.
 
     rgb, recipe, matte, at, find_subject: as for `render`.
     """
@@ -159,8 +164,14 @@ def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
 
 
 def _run(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None, motion: float, clip: float) -> np.ndarray:
-    last = deque(_stages(out, steps, matte, motion, clip), maxlen=1)  # only the final stage is kept in memory
-    return last[0][1] if last else out
+    """The image after `steps` (`out` itself when there are none); `out` stays alive as long as the caller holds it."""
+    return _last(_stages(out, steps, matte, motion, clip)) if steps else out
+
+
+def _last(stages: Iterator[tuple[Step, np.ndarray]]) -> np.ndarray:
+    """The image after the final stage (there must be one). Only the newest image is kept while the stages run: each
+    step's input is freed once the next step has its output, unless something else still holds it."""
+    return deque(stages, maxlen=1)[0][1]
 
 
 def _stages(
@@ -173,17 +184,21 @@ def _stages(
         if result.shape != out.shape:
             raise RuntimeError(f"effect {step.effect!r} changed the image shape {out.shape} -> {result.shape}")
         if step.mask or step.opacity < 1.0:
-            alpha: np.floating | np.ndarray = np.float32(step.opacity)
-            if step.mask:
-                if matte is None:  # not reachable through the public functions: `_prepare` finds it for masked steps
-                    raise ValueError(
-                        f"step {step.effect!r} is masked to the {step.mask}, but there is no subject matte"
-                    )
-                alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]
-            result = out + (result - out) * alpha
+            result = _blend(out, result, step, matte)
         out = result
         yield step, out
 
 
+def _blend(before: np.ndarray, after: np.ndarray, step: Step, matte: np.ndarray | None) -> np.ndarray:
+    """`after` blended over `before` by the step's opacity and mask. A function of its own so that its weights, a third
+    of a picture, are freed before the next step runs rather than kept by the generator."""
+    alpha: np.floating | np.ndarray = np.float32(step.opacity)
+    if step.mask:
+        if matte is None:  # not reachable through the public functions: `_prepare` finds it for masked steps
+            raise ValueError(f"step {step.effect!r} is masked to the {step.mask}, but there is no subject matte")
+        alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]
+    return before + (after - before) * alpha
+
+
 def _finish(out: np.ndarray) -> np.ndarray:
-    return np.clip(out, 0.0, 1.0).astype(np.float32)
+    return np.clip(out, 0.0, 1.0).astype(np.float32, copy=False)  # clip made a new array: no second copy needed
