@@ -1,0 +1,11 @@
+# A zoom burst: the streaks rush outward from the dog's face while it stays sharp at the centre.
+name = "radial_blur"
+size = 480
+
+[[step]]
+effect = "radial_blur"
+mode = "zoom"
+amount = 0.25
+x = 0.5
+y = 0.4
+samples = 48
