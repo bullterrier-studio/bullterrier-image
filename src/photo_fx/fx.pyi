@@ -5,6 +5,35 @@ from typing import Literal
 
 from .recipe import Step
 
+def anamorphic_streaks(length: float = 0.25, threshold: float = 0.8, amount: float = 3.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff') -> Step:
+    """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
+screened over the picture by `amount`.
+
+The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` x the picture's width, scaled to add
+up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far
+enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's
+edge. The picture only ever gets brighter, and black stays black.
+
+Parameters
+----------
+length : number, fraction, 0.001 to 1, default 0.25
+    How far the streaks reach sideways, as a fraction of the picture's width: the
+    distance over which a streak fades to 37% of its brightness (the faint tail runs on,
+    to the picture's edge). Raising it makes longer, fainter streaks.
+threshold : number, fraction, 0 to 0.99, default 0.8
+    The brightness (0..1, per channel) where a streak starts: only values above it light
+    the streaks, rising to full at 1. Raising it limits the streaks to the brightest
+    highlights.
+amount : number, ratio, 0 to 10, default 3.0
+    How strongly the streaks are screened over the picture: 0 = off; the streak is
+    spread thin along its length, so a long one needs a high amount (above 1 it
+    saturates to white sooner).
+color : colour, default '#8fb8ff'
+    The tint of the streaks: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
+    cool blue of coated anamorphic lenses; white keeps the colour of the light that
+    makes them."""
+    ...
+
 def ascii(cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, gamma: float = 1.0, photo: float = 0.0, font: str | None = None) -> Step:
     """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 
@@ -96,6 +125,44 @@ blue : number, ratio, 0 to 1, default 0.0722
     and darkens skin. The default is the Rec. 709 luma weight of blue."""
     ...
 
+def bloom(radius: float = 32.0, threshold: float = 0.6, amount: float = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
+
+The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
+`persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens, keeps
+the colour of the light (each channel blooms on its own) and leaves black black.
+
+Parameters
+----------
+radius : number, px, 0 to 500, default 32.0
+    Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the
+    light further; 0 keeps the light on the highlights themselves. Each further octave
+    is half as wide.
+threshold : number, fraction, 0 to 0.99, default 0.6
+    The brightness (0..1, per channel) where the bloom starts: only values above it give
+    light, rising to full at 1. Raising it limits the bloom to the brightest highlights.
+amount : number, ratio, 0 to 10, default 0.7
+    How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
+    brightness; above 1 it saturates to white sooner.
+octaves : whole number, count, 1 to 8, default 4
+    How many scales the halo is built from: octave 1 has the sigma `radius`, each next
+    one half of the one before (radius / 2, radius / 4...). 1 = a single Gaussian, as in
+    glow; more adds a tighter, brighter core around the highlights. Animated, it moves
+    in whole steps (rounded to the nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weight each octave gets relative to the wider one before it (the weights
+    are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave
+    alone, 1 = every octave equally. Lower values give a softer, more diffuse bloom;
+    higher values a tighter, more concentrated one.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma
+    px. Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
+    ...
+
 def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
 
@@ -159,6 +226,54 @@ constant_value : number, fraction, 0 to 1, default 0.0
     otherwise."""
     ...
 
+def color_balance(shadows_red: float = 0.0, shadows_green: float = 0.0, shadows_blue: float = 0.0, midtones_red: float = 0.0, midtones_green: float = 0.0, midtones_blue: float = 0.0, highlights_red: float = 0.0, highlights_green: float = 0.0, highlights_blue: float = 0.0, preserve_luminosity: bool = True) -> Step:
+    """Shift red, green and blue separately in the shadows, the midtones and the highlights.
+
+A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. Its weights are shadows 1 - s(2L), midtones
+s(2L) - s(2L - 1) and highlights s(2L - 1), where s is the smoothstep 3x^2 - 2x^3 of its argument held to 0..1:
+black is all shadows, mid grey all midtones, white all highlights, the three always add up to 1 and change
+smoothly. Each channel moves by the sum, over the three tones, of the weight times that tone's shift for the
+channel; the result is held to 0..1. With `preserve_luminosity` the luma the shifts changed is then restored
+by adding the same amount to every channel (before the hold to 0..1).
+
+Parameters
+----------
+shadows_red : number, fraction, -1 to 1, default 0.0
+    Shift of the red channel in the darkest tones, in 0..1 picture units at full weight
+    (pure black): +0.1 adds a tenth of the range, -0.1 removes it (towards cyan). 0 =
+    off.
+shadows_green : number, fraction, -1 to 1, default 0.0
+    Shift of the green channel in the darkest tones, at full weight (pure black):
+    positive adds green, negative removes it (towards magenta). 0 = off.
+shadows_blue : number, fraction, -1 to 1, default 0.0
+    Shift of the blue channel in the darkest tones, at full weight (pure black):
+    positive adds blue, negative removes it (towards yellow). 0 = off.
+midtones_red : number, fraction, -1 to 1, default 0.0
+    Shift of the red channel in the middle tones, at full weight (mid grey): positive
+    adds red, negative removes it (towards cyan). 0 = off.
+midtones_green : number, fraction, -1 to 1, default 0.0
+    Shift of the green channel in the middle tones, at full weight (mid grey): positive
+    adds green, negative removes it (towards magenta). 0 = off.
+midtones_blue : number, fraction, -1 to 1, default 0.0
+    Shift of the blue channel in the middle tones, at full weight (mid grey): positive
+    adds blue, negative removes it (towards yellow). 0 = off.
+highlights_red : number, fraction, -1 to 1, default 0.0
+    Shift of the red channel in the brightest tones, at full weight (pure white):
+    positive adds red, negative removes it (towards cyan). 0 = off.
+highlights_green : number, fraction, -1 to 1, default 0.0
+    Shift of the green channel in the brightest tones, at full weight (pure white):
+    positive adds green, negative removes it (towards magenta). 0 = off.
+highlights_blue : number, fraction, -1 to 1, default 0.0
+    Shift of the blue channel in the brightest tones, at full weight (pure white):
+    positive adds blue, negative removes it (towards yellow). 0 = off.
+preserve_luminosity : true or false, default True
+    Keep each pixel's Rec. 709 luma while shifting colours: on, the brightness the
+    shifts add or remove is taken off or put back on all three channels, so only the
+    colour changes (Photoshop's 'Preserve Luminosity'); off, the shifts also lighten or
+    darken. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping
+    allows."""
+    ...
+
 def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
 
@@ -220,6 +335,54 @@ blue_highlights : number, fraction, 0 to 1, default 0.75
     The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
     unchanged), applied after the master curve: raising it adds blue to the highlights,
     lowering it takes blue away. Its ends stay at black and white."""
+    ...
+
+def dehaze(amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001) -> Step:
+    """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).
+
+The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a
+channel near black. Haze lifts it, so the dark channel of I / A measures 1 - t, the haze at that place. The
+steps are
+- the airlight A: the `airlight_fraction` of pixels with the highest dark channel (the haziest) are looked at,
+  and the colour of the brightest of them (largest red + green + blue) is A, a per channel colour;
+- the transmission t = 1 - `amount` x dark channel of I / A, refined by a guided filter (`radius`,
+  `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between
+  `transmission_floor` and 1;
+- the scene J = (I - A) / t + A, held to 0..1.
+A picture without haze (a dark channel of 0) comes out as it went in. Colours are those of the sRGB-encoded picture.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.9
+    How much of the haze is taken out (He, Sun and Tang's omega): 0 = off, 1 = all of it
+    that the dark channel finds, which also flattens real distance cues; a little below
+    1 keeps the picture natural.
+patch : whole number, px, 1 to 201, default 15
+    Side of the square patch in which the darkest value is taken to find the haze, in px
+    at the recipe's size (an even size is centred half a pixel off). Larger patches
+    estimate the haze more reliably but blur it over bigger areas and miss thin haze; 1
+    judges every pixel by its own darkest channel. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+radius : number, px, 0 to 500, default 30.0
+    Radius of the guided filter that refines the haze estimate to follow the picture's
+    edges, in px at the recipe's size (rounded to whole px). Larger gives a smoother
+    haze with fewer halos far from edges; 0 keeps the blocky patch estimate.
+edge_threshold : number, fraction, 0.001 to 1, default 0.03
+    The brightness step (0..1, Rec. 709 luma) that counts as an edge the refined haze
+    estimate must not blur across: steps above it keep the haze of their own side, steps
+    below it are smoothed. Raising it gives a smoother estimate and halos around edges;
+    lowering it follows ever smaller edges.
+transmission_floor : number, fraction, 0.01 to 1, default 0.1
+    The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that
+    reaches the camera: colours are stretched by at most 1 / transmission_floor, so a
+    low floor clears thick haze but amplifies noise and clips; 1 allows no stretch at
+    all.
+airlight_fraction : number, fraction, 0.0001 to 0.1, default 0.001
+    The share of the picture's pixels, those with the highest dark channel (the
+    haziest), among which the brightest one is taken as the colour of the haze (He, Sun
+    and Tang use 0.1 percent = 0.001; at least one pixel is always used). Raising it
+    makes the estimate less sensitive to a single odd pixel but can pick a bright object
+    instead of the sky."""
     ...
 
 def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, edge: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, edge_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
@@ -366,6 +529,40 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     without a matte it also decides the figure's outline."""
     ...
 
+def equalize(tiles: int = 8, limit: float = 3.0, bins: int = 256) -> Step:
+    """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.
+
+The brightness is the value V = max(R, G, B) of the sRGB-encoded picture (the V of HSV). Every pixel's red, green
+and blue are multiplied by new V / old V, so hue and HSV saturation are unchanged and no channel can leave 0..1;
+black stays black. Each of the `tiles` x `tiles` regions gets a histogram of V in `bins` bins, clipped so no bin
+is taller than `limit` times the flat height (the clipped counts are spread evenly over all bins, repeatedly,
+until none exceeds it), and its mapping is the cumulative histogram: a pixel in bin k goes to the share of the
+tile's pixels in bins 0..k. A pixel takes the bilinear blend of the mappings of the four tiles whose centres
+surround it (the nearest tiles at the borders), so there are no seams. With one tile and a limit of `bins` or more
+this is classic histogram equalisation.
+
+Parameters
+----------
+tiles : whole number, count, 1 to 64, default 8
+    Tiles per side: the picture is cut into tiles x tiles regions, each equalised by its
+    own histogram and blended smoothly into its neighbours. 1 = one histogram for the
+    whole picture (classic equalisation); raising it adapts to smaller regions and
+    brings out local contrast. A picture with fewer pixel rows or columns than tiles
+    gets one tile per row or column. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+limit : number, ratio, 1 to 256, default 3.0
+    Clip limit, as a multiple of the height every bin would have if a tile's histogram
+    were flat: no bin may be taller, so no tone range is stretched more than this many
+    times. 1 = the histogram is made flat, which leaves tones evenly spread (a gentle
+    lift of the darkest bin by one step); raising it allows more contrast and amplifies
+    noise in flat areas. A limit of `bins` or more never clips (classic equalisation).
+bins : whole number, count, 2 to 256, default 256
+    Histogram bins over the brightness range 0..1: fewer bins give a coarser mapping and
+    fewer distinct brightnesses in the result (2 = every tile ends up with two
+    brightnesses), 256 matches 8-bit pictures. Animated, it moves in whole steps
+    (rounded to the nearest whole number)."""
+    ...
+
 def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, end: float = 0.3, edge: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
@@ -481,6 +678,29 @@ Parameters
 ----------
 color : colour, default '#000000'
     The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
+    ...
+
+def gaussian_blur(radius: float = 4.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+    """Soften the picture with a Gaussian blur of standard deviation `radius` px.
+
+Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
+
+Parameters
+----------
+radius : number, px, 0 to 500, default 4.0
+    The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is
+    softer and spreads detail further; 0 leaves the picture unchanged.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
+    Larger is more exact and slower; below 3 the blur turns visibly boxy.
+mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the edge fades
+    toward it).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1, every channel) assumed beyond the edge when mode is
+    'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
 def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, ascii_share: float = 0.0, ascii_cell: int = 9, ascii_photo: float = 0.0, seed: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, ascii_rows: int = 3, ascii_gamma: float = 0.55, ascii_chars: str = ' .:-=+*#%@', ascii_ink: str | list[float] | tuple[float, float, float] | None = None, ascii_ink_floor: float = 0.35, ascii_paper: str | list[float] | tuple[float, float, float] = '#000000', ascii_paper_threshold: float = 0.5, ascii_font: str | None = None) -> Step:
@@ -668,6 +888,38 @@ mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seamlessly)."""
     ...
 
+def halation(radius: float = 20.0, threshold: float = 0.7, amount: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by
+`radius` px, tinted `color` and screened over the picture by `amount`.
+
+Real halation comes from light that passes through the film base and bounces back, exposing the red-sensitive
+layer around bright spots, so the glow takes the tint whatever the colour of the highlight itself. It only ever
+brightens and leaves black black.
+
+Parameters
+----------
+radius : number, px, 0 to 500, default 20.0
+    Gaussian sigma of the glow in px at the recipe's size: larger spreads the glow
+    further from the highlights; 0 keeps it on the highlights themselves.
+threshold : number, fraction, 0 to 0.99, default 0.7
+    The brightness (0..1) where the glow starts, judged on the brightest of a pixel's
+    three channels: only values above it glow, rising to full at 1. Raising it limits
+    the halation to the brightest highlights.
+amount : number, ratio, 0 to 10, default 0.7
+    How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at
+    full brightness; above 1 it saturates sooner.
+color : colour, default '#ff4a14'
+    The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the red-
+    orange of film's red-sensitive layer; white makes a neutral glow.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
+    Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the glow's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
+    ...
+
 def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Print-style dot screen: tone becomes dot size. `cell` = distance between dots in px, `angle` = screen rotation.
 
@@ -721,6 +973,27 @@ constant_value : number, fraction, 0 to 1, default 0.0
     otherwise."""
     ...
 
+def highpass(radius: float = 4.0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey.
+
+A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each
+colour channel is filtered on its own and the result is kept within 0..1.
+
+Parameters
+----------
+radius : number, px, 0 to 100, default 4.0
+    Gaussian sigma of the blurred copy in px at the recipe's size: detail finer than
+    this is kept, coarser tones are removed. Small radii keep only the finest texture,
+    large ones keep edges and local contrast; 0 keeps nothing but mid-grey.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
+    px. Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
+    ...
+
 def hue_shift(hue: float = 90.0) -> Step:
     """Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme.
 
@@ -743,6 +1016,29 @@ picture turns cool. Doing it twice gives back the original picture.
 Parameters
 ----------
 """
+    ...
+
+def lens_blur(radius: float = 8.0, highlights: float = 0.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.
+
+Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it
+inside the disc, a linear ramp one pixel wide), each weighted by 1 + `highlights` x its brightness. Flat areas
+stay flat and the result never leaves the picture's own range. The cost hardly grows with the radius.
+
+Parameters
+----------
+radius : number, px, 0 to 100, default 8.0
+    The radius of the disc in px at the recipe's size: larger is further out of focus
+    and spreads each point into a bigger circle; 0 leaves the picture unchanged.
+highlights : number, ratio, 0 to 50, default 0.0
+    How much brighter pixels count in the average: a pixel of brightness b (0..1) counts
+    1 + highlights x b times as much as a black one, so with 0 every pixel counts the
+    same (a plain average), and raising it turns bright lights into distinct, luminous
+    discs (bokeh) while dark areas hardly bleed into them.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float = 0.0, output_white: float = 1.0) -> Step:
@@ -769,6 +1065,27 @@ output_black : number, fraction, 0 to 1, default 0.0
     grey. Above `output_white` the tones are reversed.
 output_white : number, fraction, 0 to 1, default 1.0
     The brightest value that can be output (0..1): lowering it dims the whites."""
+    ...
+
+def motion_blur(angle: float = 0.0, length: float = 24.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.
+
+Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay
+flat, the mean is kept and the result never leaves the picture's own range. The cost hardly grows with the length.
+
+Parameters
+----------
+angle : number, degrees, 0 to 360, default 0.0
+    The direction of the motion, counter-clockwise as seen in the picture: 0 =
+    horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180)
+    give the same blur.
+length : number, px, 0 to 500, default 24.0
+    How far the smear reaches along the line, end to end, in px at the recipe's size:
+    larger is a faster motion; 0 leaves the picture unchanged.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 def palette_quantize(palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'] = 'photo', colors: int = 8, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0) -> Step:
@@ -832,6 +1149,50 @@ levels : whole number, count, 2 to 256, default 256
     steps (rounded to the nearest whole number)."""
     ...
 
+def radial_blur(mode: Literal['spin', 'zoom'] = 'zoom', amount: float = 0.1, x: float = 0.5, y: float = 0.5, samples: int = 8, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
+
+Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the
+pixel), each read by `interpolation`, each colour channel on its own. The centre stays sharp, flat areas
+stay flat and the result never leaves the picture's own range.
+
+Parameters
+----------
+mode : one of 'spin', 'zoom', default 'zoom'
+    The direction of the smear: 'spin' averages along the circle around the centre, as a
+    rotating camera or wheel would blur; 'zoom' averages along the ray through the
+    centre, as zooming the lens during the exposure would. The centre itself stays sharp
+    in both.
+amount : number, fraction, 0 to 1, default 0.1
+    How far each pixel is smeared. 'spin': the arc, as a fraction of a full turn (0.1 =
+    36 degrees, 1 = a whole circle), centred on the pixel. 'zoom': the range of scales,
+    as a fraction of the pixel's distance from the centre (0.1 = from 5% closer to 5%
+    farther, 1 = from half to one and a half times the distance). Larger is a longer
+    smear and stronger at the edges; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+samples : whole number, count, 1 to 256, default 8
+    How many points along each arc or ray are averaged, spread evenly over its length
+    and read from the picture by the chosen interpolation: more is smoother and slower
+    (the time grows with it), and a smear of more than a few pixels per sample shows as
+    separate ghost copies. With 1 the picture is unchanged. Animated, it moves in whole
+    steps (rounded to the nearest whole number).
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but steps and ghosts show in
+    smooth areas), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest and most
+    exact on smooth gradients, a little slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smear sees beyond the picture's edge (arcs and rays near the corners leave
+    it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
+    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
 def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float = 0.0, saturation: float = 1.0, lightness: float = 0.0) -> Step:
     """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched.
 
@@ -864,6 +1225,94 @@ lightness : number, fraction, -1 to 1, default 0.0
     Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
     black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
     gap in that direction."""
+    ...
+
+def shadows_highlights(shadows: float = 0.5, highlights: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.1) -> Step:
+    """Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness.
+
+The base layer B (0..1) is the Rec. 709 luma of the sRGB-encoded picture smoothed by a guided filter (He, Sun and
+Tang 2010, guided by the luma itself) over a window of 2 x `radius` + 1 px, which averages flat areas but keeps
+its edges. Every channel c then becomes c^e with e = (1 + `highlights` B^2) / (1 + `shadows` (1 - B)^2): a gamma
+curve whose exponent follows the surroundings B, not the pixel, so a dark pixel in a bright area is lifted less
+than the same pixel in a dark one. Raising `shadows` only lowers e (lifting c towards 1) and raising
+`highlights` only raises it (pulling c towards 0), black and white stay where they are, and 0..1 maps into 0..1.
+
+Parameters
+----------
+shadows : number, ratio, 0 to 4, default 0.5
+    How much dark areas are lightened: 0 = off. In the darkest surroundings a value v
+    becomes v^(1 / (1 + shadows)), a gamma of 1 + shadows (1 = square root, 3 = fourth
+    root); surroundings that are brighter are lifted less, and areas brighter than mid
+    grey hardly at all. Black stays black.
+highlights : number, ratio, 0 to 4, default 0.0
+    How much bright areas are darkened: 0 = off. In the brightest surroundings a value v
+    becomes v^(1 + highlights), a gamma of 1 + highlights (1 = squared, 3 = to the
+    fourth power); surroundings that are darker are darkened less, and areas darker than
+    mid grey hardly at all. White stays white.
+radius : number, px, 0 to 500, default 30.0
+    Size of the surroundings that decide whether an area is dark or bright, in px at the
+    recipe's size (rounded to whole px): the base layer is an average over a square of 2
+    x radius + 1 px. Larger judges bigger regions and recovers whole dark or bright
+    areas; smaller follows fine detail; 0 judges every pixel by its own brightness (a
+    plain tone curve).
+edge_threshold : number, fraction, 0.001 to 1, default 0.1
+    The brightness step (0..1, Rec. 709 luma) that counts as an edge the base layer must
+    not blur across: steps above it keep their own side of the base, which avoids halos
+    around them; steps below it are averaged away. Raising it makes the base smoother
+    and more like a plain blur; lowering it follows ever smaller edges."""
+    ...
+
+def sharpen(radius: float = 2.0, amount: float = 0.8, threshold: float = 0.0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
+
+Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
+kept within 0..1.
+
+Parameters
+----------
+radius : number, px, 0 to 100, default 2.0
+    Gaussian sigma of the blurred copy in px at the recipe's size: small radii sharpen
+    fine texture, large ones add local contrast around coarse edges; 0 leaves the
+    picture unchanged.
+amount : number, ratio, 0 to 5, default 0.8
+    How much of the detail is added back: 0 = off, 1 = the full difference from the
+    blurred copy; above 1 edges overshoot and halos show.
+threshold : number, fraction, 0 to 1, default 0.0
+    The smallest difference (0..1, per channel) from the blurred copy that is sharpened:
+    smaller differences are left alone, which keeps grain and smooth skin from being
+    sharpened; 0 sharpens everything.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
+    px. Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def soft_focus(radius: float = 12.0, opacity: float = 0.5, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
+
+`opacity` sets how much of that replaces the sharp picture. This is the Orton effect of film photography (a sharp
+and a blurred exposure of the same scene stacked). The picture only ever gets
+brighter, detail stays under the glow, and black stays black.
+
+Parameters
+----------
+radius : number, px, 0 to 500, default 12.0
+    Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier
+    and softer; 0 blurs nothing, so the picture is only brightened by screening it with
+    itself.
+opacity : number, fraction, 0 to 1, default 0.5
+    How much of the screened result replaces the sharp picture: 0 = off (the picture
+    unchanged), 1 = the full soft focus. Raising it brightens and softens more.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
+    Larger is more exact and slower.
+mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 def solarize(threshold: float = 0.5) -> Step:
@@ -924,6 +1373,41 @@ light : colour, default '#ffffff'
     Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
+def tone_map(contrast: float = 0.5, amount: float = 0.5, radius: float = 30.0, edge_threshold: float = 0.5) -> Step:
+    """Compress the broad brightness differences of the picture and keep (or boost) its fine detail.
+
+Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in
+stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px,
+edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002).
+The new log brightness is `contrast` x B + (1 + `amount`) x D, and every pixel's red, green and blue are
+multiplied by 2^(new - L) = 2^((`contrast` - 1) B + `amount` D), so hue and saturation stay and the
+result is held to 0..1. An even area of luma Y comes out as Y^`contrast`. B is an average of values of L, so it
+never leaves their range: with `amount` 0 lowering `contrast` only ever brightens.
+
+Parameters
+----------
+contrast : number, ratio, 0 to 1, default 0.5
+    How much of the broad brightness differences between areas is kept: 1 = all of them
+    (no compression), 0.5 = halved in stops (a picture with dark areas three stops below
+    its bright ones gets them one and a half apart), 0 = every area brought up to white
+    and only the detail left. Lowering it lightens dark areas the most; white stays
+    white.
+amount : number, ratio, 0 to 5, default 0.5
+    How strongly the fine detail (what is left of the brightness once the broad areas
+    are taken out) is exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it
+    brings out texture; it can clip highlights.
+radius : number, px, 0 to 500, default 30.0
+    Size of what counts as a broad area, in px at the recipe's size (rounded to whole
+    px): the base layer is an average over a square of 2 x radius + 1 px. Larger treats
+    bigger structures as base and keeps only finer ones as detail; 0 makes every pixel
+    its own base, a plain global curve (a grey v becomes v^contrast).
+edge_threshold : number, stops, 0.01 to 8, default 0.5
+    The brightness step, in stops, that counts as an edge the base layer must not blur
+    across: steps above it keep their own side of the base, which avoids halos around
+    them; steps below it are averaged away and count as detail. Raising it makes the
+    base smoother and more like a plain blur."""
+    ...
+
 def vibrance(amount: float = 0.0) -> Step:
     """Raise the saturation of muted colours more than that of vivid ones, never lowering anyone's.
 
@@ -939,6 +1423,35 @@ amount : number, fraction, 0 to 1, default 0.0
     raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36
     while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they
     are; colours are never made duller."""
+    ...
+
+def vignette(amount: float = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000') -> Step:
+    """Fade the picture toward `color` from `radius` out to its corners, the centre untouched.
+
+A pixel's distance from the centre is 0 in the middle and 1 at a corner; the contours of equal distance are
+superellipses through the corners (`roundness` 1: an ellipse, 0: a rectangle). From `radius` the pixel is mixed
+toward `color`, rising over `feather` along a smoothstep to `amount`.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.5
+    How far the edges are mixed toward the colour where the vignette is fullest: 0 =
+    off, 0.5 = halfway, 1 = the colour itself at the corners.
+radius : number, fraction, 0 to 1, default 0.5
+    Where the vignette starts, as a fraction of the distance from the centre to a
+    corner: everything inside is untouched. Raising it clears more of the picture; 1
+    leaves even the corners alone.
+feather : number, fraction, 0 to 1, default 0.5
+    How far beyond the radius the vignette takes to reach full strength, as a fraction
+    of the distance from the centre to a corner (a smooth S-curve). 0 = a hard edge;
+    raising it softens the transition.
+roundness : number, fraction, 0 to 1, default 1.0
+    The shape of the vignette's contours: 1 = an ellipse that follows the picture's
+    proportions, 0 = a rectangle, which darkens the middle of each edge as much as a
+    corner; in between, a rounded rectangle.
+color : colour, default '#000000'
+    The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
+    white lightens."""
     ...
 
 def white_balance(temperature: float = 0.0, tint: float = 0.0) -> Step:

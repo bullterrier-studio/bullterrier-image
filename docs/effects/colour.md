@@ -9,7 +9,9 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
 | <img src="../gallery/black_and_white.jpg" width="160" alt="black_and_white"> | `black_and_white` | Convert to black and white with `red`, `green` and `blue` filter weights, like a colour filter on B&W film. | `red=0.2126` `green=0.7152` `blue=0.0722` | [black_and_white.toml](../../examples/effects/black_and_white.toml) |
 | <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
+| <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` `preserve_luminosity=True` | [color_balance.toml](../../examples/effects/color_balance.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` `red_shadows=0.25` `red_midtones=0.5` `red_highlights=0.75` `green_shadows=0.25` `green_midtones=0.5` `green_highlights=0.75` `blue_shadows=0.25` `blue_midtones=0.5` `blue_highlights=0.75` | [curves.toml](../../examples/effects/curves.toml) |
+| <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/fade.jpg" width="160" alt="fade"> | `fade` | Lift the blacks by `amount` for a matte, faded-film look; whites stay where they are. | `amount=0.12` | [fade.toml](../../examples/effects/fade.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` `quantile_method='linear'` | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
@@ -54,6 +56,21 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `blue_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output blue, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
 | `blue_from_blue` | number | ratio | -3 to 3 | `1.0` | Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
 
+### `color_balance`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `shadows_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the darkest tones, in 0..1 picture units at full weight (pure black): +0.1 adds a tenth of the range, -0.1 removes it (towards cyan). 0 = off. |
+| `shadows_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the darkest tones, at full weight (pure black): positive adds green, negative removes it (towards magenta). 0 = off. |
+| `shadows_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the darkest tones, at full weight (pure black): positive adds blue, negative removes it (towards yellow). 0 = off. |
+| `midtones_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the middle tones, at full weight (mid grey): positive adds red, negative removes it (towards cyan). 0 = off. |
+| `midtones_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the middle tones, at full weight (mid grey): positive adds green, negative removes it (towards magenta). 0 = off. |
+| `midtones_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the middle tones, at full weight (mid grey): positive adds blue, negative removes it (towards yellow). 0 = off. |
+| `highlights_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the brightest tones, at full weight (pure white): positive adds red, negative removes it (towards cyan). 0 = off. |
+| `highlights_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the brightest tones, at full weight (pure white): positive adds green, negative removes it (towards magenta). 0 = off. |
+| `highlights_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the brightest tones, at full weight (pure white): positive adds blue, negative removes it (towards yellow). 0 = off. |
+| `preserve_luminosity` | true or false |  |  | `True` | Keep each pixel's Rec. 709 luma while shifting colours: on, the brightness the shifts add or remove is taken off or put back on all three channels, so only the colour changes (Photoshop's 'Preserve Luminosity'); off, the shifts also lighten or darken. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping allows. |
+
 ### `curves`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -72,6 +89,14 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `blue_shadows` | number | fraction | 0 to 1 | `0.25` | The blue curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied after the master curve: raising it adds blue to the shadows, lowering it takes blue away. Its ends stay at black and white. |
 | `blue_midtones` | number | fraction | 0 to 1 | `0.5` | The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the master curve: raising it adds blue to the midtones, lowering it takes blue away. Its ends stay at black and white. |
 | `blue_highlights` | number | fraction | 0 to 1 | `0.75` | The blue curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), applied after the master curve: raising it adds blue to the highlights, lowering it takes blue away. Its ends stay at black and white. |
+
+### `equalize`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `tiles` | whole number | count | 1 to 64 | `8` | Tiles per side: the picture is cut into tiles x tiles regions, each equalised by its own histogram and blended smoothly into its neighbours. 1 = one histogram for the whole picture (classic equalisation); raising it adapts to smaller regions and brings out local contrast. A picture with fewer pixel rows or columns than tiles gets one tile per row or column. |
+| `limit` | number | ratio | 1 to 256 | `3.0` | Clip limit, as a multiple of the height every bin would have if a tile's histogram were flat: no bin may be taller, so no tone range is stretched more than this many times. 1 = the histogram is made flat, which leaves tones evenly spread (a gentle lift of the darkest bin by one step); raising it allows more contrast and amplifies noise in flat areas. A limit of `bins` or more never clips (classic equalisation). |
+| `bins` | whole number | count | 2 to 256 | `256` | Histogram bins over the brightness range 0..1: fewer bins give a coarser mapping and fewer distinct brightnesses in the result (2 = every tile ends up with two brightnesses), 256 matches 8-bit pictures. |
 
 ### `fade`
 

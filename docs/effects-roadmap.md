@@ -18,11 +18,11 @@ separate code.
 | `levels` ✓ | Black point, white point, gamma. | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
-| `equalize` | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
+| `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
 | `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
 | `vibrance` ✓ | Boost muted colours more than vivid ones. | `fx.vibrance(amount=0.5)` |
 | `selective_color` ✓ | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue=30, saturation=0.6)` |
-| `color_balance` | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights=[0.05,0,-0.05])` |
+| `color_balance` ✓ | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights_red=0.05, highlights_blue=-0.05)` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ | Negative. | `fx.invert()` |
 | `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
@@ -50,25 +50,25 @@ separate code.
 | --- | --- | --- |
 | `clarity` ✓ | Local contrast. | `fx.clarity(radius=40)` |
 | `glow` ✓ | Soft bloom around highlights. | `fx.glow(radius=28)` |
-| `sharpen` | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
-| `highpass` | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
+| `sharpen` ✓ | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
+| `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
 | `denoise` | Median, bilateral or non-local-means. | `fx.denoise(method="bilateral", amount=0.4)` |
-| `shadows_highlights` | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
-| `dehaze` | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
-| `tone_map` | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
-| `vignette` | Darken (or colour) the corners. | `fx.vignette(amount=0.5, roundness=0.8)` |
-| `gaussian_blur` | Blur. | `fx.gaussian_blur(radius=6)` |
-| `motion_blur` | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
-| `radial_blur` | Spin or zoom blur from a point. | `fx.radial_blur(mode="zoom", amount=0.1)` |
-| `lens_blur` | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
-| `bloom` | Multi-scale glow (upgrade of `glow`). | `fx.bloom(radius=40, threshold=0.7)` |
-| `anamorphic_streaks` | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
+| `shadows_highlights` ✓ | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
+| `dehaze` ✓ | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
+| `tone_map` ✓ | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
+| `vignette` ✓ | Darken (or colour) the corners. | `fx.vignette(amount=0.5, roundness=0.8)` |
+| `gaussian_blur` ✓ | Blur. | `fx.gaussian_blur(radius=6)` |
+| `motion_blur` ✓ | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
+| `radial_blur` ✓ | Spin or zoom blur from a point. | `fx.radial_blur(mode="zoom", amount=0.1)` |
+| `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
+| `bloom` ✓ | Multi-scale glow (upgrade of `glow`). | `fx.bloom(radius=40, threshold=0.7)` |
+| `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
 | `starburst` | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=60)` |
 | `lens_flare` | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` | Radial red/blue fringing. | `fx.chromatic_aberration(amount=4)` |
-| `soft_focus` | Dreamy glow over a sharp image (Orton). | `fx.soft_focus(amount=0.5)` |
-| `halation` | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
+| `soft_focus` ✓ | Dreamy glow over a sharp image (Orton). | `fx.soft_focus(opacity=0.5)` |
+| `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
 | `tilt_shift` | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
 | `depth_of_field` | Blur by distance from a depth map. | `fx.depth_of_field(focus=0.4)` |
