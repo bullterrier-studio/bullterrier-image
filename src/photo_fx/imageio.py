@@ -27,6 +27,12 @@ _SRGB_ICC = ImageCms.ImageCmsProfile(_SRGB).tobytes()  # littlecms's built-in sR
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _SIXTEEN_BIT = 65535.0  # the largest 16-bit value
 _ALPHA = 3  # the alpha channel of RGBA
+# ffmpeg filters ending every H.264 encode: convert RGB to YUV with the BT.709 (HD) matrix, not ffmpeg's BT.601
+# default, in limited (TV) range, and tag the stream so, so players neither shift colours nor guess
+_BT709 = (
+    "scale=out_color_matrix=bt709:out_range=tv,"
+    "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
+)
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -137,10 +143,11 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
     ffmpeg = _ffmpeg("resizing a video")
     shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
     result = subprocess.run(
-        [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", shrink,
+        [ffmpeg, "-y", "-loglevel", "error", "-i", str(source), "-an", "-vf", f"{shrink},{_BT709}",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
          "-g", "30", str(target)],
-        capture_output=True, text=True, check=False,  # the return code is checked below, with the message
+        capture_output=True, encoding="utf-8", errors="replace",
+        check=False,  # the return code is checked below, with the message
     )  # fmt: skip
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()}")
@@ -157,6 +164,7 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
     if max_side is not None and max(height, width) > max_side:
         shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
         filters = f"{shrink},{filters}"
+    filters = f"{filters},{_BT709}"
     command = [
         ffmpeg, "-y", "-loglevel", "error",
         "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",

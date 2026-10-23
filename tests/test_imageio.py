@@ -361,6 +361,30 @@ def test_save_video_max_side_shrinks_big_frames_only_and_keeps_the_aspect(tmp_pa
     assert tuple(map(int, _probe(tmp_path / "s.mp4", "stream=width,height"))) == expected
 
 
+def decoded_as_bt709(path) -> np.ndarray:
+    """The first frame of a video as 8-bit RGB, decoded with the BT.709 matrix whatever the file's tags say."""
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-frames:v", "1", "-vf", "scale=in_color_matrix=bt709:in_range=tv",
+         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+        capture_output=True, check=True,
+    ).stdout  # fmt: skip
+    return np.frombuffer(raw, np.uint8).reshape(-1, 3)
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+@pytest.mark.parametrize("max_side", [None, 16])
+def test_an_mp4_is_bt709_in_its_tags_and_in_its_pixels(tmp_path, max_side):
+    green = np.zeros((24, 32, 3), np.float32)
+    green[..., 1] = 1.0  # pure green: where the BT.601 and BT.709 matrices differ most
+    imageio.save_video([green, green], tmp_path / "g.mp4", fps=10, max_side=max_side)
+    imageio.resize_video(tmp_path / "g.mp4", tmp_path / "small.mp4", 8)
+    for name in ("g.mp4", "small.mp4"):
+        tags = _probe(tmp_path / name, "stream=color_space,color_transfer,color_primaries")
+        assert tags == ["bt709", "bt709", "bt709"]
+        pixels = decoded_as_bt709(tmp_path / name).astype(int)
+        assert np.abs(pixels - [0, 255, 0]).max() <= 4  # BT.601 pixels read as BT.709 would be off by over 15
+
+
 def test_save_video_gif_max_side_shrinks_frames(tmp_path):
     imageio.save_video(iter(_frames(3, 100, 200)), tmp_path / "s.gif", fps=10, max_side=50)
     with Image.open(tmp_path / "s.gif") as gif:
