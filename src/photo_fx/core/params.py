@@ -29,7 +29,7 @@ import re
 import textwrap
 import types
 import typing
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_origin
 
@@ -413,8 +413,10 @@ def _public(annotation: Any) -> Any:
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _public(args[0])
+    if origin is tuple and Ellipsis in args:  # a list field: callers may pass any sequence (TOML gives lists)
+        return Sequence[_public(args[0])]  # type: ignore[misc]  # built at run time
     if origin is tuple:
-        return tuple[tuple(arg if arg is Ellipsis else _public(arg) for arg in args)]  # type: ignore[misc]  # built at run time
+        return tuple[tuple(_public(arg) for arg in args)]  # type: ignore[misc]  # built at run time
     if origin in (typing.Union, types.UnionType):
         public = [_public(arg) for arg in args]
         union = public[0]

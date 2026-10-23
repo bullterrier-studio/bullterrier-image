@@ -129,6 +129,8 @@ def test_local_hooks_run_the_projects_pinned_tools_through_uv(precommit, pyproje
         assert tokens[:2] == ["uv", "run"], hook_id
         if tokens[2] == "python":  # the project's own script: it must exist
             assert (ROOT / tokens[3]).is_file(), f"{hook_id} runs {tokens[3]}, which does not exist"
+        elif tokens[2] == "poe":  # a project task: it must be defined
+            assert tokens[3] in pyproject["tool"]["poe"]["tasks"], f"{hook_id} runs poe task {tokens[3]}, not defined"
         else:
             assert tokens[2] in dev_dependency_names(pyproject), f"{hook_id} runs {tokens[2]}, not a dev dependency"
 
