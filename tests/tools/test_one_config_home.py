@@ -22,21 +22,9 @@ checker = _load_checker()
 
 # the files the project owner listed; written out here so a shortened list in the tool fails this test
 STRAY_NAMES = [
-    "ruff.toml",
-    ".ruff.toml",
-    "mypy.ini",
-    ".mypy.ini",
-    "setup.cfg",
-    "tox.ini",
-    "pytest.ini",
-    ".coveragerc",
-    ".importlinter",
-    ".flake8",
-    ".pylintrc",
-    "pyrightconfig.json",
-    ".isort.cfg",
-    ".bandit",
-]
+    "ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini", "setup.cfg", "tox.ini", "pytest.ini", ".coveragerc",
+    ".importlinter", ".flake8", ".pylintrc", "pyrightconfig.json", ".isort.cfg", ".bandit",
+]  # fmt: skip
 
 
 def test_the_repository_has_no_stray_tool_config():
@@ -66,13 +54,12 @@ def test_every_stray_config_is_reported_not_just_the_first(tmp_path):
 
 
 def test_files_with_other_names_and_files_elsewhere_are_not_reported(tmp_path):
-    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
-    (tmp_path / ".editorconfig").write_text("", encoding="utf-8")
-    (tmp_path / ".pre-commit-config.yaml").write_text("", encoding="utf-8")
+    for name in ("pyproject.toml", ".editorconfig", ".pre-commit-config.yaml"):
+        (tmp_path / name).write_text("", encoding="utf-8")
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "tox.ini").write_text(
         "", encoding="utf-8"
-    )  # outside the scanned places: documentation may mention anything
+    )  # outside the scanned places: docs may say anything
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "ruff.toml.md").write_text("", encoding="utf-8")  # similar name, different file
     assert checker.find_stray_configs(tmp_path) == []

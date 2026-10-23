@@ -198,21 +198,26 @@ def test_any_other_answer_cancels_and_changes_nothing(git_repo, answer):
     assert snapshot(git_repo) == before
 
 
-def test_a_section_written_by_hand_is_kept_and_dated(git_repo):
-    written = "### Added\n\n- Everything, curated by hand.\n"
-    link = f"[7.0.0]: {REPOSITORY}/releases/tag/v7.0.0\n"
-    make_project(git_repo, version="7.0.0.dev0", changelog=f"{PREAMBLE}## [7.0.0] - Unreleased\n\n{written}\n{link}")
-
-    release(git_repo, "7.0.0")
-
-    expected = rf"{re.escape(PREAMBLE)}## \[7\.0\.0\] - {DATED}\n\n{re.escape(written)}\n{re.escape(link)}"
-    assert re.fullmatch(expected, git_repo.read("CHANGELOG.md")), git_repo.read("CHANGELOG.md")
+WRITTEN = "### Added\n\n- Everything, curated by hand.\n"  # a 7.0.0 section written by hand before the release
+LINK = f"[7.0.0]: {REPOSITORY}/releases/tag/v7.0.0\n"
 
 
-def test_a_pre_release_takes_the_hand_written_notes_of_its_release(git_repo):
-    written = "### Added\n\n- Everything, curated by hand.\n"
-    link = f"[7.0.0]: {REPOSITORY}/releases/tag/v7.0.0\n"
-    make_project(git_repo, version="7.0.0.dev0", changelog=f"{PREAMBLE}## [7.0.0] - Unreleased\n\n{written}\n{link}")
+@pytest.fixture
+def hand_written(git_repo):
+    """A project developing 7.0.0.dev0 whose changelog already has an undated 7.0.0 section, WRITTEN."""
+    make_project(git_repo, version="7.0.0.dev0", changelog=f"{PREAMBLE}## [7.0.0] - Unreleased\n\n{WRITTEN}\n{LINK}")
+    return git_repo
+
+
+def test_a_section_written_by_hand_is_kept_and_dated(hand_written):
+    release(hand_written, "7.0.0")
+
+    expected = rf"{re.escape(PREAMBLE)}## \[7\.0\.0\] - {DATED}\n\n{re.escape(WRITTEN)}\n{re.escape(LINK)}"
+    assert re.fullmatch(expected, hand_written.read("CHANGELOG.md")), hand_written.read("CHANGELOG.md")
+
+
+def test_a_pre_release_takes_the_hand_written_notes_of_its_release(hand_written):
+    git_repo, written = hand_written, WRITTEN
     git_repo.commit("feat: a change the curated notes already cover")
 
     release(git_repo, "7.0.0rc1")
@@ -268,30 +273,35 @@ def refused(git_repo, *args: str) -> str:
     return result.stderr
 
 
-@pytest.mark.parametrize("version", ["banana", "7.2.0.dev1", "7.2"])
-def test_a_version_that_is_not_a_release_version_is_refused(git_repo, version):
+@pytest.mark.parametrize(
+    ("version", "said"),
+    [
+        ("banana", ["'banana'"]),
+        ("7.2.0.dev1", ["'7.2.0.dev1'"]),  # a development version is not a release version
+        ("7.2", ["'7.2'"]),
+        ("7.1.5", ["7.1.5", "7.2.0.dev0"]),  # above the last tag, v7.1.0, but below the project's 7.2.0.dev0
+    ],
+)
+def test_a_version_that_is_not_a_release_version_above_the_current_one_is_refused(git_repo, version, said):
     released_once(git_repo)
-    assert repr(version) in refused(git_repo, version)
+    message = refused(git_repo, version)
+    for part in said:
+        assert part in message
 
 
-def test_a_version_not_greater_than_the_current_one_is_refused(git_repo):
+@pytest.mark.parametrize(
+    ("git", "version", "said"),
+    [
+        (["tag", "-a", "v7.3.0", "-m", "made elsewhere"], "7.2.0", "v7.3.0"),  # not above the latest tag
+        (["tag", "-a", "v7.2.0rc1", "-m", "v7.2.0rc1"], "7.2.0rc1", "v7.2.0rc1 exists"),
+        (["switch", "-q", "-c", "feature"], "7.2.0rc1", "main"),  # released from another branch
+    ],
+    ids=["below the latest tag", "tag exists", "another branch"],
+)
+def test_a_tag_or_branch_in_the_way_is_refused(git_repo, git, version, said):
     released_once(git_repo)
-    message = refused(git_repo, "7.1.5")  # above the last tag, v7.1.0, but below 7.2.0.dev0
-    assert "7.1.5" in message
-    assert "7.2.0.dev0" in message
-
-
-def test_a_version_not_greater_than_the_latest_tag_is_refused(git_repo):
-    released_once(git_repo)
-    git_repo.git("tag", "-a", "v7.3.0", "-m", "made elsewhere")
-    message = refused(git_repo, "7.2.0")
-    assert "v7.3.0" in message
-
-
-def test_a_version_whose_tag_exists_is_refused(git_repo):
-    released_once(git_repo)
-    git_repo.git("tag", "-a", "v7.2.0rc1", "-m", "v7.2.0rc1")
-    assert "v7.2.0rc1 exists" in refused(git_repo, "7.2.0rc1")
+    git_repo.git(*git)
+    assert said in refused(git_repo, version)
 
 
 def test_a_version_written_in_the_tests_is_refused(git_repo):
@@ -299,12 +309,6 @@ def test_a_version_written_in_the_tests_is_refused(git_repo):
     git_repo.commit("test: check the wheel", {"tests/test_build.py": 'WHEEL = "demo-7.2.0rc1-py3-none-any.whl"\n'})
     git_repo.push()
     assert "tests/test_build.py:1" in refused(git_repo, "7.2.0rc1")
-
-
-def test_a_release_from_another_branch_is_refused(git_repo):
-    released_once(git_repo)
-    git_repo.git("switch", "-q", "-c", "feature")
-    assert "main" in refused(git_repo, "7.2.0rc1")
 
 
 def test_a_release_with_uncommitted_changes_is_refused(git_repo):

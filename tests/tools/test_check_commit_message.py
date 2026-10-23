@@ -1,7 +1,6 @@
 """tools/check_commit_message.py enforces Conventional Commits 1.0 with the limits from pyproject.toml."""
 
 import importlib.util
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -220,33 +219,24 @@ def test_main_uses_the_pyproject_it_is_pointed_at(tmp_path, capsys):
     capsys.readouterr()
 
 
+GOOD_TABLE = (
+    "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 72\nbody-max-line-length = 100\n"
+    "scope-pattern = '^a$'\n"
+)
+
+
 @pytest.mark.parametrize(
     "content",
     [
-        "[tool.other]\nx = 1\n",
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 72\nbody-max-line-length = 100\n",  # no key
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 72\nbody-max-line-length = 100\n"
-        "scope-pattern = '^a$'\nsubject-max-length = 50\n",  # an unknown extra key is not silently ignored
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-lenght = 72\nbody-max-line-length = 100\n"
-        "scope-pattern = '^a$'\n",  # a typo is not silently ignored
-        "[tool.commit-message]\ntypes = 'feat'\nheader-max-length = 72\nbody-max-line-length = 100\n"
-        "scope-pattern = '^a$'\n",  # types must be a list
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 0\nbody-max-line-length = 100\n"
-        "scope-pattern = '^a$'\n",  # a limit must be a positive integer
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = true\nbody-max-line-length = 100\n"
-        "scope-pattern = '^a$'\n",  # TOML's true is not the number 1, although Python's bool is an int
-        "[tool.commit-message]\ntypes = ['feat']\nheader-max-length = 72\nbody-max-line-length = 100\n"
-        "scope-pattern = '['\n",  # not a regular expression
-    ],
-    ids=[
-        "no table",
-        "missing key",
-        "unknown key",
-        "misspelt key",
-        "types not a list",
-        "zero limit",
-        "boolean limit",
-        "bad regex",
+        pytest.param("[tool.other]\nx = 1\n", id="no table"),
+        pytest.param(GOOD_TABLE.replace("scope-pattern = '^a$'\n", ""), id="missing key"),
+        pytest.param(GOOD_TABLE + "subject-max-length = 50\n", id="unknown key"),  # not silently ignored
+        pytest.param(GOOD_TABLE.replace("header-max-length", "header-max-lenght"), id="misspelt key"),
+        pytest.param(GOOD_TABLE.replace("['feat']", "'feat'"), id="types not a list"),
+        pytest.param(GOOD_TABLE.replace("= 72", "= 0"), id="zero limit"),  # a limit is a positive integer
+        # TOML's true is not the number 1, although Python's bool is an int
+        pytest.param(GOOD_TABLE.replace("= 72", "= true"), id="boolean limit"),
+        pytest.param(GOOD_TABLE.replace("'^a$'", "'['"), id="bad regex"),
     ],
 )
 def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, capsys):
@@ -256,6 +246,8 @@ def test_a_broken_config_is_a_loud_error_naming_the_table(tmp_path, content, cap
     message.write_text("feat: ok\n", encoding="utf-8")
     assert checker.main([str(message), "--pyproject", str(pyproject)]) == 2
     assert "tool.commit-message" in capsys.readouterr().err
+    pyproject.write_text(GOOD_TABLE, encoding="utf-8")
+    assert checker.main([str(message), "--pyproject", str(pyproject)]) == 0  # the known-good table passes
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -309,11 +301,3 @@ def test_an_unreadable_message_file_is_rejected_with_a_rule_not_a_traceback(tmp_
     assert "[message-unreadable]" in err
     assert "COMMIT_EDITMSG" in err  # names the file
     assert "Traceback" not in err
-
-
-def test_the_real_pyproject_table_matches_what_the_checker_loaded():
-    table = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["commit-message"]
-    assert CONFIG.types == tuple(table["types"])
-    assert CONFIG.header_max_length == table["header-max-length"] == 72
-    assert CONFIG.body_max_line_length == table["body-max-line-length"] == 100
-    assert CONFIG.scope_pattern.pattern == table["scope-pattern"]

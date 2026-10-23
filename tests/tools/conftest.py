@@ -1,4 +1,5 @@
-"""A throwaway git repository with a local bare `origin`, for the tests of the release tools.
+"""What the tests of the tooling share: a copy of the project to inject one fault into (`project_copy`), the environment
+`uv run` gives a command (`uv_run_env`), and a throwaway git repository with a local bare `origin` (`git_repo`).
 
 The repository is isolated from the developer's git configuration (no global or system config, so no signing, hooks or
 default branch of theirs leaks in), and the tools run with this environment's executables first on PATH, as under
@@ -8,6 +9,7 @@ with the reply the test chose (`GitRepo.answer_gh`; by default, a green `ci-ok`)
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,30 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+# this environment's executables first on PATH, as under `uv run`
+UV_RUN_PATH = os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")])
+
+
+@pytest.fixture
+def project_copy(tmp_path):
+    """`project_copy(*names)` copies the project's src/ (without bytecode caches) and the files `names` at its root into
+    tmp_path, and returns tmp_path: a scratch project to write one fault into, the real one untouched."""
+
+    def copy(*names: str) -> Path:
+        shutil.copytree(ROOT / "src", tmp_path / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        for name in names:
+            shutil.copy(ROOT / name, tmp_path)
+        return tmp_path
+
+    return copy
+
+
+@pytest.fixture
+def uv_run_env() -> dict[str, str]:
+    """The environment a command gets under `uv run`: this one, with its executables first on PATH."""
+    return {**os.environ, "PATH": UV_RUN_PATH}
+
+
 # what `gh api repos/OWNER/REPO/commits/SHA/check-runs` prints for a commit whose `ci-ok` passed (a real reply, trimmed)
 GREEN_CI_OK = {
     "total_count": 1,
@@ -60,7 +86,7 @@ class GitRepo:
             **os.environ,
             "GIT_CONFIG_GLOBAL": str(empty_config),
             "GIT_CONFIG_NOSYSTEM": "1",
-            "PATH": os.pathsep.join([str(self.bin), str(Path(sys.executable).parent), os.environ.get("PATH", "")]),
+            "PATH": os.pathsep.join([str(self.bin), UV_RUN_PATH]),
             "UV_OFFLINE": "1",  # nothing here may need the network
             "NO_COLOR": "1",
         }

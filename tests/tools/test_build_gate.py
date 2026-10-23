@@ -6,8 +6,6 @@ An architecture test of the tooling: its subject is the `build-check` task in py
 way `uv run poe check` does, in a copy of the project into which one fault at a time is written.
 """
 
-import os
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -15,32 +13,19 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-
 
 @pytest.fixture
-def project(tmp_path) -> Path:
-    shutil.copytree(ROOT / "src", tmp_path / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for name in ("pyproject.toml", "README.md", "LICENSE"):
-        shutil.copy(ROOT / name, tmp_path)
-    return tmp_path
+def project(project_copy) -> Path:
+    return project_copy("pyproject.toml", "README.md", "LICENSE")
 
 
-def build_check(project: Path) -> subprocess.CompletedProcess:
-    # the environment's own tools first on PATH, as under `uv run`
-    environment = {**os.environ, "PATH": f"{Path(sys.executable).parent}{os.pathsep}{os.environ.get('PATH', '')}"}
-    return subprocess.run(
-        [sys.executable, "-m", "poethepoet", "build-check"],
-        cwd=project,
-        env=environment,
-        capture_output=True,
-        encoding="utf-8",
-        check=False,
-    )
+def build_check(project: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
+    command = [sys.executable, "-m", "poethepoet", "build-check"]
+    return subprocess.run(command, cwd=project, env=env, capture_output=True, encoding="utf-8", check=False)
 
 
-def test_the_project_as_it_is_builds_clean_distributions(project):
-    result = build_check(project)
+def test_the_project_as_it_is_builds_clean_distributions(project, uv_run_env):
+    result = build_check(project, uv_run_env)
     assert result.returncode == 0, result.stdout + result.stderr
     built = sorted(path.name for path in (project / "dist" / "check").iterdir())
     version = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
@@ -50,21 +35,21 @@ def test_the_project_as_it_is_builds_clean_distributions(project):
     ]  # sdist and wheel, nothing else
 
 
-def test_a_long_description_pypi_cannot_render_fails_the_gate(project):
+def test_a_long_description_pypi_cannot_render_fails_the_gate(project, uv_run_env):
     (project / "README.md").unlink()
     (project / "README.rst").write_text("A title\n=====\n\n.. not-a-directive::\n\n`unclosed\n", encoding="utf-8")
     pyproject = project / "pyproject.toml"
     pyproject.write_text(
         pyproject.read_text(encoding="utf-8").replace('readme = "README.md"', 'readme = "README.rst"'), encoding="utf-8"
     )
-    result = build_check(project)
+    result = build_check(project, uv_run_env)
     assert result.returncode != 0
     assert "long_description" in result.stdout + result.stderr  # twine: "`long_description` has syntax errors"
 
 
-def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project):
+def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project, uv_run_env):
     (project / "src" / "photo_fx" / "not-importable.py").write_text('"""A module with a dash."""\n', encoding="utf-8")
-    result = build_check(project)
+    result = build_check(project, uv_run_env)
     assert result.returncode != 0
     report = result.stdout + result.stderr
     assert "W004" in report  # check-wheel-contents: module is not located at importable path
@@ -88,11 +73,11 @@ def _test_in_the_package(project: Path) -> None:
     )
 
 
-def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project):
+def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project, uv_run_env):
     # one build for the three faults (a build takes seconds); each shipped file must be named
     for fault in (_without_the_template_exclusion, _picture_in_the_package, _test_in_the_package):
         fault(project)
-    result = build_check(project)
+    result = build_check(project, uv_run_env)
     report = result.stdout + result.stderr
     assert result.returncode != 0
     assert "W102" in report  # check-wheel-contents: wheel library contains files not in the package tree

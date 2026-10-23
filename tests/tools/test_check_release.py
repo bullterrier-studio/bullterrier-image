@@ -54,12 +54,6 @@ def check(tag="v7.2.0", version="7.2.0", changelog=CHANGELOG, *, tag_on_main=Tru
     return checker.check_release(tag, version, changelog, tag_on_main=tag_on_main)
 
 
-def problems_of(**kwargs) -> str:
-    with pytest.raises(checker.ReleaseError) as caught:
-        check(**kwargs)
-    return str(caught.value)
-
-
 # ---------------------------------------------------------------------------------------------------------------------
 # known-good
 
@@ -87,41 +81,32 @@ def test_the_oldest_section_ends_before_the_link_definitions():
 # known-bad: one per rule
 
 
-@pytest.mark.parametrize("tag", ["7.2.0", "v7.2", "v7.2.0.dev1", "v7.2.0-rc1", "release-7.2.0", "v07.2.0"])
-def test_a_tag_that_is_not_v_and_a_release_version_is_refused(tag):
-    assert tag in problems_of(tag=tag)
+REFUSED = {  # what differs from the known-good release above, and what the refusal must name
+    # a tag that is not `v` and a release version
+    "tag without v": ({"tag": "7.2.0"}, ["7.2.0"]),
+    "tag of two parts": ({"tag": "v7.2"}, ["v7.2"]),
+    "development tag": ({"tag": "v7.2.0.dev1"}, ["v7.2.0.dev1"]),
+    "tag with a dash": ({"tag": "v7.2.0-rc1"}, ["v7.2.0-rc1"]),
+    "tag with a word": ({"tag": "release-7.2.0"}, ["release-7.2.0"]),
+    "tag with a leading zero": ({"tag": "v07.2.0"}, ["v07.2.0"]),
+    "tag differs from the project version": ({"version": "7.2.1"}, ["v7.2.0", "7.2.1"]),
+    "no changelog section": ({"tag": "v7.3.0", "version": "7.3.0"}, ["## [7.3.0]"]),
+    "section without a date": ({"changelog": "## [7.2.0] - Unreleased\n\n- Something\n"}, ["date"]),
+    "empty section": ({"changelog": "## [7.2.0] - 2026-11-03\n\n## [7.1.0] - 2026-10-23\n\n- Old\n"}, ["empty"]),
+    "tagged commit not on main": ({"tag_on_main": False}, ["main"]),
+    "every problem, not just the first": (
+        {"tag": "v7.3.0", "version": "7.3.1", "tag_on_main": False},
+        ["v7.3.0 does not match", "## [7.3.1]", "main"],
+    ),
+}
 
 
-def test_a_tag_that_differs_from_the_project_version_is_refused():
-    message = problems_of(tag="v7.2.0", version="7.2.1")
-    assert "v7.2.0" in message
-    assert "7.2.1" in message
-
-
-def test_a_version_without_a_changelog_section_is_refused():
-    message = problems_of(tag="v7.3.0", version="7.3.0")
-    assert "## [7.3.0]" in message
-
-
-def test_a_changelog_section_without_a_release_date_is_refused():
-    message = problems_of(changelog="## [7.2.0] - Unreleased\n\n- Something\n")
-    assert "date" in message
-
-
-def test_an_empty_changelog_section_is_refused():
-    message = problems_of(changelog="## [7.2.0] - 2026-11-03\n\n## [7.1.0] - 2026-10-23\n\n- Old\n")
-    assert "empty" in message
-
-
-def test_a_tag_whose_commit_is_not_on_main_is_refused():
-    assert "main" in problems_of(tag_on_main=False)
-
-
-def test_every_problem_is_reported_not_just_the_first():
-    message = problems_of(tag="v7.3.0", version="7.3.1", tag_on_main=False)
-    assert "v7.3.0 does not match" in message
-    assert "## [7.3.1]" in message
-    assert "main" in message
+@pytest.mark.parametrize(("changes", "said"), REFUSED.values(), ids=REFUSED.keys())
+def test_a_tag_that_breaks_a_rule_is_refused_naming_the_problem(changes, said):
+    with pytest.raises(checker.ReleaseError) as caught:
+        check(**changes)
+    for part in said:
+        assert part in str(caught.value)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
