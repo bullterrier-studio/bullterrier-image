@@ -5,12 +5,15 @@ A tag is ready when it is `v` + the version in pyproject.toml, CHANGELOG.md has 
 version (`## [0.2.0] - 2026-11-03`), and the tagged commit is on `origin/main`.
 
 Interface:
-    parse_version(text)  -> Version, ordered as releases are (0.2.0rc1 < 0.2.0 < 0.10.0); raises ReleaseError for
-                            anything but MAJOR.MINOR.PATCH with an optional pre-release aN, bN or rcN, in the canonical
-                            spelling `uv version` writes
+    parse_version(text)  -> Version (text, prerelease); raises ReleaseError for anything but MAJOR.MINOR.PATCH with an
+                            optional pre-release aN, bN or rcN, in the canonical spelling `uv version` writes (ordering
+                            versions is tools/release.py's, with PEP 440's rules)
     check_release(tag, project_version, changelog, *, tag_on_main)
                          -> Release (version, prerelease, notes: the changelog section's text); raises ReleaseError
                             listing every problem, not just the first
+    changelog_section(changelog, version)
+                         -> (the rest of the section's heading line, such as " - 2026-11-03", or None if there is no
+                            section for `version`; the section's text)
     main(argv)           -> exit code: 0 ready, 1 not ready (problems on stderr). Run in the repository:
 
         python tools/check_release.py v0.2.0 [--notes FILE] [--github-output FILE]
@@ -26,14 +29,12 @@ import re
 import subprocess
 import sys
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 # MAJOR.MINOR.PATCH and an optional pre-release, without leading zeros: the canonical PEP 440 spelling, so the tag and
 # pyproject.toml can be compared as text. Dev, post and local versions are not released.
 VERSION = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:(a|b|rc)(0|[1-9]\d*))?")
-# a final release sorts after its pre-releases: a < b < rc < final
-PHASE_ORDER = {"a": 0, "b": 1, "rc": 2, None: 3}
 DATE = re.compile(r" - \d{4}-\d{2}-\d{2}")
 # a Markdown link reference definition, as the compare links at the bottom of the changelog are written
 LINK_DEFINITION = re.compile(r"\[[^\]]+\]: \S+")
@@ -48,18 +49,12 @@ class ReleaseError(Exception):
         self.problems = problems
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class Version:
-    """A release version; comparing two orders them as releases are ordered."""
+    """A release version."""
 
-    release: tuple[int, int, int]
-    phase: tuple[int, int]  # (rank in PHASE_ORDER, pre-release number)
-    text: str = field(compare=False)
-
-    @property
-    def prerelease(self) -> bool:
-        """True for an alpha, beta or release candidate (published to TestPyPI, not PyPI)."""
-        return self.phase[0] != PHASE_ORDER[None]
+    text: str
+    prerelease: bool  # an alpha, beta or release candidate (published to TestPyPI, not PyPI)
 
 
 @dataclass(frozen=True)
@@ -78,8 +73,7 @@ def parse_version(text: str) -> Version:
         raise ReleaseError(
             [f"{text!r} is not a release version: write MAJOR.MINOR.PATCH, optionally with aN, bN or rcN (0.2.0rc1)"]
         )
-    major, minor, patch, phase, number = match.groups()
-    return Version((int(major), int(minor), int(patch)), (PHASE_ORDER[phase], int(number or 0)), text)
+    return Version(text, prerelease=match.group(4) is not None)
 
 
 def check_release(tag: str, project_version: str, changelog: str, *, tag_on_main: bool) -> Release:
@@ -91,7 +85,7 @@ def check_release(tag: str, project_version: str, changelog: str, *, tag_on_main
         problems.append(f"the tag {tag!r} is not `v` followed by a release version, such as v0.2.0 or v0.2.0rc1")
     elif tag_version != project_version:
         problems.append(f"the tag {tag} does not match the version in pyproject.toml, {project_version}")
-    heading, notes = _changelog_section(changelog, project_version)
+    heading, notes = changelog_section(changelog, project_version)
     if heading is None:
         problems.append(f"CHANGELOG.md has no section `## [{project_version}] - YYYY-MM-DD`")
     elif DATE.fullmatch(heading) is None:
@@ -105,8 +99,8 @@ def check_release(tag: str, project_version: str, changelog: str, *, tag_on_main
     return Release(project_version, parse_version(project_version).prerelease, notes)
 
 
-def _changelog_section(changelog: str, version: str) -> tuple[str | None, str]:
-    """The rest of the heading line of `version`'s section (None if there is none) and the section's text."""
+def changelog_section(changelog: str, version: str) -> tuple[str | None, str]:
+    """The rest of the heading line of `version`'s section (None if there is none) and the section's text, stripped."""
     lines = changelog.splitlines()
     prefix = f"## [{version}]"
     start = next((index for index, line in enumerate(lines) if line.startswith(prefix)), None)
