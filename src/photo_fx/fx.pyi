@@ -53,6 +53,87 @@ font : text or none, default None
     monospaced font found."""
     ...
 
+def auto_levels(clip: float = 0.005, mode: Literal['linked', 'per_channel'] = 'per_channel') -> Step:
+    """Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end.
+
+The black and white points are read from the picture itself: the `clip` share of the darkest values and of the
+brightest values (counted per channel, or over all channels together when `mode` is 'linked') end up saturated,
+and the rest is spread linearly between. A channel with no range (every value equal) is left as it is.
+
+Parameters
+----------
+clip : number, fraction, 0 to 0.45, default 0.005
+    The share of values (0..0.45) that end up saturated at each end, pure black and pure
+    white: 0.005 is 0.5 percent, 0 stretches exactly from the darkest to the brightest
+    value. Raising it gives more contrast and ignores stray dark or bright pixels, at
+    the cost of detail in the extremes.
+mode : one of 'linked', 'per_channel', default 'per_channel'
+    What is stretched: 'per_channel' stretches red, green and blue separately, which
+    also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel
+    Contrast); 'linked' finds one black and one white point over all channels together
+    and stretches them alike, so colours keep their relationships (Enhance Monochromatic
+    Contrast)."""
+    ...
+
+def black_and_white(red: float = 0.2126, green: float = 0.7152, blue: float = 0.0722) -> Step:
+    """Convert to black and white with `red`, `green` and `blue` filter weights, like a colour filter on B&W film.
+
+The weights are shares: they are divided by their sum, so only their ratio matters and a grey picture comes back
+unchanged (the result is clipped only to absorb float rounding). The default weights are the Rec. 709 luma
+weights, applied to the gamma-encoded values as the rest of photo-fx measures brightness. If all three weights
+are 0 no light passes the filter and the result is black.
+
+Parameters
+----------
+red : number, ratio, 0 to 1, default 0.2126
+    Weight of the red channel in the grey, 0..1. Raising it lightens reds and oranges
+    (skin, red roses) and darkens blues. The default is the Rec. 709 luma weight of red.
+green : number, ratio, 0 to 1, default 0.7152
+    Weight of the green channel in the grey, 0..1. Raising it lightens greens (foliage).
+    The default is the Rec. 709 luma weight of green.
+blue : number, ratio, 0 to 1, default 0.0722
+    Weight of the blue channel in the grey, 0..1. Raising it lightens blues (sky, water)
+    and darkens skin. The default is the Rec. 709 luma weight of blue."""
+    ...
+
+def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0) -> Step:
+    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
+
+The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
+matrix (the `<output>_from_<input>` weights) is output channel i, so
+`out[..., i] = sum_j matrix[i][j] * in[..., j]`. The result is clipped to 0..1.
+
+Parameters
+----------
+red_from_red : number, ratio, -3 to 3, default 1.0
+    Weight of input red in output red, -3..3: 1 keeps it as it is (default), 0 removes
+    it, above 1 amplifies it, a negative weight inverts it.
+red_from_green : number, ratio, -3 to 3, default 0.0
+    Weight of input green in output red, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+red_from_blue : number, ratio, -3 to 3, default 0.0
+    Weight of input blue in output red, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+green_from_red : number, ratio, -3 to 3, default 0.0
+    Weight of input red in output green, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+green_from_green : number, ratio, -3 to 3, default 1.0
+    Weight of input green in output green, -3..3: 1 keeps it as it is (default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
+green_from_blue : number, ratio, -3 to 3, default 0.0
+    Weight of input blue in output green, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+blue_from_red : number, ratio, -3 to 3, default 0.0
+    Weight of input red in output blue, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+blue_from_green : number, ratio, -3 to 3, default 0.0
+    Weight of input green in output blue, -3..3: 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+blue_from_blue : number, ratio, -3 to 3, default 1.0
+    Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes
+    it, above 1 amplifies it, a negative weight inverts it."""
+    ...
+
 def clarity(radius: float = 30.0, amount: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when
 the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
@@ -76,6 +157,69 @@ mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'refle
 constant_value : number, fraction, 0 to 1, default 0.0
     The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored
     otherwise."""
+    ...
+
+def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75) -> Step:
+    """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
+
+The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
+`white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed
+black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots
+its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
+
+Parameters
+----------
+black : number, fraction, 0 to 1, default 0.0
+    The master curve's output for pure black, on the input axis at 0 (0..1): raising it
+    lifts the blacks to a matte grey.
+shadows : number, fraction, 0 to 1, default 0.25
+    The master curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged): lower darkens the shadows, higher opens them up.
+midtones : number, fraction, 0 to 1, default 0.5
+    The master curve's output for the middle input, 0.5 (0..1; 0.5 = unchanged): lower
+    darkens the midtones, higher brightens them.
+highlights : number, fraction, 0 to 1, default 0.75
+    The master curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged): lower dims the highlights, higher makes them brighter.
+white : number, fraction, 0 to 1, default 1.0
+    The master curve's output for pure white, at 1 on the input axis (0..1): lowering it
+    dims the whites.
+red_shadows : number, fraction, 0 to 1, default 0.25
+    The red curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds red to the shadows,
+    lowering it takes red away. Its ends stay at black and white.
+red_midtones : number, fraction, 0 to 1, default 0.5
+    The red curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds red to the midtones, lowering it
+    takes red away. Its ends stay at black and white.
+red_highlights : number, fraction, 0 to 1, default 0.75
+    The red curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds red to the highlights,
+    lowering it takes red away. Its ends stay at black and white.
+green_shadows : number, fraction, 0 to 1, default 0.25
+    The green curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds green to the shadows,
+    lowering it takes green away. Its ends stay at black and white.
+green_midtones : number, fraction, 0 to 1, default 0.5
+    The green curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds green to the midtones, lowering it
+    takes green away. Its ends stay at black and white.
+green_highlights : number, fraction, 0 to 1, default 0.75
+    The green curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds green to the highlights,
+    lowering it takes green away. Its ends stay at black and white.
+blue_shadows : number, fraction, 0 to 1, default 0.25
+    The blue curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds blue to the shadows,
+    lowering it takes blue away. Its ends stay at black and white.
+blue_midtones : number, fraction, 0 to 1, default 0.5
+    The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds blue to the midtones, lowering it
+    takes blue away. Its ends stay at black and white.
+blue_highlights : number, fraction, 0 to 1, default 0.75
+    The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds blue to the highlights,
+    lowering it takes blue away. Its ends stay at black and white."""
     ...
 
 def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, edge: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, edge_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
@@ -314,6 +458,20 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     rather than black background: a piece no brighter never drifts (it simply vanishes
     if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also
     decides the figure's outline."""
+    ...
+
+def fade(amount: float = 0.12) -> Step:
+    """Lift the blacks by `amount` for a matte, faded-film look; whites stay where they are.
+
+Every channel is rescaled from 0..1 to `amount`..1, so black becomes a flat grey of `amount`, white is untouched
+and the tones between keep their order. With `amount` 0 the picture is unchanged.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.12
+    How far black is lifted toward white (0..1): the darkest value the picture can
+    reach. 0 = unchanged, 0.1 = a gentle matte look, 1 = everything white. White stays
+    white; raising it flattens the shadows."""
     ...
 
 def fill(color: str | list[float] | tuple[float, float, float] = '#000000') -> Step:
@@ -576,6 +734,152 @@ hue : number, degrees, -360 to 360, default 90.0
     (unchanged)."""
     ...
 
+def invert() -> Step:
+    """Turn the picture into its negative: every red, green and blue value v becomes 1 - v.
+
+Black becomes white, white black, mid grey stays mid grey and each colour becomes its complement, so a warm
+picture turns cool. Doing it twice gives back the original picture.
+
+Parameters
+----------
+"""
+    ...
+
+def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float = 0.0, output_white: float = 1.0) -> Step:
+    """Remap tones with an input black point, white point and midtone `gamma`, then an output range.
+
+Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
+between `output_black` and `output_white`. The defaults change nothing.
+
+Parameters
+----------
+black : number, fraction, 0 to 1, default 0.0
+    The input black point (0..1): values at or below it become the output black. Raising
+    it darkens shadows and adds contrast.
+white : number, fraction, 0 to 1, default 1.0
+    The input white point (0..1): values at or above it become the output white.
+    Lowering it brightens highlights and adds contrast. At or below `black` the picture
+    is cut at `black` into the two output ends.
+gamma : number, ratio, 0.1 to 10, default 1.0
+    The midtone gamma: 1 = linear, above 1 brightens the midtones, below 1 darkens them;
+    black and white stay where they are (output = input ** (1 / gamma), as in
+    Photoshop).
+output_black : number, fraction, 0 to 1, default 0.0
+    The darkest value that can be output (0..1): raising it lifts the blacks to a matte
+    grey. Above `output_white` the tones are reversed.
+output_white : number, fraction, 0 to 1, default 1.0
+    The brightest value that can be output (0..1): lowering it dims the whites."""
+    ...
+
+def palette_quantize(palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'] = 'photo', colors: int = 8, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0) -> Step:
+    """Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`.
+
+Distances are measured in Oklab, so a pixel gets the colour that looks closest to it, not the one with the nearest
+red, green and blue numbers. With palette 'photo' the colours are searched on `sample` random pixels, then every
+pixel is given its nearest colour and each colour becomes the average of the pixels it replaced, so the picture's
+overall colour is kept. With a named palette the pixels are painted in the palette's exact colours.
+
+Parameters
+----------
+palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', default 'photo'
+    Where the colours come from. 'photo' finds `colors` colours in the picture itself
+    (k-means); the others are fixed palettes: 'gameboy' (the 4 greens of the Game Boy
+    screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and
+    'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in Oklab, a
+    space where equal distances look equally different.
+colors : whole number, count, 2 to 256, default 8
+    How many colours to find when `palette` is 'photo' (ignored for a fixed palette).
+    Raising it keeps more detail and gradation; fewer than this many are used if the
+    picture has fewer distinct colours. Animated, it moves in whole steps (rounded to
+    the nearest whole number).
+init : one of 'k-means++', 'random', default 'k-means++'
+    How the search for colours starts (palette 'photo'): 'k-means++' spreads the
+    starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better
+    set; 'random' starts from `colors` random pixels.
+iterations : whole number, count, 1 to 100, default 20
+    The most k-means rounds to run when `palette` is 'photo'. Each round moves every
+    colour to the average of the pixels nearest to it; raising it lets the search settle
+    further. Animated, it moves in whole steps (rounded to the nearest whole number).
+tolerance : number, fraction, 0 to 1, default 0.001
+    Stop the k-means rounds early once no colour has moved farther than this in Oklab
+    (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a
+    rougher result.
+sample : whole number, count, 1 to 1000000, default 10000
+    How many randomly chosen pixels the colours are searched on when `palette` is
+    'photo'; every pixel is still repainted. A picture with fewer pixels is searched
+    whole. Raising it costs time and can find rare colours; lowering it is faster but
+    may miss small areas of colour. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for the choice of sample pixels and starting colours: the same seed
+    always gives the same picture, another seed may find slightly different colours.
+    Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def posterize(levels: int = 256) -> Step:
+    """Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one.
+
+The levels run from 0 to 1 in steps of 1 / (levels - 1), so black and white are always kept. Doing it twice
+changes nothing more.
+
+Parameters
+----------
+levels : whole number, count, 2 to 256, default 256
+    Number of evenly spaced tone levels kept in each of red, green and blue, black and
+    white included: 2 gives pure black or full intensity per channel (8 colours), 4
+    gives 0, 1/3, 2/3 and 1. Lowering it flattens the tones into fewer, coarser bands;
+    256 only rounds to the 8-bit levels of a JPEG or PNG. Animated, it moves in whole
+    steps (rounded to the nearest whole number)."""
+    ...
+
+def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float = 0.0, saturation: float = 1.0, lightness: float = 0.0) -> Step:
+    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched.
+
+Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the
+`hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a
+grey, which has no hue, is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0
+come back bit for bit. A selected pixel moves by weight times each change: `hue_shift` degrees, saturation times
+`saturation` and value toward black or full by `lightness`. Saturation and value stay inside 0..1 by
+construction, so the result needs no clipping.
+
+Parameters
+----------
+hue : number, degrees, 0 to 360, default 0.0
+    Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120
+    green, 180 cyan, 240 blue, 300 magenta; 360 is red again.
+width : number, degrees, 0 to 360, default 60.0
+    Full width of the range, 0..360 degrees, centred on `hue`; colours inside it are
+    changed at full strength. 360 takes in every colour; raising it widens the range.
+feather : number, degrees, 0 to 180, default 30.0
+    How far beyond each edge of the range the change fades out, 0..180 degrees: the
+    weight falls in a straight line from full at the edge to none that far away. 0 gives
+    a hard edge; raising it blends the range into its neighbours.
+hue_shift : number, degrees, -180 to 180, default 0.0
+    How far the selected hues are turned round the colour wheel, -180..180 degrees;
+    positive goes red toward yellow, green, blue. 0 keeps the hue.
+saturation : number, ratio, 0 to 3, default 1.0
+    Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above
+    1 makes them more vivid (stopping at full saturation).
+lightness : number, fraction, -1 to 1, default 0.0
+    Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
+    black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
+    gap in that direction."""
+    ...
+
+def solarize(threshold: float = 0.5) -> Step:
+    """Invert every red, green and blue value that is above `threshold` and leave the others as they are.
+
+The tones fold back on themselves at the threshold, the look of an over-exposed darkroom print (the Sabattier
+effect): shadows stay, highlights turn dark, and a bright edge appears where the two meet.
+
+Parameters
+----------
+threshold : number, fraction, 0 to 1, default 0.5
+    Channel value (0..1) above which red, green and blue are inverted; values at or
+    below it stay. Lowering it reverses more of the tones (0 inverts everything but pure
+    black); 1 changes nothing."""
+    ...
+
 def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1) -> Step:
     """Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness.
 
@@ -601,4 +905,60 @@ softness : number, fraction, 0.01 to 1, default 0.5
 black_fade : number, fraction, 0.001 to 1, default 0.1
     The brightness (0.001..1) up to which the tints fade in from nothing, so pure black
     stays black. Larger keeps more of the shadows untinted."""
+    ...
+
+def threshold(level: float = 0.5, dark: str | list[float] | tuple[float, float, float] = '#000000', light: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
+    """Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere.
+
+Brightness is Rec. 709 luminance, so a pure green is far brighter than a pure blue, as the eye sees them.
+
+Parameters
+----------
+level : number, fraction, 0 to 1, default 0.5
+    Brightness (Rec. 709 luminance, 0 = black, 1 = white) at which the picture is split:
+    pixels at or above it are painted `light`, the rest `dark`. Raising it turns more of
+    the picture dark; 0 makes all of it light.
+dark : colour, default '#000000'
+    Colour of the pixels darker than `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+light : colour, default '#ffffff'
+    Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
+    ...
+
+def vibrance(amount: float = 0.0) -> Step:
+    """Raise the saturation of muted colours more than that of vivid ones, never lowering anyone's.
+
+Works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation becomes
+s + amount * s * (1 - s), which never exceeds 1, so the result stays inside 0..1 without clipping. The strongest
+channel (HSV value) is kept and every other channel moves away from it by the same factor, so the hue is exactly
+the input's (up to float rounding) and a grey, whose saturation is 0, is unchanged.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.0
+    How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1
+    raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36
+    while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they
+    are; colours are never made duller."""
+    ...
+
+def white_balance(temperature: float = 0.0, tint: float = 0.0) -> Step:
+    """Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light.
+
+This is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel is multiplied
+by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue
+2**(-temperature/2), divided by the largest of the three, so the result is never brighter than the input, never
+clips, and a white pixel keeps one full channel instead of turning into a coloured cast. The defaults give gains
+of 1: no change.
+
+Parameters
+----------
+temperature : number, stops, -2 to 2, default 0.0
+    Warm-cool shift in stops (-2..2): the difference in stops between the red and the
+    blue gain, shared evenly (red up and blue down by half of it each). Positive warms
+    the picture (more orange), negative cools it (more blue), 0 leaves the colour
+    balance alone. Use a negative value to correct a picture shot under warm light.
+tint : number, stops, -1 to 1, default 0.0
+    Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
+    of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
+    balance alone."""
     ...

@@ -15,24 +15,24 @@ separate code.
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
 | `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
-| `levels` | Black point, white point, gamma. | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
-| `curves` | Tone curve through control points. | `fx.curves(points=[[0,0],[0.25,0.18],[1,1]])` |
-| `auto_levels` | Stretch to the full tonal range. | `fx.auto_levels(clip=0.5)` |
+| `levels` ✓ | Black point, white point, gamma. | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
+| `curves` ✓ | Tone curve through control points. | `fx.curves(shadows=0.18, highlights=0.82)` |
+| `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
-| `white_balance` | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
-| `vibrance` | Boost muted colours more than vivid ones. | `fx.vibrance(amount=0.5)` |
-| `selective_color` | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue="orange", sat=-0.4)` |
+| `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
+| `vibrance` ✓ | Boost muted colours more than vivid ones. | `fx.vibrance(amount=0.5)` |
+| `selective_color` ✓ | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue=30, saturation=0.6)` |
 | `color_balance` | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights=[0.05,0,-0.05])` |
-| `channel_mixer` | 3x3 matrix between channels. | `fx.channel_mixer(matrix=[[0,1,0],[1,0,0],[0,0,1]])` |
-| `invert` | Negative. | `fx.invert()` |
-| `posterize` | Few tone levels per channel. | `fx.posterize(levels=4)` |
-| `solarize` | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
-| `threshold` | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
-| `fade` | Lift the blacks for a matte film look. | `fx.fade(amount=0.12)` |
-| `palette_quantize` | Reduce to N colours (k-means) or a named palette. | `fx.palette_quantize(palette="gameboy")` |
+| `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
+| `invert` ✓ | Negative. | `fx.invert()` |
+| `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
+| `solarize` ✓ | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
+| `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
+| `fade` ✓ | Lift the blacks for a matte film look. | `fx.fade(amount=0.12)` |
+| `palette_quantize` ✓ | Reduce to N colours (k-means) or a named palette. | `fx.palette_quantize(palette="gameboy")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` | Apply a `.cube` 3D colour lookup table. | `fx.lut(file="film.cube", amount=0.8)` |
-| `black_and_white` | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
+| `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
 | `sepia` | Warm monochrome. | `fx.sepia()` |
 | `cyanotype` | Prussian-blue print. | `fx.cyanotype()` |
 | `cross_process` | Shifted curves per channel. | `fx.cross_process()` |
