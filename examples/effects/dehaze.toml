@@ -1,0 +1,12 @@
+# A veil of haze laid over the photo (lifted blacks), then taken out again.
+name = "dehaze"
+size = 480
+
+[[step]]
+effect = "fade"
+amount = 0.4
+
+[[step]]
+effect = "dehaze"
+amount = 0.95
+patch = 15
