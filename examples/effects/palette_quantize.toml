@@ -1,0 +1,7 @@
+# Six colours found in the picture itself.
+name = "palette_quantize"
+size = 480
+
+[[step]]
+effect = "palette_quantize"
+colors = 6
