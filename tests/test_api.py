@@ -332,6 +332,7 @@ def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_rep
     folder = tmp_path / "out" / "one" / "steps" / "look"
     assert sorted(p.name for p in folder.iterdir()) == ["00-input.jpg", "01-grade.jpg", "02-glitch.jpg", "_sheet.jpg"]
     assert item.steps == "one/steps/look/_sheet.jpg"
+    assert item.outputs == ("one/look.jpg", "one/steps/look/_sheet.jpg")  # links: `/` on every system, Windows too
     final = imageio.load(tmp_path / "out" / "one" / "look.jpg")
     assert np.abs(final - imageio.load(folder / "02-glitch.jpg")).max() < 0.03  # the last step is the exported result
     assert 'href="one/steps/look/_sheet.jpg"' in (tmp_path / "out" / "index.html").read_text(encoding="utf-8")

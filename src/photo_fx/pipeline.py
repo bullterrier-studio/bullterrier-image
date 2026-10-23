@@ -442,8 +442,9 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
     if stages:
         sheet = write_stages(stages, _inside(project.output, folder / "steps" / recipe.name), project.quality)
         outputs.append(sheet)
-    relative = tuple(str(Path(o).relative_to(project.output)) for o in outputs)
-    sheet_path = str(sheet.relative_to(project.output)) if sheet else None
+    # relative and with `/` on every system: they are the report's links (a `\` breaks an href) and the record's paths
+    relative = tuple(Path(o).relative_to(project.output).as_posix() for o in outputs)
+    sheet_path = sheet.relative_to(project.output).as_posix() if sheet else None
     return Item(
         photo.path.name, recipe.name, "done", relative, tuple(warnings), steps=sheet_path, fingerprint=fingerprint
     )
