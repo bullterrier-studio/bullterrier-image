@@ -54,11 +54,12 @@ def test_each_channel_of_a_colour_picture_is_blurred_on_its_own(mode, sigma):
     assert np.abs(got.astype(np.float64) - scipy_blur(image, sigma, mode)).max() <= TOLERANCE
 
 
-@pytest.mark.parametrize("truncate", [1.0, 2.5, 10.0])
+@pytest.mark.parametrize("truncate", [1.3, 2.5, 10.0])
 def test_truncate_cuts_the_kernel_where_scipy_does(truncate):
+    """Kernel radii of 32.5, 62.5 and 250 px: two halves, where rounding the radius up or down shows."""
     image = picture((90, 120, 3), seed=2)
-    got = blur(image, 12.0, "reflect", truncate)
-    assert np.abs(got.astype(np.float64) - scipy_blur(image, 12.0, "reflect", truncate)).max() <= TOLERANCE
+    got = blur(image, 25.0, "reflect", truncate)
+    assert np.abs(got.astype(np.float64) - scipy_blur(image, 25.0, "reflect", truncate)).max() <= TOLERANCE
 
 
 @pytest.mark.parametrize(("sigma", "truncate"), [(0.0, 4.0), (1.5, 4.0), (7.0, 4.0), (2.0, 10.0), (30.0, 1.0)])
@@ -76,6 +77,15 @@ def test_the_blur_never_leaves_the_range_of_the_picture_and_what_lies_beyond_it(
     low = min(float(image.min()), CONSTANT) if mode == "constant" else float(image.min())
     assert got.min() >= low
     assert got.max() <= image.max()
+
+
+@pytest.mark.parametrize("sigma", [2.0, 25.0, 120.0])
+@pytest.mark.parametrize("mode", MODES)
+def test_an_even_picture_stays_exactly_as_it_is(mode, sigma):
+    """Whatever the blur averages is the same value (beyond the edge too: the constant is that value), so the result
+    is that value exactly, not merely close to it."""
+    even = np.full((50, 70, 3), CONSTANT, dtype=np.float32)
+    np.testing.assert_array_equal(blur(even, sigma, mode), even)
 
 
 @pytest.mark.parametrize("sigma", [2.0, 50.0])
