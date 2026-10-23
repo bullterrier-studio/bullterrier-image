@@ -395,7 +395,9 @@ def _remembered(cached: Path, shape: tuple[int, ...]) -> np.ndarray | None:
     """The matte stored in `cached` if it is there, readable and of the photo's `shape`; None otherwise, and a
     damaged entry (cut short, not an archive, the wrong size) is deleted, so it is found again and replaced."""
     try:
-        with np.load(cached) as archive:  # no pickles: a planted file cannot run code
+        # opened here, not by np.load, which leaves its own file open when the archive is damaged; no pickles: a
+        # planted file cannot run code
+        with cached.open("rb") as file, np.load(file) as archive:
             matte = archive["matte"]
     except FileNotFoundError:
         return None
