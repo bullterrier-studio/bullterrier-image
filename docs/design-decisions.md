@@ -88,6 +88,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   output. *Consequence:* byte-identical comparison is the proof for refactors; small floating-point differences between
   platforms or library builds are tolerated, so tests assert properties with tolerances, not exact pixels.
 
+## Performance
+
+- **Cost grows with the picture, not with the parameters, and memory stays a few pictures deep.** A 12 MP photo is
+  the working case, so every Gaussian goes through `ops/blur.gaussian_blur`: scipy's direct filter, byte for byte,
+  below a kernel radius of 32 px, and from there an FFT convolution over the same edge extension, within 1e-5 of
+  scipy (float32 rounding), whatever the sigma. Code that builds per-pixel geometry works a band of rows at a time.
+  *Reason:* a radius at the top of its documented range must still render in seconds, and a direct convolution costs
+  in proportion to its kernel (clarity at 30 px spent 3 s per 12 MP photo in it). *Consequence:* a contract test holds
+  every effect at its defaults on a 1 MP photo to 1 s of process CPU time and 12 picture-sized buffers of memory
+  (`tracemalloc`), with a known-bad effect for each limit; an effect that needs more is redesigned, or the budget is
+  raised in its own reviewed commit. The FFT is single-threaded, so CPU time stays predictable when photos are
+  rendered in parallel.
+
 ## Testing and gates
 
 - **Properties, not golden images.** Tests assert the property that defines a behaviour (a blur stays in range, a sort
