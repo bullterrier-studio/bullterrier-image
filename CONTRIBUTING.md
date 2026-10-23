@@ -46,6 +46,17 @@ the tests, then `uv run poe gallery --only my_effect` renders its picture. Addin
   most 72 characters, then a body saying why. The `commit-msg` hook checks the format.
 - One logical change per commit. Never skip a hook (`--no-verify`): fix what it reports.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to main, pull request and merge-queue entry, and by hand (Actions tab,
+*CI*, *Run workflow*). Stage 1 runs every check in parallel: `lint.yml` (format, lint, dead code, dependencies, types,
+workflows), `test.yml` (the suite on Linux, macOS and Windows, Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed
+dependencies), `security.yml` (pip-audit, CodeQL, and dependency review on pull requests) and `pre-commit.yml` (the
+commit hooks over every file). Stage 2, `build.yml`, builds and checks the distributions and installs the wheel on the
+three systems, only once every check passed. `ci-ok` waits for all of them and is the one required check. Each of
+these workflows can also be started by hand, and `security.yml` runs weekly on its own. A release runs the whole CI
+again and publishes only the files its build made, so nothing that fails a check can be built or published.
+
 ## Releasing
 
 Versions follow [Semantic Versioning](https://semver.org/). Before 1.0 a minor release may change the public API (0.2.0
@@ -76,7 +87,8 @@ test.pypi.org and creates a GitHub pre-release; try it with
 
 **What the tag starts** (`.github/workflows/release.yml`): `tools/check_release.py` checks that the tag is the version
 in `pyproject.toml`, that CHANGELOG.md has a dated section for it and that the tagged commit is on main; the whole CI
-runs; after a reviewer approves the deployment, the distributions CI built and checked are uploaded through Trusted
+runs (every check, then the build; the publish jobs need it, so any failure stops the release); after a reviewer
+approves the deployment, the distributions CI built and checked are uploaded through Trusted
 Publishing (no token is stored anywhere) with signed attestations; last, the GitHub Release gets the changelog section
 as its notes, the same files and a build-provenance attestation. If anything fails before the upload, nothing is
 published: delete the tag (`git push --delete origin v0.2.0 && git tag -d v0.2.0`), fix main, and release again.
