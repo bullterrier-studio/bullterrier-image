@@ -1,0 +1,9 @@
+# Compress the contrast between the dark sofa and the bright coat while keeping the fur's texture.
+name = "tone_map"
+size = 480
+
+[[step]]
+effect = "tone_map"
+contrast = 0.65
+amount = 0.5
+radius = 30
