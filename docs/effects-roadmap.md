@@ -111,7 +111,7 @@ separate code.
 | `engraving` | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
 | `voronoi_mosaic` | Stained-glass cells with leaded edges. | `fx.voronoi_mosaic(cells=800, edge="#000")` |
-| `low_poly` | Delaunay triangles, one colour each. | `fx.low_poly(points=1500, seed=1)` |
+| `low_poly` | Delaunay triangles, one colour each, or just their wireframe. | `fx.low_poly(points=1500, seed=1)` |
 | `painterly` | Oriented brush strokes. | `fx.painterly(stroke=14, seed=1)` |
 | `pointillism` | Dots of varying size and colour. | `fx.pointillism(size=7, jitter=0.4)` |
 | `led_wall` | Round LEDs in a grid, brightness by tone. | `fx.led_wall(cell=10)` |
@@ -130,6 +130,19 @@ separate code.
 | `neon_edges` | Glowing outlines on black. | `fx.neon_edges(color="#00f0ff")` |
 | `paper_cutout` | Posterised layers with drop shadows. | `fx.paper_cutout(layers=5)` |
 | `photo_mosaic` | The photo built from other photos. | `fx.photo_mosaic(tiles="tiles/", cell=24)` |
+
+## Computational and experimental
+
+Looks made by running an algorithm on the picture rather than filtering it. The iterative ones (`reaction_diffusion`,
+`cellular_automata`) take an explicit step count so they stay within the render budget.
+
+| Effect | What it does | Example |
+| --- | --- | --- |
+| `liquid_metal` | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=0.6, tint="#c9d6ff")` |
+| `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
+| `reaction_diffusion` | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=200, seed=1)` |
+| `cellular_automata` | Life-like rules run on the thresholded picture. | `fx.cellular_automata(rule="life", steps=12, threshold=0.5)` |
+| `lenticular` | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strips=40, shift=6)` |
 
 ## Text and symbols
 
@@ -269,6 +282,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `topographic` | Contour lines of luminance or noise. | `fx.topographic(levels=14)` |
 | `flow_lines` | Streamlines through a noise flow field. | `fx.flow_lines(density=0.6, seed=1)` |
 | `aurora` | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |
+| `fractal` | Mandelbrot or Julia sets with smooth colouring. | `fx.fractal(kind="julia", zoom=1.5, iterations=64)` |
 
 ## Utilities
 
