@@ -1,0 +1,9 @@
+# Out-of-focus lights turn into soft, luminous discs behind a sharp subject.
+name = "lens_blur"
+size = 480
+
+[[step]]
+effect = "lens_blur"
+radius = 12
+highlights = 8
+mask = "background"
