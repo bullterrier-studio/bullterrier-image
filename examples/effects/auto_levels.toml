@@ -1,0 +1,13 @@
+# A flat, washed-out photo stretched back to the full tonal range: first squeezed, then put right.
+name = "auto_levels"
+size = 480
+
+[[step]]
+effect = "levels"
+output_black = 0.25
+output_white = 0.75
+
+[[step]]
+effect = "auto_levels"
+clip = 0.01
+mode = "linked"
