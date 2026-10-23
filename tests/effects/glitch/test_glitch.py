@@ -158,6 +158,18 @@ def test_ascii_ink_floor_caps_how_much_a_dark_text_colour_is_brightened() -> Non
     assert capped[..., 0].max() > 0.25  # characters were drawn, so their colour was compared
 
 
+def test_ascii_paper_threshold_decides_whether_mid_grey_paper_is_dark_or_light() -> None:
+    grey = 128 / 255  # #808080: Rec. 709 luminance 0.502, just above the default threshold of 0.5
+    width, height = cell_size(8)
+    white = np.ones((height, 2 * width, 3), np.float32)
+    settings = {"ascii_chars": CHARS, "ascii_ink": "#ff0000", "ascii_paper": "#808080"}
+    light = _all_text(white, 8, **settings)  # light paper: white needs no ink
+    np.testing.assert_allclose(light, np.full_like(light, grey), atol=1e-6)
+    dark = _all_text(white, 8, ascii_paper_threshold=0.6, **settings)  # dark paper: white gets the densest glyph
+    densest = np.tile(glyph_atlas(CHARS, 8, None)[-1], (1, 2))[..., None]
+    np.testing.assert_allclose(dark, grey * (1 - densest) + np.array([1, 0, 0]) * densest, atol=1e-6)
+
+
 def test_a_lower_text_gamma_puts_down_more_ink() -> None:
     grey = np.full((48, 64, 3), 0.5, np.float32)
     light = _all_text(grey, 4, ascii_chars=CHARS, ascii_gamma=3.0)

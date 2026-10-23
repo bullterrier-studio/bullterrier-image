@@ -84,6 +84,16 @@ def test_on_a_light_background_dark_tones_get_the_ink() -> None:
     assert registry.apply(NAME, flat(0.0, 64), **black_ink_on_white).mean() < 0.1  # black is nearly all ink
 
 
+def test_paper_threshold_decides_whether_mid_grey_paper_is_dark_or_light() -> None:
+    grey = 128 / 255  # #808080: Rec. 709 luminance 0.502, just above the default threshold of 0.5
+    red_on_grey = {"ink": "#ff0000", "paper": "#808080"}
+    light = registry.apply(NAME, flat(1.0, 64), **red_on_grey)  # light paper: white needs no ink
+    np.testing.assert_allclose(light, np.full_like(light, grey), atol=1e-6)
+    dark = registry.apply(NAME, flat(1.0, 64), paper_threshold=0.6, **red_on_grey)  # dark paper: white is all dots
+    assert dark[..., 0].mean() > 0.9
+    assert dark[..., 1].mean() < 0.1
+
+
 def test_with_one_ink_every_pixel_is_a_mix_of_the_ink_and_the_paper(photo: np.ndarray) -> None:
     ink, paper = np.array([1.0, 0.5, 0.0], np.float32), np.array([0.0, 0.0, 0.25], np.float32)
     out = registry.apply(NAME, photo, cell=6, ink="#ff8000", paper="#000040")

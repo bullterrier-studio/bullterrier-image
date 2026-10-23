@@ -47,8 +47,17 @@ class AsciiParams(EffectParams):
     )
     paper: Color = param(
         "#000000",
-        doc="The paper colour behind the characters. Paper darker than mid grey (Rec. 709 luminance below 0.5) puts "
+        doc="The paper colour behind the characters. Dark paper (Rec. 709 luminance below `paper_threshold`) puts "
         "dense characters on bright areas; lighter paper puts them on dark areas.",
+    )
+    paper_threshold: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (dense characters on bright areas) "
+        "rather than light (dense characters on dark areas); 0.5 = mid grey. Raising it lets lighter paper count as "
+        "dark: 0 treats every paper as light, 1 every paper but white as dark.",
     )
     gamma: float = param(
         1.0,
@@ -86,6 +95,7 @@ def ascii(rgb: np.ndarray, params: AsciiParams) -> np.ndarray:
         ink=None if params.ink is None else np.asarray(params.ink, np.float32),
         ink_floor=params.ink_floor,
         paper=np.asarray(params.paper, np.float32),
+        paper_threshold=params.paper_threshold,
         gamma=params.gamma,
         photo=params.photo,
         font=params.font,

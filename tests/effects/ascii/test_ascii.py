@@ -40,6 +40,17 @@ def test_the_ramp_flips_on_light_paper() -> None:
     np.testing.assert_allclose(out[..., 0], 1 - densest, atol=1e-6)
 
 
+def test_paper_threshold_decides_whether_mid_grey_paper_is_dark_or_light() -> None:
+    grey = 128 / 255  # #808080: Rec. 709 luminance 0.502, just above the default threshold of 0.5
+    white = _flat(1.0, 8, cols=2)
+    settings = {"cell": 8, "chars": CHARS, "ink": "#ff0000", "paper": "#808080"}
+    light = registry.apply(NAME, white, **settings)  # light paper: white needs no ink
+    np.testing.assert_allclose(light, np.full_like(light, grey), atol=1e-6)
+    dark = registry.apply(NAME, white, paper_threshold=0.6, **settings)  # dark paper: white gets the densest glyph
+    densest = np.tile(glyph_atlas(CHARS, 8, None)[-1], (1, 2))[..., None]
+    np.testing.assert_allclose(dark, grey * (1 - densest) + np.array([1, 0, 0]) * densest, atol=1e-6)
+
+
 def test_one_ink_colour_paints_every_character() -> None:
     out = registry.apply(NAME, _flat(1.0, 8, cols=2), cell=8, chars=CHARS, ink="#ff0000", paper="#000000")
     assert out[..., 1:].max() == 0.0  # no green or blue anywhere

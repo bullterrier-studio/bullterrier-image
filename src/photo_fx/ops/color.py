@@ -32,13 +32,15 @@ def luminance(rgb: np.ndarray) -> np.ndarray:
     return rgb @ np.array(LUMA, dtype=np.float32)
 
 
-def ink_amount(lum: np.ndarray, background: np.ndarray) -> np.ndarray:
+def ink_amount(lum: np.ndarray, background: np.ndarray, *, threshold: float) -> np.ndarray:
     """How much ink a mark-making effect (ascii, halftone) should lay down for brightness `lum` on `background`.
 
     Light marks on a dark background need to be dense where the picture is bright; dark marks on a light
-    background need to be dense where it is dark. Deciding that here means callers never pass an `invert` flag.
+    background need to be dense where it is dark. A background is dark when its luminance is below `threshold`
+    (0..1; 0 = every background is light, 1 = every one but white is dark). Deciding that here means callers never
+    pass an `invert` flag.
     """
-    return lum if float(luminance(background)) < 0.5 else 1.0 - lum
+    return lum if float(luminance(background)) < threshold else 1.0 - lum
 
 
 def vivid(colors: np.ndarray, *, floor: float) -> np.ndarray:

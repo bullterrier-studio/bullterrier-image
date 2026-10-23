@@ -123,8 +123,17 @@ class GlitchParams(EffectParams):
     )
     ascii_paper: Color = param(
         "#000000",
-        doc="The paper colour behind the text strips' characters. Paper darker than mid grey (Rec. 709 luminance "
-        "below 0.5) puts dense characters on bright areas; lighter paper puts them on dark areas.",
+        doc="The paper colour behind the text strips' characters. Dark paper (Rec. 709 luminance below "
+        "`ascii_paper_threshold`) puts dense characters on bright areas; lighter paper puts them on dark areas.",
+    )
+    ascii_paper_threshold: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The Rec. 709 luminance, 0 to 1, below which `ascii_paper` counts as dark (dense characters on bright "
+        "areas) rather than light (dense characters on dark areas); 0.5 = mid grey. Raising it lets lighter paper "
+        "count as dark: 0 treats every paper as light, 1 every paper but white as dark.",
     )
     ascii_font: str | None = param(
         None,
@@ -175,6 +184,7 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
                 ink=None if params.ascii_ink is None else np.asarray(params.ascii_ink, np.float32),
                 ink_floor=params.ascii_ink_floor,
                 paper=np.asarray(params.ascii_paper, np.float32),
+                paper_threshold=params.ascii_paper_threshold,
                 gamma=params.ascii_gamma,
                 photo=params.ascii_photo,
                 font=params.ascii_font,

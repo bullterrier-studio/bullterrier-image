@@ -46,7 +46,17 @@ class HalftoneParams(EffectParams):
     )
     paper: Color = param(
         "#000000",
-        doc="The paper colour between the dots. On a dark paper bright tones get the ink; on a light one, dark tones.",
+        doc="The paper colour between the dots. On a dark paper (Rec. 709 luminance below `paper_threshold`) bright "
+        "tones get the ink; on a light one, dark tones.",
+    )
+    paper_threshold: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get the ink) rather "
+        "than light (dark tones get it); 0.5 = mid grey. Raising it lets lighter paper count as dark: 0 treats every "
+        "paper as light, 1 every paper but white as dark.",
     )
     sigma: float = param(
         0.5,
@@ -126,7 +136,10 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     # A dot's area follows the ink. At full ink it is the circle around its square cell, radius half the diagonal,
     # so it covers the cell; dots touch their neighbours at half ink.
     full_ink_radius = 0.7071  # constant: sqrt(2) / 2 to four places, the half-diagonal of a unit cell
-    radius = np.sqrt(np.clip(ink_amount(luminance(sampled), paper), 0, 1)) * full_ink_radius
+    radius = (
+        np.sqrt(np.clip(ink_amount(luminance(sampled), paper, threshold=params.paper_threshold), 0, 1))
+        * full_ink_radius
+    )
     # The soft edge is a ramp `feather` px wide centred on the dot's edge. A dot narrower than the ramp would still
     # print its inner half (half strength at the centre even at zero ink), so the ramp fades in with the dot: in full
     # once the radius reaches half the feather, gone at zero. Zero ink is bare paper, and a tiny dot prints about its
