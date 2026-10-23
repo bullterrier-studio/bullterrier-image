@@ -282,12 +282,15 @@ layers = [
     "core",  # may import ops
     "ops",
 ]
+# the exceptions every layer may raise (core.errors imports nothing): glyphs reports a host it cannot draw on
+ignore_imports = ["photo_fx.ops.glyphs -> photo_fx.core.errors"]
 
 [[tool.importlinter.contracts]]
 name = "ops imports nothing else from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.ops"]
 forbidden_modules = ["photo_fx.*"]  # every top-level module but ops itself (overlaps are skipped)
+ignore_imports = ["photo_fx.ops.glyphs -> photo_fx.core.errors"]  # the exceptions every layer may raise
 
 [[tool.importlinter.contracts]]
 name = "Effects never import each other"

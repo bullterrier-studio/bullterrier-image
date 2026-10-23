@@ -133,7 +133,14 @@ def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
         default = ImageFont.load_default(size=round(cell / 0.6))
         # Pillow falls back to a fixed-size bitmap font, which cannot be measured or scaled, only without FreeType
         if not isinstance(default, ImageFont.FreeTypeFont):
-            raise RuntimeError("no font file was found and this Pillow has no FreeType to draw its own; pass `font`")
+            # Imported here: the error types are the one thing of photo_fx's that ops may use (pyproject's contracts)
+            from photo_fx.core.errors import BackendUnavailableError
+
+            raise BackendUnavailableError(
+                f"no font file was found and this Pillow has no FreeType to draw its own: list a monospaced .ttf or "
+                f".ttc in {FONTS_VARIABLE} (paths separated by {os.pathsep!r}), pass `font`, or install a Pillow "
+                "built with FreeType"
+            )
         return default
     reference = ImageFont.truetype(font_path, 100)  # constant: a measuring size; it cancels out below
     em_per_advance = 100.0 / reference.getlength("M")  # constant: the same measuring size

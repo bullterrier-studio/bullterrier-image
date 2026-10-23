@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
+from photo_fx import BackendUnavailableError
 from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
 
 CELLS = [5, 8, 13, 20]
@@ -286,6 +287,15 @@ def test_the_space_and_the_full_block_bound_the_ink_without_a_system_font_too(no
     totals = ink(atlas)
     assert totals[0] == 0.0
     assert totals[-1] > totals[:-1].max()
+
+
+def test_without_a_font_file_or_freetype_the_error_says_how_to_give_a_font(no_system_font, monkeypatch):
+    """A Pillow built without FreeType (an external capability) offers only a fixed-size bitmap font, which cannot be
+    sized to a cell: drawing needs a font file, so the error names the setting that lists one."""
+    monkeypatch.setattr(ImageFont, "load_default", lambda size=None: ImageFont.load_default_imagefont())
+    cell = 997  # a cell width no other test draws at, so nothing drawn earlier can answer for it
+    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_FONTS"):
+        glyph_atlas(" #", cell)
 
 
 @host_fonts
