@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -422,6 +423,7 @@ def test_a_project_built_in_code_is_checked_like_a_project_file(folder, option, 
                 **option)  # fmt: skip
 
 
+@pytest.mark.skipif(Path("...png").stem != "..", reason='this pathlib gives "...png" no ".." stem (Python 3.14+)')
 def test_a_photo_name_cannot_carry_files_out_of_the_output_folder(folder):
     # "...png" is a legal file name whose stem, "..", would make the photo's output folder the output's parent
     (folder / "photos" / "...png").write_bytes((folder / "photos" / "a.png").read_bytes())
@@ -435,6 +437,26 @@ def test_a_photo_name_cannot_carry_files_out_of_the_output_folder(folder):
     assert "outside the output folder" in str(by_photo["...png"].error)
     assert by_photo["a.png"].status == "done"  # the other photos still run
     assert sorted(p.name for p in folder.iterdir()) == ["out", "photo-fx.toml", "photos", "recipes"]
+
+
+def test_a_link_in_the_output_folder_cannot_carry_a_photos_files_elsewhere(folder):
+    elsewhere = folder / "elsewhere"
+    elsewhere.mkdir()
+    (folder / "out").mkdir()
+    try:
+        (folder / "out" / "a").symlink_to(elsewhere, target_is_directory=True)  # where a.png's results would go
+    except OSError:  # Windows without the symlink privilege
+        pytest.skip("this account cannot create symbolic links")
+    project = Project(
+        photos=(folder / "photos" / "a.png", folder / "photos" / "b.png"),
+        recipes=(folder / "recipes" / "grainy.toml",),
+        output=folder / "out",
+    )
+    by_photo = {i.photo: i for i in run(project)}
+    assert by_photo["a.png"].status == "failed"
+    assert "outside the output folder" in str(by_photo["a.png"].error)
+    assert list(elsewhere.iterdir()) == []
+    assert by_photo["b.png"].status == "done"  # the other photos still run
 
 
 def test_a_project_needs_a_photo_and_a_recipe(folder):

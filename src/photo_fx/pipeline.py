@@ -452,8 +452,8 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
 def _inside(output: Path, target: Path) -> Path:
     """`target`, once it is known to lie inside `output`: every file the pipeline writes goes through here.
 
-    A photo's file name becomes a folder name, and a name such as `...png` (stem `..`) or a link inside the output
-    folder would otherwise carry the writes elsewhere; ProjectError if it does."""
+    A photo's file name becomes a folder name, and a name such as `...png` (stem `..` before Python 3.14) or a link
+    inside the output folder would otherwise carry the writes elsewhere; ProjectError if it does."""
     if not target.resolve().is_relative_to(output.resolve()):
         raise ProjectError(f"{target} is outside the output folder {output}: rename the photo")
     return target
