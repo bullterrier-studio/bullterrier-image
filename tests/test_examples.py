@@ -1,6 +1,5 @@
 import importlib.util
-import shutil
-import subprocess
+import re
 import sys
 from pathlib import Path
 
@@ -10,20 +9,6 @@ from photo_fx import gallery, load_project, load_recipe
 from photo_fx.core import registry
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
-
-
-def _in_a_git_checkout(folder: Path) -> bool:
-    """Whether the git command exists and `folder` is inside a git work tree (a source archive is not)."""
-    if shutil.which("git") is None:
-        return False
-    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=folder, capture_output=True, check=False)
-    return inside.returncode == 0
-
-
-needs_git = pytest.mark.skipif(
-    not _in_a_git_checkout(EXAMPLES.parent),
-    reason="reads the repository with git: needs the git command and a git checkout",
-)
 
 
 @pytest.mark.parametrize("name", sorted(registry.describe()))
@@ -67,13 +52,6 @@ def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the
     assert checked, "no demo recipe moves ascii text, so nothing was checked"
 
 
-def test_the_demo_pictures_the_readme_shows_exist():
-    for name in ("neon-pulse", "glitch", "ascii-colour", "halftone-print", "ember-glitch"):
-        assert (EXAMPLES / "output" / "bullterrier" / f"{name}.jpg").is_file(), name
-    assert (EXAMPLES / "output" / "bullterrier" / "evaporate.frames.png").is_file()  # a picture, not a video
-    assert (EXAMPLES / "output" / "steps" / "ember-glitch" / "_sheet.jpg").is_file()
-
-
 @pytest.mark.skipif(sys.platform != "darwin", reason="finding the subject needs Apple Vision")
 def test_the_python_example_runs(tmp_path, capsys):
     spec = importlib.util.spec_from_file_location("python_api_example", EXAMPLES / "python_api.py")
@@ -87,16 +65,12 @@ def test_the_python_example_runs(tmp_path, capsys):
     assert "toxic-neon: done" in capsys.readouterr().out
 
 
-@needs_git
-def test_no_video_or_gif_is_checked_in():
-    listed = subprocess.run(["git", "ls-files"], cwd=EXAMPLES.parent, capture_output=True, encoding="utf-8", check=True)
-    tracked = listed.stdout.split()
-    assert not [f for f in tracked if f.lower().endswith((".mp4", ".mov", ".webm", ".gif"))]
+def test_no_video_or_gif_is_checked_in(tracked_files):
+    assert len(tracked_files) > 100  # the listing really is the repository
+    assert [f for f in tracked_files if f.lower().endswith((".mp4", ".mov", ".webm", ".gif"))] == []
 
 
 def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists():
-    import re
-
     readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
     assert re.search(r"\]\(docs/effects\.md\)", readme), "the README must link to docs/effects.md, the effect catalogue"
     assert (EXAMPLES.parent / "docs" / "effects.md").is_file()

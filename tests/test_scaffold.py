@@ -25,19 +25,6 @@ from photo_fx.core import registry
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _in_a_git_checkout(folder: Path) -> bool:
-    """Whether the git command exists and `folder` is inside a git work tree (a source archive is not)."""
-    if shutil.which("git") is None:
-        return False
-    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=folder, capture_output=True, check=False)
-    return inside.returncode == 0
-
-
-needs_git = pytest.mark.skipif(
-    not _in_a_git_checkout(ROOT), reason="reads the repository with git: needs the git command and a git checkout"
-)
-
-
 @pytest.fixture
 def checkout(tmp_path):
     """A scratch source checkout holding a copy of this photo-fx package (with its effect template)."""
@@ -189,13 +176,10 @@ def test_the_command_reports_an_existing_name_and_a_bad_category(checkout):
 PROBE = "zz_scaffold_probe_with_a_rather_long_name"  # long, so the template's lines must still fit the line limit
 
 
-def _copy_of_the_tree(destination: Path) -> Path:
+def _copy_of_the_tree(destination: Path, tracked_files: list[str]) -> Path:
     """A copy, at `destination`, of every file git tracks or has staged, as it is in the working tree (so a change not
     yet committed is in it, a stray untracked file is not)."""
-    listed = subprocess.run(
-        ["git", "ls-files", "--cached", "-z"], cwd=ROOT, capture_output=True, encoding="utf-8", check=True
-    ).stdout
-    for relative in filter(None, listed.split("\0")):
+    for relative in tracked_files:
         if (ROOT / relative).is_file():  # a file deleted but not yet staged is listed too
             (destination / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, destination / relative)
@@ -212,19 +196,17 @@ def _scaffold_into(copy: Path) -> list[str]:
     return sorted(set(after) - set(before))
 
 
-@needs_git
-def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_existing_file(tmp_path):
-    created = _scaffold_into(_copy_of_the_tree(tmp_path / "tree"))
+def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_existing_file(tmp_path, tracked_files):
+    created = _scaffold_into(_copy_of_the_tree(tmp_path / "tree", tracked_files))
     assert created  # something was added ...
     places = (f"src/photo_fx/effects/{PROBE}/", f"tests/effects/{PROBE}/", f"examples/effects/{PROBE}.")
     assert all(path.startswith(places) for path in created), created  # ... and only files named for the effect
 
 
-@needs_git
-def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as_written(tmp_path):
+def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as_written(tmp_path, tracked_files):
     """Bounded on purpose, to keep the suite fast: in the copy, ruff on the new files, then the contract tests (which
     run over every effect) and the new effect's own tests; not the whole gate."""
-    copy = _copy_of_the_tree(tmp_path / "tree")
+    copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     created = _scaffold_into(copy)
     environment = {**os.environ, "PYTHONPATH": str(copy / "src")}  # the copy's photo_fx, not the installed one
     contract_and_own = ["tests/effects/test_contract.py", f"tests/effects/{PROBE}"]

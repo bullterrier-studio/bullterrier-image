@@ -1,3 +1,8 @@
+"""What tests in every folder share: the small test picture and matte, the effect-registry helpers, a stand-in for the
+subject-finding model, and the files git tracks. Helpers used by one folder live in that folder's conftest.py."""
+
+import shutil
+import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,6 +15,20 @@ from onnx import TensorProto, helper
 from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect, unregister
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(scope="session")
+def tracked_files() -> list[str]:
+    """Every file git tracks or has staged in this checkout, as paths relative to its root. A test that asks for it is
+    skipped where git cannot tell: without the git command, or in a source archive, which is no git checkout."""
+    if shutil.which("git") is None:
+        pytest.skip("reads the repository with git: needs the git command")
+    listed = subprocess.run(["git", "ls-files", "--cached", "-z"], cwd=ROOT, capture_output=True, encoding="utf-8")
+    if listed.returncode != 0:
+        pytest.skip("reads the repository with git: needs a git checkout")
+    return [relative for relative in listed.stdout.split("\0") if relative]
 
 
 @contextmanager
