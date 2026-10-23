@@ -63,6 +63,6 @@ def shadows_highlights(rgb: np.ndarray, params: ShadowsHighlightsParams) -> np.n
     `highlights` only raises it (pulling c towards 0), black and white stay where they are, and 0..1 maps into 0..1.
     """
     luma = luminance(rgb)
-    base = np.clip(guided_filter(luma, luma, radius=round(params.radius), epsilon=params.edge_threshold**2), 0.0, 1.0)
+    base = guided_filter(luma, luma, radius=round(params.radius), epsilon=params.edge_threshold**2)
     exponent = (1.0 + params.highlights * base**2) / (1.0 + params.shadows * (1.0 - base) ** 2)
     return (rgb ** exponent[..., None]).astype(np.float32)

@@ -93,3 +93,13 @@ def test_the_inputs_are_left_alone_and_float64_is_accepted() -> None:
     np.testing.assert_array_equal(guide, before[0])
     np.testing.assert_array_equal(source, before[1])
     assert out.dtype == np.float32
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_a_picture_guided_by_itself_never_leaves_its_own_range(seed: int) -> None:
+    """Self-guided, every output is an average of source values, so edges cannot make it overshoot."""
+    rng = np.random.default_rng(seed)
+    picture = np.where(rng.random((17, 23)) > 0.5, 0.9, 0.1).astype(np.float32) * (seed + 1) / 3 - seed / 5
+    out = guided_filter(picture, picture, radius=seed % 4, epsilon=10.0 ** (-seed % 3 - 1))
+    assert out.min() >= picture.min() - 1e-5
+    assert out.max() <= picture.max() + 1e-5

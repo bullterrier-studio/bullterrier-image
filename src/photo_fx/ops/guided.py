@@ -17,10 +17,12 @@ def guided_filter(guide: np.ndarray, source: np.ndarray, *, radius: int, epsilon
     - the source itself for `radius` 0, and a constant source, whatever the guide, stays that constant;
     - a plain box average of the source (applied twice) for `epsilon` far above the guide's variance;
     - the source again where it is an affine function of the guide and `epsilon` is far below the guide's variance.
-    It is not clipped: it can leave the range of the source by a little near strong edges, so callers that need
-    a range clip it. `guide` and `source` have one shape (a picture's luminance, say); `epsilon` is in the units of
-    the guide squared and must be above 0 (0 divides by the variance of flat windows). The work is proportional to
-    the number of pixels, not to the window (box means by cumulative sums, in float64).
+    It is not clipped. With the source as its own guide (`guide` is `source`) a is between 0 and 1, so every output is
+    an average of source values and never leaves their range (up to float32 rounding); with another guide it can
+    leave the range of the source a little near strong edges. `guide` and `source` have one shape (a picture's
+    luminance, say); `epsilon` is in the units of the guide squared and must be above 0 (0 divides by the variance
+    of flat windows). The work is proportional to the number of pixels, not to the window (box means by cumulative
+    sums, in float64).
     """
     mean_guide = _box_mean(guide, radius)
     mean_source = _box_mean(source, radius)
