@@ -119,7 +119,7 @@ def release(bump: str, *, dry_run: bool) -> None:
         print(f"\nrelease (dry run): would release v{version} with these notes; nothing was changed\n\n{notes}")
         return
     _run("uv", "version", version, "--no-sync")
-    CHANGELOG.write_text(changelog, encoding="utf-8")
+    CHANGELOG.write_text(changelog, encoding="utf-8", newline="\n")  # as committed, also on Windows
     _run("git", "add", str(PYPROJECT), "uv.lock", str(CHANGELOG))
     _run("git", "commit", "--quiet", "--message", f"chore(release): v{version}")
     _run("git", "tag", "--annotate", f"v{version}", "--message", f"{project['name']} {version}")

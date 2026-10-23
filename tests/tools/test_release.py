@@ -88,6 +88,7 @@ def test_a_minor_release_bumps_writes_the_section_commits_and_tags_but_never_pus
     added, fixed = "### Added\n\n- glow: Add a falloff parameter", "### Fixed\n\n- Stop rounding twice"
     assert section.group(1).strip() == f"{added}\n\n{fixed}"  # in Keep a Changelog's order; the docs commit left out
     assert FIRST_SECTION in changelog  # the earlier section is kept as it was
+    assert b"\r" not in (git_repo.path / "CHANGELOG.md").read_bytes()  # line endings as committed, on Windows too
     assert changelog.endswith(f"[0.2.0]: {REPOSITORY}/compare/v0.1.0...v0.2.0\n{FIRST_LINK}")
     assert git_repo.git("log", "-1", "--format=%s") == "chore(release): v0.2.0"
     assert git_repo.git("status", "--porcelain") == ""
