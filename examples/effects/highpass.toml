@@ -1,0 +1,7 @@
+# The fur's fine detail alone, as a grey relief of whiskers and wrinkles.
+name = "highpass"
+size = 480
+
+[[step]]
+effect = "highpass"
+radius = 3
