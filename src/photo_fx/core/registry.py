@@ -34,7 +34,8 @@ from typing import Any
 
 import numpy as np
 
-from .errors import PhotoFxError, UnknownEffectError
+from photo_fx.errors import PhotoFxError, UnknownEffectError
+
 from .params import EffectParams
 
 # The sections of the effect catalogue (docs/effects.md is laid out in this order). Every effect is in exactly one.

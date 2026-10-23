@@ -5,7 +5,8 @@ import sees. Each layer may import only the layers below it:
     adapters   imageio, matte
     effects    one folder per effect; never import each other
     core       loader | runner > steps > registry > params | timing | vocabulary > types; may import ops
-    ops        imports nothing from photo_fx outside ops
+    ops        may import errors
+    errors     the exceptions; import nothing from photo_fx, so every layer may raise them
 
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
 unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
@@ -28,13 +29,12 @@ PACKAGE = Path(photo_fx.__file__).parent
 ROOT = PACKAGE.parent.parent  # the repository: pyproject.toml holds the contracts
 LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-imports` from the repository root
 
-LAYERS = "Layers: app > adapters > effects > core > ops"
-OPS_ALONE = "ops imports nothing else from photo_fx"
+LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
 CORE_ORDER = "Core order: loader | runner > steps > registry > params | timing > types"
-LOADER_DIRECT = "loader imports only steps, timing and errors from core"
-TIMING_ALONE = "timing imports nothing else from photo_fx"
-CONTRACTS = [LAYERS, OPS_ALONE, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
+LOADER_DIRECT = "loader imports only steps and timing from core"
+TIMING_ALONE = "timing imports only errors from photo_fx"
+CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
 
 
 def fresh_python(code: str) -> subprocess.CompletedProcess:
@@ -77,7 +77,9 @@ FORBIDDEN = {
         "photo_fx.effects.glitch.effect",
         EFFECTS_APART,
     ),
-    "ops to core": ("ops/cells.py", "import photo_fx.core.timing", "photo_fx.ops.cells", OPS_ALONE),
+    "ops to core": ("ops/cells.py", "import photo_fx.core.timing", "photo_fx.ops.cells", LAYERS),
+    "errors to ops": ("errors.py", "import photo_fx.ops.cells", "photo_fx.errors", LAYERS),
+    "errors to core": ("errors.py", "import photo_fx.core.timing", "photo_fx.errors", LAYERS),
     "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
     "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
     "effects to imageio": (
@@ -113,9 +115,18 @@ def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract
     assert importer in result.stdout, result.stdout
 
 
-def test_core_may_import_ops(tmp_path):
-    """Owner ruling: the layers are linear, app > adapters > effects > core > ops, so core may use ops."""
-    result = lint_a_copy_with(tmp_path, "core/steps.py", "import photo_fx.ops.cells")
+ALLOWED = {
+    "core to ops": ("core/steps.py", "import photo_fx.ops.cells"),
+    "core to errors": ("core/vocabulary.py", "import photo_fx.errors"),
+    "ops to errors": ("ops/cells.py", "import photo_fx.errors"),
+}
+
+
+@pytest.mark.parametrize(("module", "line"), ALLOWED.values(), ids=ALLOWED.keys())
+def test_a_layer_may_import_the_layers_below_it(module, line, tmp_path):
+    """Owner rulings: the layers are linear, app > adapters > effects > core > ops > errors, so core may use ops, and
+    the exceptions, which import nothing, sit below everything so every layer may raise them."""
+    result = lint_a_copy_with(tmp_path, module, line)
     assert result.returncode == 0, result.stdout + result.stderr
     for name in CONTRACTS:
         assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"

@@ -6,12 +6,12 @@ import re
 import numpy as np
 import pytest
 
-from photo_fx.core.errors import RecipeError
 from photo_fx.core.loader import load_recipe
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.steps import Recipe, Step
 from photo_fx.core.timing import Animated, Animation
+from photo_fx.errors import RecipeError
 
 
 class GainParams(EffectParams):

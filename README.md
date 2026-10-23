@@ -403,12 +403,13 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
   plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, effect)
-  core/          core      registry.py (effects register here), params.py (parameter models), errors.py, types.py,
+  core/          core      registry.py (effects register here), params.py (parameter models), types.py,
                            vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
                            (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;
                            given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: color, resample, textart, glyphs, cells,
                            distance (internal; core may import ops; ops imports nothing above it)
+  errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect, <effect>.toml
 docs/            the effect catalogue (effects.md, generated) and its pictures (gallery/<effect>.jpg), roadmap, design decisions

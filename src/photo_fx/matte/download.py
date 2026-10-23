@@ -23,7 +23,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import IO
 
-from photo_fx.core.errors import PhotoFxError
+from photo_fx.errors import PhotoFxError
 
 APP = "photo-fx"
 _CHUNK = 1 << 20  # bytes read at a time: memory use only, the result does not depend on it

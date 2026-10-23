@@ -21,6 +21,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from photo_fx.errors import BackendUnavailableError
+
 FONTS_VARIABLE = "PHOTO_FX_FONTS"
 # Tried in order when FONTS_VARIABLE is unset; the first that exists wins. All are monospaced.
 _FONTS = [
@@ -133,9 +135,6 @@ def _load_font(cell: int, font_path: str | None) -> ImageFont.FreeTypeFont:
         default = ImageFont.load_default(size=round(cell / 0.6))
         # Pillow falls back to a fixed-size bitmap font, which cannot be measured or scaled, only without FreeType
         if not isinstance(default, ImageFont.FreeTypeFont):
-            # Imported here: the error types are the one thing of photo_fx's that ops may use (pyproject's contracts)
-            from photo_fx.core.errors import BackendUnavailableError
-
             raise BackendUnavailableError(
                 f"no font file was found and this Pillow has no FreeType to draw its own: list a monospaced .ttf or "
                 f".ttc in {FONTS_VARIABLE} (paths separated by {os.pathsep!r}), pass `font`, or install a Pillow "

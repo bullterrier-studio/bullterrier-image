@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from .errors import RecipeError
+from photo_fx.errors import RecipeError
 
 _SIMPLE_EASES = {
     "linear": lambda t: t,

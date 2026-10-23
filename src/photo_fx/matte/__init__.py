@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-from photo_fx.core.errors import BackendUnavailableError, SubjectNotFoundError
+from photo_fx.errors import BackendUnavailableError, SubjectNotFoundError
 
 from . import _onnx, _vision
 from .download import DownloadError, fetch, user_cache_dir

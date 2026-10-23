@@ -5,8 +5,8 @@ import re
 
 import pytest
 
-from photo_fx.core.errors import RecipeError
 from photo_fx.core.loader import load_recipe
+from photo_fx.errors import RecipeError
 
 STEP = "[[step]]\neffect = 'grade'\n"
 

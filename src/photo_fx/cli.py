@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     developers. See the exit codes in `--help`.
     """
     args = _parser().parse_args(argv)
-    from .core.errors import PhotoFxError  # after parsing: `--help` and `--version` have exited by now
+    from .errors import PhotoFxError  # after parsing: `--help` and `--version` have exited by now
 
     debug = args.debug or os.environ.get(_DEBUG_VARIABLE) == "1"
     try:
@@ -248,7 +248,7 @@ def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, SubjectFinde
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
-    from .core.errors import RecipeError
+    from .errors import RecipeError
     from .recipe import load_recipe
 
     files: list[Path] = []
@@ -299,7 +299,7 @@ def _sheet(args: argparse.Namespace) -> int:
 
 def _cutout(args: argparse.Namespace) -> int:
     from . import imageio
-    from .core.errors import SubjectNotFoundError
+    from .errors import SubjectNotFoundError
     from .matte import refine_edge
 
     photo = imageio.load(args.photo)
@@ -321,7 +321,7 @@ def _cutout(args: argparse.Namespace) -> int:
 
 def _animate(args: argparse.Namespace) -> int:
     from . import imageio
-    from .core.errors import RecipeError
+    from .errors import RecipeError
     from .recipe import load_recipe, render_frames
 
     recipe = load_recipe(args.recipe)

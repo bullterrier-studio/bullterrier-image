@@ -19,7 +19,8 @@ adapters   imageio (files), matte (finding the subject)               (may impor
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
-ops        pure numeric primitives                                    (imports nothing from photo_fx)
+ops        pure numeric primitives                                    (may import errors)
+errors     PhotoFxError and its subclasses                            (imports nothing from photo_fx)
 ```
 Imports flow **downward only**. `import-linter` enforces this in the test suite (contracts in `pyproject.toml`, run by `tests/test_layering.py`; `uv run lint-imports`).
 If you want an import the rules forbid, the code is in the wrong layer: move it.
@@ -35,7 +36,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
-8. **Errors:** callers catch `PhotoFxError` (`photo_fx.core.errors`, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
+8. **Errors:** callers catch `PhotoFxError` (`photo_fx.errors`, the bottom layer, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
 
 ## Standards
 

@@ -48,7 +48,8 @@ Dependency direction: imports `steps`, `timing` and `errors` only; it does not k
 import tomllib
 from pathlib import Path
 
-from .errors import RecipeError
+from photo_fx.errors import RecipeError
+
 from .steps import Recipe, Step, safe_name
 from .timing import EASE_NAMES, Animated, Animation
 

@@ -37,9 +37,9 @@ import annotated_types
 import numpy as np
 from pydantic import AllowInfNan, BaseModel, BeforeValidator, ConfigDict, Field, Strict, ValidationError, WithJsonSchema
 
+from photo_fx.errors import RecipeError
 from photo_fx.ops.color import parse_color
 
-from .errors import RecipeError
 from .types import Color as ColorForms
 
 UNITS = ("px", "fraction", "degrees", "stops", "seconds", "count", "ratio", "cycles")

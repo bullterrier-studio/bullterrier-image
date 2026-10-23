@@ -264,12 +264,12 @@ DEP003 = ["Foundation"]
 root_package = "photo_fx"
 
 [[tool.importlinter.contracts]]
-name = "Layers: app > adapters > effects > core > ops"
+name = "Layers: app > adapters > effects > core > ops > errors"
 type = "layers"
 containers = ["photo_fx"]
 exhaustive = true  # a new top-level module must be placed in a layer here
 # Each layer may import only the layers below it ("|" = independent siblings, ":" = siblings that may import each
-# other). Being exhaustive, it also stops core and ops importing anything above them.
+# other). Being exhaustive, it also stops core, ops and errors importing anything above them.
 layers = [
     "__main__",  # `python -m photo_fx`: runs the command line
     "cli",  # app, split so its modules cannot form cycles: recipe imports no other app module
@@ -281,16 +281,8 @@ layers = [
     "plugin",  # the effect-author API for other packages: core's names, so photo-fx's own effects may use it too
     "core",  # may import ops
     "ops",
+    "errors",  # the exceptions: they import nothing, so every layer may raise them
 ]
-# the exceptions every layer may raise (core.errors imports nothing): glyphs reports a host it cannot draw on
-ignore_imports = ["photo_fx.ops.glyphs -> photo_fx.core.errors"]
-
-[[tool.importlinter.contracts]]
-name = "ops imports nothing else from photo_fx"
-type = "forbidden"
-source_modules = ["photo_fx.ops"]
-forbidden_modules = ["photo_fx.*"]  # every top-level module but ops itself (overlaps are skipped)
-ignore_imports = ["photo_fx.ops.glyphs -> photo_fx.core.errors"]  # the exceptions every layer may raise
 
 [[tool.importlinter.contracts]]
 name = "Effects never import each other"
@@ -306,21 +298,21 @@ containers = ["photo_fx.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
 # (types). Both edges point down, so each gets a layer of its own; nothing else changes.
-layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types | errors"]
+layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types"]
 
 [[tool.importlinter.contracts]]
-name = "loader imports only steps, timing and errors from core"
+name = "loader imports only steps and timing from core"
 type = "forbidden"
 source_modules = ["photo_fx.core.loader"]
 forbidden_modules = ["photo_fx.core.registry", "photo_fx.core.types", "photo_fx.core.vocabulary"]
 allow_indirect_imports = true  # through steps is fine: the TOML reader itself only builds Steps and Recipes
 
 [[tool.importlinter.contracts]]
-name = "timing imports nothing else from photo_fx"
+name = "timing imports only errors from photo_fx"
 type = "forbidden"
 source_modules = ["photo_fx.core.timing"]
-forbidden_modules = ["photo_fx.*", "photo_fx.core.*"]  # overlaps (core itself, timing itself) are skipped
-ignore_imports = ["photo_fx.core.timing -> photo_fx.core.errors"]  # the exceptions every layer may raise
+# the layers contracts already keep it from everything above core; overlaps (timing itself) are skipped
+forbidden_modules = ["photo_fx.ops", "photo_fx.core.*"]
 
 # the dev group installs this project's own `video` extra (so the bundled-ffmpeg fallback is tested)
 [tool.uv.sources]

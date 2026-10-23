@@ -20,10 +20,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from photo_fx.errors import RecipeError, SubjectNotFoundError
 from photo_fx.ops.resample import resize
 
 from . import registry
-from .errors import RecipeError, SubjectNotFoundError
 from .steps import Recipe, Step
 
 # Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).

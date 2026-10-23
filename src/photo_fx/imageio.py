@@ -17,7 +17,7 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.core.errors import BackendUnavailableError, ImageReadError
+from photo_fx.errors import BackendUnavailableError, ImageReadError
 from photo_fx.ops import resample
 
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]

@@ -4,7 +4,7 @@ Each subclass also inherits the builtin exception it replaces, so code that alre
 `RuntimeError`, `NotImplementedError` or `OSError` keeps working. Library code raises one of these, never a bare
 builtin, for anything a caller, a recipe or a photo can get wrong; the message says what was wrong and what is valid.
 
-Dependency direction: imports nothing, so every layer may raise them.
+Dependency direction: the bottom layer, below `ops`: it imports nothing from photo_fx, so every layer may raise them.
 """
 
 __all__ = [

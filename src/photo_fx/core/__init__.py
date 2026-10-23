@@ -1,6 +1,5 @@
 """The kernel: the effect registry, the contract types every effect is written against, and the recipe engine.
 
-    errors      `PhotoFxError` and its subclasses: the exceptions the library raises on purpose
     registry    effects register here (`@effect`); everything else looks them up here
     params      `EffectParams`, `param`, `Color`: how an effect declares its validated, documented parameters
     types       the forms a colour may be written in
@@ -16,6 +15,6 @@ effects, adapters and the app change around it. Its names are imported from thei
 Users import from `photo_fx` / `photo_fx.recipe`, whose `render` & co. also know how to find the subject.
 """
 
-from . import errors, loader, params, registry, runner, steps, timing, types, vocabulary
+from . import loader, params, registry, runner, steps, timing, types, vocabulary
 
-__all__ = ["errors", "loader", "params", "registry", "runner", "steps", "timing", "types", "vocabulary"]
+__all__ = ["loader", "params", "registry", "runner", "steps", "timing", "types", "vocabulary"]

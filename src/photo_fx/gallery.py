@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 from . import fx, imageio
 from .core import registry
-from .core.errors import ProjectError
+from .errors import ProjectError
 from .matte import subject_matte
 from .ops.resample import resize
 from .recipe import load_recipe, render

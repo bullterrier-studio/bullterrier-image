@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr__` imports each name on first use
     from . import fx, imageio, recipe
-    from .core.errors import (
+    from .errors import (
         BackendUnavailableError,
         ImageReadError,
         PhotoFxError,
@@ -50,7 +50,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 # numpy, Pillow, pydantic and scipy for a bare `import photo_fx`, about 0.25 s, before anything is used (PEP 562).
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
-    ".core.errors": (
+    ".errors": (
         "BackendUnavailableError", "ImageReadError", "PhotoFxError", "ProjectError", "RecipeError",
         "SubjectNotFoundError", "UnknownEffectError",
     ),

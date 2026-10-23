@@ -5,7 +5,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Architecture
 
-- **Linear layers: app > adapters > effects > core > ops.** Each layer imports only the layers below it.
+- **Linear layers: app > adapters > effects > core > ops > errors.** Each layer imports only the layers below it; the
+  exception hierarchy (`photo_fx.errors`) imports nothing, so it is the bottom layer and every layer may raise it.
   *Reason:* one direction of dependency is the simplest rule that stays true as the project grows; a forbidden import
   means the code is in the wrong layer, so the fix is always a move, never an exception. *Consequence:* the rules are
   import-linter contracts in `pyproject.toml`, run by the test suite (`uv run lint-imports`); `core` never imports

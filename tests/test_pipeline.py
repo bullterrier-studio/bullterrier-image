@@ -10,7 +10,7 @@ from PIL import Image
 
 from photo_fx import Project, imageio
 from photo_fx.cli import main
-from photo_fx.core.errors import BackendUnavailableError, ProjectError
+from photo_fx.errors import BackendUnavailableError, ProjectError
 from photo_fx.pipeline import init_project, load_project, run
 
 FFMPEG = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
