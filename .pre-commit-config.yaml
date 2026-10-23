@@ -36,25 +36,11 @@ repos:
         entry: uv run python tools/check_commit_message.py
         language: system
         stages: [commit-msg]
-      # The whole-repository checks run on push (and in `uv run poe check`), not on every commit, so commits stay
-      # fast. They check everything, whatever the push touched: no file names, and they run even without .py changes.
-      - id: tests
-        name: tests (reproduce with `uv run poe test`)
-        entry: uv run poe test
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-      - id: mypy
-        name: mypy (reproduce with `uv run mypy`)
-        entry: uv run mypy
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-      - id: vulture
-        name: vulture, dead code (reproduce with `uv run vulture`)
-        entry: uv run vulture
+      # The whole local gate runs on a push to main (or a tag), not on every commit and not on feature branches:
+      # tools/pre_push.py decides, and runs `uv run poe check`. CI checks a feature branch when its pull request opens.
+      - id: gate
+        name: the whole gate (reproduce with `uv run poe check`)
+        entry: uv run python tools/pre_push.py
         language: system
         pass_filenames: false
         always_run: true
