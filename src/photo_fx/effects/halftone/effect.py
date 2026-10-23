@@ -3,10 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.blur import gaussian_blur
 from photo_fx.ops.color import ink_amount, luminance, vivid
 
 # constant: pixels drawn at once; bounds the working memory and never changes the result
@@ -111,18 +111,8 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     height, width = rgb.shape[:2]
     cell = params.cell
     paper = np.asarray(params.paper, dtype=np.float32)
-    smooth = np.stack(
-        [
-            ndimage.gaussian_filter(
-                rgb[..., c],
-                cell * params.sigma,
-                mode=params.mode,
-                cval=params.constant_value,
-                truncate=params.truncate,
-            )
-            for c in range(3)  # constant: the three colour channels, red, green, blue
-        ],
-        axis=-1,
+    smooth = gaussian_blur(
+        rgb, cell * params.sigma, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
     )
     cos, sin = np.cos(np.radians(params.angle)), np.sin(np.radians(params.angle))
     x = np.arange(width, dtype=np.float32)
