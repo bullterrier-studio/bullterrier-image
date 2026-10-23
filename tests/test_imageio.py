@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image
 
-from photo_fx import imageio
+from photo_fx import ImageReadError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -198,6 +198,49 @@ def test_a_broken_or_mismatched_profile_is_ignored_quietly_and_the_pixels_taken_
     assert capfd.readouterr() == ("", "")  # neither Python nor littlecms printed anything
 
 
+# --- animations and unreadable files ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("suffix", [".gif", ".png"], ids=["animated GIF", "APNG"])
+def test_an_animation_loads_as_its_first_frame(tmp_path, suffix):
+    red, blue = Image.new("RGB", (4, 3), (255, 0, 0)), Image.new("RGB", (4, 3), (0, 0, 255))
+    red.save(tmp_path / f"anim{suffix}", save_all=True, append_images=[blue], duration=100, loop=0)
+    with Image.open(tmp_path / f"anim{suffix}") as written:
+        assert getattr(written, "n_frames", 1) == 2  # the file really is an animation
+    np.testing.assert_array_equal(imageio.load(tmp_path / f"anim{suffix}"), np.tile([1, 0, 0], (3, 4, 1)))
+
+
+def truncated_png(path):
+    Image.fromarray(np.random.default_rng(0).integers(0, 256, (64, 64, 3), np.uint8)).save(path)
+    path.write_bytes(path.read_bytes()[:400])
+
+
+UNREADABLE = [
+    pytest.param(lambda path: None, id="missing"),
+    pytest.param(lambda path: path.write_text("just some text", encoding="utf-8"), id="not an image"),
+    pytest.param(truncated_png, id="truncated"),
+    pytest.param(lambda path: path.mkdir(), id="a folder"),
+]
+
+
+@pytest.mark.parametrize("make", UNREADABLE)
+@pytest.mark.parametrize("read", [imageio.load, imageio.load_matte], ids=["load", "load_matte"])
+def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_it(tmp_path, read, make):
+    path = tmp_path / "broken-photo.png"
+    make(path)
+    with pytest.raises(ImageReadError, match=r"broken-photo\.png"):
+        read(path)
+
+
+def test_a_decompression_bomb_is_refused_with_image_read_error(tmp_path, monkeypatch):
+    Image.new("RGB", (30, 20)).save(tmp_path / "bomb.png")  # 600 px
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)  # Pillow's own limit, lowered: refused above twice the limit
+    with pytest.raises(ImageReadError, match=r"bomb\.png"):
+        imageio.load(tmp_path / "bomb.png")
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 600)  # the same file within the limit loads
+    assert imageio.load(tmp_path / "bomb.png").shape == (20, 30, 3)
+
+
 def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
     imageio.save(photo, tmp_path / "cut.png", alpha=matte)
     with Image.open(tmp_path / "cut.png") as img:
@@ -365,8 +408,3 @@ def test_a_16_bit_greyscale_png_keeps_its_full_range(tmp_path):
     matte = imageio.load_matte(tmp_path / "m.png")
     np.testing.assert_allclose(matte[:, 15:], 16384 / 65535, atol=1e-6)
     np.testing.assert_allclose(matte[:, :15], 0.0)
-
-
-def test_a_missing_matte_file_is_named(tmp_path):
-    with pytest.raises(FileNotFoundError, match=r"nope\.png"):
-        imageio.load_matte(tmp_path / "nope.png")

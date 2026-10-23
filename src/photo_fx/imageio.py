@@ -8,7 +8,8 @@ about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of
 import io
 import shutil
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from itertools import chain
 from pathlib import Path
 from typing import IO, cast
@@ -16,6 +17,7 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
+from photo_fx.core.errors import ImageReadError
 from photo_fx.ops import resample
 
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
@@ -30,26 +32,43 @@ def load(path: str | Path) -> np.ndarray:
     """Read a photo as RGB float32 0..1, upright and in sRGB: what a viewer shows (see `from_pil` for every format).
 
     Phone photos carry an EXIF rotation and often a Display P3 profile; both are applied here so that
-    what you see in Preview is what the effects get.
+    what you see in Preview is what the effects get. An animation (GIF, APNG, a multi-page TIFF) gives its first
+    frame. ImageReadError, naming the path, when the file is missing, not an image, truncated, or larger than
+    Pillow's decompression-bomb limit allows (twice `PIL.Image.MAX_IMAGE_PIXELS`, about 179 megapixels by default;
+    raise that limit yourself to read bigger files you trust).
     """
-    with Image.open(path) as opened:
-        return from_pil(ImageOps.exif_transpose(opened))
+    with _picture(path) as img:
+        return from_pil(img)
 
 
 def load_matte(path: str | Path) -> np.ndarray:
     """Read a subject matte someone already has: float32 (height, width), 1 = subject, 0 = background.
 
     A picture with transparency (a cut-out PNG) gives its alpha channel; any other gives its brightness, so a
-    black-and-white mask works as it is. 8- and 16-bit files keep their full range; EXIF rotation is applied, as in
-    `load`, so the matte lines up with the photo it was made for.
+    black-and-white mask works as it is. 8- and 16-bit files keep their full range; EXIF rotation, the first-frame
+    rule and ImageReadError are as in `load`, so the matte lines up with the photo it was made for.
     """
-    with Image.open(path) as opened:
-        img = ImageOps.exif_transpose(opened)
+    with _picture(path) as img:
         if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants, or "I" from older Pillow)
             return np.clip(np.asarray(img, np.float32) / _SIXTEEN_BIT, 0.0, 1.0)
         if img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info:
             return np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
         return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
+
+
+@contextmanager
+def _picture(path: str | Path) -> Iterator[Image.Image]:
+    """The picture at `path`, upright, its first frame if it has several (the one Pillow opens on).
+
+    A failure to read it, also while its pixels are decoded inside the block, is raised as ImageReadError naming the
+    path. Pillow's decompression-bomb limit is kept, not disabled: a file that claims huge dimensions is refused
+    before its pixels are decoded.
+    """
+    try:
+        with Image.open(path) as opened:
+            yield ImageOps.exif_transpose(opened)
+    except (OSError, ValueError, EOFError, Image.DecompressionBombError) as error:
+        raise ImageReadError(f"cannot read {path} as an image: {error}") from error
 
 
 def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, quality: int = 95) -> None:
