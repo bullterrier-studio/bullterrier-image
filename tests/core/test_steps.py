@@ -192,7 +192,7 @@ def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_val
         (lambda: Animated(0.0, 1.0, (1.5, 0.0, 0.2, 1.0)), "ease"),  # x1 beyond 0..1
         (lambda: Animated(0.0, 1.0, (-0.1, 0.0, 0.2, 1.0)), "ease"),
         (lambda: Animated(0.0, 1.0, (0.4, 0.0, -0.1, 1.0)), "ease"),  # x2 beyond 0..1
-        (lambda: Animated(0.0, 1.0, (0.4, 0.0, 1.5, 1.0)), "ease"),
+        (lambda: Animated(0.0, 1.0, (0.4, 0.0, 1.5, 1.0)), r"ease.*1\.5"),  # names the value given
         (lambda: Animated(0.0, 1.0, (True, 0.0, 0.2, 1.0)), "ease"),
         (lambda: Animated(0.0, 1.0, (0.4, 0.0, "x", 1.0)), "ease"),  # type: ignore[arg-type]  # the point of the test
         (lambda: Animated(0.0, 1.0, "wobbly"), "wobbly"),
@@ -201,8 +201,8 @@ def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_val
         (lambda: Animated("0", 1.0), "start"),  # type: ignore[arg-type]  # the point of the test
     ],
 )
-def test_a_bad_animated_value_made_in_code_is_refused(make, complaint):
-    with pytest.raises(ValueError, match=complaint):
+def test_a_bad_animated_value_made_in_code_is_a_recipe_error_naming_it(make, complaint):
+    with pytest.raises(RecipeError, match=complaint):
         make()
 
 
@@ -223,8 +223,8 @@ def test_a_custom_cubic_bezier_of_four_numbers_with_x_in_range_is_accepted():
         ({"seconds": 2, "loop": "spiral"}, "loop"),
     ],
 )
-def test_a_bad_animation_made_in_code_is_refused(values, complaint):
-    with pytest.raises(ValueError, match=complaint):
+def test_a_bad_animation_made_in_code_is_a_recipe_error_naming_it(values, complaint):
+    with pytest.raises(RecipeError, match=complaint):
         Animation(**values)
 
 

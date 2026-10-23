@@ -3,7 +3,6 @@ cubic-bezier definition), never against the module's own formulas."""
 
 import pytest
 
-from photo_fx import RecipeError
 from photo_fx.core.timing import Animated, Animation
 
 # (name, value of the ease at t = 0.25, 0.5, 0.75), worked out by hand from the definitions
@@ -40,20 +39,20 @@ def bezier_point(x1: float, y1: float, x2: float, y2: float, s: float) -> tuple[
     return b1 * x1 + b2 * x2 + b3, b1 * y1 + b2 * y2 + b3
 
 
-@pytest.mark.parametrize("name", PRESETS)
-def test_named_curves_follow_their_cubic_bezier_to_high_precision(name):
+CUSTOM = (0.17, 0.67, 0.83, 0.67)  # not a preset
+
+
+@pytest.mark.parametrize(
+    ("ease", "control"), [*PRESETS.items(), (CUSTOM, CUSTOM)], ids=[*PRESETS, "four numbers of one's own"]
+)
+def test_named_and_custom_curves_follow_their_cubic_bezier_to_high_precision(
+    ease: str | tuple[float, float, float, float], control: tuple[float, float, float, float]
+) -> None:
     """The curve is the set of points (x(s), y(s)), so the ease at time x(s) must be y(s). Walking s forward needs no
     inversion, so this is independent of the module's solver, and a coarse solver or a wrong constant shows."""
     for step in range(1, 20):
-        x, y = bezier_point(*PRESETS[name], step / 20)
-        assert Animated(0.0, 1.0, name).at(x) == pytest.approx(y, abs=1e-9)
-
-
-def test_a_custom_cubic_bezier_follows_the_same_definition():
-    control = (0.17, 0.67, 0.83, 0.67)  # not a preset
-    for step in range(1, 20):
         x, y = bezier_point(*control, step / 20)
-        assert Animated(0.0, 1.0, control).at(x) == pytest.approx(y, abs=1e-9)
+        assert Animated(0.0, 1.0, ease).at(x) == pytest.approx(y, abs=1e-9)
 
 
 @pytest.mark.parametrize(
@@ -72,25 +71,3 @@ def test_frame_count_is_seconds_times_fps_to_the_nearest_frame(seconds, fps, fra
 def test_pingpong_adds_the_way_back_without_repeating_the_turning_frames():
     once = Animation(1.27, 10).frames()
     assert len(Animation(1.27, 10, loop="pingpong").frames()) == 2 * len(once) - 2  # 24
-
-
-@pytest.mark.parametrize(
-    ("make", "named"),
-    [
-        (lambda: Animated(0.0, 1.0, "wobble"), "wobble"),
-        (lambda: Animated(0.0, 1.0, (0.5, 0.0, 1.5, 1.0)), "1.5"),
-        (lambda: Animation(seconds=-2), "seconds"),
-        (lambda: Animation(seconds=2, fps=0), "fps"),
-        (lambda: Animation(seconds=2, hold_start=1.5, hold_end=0.5), "holds"),
-    ],
-    ids=["unknown ease", "bezier out of range", "negative length", "zero fps", "holds fill the clip"],
-)
-def test_a_bad_animation_value_is_a_recipe_error_naming_it(make, named):
-    with pytest.raises(RecipeError, match=named):
-        make()
-
-
-def test_a_good_animation_and_animated_value_raise_nothing():
-    """The known-good side of the table above."""
-    assert Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).frames()
-    assert Animated(0.0, 1.0, (0.25, 0.1, 0.25, 1.0)).at(0.0) == 0.0
