@@ -20,15 +20,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="session")
-def tracked_files() -> list[str]:
-    """Every file git tracks or has staged in this checkout, as paths relative to its root. A test that asks for it is
-    skipped where git cannot tell: without the git command, or in a source archive, which is no git checkout."""
-    if shutil.which("git") is None:
-        pytest.skip("reads the repository with git: needs the git command")
-    listed = subprocess.run(["git", "ls-files", "--cached", "-z"], cwd=ROOT, capture_output=True, encoding="utf-8")
-    if listed.returncode != 0:
-        pytest.skip("reads the repository with git: needs a git checkout")
-    return [relative for relative in listed.stdout.split("\0") if relative]
+def repository_files() -> Callable[[Path], list[str]]:
+    """`repository_files(root)` lists the files of the git repository at `root` as paths relative to it: those git
+    tracks or has staged, and those it does not know yet unless .gitignore excludes them (so a new file counts before
+    it is `git add`ed). A test that asks for it is skipped where git cannot tell: without the git command, or in a
+    source archive, which is no git checkout."""
+
+    def listing(root: Path) -> list[str]:
+        if shutil.which("git") is None:
+            pytest.skip("reads the repository with git: needs the git command")
+        listed = subprocess.run(
+            ["git", "ls-files", "--cached", "--exclude-standard", "--others", "-z"],
+            cwd=root,
+            capture_output=True,
+            encoding="utf-8",
+        )
+        if listed.returncode != 0:
+            pytest.skip("reads the repository with git: needs a git checkout")
+        return [relative for relative in listed.stdout.split("\0") if relative]
+
+    return listing
+
+
+@pytest.fixture(scope="session")
+def tracked_files(repository_files) -> list[str]:
+    """Every file of this checkout that is tracked, staged or new and not ignored, as paths relative to its root (see
+    `repository_files`)."""
+    return repository_files(ROOT)
 
 
 @contextmanager

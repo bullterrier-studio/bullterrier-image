@@ -177,8 +177,8 @@ PROBE = "zz_scaffold_probe_with_a_rather_long_name"  # long, so the template's l
 
 
 def _copy_of_the_tree(destination: Path, tracked_files: list[str]) -> Path:
-    """A copy, at `destination`, of every file git tracks or has staged, as it is in the working tree (so a change not
-    yet committed is in it, a stray untracked file is not)."""
+    """A copy, at `destination`, of every file git tracks, has staged or does not know yet (unless .gitignore excludes
+    it), as it is in the working tree: a change or a new file not yet committed is in it, so is a new ops module."""
     for relative in tracked_files:
         if (ROOT / relative).is_file():  # a file deleted but not yet staged is listed too
             (destination / relative).parent.mkdir(parents=True, exist_ok=True)
@@ -220,3 +220,42 @@ def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as
         assert done.returncode == 0, f"{' '.join(command[2:5])} failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
     assert f"PASSED tests/effects/{PROBE}/test_{PROBE}.py::" in done.stdout  # its own tests ran, and passed
     assert f"[{PROBE}]" in done.stdout  # the contract tests ran over it too
+
+
+# --- the files a copy of the tree is made from ---------------------------------------------------------------------
+
+
+@pytest.fixture
+def repository(tmp_path, monkeypatch):
+    """A git repository in tmp_path, isolated from the developer's git configuration, with a staged file, a new file
+    git does not know yet and a file its .gitignore excludes, in an `ops` folder like a new ops module would be."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    files = {
+        ".gitignore": "*.log\n__pycache__/\n",
+        "src/ops/staged.py": "STAGED = 1\n",
+        "src/ops/new_module.py": "NEW = 1\n",
+        "src/ops/debug.log": "noise\n",
+        "src/ops/__pycache__/new_module.pyc": "bytecode",
+    }
+    for relative, text in files.items():
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / relative).write_text(text, encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", ".gitignore", "src/ops/staged.py"], cwd=tmp_path, check=True)
+    return tmp_path
+
+
+LISTED = {  # file in the repository above -> whether the copy of the tree must have it
+    "a staged file": ("src/ops/staged.py", True),
+    "a new file git does not know yet, so that a new ops module needs no `git add`": ("src/ops/new_module.py", True),
+    "a file the .gitignore excludes": ("src/ops/debug.log", False),
+    "a bytecode cache in an ignored folder": ("src/ops/__pycache__/new_module.pyc", False),
+}
+
+
+@pytest.mark.parametrize(("relative", "listed"), LISTED.values(), ids=LISTED.keys())
+def test_the_files_a_copy_is_made_from_are_the_tracked_and_the_new_but_not_the_ignored(
+    repository_files, repository, relative, listed
+):
+    assert (relative in repository_files(repository)) is listed
