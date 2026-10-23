@@ -181,7 +181,7 @@ def test_claude_md_lists_every_commit_type_from_the_configuration(pyproject):
         assert f"`{commit_type}`" in claude_md, f"CLAUDE.md does not list the commit type {commit_type!r}"
 
 
-@pytest.mark.parametrize("document", ["CLAUDE.md", "README.md"])
+@pytest.mark.parametrize("document", ["CLAUDE.md", "README.md", "CONTRIBUTING.md"])
 def test_every_poe_command_the_documentation_mentions_is_a_task(pyproject, document):
     mentioned = set(re.findall(r"uv run poe ([a-z][a-z-]*)", (ROOT / document).read_text(encoding="utf-8")))
     assert mentioned, f"{document} should mention at least one poe task"
