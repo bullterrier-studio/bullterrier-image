@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import sys
+from functools import partial
 
 import numpy as np
 import pytest
@@ -164,6 +165,54 @@ def test_the_subject_is_found_once_per_photo_and_remembered_between_runs(folder)
     assert sorted(seen.tobytes() for seen in finder.seen) == photos  # each photo itself, at full size
     run(project, force=True, find_subject=finder)
     assert len(finder.seen) == 2  # redoing everything reads the remembered subject instead of looking again
+
+
+def test_a_damaged_remembered_subject_is_found_again_even_when_forcing(folder):
+    masked_recipes(folder)
+    finder = StandInFinder()
+    project = load_project(folder / "photo-fx.toml")
+    run(project, find_subject=finder)
+    for remembered in project.cache.iterdir():  # cut short, as by a full disk or a crash
+        remembered.write_bytes(remembered.read_bytes()[:40])
+    assert {i.status for i in run(project, force=True, find_subject=finder)} == {"done"}
+    assert len(finder.seen) == 4  # both photos searched again
+    run(project, force=True, find_subject=finder)
+    assert len(finder.seen) == 4  # and what was found again is remembered
+
+
+def finds_disc(rgb, radius):
+    """A subject finder taking an option, bound with functools.partial as the command line binds `--segmenter`."""
+    return disc_matte(rgb.shape[:2], radius)
+
+
+def test_switching_the_subject_finder_finds_the_subjects_again(folder):
+    masked_recipes(folder)
+    project = load_project(folder / "photo-fx.toml")
+    run(project, find_subject=partial(finds_disc, radius=30))
+    items = run(project, find_subject=partial(finds_disc, radius=3))
+    assert sorted((i.recipe, i.status) for i in items if i.photo == "a.png") == [
+        ("cut1", "done"), ("cut2", "done"), ("grainy", "skipped"), ("warm", "skipped"),
+    ]  # fmt: skip
+    assert all("covers only" in i.warnings[0] for i in items if i.recipe == "cut1")  # the new finder's small disc
+
+
+def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
+    masked_recipes(folder)
+    project = load_project(folder / "photo-fx.toml")
+    finder = StandInFinder()
+
+    def interrupted_at_the_second_photo(message):
+        if "b.png" in message:  # just after b.png's first pair is finished
+            raise KeyboardInterrupt  # Ctrl-C
+
+    with pytest.raises(KeyboardInterrupt):
+        run(project, find_subject=finder, log=interrupted_at_the_second_photo)
+    items = run(project, find_subject=finder)
+    assert sorted((i.photo, i.recipe, i.status) for i in items) == [
+        ("a.png", "cut1", "skipped"), ("a.png", "cut2", "skipped"), ("a.png", "grainy", "skipped"),
+        ("a.png", "warm", "skipped"), ("b.png", "cut1", "skipped"), ("b.png", "cut2", "done"),
+        ("b.png", "grainy", "done"), ("b.png", "warm", "done"),
+    ]  # fmt: skip
 
 
 def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_searched_once(folder):

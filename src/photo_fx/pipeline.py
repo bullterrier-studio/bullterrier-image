@@ -35,12 +35,17 @@ import functools
 import glob
 import hashlib
 import html
+import io
 import json
+import os
+import tempfile
 import time
 import tomllib
+import zipfile
 from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime
+from importlib import metadata
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -49,11 +54,12 @@ from pydantic import AfterValidator, ConfigDict, Field, ValidationError, model_v
 from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import imageio
+from . import matte as finding
 from .checks import MotionMeter, matte_warnings, still_warnings
 from .core.errors import ProjectError
 from .core.params import describe_error
 from .core.runner import subject_from
-from .matte import subject_matte
+from .matte import MODEL_VARIABLE, SEGMENTER_VARIABLE, subject_matte
 from .ops.resample import resize
 from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
 from .sheet import contact_sheet, write_stages
@@ -240,9 +246,12 @@ def run(
     (RecipeError); two recipes with one name, or an `only` that matches no photo, raise ProjectError.
     `find_subject(rgb) -> matte` finds the subject of a photo for the recipes that need it (default: `subject_matte`).
     It is asked at most once per photo, and never again for a photo whose subject is remembered in the project's
-    cache from an earlier run; if it raises, the recipes of that photo that need the subject fail, and the rest run.
-    The cache knows the photo, not the finder: after switching to a different `find_subject`, delete `project.cache`,
-    or the subjects the earlier finder found are used again.
+    cache from an earlier run by the same finder; if it raises, the recipes of that photo that need the subject fail,
+    and the rest run. A finder is known by its name and, for a `functools.partial` (as the command line binds
+    `--segmenter`), the arguments bound to it; switching to another finder finds the subjects again and redoes the
+    recipes that use them. A callable object is known by its class alone: give one whose answers differ another class
+    or delete `project.cache`. A damaged cache entry is found again, also with `force`.
+    The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
     names = [recipe.name for _, recipe in recipes]
@@ -264,17 +273,19 @@ def run(
             project.steps_at,
         )
     )
-    code = _code_fingerprint()
+    code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
+    subject_key = _subject_key(find_subject)
     items: list[Item] = []
     total = len(photos) * len(recipes)
     for photo in photos:
         photo_hash = hashlib.sha256(photo.read_bytes()).hexdigest()
-        state = _Photo(photo, photo_hash, project, find_subject)
+        state = _Photo(photo, _fingerprint(photo_hash, subject_key), project, find_subject)
         for path, recipe in recipes:
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
-            fingerprint = _fingerprint(
-                photo_hash, repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8"), settings, code
-            )
+            recipe_text = repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8")
+            # a recipe that uses the subject is redone when another finder would find it
+            parts = (photo_hash, recipe_text, settings, code, *((subject_key,) if recipe.needs_matte else ()))
+            fingerprint = _fingerprint(*parts)
             old = previous.get((photo.name, recipe.name))
             if (
                 not force
@@ -302,42 +313,46 @@ def run(
                     )
                 item = replace(item, seconds=round(time.time() - started, 2))
                 items.append(item)
+                _write_record(project, items, previous, names, code)
                 log(
                     f"{label}: {item.status}"
                     + (f" ({'; '.join(item.warnings)})" if item.warnings else "")
                     + (f" {item.error}" if item.error else "")
                 )
     if not dry_run:
-        # The record keeps earlier results for photos this run left alone (--only); the return value does not.
-        seen = {(i.photo, i.recipe) for i in items}
-        photo_names = {p.name for p in project.photos}
-        record = items + [
-            i for key, i in previous.items() if key not in seen and i.photo in photo_names and i.recipe in names
-        ]
-        record.sort(key=lambda i: (i.photo, names.index(i.recipe)))
-        project.output.mkdir(parents=True, exist_ok=True)
-        (project.output / "manifest.json").write_text(
-            json.dumps(
-                {
-                    # local time, for the person reading the report; zone-aware would change the manifest's format
-                    "generated": datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005
-                    "code": code,
-                    "items": [asdict(i) for i in record],
-                },
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        (project.output / "index.html").write_text(_report_html(project, record), encoding="utf-8")
+        record = _write_record(project, items, previous, names, code)
+        _write_atomically(project.output / "index.html", _report_html(project, record).encode("utf-8"))
     return items
+
+
+def _write_record(
+    project: Project, items: list[Item], previous: dict[tuple[str, str], Item], names: list[str], code: str
+) -> list[Item]:
+    """Write `manifest.json`: this run's `items`, and the `previous` results of the pairs it has not reached or left
+    alone (--only), for the project's photos and its recipes (`names`, in their order). Returns the record."""
+    seen = {(i.photo, i.recipe) for i in items}
+    photo_names = {p.name for p in project.photos}
+    record = items + [
+        i for key, i in previous.items() if key not in seen and i.photo in photo_names and i.recipe in names
+    ]
+    record.sort(key=lambda i: (i.photo, names.index(i.recipe)))
+    manifest = {
+        # local time, for the person reading the report; zone-aware would change the manifest's format
+        "generated": datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005
+        "code": code,
+        "items": [asdict(i) for i in record],
+    }
+    _write_atomically(project.output / "manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+    return record
 
 
 @dataclass
 class _Photo:
-    """One photo while its recipes run: read and analysed once, on first use."""
+    """One photo while its recipes run: read and analysed once, on first use. `subject_key` names its remembered
+    subject: the photo's content and what finds the subject."""
 
     path: Path
-    hash: str
+    subject_key: str
     project: Project
     find_subject: Callable[[np.ndarray], np.ndarray]
     _rgb: np.ndarray | None = field(default=None, repr=False)
@@ -350,22 +365,52 @@ class _Photo:
         return self._rgb
 
     def matte(self) -> np.ndarray:
-        """The subject matte, from the on-disk cache when this exact photo has been analysed before."""
+        """The subject matte, from the on-disk cache when this photo has been analysed by the same finder before."""
         if self._matte_error is not None:
             raise self._matte_error
         if self._matte is None:
-            cached = self.project.cache / f"{self.hash}.npz"
-            if cached.exists():
-                self._matte = np.load(cached)["matte"].astype(np.float32)
-            else:
+            cached = _inside(self.project.output, self.project.cache / f"{self.subject_key}.npz")
+            self._matte = _remembered(cached, self.rgb().shape[:2])
+            if self._matte is None:
                 try:
                     self._matte = subject_from(self.find_subject, self.rgb())  # analyse
-                except Exception as error:
+                except Exception as error:  # remembered, so the photo's other recipes fail without asking again
                     self._matte_error = error
                     raise
-                self.project.cache.mkdir(parents=True, exist_ok=True)
-                np.savez_compressed(cached, matte=self._matte.astype(np.float16))
+                packed = io.BytesIO()
+                np.savez_compressed(packed, matte=self._matte.astype(np.float16))
+                _write_atomically(cached, packed.getvalue())
         return self._matte
+
+
+def _remembered(cached: Path, shape: tuple[int, ...]) -> np.ndarray | None:
+    """The matte stored in `cached` if it is there, readable and of the photo's `shape`; None otherwise, and a
+    damaged entry (cut short, not an archive, the wrong size) is deleted, so it is found again and replaced."""
+    try:
+        with np.load(cached) as archive:  # no pickles: a planted file cannot run code
+            matte = archive["matte"]
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
+        matte = None
+    if matte is None or matte.shape != shape:
+        cached.unlink(missing_ok=True)
+        return None
+    return matte.astype(np.float32)
+
+
+def _write_atomically(target: Path, data: bytes) -> None:
+    """Write `data` to `target` whole or not at all: into a temporary file beside it, then renamed over it (a rename
+    within one folder is atomic), so a crash or Ctrl-C never leaves half a file for the next run to trust."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", delete=False) as file:
+        temporary = Path(file.name)
+    try:
+        temporary.write_bytes(data)
+        temporary.replace(target)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) -> Item:
@@ -469,12 +514,41 @@ def _fingerprint(*parts: str) -> str:
     return hashlib.sha256("\0".join(parts).encode()).hexdigest()
 
 
-def _code_fingerprint() -> str:
-    """A hash of the tool's own source, so changing an effect makes the next run redo what it produced."""
+def _source_digest(package: Path) -> str:
+    """A hash of the Python source under `package`, so changing the code makes the next run redo what it produced."""
     digest = hashlib.sha256()
-    for source in sorted(Path(__file__).parent.rglob("*.py")):
+    for source in sorted(package.rglob("*.py")):
         digest.update(source.read_bytes())
     return digest.hexdigest()
+
+
+# The libraries whose releases can change the pixels (resampling, filters, the subject model), as major.minor.
+_PIXEL_LIBRARIES = ("numpy", "pillow", "scipy", "onnxruntime")
+
+
+def _library_versions() -> str:
+    """The major.minor versions of the installed `_PIXEL_LIBRARIES`, e.g. "numpy 2.3; pillow 11.3; scipy 1.16"."""
+    versions = []
+    for name in _PIXEL_LIBRARIES:
+        try:
+            versions.append(f"{name} {'.'.join(metadata.version(name).split('.')[:2])}")
+        except metadata.PackageNotFoundError:  # onnxruntime is optional
+            continue
+    return "; ".join(versions)
+
+
+def _subject_key(find_subject: Callable[[np.ndarray], np.ndarray]) -> str:
+    """What a remembered subject depends on besides the photo: the finder (its name and, for a functools.partial, the
+    arguments bound to it), the environment variables that steer the default finder, the subject-finding code and the
+    libraries. A finder this cannot tell apart from another (a callable object, known by its class) shares its key."""
+    bound = ""
+    if isinstance(find_subject, functools.partial):
+        bound = repr((find_subject.args, sorted(find_subject.keywords.items())))
+        find_subject = find_subject.func
+    name = getattr(find_subject, "__qualname__", type(find_subject).__qualname__)
+    finder = f"{find_subject.__module__}.{name}{bound}"
+    steering = repr([os.environ.get(variable, "") for variable in (SEGMENTER_VARIABLE, MODEL_VARIABLE)])
+    return _fingerprint(finder, steering, _source_digest(Path(finding.__file__).parent), _library_versions())
 
 
 def _read_manifest(output: Path) -> list[Item]:
