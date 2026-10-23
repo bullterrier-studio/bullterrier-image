@@ -427,6 +427,7 @@ built this way, decision by decision: [docs/design-decisions.md](docs/design-dec
 uv sync
 uv run poe setup       # once per clone: installs the git hooks and the commit-message template
 uv run poe check       # before every push or merge: format, lint, dead code, dependencies, build, types, tests
+uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
 uv run poe fix         # applies the automatic lint and format fixes
 uv run poe new-effect my_effect --category light   # a new effect's files, from the template
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
