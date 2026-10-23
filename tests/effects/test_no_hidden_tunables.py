@@ -12,7 +12,7 @@ they share (`ops/*.py`), so it reads them with `ast`. A numeric literal fails un
 Anything else fails, whatever its value: an option of a call, by keyword or position (`sigma=2`, `iterations=1`,
 `gaussian_filter(x, 2)`), a default of a function, a value assigned to a name, an element of a list that is not an
 index.
-`EXEMPT` lists the known findings still to be turned into parameters; each entry goes with its finding.
+There is no list of exemptions: a finding is fixed (a parameter, or a cited constant), never waved through.
 """
 
 import ast
@@ -49,11 +49,6 @@ BOUND_CALLS = {
     "array",
     "uniform",
 }
-
-# Known findings whose fix needs new effect parameters (a change of each effect's interface, not of its look). Key:
-# (module relative to photo_fx, literal); value: where it is used and what it does. One entry per line, so removals
-# merge cleanly; an entry that no longer matches anything fails, so it is removed with its finding.
-EXEMPT: dict[tuple[str, float], str] = {}
 
 
 def hidden_tunables(source: str) -> list[tuple[int, float]]:
@@ -140,9 +135,8 @@ def _module_name(path: Path) -> str:
     return path.relative_to(PACKAGE).as_posix()
 
 
-def _unexempted(path: Path) -> list[str]:
-    found = hidden_tunables(path.read_text(encoding="utf-8"))
-    return [f"{path}:{line}: {value!r}" for line, value in found if (_module_name(path), value) not in EXEMPT]
+def _findings(path: Path) -> list[str]:
+    return [f"{path}:{line}: {value!r}" for line, value in hidden_tunables(path.read_text(encoding="utf-8"))]
 
 
 def test_the_scan_covers_the_effect_packages_and_the_ops_modules():
@@ -152,13 +146,7 @@ def test_the_scan_covers_the_effect_packages_and_the_ops_modules():
 
 @pytest.mark.parametrize("path", SCANNED, ids=[_module_name(path) for path in SCANNED])
 def test_every_number_is_a_parameter_or_a_cited_constant(path):
-    assert _unexempted(path) == []
-
-
-@pytest.mark.parametrize(("module", "literal"), EXEMPT.keys(), ids=[f"{m}:{v}" for m, v in EXEMPT])
-def test_every_exemption_still_matches_a_finding(module, literal):
-    found = hidden_tunables((PACKAGE / module).read_text(encoding="utf-8"))
-    assert literal in {value for _, value in found}, f"{module}: {literal} is fixed, delete its EXEMPT entry"
+    assert _findings(path) == []
 
 
 # --- the scanner itself: known-good and known-bad modules ---------------------------------------------------------
