@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img alt="Python 3.13+" src="https://img.shields.io/badge/python-3.13%2B-3776ab?logo=python&logoColor=white">
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white">
   <img alt="uv" src="https://img.shields.io/badge/built%20with-uv-de5fe9">
   <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-2ea44f">
   <img alt="Code style" src="https://img.shields.io/badge/lint-ruff-261230">
@@ -66,7 +66,7 @@ The sixth demo recipe is an [animation](#animation).
 
 ## Install
 
-Requires Python 3.13+. As a package:
+Requires Python 3.12+. As a package:
 
 ```bash
 pip install photo-fx               # everything but .mp4 / .mov export (unless ffmpeg is already installed)
