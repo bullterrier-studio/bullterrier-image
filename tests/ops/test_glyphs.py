@@ -178,12 +178,28 @@ def test_a_font_that_does_not_exist_raises_oserror():
         glyph_atlas(" .#", 8, missing)
 
 
-@pytest.mark.skipif(len(HOST_FONTS) < 2, reason="needs two different monospaced font files installed on the host")
-def test_different_font_files_give_different_cells_or_glyphs():
-    first, second = HOST_FONTS[:2]
-    assert cell_size(13, first) != cell_size(13, second) or not np.array_equal(
-        glyph_atlas("M@g", 13, first), glyph_atlas("M@g", 13, second)
-    )
+def _line_per_advance(font: str) -> float:
+    """Pillow's own line height (ascent + descent) per 'M' advance of `font`: how tall a cell of a given width is."""
+    measured = ImageFont.truetype(font, 100)
+    return sum(measured.getmetrics()) / measured.getlength("M")
+
+
+def _fonts_of_clearly_different_lines() -> list:
+    """The installed fonts with the shortest and the tallest line for their width, if they differ by 10 % or more.
+
+    Two fonts that truly differ: the first two files found may be two styles of one face, which draw alike (they did
+    on Windows) and so prove nothing about `font`."""
+    if HOST_FONTS:
+        short, tall = min(HOST_FONTS, key=_line_per_advance), max(HOST_FONTS, key=_line_per_advance)
+        if _line_per_advance(tall) >= 1.1 * _line_per_advance(short):
+            return [(short, tall)]
+    return [pytest.param(None, None, marks=pytest.mark.skip(reason="needs two fonts of clearly different lines"))]
+
+
+@pytest.mark.parametrize(("short", "tall"), _fonts_of_clearly_different_lines())
+def test_the_font_named_is_the_one_that_draws(short, tall):
+    # 10 % of a 40 px cell's line (about 80 px) is far more than one font size step can move it
+    assert cell_size(40, short)[1] < cell_size(40, tall)[1]
 
 
 @host_fonts
