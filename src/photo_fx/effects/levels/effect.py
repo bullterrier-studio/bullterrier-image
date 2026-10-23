@@ -4,10 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-
-# constant: only keeps equal or crossed input points from dividing by zero; the span then counts as this tiny, so the
-# picture is cut at `black` into the two output ends (a threshold).
-_MIN_SPAN = 1e-6
+from photo_fx.ops.tone import remap_levels
 
 
 class LevelsParams(EffectParams):
@@ -61,9 +58,11 @@ def levels(rgb: np.ndarray, params: LevelsParams) -> np.ndarray:
     Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
     between `output_black` and `output_white`. The defaults change nothing.
     """
-    span = max(params.white - params.black, _MIN_SPAN)
-    x = np.clip((rgb - np.float32(params.black)) / np.float32(span), 0.0, 1.0)
-    x = x ** np.float32(1.0 / params.gamma)
-    return (np.float32(params.output_black) + x * np.float32(params.output_white - params.output_black)).astype(
-        np.float32
+    return remap_levels(
+        rgb,
+        black=params.black,
+        white=params.white,
+        gamma=params.gamma,
+        output_black=params.output_black,
+        output_white=params.output_white,
     )
