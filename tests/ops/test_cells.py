@@ -85,7 +85,7 @@ def test_figure_with_a_matte_marks_a_piece_only_when_more_than_half_of_it_is_ins
     matte[0:4, 8:12].flat[:9] = 1.0  # piece (0, 2): 9 of 16
     matte[4, 0] = 1.0  # piece (1, 0): 1 of 16
     lit_pieces = np.zeros((2, 3), dtype=bool)  # the matte decides: dark parts of the figure still count
-    result = figure(lit_pieces, matte, cell_w, cell_h, height, width)
+    result = figure(lit_pieces, matte, cell_w, cell_h, height, width, threshold=0.5)
     np.testing.assert_array_equal(result, [[True, False, True], [False, False, False]])
 
 
@@ -93,7 +93,7 @@ def test_figure_with_a_matte_counts_the_padding_of_edge_pieces_as_outside():
     cell_w, cell_h, height, width = 4, 4, 6, 6  # padded to 8 x 8: the corner piece holds only 2 x 2 real pixels
     matte = np.ones((height, width), dtype=np.float32)
     lit_pieces = np.zeros((2, 2), dtype=bool)
-    result = figure(lit_pieces, matte, cell_w, cell_h, height, width)
+    result = figure(lit_pieces, matte, cell_w, cell_h, height, width, threshold=0.5)
     # corner piece: 4 of 16 pixels inside; edge pieces: 8 of 16 (not more than half); first piece: full.
     np.testing.assert_array_equal(result, [[True, False], [False, False]])
 
@@ -101,7 +101,7 @@ def test_figure_with_a_matte_counts_the_padding_of_edge_pieces_as_outside():
 def test_figure_with_a_matte_ignores_which_pieces_are_lit():
     matte = np.zeros((8, 8), dtype=np.float32)
     matte[:4, :4] = 1.0
-    result = figure(np.ones((2, 2), dtype=bool), matte, 4, 4, 8, 8)
+    result = figure(np.ones((2, 2), dtype=bool), matte, 4, 4, 8, 8, threshold=0.5)
     np.testing.assert_array_equal(result, [[True, False], [False, False]])
 
 
@@ -113,7 +113,7 @@ def test_figure_with_a_matte_uses_cell_width_across_and_cell_height_down():
     matte[0:2, 4:8] = 1.0  # piece (0, 1): 8 of 12
     matte[3:5, 0:4] = 1.0  # piece (1, 0): 8 real pixels of 12 (its third row is padding)
     matte[0:3, 8] = 1.0  # piece (0, 2): 3 of 12; its other 9 pixels are padding
-    result = figure(np.zeros((2, 3), dtype=bool), matte, cell_w, cell_h, height, width)
+    result = figure(np.zeros((2, 3), dtype=bool), matte, cell_w, cell_h, height, width, threshold=0.5)
     np.testing.assert_array_equal(result, [[True, True, False], [True, False, False]])
 
 
@@ -121,7 +121,7 @@ def test_figure_without_a_matte_fills_the_hole_of_a_lit_ring():
     ring = np.zeros((7, 7), dtype=bool)
     ring[1:6, 1:6] = True
     ring[2:5, 2:5] = False  # dark centre enclosed by lit pieces
-    result = figure(ring, None, cell_w=5, cell_h=5, height=35, width=35)
+    result = figure(ring, None, cell_w=5, cell_h=5, height=35, width=35, threshold=0.5)
     expected = np.zeros((7, 7), dtype=bool)
     expected[1:6, 1:6] = True
     np.testing.assert_array_equal(result, expected)
@@ -132,5 +132,5 @@ def test_figure_without_a_matte_keeps_open_gaps_and_unrelated_dark_pieces_dark()
     c_shape[1:6, 1:6] = True
     c_shape[2:5, 2:5] = False
     c_shape[3, 5] = False  # a gap in the ring: the centre is no longer enclosed
-    result = figure(c_shape, None, cell_w=5, cell_h=5, height=35, width=35)
+    result = figure(c_shape, None, cell_w=5, cell_h=5, height=35, width=35, threshold=0.5)
     np.testing.assert_array_equal(result, c_shape)

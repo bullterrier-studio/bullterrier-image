@@ -295,6 +295,15 @@ class DisperseParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    matte_threshold: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
+        "the figure whose outline `edge` and `hover` start at; 0.5 = more than half. Lowering it takes in more of a "
+        "soft edge (hair, fur), raising it less. Ignored without a matte.",
+    )
     background_threshold: float = param(
         0.02,
         unit="fraction",
@@ -328,7 +337,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
     present = cells.lit(pieces, threshold=p.background_threshold)
-    figure = cells.figure(present, matte, cell_w, cell_h, height, width)
+    figure = cells.figure(present, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
     edges = distance.edge_distance(
         figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing
     )

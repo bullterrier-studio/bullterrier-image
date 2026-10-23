@@ -152,6 +152,15 @@ class EvaporateParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    matte_threshold: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
+        "the figure whose outline `edge` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge "
+        "(hair, fur), raising it less. Ignored without a matte.",
+    )
     background_threshold: float = param(
         0.02,
         unit="fraction",
@@ -197,7 +206,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     strength = np.broadcast_to(
         (t * t * (3.0 - 2.0 * t))[:, None], (rows, cols)
     )  # constant: smoothstep polynomial 3t^2 - 2t^3
-    figure = cells.figure(lit, matte, cell_w, cell_h, height, width)
+    figure = cells.figure(lit, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
     edges = distance.edge_distance(
         figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing
     )  # px from the nearest edge; direction out

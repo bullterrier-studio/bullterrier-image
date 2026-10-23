@@ -510,6 +510,17 @@ def test_disperse_takes_its_edge_from_the_matte_when_given():
     assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure waits its turn
 
 
+def test_disperse_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
+    img = np.ones((200, 200, 3), np.float32)
+    matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
+    matte[:, 80:120] = 1.0  # and a solid column
+    kwargs = {"progress": 0.5, "top": 0, "edge": 1.0, "sweep": 0, "seed": 1}
+    outside = (slice(150, None), slice(20, 60))
+    assert registry.apply("disperse", img, matte=matte, **kwargs)[outside].max() == 0.0  # 0.4 < 0.5: edge, gone
+    kept = registry.apply("disperse", img, matte=matte, matte_threshold=0.3, **kwargs)[outside]
+    assert kept.mean() > 0.8  # 0.4 > 0.3: figure, far from its edge (only the picture's borders), so most stays
+
+
 def _ragged_picture() -> np.ndarray:
     """Lit and dark pieces at random, so the outline turns at every piece."""
     cell_w, cell_h = cell_size(5)

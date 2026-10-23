@@ -44,7 +44,14 @@ def lit(pieces: np.ndarray, *, threshold: float) -> np.ndarray:
 
 
 def figure(
-    lit_pieces: np.ndarray, matte: np.ndarray | None, cell_w: int, cell_h: int, height: int, width: int
+    lit_pieces: np.ndarray,
+    matte: np.ndarray | None,
+    cell_w: int,
+    cell_h: int,
+    height: int,
+    width: int,
+    *,
+    threshold: float,
 ) -> np.ndarray:
     """(rows, cols) bool: the pieces that belong to the subject.
 
@@ -52,12 +59,12 @@ def figure(
     0..1, or None. `cell_w`, `cell_h` (px) are the piece size and `height`, `width` (px) the picture size that the grid
     was cut from.
 
-    With a matte, a piece belongs to the subject when more than half of its pixels are inside the matte (above 0.5 on
-    average; padding beyond the picture counts as outside), so dark parts of the figure (eyes, shadows) still count.
-    Without one, it is the lit pieces with enclosed gaps filled in.
+    With a matte, a piece belongs to the subject when the matte's average over it is above `threshold` (0..1; at 0.5,
+    more than half of its pixels are inside; padding beyond the picture counts as outside), so dark parts of the figure
+    (eyes, shadows) still count. Without one, it is the lit pieces with enclosed gaps filled in (`threshold` unused).
     """
     if matte is None:
         return ndimage.binary_fill_holes(lit_pieces)
     rows, cols = lit_pieces.shape
     padded = np.pad(matte, ((0, rows * cell_h - height), (0, cols * cell_w - width)))
-    return padded.reshape(rows, cell_h, cols, cell_w).mean(axis=(1, 3)) > 0.5
+    return padded.reshape(rows, cell_h, cols, cell_w).mean(axis=(1, 3)) > threshold

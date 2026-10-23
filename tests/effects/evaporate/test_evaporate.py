@@ -126,6 +126,16 @@ def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift()
     assert above.max() == 0.0  # no brighter than the threshold: background, nothing drifts
 
 
+def test_evaporate_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
+    img = np.ones((200, 200, 3), np.float32)
+    matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
+    matte[:, 80:120] = 1.0  # and a solid column
+    kwargs = {"cell": 5, "start": 0, "edge": 0.05, "seed": 1}
+    outside = (slice(150, None), slice(20, 60))  # more than `edge` (10 px) from the picture's borders
+    assert registry.apply("evaporate", img, matte=matte, **kwargs)[outside].mean() < 1.0  # 0.4 < 0.5: not figure
+    assert registry.apply("evaporate", img, matte=matte, matte_threshold=0.3, **kwargs)[outside].min() == 1.0
+
+
 def test_evaporate_seed_controls_the_dissolve(photo):
     a, b = registry.apply("evaporate", photo, seed=1), registry.apply("evaporate", photo, seed=2)
     assert not np.array_equal(a, b)
