@@ -365,36 +365,21 @@ def test_save_names_a_file_type_it_cannot_write_and_writes_a_known_one(tmp_path)
     assert imageio.load(tmp_path / "a.png").shape == (4, 5, 3)
 
 
-def _probe(path, entries):
+def _probe(path, entries) -> list[str]:
+    """The values ffprobe reads for `entries` of the video's first stream, in order (one per packet for packet ones)."""
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", entries, "-of", "csv=p=0:s=,", str(path)],
         capture_output=True,
         encoding="utf-8",
         check=True,
-    ).stdout.strip()
-    return out.split(",")
+    ).stdout
+    return re.split(r"[,\s]+", out.strip())
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 def test_save_video_mp4_has_a_keyframe_every_second_so_it_is_seekable(tmp_path):
     imageio.save_video(iter(_frames(70, height=48, width=64)), tmp_path / "k.mp4", fps=10)
-    flags = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "packet=flags",
-            "-of",
-            "csv=p=0",
-            str(tmp_path / "k.mp4"),
-        ],
-        capture_output=True,
-        encoding="utf-8",
-        check=True,
-    ).stdout.split()
+    flags = _probe(tmp_path / "k.mp4", "packet=flags")  # one entry per packet: "K_" for a keyframe
     assert sum("K" in f for f in flags) >= 7  # 70 frames at 10 fps = 7 s: one keyframe per second, not one per clip
 
 
@@ -490,41 +475,33 @@ def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_p
 # --- bring your own matte: imageio.load_matte ----------------------------------------------------------------------
 
 
-def halves(height=20, width=30, low=0, high=255) -> np.ndarray:
-    """uint8: `low` in the left half, `high` in the right half."""
-    values = np.full((height, width), low, np.uint8)
-    values[:, width // 2 :] = high
+def halves(low, high, dtype=np.uint8) -> np.ndarray:
+    """A 20x30 picture: `low` in the left half, `high` in the right half."""
+    values = np.full((20, 30), low, dtype)
+    values[:, 15:] = high
     return values
 
 
-def test_a_transparent_png_gives_its_alpha_channel_whatever_its_colours(tmp_path):
-    rgba = np.dstack([np.full((20, 30, 3), 200, np.uint8), halves(low=51, high=255)])
-    Image.fromarray(rgba, "RGBA").save(tmp_path / "m.png")
-    matte = imageio.load_matte(tmp_path / "m.png")
+PNG, JPEG = ("m.png", 0, 1e-6), ("m.jpg", 5, 0.02)  # file, columns left unchecked beside the middle, tolerance
+
+
+@pytest.mark.parametrize(
+    ("picture", "file", "left", "right"),
+    [
+        # a transparent PNG gives its alpha channel, whatever its colours: 51 / 255 and 255 / 255
+        (Image.fromarray(np.dstack([np.full((20, 30, 3), 200, np.uint8), halves(51, 255)]), "RGBA"), PNG, 0.2, 1.0),
+        (Image.fromarray(halves(0, 102), "L"), PNG, 0.0, 0.4),  # a greyscale PNG gives its grey levels
+        (Image.fromarray(halves(0, 16384, np.uint16)), PNG, 0.0, 16384 / 65535),  # 16 bits keep their full range
+        # a black and white RGB picture gives its brightness (a JPEG: within its rounding, away from the edge)
+        (Image.fromarray(np.dstack([halves(0, 255)] * 3), "RGB"), JPEG, 0.0, 1.0),
+    ],
+    ids=["alpha of a transparent PNG", "greyscale PNG", "16-bit greyscale PNG", "black and white RGB JPEG"],
+)
+def test_a_matte_file_gives_its_subject_share_per_pixel(tmp_path, picture, file, left, right):
+    name, margin, atol = file
+    picture.save(tmp_path / name, quality=100)  # (PNG has no quality setting and ignores it)
+    matte = imageio.load_matte(tmp_path / name)
     assert matte.dtype == np.float32
     assert matte.shape == (20, 30)
-    np.testing.assert_allclose(matte[:, :15], 0.2, atol=1e-6)  # 51 / 255
-    np.testing.assert_allclose(matte[:, 15:], 1.0, atol=1e-6)
-
-
-def test_a_greyscale_png_gives_its_grey_levels(tmp_path):
-    Image.fromarray(halves(low=0, high=102), "L").save(tmp_path / "m.png")
-    matte = imageio.load_matte(tmp_path / "m.png")
-    np.testing.assert_allclose(matte[:, :15], 0.0)
-    np.testing.assert_allclose(matte[:, 15:], 0.4, atol=1e-6)  # 102 / 255
-
-
-def test_a_black_and_white_rgb_picture_gives_its_brightness(tmp_path):
-    Image.fromarray(np.dstack([halves()] * 3), "RGB").save(tmp_path / "m.jpg", quality=100)
-    matte = imageio.load_matte(tmp_path / "m.jpg")
-    assert matte[:, :10].max() < 0.02
-    assert matte[:, 20:].min() > 0.98
-
-
-def test_a_16_bit_greyscale_png_keeps_its_full_range(tmp_path):
-    levels = halves().astype(np.uint16) * 0
-    levels[:, 15:] = 16384  # a quarter of 65535, rounded
-    Image.fromarray(levels).save(tmp_path / "m.png")
-    matte = imageio.load_matte(tmp_path / "m.png")
-    np.testing.assert_allclose(matte[:, 15:], 16384 / 65535, atol=1e-6)
-    np.testing.assert_allclose(matte[:, :15], 0.0)
+    np.testing.assert_allclose(matte[:, : 15 - margin], left, atol=atol)
+    np.testing.assert_allclose(matte[:, 15 + margin :], right, atol=atol)
