@@ -156,7 +156,7 @@ def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
     """
     ffmpeg = _ffmpeg("resizing a video")
     shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603  no shell: the resolved ffmpeg, our own options and two absolute paths
         [ffmpeg, "-y", "-loglevel", "error", "-i", _as_file(source), "-an", "-vf", f"{shrink},{_BT709}",
          "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
          "-g", "30", _as_file(target)],
@@ -187,8 +187,9 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
         "-g", str(max(1, fps)),  # a keyframe every second: seekable, and one bad frame cannot spoil the rest
         _as_file(path),
     ]  # fmt: skip
-    # leaving the `with` closes both pipes and waits for ffmpeg, also when a frame cannot be written
-    with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+    # leaving the `with` closes both pipes and waits for ffmpeg, also when a frame cannot be written. No shell (S603):
+    # the resolved ffmpeg, our own options and numbers, and an absolute path
+    with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:  # noqa: S603  see above
         # typed `IO[bytes] | None`, but always open: both were asked for with PIPE
         stdin, stderr = cast(IO[bytes], process.stdin), cast(IO[bytes], process.stderr)
         count = 0

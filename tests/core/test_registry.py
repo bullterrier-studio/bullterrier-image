@@ -114,7 +114,8 @@ def test_inputs_are_the_agreed_list():
 
 def _probe_with(signature: str):
     namespace: dict[str, Any] = {}
-    exec(f"def shape_probe{signature}:\n    return rgb", namespace)  # a function with exactly the signature under test
+    # a function with exactly the signature under test; the signatures are this file's own literals
+    exec(f"def shape_probe{signature}:\n    return rgb", namespace)  # noqa: S102  only a def is built from them
     return namespace["shape_probe"]
 
 

@@ -169,10 +169,15 @@ select = [
     "ANN",  # type hints on public functions
     # docstrings on every PUBLIC module, class, method, function and package (a leading _ exempts a name); none empty
     "D100", "D101", "D102", "D103", "D104", "D106", "D419",
-    "S102", "S307",  # exec / eval
+    # security (flake8-bandit): shell commands, pickle, yaml.load, eval/exec, hard-coded secrets, unchecked URL schemes,
+    # insecure temp files and hashes, assert in library code. A subprocess call (S603) carries a `# noqa` saying why
+    # its argv is safe.
+    "S",
     "SLF001",  # private-member access: applies to tests too, which must not reach into the implementation
     "PLC2701",  # import of a private name (a preview rule, turned on alone by explicit-preview-rules)
-    "PGH003",  # a `# type: ignore` must name its error code (RUF100, in RUF, fails an unused `# noqa`)
+    # a `# type: ignore` names its error code and a `# noqa` its rule (RUF100, in RUF, fails an unused `# noqa`)
+    "PGH",
+    "LOG",  # logging misuse (the root logger, a logger made by hand), should anything here ever log
     "PLW1514",  # text files opened without `encoding=` use the locale's, which breaks non-ASCII names on Windows (preview)
     "BLE",  # `except Exception` hides bugs; catch what can happen, or say why everything must be caught
     "PTH",  # pathlib, not os.path / open() / glob: one way to handle paths
@@ -192,9 +197,10 @@ max-complexity = 18
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-# Tests are exempt from annotations, docstrings, bandit, PLW, naming and assert-False; NOT from SLF001 / PLC2701, on
-# purpose: a test must not reach into the implementation.
-"tests/**" = ["ANN", "D", "S", "PLW", "N", "B011"]
+# Tests are exempt from annotations, docstrings, PLW, naming and assert-False; NOT from SLF001 / PLC2701, on purpose: a
+# test must not reach into the implementation. Of bandit only these: assert is how pytest checks (S101), and a test
+# runs our own interpreter and the developer's tools (python, git, uv, ffmpeg) with argv it wrote itself (S603, S607).
+"tests/**" = ["ANN", "D", "S101", "S603", "S607", "PLW", "N", "B011"]
 "src/photo_fx/cli.py" = ["T20"]  # the CLI prints; add other presentation modules only with a reason
 # scripts run by hand (the commit-message and config checks, the banner, the API example): printing is their output
 "tools/**" = ["T20"]
