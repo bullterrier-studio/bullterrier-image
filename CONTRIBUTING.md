@@ -46,6 +46,52 @@ the tests, then `uv run poe gallery --only my_effect` renders its picture. Addin
   most 72 characters, then a body saying why. The `commit-msg` hook checks the format.
 - One logical change per commit. Never skip a hook (`--no-verify`): fix what it reports.
 
+## Releasing
+
+Versions follow [Semantic Versioning](https://semver.org/). Before 1.0 a minor release may change the public API (0.2.0
+may rename a parameter); a patch release never does. The version is written in `pyproject.toml` and changed only by
+the release command. Five commands, from a clone with the hooks installed:
+
+```bash
+git switch main && git pull --ff-only     # releases are cut from main, the same commit as origin/main
+uv run poe audit                          # no known vulnerability in the locked dependencies
+uv run poe release minor --dry-run        # every check, the gate included; shows the version and its changelog section
+uv run poe release minor                  # bumps pyproject.toml and uv.lock, writes CHANGELOG.md, commits, tags v0.2.0
+git push --atomic origin main v0.2.0      # the command it prints: nothing is published before this push
+```
+
+`poe release` takes `major`, `minor`, `patch` or an explicit version, and never pushes. It refuses, changing nothing,
+on another branch, with uncommitted changes, when main differs from origin/main, when `poe check` fails, or when the
+version would go down or is tagged already. The changelog section is written by git-cliff from the Conventional Commits
+since the previous release: `feat` under Added, `fix` under Fixed, `perf` and `revert` under Changed, a subject starting
+with remove, drop or delete under Removed, the scope `security` under Security, and a breaking change (`!` or a
+`BREAKING CHANGE:` footer) under Changed, marked **Breaking**; `docs`, `test`, `style`, `ci`, `build`, `chore` and
+`refactor` commits are left out. To write the notes yourself, add a `## [0.2.0] - Unreleased` section before releasing:
+it is kept, and dated.
+
+**Pre-releases** go to TestPyPI, not PyPI: `uv run poe release 0.2.0rc1` tags `v0.2.0rc1`, which publishes to
+test.pypi.org and creates a GitHub pre-release; try it with
+`pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ photo-fx==0.2.0rc1`.
+`uv run poe release 0.2.0` then makes the release (a bump from a pre-release goes past it: `minor` gives 0.3.0).
+
+**What the tag starts** (`.github/workflows/release.yml`): `tools/check_release.py` checks that the tag is the version
+in `pyproject.toml`, that CHANGELOG.md has a dated section for it and that the tagged commit is on main; the whole CI
+runs; after a reviewer approves the deployment, the distributions CI built and checked are uploaded through Trusted
+Publishing (no token is stored anywhere) with signed attestations; last, the GitHub Release gets the changelog section
+as its notes, the same files and a build-provenance attestation. If anything fails before the upload, nothing is
+published: delete the tag (`git push --delete origin v0.2.0 && git tag -d v0.2.0`), fix main, and release again.
+
+**One-time setup, by the owner:**
+- pypi.org, *Publishing*: add a pending publisher for the project `photo-fx`: owner `jcakstins`, repository
+  `photo-fx`, workflow `release.yml`, environment `pypi`. The same on test.pypi.org with the environment `testpypi`.
+  The first upload creates the project.
+- GitHub, *Settings > Environments*: `pypi` and `testpypi`, each with the owner as required reviewer and deployments
+  limited to tags `v*`.
+- GitHub, *Settings > Rules*: a ruleset on `main` requiring the status check `ci-ok` (the one job that waits for all
+  the others, so adding a job never changes the ruleset).
+- The first release is `uv run poe release 0.1.0`: the version is 0.1.0 already, and its changelog section is written
+  by hand.
+
 ## Design decisions
 
 A new decision, or a change to an old one, goes in [docs/design-decisions.md](docs/design-decisions.md) with its reason,

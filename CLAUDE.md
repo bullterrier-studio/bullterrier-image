@@ -50,6 +50,11 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 - Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
 - Security gates: ruff's `S` (bandit), `PGH` and `LOG` rules run in `poe check` (a subprocess call carries `# noqa: S603  <why its argv is safe>`);
   `uv run poe audit` runs pip-audit on `uv.lock` (needs the network, so not in `check`: before a release and in CI, which runs `uv run --locked poe check` so a stale `uv.lock` fails).
+- Versions are SemVer (a 0.x minor may break the API), written in `pyproject.toml` and changed only by `uv run poe release`,
+  which also writes the CHANGELOG.md section with git-cliff from the Conventional Commits; CONTRIBUTING.md, "Releasing".
+- CI is one workflow per concern in `.github/workflows/`, joined by `ci.yml`, whose `ci-ok` job is the only required check:
+  a new job goes into its `needs`, never into branch protection. Actions are pinned by commit SHA and each job holds only
+  the permissions it uses; `uv run poe lint-workflows` (actionlint, zizmor; part of `poe check`) enforces it.
 - The gates (`uv run poe check`) are the review: reviewers check behaviour and the rules in this file, nothing else. A defect a review finds twice
   becomes a gate.
 - Design decisions and their reasons are in `docs/design-decisions.md`; a new one goes there, not in this file.
