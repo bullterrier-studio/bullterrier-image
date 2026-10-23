@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -42,7 +43,11 @@ def test_the_project_as_it_is_builds_clean_distributions(project):
     result = build_check(project)
     assert result.returncode == 0, result.stdout + result.stderr
     built = sorted(path.name for path in (project / "dist" / "check").iterdir())
-    assert built == ["photo_fx-0.1.0-py3-none-any.whl", "photo_fx-0.1.0.tar.gz"]  # sdist and wheel, nothing else
+    version = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    assert built == [
+        f"photo_fx-{version}-py3-none-any.whl",
+        f"photo_fx-{version}.tar.gz",
+    ]  # sdist and wheel, nothing else
 
 
 def test_a_long_description_pypi_cannot_render_fails_the_gate(project):
