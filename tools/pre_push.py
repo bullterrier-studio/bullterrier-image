@@ -23,6 +23,9 @@ def must_run(remote_ref: str) -> bool:
 
 def main() -> int:
     """Run the gate when the push needs it; return the exit status git should see."""
+    if os.environ.get("PHOTO_FX_GATE_PASSED") == "1":  # set by `poe release`, which has just run the gate
+        print("pre-push: the gate has just passed (poe release), so it is not run again")
+        return 0
     remote_ref = os.environ.get("PRE_COMMIT_REMOTE_BRANCH", "")
     if not must_run(remote_ref):
         print(
