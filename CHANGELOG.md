@@ -8,7 +8,7 @@ may change the public API.
 "Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)); a section already written by hand for that version is kept, and
 its `Unreleased` becomes the release date.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-23
 
 The first release, 0.1.0.
 
