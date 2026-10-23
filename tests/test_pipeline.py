@@ -17,6 +17,17 @@ from photo_fx.pipeline import init_project, load_project, run
 FFMPEG = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 
 
+def write_recipe(folder: Path, name: str, step: str, file: str | None = None) -> None:
+    """recipes/<file or name>.toml: a 64 px recipe called `name` with one step, `step` (its TOML lines)."""
+    (folder / "recipes" / f"{file or name}.toml").write_text(
+        f'name = "{name}"\nsize = 64\n[[step]]\n{step}\n', encoding="utf-8"
+    )
+
+
+def write_project(folder: Path, text: str) -> None:
+    (folder / "photo-fx.toml").write_text(text, encoding="utf-8")
+
+
 @pytest.fixture
 def folder(tmp_path, photo):
     """A project with two photos and two recipes that need no subject cut-out."""
@@ -24,18 +35,15 @@ def folder(tmp_path, photo):
     imageio.save(photo, tmp_path / "photos" / "a.png")
     imageio.save(photo[::-1], tmp_path / "photos" / "b.png")
     (tmp_path / "recipes").mkdir()
-    (tmp_path / "recipes" / "grainy.toml").write_text(
-        'name = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
-    )
-    (tmp_path / "recipes" / "warm.toml").write_text(
-        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.3\n', encoding="utf-8"
-    )
-    (tmp_path / "photo-fx.toml").write_text('[export]\nformats = ["jpg", "png"]\n', encoding="utf-8")
+    write_recipe(tmp_path, "grainy", 'effect = "grain"')
+    write_recipe(tmp_path, "warm", 'effect = "grade"\nexposure = 0.3')
+    write_project(tmp_path, '[export]\nformats = ["jpg", "png"]\n')
     return tmp_path
 
 
-def statuses(items):
-    return sorted((i.photo, i.recipe, i.status) for i in items)
+def by_pair(items) -> dict:
+    """Run results by (photo, recipe)."""
+    return {(i.photo, i.recipe): i for i in items}
 
 
 def test_run_exports_every_photo_with_every_recipe_and_writes_the_manifest_and_report(folder):
@@ -77,9 +85,7 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     assert {i.status for i in run(project)} == {"skipped"}
     assert remade(folder) == []
 
-    (folder / "recipes" / "warm.toml").write_text(
-        'name = "warm"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.9\n', encoding="utf-8"
-    )
+    write_recipe(folder, "warm", 'effect = "grade"\nexposure = 0.9')
     items = run(project)
     assert sorted((i.recipe, i.status) for i in items) == [("grainy", "skipped")] * 2 + [("warm", "done")] * 2
     assert remade(folder) == [("a", "warm.jpg"), ("a", "warm.png"), ("b", "warm.jpg"), ("b", "warm.png")]
@@ -98,7 +104,7 @@ def test_a_missing_output_file_is_made_again(folder):
     project = load_project(folder / "photo-fx.toml")
     run(project)
     (folder / "out" / "a" / "warm.jpg").unlink()
-    assert statuses(run(project))[1] == ("a.png", "warm", "done")
+    assert by_pair(run(project))[("a.png", "warm")].status == "done"
 
 
 def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
@@ -125,9 +131,7 @@ def test_a_broken_recipe_fails_before_any_work_is_done(folder):
 
 
 def test_two_recipes_with_the_same_name_are_refused(folder):
-    (folder / "recipes" / "again.toml").write_text(
-        'name = "warm"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
-    )
+    write_recipe(folder, "warm", 'effect = "grain"', file="again")
     with pytest.raises(ProjectError, match="same"):
         run(load_project(folder / "photo-fx.toml"))
 
@@ -139,9 +143,7 @@ def disc_matte(shape=(96, 128), radius=30):
 
 def masked_recipes(folder):
     for name in ("cut1", "cut2"):
-        (folder / "recipes" / f"{name}.toml").write_text(
-            f'name = "{name}"\nsize = 64\n[[step]]\neffect = "fill"\nmask = "background"\n', encoding="utf-8"
-        )
+        write_recipe(folder, name, 'effect = "fill"\nmask = "background"')
 
 
 class StandInFinder:
@@ -261,12 +263,10 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
 def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_searched_once(folder):
     masked_recipes(folder)
     finder = StandInFinder(error=RuntimeError("no subject found in the picture"))
-    items = run(load_project(folder / "photo-fx.toml"), find_subject=finder)
-    by = {(i.photo, i.recipe): i for i in items}
-    assert by[("a.png", "cut1")].status == "failed"
-    assert "no subject" in str(by[("a.png", "cut1")].error)
-    assert by[("a.png", "cut2")].status == "failed"
-    assert "no subject" in str(by[("a.png", "cut2")].error)
+    by = by_pair(run(load_project(folder / "photo-fx.toml"), find_subject=finder))
+    for recipe in ("cut1", "cut2"):
+        assert by[("a.png", recipe)].status == "failed"
+        assert "no subject" in str(by[("a.png", recipe)].error)
     assert by[("a.png", "grainy")].status == "done"
     assert by[("b.png", "warm")].status == "done"
     assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second masked recipe
@@ -278,8 +278,7 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
     def finds_nothing(rgb):
         return None  # a broken finder, typed loosely on purpose: the point of the test
 
-    items = run(load_project(folder / "photo-fx.toml"), find_subject=finds_nothing)
-    by = {(i.photo, i.recipe): i for i in items}
+    by = by_pair(run(load_project(folder / "photo-fx.toml"), find_subject=finds_nothing))
     assert by[("a.png", "cut1")].status == "failed"
     assert "`find_subject` returned None" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "grainy")].status == "done"
@@ -295,9 +294,7 @@ def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(fol
 
 
 def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):
-    (folder / "recipes" / "black.toml").write_text(
-        'name = "black"\nsize = 64\n[[step]]\neffect = "fill"\ncolor = "#000000"\n', encoding="utf-8"
-    )
+    write_recipe(folder, "black", 'effect = "fill"\ncolor = "#000000"')
     flagged = [i for i in run(load_project(folder / "photo-fx.toml")) if i.recipe == "black"]
     assert all(i.warnings and "blank" in i.warnings[0] for i in flagged)
     assert "blank" in (folder / "out" / "index.html").read_text(encoding="utf-8")
@@ -313,7 +310,7 @@ def test_dry_run_writes_nothing_and_says_what_would_happen(folder):
 
 
 def test_sizes_make_smaller_copies_and_never_enlarge(folder):
-    (folder / "photo-fx.toml").write_text('[export]\nformats = ["jpg"]\nsizes = [40, 500]\n', encoding="utf-8")
+    write_project(folder, '[export]\nformats = ["jpg"]\nsizes = [40, 500]\n')
     run(load_project(folder / "photo-fx.toml"))
     out = folder / "out" / "a"
     assert sorted(p.name for p in out.glob("grainy*")) == ["grainy.jpg", "grainy_40.jpg"]  # 500 > 64: as rendered
@@ -356,9 +353,7 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
     # locale with UTF-8 mode off, which every POSIX system has, stands in for it: ASCII, so no text survives a write or
     # read in the locale's encoding. On Linux the photo's name is then listed with its undecodable bytes as surrogates.
     imageio.save(photo, folder / "photos" / "Jānis-č.png")
-    (folder / "recipes" / "grainy.toml").write_text(
-        '# Jānis’ grain, fine as sand\nname = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
-    )
+    write_recipe(folder, "grainy", '# Jānis’ grain, fine as sand\neffect = "grain"')
     child = subprocess.run(
         [sys.executable, "-c", RUN_IN_CHILD, str(folder / "photo-fx.toml")],
         env={**os.environ, "LC_ALL": "C", "PYTHONUTF8": "0"},
@@ -389,13 +384,13 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
     ],
 )
 def test_a_bad_project_file_is_explained(folder, text, expect):
-    (folder / "photo-fx.toml").write_text(text, encoding="utf-8")
+    write_project(folder, text)
     with pytest.raises(ProjectError, match=expect):
         load_project(folder / "photo-fx.toml")
 
 
 def test_a_project_file_that_is_not_toml_is_named_in_the_error(folder):
-    (folder / "photo-fx.toml").write_text('output = "out"\nrecipes = = ["recipes"]\n', encoding="utf-8")
+    write_project(folder, 'output = "out"\nrecipes = = ["recipes"]\n')
     with pytest.raises(ProjectError, match=r"photo-fx\.toml.*line 2"):
         load_project(folder / "photo-fx.toml")
 
@@ -491,7 +486,7 @@ def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, 
     assert "no photos match" in capsys.readouterr().err
 
 
-ANIMATED = """name = "move"
+ANIMATED = """name = "{name}"
 size = 48
 [animation]
 seconds = 1.0
@@ -516,13 +511,11 @@ def video_size(path) -> tuple[int, int]:
 
 @FFMPEG
 def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
-    (folder / "recipes" / "steady.toml").write_text(
-        ANIMATED.format(hold_end=0.0).replace('"move"', '"steady"'), encoding="utf-8"
-    )
-    (folder / "recipes" / "stalls.toml").write_text(
-        ANIMATED.format(hold_end=0.7).replace('"move"', '"stalls"'), encoding="utf-8"
-    )
-    (folder / "photo-fx.toml").write_text("[export]\nsizes = [24]\n", encoding="utf-8")
+    for name, hold_end in (("steady", 0.0), ("stalls", 0.7)):
+        (folder / "recipes" / f"{name}.toml").write_text(
+            ANIMATED.format(name=name, hold_end=hold_end), encoding="utf-8"
+        )
+    write_project(folder, "[export]\nsizes = [24]\n")
     items = {i.recipe: i for i in run(load_project(folder / "photo-fx.toml")) if i.photo == "a.png"}
     out = folder / "out" / "a"
     assert video_size(out / "steady.mp4") == (48, 36)  # the recipe's 48 px, from the 128x96 photo
