@@ -281,6 +281,16 @@ def test_a_saved_picture_never_carries_the_inputs_exif_or_gps(tmp_path):
         assert b"PhoneMaker" not in (tmp_path / name).read_bytes()
 
 
+def test_saving_maps_nan_to_black_and_infinities_to_the_ends_without_warning(tmp_path):
+    rgb = np.full((1, 4, 3), 0.4, np.float32)
+    rgb[0, 0], rgb[0, 1], rgb[0, 2] = np.nan, np.inf, -np.inf
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        imageio.save(rgb, tmp_path / "odd.png")
+    with Image.open(tmp_path / "odd.png") as img:
+        assert np.asarray(img)[0, :, 0].tolist() == [0, 255, 0, 102]  # 0.4 * 255 = 102: finite pixels untouched
+
+
 def _frames(count=4, height=47, width=63):
     rng = np.random.default_rng(0)
     return [rng.random((height, width, 3), dtype=np.float32) for _ in range(count)]

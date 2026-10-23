@@ -75,11 +75,11 @@ def _picture(path: str | Path) -> Iterator[Image.Image]:
 def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, quality: int = 95) -> None:
     """Write `rgb` to `path`; the extension picks the format.
 
-    With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp.
-    `quality` (1..100, default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no
-    chroma subsampling) and PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer
-    shows the colours the effects made, and carries no other metadata: nothing from the photo it came from, so no
-    EXIF and no GPS position.
+    With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp. Values outside
+    0..1 are clipped and NaN is written as 0 (black), silently. `quality` (1..100, default 95) sets JPEG and WebP
+    compression; JPEGs keep full-resolution colour (4:4:4, no chroma subsampling) and PNG is lossless. The file
+    embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the effects made, and carries no
+    other metadata: nothing from the photo it came from, so no EXIF and no GPS position.
     """
     img = to_pil(rgb, alpha)
     suffix = Path(path).suffix.lower()
@@ -97,7 +97,9 @@ def to_pil(rgb: np.ndarray, alpha: np.ndarray | None = None) -> Image.Image:
 
 
 def _to_uint8(data: np.ndarray) -> np.ndarray:
-    return (np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+    """0..1 floats to 8-bit levels, rounded; out-of-range values clip, NaN (no colour at all) becomes 0, black."""
+    finite = np.nan_to_num(data, nan=0.0, posinf=1.0, neginf=0.0)
+    return (np.clip(finite, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
 
 
 def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, max_side: int | None = None) -> int:
