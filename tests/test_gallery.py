@@ -1,4 +1,4 @@
-"""The generated effect catalogue: docs/effects.md, the gallery pictures, `photo-fx gallery` and `photo-fx regenerate`.
+"""The generated effect catalogue: docs/effects.md, the gallery pictures, `poe gallery` and `poe regenerate`.
 
 These tests build their own effects (throwaway or in a fresh registry) and their own example recipes, so they do not
 depend on which real effects exist or how they are documented.
@@ -278,12 +278,14 @@ def test_gallery_outside_a_source_checkout_says_it_needs_one(tmp_path):
     assert not (tmp_path / "not-a-checkout").exists()
 
 
-# --- writing everything: `photo-fx gallery` and `photo-fx regenerate` --------------------------------------------
+# --- writing everything: `poe gallery` and `poe regenerate` (tools/dev.py) --------------------------------------------
 
 
 # The commands always work on the checkout photo-fx runs from. To run them without touching the real one, each test
-# runs `photo-fx` in a fresh interpreter from a copy of the package placed in the scratch checkout's src/: imported
+# runs the script in a fresh interpreter from a copy of the package placed in the scratch checkout's src/: imported
 # from there, photo-fx takes the scratch checkout for its own.
+
+DEV_SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "dev.py"
 
 
 @pytest.fixture
@@ -294,16 +296,16 @@ def docs(checkout):
     return checkout
 
 
-def photo_fx_command(checkout: Path, *args: str) -> subprocess.CompletedProcess:
-    """`photo-fx ARGS`, run from the copy of the package in `checkout`."""
+def dev_command(checkout: Path, *args: str) -> subprocess.CompletedProcess:
+    """`tools/dev.py ARGS`, run from the copy of the package in `checkout`."""
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
     return subprocess.run(
-        [sys.executable, "-m", "photo_fx.cli", *args], cwd=checkout, env=environment, capture_output=True, text=True
+        [sys.executable, str(DEV_SCRIPT), *args], cwd=checkout, env=environment, capture_output=True, text=True
     )
 
 
 def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(docs):
-    done = photo_fx_command(docs, "regenerate")
+    done = dev_command(docs, "regenerate")
     assert done.returncode == 0, done.stderr
     stub, page = docs / "src" / "photo_fx" / "fx.pyi", docs / "docs" / "effects.md"
     assert done.stdout.split() == [str(stub), str(page)]  # written into the scratch checkout, nowhere else
@@ -314,7 +316,7 @@ def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(doc
 
 
 def test_the_gallery_command_writes_the_page_too(docs):
-    done = photo_fx_command(docs, "gallery")
+    done = dev_command(docs, "gallery")
     assert done.returncode == 0, done.stderr
     assert done.stdout.split() == [str(docs / "docs" / "effects.md")]
     assert (docs / "docs" / "effects.md").read_text() == gallery.render_effects_page()
@@ -323,9 +325,9 @@ def test_the_gallery_command_writes_the_page_too(docs):
 
 def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(docs):
     picture = gallery.effect_files("grain", checkout=docs).picture  # grain's recipe needs no cut-out: renders anywhere
-    assert photo_fx_command(docs, "gallery", "--only", "grain").returncode == 0
+    assert dev_command(docs, "gallery", "--only", "grain").returncode == 0
     assert picture.read_bytes() == b"existing"  # kept
-    done = photo_fx_command(docs, "gallery", "--only", "grain", "--force")
+    done = dev_command(docs, "gallery", "--only", "grain", "--force")
     assert done.returncode == 0, done.stderr
     with Image.open(picture) as rendered:
         # rendered again
@@ -335,7 +337,7 @@ def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(d
 
 
 def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
-    done = photo_fx_command(docs, "gallery", "--only", "grain", "nope")
+    done = dev_command(docs, "gallery", "--only", "grain", "nope")
     assert done.returncode == 1
     assert "'nope'" in done.stderr
     assert not (docs / "docs" / "effects.md").exists()

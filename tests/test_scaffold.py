@@ -1,6 +1,6 @@
-"""`photo-fx new-effect`: a new effect is a set of new files named for it, written from the template, that works as
-written: its package (`src/photo_fx/effects/<name>/`), its tests (`tests/effects/<name>/`) and its example recipe
-(`examples/effects/<name>.toml`), where `gallery.effect_files` says they belong.
+"""`poe new-effect` (tools/dev.py): a new effect is a set of new files named for it, written from the template, that
+works as written: its package (`src/photo_fx/effects/<name>/`), its tests (`tests/effects/<name>/`) and its
+example recipe (`examples/effects/<name>.toml`), where `gallery.effect_files` says they belong.
 
 The scaffold always writes into the checkout photo-fx runs from, so these tests run it on a copy: in-process through
 `gallery.new_effect(checkout=...)`, or as the command, in a fresh interpreter importing the copy. The last two prove
@@ -55,12 +55,16 @@ def _tree(root: Path) -> dict[str, str]:
     }
 
 
-def run_photo_fx(checkout: Path, *args: str) -> subprocess.CompletedProcess:
-    """`photo-fx ARGS` from the copy of the package in `checkout` (so photo-fx takes the copy for its checkout)."""
+def run_dev_script(checkout: Path, *args: str) -> subprocess.CompletedProcess:
+    """`tools/dev.py ARGS` from the copy of the package in `checkout` (so photo-fx takes the copy for its checkout)."""
     # no bytecode caches: the files in the checkout are exactly what the command wrote
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src"), "PYTHONDONTWRITEBYTECODE": "1"}
     return subprocess.run(
-        [sys.executable, "-m", "photo_fx.cli", *args], cwd=checkout, env=environment, capture_output=True, text=True
+        [sys.executable, str(ROOT / "tools" / "dev.py"), *args],
+        cwd=checkout,
+        env=environment,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -166,21 +170,21 @@ def test_an_unknown_category_is_refused_listing_the_categories(checkout):
 
 
 def test_the_command_writes_the_files_prints_them_and_says_how_to_make_the_picture(checkout):
-    done = run_photo_fx(checkout, "new-effect", "lamp_probe", "--category", "light")
+    done = run_dev_script(checkout, "new-effect", "lamp_probe", "--category", "light")
     assert done.returncode == 0, done.stderr
     printed = [Path(line) for line in done.stdout.split()]
     assert printed
     assert all(path.is_file() and "lamp_probe" in path.as_posix() for path in printed)
-    assert "photo-fx gallery --only lamp_probe" in done.stderr
+    assert "poe gallery --only lamp_probe" in done.stderr
 
 
 def test_the_command_reports_an_existing_name_and_a_bad_category(checkout):
     before = _tree(checkout)
-    taken = run_photo_fx(checkout, "new-effect", "grade", "--category", "colour")
+    taken = run_dev_script(checkout, "new-effect", "grade", "--category", "colour")
     assert taken.returncode == 1
     assert "error:" in taken.stderr
     assert "'grade'" in taken.stderr
-    unknown = run_photo_fx(checkout, "new-effect", "lamp_probe", "--category", "lights")
+    unknown = run_dev_script(checkout, "new-effect", "lamp_probe", "--category", "lights")
     assert unknown.returncode == 2  # a usage error: argparse lists the choices
     assert "lights" in unknown.stderr
     assert _tree(checkout) == before
@@ -207,7 +211,7 @@ def _copy_of_the_tree(destination: Path) -> Path:
 def _scaffold_into(copy: Path) -> list[str]:
     """Scaffold PROBE in `copy`, check that no existing file changed, and return the new files (relative paths)."""
     before = _tree(copy)
-    scaffolded = run_photo_fx(copy, "new-effect", PROBE, "--category", "utilities")
+    scaffolded = run_dev_script(copy, "new-effect", PROBE, "--category", "utilities")
     assert scaffolded.returncode == 0, scaffolded.stderr
     after = _tree(copy)
     assert {path: after.get(path) for path in before} == before  # no existing file changed or went missing

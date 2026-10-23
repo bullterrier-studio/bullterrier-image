@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -208,3 +209,21 @@ def test_python_dash_m_photo_fx_runs_the_command_line():
     out, err = process.communicate(timeout=60)
     assert process.returncode == 0, err
     assert out.startswith("photo-fx ")
+
+
+def commands_in_help(capsys) -> list[str]:
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    listed = re.search(r"\{([a-z,-]+)\}", capsys.readouterr().out)
+    assert listed, "the help shows no list of commands"
+    return listed.group(1).split(",")
+
+
+@pytest.mark.parametrize("command", ["gallery", "regenerate", "new-effect"])
+def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
+    """They need a source checkout, so `poe` runs them from `tools/dev.py`."""
+    assert command not in commands_in_help(capsys)
+    with pytest.raises(SystemExit) as caught:
+        main([command])
+    assert caught.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err

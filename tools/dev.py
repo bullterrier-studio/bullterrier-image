@@ -1,0 +1,65 @@
+"""Developer commands that need a source checkout of photo-fx: `uv run poe gallery|regenerate|new-effect`.
+
+They write into the checkout photo-fx runs from (the effect packages, tests, example recipes, gallery pictures,
+`fx.pyi` and `docs/effects.md`), so they are not part of the installed `photo-fx` program. Each prints the files it
+wrote, one per line, to stdout; an error is `error: <reason>` on stderr and exit code 1.
+"""
+
+import argparse
+import sys
+
+from photo_fx import PhotoFxError, gallery
+from photo_fx.core import registry
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the developer command in `argv` (default: `sys.argv[1:]`); return the exit code (0 done, 1 failed)."""
+    parser = argparse.ArgumentParser(prog="dev.py", description="Developer commands that need a source checkout.")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    p = commands.add_parser(
+        "gallery",
+        help="render each effect's missing gallery picture from its example recipe and write docs/effects.md",
+        epilog="example: uv run poe gallery --only grain",
+    )
+    p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
+    p.add_argument("--force", action="store_true", help="render again even if the picture exists")
+
+    commands.add_parser(
+        "regenerate",
+        help="after adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures",
+        epilog="example: uv run poe regenerate",
+    )
+
+    p = commands.add_parser(
+        "new-effect",
+        help="create a new effect's files from the template: its code, its tests and its example recipe",
+        epilog="example: uv run poe new-effect my_effect --category light",
+    )
+    p.add_argument("name", help="the effect's name: lowercase letters, digits and _, starting with a letter")
+    p.add_argument("--category", required=True, choices=registry.CATEGORIES, help="its section of the catalogue")
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "gallery":
+            written = gallery.write_docs(args.only, args.force)
+        elif args.command == "regenerate":
+            written = gallery.regenerate()
+        else:
+            written = gallery.new_effect(args.name, args.category)
+    except (PhotoFxError, ValueError, OSError) as error:  # ValueError: gallery's own refusals (unknown or taken name)
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    for path in written:
+        print(path)
+    if args.command == "new-effect":
+        print(
+            f"next: fill in the effect, its tests and its example recipe, then render its picture with "
+            f"`uv run poe gallery --only {args.name}`",
+            file=sys.stderr,
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

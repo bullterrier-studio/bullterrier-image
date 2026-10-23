@@ -79,16 +79,18 @@ to declare parameters.
 
 ## Adding an effect (the recipe)
 
+The three commands below are developer tasks (`tools/dev.py`, run through `poe`), not part of the installed `photo-fx` program.
+
 What a new effect looks like is defined once, by the template in `src/photo_fx/effects/_template/` (the colour effects, `effects/grade/`,
 `effects/clarity/`... are worked examples of it). Three steps:
-1. **Scaffold:** `uv run photo-fx new-effect <name> --category <category>` writes `src/photo_fx/effects/<name>/__init__.py` and `effect.py` (the
+1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes `src/photo_fx/effects/<name>/__init__.py` and `effect.py` (the
    `EffectParams` model with one documented example field and the registered function), `tests/effects/<name>/test_<name>.py` and
    `examples/effects/<name>.toml`. It works and passes the gate as written.
 2. **Fill in:** in `effect.py` replace the example field with the effect's own (every value that shapes the result is a `param` field, library options
    included) and the function body with the effect, whose docstring's first sentence is its summary; in the test file the properties of the behaviour (the
    contract tests already cover ranges, schema and call styles for every effect); in the example recipe a short recipe showing it (`size = 480`, 1 to 3
-   steps). Then `uv run photo-fx gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`.
-3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run photo-fx regenerate` is run by the
+   steps). Then `uv run poe gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`.
+3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run poe regenerate` is run by the
    integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`.
 
 ## Lint, types and the other gates
