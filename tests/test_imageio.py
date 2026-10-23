@@ -5,6 +5,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
 import warnings
 
 import numpy as np
@@ -279,6 +280,43 @@ def test_a_saved_picture_never_carries_the_inputs_exif_or_gps(tmp_path):
             assert dict(saved.getexif()) == {}
             assert "exif" not in saved.info
         assert b"PhoneMaker" not in (tmp_path / name).read_bytes()
+
+
+SAVE_EVERY_FORMAT = """
+import sys, time
+from pathlib import Path
+import numpy as np
+from photo_fx import imageio
+
+out = Path(sys.argv[1])
+rgb = np.random.default_rng(3).random((24, 32, 3), dtype=np.float32)
+for name in ("a.jpg", "a.png", "a.webp", "a.gif"):
+    imageio.save(rgb, out / name)
+imageio.save_video([rgb, rgb[::-1]], out / "a.mp4", fps=2)
+print(int(time.time()))  # the clock second when this run finished
+"""
+
+
+def test_the_same_picture_saved_at_another_time_gives_the_same_bytes(tmp_path):
+    # Two separate processes, the second started in a later clock second than the first finished, so anything that
+    # writes the time into a file (an embedded profile's creation date, a container timestamp) shows as a difference.
+    runs: list[int] = []  # the clock second each run finished in
+    for run in ("first", "second"):
+        if runs:
+            while int(time.time()) <= runs[-1]:  # wait for the clock to reach the next second (under a second)
+                time.sleep(0.02)
+        (tmp_path / run).mkdir()
+        done = subprocess.run(
+            [sys.executable, "-c", SAVE_EVERY_FORMAT, str(tmp_path / run)],
+            capture_output=True,
+            encoding="utf-8",
+            check=True,
+        )
+        runs.append(int(done.stdout))
+    names = sorted(p.name for p in (tmp_path / "first").iterdir())
+    assert names == ["a.gif", "a.jpg", "a.mp4", "a.png", "a.webp"]
+    for name in names:
+        assert (tmp_path / "first" / name).read_bytes() == (tmp_path / "second" / name).read_bytes(), name
 
 
 def test_saving_maps_nan_to_black_and_infinities_to_the_ends_without_warning(tmp_path):

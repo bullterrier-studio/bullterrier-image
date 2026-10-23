@@ -7,6 +7,7 @@ about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of
 
 import io
 import shutil
+import struct
 import subprocess
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
@@ -23,7 +24,13 @@ from photo_fx.ops import resample
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
-_SRGB_ICC = ImageCms.ImageCmsProfile(_SRGB).tobytes()  # littlecms's built-in sRGB profile, 588 bytes
+# littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
+# into the header's creation date (bytes 24..35: year, month, day, hours, minutes, seconds as big-endian 16-bit
+# numbers, ICC.1:2022 section 7.2.1); a fixed date keeps a saved file's bytes the same whenever it is saved.
+# The profile ID (bytes 84..99), a checksum that would cover the date, is left unset by littlecms: nothing to redo.
+_GENERATED_ICC = ImageCms.ImageCmsProfile(_SRGB).tobytes()
+_FIXED_DATE = struct.pack(">6H", 2000, 1, 1, 0, 0, 0)  # constant: any valid date will do; 2000-01-01 00:00:00
+_SRGB_ICC = _GENERATED_ICC[:24] + _FIXED_DATE + _GENERATED_ICC[36:]  # constant: 24..35, the ICC header's date field
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _SIXTEEN_BIT = 65535.0  # the largest 16-bit value
 _ALPHA = 3  # the alpha channel of RGBA
