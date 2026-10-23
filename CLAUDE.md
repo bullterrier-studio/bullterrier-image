@@ -31,8 +31,8 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 
 1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before. An `ops` module is added together with its first consumer, never ahead of it (`vulture` fails the gate on code nothing uses; earlier modules wait in git history). `photo_fx.ops` is internal, not API.
 2. **Presets are data, not code**: a preset is a recipe fragment (TOML), so it never needs to import effects.
-3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects.md`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
-4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects.md`, stop: something is wrong.
+3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects/`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
+4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects/`, stop: something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
@@ -106,7 +106,7 @@ What a new effect looks like is defined once, by the template in `src/photo_fx/e
    contract tests already cover ranges, schema and call styles for every effect); in the example recipe a short recipe showing it (`size = 480`, 1 to 3
    steps). Then `uv run poe gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`.
 3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run poe regenerate` is run by the
-   integrator, not by you: do not commit `fx.pyi` or `docs/effects.md`.
+   integrator, not by you: do not commit `fx.pyi` or `docs/effects/`.
 
 ## Lint, types and the other gates
 

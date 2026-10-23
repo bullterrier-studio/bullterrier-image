@@ -1,4 +1,5 @@
-"""The generated effect catalogue: docs/effects.md, the gallery pictures, `poe gallery` and `poe regenerate`.
+"""The generated effect catalogue: docs/effects/ (an index and a page per category), the gallery pictures, `poe gallery`
+and `poe regenerate`.
 
 These tests build their own effects (throwaway or in a fresh registry) and their own example recipes, so they do not
 depend on which real effects exist or how they are documented.
@@ -31,14 +32,9 @@ class AmountParams(EffectParams):
     amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of the picture a probe keeps.")
 
 
-def _sections(page: str) -> dict[str, str]:
-    """The page cut at its `## ` headings: heading -> the text under it."""
-    parts = re.split(r"^## (.+)$", page, flags=re.M)
-    return dict(zip(parts[1::2], parts[2::2], strict=True))
-
-
 def _row(page: str, name: str) -> str:
-    (row,) = [line for line in page.splitlines() if line.startswith("|") and f"`{name}`" in line]
+    """The table row of effect `name` on a category page (the rows start with its picture)."""
+    (row,) = [line for line in page.splitlines() if line.startswith("| <img") and f"`{name}`" in line]
     return row
 
 
@@ -46,27 +42,118 @@ def _unescaped_pipes(row: str) -> int:
     return len(re.findall(r"(?<!\\)\|", row))
 
 
-# --- the effects page --------------------------------------------------------------------------------------------
+def _slug(heading: str) -> str:
+    """The anchor GitHub gives a heading: lower case, punctuation dropped, spaces to hyphens."""
+    return re.sub(r"[^\w\s-]", "", heading.lower()).replace(" ", "-")
 
 
-def test_the_effects_page_has_one_section_per_used_category_in_catalogue_order(fresh_registry, register_probe):
-    for name, category in [("drift", "animation"), ("tint", "colour"), ("lamp", "light")]:
-        register_probe(name, category)  # registered in another order than the catalogue's
-    assert list(_sections(gallery.render_effects_page())) == ["Colour", "Light", "Animation"]
+def _dangling_links(pages: dict[str, str]) -> list[str]:
+    """The links between pages that lead nowhere: to a page that is not there, or to an anchor its page lacks."""
+    anchors = {
+        filename: {_slug(heading) for heading in re.findall(r"^#+ (.+)$", text, flags=re.M)}
+        for filename, text in pages.items()
+    }
+    dangling = []
+    for text in pages.values():
+        for target in re.findall(r"\]\(([^)\s]+\.md(?:#[^)\s]*)?)\)", text):
+            filename, _, anchor = target.partition("#")
+            if filename not in pages or (anchor and anchor not in anchors[filename]):
+                dangling.append(target)
+    return dangling
 
 
-def test_a_category_appears_on_the_page_once_it_has_an_effect(fresh_registry, register_probe):
+def _index_rows(pages: dict[str, str]) -> dict[str, list[str]]:
+    """The category table of the index: category page -> its cells (name link, count, description)."""
+    rows = [
+        [cell.strip() for cell in line.strip("|").split("|")]
+        for line in pages["README.md"].splitlines()
+        if re.match(r"\| \[\w+\]\(\w+\.md\) \|", line)
+    ]
+    return {re.search(r"\((\w+\.md)\)", cells[0]).group(1): cells for cells in rows}  # type: ignore[union-attr]
+
+
+# --- the effects pages -------------------------------------------------------------------------------------------
+
+
+def test_a_category_has_a_page_only_while_it_has_effects(fresh_registry, register_probe):
     register_probe("lamp", "light")
-    assert "Distortion" not in _sections(gallery.render_effects_page())  # no empty table
+    pages = gallery.render_effects_pages()
+    assert set(pages) == {"README.md", "light.md"}  # no page, no index row and no link for a category without effects
+    assert "distortion" not in pages["README.md"].lower()
     register_probe("swirl", "distortion")
-    assert "`swirl`" in _sections(gallery.render_effects_page())["Distortion"]
+    pages = gallery.render_effects_pages()
+    assert set(pages) == {"README.md", "light.md", "distortion.md"}
+    assert "`swirl`" in pages["distortion.md"]
+    assert "`swirl`" not in pages["light.md"]
 
 
-def test_every_real_effect_is_listed_once_in_its_own_category_section():
-    sections = _sections(gallery.render_effects_page())
+def test_the_index_lists_every_effect_once_alphabetically_linking_to_its_category_page(fresh_registry, register_probe):
+    for name, category in [("zoom", "light"), ("tint", "colour"), ("amber", "colour"), ("drift", "animation")]:
+        register_probe(name, category)
+    listed = re.findall(r"^- \[`(\w+)`\]\((\S+)\)", gallery.render_effects_pages()["README.md"], flags=re.M)
+    assert listed == [
+        ("amber", "colour.md#amber"),
+        ("drift", "animation.md#drift"),
+        ("tint", "colour.md#tint"),
+        ("zoom", "light.md#zoom"),
+    ]
+
+
+def test_the_index_gives_each_category_its_count_and_one_line_description_in_catalogue_order(
+    fresh_registry, register_probe
+):
+    for name, category in [("drift", "animation"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
+        register_probe(name, category)  # registered in another order than the catalogue's
+    rows = _index_rows(gallery.render_effects_pages())
+    assert list(rows) == ["colour.md", "light.md", "animation.md"]
+    assert [cells[0] for cells in rows.values()] == [
+        "[Colour](colour.md)",
+        "[Light](light.md)",
+        "[Animation](animation.md)",
+    ]
+    assert [cells[1] for cells in rows.values()] == ["2", "1", "1"]
+
+
+def test_every_category_has_a_description_in_the_index(fresh_registry, register_probe):
+    categories = list(registry.CATEGORIES)
+    for index, category in enumerate(categories):
+        register_probe(f"probe{index}", category)
+    rows = _index_rows(gallery.render_effects_pages())
+    assert len(rows) == len(categories)
+    descriptions = [cells[2] for cells in rows.values()]
+    assert all(description for description in descriptions)
+    assert len(set(descriptions)) == len(descriptions)  # one line of its own for each, none a copy of another
+
+
+def test_every_real_effect_is_listed_once_in_its_own_category_page():
+    pages = gallery.render_effects_pages()
     for name in registry.describe():
-        homes = [heading for heading, text in sections.items() if f"`{name}`" in text]
-        assert homes == [registry.category(name).capitalize()], name
+        homes = [filename for filename, text in pages.items() if f"| `{name}` |" in text]
+        assert homes == [f"{registry.category(name)}.md"], name
+
+
+@pytest.mark.parametrize(
+    ("pages", "dangling"),
+    [
+        pytest.param({"a.md": "[b](b.md#top)", "b.md": "# Top"}, [], id="good-link-and-anchor"),
+        pytest.param({"a.md": "[b](b.md)"}, ["b.md"], id="page-missing"),
+        pytest.param({"a.md": "[b](b.md#gone)", "b.md": "# Top"}, ["b.md#gone"], id="anchor-missing"),
+    ],
+)
+def test_the_link_check_finds_dangling_links_and_passes_good_ones(pages, dangling):
+    assert _dangling_links(pages) == dangling
+
+
+def test_every_link_between_the_real_pages_resolves_to_a_page_and_a_heading():
+    pages = gallery.render_effects_pages()
+    assert len(re.findall(r"\]\([^)]+\.md", pages["README.md"])) > len(registry.describe())  # there are links to check
+    assert _dangling_links(pages) == []
+
+
+def test_rendering_the_pages_twice_gives_the_same_text(fresh_registry, register_probe):
+    register_probe("lamp", "light")
+    register_probe("tint", "colour")
+    assert gallery.render_effects_pages() == gallery.render_effects_pages()
 
 
 class RowParams(EffectParams):
@@ -83,14 +170,14 @@ def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_regi
         """Softly probes the bright parts. Then says more."""
         return rgb
 
-    row = _row(gallery.render_effects_page(), "row_probe")
-    assert 'src="gallery/row_probe.jpg"' in row
+    row = _row(gallery.render_effects_pages()["light.md"], "row_probe")
+    assert 'src="../gallery/row_probe.jpg"' in row
     assert "| Softly probes the bright parts. |" in row  # the first sentence only
     assert "`radius=24.0` `chars=' .:'` `ink=None`" in row  # what a recipe sets, in order, with defaults
     # the recipe supplies the image and the cut-out itself
     assert "rgb" not in row
     assert "matte" not in row
-    assert "[row_probe.toml](../examples/effects/row_probe.toml)" in row
+    assert "[row_probe.toml](../../examples/effects/row_probe.toml)" in row
     assert _unescaped_pipes(row) == 6  # five columns
 
 
@@ -107,10 +194,9 @@ def test_a_modelled_effect_gets_a_table_of_its_parameters(fresh_registry):
         """Puts a halo around the bright parts."""
         return rgb
 
-    page = gallery.render_effects_page()
-    section = _sections(page)["Light"]
+    page = gallery.render_effects_pages()["light.md"]
     assert "`radius=24.0` `mode='screen'`" in _row(page, "halo_probe")  # the short form in the effect's row
-    table = section[section.index("### `halo_probe`") :]
+    table = page[page.index("### `halo_probe`") :]
     lines = [line for line in table.splitlines() if line.startswith("|")]
     assert lines[0] == "| Parameter | Type | Unit | Range | Default | Description |"
     assert lines[2] == "| `radius` | number | px | 0 to 500 | `24.0` | Width of the halo \\| in px. Larger = softer. |"
@@ -134,7 +220,7 @@ def test_effects_page_escapes_table_breaking_characters(throwaway_effects):
         across two lines. More."""
         return rgb
 
-    row = _row(gallery.render_effects_page(), "pipe_probe")
+    row = _row(gallery.render_effects_pages()["utilities.md"], "pipe_probe")
     assert "`chars='a\\|b'`" in row
     assert "Draws a \\| b across two lines." in row
     assert _unescaped_pipes(row) == 6  # still five columns
@@ -201,10 +287,10 @@ def test_an_effects_files_are_found_by_its_name_in_the_layout_that_mirrors_the_p
     assert files.picture == checkout / "docs" / "gallery" / "lamp.jpg"
 
 
-def test_every_row_of_the_real_page_links_to_its_effects_own_picture_and_recipe():
-    page, docs = gallery.render_effects_page(), gallery.CHECKOUT / "docs"
+def test_every_row_of_the_real_pages_links_to_its_effects_own_picture_and_recipe():
+    pages, docs = gallery.render_effects_pages(), gallery.CHECKOUT / "docs" / "effects"
     for name in registry.describe():
-        files, row = gallery.effect_files(name), _row(page, name)
+        files, row = gallery.effect_files(name), _row(pages[f"{registry.category(name)}.md"], name)
         (picture,) = re.findall(r'src="([^"]+)"', row)
         (recipe,) = re.findall(r"\]\(([^)]+)\)", row)
         assert (docs / picture).resolve() == files.picture.resolve(), name
@@ -269,7 +355,7 @@ def test_regenerate_checks_the_checkout_before_writing_anything(checkout):
     with pytest.raises(ProjectError, match="grain"):
         gallery.regenerate(checkout=checkout)
     assert not (checkout / "src" / "photo_fx" / "fx.pyi").exists()
-    assert not (checkout / "docs" / "effects.md").exists()
+    assert not (checkout / "docs" / "effects").exists()
 
 
 def test_gallery_outside_a_source_checkout_says_it_needs_one(tmp_path):
@@ -304,23 +390,49 @@ def dev_command(checkout: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def test_regenerate_writes_the_stub_and_the_page_and_keeps_existing_pictures(docs):
+def _page_files(root: Path) -> dict[str, Path]:
+    """The generated catalogue pages in a checkout, by file name, in the order `render_effects_pages` gives them."""
+    return {filename: root / "docs" / "effects" / filename for filename in gallery.render_effects_pages()}
+
+
+def test_regenerate_writes_the_stub_and_the_pages_and_keeps_existing_pictures(docs):
     done = dev_command(docs, "regenerate")
     assert done.returncode == 0, done.stderr
-    stub, page = docs / "src" / "photo_fx" / "fx.pyi", docs / "docs" / "effects.md"
-    assert done.stdout.split() == [str(stub), str(page)]  # written into the scratch checkout, nowhere else
+    stub, pages = docs / "src" / "photo_fx" / "fx.pyi", _page_files(docs)
+    assert done.stdout.split() == [str(stub), *map(str, pages.values())]  # into the scratch checkout, nowhere else
     assert stub.read_text(encoding="utf-8") == fx.stub_text()
-    assert page.read_text(encoding="utf-8") == gallery.render_effects_page()
+    for filename, text in gallery.render_effects_pages().items():
+        assert pages[filename].read_text(encoding="utf-8") == text
     pictures = [gallery.effect_files(name, checkout=docs).picture for name in registry.describe()]
     assert {picture.read_bytes() for picture in pictures} == {b"existing"}
 
 
-def test_the_gallery_command_writes_the_page_too(docs):
+def test_the_gallery_command_writes_the_pages_too(docs):
     done = dev_command(docs, "gallery")
     assert done.returncode == 0, done.stderr
-    assert done.stdout.split() == [str(docs / "docs" / "effects.md")]
-    assert (docs / "docs" / "effects.md").read_text(encoding="utf-8") == gallery.render_effects_page()
+    pages = _page_files(docs)
+    assert done.stdout.split() == [str(path) for path in pages.values()]
+    for filename, text in gallery.render_effects_pages().items():
+        assert pages[filename].read_text(encoding="utf-8") == text
     assert not (docs / "src" / "photo_fx" / "fx.pyi").exists()
+
+
+def test_regenerating_again_changes_no_file_and_removes_the_page_of_a_category_that_lost_its_effects(docs):
+    assert dev_command(docs, "regenerate").returncode == 0
+    written = {path: path.read_bytes() for path in (docs / "docs" / "effects").iterdir()}
+    stale = docs / "docs" / "effects" / "no_such_category.md"  # what a category that has no effects any more leaves
+    stale.write_text("# Gone\n", encoding="utf-8")
+    assert dev_command(docs, "regenerate").returncode == 0
+    assert not stale.exists()
+    assert {path: path.read_bytes() for path in (docs / "docs" / "effects").iterdir()} == written
+
+
+def test_the_gallery_command_keeps_what_is_not_a_generated_page(docs):
+    note = docs / "docs" / "effects" / "notes.txt"
+    note.parent.mkdir()
+    note.write_text("mine", encoding="utf-8")
+    assert dev_command(docs, "gallery").returncode == 0
+    assert note.read_text(encoding="utf-8") == "mine"
 
 
 def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(docs):
@@ -340,4 +452,4 @@ def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
     done = dev_command(docs, "gallery", "--only", "grain", "nope")
     assert done.returncode == 1
     assert "'nope'" in done.stderr
-    assert not (docs / "docs" / "effects.md").exists()
+    assert not (docs / "docs" / "effects").exists()

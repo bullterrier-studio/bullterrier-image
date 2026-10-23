@@ -43,7 +43,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 - **Every effect declares its parameters once, as a frozen Pydantic model** (`EffectParams`, `extra="forbid"`, strict
   fields). *Reason:* one declaration drives validation, defaults, `help(fx.<effect>)`, `photo-fx effects`,
-  `docs/effects.md`, `fx.pyi`, the `fx` signatures and the JSON schema, so they cannot disagree. *Consequence:*
+  `docs/effects/`, `fx.pyi`, the `fx` signatures and the JSON schema, so they cannot disagree. *Consequence:*
   `@effect(category=..., params=...)` requires the model; a misspelt or out-of-range value fails at construction or
   load, naming the effect, the field, the constraint and the value, never deep inside a render.
 - **Nothing hidden.** Every value that shapes a result, including options of the libraries an effect calls, is a named,

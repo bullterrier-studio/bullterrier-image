@@ -129,8 +129,8 @@ build-check = { sequence = ["uv build --quiet --clear --no-create-gitignore --ou
 lint-workflows = { sequence = ["uv run actionlint", "zizmor --offline .github"], default_item_type = "cmd", help = "Lint the GitHub workflows (actionlint, zizmor)" }
 check = { sequence = ["ruff format --check .", "ruff check .", { ref = "lint-workflows" }, "vulture", "deptry .", { ref = "build-check" }, "mypy", { ref = "test" }], default_item_type = "cmd", help = "The full gate (format, lint, workflows, dead code, dependencies, distributions, types, tests); stops at the first failure" }
 # Developer commands that need a source checkout (tools/dev.py); extra arguments go to the script, e.g. `poe gallery --only grain`.
-gallery = { cmd = "uv run python tools/dev.py gallery", help = "Render the missing gallery pictures and write docs/effects.md (--only NAME..., --force)" }
-regenerate = { cmd = "uv run python tools/dev.py regenerate", help = "After adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures" }
+gallery = { cmd = "uv run python tools/dev.py gallery", help = "Render the missing gallery pictures and write the catalogue in docs/effects/ (--only NAME..., --force)" }
+regenerate = { cmd = "uv run python tools/dev.py regenerate", help = "After adding or changing effects: write fx.pyi and the catalogue in docs/effects/, render missing pictures" }
 new-effect = { cmd = "uv run python tools/dev.py new-effect", help = "Create a new effect's files from the template (NAME --category CATEGORY)" }
 # Release from main in one command: checks, plan, [y/N], version bump, changelog section, commit, annotated tag and an
 # atomic push of main and the tag (CONTRIBUTING.md, "Releasing")

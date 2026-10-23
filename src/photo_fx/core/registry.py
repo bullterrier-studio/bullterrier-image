@@ -38,11 +38,24 @@ from photo_fx.errors import PhotoFxError, UnknownEffectError
 
 from .params import EffectParams
 
-# The sections of the effect catalogue (docs/effects.md is laid out in this order). Every effect is in exactly one.
-CATEGORIES = (
-    "colour", "light", "texture", "stylised", "text", "distortion", "glitch", "atmosphere", "subject", "compositing",
-    "backgrounds", "utilities", "animation",
-)  # fmt: skip
+# The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
+# catalogue's index shows it). Every effect is in exactly one category. A dict, so no category lacks its description.
+CATEGORY_DESCRIPTIONS = {
+    "colour": "Grades, gradient maps, tints and hue changes: they recolour the picture and leave its shapes alone.",
+    "light": "Glow, bloom and local contrast: they add or shape the light in the picture.",
+    "texture": "Grain and other surface texture laid over the picture.",
+    "stylised": "Looks that redraw the picture in a printing or drawing style, such as halftone.",
+    "text": "Pictures redrawn as characters, such as ASCII art.",
+    "distortion": "Warps that bend, ripple or displace the picture's geometry.",
+    "glitch": "Digital-error looks: displaced slices, colour splits and corrupted blocks.",
+    "atmosphere": "Weather and air: fog, haze, rain and the like.",
+    "subject": "Effects that work on the cut-out subject, apart from its background.",
+    "compositing": "Ways of combining the picture with other layers.",
+    "backgrounds": "Generated or replaced backgrounds behind the subject.",
+    "utilities": "Plain helpers such as resizing, cropping and borders.",
+    "animation": "Effects that change over time, such as particles dispersing or evaporating.",
+}
+CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
 # What a recipe hands an effect besides the image and its parameters, by name: the subject's silhouette, float32
 # (h, w) 0..1. An effect declares the ones it needs as keyword-only parameters after `params`, each with a default.

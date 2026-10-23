@@ -275,7 +275,7 @@ recipes can be handed straight to the pipeline: `run(Project(photos=(...), recip
 
 Every effect declares its parameters once, as a frozen Pydantic model in which each field has a description, a unit, a
 range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `photo-fx effects` and
-[docs/effects.md](docs/effects.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
+[docs/effects/](docs/effects/README.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
 field, the limit and the value. Writing an effect follows the same pattern: `uv run poe new-effect <name>
 --category <category>` starts one from the template, and [`effects/grade/effect.py`](src/photo_fx/effects/grade/effect.py)
 is a worked example.
@@ -369,7 +369,7 @@ Generated videos are not committed to this repository: only the filmstrip is.
 ## Effects
 
 Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and evaporating
-particles, grouped by category. **[The effect catalogue](docs/effects.md)** shows every effect with a picture of it, a
+particles, grouped by category. **[The effect catalogue](docs/effects/README.md)** (an index and a page per category) shows every effect with a picture of it, a
 one-line description, its parameters and defaults, and the example recipe that made the picture.
 `uv run photo-fx effects` prints the full documentation of every parameter.
 
@@ -425,7 +425,7 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
 examples/        the demo project: one photo, six recipes, the committed results, a Python example
   effects/       one short example recipe per effect, <effect>.toml
-docs/            the effect catalogue (effects.md, generated) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
+docs/            the effect catalogue (effects/, generated: an index and a page per category) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
 recipes/         a larger set of experiments
 tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
 ```
@@ -445,7 +445,7 @@ uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest d
 uv run poe fix         # applies the automatic lint and format fixes
 uv run poe new-effect my_effect --category light   # a new effect's files, from the template
 uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
-uv run poe regenerate   # at integration: fx.pyi, docs/effects.md, missing pictures
+uv run poe regenerate   # at integration: fx.pyi, docs/effects/, missing pictures
 ```
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): imperative subject`, header at
@@ -453,7 +453,7 @@ most 72 characters, body explaining why); a `commit-msg` hook checks it. The det
 How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md), what changed in each release in [CHANGELOG.md](CHANGELOG.md),
 and how to report a security problem privately in [SECURITY.md](SECURITY.md).
 
-Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects.md`) are not updated on feature branches, so branches that
+Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches that
 add effects never conflict over them; each effect's picture is a file of its own. After merging, `uv run poe regenerate` brings them up to date in one
 commit. Pictures that exist are kept (`uv run poe gallery --force` renders them again).
 

@@ -1,8 +1,8 @@
 """Developer commands that need a source checkout of photo-fx: `uv run poe gallery|regenerate|new-effect`.
 
 They write into the checkout photo-fx runs from (the effect packages, tests, example recipes, gallery pictures,
-`fx.pyi` and `docs/effects.md`), so they are not part of the installed `photo-fx` program. Each prints the files it
-wrote, one per line, to stdout; an error is `error: <reason>` on stderr and exit code 1.
+`fx.pyi` and the catalogue in `docs/effects/`), so they are not part of the installed `photo-fx` program. Each prints
+the files it wrote, one per line, to stdout; an error is `error: <reason>` on stderr and exit code 1.
 """
 
 import argparse
@@ -19,7 +19,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p = commands.add_parser(
         "gallery",
-        help="render each effect's missing gallery picture from its example recipe and write docs/effects.md",
+        help="render each effect's missing gallery picture from its example recipe and write docs/effects/",
         epilog="example: uv run poe gallery --only grain",
     )
     p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
 
     commands.add_parser(
         "regenerate",
-        help="after adding or changing effects: write fx.pyi and docs/effects.md, render missing pictures",
+        help="after adding or changing effects: write fx.pyi and docs/effects/, render missing pictures",
         epilog="example: uv run poe regenerate",
     )
 

@@ -72,8 +72,8 @@ def test_no_video_or_gif_is_checked_in(tracked_files):
 
 def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists():
     readme = (EXAMPLES.parent / "README.md").read_text(encoding="utf-8")
-    assert re.search(r"\]\(docs/effects\.md\)", readme), "the README must link to docs/effects.md, the effect catalogue"
-    assert (EXAMPLES.parent / "docs" / "effects.md").is_file()
+    assert re.search(r"\]\(docs/effects/README\.md\)", readme), "the README must link to the effect catalogue"
+    assert (EXAMPLES.parent / "docs" / "effects" / "README.md").is_file()
     local = [p for p in re.findall(r'src="([^"]+)"', readme) if not p.startswith("http")]
     assert len(local) >= 8  # the banner, the gallery, the step sheet and the filmstrip
     for path in local:
