@@ -3,10 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.blur import gaussian_blur
 
 
 class GlowParams(EffectParams):
@@ -17,8 +17,8 @@ class GlowParams(EffectParams):
         unit="px",
         min=0,
         max=500,
-        doc="Gaussian sigma of the halo in px at the recipe's size: larger spreads the light further and softer (and "
-        "takes longer); 0 keeps the light on the bright parts themselves.",
+        doc="Gaussian sigma of the halo in px at the recipe's size: larger spreads the light further and softer; 0 "
+        "keeps the light on the bright parts themselves.",
     )
     amount: float = param(
         0.6,
@@ -67,11 +67,7 @@ def glow(rgb: np.ndarray, params: GlowParams) -> np.ndarray:
     Glow only ever brightens, and keeps the colour of the light: each channel glows on its own.
     """
     bright = np.clip((rgb - params.threshold) / (1.0 - params.threshold), 0.0, 1.0)
-    halo = ndimage.gaussian_filter(
-        bright,
-        sigma=(params.radius, params.radius, 0),  # constant: a zero sigma, so no blur across the colour axis
-        mode=params.mode,
-        cval=params.constant_value,
-        truncate=params.truncate,
+    halo = gaussian_blur(
+        bright, params.radius, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
     )
     return (1.0 - (1.0 - rgb) * (1.0 - np.clip(params.amount * halo, 0, 1))).astype(np.float32)  # screen blend

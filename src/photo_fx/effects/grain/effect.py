@@ -3,10 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.blur import gaussian_blur
 
 
 class GrainParams(EffectParams):
@@ -60,6 +60,6 @@ def grain(rgb: np.ndarray, params: GrainParams) -> np.ndarray:
     """
     noise = np.random.default_rng(params.seed).standard_normal(rgb.shape[:2]).astype(np.float32)
     if params.size > 1.0:  # a speck of 1 px or less is a single pixel: nothing to clump
-        noise = ndimage.gaussian_filter(noise, params.size / 2.0, mode=params.mode, truncate=params.truncate)
+        noise = gaussian_blur(noise, params.size / 2.0, truncate=params.truncate, mode=params.mode)
         noise /= max(float(noise.std()), 1e-6)  # constant: guard against dividing by zero on a 1-pixel picture
     return np.clip(rgb + params.amount * noise[..., None], 0.0, 1.0).astype(np.float32)

@@ -3,10 +3,10 @@
 from typing import Literal
 
 import numpy as np
-from scipy import ndimage
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.blur import gaussian_blur
 
 
 class ClarityParams(EffectParams):
@@ -18,8 +18,7 @@ class ClarityParams(EffectParams):
         min=0,
         max=500,
         doc="Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the recipe's size. Larger "
-        "compares bigger regions and takes longer (at the top of the range, with a large truncate, seconds per "
-        "picture); 0 turns the effect off.",
+        "compares bigger regions; 0 turns the effect off.",
     )
     amount: float = param(
         1.0,
@@ -57,13 +56,7 @@ def clarity(rgb: np.ndarray, params: ClarityParams) -> np.ndarray:
     the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
     Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
     """
-    blurred = np.stack(
-        [
-            ndimage.gaussian_filter(
-                rgb[..., c], params.radius, mode=params.mode, cval=params.constant_value, truncate=params.truncate
-            )
-            for c in range(rgb.shape[-1])
-        ],
-        axis=-1,
+    blurred = gaussian_blur(
+        rgb, params.radius, truncate=params.truncate, mode=params.mode, constant_value=params.constant_value
     )
     return np.clip(rgb + params.amount * (rgb - blurred), 0.0, 1.0).astype(np.float32)
