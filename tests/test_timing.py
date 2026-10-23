@@ -50,8 +50,8 @@ def test_named_and_custom_curves_follow_their_cubic_bezier_to_high_precision(
 ) -> None:
     """The curve is the set of points (x(s), y(s)), so the ease at time x(s) must be y(s). Walking s forward needs no
     inversion, so this is independent of the module's solver, and a coarse solver or a wrong constant shows."""
-    for step in range(1, 20):
-        x, y = bezier_point(*control, step / 20)
+    for step in range(21):
+        x, y = bezier_point(*control, step / 20)  # from (0, 0) at s = 0 to (1, 1) at s = 1
         assert Animated(0.0, 1.0, ease).at(x) == pytest.approx(y, abs=1e-9)
 
 
@@ -66,8 +66,3 @@ def test_named_and_custom_curves_follow_their_cubic_bezier_to_high_precision(
 )
 def test_frame_count_is_seconds_times_fps_to_the_nearest_frame(seconds, fps, frames):
     assert len(Animation(seconds, fps).frames()) == frames
-
-
-def test_pingpong_adds_the_way_back_without_repeating_the_turning_frames():
-    once = Animation(1.27, 10).frames()
-    assert len(Animation(1.27, 10, loop="pingpong").frames()) == 2 * len(once) - 2  # 24

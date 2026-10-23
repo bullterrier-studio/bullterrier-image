@@ -151,16 +151,6 @@ def test_pingpong_plays_forward_then_back_without_repeating_the_turning_frames()
     assert len(both) == 2 * len(once) - 2
 
 
-def test_animated_values_ease_between_their_end_points():
-    for ease in ("linear", "in", "out", "in-out"):
-        value = Animated(2.0, 6.0, ease)
-        assert value.at(0.0) == 2.0
-        assert value.at(1.0) == 6.0
-        assert value.at(0.25) <= value.at(0.5) <= value.at(0.75)
-    assert Animated(0.0, 1.0, "in-out").at(0.5) == 0.5
-    assert Animated(0.0, 1.0, "in").at(0.5) < 0.5
-
-
 @pytest.mark.parametrize(
     ("text", "expect"),
     [
@@ -179,31 +169,6 @@ def test_bad_animations_fail_at_load_time(tmp_path, text, expect):
     made in code (tests/core/test_steps.py), the one model both paths go through."""
     with pytest.raises(ValueError, match=expect):
         load_recipe(write(tmp_path, text))
-
-
-def test_cubic_bezier_easing_slow_in_slow_out_without_overshoot():
-    gentle = Animated(0.0, 1.0, "gentle")
-    values = [gentle.at(i / 100) for i in range(101)]
-    assert values[0] == 0.0
-    assert abs(values[-1] - 1.0) < 1e-9
-    # smooth, never past the target
-    assert values == sorted(values)
-    assert max(values) <= 1.0 + 1e-9
-    # slow start, slow finish
-    assert gentle.at(0.1) < 0.1
-    assert gentle.at(0.9) > 0.9
-    assert Animated(0, 1, (0.4, 0.0, 0.2, 1.0)).at(0.3) == gentle.at(0.3)  # the preset is that curve
-
-
-@pytest.mark.parametrize("name", ["gentle", "standard", "accelerate", "decelerate", "emphasized", "sine"])
-def test_every_named_curve_runs_from_zero_to_one(name):
-    curve = Animated(0.0, 1.0, name)
-    assert abs(curve.at(0.0)) < 1e-9
-    assert abs(curve.at(1.0) - 1.0) < 1e-9
-
-
-def test_exit_and_entrance_curves_accelerate_and_decelerate():
-    assert Animated(0, 1, "accelerate").at(0.3) < 0.3 < Animated(0, 1, "decelerate").at(0.3)
 
 
 def test_a_custom_cubic_bezier_can_be_written_as_four_numbers(tmp_path):
