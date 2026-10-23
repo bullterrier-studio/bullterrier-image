@@ -449,6 +449,59 @@ def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(d
     assert str(picture) in done.stdout.split()
 
 
+def _files(root: Path) -> dict[str, bytes]:
+    """Every file under `root` (relative path -> bytes), bytecode caches aside."""
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    }
+
+
+def _catalogue_pages() -> set[str]:
+    return {f"docs/effects/{filename}" for filename in gallery.render_effects_pages()}
+
+
+GALLERY_RUNS = {  # command arguments -> the files it must add or change in the checkout (none else)
+    "--only renders a missing picture and nothing else": (["--only", "grain"], {"docs/gallery/grain.jpg"}, True),
+    "--only --force renders one picture again and nothing else": (
+        ["--only", "grain", "--force"],
+        {"docs/gallery/grain.jpg"},
+        False,
+    ),
+    "--only names several effects": (
+        ["--only", "grain", "invert", "--force"],
+        {"docs/gallery/grain.jpg", "docs/gallery/invert.jpg"},
+        False,
+    ),
+    "--only leaves an existing picture alone and writes nothing": (["--only", "grain"], set(), False),
+    "without --only the catalogue pages are written too": ([], _catalogue_pages(), False),
+}
+
+
+@pytest.mark.parametrize(("arguments", "changed", "picture_missing"), GALLERY_RUNS.values(), ids=GALLERY_RUNS.keys())
+def test_the_gallery_command_writes_exactly_the_files_its_arguments_name(docs, arguments, changed, picture_missing):
+    sentinels = {  # stand-ins for the generated and the hand-written files a picture run must leave alone
+        "docs/effects/README.md": "old index",
+        "docs/effects/light.md": "old page",
+        "src/photo_fx/fx.pyi": "old stub",
+        "README.md": "the project readme",
+    }
+    for relative, text in sentinels.items():
+        (docs / relative).parent.mkdir(parents=True, exist_ok=True)
+        (docs / relative).write_text(text, encoding="utf-8")
+    if picture_missing:
+        gallery.effect_files("grain", checkout=docs).picture.unlink()
+    before = _files(docs)
+
+    done = dev_command(docs, "gallery", *arguments)
+
+    assert done.returncode == 0, done.stderr
+    after = _files(docs)
+    assert {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)} == changed
+    assert set(done.stdout.split()) == {str(docs / path) for path in changed}  # it reports what it wrote
+
+
 def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
     done = dev_command(docs, "gallery", "--only", "grain", "nope")
     assert done.returncode == 1

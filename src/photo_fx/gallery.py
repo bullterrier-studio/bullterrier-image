@@ -94,23 +94,32 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
 
 
 def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path = CHECKOUT) -> list[Path]:
-    """Write the catalogue pages (`render_effects_pages`) into `docs/effects/` and render the gallery pictures that are
-    missing (or those in `only`, or all of them with `force`; see `render_gallery`), both in `checkout`. Markdown pages
-    there that the catalogue no longer has (a category that lost its effects) are removed; other files are left alone.
-    The pages are written first, so they are up to date even where pictures cannot be rendered. Returns the files
-    written: the pages, then the pictures."""
+    """Render gallery pictures in `checkout` (see `render_gallery`), and, unless `only` names effects, write the
+    catalogue pages (`render_effects_pages`) into `docs/effects/` first.
+
+    Without `only`, the pages are written, so they are up to date even where pictures cannot be rendered; Markdown
+    pages there that the catalogue no longer has (a category that lost its effects) are removed and other files are
+    left alone; then the missing pictures (all of them with `force`) are rendered. Returns the pages, then the pictures.
+
+    With `only`, nothing but those effects' pictures is written: no page, no `fx.pyi`, no other file, so an agent
+    adding one effect leaves the shared generated files to the integrator (`regenerate`). Returns the pictures.
+    """
     _chosen(only, checkout)  # a bad name fails before anything is written
+    written = [] if only else _write_pages(checkout)
+    rendered = render_gallery(only, force, checkout=checkout)
+    return [*written, *(effect_files(name, checkout=checkout).picture for name in rendered)]
+
+
+def _write_pages(checkout: Path) -> list[Path]:
+    """Write the catalogue into `docs/effects/` of `checkout`, dropping pages it no longer has; the files written."""
     folder, pages = _layout(checkout).pages, render_effects_pages()
     folder.mkdir(parents=True, exist_ok=True)
     for stale in folder.glob("*.md"):
         if stale.name not in pages:
             stale.unlink()
-    written = []
     for filename, text in pages.items():
         (folder / filename).write_text(text, encoding="utf-8")
-        written.append(folder / filename)
-    rendered = render_gallery(only, force, checkout=checkout)
-    return [*written, *(effect_files(name, checkout=checkout).picture for name in rendered)]
+    return [folder / filename for filename in pages]
 
 
 def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:

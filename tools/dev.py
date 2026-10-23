@@ -19,10 +19,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p = commands.add_parser(
         "gallery",
-        help="render each effect's missing gallery picture from its example recipe and write docs/effects/",
+        help="render missing gallery pictures from the example recipes (without --only, also write docs/effects/)",
         epilog="example: uv run poe gallery --only grain",
     )
-    p.add_argument("--only", nargs="+", default=[], metavar="NAME", help="only these effects")
+    p.add_argument(
+        "--only", nargs="+", default=[], metavar="NAME", help="only these effects' pictures: no pages are written"
+    )
     p.add_argument("--force", action="store_true", help="render again even if the picture exists")
 
     commands.add_parser(

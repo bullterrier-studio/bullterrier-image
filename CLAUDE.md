@@ -104,7 +104,7 @@ What a new effect looks like is defined once, by the template in `src/photo_fx/e
 2. **Fill in:** in `effect.py` replace the example field with the effect's own (every value that shapes the result is a `param` field, library options
    included) and the function body with the effect, whose docstring's first sentence is its summary; in the test file the properties of the behaviour (the
    contract tests already cover ranges, schema and call styles for every effect); in the example recipe a short recipe showing it (`size = 480`, 1 to 3
-   steps). Then `uv run poe gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`.
+   steps). Then `uv run poe gallery --only <name>` renders its picture, `docs/gallery/<name>.jpg`, and writes nothing else.
 3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run poe regenerate` is run by the
    integrator, not by you: do not commit `fx.pyi` or `docs/effects/`.
 
