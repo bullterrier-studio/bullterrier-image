@@ -1192,7 +1192,7 @@ requires-dist = [
     { name = "imageio-ffmpeg", marker = "extra == 'video'", specifier = ">=0.6.0" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "onnxruntime", marker = "python_full_version < '3.15'", specifier = ">=1.17.0" },
-    { name = "pillow", specifier = ">=10.2.0" },
+    { name = "pillow", specifier = ">=11.1.0" },
     { name = "pydantic", specifier = ">=2.7.1" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'", specifier = ">=10.0" },
     { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin'", specifier = ">=10.0" },
