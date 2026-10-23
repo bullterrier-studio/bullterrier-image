@@ -21,6 +21,7 @@ import numpy as np
 from photo_fx.ops.resample import resize
 
 from . import registry
+from .errors import RecipeError, SubjectNotFoundError
 from .steps import Recipe, Step
 
 # Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).
@@ -46,7 +47,8 @@ def render(
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
     height and width, 0..1 (white = subject), or None. at: position in the clip, 0..1 (ignored by a still recipe).
     find_subject: called with the photo (already scaled to `recipe.size`) when a step needs the subject and no `matte`
-    was given. Raises ValueError when a step needs the subject and neither was given, or the finder returns None.
+    was given. Raises SubjectNotFoundError when a step needs the subject and neither was given, the finder returns
+    None, or the matte is not the photo's size.
     """
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
     return _finish(_run(rgb, recipe.steps, matte, at, at))
@@ -61,10 +63,10 @@ def render_frames(
     subject is found once for the whole clip. A recipe with an animation but no animated parameter gives the same still
     picture in every frame.
 
-    rgb, matte, find_subject: as for `render`. recipe: must have an animation (ValueError otherwise).
+    rgb, matte, find_subject: as for `render`. recipe: must have an animation (RecipeError otherwise).
     """
     if recipe.animation is None:
-        raise ValueError(f"recipe {recipe.name!r} has no animation: add an [animation] table (seconds, fps)")
+        raise RecipeError(f"recipe {recipe.name!r} has no animation: add an [animation] table (seconds, fps)")
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
     # With no animated step every step is still: the clip is the still picture, held for every frame.
     first_moving = next((i for i, step in enumerate(recipe.steps) if step.animated), len(recipe.steps))
@@ -112,8 +114,8 @@ def render_all(
     """Run several recipes on one photo; the subject is found at most once, however many recipes need it.
 
     rgb: the photo (see `render`). recipes: the recipes to run; the results come back in the same order, one still each.
-    find_subject: called once with the photo as given when any recipe needs the subject (ValueError if it is needed
-    and missing).
+    find_subject: called once with the photo as given when any recipe needs the subject (SubjectNotFoundError if it is
+    needed and missing).
     """
     masked = next((recipe for recipe in recipes if recipe.needs_matte), None)
     matte = None if masked is None else _find_subject(rgb, masked, find_subject)
@@ -125,7 +127,7 @@ def _prepare(
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Scale the photo and matte to the recipe's size, and find the subject if a step needs it."""
     if matte is not None and matte.shape[:2] != rgb.shape[:2]:
-        raise ValueError(f"matte is {matte.shape[:2]} but the photo is {rgb.shape[:2]}")
+        raise SubjectNotFoundError(f"matte is {matte.shape[:2]} but the photo is {rgb.shape[:2]}")
     if recipe.size:
         rgb = resize(rgb, recipe.size)
         matte = None if matte is None else resize(matte, recipe.size)
@@ -136,7 +138,7 @@ def _prepare(
 
 def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder | None) -> np.ndarray:
     if find_subject is None:
-        raise ValueError(
+        raise SubjectNotFoundError(
             f"recipe {recipe.name!r} has masked steps, so it needs the subject: pass `matte` (the subject's alpha) "
             "or `find_subject` (a function photo -> alpha, e.g. photo_fx.matte.subject_matte)"
         )
@@ -145,11 +147,11 @@ def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder |
 
 def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
     """Ask `find_subject` for the subject of `rgb` and return its matte. The one place a finder is called and its answer
-    checked (the runner and the pipeline both use it): ValueError if it returned None, since a finder must answer or
-    raise, and carrying on would drop the subject without a word."""
+    checked (the runner and the pipeline both use it): SubjectNotFoundError if it returned None, since a finder must
+    answer or raise, and carrying on would drop the subject without a word."""
     matte = find_subject(rgb)
     if matte is None:
-        raise ValueError(
+        raise SubjectNotFoundError(
             "`find_subject` returned None: it must return the subject's alpha (float32, the photo's height and width, "
             "0..1) or raise when it finds none"
         )

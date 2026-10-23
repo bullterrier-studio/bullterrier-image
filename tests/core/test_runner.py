@@ -4,6 +4,7 @@ for the subject itself."""
 import numpy as np
 import pytest
 
+from photo_fx import SubjectNotFoundError
 from photo_fx.core import runner
 from photo_fx.core.steps import Recipe, Step
 from photo_fx.core.timing import Animated, Animation
@@ -41,7 +42,7 @@ RUNS = {
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways(run, photo):
     recipe = CLIP if run is RUNS["render_frames"] else MASKED
-    with pytest.raises(ValueError, match="needs the subject") as raised:
+    with pytest.raises(SubjectNotFoundError, match="needs the subject") as raised:
         run(photo, recipe)
     message = str(raised.value)  # names the recipe and both ways to give the subject
     assert f"'{recipe.name}'" in message
@@ -96,5 +97,5 @@ def test_an_animation_whose_parameters_never_change_is_the_still_held_for_the_wh
 def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     """A finder returning None (instead of raising) would otherwise make `trace` drop the subject stage silently."""
     recipe = CLIP if run is RUNS["render_frames"] else MASKED
-    with pytest.raises(ValueError, match="`find_subject` returned None"):
+    with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
         run(photo, recipe, find_subject=lambda rgb: None)

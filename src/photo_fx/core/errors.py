@@ -39,7 +39,8 @@ class UnknownEffectError(RecipeError, KeyError):
 
 
 class SubjectNotFoundError(PhotoFxError, RuntimeError):
-    """The subject of a photo was needed (a masked step, an effect that takes the matte) but could not be found."""
+    """The subject of a photo was needed (a masked step, an effect that takes the matte) but could not be found or
+    used: no `matte` and no finder given, a finder that found nothing, or a matte of another size than the photo."""
 
 
 class BackendUnavailableError(PhotoFxError, NotImplementedError):

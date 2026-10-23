@@ -3,6 +3,7 @@ cubic-bezier definition), never against the module's own formulas."""
 
 import pytest
 
+from photo_fx import RecipeError
 from photo_fx.core.timing import Animated, Animation
 
 # (name, value of the ease at t = 0.25, 0.5, 0.75), worked out by hand from the definitions
@@ -71,3 +72,25 @@ def test_frame_count_is_seconds_times_fps_to_the_nearest_frame(seconds, fps, fra
 def test_pingpong_adds_the_way_back_without_repeating_the_turning_frames():
     once = Animation(1.27, 10).frames()
     assert len(Animation(1.27, 10, loop="pingpong").frames()) == 2 * len(once) - 2  # 24
+
+
+@pytest.mark.parametrize(
+    ("make", "named"),
+    [
+        (lambda: Animated(0.0, 1.0, "wobble"), "wobble"),
+        (lambda: Animated(0.0, 1.0, (0.5, 0.0, 1.5, 1.0)), "1.5"),
+        (lambda: Animation(seconds=-2), "seconds"),
+        (lambda: Animation(seconds=2, fps=0), "fps"),
+        (lambda: Animation(seconds=2, hold_start=1.5, hold_end=0.5), "holds"),
+    ],
+    ids=["unknown ease", "bezier out of range", "negative length", "zero fps", "holds fill the clip"],
+)
+def test_a_bad_animation_value_is_a_recipe_error_naming_it(make, named):
+    with pytest.raises(RecipeError, match=named):
+        make()
+
+
+def test_a_good_animation_and_animated_value_raise_nothing():
+    """The known-good side of the table above."""
+    assert Animation(seconds=2, fps=10, hold_start=0.5, hold_end=0.5).frames()
+    assert Animated(0.0, 1.0, (0.25, 0.1, 0.25, 1.0)).at(0.0) == 0.0

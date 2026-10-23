@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from photo_fx import Recipe, Step, imageio, load_recipe, render, trace
+from photo_fx import Recipe, RecipeError, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
 from photo_fx import recipe as facade
 from photo_fx.core import runner
 from photo_fx.core.params import EffectParams, param
@@ -290,7 +290,7 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
 
 
 def test_render_frames_needs_an_animated_recipe(photo):
-    with pytest.raises(ValueError, match="no animation"):
+    with pytest.raises(RecipeError, match="no animation"):
         list(render_frames(photo, Recipe("still", (Step("grain"),), size=None)))
 
 
@@ -300,7 +300,7 @@ def test_size_scales_photo_and_matte_together(photo, matte):
 
 
 def test_matte_of_the_wrong_size_is_rejected(photo):
-    with pytest.raises(ValueError, match="matte"):
+    with pytest.raises(SubjectNotFoundError, match="matte"):
         render(photo, Recipe("r", (Step("grain"),), size=None), np.ones((5, 5), np.float32))
 
 

@@ -6,9 +6,9 @@ Promises:
 - `Animation` turns seconds, fps, holds and looping into the position (0..1) of every output frame.
 - Easing is by name (see `EASE_NAMES`) or by your own cubic-bezier of four numbers; both end exactly on 0 and 1.
 - `Animated` and `Animation` are frozen, validated Pydantic models: a bad ease, a negative length or holds that leave no
-  time to move fail when the value is made (a plain `ValueError` naming the field and the value), wherever it is made.
+  time to move fail when the value is made (a `RecipeError` naming the field and the value), wherever it is made.
 
-Dependency direction: this module imports nothing from photo_fx. `steps` builds on it, `loader` and `runner` on `steps`.
+Dependency direction: this module imports only `errors`. `steps` builds on it, `loader` and `runner` on `steps`.
 """
 
 import math
@@ -16,6 +16,8 @@ from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+
+from .errors import RecipeError
 
 _SIMPLE_EASES = {
     "linear": lambda t: t,
@@ -97,12 +99,12 @@ class Animated(BaseModel):
     def __init__(
         self, start: float, end: float, ease: str | Sequence[float] = "linear", over: str = "motion", **unknown: Any
     ) -> None:
-        """Validate and make the value; ValueError naming each bad field and the value given (unknown keywords, which
+        """Validate and make the value; RecipeError naming each bad field and the value given (unknown keywords, which
         pydantic's own validation may pass, are refused by name)."""
         try:
             super().__init__(start=start, end=end, ease=ease, over=over, **unknown)
         except ValidationError as error:
-            raise ValueError(_explain(error, "animated value")) from None
+            raise RecipeError(_explain(error, "animated value")) from None
 
     @field_validator("ease", mode="before")
     @classmethod
@@ -160,12 +162,12 @@ class Animation(BaseModel):
         loop: str = "once",
         **unknown: Any,
     ) -> None:
-        """Validate and make the timeline; ValueError naming each bad field and the value given (unknown keywords are
+        """Validate and make the timeline; RecipeError naming each bad field and the value given (unknown keywords are
         refused by name)."""
         try:
             super().__init__(seconds=seconds, fps=fps, hold_start=hold_start, hold_end=hold_end, loop=loop, **unknown)
         except ValidationError as error:
-            raise ValueError(_explain(error, "animation")) from None
+            raise RecipeError(_explain(error, "animation")) from None
 
     @model_validator(mode="after")
     def _time_to_move(self) -> "Animation":
