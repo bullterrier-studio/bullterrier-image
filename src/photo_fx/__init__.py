@@ -23,9 +23,11 @@ Layers, each importing only from the ones below it (import-linter checks this in
     ops        shared numeric primitives, named by concept
 """
 
+from importlib import metadata  # noqa: I001  (the next statement must stay the first photo_fx import: no sorting)
+
 # First, before anything else: importing the effect library registers every effect, so whichever photo_fx module is
 # imported (even `photo_fx.core.runner` alone, since Python runs this file first), every effect is there.
-from . import effects  # noqa: I001  (a statement of its own, so no import sorting can move another before it)
+from . import effects
 from . import fx, imageio, recipe  # binds `photo_fx.recipe`, which callers use as a namespace
 from .core.errors import (
     BackendUnavailableError, ImageReadError, PhotoFxError, RecipeError, SubjectNotFoundError, UnknownEffectError,
@@ -34,8 +36,13 @@ from .matte import subject_matte
 from .pipeline import Project, load_project, run
 from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
 
+try:
+    __version__ = metadata.version("photo-fx")  # pyproject.toml is the one place the version is written
+except metadata.PackageNotFoundError:  # run from a source tree that was never installed
+    __version__ = "0+unknown"
+
 __all__ = [
     "Animation", "BackendUnavailableError", "ImageReadError", "PhotoFxError", "Project", "Recipe", "RecipeError",
-    "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "fx", "imageio", "load_project", "load_recipe",
-    "ramp", "recipe", "render", "render_all", "render_frames", "run", "subject_matte", "trace",
+    "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "__version__", "fx", "imageio", "load_project",
+    "load_recipe", "ramp", "recipe", "render", "render_all", "render_frames", "run", "subject_matte", "trace",
 ]  # fmt: skip

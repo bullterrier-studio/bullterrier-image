@@ -1,9 +1,14 @@
+import os
+import subprocess
 import sys
+import tomllib
+from pathlib import Path
 
 import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image
 
+import photo_fx
 from photo_fx import imageio
 from photo_fx.cli import main
 from photo_fx.core import registry
@@ -170,3 +175,36 @@ def test_run_finds_subjects_with_the_chosen_segmenter(cut, echo_model, monkeypat
     (cut / "photo-fx.toml").write_text('photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n')
     assert main(["run", str(cut / "photo-fx.toml"), "--segmenter", "onnx"]) == 0
     assert (cut / "done" / "me" / "cut.jpg").exists()
+
+
+# --- user mistakes are reported, not thrown at the user ------------------------------------------------------------
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def photo_fx_process(*args: str, **options) -> subprocess.Popen:
+    """`python -m photo_fx ARGS` in a fresh interpreter (the way a user starts it), stderr and stdout as text."""
+    environment = {key: value for key, value in os.environ.items() if key != "PHOTO_FX_DEBUG"}
+    return subprocess.Popen(
+        [sys.executable, "-m", "photo_fx", *args], cwd=ROOT, env=environment, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, **options,
+    )  # fmt: skip
+
+
+# --- the program itself: --version, python -m photo_fx, the exit codes in --help --------------------------------------
+
+
+def test_version_is_the_one_in_pyproject(capsys):
+    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    with pytest.raises(SystemExit) as caught:
+        main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr().out.strip() == f"photo-fx {declared}"
+    assert photo_fx.__version__ == declared
+
+
+def test_python_dash_m_photo_fx_runs_the_command_line():
+    process = photo_fx_process("--version")
+    out, err = process.communicate(timeout=60)
+    assert process.returncode == 0, err
+    assert out.startswith("photo-fx ")

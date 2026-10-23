@@ -242,6 +242,7 @@ exhaustive = true  # a new top-level module must be placed in a layer here
 # Each layer may import only the layers below it ("|" = independent siblings, ":" = siblings that may import each
 # other). Being exhaustive, it also stops core and ops importing anything above them.
 layers = [
+    "__main__",  # `python -m photo_fx`: runs the command line
     "cli",  # app, split so its modules cannot form cycles: recipe imports no other app module
     "pipeline | gallery",
     "sheet | checks | fx",

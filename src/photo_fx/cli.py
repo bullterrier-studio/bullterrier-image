@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import gallery, imageio
+from . import __version__, gallery, imageio
 from .core import registry
 from .imageio import save_video
 from .matte import SEGMENTERS, refine_edge, subject_matte
@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="photo-fx",
         description="Style photos with composable effects, optionally on a cut-out subject, and animate them.",
     )
+    parser.add_argument("--version", action="version", version=f"photo-fx {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     p = commands.add_parser("render", help="render a photo through one or more recipes, one file each")
