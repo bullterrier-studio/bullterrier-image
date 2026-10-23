@@ -103,14 +103,6 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
     assert json.loads(done.stdout) == ["light", 0.75]  # the template's effect: the negative at amount 1
 
 
-@pytest.mark.parametrize("name", ["grade", "glitch"])
-def test_the_name_of_an_existing_effect_is_refused_and_nothing_is_written(checkout, name):
-    before = _tree(checkout)
-    with pytest.raises(ProjectError, match=f"'{name}'"):
-        gallery.new_effect(name, "light", checkout=checkout)
-    assert _tree(checkout) == before
-
-
 @pytest.mark.parametrize(
     "existing",
     [
@@ -130,30 +122,38 @@ def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     assert _tree(checkout) == before
 
 
-@pytest.mark.parametrize("name", ["Lamp", "2lamp", "lamp-probe", "class", "_lamp", ""])
-def test_a_name_that_is_no_lowercase_identifier_is_refused(checkout, name):
-    before = _tree(checkout)
-    with pytest.raises(ProjectError, match=repr(name)):
-        gallery.new_effect(name, "light", checkout=checkout)
-    assert _tree(checkout) == before
+REFUSED = {  # name, category -> what the refusal must name
+    "the name of an existing effect: grade": ("grade", "light", ["'grade'"]),
+    "the name of an existing effect: glitch": ("glitch", "light", ["'glitch'"]),
+    # a name that is no lowercase identifier
+    "capitalised": ("Lamp", "light", ["'Lamp'"]),
+    "starting with a digit": ("2lamp", "light", ["'2lamp'"]),
+    "with a dash": ("lamp-probe", "light", ["'lamp-probe'"]),
+    "a keyword": ("class", "light", ["'class'"]),
+    "private": ("_lamp", "light", ["'_lamp'"]),
+    "empty": ("", "light", ["''"]),
+    # a name the generated effect.py or fx already uses, saying which
+    "np": ("np", "light", ["'np'", "effect.py"]),  # the function would hide numpy from its own body
+    "param": ("param", "light", ["'param'", "effect.py"]),
+    "effect": ("effect", "light", ["'effect'", "effect.py"]),
+    "stub_text": ("stub_text", "light", ["'stub_text'", "fx"]),
+    "registry": ("registry", "light", ["'registry'", "fx"]),  # a module fx imports for itself: it never builds it
+    "cache": ("cache", "light", ["'cache'", "fx"]),
+    "an unknown category, listing the categories": (
+        "lamp_probe",
+        "lights",
+        ["'lights'", ", ".join(registry.CATEGORIES)],
+    ),
+}
 
 
-@pytest.mark.parametrize(
-    ("name", "why"),
-    [
-        ("np", "effect.py"),  # the function would hide numpy from its own body
-        ("param", "effect.py"),
-        ("effect", "effect.py"),
-        ("stub_text", "fx"),
-        ("registry", "fx"),  # fx.registry is a module fx imports for itself, so it would never build the effect
-        ("cache", "fx"),
-    ],
-)
-def test_a_name_the_generated_effect_or_fx_already_uses_is_refused_saying_why(checkout, name, why):
+@pytest.mark.parametrize(("name", "category", "said"), REFUSED.values(), ids=REFUSED.keys())
+def test_a_bad_name_or_category_is_refused_saying_why_and_nothing_is_written(checkout, name, category, said):
     before = _tree(checkout)
-    with pytest.raises(ProjectError, match=repr(name)) as raised:
-        gallery.new_effect(name, "light", checkout=checkout)
-    assert why in str(raised.value)
+    with pytest.raises(ProjectError) as raised:
+        gallery.new_effect(name, category, checkout=checkout)
+    for part in said:
+        assert part in str(raised.value)
     assert _tree(checkout) == before
 
 
@@ -161,14 +161,6 @@ def test_a_name_the_generated_effect_or_fx_already_uses_is_refused_saying_why(ch
 def test_a_name_shared_with_some_other_module_is_fine_when_neither_effect_py_nor_fx_uses_it(checkout, name):
     written = gallery.new_effect(name, "light", checkout=checkout)
     assert gallery.effect_files(name, checkout=checkout).tests in written
-
-
-def test_an_unknown_category_is_refused_listing_the_categories(checkout):
-    before = _tree(checkout)
-    with pytest.raises(ProjectError, match="'lights'") as raised:
-        gallery.new_effect("lamp_probe", "lights", checkout=checkout)
-    assert ", ".join(registry.CATEGORIES) in str(raised.value)
-    assert _tree(checkout) == before
 
 
 def test_the_command_writes_the_files_prints_them_and_says_how_to_make_the_picture(checkout):

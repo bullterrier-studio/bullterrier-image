@@ -36,19 +36,8 @@ AXIS_CALLS = {"transpose", "moveaxis", "swapaxes"}
 # calls whose trivial positional numbers are bounds, fills or matrix entries, never a library's option: in any other
 # call (`gaussian_filter(rgb, 2)`) a positional number is an option like a keyword one
 BOUND_CALLS = {
-    "clip",
-    "minimum",
-    "maximum",
-    "min",
-    "max",
-    "where",
-    "full",
-    "full_like",
-    "pad",
-    "range",
-    "array",
-    "uniform",
-}
+    "clip", "minimum", "maximum", "min", "max", "where", "full", "full_like", "pad", "range", "array", "uniform",
+}  # fmt: skip
 
 
 def hidden_tunables(source: str) -> list[tuple[int, float]]:
@@ -201,30 +190,38 @@ def test_the_scanner_finds_each_hidden_tunable_with_its_line(line, literals):
     assert sorted(hidden_tunables(source)) == sorted((2, literal) for literal in literals)
 
 
-def test_a_marker_needs_a_reason_of_at_least_three_words():
-    assert scan("x = 0.35  # constant:\n") == [0.35]
-    assert scan("x = 0.35  # constant: golden ratio\n") == [0.35]
-    assert scan("x = 0.35  # constant: the golden-angle share\n") == []
+MARKED = {  # module source -> the literals still found
+    "a marker without a reason": ("x = 0.35  # constant:\n", [0.35]),
+    "a reason of two words": ("x = 0.35  # constant: golden ratio\n", [0.35]),
+    "a reason of three words": ("x = 0.35  # constant: the golden-angle share\n", []),
+    "a trailing marker covers its own statement only": (
+        "a = 0.3  # constant: the first standard value\nb = 0.35\n",
+        [0.35],
+    ),
+    "a trailing marker covers the whole statement, not the next": (
+        "weights = (\n    0.2,  # constant: Rec. 709 weights of the channels\n    0.7,\n)\nother = 0.9\n",
+        [0.9],
+    ),
+    "a marker on its own line covers the next statement only": (
+        "# constant: the golden-angle share\nx = 0.35\ny = 0.36\n",
+        [0.36],
+    ),
+    "a marker before a def covers only the def line": (
+        "# constant: too far from its value\n\n\ndef probe():\n    return 0.35\n",
+        [0.35],
+    ),
+    "a marker on a decorator covers the decorator, not the body": (
+        "@lru_cache(maxsize=16)  # constant: a cache size only\ndef probe():\n    return 0.35\n",
+        [0.35],
+    ),
+    "an unmarked decorator": ("@lru_cache(maxsize=16)\ndef probe():\n    return 0.35\n", [16, 0.35]),
+    "a literal in a param declaration is never a finding": (
+        'radius: float = param(0.35, unit="px", min=0.1, max=7, doc="Radius.")\n',
+        [],
+    ),
+}
 
 
-def test_a_trailing_marker_covers_its_own_statement_only():
-    assert scan("a = 0.3  # constant: the first standard value\nb = 0.35\n") == [0.35]
-    multi_line = "weights = (\n    0.2,  # constant: Rec. 709 weights of the channels\n    0.7,\n)\nother = 0.9\n"
-    assert scan(multi_line) == [0.9]  # the whole tuple statement is covered, the next statement is not
-
-
-def test_a_marker_on_its_own_line_covers_the_next_statement_only():
-    assert scan("# constant: the golden-angle share\nx = 0.35\ny = 0.36\n") == [0.36]
-    assert scan("# constant: too far from its value\n\n\ndef probe():\n    return 0.35\n") == [
-        0.35
-    ]  # only the def line
-
-
-def test_a_marker_on_a_decorator_covers_the_decorator_but_not_the_body():
-    source = "@lru_cache(maxsize=16)  # constant: a cache size only\ndef probe():\n    return 0.35\n"
-    assert scan(source) == [0.35]
-    assert scan("@lru_cache(maxsize=16)\ndef probe():\n    return 0.35\n") == [16, 0.35]
-
-
-def test_a_numeric_literal_in_a_param_declaration_is_never_a_finding():
-    assert scan('radius: float = param(0.35, unit="px", min=0.1, max=7, doc="Radius.")\n') == []
+@pytest.mark.parametrize(("source", "found"), MARKED.values(), ids=MARKED.keys())
+def test_a_constant_marker_with_a_reason_covers_its_statement_and_a_param_declaration_needs_none(source, found):
+    assert scan(source) == found

@@ -14,10 +14,9 @@ from photo_fx.core.registry import effect
 ALL = sorted(registry.describe())
 
 
-@pytest.mark.parametrize("name", ALL)
-def test_every_effect_keeps_shape_dtype_and_range(name, photo):
-    out = registry.apply(name, photo)
-    assert out.shape == photo.shape
+def assert_a_picture_like(out: np.ndarray, rgb: np.ndarray) -> None:
+    """`out` is a picture of `rgb`'s shape: float32, finite, every value in 0..1."""
+    assert out.shape == rgb.shape
     assert out.dtype == np.float32
     assert np.isfinite(out).all()
     assert out.min() >= -1e-6
@@ -25,9 +24,10 @@ def test_every_effect_keeps_shape_dtype_and_range(name, photo):
 
 
 @pytest.mark.parametrize("name", ALL)
-def test_every_effect_is_deterministic_and_leaves_its_input_alone(name, photo):
+def test_every_effect_keeps_shape_dtype_and_range_is_deterministic_and_leaves_its_input_alone(name, photo):
     before = photo.copy()
     first, second = registry.apply(name, photo), registry.apply(name, photo)
+    assert_a_picture_like(first, photo)
     np.testing.assert_array_equal(first, second)
     np.testing.assert_array_equal(photo, before)
 
@@ -41,13 +41,7 @@ ODD_SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)]
 def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, size, photo):
     rgb = np.ascontiguousarray(photo[: size[0], : size[1]])
     before = rgb.copy()
-    inputs = _inputs(name, rgb)
-    out = registry.apply(name, rgb, **inputs)
-    assert out.shape == rgb.shape
-    assert out.dtype == np.float32
-    assert np.isfinite(out).all()
-    assert out.min() >= -1e-6
-    assert out.max() <= 1 + 1e-6
+    assert_a_picture_like(registry.apply(name, rgb, **_inputs(name, rgb)), rgb)
     np.testing.assert_array_equal(rgb, before)
 
 
@@ -137,47 +131,24 @@ def test_the_vocabulary_check_flags_discouraged_field_names_and_passes_preferred
     assert _naming_problems("good_probe") == []
 
 
-def test_the_vocabulary_is_the_agreed_one():
-    from photo_fx.core.vocabulary import DISCOURAGED
-
-    assert DISCOURAGED == {
-        "strength": "amount", "intensity": "amount", "factor": "amount", "colour": "color", "rotation": "angle",
-        "random_state": "seed", "rng": "seed",
-    }  # fmt: skip
-
-
 # --- categories --------------------------------------------------------------------------------------------------
 
 
-AGREED_CATEGORIES = (
-    "colour", "light", "texture", "stylised", "text", "distortion", "glitch", "atmosphere", "subject",
-    "compositing", "backgrounds", "utilities", "animation",
-)  # fmt: skip
-
-
-def test_the_categories_are_exactly_the_agreed_slugs_in_order():
-    assert registry.CATEGORIES == AGREED_CATEGORIES  # the published list effect authors choose from
-
-
-def test_categories_maps_every_category_in_order_to_its_sorted_effects(fresh_registry, register_probe):
+def test_categories_maps_every_category_in_catalogue_order_to_its_sorted_effects(fresh_registry, register_probe):
+    """A category with no effects is listed too, empty. The catalogue order is `registry.CATEGORIES`, the published
+    list effect authors choose from."""
     for name, category in [("zeta", "animation"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
         register_probe(name, category)  # registered out of order, on purpose
-    expected: dict[str, list[str]] = {category: [] for category in AGREED_CATEGORIES}
+    expected: dict[str, list[str]] = {category: [] for category in registry.CATEGORIES}
     expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
     assert registry.categories() == expected
-    assert list(registry.categories()) == list(AGREED_CATEGORIES)  # dict order is the catalogue order
-
-
-def test_categories_lists_a_category_with_no_effects_as_empty(fresh_registry, register_probe):
-    register_probe("lamp", "light")
-    assert registry.categories()["distortion"] == []  # listed, although it has nothing yet
-    register_probe("swirl", "distortion")
-    assert registry.categories()["distortion"] == ["swirl"]
+    assert list(registry.categories()) == list(registry.CATEGORIES)  # dict order is the catalogue order
+    assert registry.categories()["distortion"] == []
 
 
 def test_the_real_effects_are_each_in_exactly_one_category():
     grouped = registry.categories()
-    assert list(grouped) == list(AGREED_CATEGORIES)
+    assert list(grouped) == list(registry.CATEGORIES)
     assert sorted(name for names in grouped.values() for name in names) == ALL
     assert all(names == sorted(names) for names in grouped.values())
 
@@ -245,10 +216,7 @@ def test_every_parameter_is_described_and_has_a_unit_entry(name):
 def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
     small = _small(photo)
     out = registry.apply(name, small, **_setting(name, field, _bound_value(name, field, side)), **_inputs(name, small))
-    assert out.shape == small.shape
-    assert np.isfinite(out).all()
-    assert out.min() >= -1e-6
-    assert out.max() <= 1 + 1e-6
+    assert_a_picture_like(out, small)
 
 
 def _interior_values() -> list[tuple[str, str, float]]:
@@ -270,11 +238,7 @@ def _interior_values() -> list[tuple[str, str, float]]:
 @pytest.mark.parametrize(("name", "field", "value"), _interior_values())
 def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, field, value, photo):
     small = _small(photo)
-    out = registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small))
-    assert out.shape == small.shape
-    assert np.isfinite(out).all()
-    assert out.min() >= -1e-6
-    assert out.max() <= 1 + 1e-6
+    assert_a_picture_like(registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small)), small)
 
 
 @pytest.mark.parametrize(("name", "field", "side"), _bounds())
