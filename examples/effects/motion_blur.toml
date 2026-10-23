@@ -1,0 +1,8 @@
+# A sideways whoosh: the camera pans while the shutter is open.
+name = "motion_blur"
+size = 480
+
+[[step]]
+effect = "motion_blur"
+angle = 20
+length = 36
