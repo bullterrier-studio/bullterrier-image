@@ -1,0 +1,9 @@
+# A classic dark vignette that pulls the eye to the centre.
+name = "vignette"
+size = 480
+
+[[step]]
+effect = "vignette"
+amount = 0.7
+radius = 0.45
+feather = 0.55
