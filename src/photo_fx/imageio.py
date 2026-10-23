@@ -73,7 +73,8 @@ def _picture(path: str | Path) -> Iterator[Image.Image]:
     """
     try:
         with Image.open(path) as opened:
-            yield ImageOps.exif_transpose(opened)
+            ImageOps.exif_transpose(opened, in_place=True)  # in place: an upright photo is not copied
+            yield opened
     except (OSError, ValueError, EOFError, Image.DecompressionBombError) as error:
         raise ImageReadError(f"cannot read {path} as an image: {error}") from error
 
