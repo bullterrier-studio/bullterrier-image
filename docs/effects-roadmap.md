@@ -238,6 +238,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `double_exposure` | Another picture blended inside the silhouette. | `fx.double_exposure(image="forest.jpg")` |
 | `layered_cutouts` | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
+| decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
 
 ## Compositing
 
