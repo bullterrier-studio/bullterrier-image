@@ -57,23 +57,6 @@ def test_disperse_neighbouring_frames_look_alike_so_the_motion_is_continuous():
     assert continuous < re_rolled / 2
 
 
-@pytest.mark.parametrize(("wind", "sign"), [(0.3, 1), (-0.3, -1)])
-def test_disperse_a_piece_pulls_back_against_the_wind_before_it_goes_with_it(wind, sign):
-    cell_w, cell_h = cell_size(5)
-    single = np.zeros((120, 400, 3), np.float32)
-    single[5 * cell_h : 6 * cell_h, 40 * cell_w : 41 * cell_w] = 1.0  # exactly one piece, in the middle
-    xs = []
-    for progress in np.arange(0.0, 0.2, 0.004):  # with no jitter it winds up from 0 and leaves at 0.06 (`anticipation`)
-        frame = registry.apply("disperse", single, progress=progress, wind=wind, angle=0, jitter=0.0, seed=3)
-        columns = np.nonzero(frame.max(axis=(0, 2)) > 0.05)[0]
-        if len(columns):
-            xs.append(columns.mean())
-    start = xs[0]
-    first_move = next(x - start for x in xs if abs(x - start) > 1)
-    assert first_move * sign < 0  # its first movement is against the wind (the wind-up)
-    assert max((x - start) * sign for x in xs) > 20  # and then it is carried with the wind
-
-
 def _one_piece(height=240, width=400):
     """Exactly one lit piece, near the middle, and its centre (y, x) in px."""
     cell_w, cell_h = cell_size(5)
@@ -239,13 +222,6 @@ def test_disperse_seed_changes_the_motion_and_repeats_exactly():
     assert not np.array_equal(a, registry.apply("disperse", _lit(), progress=0.5, seed=2))
 
 
-@pytest.mark.parametrize("progress", [0.1, 0.3, 0.5, 0.7, 0.9])
-def test_disperse_glowing_and_shimmering_pieces_never_go_above_white(progress):
-    out = registry.apply("disperse", _lit(), progress=progress, ambient=0.1, clock=0.7, seed=1)
-    assert out.max() <= 1.0
-    assert out.min() >= 0.0
-
-
 def _random_settings(rng: np.random.Generator) -> dict[str, object]:
     """A value for every number of the effect, drawn from its documented range (ints whole), and a random switch."""
     model = registry.parameters("disperse")
@@ -274,9 +250,10 @@ def test_disperse_stays_within_0_to_1_whatever_the_settings(draw):
     assert out.max() <= 1.0
 
 
-@pytest.mark.parametrize("progress", [0.0, 0.25, 0.5, 0.75, 1.0])
+@pytest.mark.parametrize("progress", [0.0, 0.1, 0.25, 0.3, 0.5, 0.7, 0.75, 0.9, 1.0])
 def test_disperse_every_frame_of_an_animated_progress_is_a_valid_value(progress):
-    """`progress` and `clock` are what recipes animate; every frame of that range is accepted and well-formed."""
+    """`progress` and `clock` are what recipes animate; every frame of that range is accepted and well-formed, and
+    glowing and shimmering pieces never go above white."""
     out = registry.apply("disperse", _lit(), progress=progress, clock=3600.0 * progress, ambient=0.1)
     assert np.isfinite(out).all()
     assert out.min() >= 0.0
@@ -307,19 +284,17 @@ def test_disperse_without_flare_nothing_gets_brighter():
         assert registry.apply("disperse", grey, progress=progress, sweep=0.5, seed=1, wind=0.1, flare=0.0).max() <= 0.5
 
 
-@pytest.mark.parametrize(("wind", "sign"), [(0.3, 1), (-0.3, -1)])
-def test_disperse_without_pullback_a_piece_moves_with_the_wind_from_the_start(wind, sign):
-    cell_w, cell_h = cell_size(5)
-    single = np.zeros((120, 400, 3), np.float32)
-    single[5 * cell_h : 6 * cell_h, 40 * cell_w : 41 * cell_w] = 1.0
-    xs = []
-    for progress in np.arange(0.0, 0.6, 0.004):
-        frame = registry.apply("disperse", single, progress=progress, wind=wind, angle=0, pullback=0.0, seed=3)
-        columns = np.nonzero(frame.max(axis=(0, 2)) > 0.05)[0]
-        if len(columns):
-            xs.append(columns.mean())
+@pytest.mark.parametrize(("pullback", "first_way"), [({}, -1), ({"pullback": 0.0}, 1)], ids=["default", "pullback 0"])
+@pytest.mark.parametrize(("wind", "sign"), [(0.3, 1), (-0.3, -1)], ids=["wind right", "wind left"])
+def test_disperse_a_piece_pulls_back_against_the_wind_before_it_goes_with_it_unless_pullback_is_0(
+    pullback, first_way, wind, sign
+):
+    img, _ = _one_piece(height=120)
+    # with no jitter it winds up from 0 and leaves at 0.06 (`anticipation`)
+    xs = [x for _, x, _ in _track(img, until=0.3, wind=wind, angle=0, jitter=0.0, seed=3, **pullback)]
     first_move = next(x - xs[0] for x in xs if abs(x - xs[0]) > 1)
-    assert first_move * sign > 0
+    assert first_move * sign * first_way > 0  # against the wind first (the wind-up), or with it at once
+    assert max((x - xs[0]) * sign for x in xs) > 20  # and then it is carried with the wind
 
 
 def test_disperse_finish_is_when_the_last_piece_has_vanished():
