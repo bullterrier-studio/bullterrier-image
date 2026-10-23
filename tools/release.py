@@ -27,10 +27,31 @@ import tomllib
 from pathlib import Path
 
 from check_release import LINK_DEFINITION, ReleaseError, check_release, parse_version
+from packaging.version import VERSION_PATTERN, Version
 
 PARTS = ("major", "minor", "patch")
 CHANGELOG = Path("CHANGELOG.md")
 PYPROJECT = Path("pyproject.toml")
+# any PEP 440 spelling of a version (v1.0, 1.0-RC.1, 1.0.dev0); matching is greedy, so 11.0 never yields 1.0
+VERSION_LITERAL = re.compile(VERSION_PATTERN, re.VERBOSE | re.IGNORECASE)
+
+
+def literal_versions(version: str, folder: Path) -> list[str]:
+    """Where the text files under `folder` write `version`, in any PEP 440 spelling: `path:line: literal` each, the
+    path relative to `folder` with forward slashes, in path then line order; an empty list if nowhere."""
+    wanted = Version(version)
+    found = []
+    for path in sorted(folder.rglob("*")):
+        if not path.is_file() or "__pycache__" in path.parts or b"\0" in (data := path.read_bytes()):
+            continue
+        lines = enumerate(data.decode("utf-8", errors="replace").splitlines(), start=1)
+        found += [
+            f"{path.relative_to(folder).as_posix()}:{number}: {match.group()}"
+            for number, line in lines
+            for match in VERSION_LITERAL.finditer(line)
+            if Version(match.group()) == wanted
+        ]
+    return found
 
 
 def _run(*argv: str) -> str:

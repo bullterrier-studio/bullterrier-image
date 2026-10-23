@@ -87,6 +87,7 @@ dev = [
     "import-linter>=2.15",
     "mypy>=2.4.0",
     "onnx>=1.23.2",
+    "packaging>=26.3",
     "photo-fx[video]",
     "pip-audit>=2.10.1",
     "poethepoet>=0.49.0",
@@ -291,6 +292,8 @@ package_module_name_map = { "pyobjc-framework-quartz" = "Quartz", "pyobjc-framew
 # Foundation comes with pyobjc-framework-cocoa, which both declared pyobjc frameworks depend on (macOS only)
 DEP001 = ["Foundation"]
 DEP003 = ["Foundation"]
+# packaging (PEP 440 versions) is used by tools/release.py, a developer command that runs in the dev environment
+DEP004 = ["packaging"]
 
 # The layering rules of CLAUDE.md, checked by `uv run lint-imports` (tests/test_layering.py runs it, and proves each
 # contract fails on a forbidden import). Imports flow downward only. Wildcards keep the rules free of effect names, so
