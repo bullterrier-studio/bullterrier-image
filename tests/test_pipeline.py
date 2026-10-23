@@ -351,14 +351,16 @@ print(json.dumps([[i.photo, i.status, i.error] for i in run(load_project(sys.arg
 
 
 def test_text_files_are_utf8_whatever_the_locale(folder, photo):
-    # Windows' default is cp1252, not UTF-8; a Latin-1 locale with UTF-8 mode off stands in for it on any system
+    # Windows' default is cp1252, not UTF-8 (there `LC_ALL` is ignored and the code page applies). Elsewhere the C
+    # locale with UTF-8 mode off, which every POSIX system has, stands in for it: ASCII, so no text survives a write or
+    # read in the locale's encoding. On Linux the photo's name is then listed with its undecodable bytes as surrogates.
     imageio.save(photo, folder / "photos" / "Jānis-č.png")
     (folder / "recipes" / "grainy.toml").write_text(
         '# Jānis’ grain, fine as sand\nname = "grainy"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8"
     )
     child = subprocess.run(
         [sys.executable, "-c", RUN_IN_CHILD, str(folder / "photo-fx.toml")],
-        env={**os.environ, "LC_ALL": "en_US.ISO8859-1", "PYTHONUTF8": "0"},
+        env={**os.environ, "LC_ALL": "C", "PYTHONUTF8": "0"},
         capture_output=True,
         check=False,
     )

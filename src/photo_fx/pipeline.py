@@ -329,7 +329,7 @@ def run(
                 )
     if not dry_run:
         record = _write_record(project, items, previous, names, code)
-        _write_atomically(project.output / "index.html", _report_html(project, record).encode("utf-8"))
+        _write_text(project.output / "index.html", _report_html(project, record))
     return items
 
 
@@ -350,7 +350,7 @@ def _write_record(
         "code": code,
         "items": [asdict(i) for i in record],
     }
-    _write_atomically(project.output / "manifest.json", json.dumps(manifest, indent=2).encode("utf-8"))
+    _write_text(project.output / "manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
     return record
 
 
@@ -421,6 +421,16 @@ def _write_atomically(target: Path, data: bytes) -> None:
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+
+
+def _write_text(target: Path, text: str) -> None:
+    """Write `text` to `target` as UTF-8, whole or not at all, whatever the locale.
+
+    `text` holds file names. Under a POSIX locale that cannot decode a name's bytes (the C locale with UTF-8 mode off,
+    say) Python keeps those bytes as surrogates, which strict UTF-8 refuses; `surrogateescape` writes them back as the
+    bytes the name has on disk. Those are UTF-8 on any current system, so the file shows, and links to, the name the
+    file system holds."""
+    _write_atomically(target, text.encode("utf-8", "surrogateescape"))
 
 
 def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) -> Item:
