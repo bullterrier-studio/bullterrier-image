@@ -408,7 +408,7 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 repeat run asks the model nothing. A `--matte` file does not stand in for the finder here: a cell is a part of the picture.
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
-examples are in [`examples/regions/`](examples/regions/).
+examples are in [`examples/regions/`](examples/regions/); [the pictures](docs/gallery/regions/README.md).
 
 **Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
 before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the
