@@ -70,6 +70,7 @@ class FractalParams(EffectParams):
         max=2000,
         doc="How many times z -> z^2 + c is applied before a point is taken to stay for ever (the interior). More "
         "reveals finer detail at the set's edge and costs time in proportion; zooming in needs more.",
+        advanced=True,
     )
     period: float = param(
         24.0,
@@ -78,6 +79,7 @@ class FractalParams(EffectParams):
         max=1000,
         doc="How many iterations of escape time take the colours from the first to the last of `colors`; they then "
         "run back, so the bands cycle without a seam. Smaller = more, thinner bands.",
+        advanced=True,
     )
     colors: tuple[Color, ...] = param(
         ("#12002b", "#6a1bff", "#ff2bd6", "#ffd84a"),
@@ -85,7 +87,11 @@ class FractalParams(EffectParams):
         "the first colours.",
         min_length=2,
     )
-    interior: Color = param("#000000", doc="The colour of the points that never escape: the inside of the set.")
+    interior: Color = param(
+        "#000000",
+        doc="The colour of the points that never escape: the inside of the set.",
+        advanced=True,
+    )
 
 
 @effect(category="backgrounds", params=FractalParams)
