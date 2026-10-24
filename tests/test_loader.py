@@ -2,6 +2,7 @@
 keys) is a `RecipeError` that starts with the file's name."""
 
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -218,7 +219,7 @@ def test_a_picture_that_cannot_be_used_fails_at_load_naming_file_step_parameter_
     layer_probe, tmp_path, written, make, kind
 ):
     make(tmp_path)
-    with pytest.raises(kind, match=r"^look\.toml: step 2: .*`image`.*" + re.escape(written.strip("'"))):
+    with pytest.raises(kind, match=r"^look\.toml: step 2: .*`image`.*" + re.escape(str(Path(written.strip("'"))))):
         load_recipe(_layer(tmp_path, written))
 
 
