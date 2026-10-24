@@ -87,7 +87,7 @@ Every picture here is made from one photo by the recipe linked under it (`exampl
   </tr>
 </table>
 
-Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`).
+Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`), mixed in partway (`opacity`) or laid over the picture in a blend mode such as screen or multiply (`blend_mode`).
 
 ## Contents
 
@@ -272,11 +272,28 @@ seed = 4                          # same seed, same result, every time
 
 [[step]]
 effect = "glow"
+blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
 
-Removing a background is just a `fill` step masked to the background. Every step can take `mask` and `opacity`. Unknown
-effects, misspelt parameters and bad values fail when the recipe loads, naming the file and the step.
+Removing a background is just a `fill` step masked to the background. Unknown effects, misspelt parameters and bad
+values fail when the recipe loads, naming the file and the step.
+
+**Step keys.** Besides `effect` and the effect's own parameters, every step takes the same four keys. The runner applies
+them after any effect, so each step is a layer over the picture below it, as in an image editor: the effect's result is
+combined with that picture by the blend mode, then mixed in by the opacity, only where the mask says.
+
+| Key | Values | What it does |
+|---|---|---|
+| `mask` | `"subject"` or `"background"` | Apply the step only there (the subject is found first). |
+| `opacity` | 0 to 1, default 1 | How much of the step shows: 0 none, 1 fully. |
+| `blend_mode` | `normal` (default), `multiply`, `screen`, `overlay`, `soft_light`, `difference`, `color` | How the result combines with the picture below it: `normal` shows the result, `multiply` darkens, `screen` lightens, `overlay` and `soft_light` deepen contrast, `difference` subtracts, `color` takes the result's hue and saturation and keeps the brightness below. These are the W3C blend modes, the same as the `blend` effect's `mode`. |
+| `preset` | a preset's name | Start from one of the effect's named parameter sets (see Presets, below). |
+
+No effect has a parameter with one of these names, so a key means the same in every step, and the same in Python:
+`fx.glow(opacity=0.6, blend_mode="screen")`. A gradient screened over the photo, or a texture multiplied into it, is
+an ordinary step with a `blend_mode`; the `blend` effect is for a second picture of your own (`image = "grain.png"`),
+which it fits to the photo and blends by its own transparency.
 
 **Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
 before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the
@@ -296,6 +313,14 @@ The order is fixed: `flip`, `angle` (with `fit` and `resample`), the crop, the `
 `size`. `Recipe(..., frame=Framing(...))` is the same in Python; `Framing.documentation()` lists every field with its unit
 and range. A recipe with `transparent` renders to PNG or WebP (RGBA), never JPEG: a project that exports it to `jpg`
 fails before anything is rendered.
+
+**`bt-image cutout` or `transparent = "background"`?** Both cut the subject out; they are for different jobs.
+`bt-image cutout photo.jpg -o dog.png` makes a cut-out *file*: the photo at its own size with the subject's alpha, after
+an optional clean-up of the edge (`--shrink` pulls it in, `--feather` softens it), with no recipe. Make one when the
+cut-out is an input you will reuse and want to check once: the `--matte` of a later run (`matte=` in Python), so the
+subject is not found again, or a picture parameter such as `overlay`'s `image` (`examples/assets/bullterrier-cutout.png`
+is one). `transparent = "background"` in a recipe's `[frame]` ends a *look*: the finished picture, at the recipe's size and
+after every step, cut out around the subject, as a sticker or an avatar is.
 
 **Presets.** Some built-in effects ship named parameter sets for common looks: `preset = "sepia"` on a `gradient_map` step,
 or `fx.gradient_map(preset="sepia")` in Python. Parameters you write next to it win over the preset's
