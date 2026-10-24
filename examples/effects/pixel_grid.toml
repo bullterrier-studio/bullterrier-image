@@ -1,0 +1,7 @@
+# An LCD pixel grid: 5 px cells of red, green and blue stripes over the photo.
+name = "pixel_grid"
+size = 480
+
+[[step]]
+effect = "pixel_grid"
+cell = 5
