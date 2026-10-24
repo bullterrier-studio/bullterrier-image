@@ -1,0 +1,10 @@
+# Wind-blown paint: the picture is dragged 10 px along a meandering flow, smearing into soft streaks.
+name = "flow_warp"
+size = 480
+
+[[step]]
+effect = "flow_warp"
+amount = 10
+scale = 80
+variation = 80
+seed = 1
