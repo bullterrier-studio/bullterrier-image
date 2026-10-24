@@ -1,4 +1,4 @@
-"""Behaviour of the `mirror` effect: one half of the picture kept, the other replaced by its reflection."""
+"""Behaviour of the `mirror` effect: part of the picture kept, the rest replaced by its reflection."""
 
 import numpy as np
 import pytest
@@ -8,69 +8,105 @@ from photo_fx.core import registry
 NAME = "mirror"
 SIZES = [(96, 128), (13, 29), (61, 37)]  # even by even, and two odd ones: the middle row or column is its own mirror
 
+# direction -> which rows are kept (None: the rows are not mirrored), which columns are kept
+DIRECTIONS = {
+    "left_to_right": (None, "first"),
+    "right_to_left": (None, "last"),
+    "top_to_bottom": ("first", None),
+    "bottom_to_top": ("last", None),
+    "top_left": ("first", "first"),
+    "top_right": ("first", "last"),
+    "bottom_left": ("last", "first"),
+    "bottom_right": ("last", "last"),
+}
+
 
 def row(*values: float) -> np.ndarray:
     """A grey picture one pixel high whose columns have `values`."""
     return np.broadcast_to(np.array(values, np.float32)[None, :, None], (1, len(values), 3)).copy()
 
 
-@pytest.mark.parametrize("keep", ["first", "last"])
-@pytest.mark.parametrize("axis", ["vertical", "horizontal", "both"])
+def reflected(rgb: np.ndarray, rows: str | None, columns: str | None) -> np.ndarray:
+    """Brute-force reference: every pixel looks up where it comes from. A pixel on the kept side comes from itself,
+    any other from its mirror image; 'first' keeps the first `ceil(n / 2)` lines, 'last' the last `ceil(n / 2)`."""
+    height, width = rgb.shape[:2]
+
+    def source(index: int, size: int, kept: str | None) -> int:
+        if kept is None:
+            return index
+        on_kept_side = index < (size + 1) // 2 if kept == "first" else index >= size // 2
+        return index if on_kept_side else size - 1 - index
+
+    out = np.empty_like(rgb)
+    for y in range(height):
+        for x in range(width):
+            out[y, x] = rgb[source(y, height, rows), source(x, width, columns)]
+    return out
+
+
+@pytest.mark.parametrize("direction", DIRECTIONS)
 @pytest.mark.parametrize("size", SIZES, ids=lambda size: f"{size[0]}x{size[1]}")
-def test_the_result_is_symmetric_about_each_mirror_line(axis: str, keep: str, size: tuple[int, int], photo) -> None:
-    out = registry.apply(NAME, photo[: size[0], : size[1]], axis=axis, keep=keep)
-    if axis in ("vertical", "both"):
+def test_the_result_is_symmetric_about_each_mirror_line(direction: str, size: tuple[int, int], photo) -> None:
+    rows, columns = DIRECTIONS[direction]
+    out = registry.apply(NAME, photo[: size[0], : size[1]], direction=direction)
+    if columns is not None:
         np.testing.assert_array_equal(out, np.flip(out, axis=1))
-    if axis in ("horizontal", "both"):
+    if rows is not None:
         np.testing.assert_array_equal(out, np.flip(out, axis=0))
 
 
+@pytest.mark.parametrize("direction", DIRECTIONS)
 @pytest.mark.parametrize("size", SIZES, ids=lambda size: f"{size[0]}x{size[1]}")
-def test_the_kept_half_is_untouched_and_the_other_is_its_reflection(size: tuple[int, int], photo) -> None:
-    """Rows and columns count from 0; an odd picture keeps its middle line with either half."""
-    height, width = size
-    rgb = photo[:height, :width]
-    first = registry.apply(NAME, rgb, axis="both", keep="first")
-    last = registry.apply(NAME, rgb, axis="both", keep="last")
-    top, left = (height + 1) // 2, (width + 1) // 2  # the first half: this many rows and columns
-    np.testing.assert_array_equal(first[:top, :left], rgb[:top, :left])
-    np.testing.assert_array_equal(last[height // 2 :, width // 2 :], rgb[height // 2 :, width // 2 :])
-    # the opposite corner, read backwards in rows and columns, is the kept quarter
-    np.testing.assert_array_equal(first[height // 2 :, width // 2 :][::-1, ::-1], rgb[:top, :left])
-    np.testing.assert_array_equal(
-        last[: height - height // 2, : width - width // 2][::-1, ::-1], rgb[height // 2 :, width // 2 :]
-    )
+def test_the_kept_part_is_untouched_and_the_rest_is_its_reflection(
+    direction: str, size: tuple[int, int], photo
+) -> None:
+    """An odd picture keeps its middle line whichever side is kept; a direction that names one line leaves the other
+    axis exactly as it is."""
+    rgb = photo[: size[0], : size[1]]
+    out = registry.apply(NAME, rgb, direction=direction)
+    np.testing.assert_array_equal(out, reflected(rgb, *DIRECTIONS[direction]))
 
 
 @pytest.mark.parametrize(
-    ("columns", "keep", "expected"),
+    ("direction", "columns", "expected"),
     [
-        ((1, 2, 3, 4), "first", (1, 2, 2, 1)),
-        ((1, 2, 3, 4), "last", (4, 3, 3, 4)),
-        ((1, 2, 3), "first", (1, 2, 1)),
-        ((1, 2, 3), "last", (3, 2, 3)),
-        ((7,), "first", (7,)),
+        ("left_to_right", (1, 2, 3, 4), (1, 2, 2, 1)),
+        ("right_to_left", (1, 2, 3, 4), (4, 3, 3, 4)),
+        ("left_to_right", (1, 2, 3), (1, 2, 1)),
+        ("right_to_left", (1, 2, 3), (3, 2, 3)),
+        ("left_to_right", (7,), (7,)),
     ],
-    ids=["even, first half", "even, last half", "odd, first half", "odd, last half", "a single column"],
+    ids=["even, left half", "even, right half", "odd, left half", "odd, right half", "a single column"],
 )
-def test_a_row_keeps_its_first_or_last_half_and_reflects_it(columns, keep: str, expected) -> None:
-    out = registry.apply(NAME, row(*columns) / 10, axis="vertical", keep=keep)
+def test_a_row_keeps_its_left_or_right_half_and_reflects_it(direction: str, columns, expected) -> None:
+    out = registry.apply(NAME, row(*columns) / 10, direction=direction)
     np.testing.assert_allclose(out, row(*expected) / 10, atol=1e-7)
 
 
-def test_the_horizontal_axis_reflects_top_onto_bottom_and_leaves_each_row_as_it_is() -> None:
+def test_top_to_bottom_reflects_top_onto_bottom_and_leaves_each_row_as_it_is() -> None:
     rows = np.array([1, 2, 3, 4], np.float32)[:, None, None] / 10 + np.zeros((4, 3, 3), np.float32)
     rows += np.array([0.0, 0.01, 0.02], np.float32)[None, :, None]  # distinct columns, to see them stay in place
-    out = registry.apply(NAME, rows, axis="horizontal", keep="first")
+    out = registry.apply(NAME, rows, direction="top_to_bottom")
     np.testing.assert_array_equal(out, rows[[0, 1, 1, 0]])
+
+
+@pytest.mark.parametrize(
+    ("direction", "quarter"),
+    [("top_left", 1), ("top_right", 2), ("bottom_left", 3), ("bottom_right", 4)],
+)
+def test_a_corner_direction_copies_that_quarter_into_the_other_three(direction: str, quarter: int) -> None:
+    quarters = np.array([[1, 2], [3, 4]], np.float32)[:, :, None] / 10 + np.zeros((2, 2, 3), np.float32)
+    out = registry.apply(NAME, quarters, direction=direction)
+    np.testing.assert_allclose(out, np.full((2, 2, 3), quarter / 10), atol=1e-7)
 
 
 @pytest.mark.parametrize(
     ("setting", "refused"),
     [
-        pytest.param({"axis": "diagonal"}, True, id="an axis that is not offered is refused"),
-        pytest.param({"keep": "middle"}, True, id="a half that is not offered is refused"),
-        pytest.param({"axis": "both", "keep": "last"}, False, id="every offered choice works"),
+        pytest.param({"direction": "diagonal"}, True, id="a direction that is not offered is refused"),
+        pytest.param({"direction": "both"}, True, id="the old axis choice is not a direction"),
+        pytest.param({"axis": "vertical"}, True, id="the old axis field is gone"),
+        pytest.param({"direction": "bottom_right"}, False, id="every offered choice works"),
     ],
 )
 def test_only_the_documented_choices_are_accepted(setting: dict, refused: bool, photo) -> None:

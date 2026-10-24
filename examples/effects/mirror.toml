@@ -4,5 +4,4 @@ size = 480
 
 [[step]]
 effect = "mirror"
-axis = "vertical"
-keep = "first"
+direction = "left_to_right"
