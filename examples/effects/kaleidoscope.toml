@@ -1,0 +1,10 @@
+# A mandala from the dog's face: eight wedges of the picture, each next to its mirror image, about the centre.
+name = "kaleidoscope"
+size = 480
+
+[[step]]
+effect = "kaleidoscope"
+segments = 8
+angle = 15
+x = 0.5
+y = 0.4
