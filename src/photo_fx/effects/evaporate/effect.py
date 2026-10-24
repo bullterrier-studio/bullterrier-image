@@ -42,6 +42,7 @@ class EvaporateParams(EffectParams):
         max=1,
         doc="Height of the band (fraction of the picture) above `start` over which the chance of detaching rises "
         "smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out.",
+        advanced=True,
     )
     outline: float = param(
         0.0,
@@ -95,6 +96,7 @@ class EvaporateParams(EffectParams):
         max=5,
         doc="Gamma of the climb against how strongly a piece is pulled away (0..1): a piece climbs up to `rise` x "
         "pull^rise_gamma. Below 1 even weakly pulled pieces climb far, above 1 only the strongly pulled ones.",
+        advanced=True,
     )
     rise_minimum: float = param(
         0.1,
@@ -102,6 +104,7 @@ class EvaporateParams(EffectParams):
         min=0,
         max=1,
         doc="Shortest climb as a share of a piece's longest one; 1 makes every piece climb the full way.",
+        advanced=True,
     )
     rise_skew: float = param(
         1.5,
@@ -110,6 +113,7 @@ class EvaporateParams(EffectParams):
         max=5,
         doc="Exponent on each piece's random share of its climb: above 1 most pieces stay low and a few go high, "
         "1 spreads them evenly, below 1 most go high.",
+        advanced=True,
     )
     thinning: float = param(
         0.5,
@@ -118,6 +122,7 @@ class EvaporateParams(EffectParams):
         max=1,
         doc="Extra share of pieces gone by the time they climb the full `rise` (on top of `vanish`): raising it "
         "makes the smoke sparser higher up.",
+        advanced=True,
     )
     falloff: float = param(
         1.5,
@@ -126,6 +131,7 @@ class EvaporateParams(EffectParams):
         max=5,
         doc="How fast a piece dims as it climbs: brightness is (1 - climbed share of `rise`)^falloff. 0 keeps full "
         "brightness, 1 dims evenly, above 1 dims quickly at first.",
+        advanced=True,
     )
     sway: float = param(
         0.12,
@@ -134,6 +140,7 @@ class EvaporateParams(EffectParams):
         max=1,
         doc="Random sideways sway in characters per row climbed (a standard deviation): raising it makes the smoke "
         "spread wider the higher it goes.",
+        advanced=True,
     )
     sway_minimum: float = param(
         0.3,
@@ -141,11 +148,13 @@ class EvaporateParams(EffectParams):
         min=0,
         max=5,
         doc="Sideways sway every detached piece has, however little it climbs, in characters (a standard deviation).",
+        advanced=True,
     )
     open_bottom: bool = param(
         True,
         doc="True: the bottom border is not an edge for `outline` (a portrait is simply cut off there). False: it "
         "sheds like the other borders.",
+        advanced=True,
     )
     normal_smoothing: float = param(
         1.0,
