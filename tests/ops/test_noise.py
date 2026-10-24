@@ -6,9 +6,12 @@ from typing import Any
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.noise import clumped_noise, fractal, standardise
+from bullterrier_image.ops.noise import clumped_noise, fractal, frame_fractal, standardise
 
 SETTINGS: dict[str, Any] = {"scale": 16.0, "octaves": 3, "persistence": 0.5, "lacunarity": 2.0, "seed": 4}
+
+
+FRAME_SETTINGS: dict[str, Any] = {"scale": 0.25, "octaves": 3, "persistence": 0.5, "lacunarity": 2.0, "seed": 4}
 
 
 def neighbour_correlation(field: np.ndarray) -> float:
@@ -66,6 +69,62 @@ def test_octaves_finer_than_a_pixel_are_left_out() -> None:
     """Lattice spacings 2, 1, 0.5, ...: from the third on they are finer than the pixel grid and add nothing."""
     two = fractal((64, 64), **{**SETTINGS, "scale": 2.0, "octaves": 2})
     np.testing.assert_array_equal(fractal((64, 64), **{**SETTINGS, "scale": 2.0, "octaves": 8}), two)
+
+
+# ---- frame_fractal: the same field at any resolution -------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "shape", [(64, 64), (50, 90), (1, 40), (40, 1)], ids=["square", "wide", "one row", "one column"]
+)
+def test_the_framed_field_has_the_shape_asked_for_zero_mean_and_unit_variance(shape: tuple[int, int]) -> None:
+    field = frame_fractal(shape, **FRAME_SETTINGS)
+    assert field.shape == shape
+    assert field.dtype == np.float32
+    assert field.mean() == pytest.approx(0.0, abs=1e-4)
+    assert field.std() == pytest.approx(1.0, abs=1e-4)
+
+
+def test_the_framed_field_is_a_pure_function_of_shape_settings_and_seed() -> None:
+    np.testing.assert_array_equal(frame_fractal((64, 48), **FRAME_SETTINGS), frame_fractal((64, 48), **FRAME_SETTINGS))
+    other = frame_fractal((64, 48), **{**FRAME_SETTINGS, "seed": [4, 1]})
+    assert np.abs(frame_fractal((64, 48), **FRAME_SETTINGS) - other).mean() > 0.1
+
+
+@pytest.mark.parametrize("shape", [(40, 60), (45, 61), (60, 40)], ids=["wide", "odd", "tall"])
+def test_the_framed_field_at_twice_the_size_is_the_same_field(shape: tuple[int, int]) -> None:
+    """Both sizes sample one smooth field, a coarse pixel being the mean of its 2 x 2 fine pixels to within the field's
+    curvature (a quarter pixel's shift of the sampling lowers the correlation to 0.987); every octave (spacings 6, 3,
+    1.5 px or more) is coarser than a pixel at both sizes. Two independent fields would correlate at about 0."""
+    settings = {**FRAME_SETTINGS, "scale": 0.1}
+    coarse = frame_fractal(shape, **settings)
+    fine = frame_fractal((2 * shape[0], 2 * shape[1]), **settings)
+    blocks = fine.reshape(shape[0], 2, shape[1], 2).mean(axis=(1, 3))
+    assert np.corrcoef(coarse.ravel(), blocks.ravel())[0, 1] > 0.999
+
+
+def test_the_framed_field_of_a_picture_is_the_square_it_lies_in_cropped() -> None:
+    """Picture and square share the long side and so the lattice; standardising over each (an affine change) is the
+    only difference."""
+    picture = frame_fractal((30, 64), **FRAME_SETTINGS)
+    square = frame_fractal((64, 64), **FRAME_SETTINGS)
+    assert np.corrcoef(picture.ravel(), square[:30].ravel())[0, 1] > 0.9999
+
+
+def test_framed_octaves_finer_than_a_pixel_are_left_out() -> None:
+    """Spacings 4, 2, 1, 0.5, ... px on a 64 px picture: from the fourth on they are finer than the pixel grid, the
+    third (one pixel) is not."""
+    three = frame_fractal((64, 64), **{**FRAME_SETTINGS, "scale": 4 / 64, "octaves": 3})
+    assert not np.array_equal(three, frame_fractal((64, 64), **{**FRAME_SETTINGS, "scale": 4 / 64, "octaves": 2}))
+    np.testing.assert_array_equal(frame_fractal((64, 64), **{**FRAME_SETTINGS, "scale": 4 / 64, "octaves": 8}), three)
+
+
+def test_a_larger_framed_scale_gives_a_smoother_field() -> None:
+    smooth, rough = (
+        neighbour_correlation(frame_fractal((256, 256), **{**FRAME_SETTINGS, "octaves": 1, "scale": scale}))
+        for scale in (0.25, 0.01)
+    )
+    assert smooth > 0.99 > 0.9 > rough
 
 
 @pytest.mark.parametrize(

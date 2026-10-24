@@ -254,7 +254,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   need. Each distinct look is rendered once over the whole picture and blended through its pieces' weights, which sum
   to 1 and are then multiplied by `mask`: the cost is the number of looks, not pieces.
 - **Positions are shares of the frame, lengths shares of the picture's long side.** The frame is the picture, or the
-  box of the selection named by `fit`. The same look comes out at any resolution.
+  box of the selection named by `fit`. The same look comes out at any resolution, torn edges too (their noise is laid
+  on the frame, not on the pixel grid).
 - **Region kinds are a closed set in one module, with presets as data.** Not plugins: nobody else writes kinds, and a
   shared plugin registry would be speculative. Python writes regions with the kinds' own Pydantic models. *Revisit
   when* another package wants to add kinds.

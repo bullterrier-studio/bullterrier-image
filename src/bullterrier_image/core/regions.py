@@ -14,7 +14,7 @@ is asked for. `look_weights` turns a partition and a look for each piece into th
 Promises:
 - Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
   lengths are shares of the picture's long side, so the same declaration cuts the same pieces at any resolution
-  (the bend of a torn edge has the same size and character, not the same ripples).
+  (a torn edge too: its noise is laid on the frame).
 - The same declaration, picture size and seed give the same regions on any machine; no global random state is used.
 - Regions are made once per `resolve` and handed out read-only.
 - A declaration is checked when it is made (a value out of range) and when it is resolved (an unknown name, a name of
@@ -33,7 +33,7 @@ from pydantic import BeforeValidator, field_validator, model_validator
 
 from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
-from bullterrier_image.ops.noise import fractal
+from bullterrier_image.ops.noise import frame_fractal
 from bullterrier_image.ops.voronoi import centres, nearest
 
 from .params import EffectParams, param
@@ -253,7 +253,7 @@ class Shards(_Laid):
         name = values.get("preset") if isinstance(values, dict) else None
         if not isinstance(name, str):
             return values
-        found = read("shards", cls, SHIPPED / "regions")  # type: ignore[arg-type]  # `read` caches by folder: hashable
+        found = read("shards", cls, SHIPPED / "regions")
         if name not in found:
             raise ValueError(f"no preset {name!r}; the presets are: {', '.join(found)}")
         return {**found[name].params, **values}
@@ -321,9 +321,9 @@ def _coordinates(shape: tuple[int, int], edge: Edge) -> tuple[np.ndarray, np.nda
         return x, y
     long_side = max(shape)
     bend = [
-        fractal(
+        frame_fractal(
             shape,
-            scale=edge.scale * long_side,
+            scale=edge.scale,
             octaves=edge.octaves,
             persistence=edge.persistence,
             lacunarity=_LACUNARITY,

@@ -171,14 +171,26 @@ def test_a_selection_of_a_picture_with_fewer_pieces_than_picked_selects_what_exi
 
 @pytest.mark.parametrize(
     "kind",
-    [Grid(columns=3, rows=4), Grid(columns=[1, 2], rows=[3, 1, 1]), Shards(preset="glass"), Shards(preset="mosaic")],
-    ids=["grid", "uneven grid", "glass", "mosaic"],
+    [
+        Grid(columns=3, rows=4),
+        Grid(columns=[1, 2], rows=[3, 1, 1]),
+        Shards(preset="glass"),
+        Shards(preset="mosaic"),
+        Grid(columns=3, rows=4, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=3)),
+        Shards(count=12, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=5)),
+        Shards(preset="torn"),
+        Shards(preset="stone"),
+    ],
+    ids=["grid", "uneven grid", "glass", "mosaic", "torn grid", "wide torn shards", "torn", "stone"],
 )
 def test_the_same_pieces_come_out_at_twice_the_resolution(kind):
     """Positions are shares of the frame, so the sites sit at the same share. A coarse pixel's centre is the centre of
     a 2 x 2 block of fine pixels, so its piece must be one of the four the block holds, unless a piece is thinner than
     a pixel there: at most 1 coarse pixel in 100 may fail that. A piece smaller than a coarse pixel may have no pixel
-    there, so the coarse picture may have fewer pieces, never more."""
+    there, so the coarse picture may have fewer pieces, never more. A torn edge bends the positions by noise defined
+    in shares of the frame too, so it is the same tear: it differs only where the coarse picture leaves out a layer
+    finer than its pixel, which moves a border by a fraction of a pixel. A different tear (the wide ones here, 8% of
+    the long side, 7 px on the coarse picture) fails it."""
     coarse = labels_of({"k": kind}, "k", (60, 90))
     fine = labels_of({"k": kind}, "k", (120, 180))
     assert coarse.max() <= fine.max()
