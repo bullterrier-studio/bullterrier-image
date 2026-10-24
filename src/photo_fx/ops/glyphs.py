@@ -78,8 +78,13 @@ def _atlas(chars: str, cell: int, font: str | None) -> np.ndarray:
             bitmaps.append(np.full((cell_h, cell_w), _BLOCK_INK[ch], dtype=np.float32))
             continue
         canvas = Image.new("L", (cell_w, cell_h), 0)  # constant: 8-bit grey, no ink
-        # the glyph is centred in its cell (anchor "mm": middle of the text, horizontally and vertically)
-        ImageDraw.Draw(canvas).text((cell_w / 2, cell_h / 2), ch, fill=_FULL_INK, font=glyph_font, anchor="mm")
+        # The glyph is centred in its cell: the middle of its advance width over the middle of the cell, and the middle
+        # of its line (halfway between ascent and descent) over the middle of the cell, each in whole px with a half
+        # rounded up, so its pixels are those Pillow's own centring anchor ("mm") would draw. That anchor is not used:
+        # it is a library option, and measuring the font and offsetting says what it does.
+        left = cell_w / 2 - (glyph_font.getlength(ch) + 1) // 2
+        top = cell_h / 2 + (ascent - descent + 1) // 2 - ascent
+        ImageDraw.Draw(canvas).text((left, top), ch, fill=_FULL_INK, font=glyph_font)
         bitmaps.append(np.asarray(canvas, dtype=np.float32) / float(_FULL_INK))
     if len(bitmaps) < 2:
         raise ValueError("glyph_atlas needs at least two different characters in `chars`")
