@@ -1,0 +1,7 @@
+# Worms and spots grown from the dog's bright parts, laid over the photo.
+name = "reaction_diffusion"
+size = 480
+
+[[step]]
+effect = "reaction_diffusion"
+opacity = 0.6
