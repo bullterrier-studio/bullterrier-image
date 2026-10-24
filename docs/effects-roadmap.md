@@ -320,8 +320,7 @@ no time of its own.
 | `morph` | Blend two photos with optical flow. | `fx.morph(to="b.jpg", progress=0.5)` |
 
 Effects that need time or several frames (`flicker`, `breathe`, `camera_shake`, `ken_burns`, `trails`, `slit_scan`) and
-animated values (ramps, easing, keyframes) do not belong here: they are for the video and control packages
-(`bullterrier-design`).
+animated values (ramps, easing, keyframes) do not belong here: they are for the video and control packages.
 
 ## Signature looks
 

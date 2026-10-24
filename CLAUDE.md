@@ -6,8 +6,8 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 
 ## Responsibility
 
-This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (design in `~/github/bullterrier-design`; the
-GitHub repository is `bullterrier-studio/bullterrier-image`).
+This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (the GitHub repository is
+`bullterrier-studio/bullterrier-image`).
 It changes and understands **single pictures** and has **no concept of time**. Its siblings are `audio` (finds beats and sections in sound),
 `control` (values that change over time: keyframes, envelopes, LFOs) and `video` (decides what happens when, maps control signals onto
 parameters, renders frames). Image, audio and control never depend on each other; only video knows the others.
@@ -31,7 +31,7 @@ a ramp or an LFO, and it keeps the parameter descriptions (unit, range, meaning)
 
 `bullterrier-image` (PyPI, repository), `bullterrier_image` (import; the documentation's alias is `bti`), `bt-image` (command, `bt-image.toml`,
 cache folder), `BT_IMAGE_*` (environment variables), `BullterrierImageError` (base exception), `bullterrier_image.effects` (plugin group). The rule
-is: the full name for identity, `bt-` for what a person types; the specification is `~/github/bullterrier-design/naming.md`. Names inside the
+is: the full name for identity, `bt-` for what a person types. Names inside the
 package (`Recipe`, `fx`, `RecipeError`, effect and parameter names) carry no prefix.
 
 ## Architecture in one paragraph
@@ -210,7 +210,7 @@ Where they pull against this file: tests follow this file (no goldens); fixes fo
 
 ## Git conventions
 
-Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (every gate, see "Lint, types and the other gates"; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs the whole gate only for a push to `main` or a tag (a feature branch is checked by CI when its pull request opens).
+Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (every gate, see "Lint, types and the other gates"; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs the whole gate only for a push to `main` or a tag that changes more than documentation (a feature branch, or a push of only pages and pictures, is left to CI).
 - **Trunk-based:** work on a short-lived branch (in a worktree only when the project owner asks for one; the controller says so in the brief) named `<type>/<short-description>` (`feat/glow-falloff`), rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scope is optional and lowercase: the effect name, `core`, `ops`, `cli`, `pipeline`, `docs` or `deps`. `!` or a `BREAKING CHANGE:` footer marks a breaking change.
 - **Subject:** imperative present tense ("add", not "added"), lowercase start (acronyms and identifiers excepted), no final period, header at most 72 characters. Imperative mood is a convention, not checked by the hook.

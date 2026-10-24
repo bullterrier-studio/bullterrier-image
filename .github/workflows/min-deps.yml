@@ -26,4 +26,5 @@ jobs:
         run: >-
           test -f /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
           || (sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends fonts-dejavu-core)
-      - run: uv run --locked poe check-min-deps
+      - name: Tests on the lowest allowed dependencies (pytest; skips and the 10 slowest tests are listed)
+        run: uv run --locked poe check-min-deps -ra --durations=10
