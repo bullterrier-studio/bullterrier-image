@@ -15,18 +15,19 @@ class Cells(NamedTuple):
     """The cells of a set of sites over a picture, each array of shape (height, width)."""
 
     owner: np.ndarray  # intp: the index of the site nearest each pixel centre (the pixel's cell)
+    site_distance: np.ndarray  # float64: the distance in px from each pixel centre to its own site
     border_distance: np.ndarray  # float32: the distance in px from each pixel centre to the border of its own cell
 
 
 def cells(shape: tuple[int, int], sites: np.ndarray) -> Cells:
-    """The Voronoi cells of `sites` over a picture of `shape` (height, width): for every pixel its cell and its distance
-    to the cell's border (the cell is convex, so that is the least distance to one of the bisector lines that bound
-    it, which are those between the site and the sites its Delaunay triangles join it to; it is exact, also for a pixel
-    near the edge of the picture)."""
+    """The Voronoi cells of `sites` over a picture of `shape` (height, width): for every pixel its cell, its distance to
+    the cell's site and its distance to the cell's border (the cell is convex, so that is the least distance to one of
+    the bisector lines that bound it, which are those between the site and the sites its Delaunay triangles join it
+    to; it is exact, also for a pixel near the edge of the picture)."""
     height, width = shape
     y, x = np.mgrid[0:height, 0:width]
     px, py = (x.ravel() + 0.5).astype(np.float32), (y.ravel() + 0.5).astype(np.float32)
-    _, own = cKDTree(sites).query(np.stack([px, py], axis=1))
+    own_distance, own = cKDTree(sites).query(np.stack([px, py], axis=1))
     # Neighbours are the sites the Delaunay triangulation joins to a site; short lists are padded by repeating one,
     # which changes no minimum.
     indptr, indices = Delaunay(sites).vertex_neighbor_vertices
@@ -39,7 +40,7 @@ def cells(shape: tuple[int, int], sites: np.ndarray) -> Cells:
     border = np.full(px.shape, np.inf, np.float32)
     for k in slots:
         np.minimum(border, offset[own, k] - normal[own, k, 0] * px - normal[own, k, 1] * py, out=border)
-    return Cells(own.reshape(shape), border.reshape(shape))
+    return Cells(own.reshape(shape), own_distance.reshape(shape), border.reshape(shape))
 
 
 def line_coverage(border_distance: np.ndarray, width: float) -> np.ndarray:
