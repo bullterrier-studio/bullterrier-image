@@ -1,0 +1,10 @@
+# Water-surface ripples run down the picture: a gentle wave that moves every row sideways.
+name = "ripple"
+size = 480
+
+[[step]]
+effect = "ripple"
+wavelength = 36
+amplitude = 7
+phase = 40
+angle = 80

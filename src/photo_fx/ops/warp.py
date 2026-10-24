@@ -75,6 +75,12 @@ class Centre:
     x: float
     y: float
 
+    @classmethod
+    def middle(cls, height: int, width: int) -> "Centre":
+        """The centre of a picture of `height` x `width` px: half way across and down, between the middle two pixels
+        of a side that has an even number of them."""
+        return cls(height, width, x=0.5, y=0.5)  # constant: the middle of a picture is half way across it
+
     @property
     def distance(self) -> np.ndarray:
         """The distance in px of every pixel from the centre, float64, shape (height, width)."""
