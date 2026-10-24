@@ -28,9 +28,9 @@ class FractalParams(EffectParams):
         1.0,
         unit="ratio",
         min=0.1,
-        max=100000,
+        max=10000,
         doc="Magnification. At 1 the picture's shorter side shows 4 units of the complex plane, enough for the whole "
-        "Mandelbrot set or any Julia set; 2 shows 2 units. Very deep zooms run out of single precision around 10000.",
+        "Mandelbrot set or any Julia set; 2 shows 2 units.",
     )
     x: float = param(
         0.0,
