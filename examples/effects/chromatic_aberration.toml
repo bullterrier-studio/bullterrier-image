@@ -1,0 +1,9 @@
+# Cheap-lens colour fringes: red and blue split apart toward the corners, the dog's face stays clean.
+name = "chromatic_aberration"
+size = 480
+
+[[step]]
+effect = "chromatic_aberration"
+amount = 14
+x = 0.5
+y = 0.4
