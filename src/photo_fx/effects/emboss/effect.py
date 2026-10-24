@@ -6,8 +6,8 @@ import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-from photo_fx.ops.blur import NUMPY_PAD
 from photo_fx.ops.color import luminance
+from photo_fx.ops.relief import lambert, slopes
 
 
 class EmbossParams(EffectParams):
@@ -56,12 +56,9 @@ def emboss(rgb: np.ndarray, params: EmbossParams) -> np.ndarray:
     grey, one facing the light edge-on 1 and one facing away 0, and the shade never leaves 0..1. `saturation` mixes in
     the picture multiplied by twice the shade (flat areas keep their colour), clipped to 0..1.
     """
-    padded = np.pad(luminance(rgb), 1, mode=NUMPY_PAD[params.edge])
-    rise_y = params.depth * (padded[2:, 1:-1] - padded[:-2, 1:-1]) / 2  # a central difference spans 2 px
-    rise_x = params.depth * (padded[1:-1, 2:] - padded[1:-1, :-2]) / 2  # a central difference spans 2 px
-    angle = np.radians(params.angle)
-    # The normal (-rise_x, -rise_y, 1) / its length, dotted with the horizontal direction of the light.
-    toward = (rise_x * np.sin(angle) - rise_y * np.cos(angle)) / np.sqrt(1 + rise_x**2 + rise_y**2)
-    shade = (0.5 - 0.5 * toward).astype(np.float32)[..., None]
+    rise_y, rise_x = slopes(luminance(rgb), scale=params.depth, edge=params.edge)
+    horizon = 0  # constant: a light level with the picture's plane, so a flat surface catches none and is mid grey
+    # The shade is 1 where the surface leans edge-on to the light, 0 where it leans away, 0.5 where it is flat.
+    shade = (0.5 + 0.5 * lambert(rise_y, rise_x, angle=params.angle, elevation=horizon)).astype(np.float32)[..., None]
     coloured = np.clip(2 * shade * rgb, 0, 1)
     return ((1 - params.saturation) * shade + params.saturation * coloured).astype(np.float32)

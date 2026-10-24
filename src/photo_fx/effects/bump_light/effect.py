@@ -7,8 +7,9 @@ import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-from photo_fx.ops.blur import NUMPY_PAD, gaussian_blur
+from photo_fx.ops.blur import gaussian_blur
 from photo_fx.ops.color import luminance
+from photo_fx.ops.relief import lambert, slopes
 
 
 class BumpLightParams(EffectParams):
@@ -76,11 +77,7 @@ def bump_light(rgb: np.ndarray, params: BumpLightParams) -> np.ndarray:
     kept, and the result is clipped to 0..1.
     """
     surface = gaussian_blur(luminance(rgb), params.blur, truncate=params.truncate, edge=params.edge)
-    padded = np.pad(surface, 1, mode=NUMPY_PAD[params.edge])
-    rise_y = params.height * (padded[2:, 1:-1] - padded[:-2, 1:-1]) / 2  # a central difference spans 2 px
-    rise_x = params.height * (padded[1:-1, 2:] - padded[1:-1, :-2]) / 2  # a central difference spans 2 px
-    angle, elevation = np.radians(params.angle), np.radians(params.elevation)
-    toward = rise_x * np.sin(angle) - rise_y * np.cos(angle)  # how fast the surface rises towards the light
-    lit = (np.sin(elevation) - np.cos(elevation) * toward) / np.sqrt(1 + rise_x**2 + rise_y**2)
-    gain = lit / np.sin(elevation)
+    rise_y, rise_x = slopes(surface, scale=params.height, edge=params.edge)
+    lit = lambert(rise_y, rise_x, angle=params.angle, elevation=params.elevation)
+    gain = lit / np.sin(np.radians(params.elevation))  # a flat surface catches sin(elevation): that is no change
     return np.clip(rgb * gain[..., None], 0, 1).astype(np.float32)
