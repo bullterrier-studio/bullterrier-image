@@ -35,7 +35,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `morph`, side by side) is not an asset: it needs several inputs or a canvas of its own, so it belongs to video or a
   layout package, and before/after is the `compare` command. *Consequence:* the recipe reader moved from `core` to the
   adapters layer, beside `imageio` (`bullterrier_image/loader.py`); the pipeline's fingerprint covers each asset's content, not only the recipe text;
-  a loaded picture counts toward the memory budget; another kind of asset file (a `.cube` LUT, a folder of tiles) gets
+  a large asset is counted nowhere (the effect contract measures the budget on an effect's default 1x1 pictures, and a recipe's
+  assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file (a `.cube` LUT, a folder of tiles) gets
   its own value type and reader in the adapters layer together with its first effect.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
@@ -122,19 +123,29 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   own `opacity` when it means that effect's own element (the brightness of a particle, the share a soft focus replaces);
   the two multiply. *Reason:* one place for the general blend, standard names for the specific one. *Consequence:*
   never add an effect parameter that only mixes the effect's result with the picture.
-- **Size changes frame the photo before the steps; transparency is cut after them** (decided, not built yet). A
-  recipe's framing (flip, rotate, crop to an aspect around the subject or an anchor, pad, then `size`, always in that
-  order) is applied by the runner to the photo and the subject matte together, before the first step. A recipe's
-  transparency (`background`: the subject matte becomes the alpha; `circle`; `rounded` with a corner radius) is applied
-  after the last step. Effects keep the same-shape RGB contract. *Reason:* cropping and rotating decide which picture
-  the look is applied to (a vignette is centred on the final crop), and a masked step after them needs a matte that
-  moved with the photo; one module that owns the geometry of both keeps it out of every effect, where shape-changing
-  effects would each have to transform the matte as well. A fixed order is a decision made once instead of a setting.
-  *Consequence:* `crop`, `smart_crop`, `resize`, `pad`, `rotate`, `flip` and `avatar` are recipe settings, not effects,
-  their fields documented like effect parameters (enlarging by interpolation is a `size` above the photo's own);
-  `render` returns RGBA (h, w, 4) when the recipe asks for transparency, and a project that exports such a recipe to
-  JPEG fails when it is loaded; a frame that needs a canvas larger than the photo (polaroid, film strip) belongs to a
-  layout package; a border drawn inside the picture's edge is an ordinary effect.
+- **Size changes frame the photo before the steps; transparency is cut after them.** A recipe's framing (`Framing`,
+  `bullterrier_image.core.framing`: `[frame]` in a recipe file, `Recipe(..., frame=Framing(...))` in Python) is applied
+  by the runner to the photo and the subject matte together, before the first step, in one fixed order: `flip` (none, x,
+  y, both), `angle` (counter-clockwise degrees, with `fit` crop or expand and a `resample` filter), the crop (`aspect`
+  as width over height, put at an `anchor`: center, top, bottom, left, right, or the subject with a `margin` around
+  it), the `pad_top`, `pad_right`, `pad_bottom` and `pad_left` borders (shares of the picture's shorter side, in
+  `fill`), and then the existing `size`. The subject is found on the photo as given, before any of it, so a crop can
+  follow the subject, and the matte moves with the photo (it travels as a fourth channel through the same geometry in
+  `ops/frame`, so there is one geometry to get right). A recipe's transparency (`transparent`: `background`, the
+  subject matte becomes the alpha; `circle`, the circle inscribed in the finished picture; `rounded`, corners rounded by
+  `corner_radius`, a share of the shorter side) is cut after the last step. Effects keep the same-shape RGB contract.
+  *Reason:* cropping and rotating decide which picture the look is applied to (a vignette is centred on the final
+  crop), and a masked step after them needs a matte that moved with the photo; one module that owns the geometry of both
+  keeps it out of every effect, where shape-changing effects would each have to transform the matte as well. A fixed
+  order is a decision made once instead of a setting. *Consequence:* `crop`, `smart_crop`, `resize`, `pad`, `rotate`,
+  `flip` and `avatar` are recipe settings, not effects, their fields documented like effect parameters (enlarging by
+  interpolation is a `size` above the photo's own); `render` returns RGBA (h, w, 4) when the recipe asks for
+  transparency, `trace` ends in that cut, `imageio.save` takes RGBA as one array (there is no separate alpha argument,
+  so a picture and its alpha cannot disagree) and refuses a JPEG with transparency, and a project that exports such a
+  recipe to `jpg` fails before anything renders; a finder is now asked about the whole photo rather than the scaled
+  one; a frame that needs a canvas larger than the photo (polaroid, film strip) belongs to a layout package; a border
+  drawn inside the picture's edge is an ordinary effect. The transparency keys live in `[frame]` with the geometry,
+  because they are the same model and one place says how a recipe's picture is framed and cut.
 - **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
