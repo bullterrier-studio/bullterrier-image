@@ -23,18 +23,37 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     preset = "sepia"               # optional: one of the effect's presets (`bt-image effects NAME` lists them); the
     opacity = 0.6                  # step's own keys win over the preset's
 
+A parameter that is a picture (a texture, a logo; the effect's documentation says which) is written as a path, relative
+to the recipe file's folder, or as a colour (a string starting with `#`, or three numbers):
+
+    [[step]]
+    effect = "blend"
+    texture = "../assets/grain.png"
+
+The picture is read once, when the recipe is loaded; a file that is missing or not a picture fails there, naming the
+file, the step, the parameter and the path.
+
 Removing the background is not a feature of its own: it is a `fill` step masked to the background. Any other top-level
 key is refused, so a misspelt `size` or `format` is not silently ignored.
 
-Dependency direction: imports `core.steps` and `errors` only; it does not know `runner`.
+Dependency direction: imports `core` (steps, registry, params), `imageio` and `errors`; it does not know `runner`.
 """
 
 import tomllib
+from collections.abc import Mapping
+from os import PathLike
 from pathlib import Path
 
-from bullterrier_image.errors import RecipeError
+import numpy as np
 
+from bullterrier_image.errors import BullterrierImageError, ImageReadError, RecipeError
+
+from . import imageio
+from .core import registry
+from .core.params import Picture
 from .core.steps import Recipe, Step, safe_name
+
+__all__ = ["load_recipe", "with_pictures"]
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones.
@@ -42,10 +61,32 @@ _FORMATS = (1,)
 _KEYS = ("format", "name", "size", "step")
 
 
-def _located(error: RecipeError, where: str) -> RecipeError:
+def _located[E: BullterrierImageError](error: E, where: str) -> E:
     """`error` with `where` (the file, and the step) in front, keeping its class (an unknown effect stays an
-    `UnknownEffectError`)."""
+    `UnknownEffectError`, a missing picture an `ImageReadError`)."""
     return type(error)(f"{where}: {error}")
+
+
+def with_pictures(effect: str, values: Mapping[str, object], folder: Path) -> dict[str, object]:
+    """`values` (the parameters of `effect`) with each picture given as a path or an array turned into a `Picture`.
+
+    A path (a `str` not starting with `#`, which is a colour, or a `PathLike`) is read with `imageio.load_picture`,
+    relative to `folder` and labelled as written; a 3-d array is a `Picture` labelled "array". A `Picture`, a colour and
+    every other parameter pass unchanged. ImageReadError naming the effect, the parameter and the path when a file
+    cannot be read; an unknown effect is the registry's UnknownEffectError.
+    """
+    pictures = registry.parameters(effect).picture_fields()
+    resolved = dict(values)
+    for key in pictures & values.keys():
+        value = values[key]
+        if isinstance(value, PathLike) or (isinstance(value, str) and not value.startswith("#")):
+            try:
+                resolved[key] = Picture(imageio.load_picture(folder / value), str(value))
+            except ImageReadError as error:
+                raise ImageReadError(f"effect {effect!r}: `{key}`: {error}") from None
+        elif isinstance(value, np.ndarray) and value.ndim == 3:
+            resolved[key] = Picture(value)
+    return resolved
 
 
 def _read(path: Path) -> dict:
@@ -100,8 +141,8 @@ def load_recipe(path: str | Path) -> Recipe:
             raise RecipeError(f"{where}: missing `effect`")
         mask, opacity, preset = entry.pop("mask", None), entry.pop("opacity", 1.0), entry.pop("preset", None)
         try:
-            steps.append(Step(name, entry, mask, opacity, preset))
-        except RecipeError as error:
+            steps.append(Step(name, with_pictures(name, entry, path.parent), mask, opacity, preset))
+        except (RecipeError, ImageReadError) as error:
             raise _located(error, where) from None
     try:
         return Recipe(recipe_name, tuple(steps), raw.get("size", 1024))

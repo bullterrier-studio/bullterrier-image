@@ -5,6 +5,7 @@ import pydoc
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -14,7 +15,19 @@ import bullterrier_image
 import bullterrier_image.core.runner
 import bullterrier_image.effects
 import bullterrier_image.plugin
-from bullterrier_image import Project, Recipe, Step, fx, imageio, load_recipe, render, run, trace
+from bullterrier_image import (
+    ImageReadError,
+    Project,
+    Recipe,
+    RecipeError,
+    Step,
+    fx,
+    imageio,
+    load_recipe,
+    render,
+    run,
+    trace,
+)
 from bullterrier_image.cli import main
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import Color, EffectParams, Picture, param
@@ -399,3 +412,34 @@ def test_the_steps_command_writes_one_picture_per_step_and_a_sheet(tmp_path, pho
         "_sheet.jpg",
     ]
     assert "1. grade(exposure=0.2)" in capsys.readouterr().err
+
+
+# --- a picture parameter in fx: a path, an array, a Picture or a colour ---------------------------------------------
+
+
+def test_fx_turns_a_path_or_an_array_into_a_picture_and_leaves_a_picture_or_a_colour_alone(
+    layer_probe, tmp_path, monkeypatch
+):
+    pixels = np.random.default_rng(2).random((5, 7, 4), dtype=np.float32)
+    imageio.save(pixels[..., :3], tmp_path / "tex.png", alpha=pixels[..., 3])
+    monkeypatch.chdir(tmp_path)  # a path is relative to the folder the program runs in
+    from_path, from_pathlib = fx.layer_probe("tex.png"), fx.layer_probe(texture=Path("tex.png"))
+    from_array, picture = fx.layer_probe(pixels), Picture(pixels)
+    assert from_path.params["texture"].label == "tex.png"
+    assert from_array.params["texture"] == picture == fx.layer_probe(picture).params["texture"]
+    assert from_path.params["texture"] == from_pathlib.params["texture"]
+    np.testing.assert_allclose(from_path.params["texture"].pixels, pixels, atol=1 / 255)
+    assert fx.layer_probe("#102030").params["texture"] == "#102030"  # a colour stays as written
+
+
+@pytest.mark.parametrize(
+    ("texture", "kind", "complaint"),
+    [
+        pytest.param("missing.png", ImageReadError, r"layer_probe.*`texture`.*missing\.png", id="missing file"),
+        pytest.param(np.zeros((4, 4, 3), np.uint8), RecipeError, r"picture.*uint8", id="integer array"),
+        pytest.param(np.full((4, 4, 3), 2.0, np.float32), RecipeError, r"picture.*0\.\.1", id="values above one"),
+    ],
+)
+def test_fx_refuses_a_picture_it_cannot_use_naming_the_problem(layer_probe, texture, kind, complaint):
+    with pytest.raises(kind, match=complaint):
+        fx.layer_probe(texture)

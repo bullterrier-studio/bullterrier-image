@@ -21,10 +21,12 @@ import inspect
 import re
 from collections.abc import Callable
 from functools import cache
+from pathlib import Path
 from typing import Any, Literal
 
 from .core import registry
 from .core.steps import Step
+from .loader import with_pictures
 
 # The effect builders are module attributes made on demand (`__getattr__`), one per registered effect.
 __all__ = ["stub_text"]
@@ -52,7 +54,8 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
 
     Values may be given by position, in the model's field order, or by keyword; the Step checks them with the model,
     so a misspelt or out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the
-    effect's presets (see `registry.presets`); the values given win over the preset's.
+    effect's presets (see `registry.presets`); the values given win over the preset's. A picture parameter takes a
+    `Picture`, a colour, a path (read now, relative to the current folder) or an array (float, height x width x 3 or 4).
     """
     fields = tuple(registry.parameters(name).model_fields)
 
@@ -62,7 +65,7 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
         positional = dict(zip(fields, args, strict=False))
         for twice in positional.keys() & values.keys():
             raise TypeError(f"fx.{name}() got `{twice}` both by position and by keyword")
-        return Step(name, {**positional, **values}, preset=preset)
+        return Step(name, with_pictures(name, {**positional, **values}, Path()), preset=preset)
 
     build.__name__, build.__qualname__ = name, f"fx.{name}"
     build.__doc__ = registry.documentation(name)

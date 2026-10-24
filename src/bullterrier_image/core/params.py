@@ -331,6 +331,12 @@ class EffectParams(ValidatedModel):
         return _whole_number_fields(cls)
 
     @classmethod
+    def picture_fields(cls) -> frozenset[str]:
+        """The fields that hold a `Picture`: a recipe file writes a path for one, `fx` takes a path or an array."""
+        hints = typing.get_type_hints(cls)
+        return frozenset(name for name in cls.model_fields if hints[name] is Picture)
+
+    @classmethod
     def signature(cls) -> inspect.Signature:
         """The fields as a call signature, in declaration order: each a positional-or-keyword parameter with its
         default and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`)."""

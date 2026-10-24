@@ -3,10 +3,13 @@ keys) is a `RecipeError` that starts with the file's name."""
 
 import re
 
+import numpy as np
 import pytest
+from PIL import Image
 
+from bullterrier_image.core import registry
 from bullterrier_image.core.steps import Step
-from bullterrier_image.errors import RecipeError
+from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
 
 STEP = "[[step]]\neffect = 'grade'\n"
@@ -107,3 +110,65 @@ def test_a_wrong_preset_in_a_file_names_the_file_the_step_and_the_preset(tmp_pat
     path = _write(tmp_path, f"[[step]]\neffect = 'grade'\n\n[[step]]\neffect = '{effect}'\npreset = '{preset}'\n")
     with pytest.raises(RecipeError, match=rf"^look\.toml: step 2: .*{complaint}"):
         load_recipe(path)
+
+
+# --- a picture parameter is a path, relative to the recipe file -------------------------------------------------------
+
+
+def _logo(folder, name="logo.png"):
+    """A 2 x 1 picture: an opaque red pixel and a half-transparent blue one; returns its path."""
+    folder.mkdir(exist_ok=True)
+    Image.fromarray(np.array([[(255, 0, 0, 255), (0, 0, 255, 128)]], np.uint8), "RGBA").save(folder / name)
+    return folder / name
+
+
+def _layer(folder, texture, name="look.toml"):
+    """A recipe file in `folder` whose second step gives the picture parameter `texture` (TOML text)."""
+    folder.mkdir(exist_ok=True)
+    return _write(folder, f"{STEP}\n[[step]]\neffect = 'layer_probe'\ntexture = {texture}\n", name)
+
+
+def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(layer_probe, tmp_path, monkeypatch):
+    _logo(tmp_path / "assets")
+    recipe = load_recipe(_layer(tmp_path / "recipes", "'../assets/logo.png'"))
+    monkeypatch.chdir(tmp_path)  # the folder the process runs in does not matter
+    texture = recipe.steps[1].params["texture"]
+    assert (texture.width, texture.height, texture.label) == (2, 1, "../assets/logo.png")
+    np.testing.assert_allclose(texture.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
+
+
+def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
+    logo = _logo(tmp_path / "elsewhere")
+    recipe = load_recipe(_layer(tmp_path / "recipes", f"'{logo}'"))
+    assert recipe.steps[1].params["texture"].width == 2
+
+
+@pytest.mark.parametrize(
+    ("written", "pixel"),
+    [("'#ff8000'", [1, 128 / 255, 0, 1]), ("[0.25, 0.5, 1.0]", [0.25, 0.5, 1, 1])],
+    ids=["hex", "numbers"],
+)
+def test_a_picture_parameter_may_be_a_colour_and_no_file_is_read(layer_probe, tmp_path, written, pixel):
+    step = load_recipe(_layer(tmp_path, written)).steps[1]
+    out = registry.apply("layer_probe", np.zeros((2, 3, 3), np.float32), **step.params)
+    np.testing.assert_allclose(out, np.broadcast_to(pixel[:3], (2, 3, 3)), atol=1e-6)
+
+
+def _not_an_image(folder):
+    (folder / "words.png").write_text("not a picture", encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("written", "make", "kind"),
+    [
+        pytest.param("'assets/missing.png'", lambda folder: None, ImageReadError, id="missing file"),
+        pytest.param("'words.png'", _not_an_image, ImageReadError, id="not an image"),
+        pytest.param("'#zzzzzz'", lambda folder: None, RecipeError, id="a bad colour is not read as a path"),
+    ],
+)
+def test_a_picture_that_cannot_be_used_fails_at_load_naming_file_step_parameter_and_value(
+    layer_probe, tmp_path, written, make, kind
+):
+    make(tmp_path)
+    with pytest.raises(kind, match=r"^look\.toml: step 2: .*`texture`.*" + re.escape(written.strip("'"))):
+        load_recipe(_layer(tmp_path, written))
