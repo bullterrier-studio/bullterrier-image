@@ -88,9 +88,9 @@ recipes.
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
 | `border` | Solid or rounded border, drawn inside the picture's edge. | `fx.border(width=24, color="#fff", radius=12)` |
-| `crt` | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.1, mask=0.4)` |
-| `vhs` | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.4, bleed=3)` |
-| `ntsc` | Chroma smear and dot crawl. | `fx.ntsc(bleed=4)` |
+| `crt` ✓ | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.15, shadow_mask=0.35)` |
+| `vhs` ✓ | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.06, bleed=5)` |
+| `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
 
 Frames that need a canvas larger than the photo (a polaroid with caption space, a 35 mm strip with sprocket holes)
@@ -144,7 +144,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
 | `reaction_diffusion` ✓ | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=300)` |
 | `cellular_automata` | Life-like rules run on the thresholded picture. | `fx.cellular_automata(rule="life", steps=12, threshold=0.5)` |
-| `lenticular` | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strips=40, shift=6)` |
+| `lenticular` ✓ | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strip=6, shift=5)` |
 
 ## Text and symbols
 
@@ -179,13 +179,13 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
 | `shear` ✓ | Skew with edge fill. | `fx.shear(x=0.2)` |
 | `perspective` ✓ | Corner-pin to a quad. | `fx.perspective(vertical=0.3, rotate=-3, scale=0.2)` |
-| `pixel_sort` | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", angle=90, low=0.2, high=0.8)` |
+| `pixel_sort` ✓ | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", low=0.25, high=0.75)` |
 | `melt` ✓ | Brightness-driven drips running down. | `fx.melt(amount=40, seed=1)` |
 | `flow_warp` ✓ | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
-| `stretch` | Smear one pixel row or column outward. | `fx.stretch(axis="x", at=0.5)` |
-| `scatter` | Random pixel displacement. | `fx.scatter(radius=6, seed=1)` |
-| `shatter` | Cracked-glass pieces, slightly offset and rotated. | `fx.shatter(pieces=60, gap=2, seed=1)` |
-| `droste` | Recursive picture-in-picture spiral. | `fx.droste(scale=0.4)` |
+| `stretch` ✓ | Smear one pixel row or column outward. | `fx.stretch(axis="vertical", at=0.5)` |
+| `scatter` ✓ | Random pixel displacement. | `fx.scatter(radius=4, seed=1)` |
+| `shatter` ✓ | Cracked-glass pieces, slightly offset and rotated. | `fx.shatter(pieces=24, gap=1.5, seed=1)` |
+| `droste` ✓ | Recursive picture-in-picture spiral. | `fx.droste(scale=0.5)` |
 | `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
 
 **Changing the picture's size and shape**
@@ -212,16 +212,16 @@ together, always in the order flip, rotate, crop, pad, size; transparency is cut
 | --- | --- | --- |
 | `glitch` ✓ | Channel split and sliding bands. | `fx.glitch(split=9, bands=8)` |
 | `rgb_split` ✓ | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
-| `jpeg_crush` | Re-encode at very low quality. | `fx.jpeg_crush(quality=4)` |
+| `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
-| `interlace` | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
-| `signal_noise` | Static bands and dropouts. | `fx.signal_noise(bands=5, seed=1)` |
+| `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
+| `signal_noise` ✓ | Static bands and dropouts. | `fx.signal_noise(bands=3, seed=1)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
-| `prism` | Rainbow dispersion. | `fx.prism(amount=10)` |
-| `anaglyph` | Red/cyan 3D look. | `fx.anaglyph(shift=10)` |
-| `dead_pixels` | Stuck and dead LCD pixels. | `fx.dead_pixels(count=40, seed=1)` |
-| `byte_corrupt` | Corrupt the encoded file's bytes, then decode. | `fx.byte_corrupt(hits=5, seed=2)` |
-| `hologram` | Cyan scanlines, flicker, edge glow. | `fx.hologram()` |
+| `prism` ✓ | Rainbow dispersion. | `fx.prism(amount=18)` |
+| `anaglyph` ✓ | Red/cyan 3D look. | `fx.anaglyph(shift=6)` |
+| `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
+| `byte_corrupt` ✓ | Damage a JPEG's stored coefficients, then decode: smears and colour blocks. | `fx.byte_corrupt(hits=40, seed=2)` |
+| `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |
 
 ## Atmosphere
 
@@ -267,8 +267,8 @@ modes.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `blend` | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(image="tex.png", mode="overlay", opacity=0.4)` |
-| `overlay` | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom-right", scale=0.15)` |
+| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(texture="tex.png", mode="soft_light")` |
+| `overlay` ✓ | Place an image, logo or watermark. | `fx.overlay(logo="logo.png", at="bottom_right", scale=0.2)` |
 | `gradient_overlay` | Linear, radial or conic colour wash. | `fx.gradient_overlay(["#f0f","#0ff"], kind="linear", mode="screen")` |
 | `text` | Render text with font, outline and shadow. | `fx.text("BULLTERRIER", size=0.08, at="bottom")` |
 
@@ -333,15 +333,15 @@ control packages.
 
 What combining effects can give, once the pieces exist:
 
-- **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain
+- **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain, CRT glass
 - **Risograph poster**: levels, risograph inks, paper texture, border
-- **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml); gains `crt` with batch 6): green ASCII, CRT, scanlines, vignette
+- **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml)): green ASCII on a curved CRT screen with shadow mask, scanlines and glow
 - **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
 - **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
-- **Double exposure**: black and white, a second photo inside the silhouette, vignette
+- **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with the first `Picture` effect, Turn to dust with batch 12).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with the first `Picture` effect (done with `blend`), Turn to dust with batch 12).
