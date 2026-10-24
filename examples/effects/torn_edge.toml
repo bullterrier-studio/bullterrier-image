@@ -1,0 +1,9 @@
+# A rough-torn paper edge around the photo.
+# It also makes the effect's picture in the catalogue.
+name = "torn_edge"
+size = 480
+
+[[step]]
+effect = "torn_edge"
+depth = 28
+seed = 2
