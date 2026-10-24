@@ -1,0 +1,32 @@
+# Looks that are one evaporate step. They leave `cell` at its default, 5: give the ascii step before it the same.
+
+[halo]
+description = "The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces."
+start = 0.4
+ramp = 0.24
+outline = 0.1
+outward = 0.5
+rise = 0.22
+vanish = 0.35
+seed = 3
+
+[windblown]
+description = "The edges dissolve and everything is blown to the right, like dust in a wind."
+start = 0.4
+ramp = 0.24
+outline = 0.12
+outward = 0.4
+rise = 0.24
+wind = 1.4
+vanish = 0.35
+seed = 9
+
+[disintegrate]
+description = "Heavy: the whole outline and the top come apart, in long plumes in every direction."
+start = 0.5
+ramp = 0.28
+outline = 0.2
+outward = 0.7
+rise = 0.3
+vanish = 0.45
+seed = 7

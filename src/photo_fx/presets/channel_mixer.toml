@@ -1,0 +1,11 @@
+# Looks that are one channel mix.
+
+[infrared]
+description = "False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale."
+red_from_red = 0.2
+red_from_green = 1.0
+green_from_red = 0.6
+green_from_green = 0.0
+green_from_blue = 0.4
+blue_from_blue = 0.2
+blue_from_green = 0.8

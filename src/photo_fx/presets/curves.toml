@@ -1,0 +1,15 @@
+# Looks that are one tone curve.
+
+[cross_process]
+description = "Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows."
+shadows = 0.2
+highlights = 0.8
+red_shadows = 0.14
+red_midtones = 0.55
+red_highlights = 0.88
+green_shadows = 0.24
+green_midtones = 0.52
+green_highlights = 0.82
+blue_shadows = 0.36
+blue_midtones = 0.45
+blue_highlights = 0.62
