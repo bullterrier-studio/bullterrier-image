@@ -1,0 +1,10 @@
+# Canvas weave with a little paper fibre, laid over the photo.
+# It also makes the effect's picture in the catalogue.
+name = "paper_texture"
+size = 480
+
+[[step]]
+effect = "paper_texture"
+kind = "canvas"
+amount = 0.15
+spacing = 6
