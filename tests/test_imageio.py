@@ -320,6 +320,27 @@ def test_a_saved_picture_never_carries_the_inputs_exif_or_gps(tmp_path):
         assert b"PhoneMaker" not in (tmp_path / name).read_bytes()
 
 
+def test_a_jpeg_keeps_full_resolution_colour(tmp_path):
+    """Columns one pixel wide alternate red and blue: chroma subsampling (4:2:0 or 4:2:2) would average each pair of
+    columns into one purple, so every pixel would be off by about half the range."""
+    stripes = np.zeros((16, 16, 3), np.float32)
+    stripes[:, 0::2, 0] = 1.0
+    stripes[:, 1::2, 2] = 1.0
+    imageio.save(stripes, tmp_path / "stripes.jpg", quality=100)
+    assert np.abs(imageio.load(tmp_path / "stripes.jpg") - stripes).max() < 0.1
+
+
+def test_a_jpeg_honours_its_quality(photo, tmp_path):
+    def error_and_size(quality: int) -> tuple[float, int]:
+        path = tmp_path / f"q{quality}.jpg"
+        imageio.save(photo, path, quality=quality)
+        return float(np.abs(imageio.load(path) - photo).mean()), path.stat().st_size
+
+    (rough, small), (fine, large) = error_and_size(20), error_and_size(95)
+    assert fine < rough / 2  # a higher quality is closer to the picture...
+    assert large > small  # ...and spends more bytes on it
+
+
 ICC_FIXED_DATE = bytes.fromhex(
     "07d0 0001 0001 0000 0000 0000"
 )  # ICC.1 header bytes 24..35: 2000-01-01 00:00:00 as 6 u16
