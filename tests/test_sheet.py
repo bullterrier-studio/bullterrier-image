@@ -64,7 +64,7 @@ def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():
 def test_effect_number_picks_one_of_an_effect_the_recipe_has_twice():
     tiles = sweep(TWICE, "grain#2.amount", 0, 0.2, 3)
     assert [tile.steps[0] for _, tile in tiles] == [GRAIN] * 3  # the first grain stays as written
-    assert [tile.steps[2].params["amount"] for _, tile in tiles] == [0, 0.1, 0.2]
+    assert [tile.steps[2].runs[0].params["amount"] for _, tile in tiles] == [0, 0.1, 0.2]
     assert sweep(TWICE, "grain#1.amount", 0, 0.2, 3)[0][1].steps[2] == TWICE.steps[2]
 
 

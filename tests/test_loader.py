@@ -56,7 +56,7 @@ def test_a_file_name_that_leaves_no_usable_name_asks_for_a_name_or_a_new_file_na
 
 
 def test_a_recipe_without_a_format_or_with_format_1_loads(tmp_path):
-    assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].effect == "grade"
+    assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].runs[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
 
 
@@ -170,7 +170,7 @@ def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(la
     _logo(tmp_path / "assets")
     recipe = load_recipe(_layer(tmp_path / "recipes", "'../assets/logo.png'"))
     monkeypatch.chdir(tmp_path)  # the folder the process runs in does not matter
-    image = recipe.steps[1].params["image"]
+    image = recipe.steps[1].runs[0].params["image"]
     assert (image.width, image.height, image.label) == (2, 1, "../assets/logo.png")
     np.testing.assert_allclose(image.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
 
@@ -178,7 +178,7 @@ def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(la
 def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     logo = _logo(tmp_path / "elsewhere")
     recipe = load_recipe(_layer(tmp_path / "recipes", f"'{logo}'"))
-    assert recipe.steps[1].params["image"].width == 2
+    assert recipe.steps[1].runs[0].params["image"].width == 2
 
 
 @pytest.mark.parametrize(
@@ -187,7 +187,7 @@ def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     ids=["hex", "numbers"],
 )
 def test_a_picture_parameter_may_be_a_colour_and_no_file_is_read(layer_probe, tmp_path, written, pixel):
-    step = load_recipe(_layer(tmp_path, written)).steps[1]
+    step = load_recipe(_layer(tmp_path, written)).steps[1].runs[0]
     out = registry.apply("layer_probe", np.zeros((2, 3, 3), np.float32), **step.params)
     np.testing.assert_allclose(out, np.broadcast_to(pixel[:3], (2, 3, 3)), atol=1e-6)
 

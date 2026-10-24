@@ -18,7 +18,7 @@ def test_every_effect_has_a_short_example_recipe_that_shows_it(name):
     assert recipe.name == name
     assert recipe.size == 480
     assert 1 <= len(recipe.steps) <= 3
-    assert name in [step.effect for step in recipe.steps]
+    assert name in [run.effect for step in recipe.steps for run in step.runs]
 
 
 def test_every_example_recipe_belongs_to_an_effect():
@@ -38,7 +38,7 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
 
 def _is_a_combination(recipe: Recipe) -> bool:
     """A demo recipe combines effects: three different ones at least."""
-    return len({step.effect for step in recipe.steps}) >= 3
+    return len({run.effect for step in recipe.steps for run in step.runs}) >= 3
 
 
 @pytest.mark.parametrize("path", sorted((EXAMPLES / "recipes").glob("*.toml")), ids=lambda path: path.stem)
@@ -69,7 +69,7 @@ def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the
     checked = []
     examples = [gallery.effect_files(name).example for name in registry.describe()]
     for path in [*(EXAMPLES / "recipes").glob("*.toml"), *examples]:
-        steps = {s.effect: s.params for s in load_recipe(path).steps}
+        steps = {run.effect: run.params for step in load_recipe(path).steps for run in step.runs}
         for mover in ("disperse", "evaporate"):
             if mover in steps and "ascii" in steps:
                 assert steps[mover]["cell"] == steps["ascii"]["cell"], path.name

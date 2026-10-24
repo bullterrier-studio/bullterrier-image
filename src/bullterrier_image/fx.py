@@ -13,9 +13,14 @@
 
 Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
 (`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask`
-("subject" or "background"), `opacity` (0..1), `blend_mode` (normal, multiply, screen, overlay, soft_light,
-difference, color) and, for an effect with presets, `preset`. A misspelt parameter or key fails when the step is made,
+(a selection: "subject", "background" or a region), `opacity` (0..1), `blend_mode` (normal, multiply, screen, overlay,
+soft_light, difference, color), for an effect with presets `preset`, and for an effect that draws along the borders of
+a partition (`seams`) `partition`. A misspelt parameter or key fails when the step is made,
 not when the photo is rendered.
+
+`mask` may name a region the recipe declares (`Recipe(..., regions={"glass": Shards(...)})`); `fx` itself declares none,
+so by itself it knows only the built-in `subject` and `background`, and the recipe that holds the step checks the name.
+A step that gives each piece of a region its own look is an `Each` (`bullterrier_image.Each`), not an effect.
 
 `fx.pyi` lets editors complete effect names and parameters. It is written from `stub_text()` by
 `uv run poe regenerate`, once at integration rather than on every branch, so it can lag behind a branch's effects.
@@ -59,7 +64,8 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     a Step.
 
     Values may be given by position, in the model's field order, or by keyword; the step keys (`mask`, `opacity`,
-    `blend_mode`, `preset`) only by keyword. The Step checks them all, so a misspelt or out-of-range value fails here
+    `blend_mode`, `preset`, `partition`) only by keyword. The Step checks them all, so a misspelt or out-of-range
+    value fails here
     exactly as it would in a recipe file. `preset=` names one of the effect's presets (see `registry.presets`); the
     values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path (read now, relative to
     the current folder) or an array (float, height x width x 3 or 4).
@@ -89,15 +95,16 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
 
 def _signature(name: str) -> inspect.Signature:
     """The effect's parameters as a call signature, then the step keys as keywords, typed and defaulted as `Step`
-    declares them (`effect` is the builder's own name; `opacity` defaults to the effect's own, `registry.opacity`), and
-    `preset` (one of the names) if the effect has presets."""
+    declares them (`effect` is the builder's own name; `opacity` defaults to the effect's own, `registry.opacity`; a
+    key that is also an injected input, `partition`, only for an effect that takes it), and `preset` (one of the
+    names) if the effect has presets."""
     signature = registry.parameters(name).signature()
     step = Step.model_fields
     defaults = {key: step[key].default for key in step} | {"opacity": registry.opacity(name)}
     keys = [
         inspect.Parameter(key, inspect.Parameter.KEYWORD_ONLY, default=defaults[key], annotation=step[key].annotation)
         for key in registry.STEP_KEYS
-        if key in step and key != "effect"
+        if key in step and key != "effect" and (key not in registry.INPUTS or key in registry.inputs(name))
     ]
     names = tuple(registry.presets(name))
     if names:

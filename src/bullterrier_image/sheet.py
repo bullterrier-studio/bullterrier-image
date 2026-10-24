@@ -64,29 +64,37 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
         raise RecipeError(f"count must be 2 to 24 tiles, got {count}")
     if start == end:
         raise RecipeError(f"a sweep needs a range: start and end are both {start:g}")
-    index, name = _locate(recipe, target)
-    step = recipe.steps[index]
+    index, step, name = _locate(recipe, target)
     values = np.linspace(start, end, count).tolist()
     if name in registry.parameters(step.effect).whole_number_fields():
         values = list(dict.fromkeys(round(value) for value in values))
     tiles = []
     for value in values:
-        swept = Step(step.effect, {**step.params, name: value}, step.mask, step.opacity, step.blend_mode)
+        swept = Step(
+            step.effect,
+            {**step.params, name: value},
+            step.mask,
+            step.opacity,
+            step.blend_mode,
+            partition=step.partition,
+        )
         steps = [*recipe.steps[:index], swept, *recipe.steps[index + 1 :]]
         tiles.append((f"{name}={value:g}", recipe.model_copy(update={"steps": tuple(steps)})))  # keeps the rest
     return tiles
 
 
-def _locate(recipe: Recipe, target: str) -> tuple[int, str]:
-    """The index of the step and the name of the parameter that `target` (see `sweep`) points at. The parameter is
-    checked by the effect's model when the tile is made, which names it and the valid ones."""
+def _locate(recipe: Recipe, target: str) -> tuple[int, Step, str]:
+    """The index and the step, and the name of the parameter, that `target` (see `sweep`) points at: one of the
+    recipe's own effect steps (not a look of an `Each`). The parameter is checked by the effect's model when the tile is
+    made, which names it and the valid ones."""
     found = re.fullmatch(r"(\w+)(?:#(\d+))?\.(\w+)", target)
     if not found:
         raise RecipeError(f"sweep target {target!r} is not `effect.parameter` (or `effect#2.parameter`)")
     effect, number, name = found.groups()
-    steps = [i for i, step in enumerate(recipe.steps) if step.effect == effect]
+    effects = [(i, step) for i, step in enumerate(recipe.steps) if isinstance(step, Step)]
+    steps = [(i, step) for i, step in effects if step.effect == effect]
     if not steps:
-        have = ", ".join(dict.fromkeys(step.effect for step in recipe.steps))
+        have = ", ".join(dict.fromkeys(step.effect for _, step in effects))
         raise RecipeError(f"sweep target {target!r}: recipe {recipe.name!r} has no {effect!r} step; it has: {have}")
     if number is None and len(steps) > 1:
         raise RecipeError(
@@ -98,7 +106,8 @@ def _locate(recipe: Recipe, target: str) -> tuple[int, str]:
         raise RecipeError(
             f"sweep target {target!r}: recipe {recipe.name!r} has {len(steps)} {effect!r} steps, no #{pick}"
         )
-    return steps[pick - 1], name
+    index, step = steps[pick - 1]
+    return index, step, name
 
 
 def write_stages(stages: list[Stage], folder: str | Path, quality: int = 92) -> Path:

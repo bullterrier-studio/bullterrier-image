@@ -16,7 +16,9 @@ import bullterrier_image.core.runner
 import bullterrier_image.effects
 import bullterrier_image.plugin
 from bullterrier_image import (
+    Grid,
     ImageReadError,
+    Pick,
     Project,
     Recipe,
     RecipeError,
@@ -103,7 +105,7 @@ def test_effect_queries_live_only_in_the_registry(name):
     [
         (lambda: Step("no_such_effect"), "unknown effect.*ascii"),
         (lambda: Step("glitch", {"spilt": 3}), "spilt"),
-        (lambda: Step("grain", mask="sideways"), "mask.*'sideways'"),
+        (lambda: Step("grain", mask=3), "mask"),  # type: ignore[arg-type]
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
@@ -125,17 +127,42 @@ def test_a_recipe_built_in_code_is_checked_too():
 @pytest.mark.parametrize(
     ("keys", "complaint"),
     [
-        ({"mask": "left half"}, r"`mask`.*'left half'"),
+        ({"mask": 3}, r"`mask`.*\b3\b"),
+        ({"each": "panes"}, r"`each`"),
+        ({"looks": ["none"]}, r"`looks`"),
+        ({"partition": "panes"}, r"gradient_map.*takes no partition"),
         ({"opacity": 2}, r"`opacity`.*\b2\b"),
         ({"blend_mode": "lighten"}, r"`blend_mode`.*screen.*'lighten'"),
         ({"preset": "sepya"}, r"'sepya'.*sepia"),
         ({"effect": "blur"}, r"`effect`.*'gradient_map'.*'blur'"),
     ],
-    ids=["mask", "opacity", "blend_mode", "preset", "effect: the function already names it"],
+    ids=[
+        "mask",
+        "each",
+        "looks",
+        "partition",
+        "opacity",
+        "blend_mode",
+        "preset",
+        "effect: the function already names it",
+    ],
 )
 def test_fx_refuses_a_bad_step_key_naming_it_and_the_value(keys, complaint):
     with pytest.raises(ValueError, match=complaint):
         fx.gradient_map(**keys)
+
+
+def test_fx_takes_a_region_name_as_mask_and_the_recipe_that_holds_the_step_declares_it():
+    step = fx.fill("#ff0000", mask="glass")
+    assert Recipe("r", [step], regions={"glass": Pick(of="panes"), "panes": Grid()}).steps == (step,)
+    with pytest.raises(RecipeError, match=r"step 1: `mask` names 'glass'.*subject, background.*declares no regions"):
+        Recipe("r", [step])  # fx declares no regions: by itself it knows the built-in ones only
+
+
+def test_the_fx_signature_offers_partition_only_to_an_effect_that_takes_it(partition_probe):
+    assert "partition" in inspect.signature(fx.partition_probe).parameters
+    assert "partition" not in inspect.signature(fx.grade).parameters
+    assert fx.partition_probe(partition="panes") == Step("partition_probe", partition="panes")
 
 
 def test_a_step_describes_itself_briefly_for_labels():
@@ -251,7 +278,7 @@ def _stub_functions() -> dict[str, ast.FunctionDef]:
     return {node.name: node for node in ast.parse(fx.stub_text()).body if isinstance(node, ast.FunctionDef)}
 
 
-MASK = ("Literal['subject', 'background'] | None", None)
+MASK = ("str | None", None)
 BLEND_MODE = ("Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color']", "normal")
 
 

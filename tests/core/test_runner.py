@@ -11,8 +11,9 @@ from bullterrier_image.core import runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
+from bullterrier_image.recipe import Grid, Pick, Shards
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
@@ -270,7 +271,7 @@ SUBJECT[50:150, 80:250] = 1.0
     [
         (None, None, 0.0),
         ("subject", SUBJECT, 1 / 3),  # the scaled matte, one channel: a third of a picture, needed by every step
-        ("background", SUBJECT, 1 / 3),
+        ("background", SUBJECT, 2 / 3),  # and the background selection made from it, kept for the steps that mask
     ],
     ids=["plain", "subject", "background"],
 )
@@ -279,8 +280,253 @@ def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_outpu
     weights are kept for the rest of the chain: the peak is the busiest step's scratch, output and input (and the
     scaled matte), whatever the number of steps."""
     steps = tuple(Step("scratch_probe", {"copies": SCRATCH_COPIES}, mask) for _ in range(6))
-    bound = SCRATCH_COPIES + 1 + 1 + kept + 0.25  # scratch, output, input, matte, a quarter picture for small things
+    bound = (
+        SCRATCH_COPIES + 1 + 1 + kept + 0.25
+    )  # scratch, output, input, the selections, a quarter picture for small things
     assert peak_pictures(PHOTO, Recipe("chain", steps, size=320), matte) <= bound
     # known-bad: the same gauge sees a picture that something keeps alive
     leaky = (*steps[:3], Step("hoarding_probe", {}, mask), *steps[3:])
     assert peak_pictures(PHOTO, Recipe("leaky", leaky, size=320), matte) > bound
+
+
+# --- regions: `each` gives every piece of a partition its look; `mask` limits a step to a selection -----------------
+
+RED, GREEN, BLUE, WHITE = "#ff0000", "#00ff00", "#0000ff", "#ffffff"
+RGB = {RED: (1.0, 0.0, 0.0), GREEN: (0.0, 1.0, 0.0), BLUE: (0.0, 0.0, 1.0), WHITE: (1.0, 1.0, 1.0)}
+
+
+def fill(color: str, **keys) -> Step:
+    return Step("fill", {"color": color}, **keys)
+
+
+def columns(count: int) -> dict[str, Grid | Pick | Shards]:
+    return {"cols": Grid(columns=count, rows=1)}
+
+
+def run(photo, steps, regions, **keys):
+    return runner.render(photo, Recipe("regions", steps, size=None, regions=regions), **keys)
+
+
+@pytest.mark.parametrize("count", [1, 2, 4, 5])
+def test_each_piece_shows_its_look_and_the_looks_take_turns(photo, count):
+    looks = [fill(RED), fill(GREEN), fill(BLUE)]
+    out = run(photo, [Each("cols", looks, feather=0)], columns(count))
+    width = photo.shape[1]
+    for x in range(width):
+        column = int((x + 0.5) * count / width)  # the piece holding the pixel's centre, worked out by hand
+        want = RGB[(RED, GREEN, BLUE)[column % 3]]
+        assert (out[:, x] == want).all(), (count, x)
+
+
+@pytest.mark.parametrize("size", [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)])
+@pytest.mark.parametrize("feather", [0, 0.5, 3])
+@pytest.mark.parametrize("assign", ["cycle", "random"])
+def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_feather(size, feather, assign):
+    photo = np.random.default_rng(2).random((*size, 3), dtype=np.float32)
+    pure = [
+        fill(RED),
+        fill(GREEN),
+        fill(BLUE),
+    ]  # a pure look is its own weight in its channel, so the channels add up to 1
+    out = run(photo, [Each("cols", pure, assign=assign, feather=feather)], columns(5))
+    assert out.shape == photo.shape
+    assert out.min() >= 0
+    assert out.max() <= 1
+    np.testing.assert_allclose(out.sum(axis=2), 1.0, atol=1e-5)
+
+
+def test_a_none_look_leaves_its_pieces_exactly_as_they_were(photo):
+    out = run(photo, [Each("cols", [fill(RED), "none"], feather=0)], columns(4))
+    np.testing.assert_array_equal(out[:, 32:64], photo[:, 32:64])
+    np.testing.assert_array_equal(out[:, 96:], photo[:, 96:])
+    assert (out[:, 0:32] == RGB[RED]).all()
+
+
+def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
+    out = run(photo, [Each("cols", [fill(RED), "none"], feather=2)], columns(4))
+    reach = 4 * 2 + 1  # a feather is cut off at 4 sigmas
+    np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
+    assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
+    assert not np.array_equal(out[:, 30:34], photo[:, 30:34])  # and the border is blended
+
+
+@pytest.mark.parametrize("feather", [0, 3])
+@pytest.mark.parametrize("assign", ["cycle", "random"])
+def test_looks_that_change_nothing_give_back_the_photo_exactly(photo, feather, assign):
+    nothing: list[Step | str] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), "none"]
+    np.testing.assert_array_equal(
+        run(photo, [Each("cols", nothing, assign=assign, feather=feather)], columns(7)), photo
+    )
+
+
+def test_a_look_with_its_own_opacity_and_blend_mode_is_laid_over_the_photo_like_a_step(photo):
+    looks = [fill("#808080", blend_mode="multiply"), fill(WHITE, opacity=0.25)]
+    out = run(photo, [Each("cols", looks, feather=0)], columns(2))
+    np.testing.assert_allclose(out[:, :64], photo[:, :64] * (128 / 255), atol=1e-6)
+    np.testing.assert_allclose(out[:, 64:], photo[:, 64:] * 0.75 + 0.25, atol=1e-6)
+
+
+def test_a_look_takes_its_effects_default_opacity_unless_it_gives_one(photo, throwaway_effects):
+    @effect(category="utilities", params=ScratchParams, opacity=0.4)
+    def faint_white(rgb, params):
+        """Paints white, shown at 0.4 unless a step says otherwise."""
+        return np.ones_like(rgb)
+
+    out = run(photo, [Each("cols", [Step("faint_white"), Step("faint_white", opacity=1.0)], feather=0)], columns(2))
+    np.testing.assert_allclose(out[:, :64], photo[:, :64] * 0.6 + 0.4, atol=1e-6)
+    assert (out[:, 64:] == 1).all()
+
+
+def test_the_each_steps_own_opacity_and_blend_mode_apply_to_the_blended_looks(photo):
+    looks = [fill(RED), fill(GREEN)]
+    half = run(photo, [Each("cols", looks, feather=0, opacity=0.5)], columns(2))
+    np.testing.assert_allclose(half[:, :64], photo[:, :64] * 0.5 + 0.5 * np.array(RGB[RED], np.float32), atol=1e-6)
+    np.testing.assert_allclose(half[:, 64:], photo[:, 64:] * 0.5 + 0.5 * np.array(RGB[GREEN], np.float32), atol=1e-6)
+    multiplied = run(photo, [Each("cols", looks, feather=0, blend_mode="multiply")], columns(2))
+    np.testing.assert_allclose(multiplied[:, :64], photo[:, :64] * np.array(RGB[RED], np.float32), atol=1e-6)
+
+
+HEAD: dict[str, Grid | Pick | Shards] = {
+    "panes": Grid(columns=2, rows=2),
+    "head": Pick(of="panes", pieces=[1]),
+}  # the top right quarter
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        pytest.param(fill(RED, mask="head"), id="a step"),
+        pytest.param(Each("panes", [fill(RED)], mask="head"), id="an each step"),
+    ],
+)
+def test_a_step_masked_by_a_region_changes_only_the_pixels_the_region_chooses(photo, step):
+    out = run(photo, [step], HEAD)
+    assert (out[:48, 64:] == RGB[RED]).all()
+    np.testing.assert_array_equal(out[:48, :64], photo[:48, :64])
+    np.testing.assert_array_equal(out[48:], photo[48:])
+
+
+def test_a_mask_can_name_a_region_made_from_the_subject(photo, matte):
+    regions = {"around": Shards(count=6, fit="subject"), "piece": Pick(of="around", pieces=[0])}
+    out = run(photo, [fill(RED, mask="piece")], regions, matte=matte)
+    changed = (out != photo).any(axis=2)
+    assert changed.any()
+    assert not changed.all()  # one shard of six
+
+
+class Stamps:
+    """The renders so far of the `stamp` effect, which paints its own number into the picture."""
+
+    count = 0
+
+
+@pytest.fixture
+def stamp(throwaway_effects):
+    Stamps.count = 0
+
+    @effect(category="utilities", params=ScratchParams)
+    def stamp(rgb, params):
+        """Paints a flat grey of 0.01 per render so far, counting this one."""
+        Stamps.count += 1
+        return np.full_like(rgb, Stamps.count / 100)
+
+
+def test_every_look_is_rendered_once_over_the_whole_picture_however_many_pieces_it_has(photo, stamp):
+    twice = Step("stamp", {"copies": 2})
+    out = run(photo, [Each("cols", [Step("stamp"), twice, "none"], feather=0), Step("stamp")], columns(30))
+    # 30 pieces, 3 looks, one a "none": two renders (0.01 and 0.02) and the step after them is the third
+    assert set(np.unique(out)) == {np.float32(0.03)}
+
+
+def test_a_look_no_piece_has_is_not_rendered(photo, stamp):
+    out = run(
+        photo, [Each("cols", [Step("stamp"), Step("stamp"), Step("stamp")], feather=0), Step("stamp")], columns(2)
+    )
+    assert set(np.unique(out)) == {np.float32(0.03)}  # two pieces use two looks; the third would have made it 0.04
+
+
+def test_the_random_assignment_is_decided_by_the_seed_alone(photo):
+    looks = [fill(RED), fill(GREEN), fill(BLUE)]
+
+    def render_with(seed: int) -> np.ndarray:
+        return run(photo, [Each("cols", looks, assign="random", seed=seed, feather=0)], columns(40))
+
+    np.testing.assert_array_equal(render_with(3), render_with(3))
+    assert not np.array_equal(render_with(3), render_with(4))
+    chosen = {tuple(pixel) for pixel in render_with(3).reshape(-1, 3)}
+    assert chosen == set(RGB.values()) - {RGB[WHITE]}  # all three looks are used, and nothing else appears
+    cycle = run(photo, [Each("cols", looks, feather=0)], columns(40))
+    assert not np.array_equal(render_with(3), cycle)
+
+
+def test_regions_are_made_for_the_working_picture_after_framing_and_scaling(photo):
+    recipe = Recipe(
+        "framed",
+        [Each("halves", [fill(RED), fill(GREEN)], feather=0)],
+        size=64,
+        frame=Framing(aspect=1.0),
+        regions={"halves": Grid(columns=2, rows=1)},
+    )
+    out = runner.render(photo, recipe)
+    assert out.shape == (64, 64, 3)
+    assert (out[:, :32] == RGB[RED]).all()
+    assert (out[:, 32:] == RGB[GREEN]).all()
+
+
+# --- regions and the subject: found at most once, and only when a region in use needs it ------------------------------
+
+
+def test_a_declared_region_nobody_uses_costs_nothing_and_does_not_look_for_the_subject(photo, matte):
+    finder = CountingFinder(matte)
+    unused = {"glass": Shards(fit="subject"), "head": Pick(of="glass")}
+    out = run(
+        photo, [fill(RED, mask="head")] if False else [Step("grade", {"exposure": 0.5})], unused, find_subject=finder
+    )
+    assert finder.seen == []
+    np.testing.assert_array_equal(out, run(photo, [Step("grade", {"exposure": 0.5})], {}))
+
+
+def test_a_region_in_use_asks_for_the_subject_once_however_many_steps_use_it(photo, matte):
+    finder = CountingFinder(matte)
+    regions = {"glass": Shards(count=5, fit="subject"), "head": Pick(of="glass", pieces=[0])}
+    steps = [fill(RED, mask="head"), Each("glass", [fill(GREEN), "none"]), fill(BLUE, mask="subject")]
+    run(photo, steps, regions, find_subject=finder)
+    assert finder.seen == [(96, 128, 3)]  # the photo as given
+
+
+def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_working_picture(photo, matte):
+    recipe = Recipe(
+        "scaled",
+        [Each("sides", [fill(RED), fill(GREEN)], feather=0)],
+        size=64,
+        regions={"sides": Grid(columns=2, rows=1, fit="subject")},
+    )
+    out = runner.render(photo, recipe, find_subject=CountingFinder(matte))
+    assert out.shape == (48, 64, 3)
+    middle = 32  # the disc is in the middle of the picture, so its box is cut in half there
+    assert (out[:, :middle] == RGB[RED]).all()
+    assert (out[:, middle:] == RGB[GREEN]).all()
+
+
+@pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
+def test_a_region_that_needs_the_subject_without_a_finder_is_refused_like_a_masked_step(run_it, photo):
+    recipe = Recipe("fitted", [Each("glass", ["none"])], size=None, regions={"glass": Shards(fit="subject")})
+    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
+        run_it(photo, recipe)
+
+
+# --- the partition an effect draws ---------------------------------------------------------------------------------
+
+
+def test_an_effect_that_takes_a_partition_gets_the_pieces_numbered_in_reading_order(photo, partition_probe):
+    out = run(photo, [Step("partition_probe", partition="panes")], {"panes": Grid(columns=3, rows=2)})
+    height, width = photo.shape[:2]
+    for y in range(height):
+        for x in range(width):
+            want = int((y + 0.5) * 2 / height) * 3 + int((x + 0.5) * 3 / width)  # row after row, by hand
+            assert out[y, x, 0] * 255 == pytest.approx(want), (x, y)
+
+
+def test_a_selection_is_given_to_an_effect_as_a_partition_of_two_pieces(photo, matte, partition_probe):
+    out = run(photo, [Step("partition_probe", partition="subject")], {}, matte=matte)
+    np.testing.assert_allclose(out[..., 0] * 255, matte > 0.5)  # outside the subject first: it holds the first pixel

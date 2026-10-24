@@ -16,6 +16,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
+from bullterrier_image.recipe import Each, Grid, Pick, Shards
 
 
 class GainParams(EffectParams):
@@ -80,7 +81,7 @@ def faint(throwaway_effects):
 def recipe_step(folder, keys: str) -> Step:
     path = folder / "faint.toml"
     path.write_text(f"[[step]]\neffect = 'faint_probe'\n{keys}", encoding="utf-8")
-    return load_recipe(path).steps[0]
+    return load_recipe(path).steps[0].runs[0]
 
 
 @pytest.mark.parametrize(
@@ -257,3 +258,173 @@ def test_an_effect_receives_the_picture_a_step_holds(layer_probe):
     out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), image=picture)
     np.testing.assert_allclose(out, 0.25)
     assert Step("layer_probe", {"image": picture}, mask="subject").params["image"] is picture
+
+
+# --- regions: steps name them, the recipe declares them ---------------------------------------------------------------
+
+REGIONS: dict[str, Grid | Shards | Pick] = {
+    "panes": Grid(columns=3, rows=2),
+    "glass": Shards(count=5),
+    "head": Pick(of="panes", pieces=[1]),
+}
+
+
+def test_a_recipe_declaring_regions_accepts_steps_that_name_them_in_every_place_a_step_can():
+    steps: list[Step | Each] = [
+        Step("grade", mask="head"),
+        Step("grade", mask="subject"),
+        Each("panes", [Step("grade", mask="head"), "none", Step("grade", opacity=0.5)], mask="background"),
+    ]
+    assert Recipe("r", steps, regions=REGIONS).regions == REGIONS
+    assert Recipe("plain", [Step("grade")]).regions == {}
+
+
+# Every way a step can name a region wrongly: each is refused when the recipe is made, naming the step (counted from 1),
+# the key, the name given and what would have been valid.
+BAD_REFERENCES = {
+    "a mask no region has": (
+        lambda: Recipe("r", [Step("grade"), Step("grade", mask="nope")], regions=REGIONS),
+        r"step 2: `mask` names 'nope', which is no region; valid selections: subject, background, head",
+    ),
+    "a mask that is a partition": (
+        lambda: Recipe("r", [Step("grade", mask="panes")], regions=REGIONS),
+        r"step 1: `mask` names 'panes', a partition, but it needs a selection; valid selections: .*head",
+    ),
+    "an each no region has": (
+        lambda: Recipe("r", [Each("nope", ["none"])], regions=REGIONS),
+        r"step 1: `each` names 'nope', which is no region; valid partitions: panes, glass",
+    ),
+    "an each that is a selection": (
+        lambda: Recipe("r", [Each("head", ["none"])], regions=REGIONS),
+        r"step 1: `each` names 'head', a selection, but it needs a partition; valid partitions: panes, glass",
+    ),
+    "an each that is the subject": (
+        lambda: Recipe("r", [Each("subject", ["none"])], regions=REGIONS),
+        r"step 1: `each` names 'subject', a selection",
+    ),
+    "a mask on an each": (
+        lambda: Recipe("r", [Each("panes", ["none"], mask="glass")], regions=REGIONS),
+        r"step 1: `mask` names 'glass', a partition",
+    ),
+    "a look with a mask no region has": (
+        lambda: Recipe("r", [Each("panes", [Step("grade", mask="nope")])], regions=REGIONS),
+        r"step 1: `mask` names 'nope'",
+    ),
+    "a partition no region has": (
+        lambda: Recipe("r", [Step("partition_probe", partition="nope")], regions=REGIONS),
+        r"step 1: `partition` names 'nope', which is no region; valid regions: subject, background, panes, glass, head",
+    ),
+    "a recipe that declares no regions": (
+        lambda: Recipe("r", [Step("grade", mask="glass")]),
+        r"valid selections: subject, background .*declares no regions of its own.*regions=",
+    ),
+    "a region fitted to a partition": (
+        lambda: Recipe("r", [Step("grade")], regions={"a": Grid(), "b": Shards(fit="a")}),
+        r"region 'b': `fit` names 'a', a partition, but it needs a selection",
+    ),
+    "regions in a cycle": (
+        lambda: Recipe("r", [Step("grade")], regions={"a": Shards(fit="b"), "b": Pick(of="a")}),
+        r"cycle: 'a' -> 'b' -> 'a'",
+    ),
+    "a region called like a built-in": (
+        lambda: Recipe("r", [Step("grade")], regions={"subject": Grid()}),
+        r"region 'subject' is a built-in",
+    ),
+}
+
+
+@pytest.mark.parametrize(("make", "complaint"), BAD_REFERENCES.values(), ids=BAD_REFERENCES.keys())
+def test_a_recipe_refuses_a_bad_region_reference_when_it_is_made(partition_probe, make, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        make()
+
+
+BAD_EACH = {
+    "no looks": (lambda: Each("panes", []), r"looks"),
+    "a look that is a word other than none": (lambda: Each("panes", ["nothing"]), r"looks"),
+    "a look that is a number": (lambda: Each("panes", [3]), r"looks"),  # type: ignore[list-item]
+    "an assignment that does not exist": (
+        lambda: Each("panes", ["none"], assign="shuffle"),
+        r"`assign`.*cycle.*random",
+    ),
+    "a negative seed": (lambda: Each("panes", ["none"], seed=-1), r"`seed`.*0"),
+    "a feather below 0": (lambda: Each("panes", ["none"], feather=-0.5), r"`feather`.*0"),
+    "an infinite feather": (lambda: Each("panes", ["none"], feather=float("inf")), r"`feather`"),
+    "an unknown key": (lambda: Each("panes", ["none"], effect="grade"), r"`effect`"),
+    "a mask that is not a name": (lambda: Each("panes", ["none"], mask=3), r"`mask`"),  # type: ignore[arg-type]
+}
+
+
+@pytest.mark.parametrize(("make", "complaint"), BAD_EACH.values(), ids=BAD_EACH.keys())
+def test_an_each_step_is_refused_naming_what_is_wrong(make, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        make()
+
+
+PARTITIONS = {
+    "an effect that draws a partition needs one named": (
+        lambda: Step("partition_probe"),
+        r"partition_probe.*`partition`",
+    ),
+    "an effect that takes none refuses one": (
+        lambda: Step("grade", partition="panes"),
+        r"grade.*takes no partition",
+    ),
+}
+
+
+@pytest.mark.parametrize(("make", "complaint"), PARTITIONS.values(), ids=PARTITIONS.keys())
+def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_probe, make, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        make()
+    assert Step("partition_probe", partition="panes").partition == "panes"
+
+
+@pytest.mark.parametrize(
+    ("steps", "regions", "needs_matte"),
+    [
+        pytest.param([Step("grade", mask="head")], REGIONS, False, id="a mask from a grid needs no subject"),
+        pytest.param(
+            [Step("grade", mask="head")], {**REGIONS, "unused": Shards(fit="subject")}, False, id="an unused one"
+        ),
+        pytest.param(
+            [Step("grade", mask="head")],
+            {"panes": Grid(fit="subject"), "head": Pick(of="panes")},
+            True,
+            id="a grid laid over the subject",
+        ),
+        pytest.param(
+            [Each("cut", ["none"])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
+        ),
+        pytest.param([Each("cut", ["none"])], {"cut": Shards(fit="background")}, True, id="on the background"),
+        pytest.param(
+            [Each("cut", ["none"])],
+            {"cut": Shards(fit="aura"), "aura": Pick(of="g"), "g": Grid(fit="subject")},
+            True,
+            id="through two regions",
+        ),
+        pytest.param([Each("g", [Step("evaporate"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"),
+        pytest.param([Each("g", [Step("grade"), "none"])], {"g": Grid()}, False, id="looks that do not"),
+        pytest.param([Each("g", ["none"], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"),
+    ],
+)
+def test_a_recipe_needs_the_subject_only_when_a_region_it_uses_does(steps, regions, needs_matte):
+    assert Recipe("look", steps, regions=regions).needs_matte is needs_matte
+
+
+def test_an_each_step_describes_itself_with_its_partition_and_looks():
+    step = Each("panes", [Step("grade", {"exposure": 0.5}), "none"], mask="subject", opacity=0.5)
+    assert step.describe() == "each panes [grade(exposure=0.5), none] on subject x0.5"
+    assert len(Each("panes", [Step("ascii", {"chars": "xy" * 50})] * 3).describe(width=30)) == 30
+
+
+def test_an_each_step_shows_fully_unless_it_gives_an_opacity():
+    assert Each("panes", [Step("grade")]).opacity == 1.0
+    assert Each("panes", [Step("grade")], opacity=0.3).opacity == 0.3
+
+
+def test_the_each_step_is_a_frozen_value_and_keeps_its_looks_as_a_tuple():
+    step = Each("panes", [Step("grade"), "none"])
+    assert step.looks == (Step("grade"), "none")
+    with pytest.raises(ValueError, match="frozen"):
+        step.feather = 3.0  # type: ignore[misc]  # the point of the test

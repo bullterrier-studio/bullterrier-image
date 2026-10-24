@@ -7,13 +7,15 @@ an error; `render` keeps alive only the image the next step needs, so a render's
 own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps, while `trace` keeps
 every stage. The runner is given everything it uses: the photo, and the subject either as a
 `matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
-only if the recipe needs the subject. It never loads a file or looks for the subject on its own;
+only if the recipe needs the subject: a step on it, an effect that takes it, or a region in use that is made from it
+(regions declared but unused need nothing). It never loads a file or looks for the subject on its own;
 `bullterrier_image.recipe` binds the default finder for users. The subject is found on the photo as given, before the
 recipe's `Framing` is applied, so a crop can follow the subject and the matte moves with the photo; the framed photo is
-then scaled to the recipe's size.
+then scaled to the recipe's size. The recipe's regions are made once per render, for that scaled picture, and only as
+steps ask for them.
 
-Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo and blend a step); never the
-recipe-file reader `loader`, so recipes built in Python run without it.
+Dependency direction: imports `steps`, `regions`, the effect registry and `ops` (to scale the photo and blend a step);
+never the recipe-file reader `loader`, so recipes built in Python run without it.
 """
 
 from collections import deque
@@ -27,7 +29,8 @@ from bullterrier_image.ops.composite import composite
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .steps import Recipe, Step
+from .regions import Regions, look_weights, resolve
+from .steps import Each, Recipe, Step
 
 # Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).
 SubjectFinder = Callable[[np.ndarray], np.ndarray]
@@ -44,8 +47,10 @@ def render(
 
     The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; the subject
     matte is framed and scaled with it. Steps run in order, each on the previous step's output, which the step's result
-    is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the subject
-    matte, so only the subject or only the background changes.
+    is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the
+    selection its `mask` names (the subject, the background or a region of the recipe), so only that changes. An `Each`
+    step renders each of its looks once over the whole picture and shows it through the pieces of its partition that
+    have it, blending the looks across the borders.
     Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically. After the
     last step a recipe whose framing is `transparent` is cut out: the result then has four channels, RGB and straight
     alpha (h, w, 4), instead of three.
@@ -56,8 +61,8 @@ def render(
     recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's size, or the
     framing crops around a subject that is not there.
     """
-    image, matte = _prepare(rgb, recipe, matte, find_subject)
-    stages = _stages(image, recipe.steps, matte)
+    image, matte, regions = _prepare(rgb, recipe, matte, find_subject)
+    stages = _stages(image, recipe.steps, matte, regions)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     result = _last(stages)
     return recipe.frame.cut(result, matte) if recipe.frame.has_alpha else result
@@ -87,12 +92,12 @@ def trace(
 
     rgb, recipe, matte, find_subject: as for `render`.
     """
-    rgb, matte = _prepare(rgb, recipe, matte, find_subject)
+    rgb, matte, regions = _prepare(rgb, recipe, matte, find_subject)
     stages = [Stage("input", rgb)]
     if recipe.needs_matte:
         subject = np.repeat(matte[..., None], 3, axis=2)  # type: ignore[index]  # `_prepare` gave the matte this recipe needs
         stages.append(Stage("subject matte (white = subject)", subject))
-    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte), start=1):
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, regions), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
@@ -116,9 +121,10 @@ def render_all(
 
 def _prepare(
     rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None, find_subject: SubjectFinder | None
-) -> tuple[np.ndarray, np.ndarray | None]:
+) -> tuple[np.ndarray, np.ndarray | None, Regions]:
     """Find the subject if the recipe needs it, then frame the photo and the matte together and scale both to the
-    recipe's size. The one place the photo is framed (a depth map, later, moves with it here too)."""
+    recipe's size, and set up the recipe's regions for that picture. The one place the photo is framed (a depth map,
+    later, moves with it here too)."""
     if matte is None and recipe.needs_matte:
         matte = _find_subject(rgb, recipe, find_subject)
     if matte is not None and matte.shape[:2] != rgb.shape[:2]:
@@ -127,13 +133,15 @@ def _prepare(
     if recipe.size:
         rgb = resize(rgb, recipe.size)
         matte = None if matte is None else resize(matte, recipe.size)
-    return rgb, matte
+    found = None if matte is None else (lambda: matte)  # the subject of the working picture, for a region that needs it
+    return rgb, matte, resolve(recipe.regions, rgb.shape[:2], subject=found)
 
 
 def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder | None) -> np.ndarray:
     if find_subject is None:
         raise SubjectNotFoundError(
-            f"recipe {recipe.name!r} has masked steps, so it needs the subject: pass `matte` (the subject's alpha) "
+            f"recipe {recipe.name!r} uses the subject (a mask, a region made from it, or an effect that takes it), so "
+            "it needs the subject: pass `matte` (the subject's alpha) "
             "or `find_subject` (a function photo -> alpha, e.g. bullterrier_image.matte.subject_matte)"
         )
     return subject_from(find_subject, rgb)
@@ -152,30 +160,61 @@ def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
     return matte
 
 
-def _last(stages: Iterator[tuple[Step, np.ndarray]]) -> np.ndarray:
+def _last(stages: Iterator[tuple[Step | Each, np.ndarray]]) -> np.ndarray:
     """The image after the final stage (there must be one). Only the newest image is kept while the stages run: each
     step's input is freed once the next step has its output, unless something else still holds it."""
     return deque(stages, maxlen=1)[0][1]
 
 
-def _stages(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None) -> Iterator[tuple[Step, np.ndarray]]:
+def _stages(
+    out: np.ndarray, steps: Sequence[Step | Each], matte: np.ndarray | None, regions: Regions
+) -> Iterator[tuple[Step | Each, np.ndarray]]:
     """Run the steps in order, yielding each step with the image after it. The one place a step is applied."""
     for step in steps:
-        extra = {"matte": matte} if step.wants_matte else {}
-        result = registry.apply(step.effect, out, **step.params, **extra)
-        if result.shape != out.shape:
-            raise RuntimeError(f"effect {step.effect!r} changed the image shape {out.shape} -> {result.shape}")
-        if step.mask or step.opacity < 1.0 or step.blend_mode != "normal":
-            result = _blend(out, result, step, matte)
-        out = result
+        out = _apply(out, step, matte, regions)
         yield step, out
 
 
-def _blend(before: np.ndarray, after: np.ndarray, step: Step, matte: np.ndarray | None) -> np.ndarray:
-    """`after` laid over `before` by the step's blend mode, then mixed in by its opacity and mask. A function of its own
-    so that its weights, a third of a picture, are freed before the next step runs rather than kept by the generator."""
+def _apply(before: np.ndarray, step: Step | Each, matte: np.ndarray | None, regions: Regions) -> np.ndarray:
+    """`before` with the step's result laid over it. A function of its own, like `_lay`, so that what a step needs on
+    the way (the pieces' weights, a third of a picture or more) is freed before the next step runs."""
+    result = _each(before, step, matte, regions) if isinstance(step, Each) else _effect(before, step, matte, regions)
+    return _lay(before, result, step, regions)
+
+
+def _effect(before: np.ndarray, step: Step, matte: np.ndarray | None, regions: Regions) -> np.ndarray:
+    """The step's effect run on `before`, given the inputs it declares."""
+    extra: dict[str, np.ndarray] = {}
+    if step.wants_matte:
+        extra["matte"] = matte  # type: ignore[assignment]  # `_prepare` gave the matte every step that takes it
+    if step.partition:
+        extra["partition"] = regions.pieces(step.partition).labels
+    result = registry.apply(step.effect, before, **step.params, **extra)
+    if result.shape != before.shape:
+        raise RuntimeError(f"effect {step.effect!r} changed the image shape {before.shape} -> {result.shape}")
+    return result
+
+
+def _each(before: np.ndarray, step: Each, matte: np.ndarray | None, regions: Regions) -> np.ndarray:
+    """`before` with each piece of the step's partition replaced by its look: every look that has pieces is rendered
+    once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
+    pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
+    partition = regions.partition(step.each)
+    assignment = step.assignment(partition.count)
+    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather)
+    out = before.copy()
+    for look, weight in zip(step.looks, weights, strict=True):
+        if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered
+            out += weight[..., None] * (_apply(before, look, matte, regions) - before)
+    return np.clip(out, 0.0, 1.0, out=out)
+
+
+def _lay(before: np.ndarray, after: np.ndarray, step: Step | Each, regions: Regions) -> np.ndarray:
+    """`after` laid over `before` by the step's blend mode, then mixed in by its opacity and mask. The one place these
+    three are applied, for a step and for a look alike."""
+    if not (step.mask or step.opacity < 1.0 or step.blend_mode != "normal"):
+        return after
     alpha: np.floating | np.ndarray = np.float32(step.opacity)
     if step.mask:
-        # `_prepare` gave the matte every masked step needs
-        alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]  # type: ignore[index,operator]
+        alpha = alpha * regions.selection(step.mask).alpha[..., None]
     return composite(before, after, step.blend_mode, alpha)

@@ -92,7 +92,7 @@ def test_opacity_combines_with_a_mask(photo, matte):
 def test_a_step_key_is_read_from_the_file_onto_the_step_and_validated(tmp_path, key, good, bad):
     (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(good)}\n')).steps
     assert getattr(step, key) == good
-    assert key not in step.params
+    assert key not in step.runs[0].params
     with pytest.raises(ValueError, match=rf"step 1.*{key}.*{bad}"):
         load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(bad)}\n', "bad.toml"))
 

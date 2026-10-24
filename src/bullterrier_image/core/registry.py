@@ -59,14 +59,17 @@ CATEGORY_DESCRIPTIONS = {
 }
 CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
-# What a recipe hands an effect besides the image and its parameters, by name: the subject's silhouette, float32
-# (h, w) 0..1. An effect declares the ones it needs as keyword-only parameters after `params`, each with a default.
-INPUTS = ("matte",)
+# What a recipe hands an effect besides the image and its parameters, by name: `matte`, the subject's silhouette,
+# float32 (h, w) 0..1, and `partition`, the pieces of the region the step names with its `partition` key, int32 (h, w)
+# numbered 0..n-1 in reading order. An effect declares the ones it needs as keyword-only parameters after `params`,
+# each with a default.
+INPUTS = ("matte", "partition")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
-# effect, where it applies, how much of it shows, how it combines with the picture below it, and one of its presets.
+# effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
+# partition it draws, and (of a step that gives each piece of a partition its look, an `Each`) `each` and `looks`.
 # No effect parameter may take one of these names (nor an input's), so a key means the same in every step.
-STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset")
+STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset", "partition", "each", "looks")
 
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
 # never followed by a space; "e.g." and "i.e." are, so they are skipped.

@@ -24,7 +24,7 @@ Dependency direction: imports `params`, `presets` and `ops`; the steps and the r
 """
 
 import math
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -48,7 +48,10 @@ __all__ = [
     "Selection",
     "Shards",
     "as_partition",
+    "check",
     "look_weights",
+    "needs",
+    "needs_subject",
     "resolve",
 ]
 
@@ -243,10 +246,11 @@ class Shards(_Laid):
 
     @model_validator(mode="before")
     @classmethod
-    def _lay_preset_under(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """The values with the named preset's fields under them (the explicit ones win)."""
-        name = values.get("preset")
-        if not isinstance(name, str):  # not set, or not text: the field itself judges
+    def _lay_preset_under(cls, values: Any) -> Any:
+        """The values with the named preset's fields under them (the explicit ones win). Anything but a mapping with a
+        preset name (a declaration of another kind, tried by a union) is left for the model itself to judge."""
+        name = values.get("preset") if isinstance(values, dict) else None
+        if not isinstance(name, str):
             return values
         found = read("shards", cls, SHIPPED / "regions")  # type: ignore[arg-type]  # `read` caches by folder: hashable
         if name not in found:
@@ -404,14 +408,28 @@ def _type_of(name: str, declared: Mapping[str, Grid | Shards | Pick]) -> Literal
             return None
 
 
-def _needs(region: str, field: str, name: str, wanted: str, declared: Mapping[str, Grid | Shards | Pick]) -> None:
-    """RecipeError unless `name` (what `region`'s `field` refers to) is a region of the `wanted` kind."""
+def needs(
+    owner: str,
+    field: str,
+    name: str,
+    wanted: Literal["partition", "selection"] | None,
+    declared: Mapping[str, Grid | Shards | Pick],
+) -> None:
+    """RecipeError unless `name` (what `owner`'s `field` refers to, say "region 'glass'" or "step 2") is a region of
+    the `wanted` kind, or any region when `wanted` is None. The message names the owner, field and name and lists the
+    valid names (the built-in ones and those in `declared`)."""
     have = _type_of(name, declared)
-    if have == wanted:
+    if have is not None and wanted in (None, have):
         return
-    valid = ", ".join(other for other in (*BUILT_IN, *declared) if _type_of(other, declared) == wanted) or "none"
+    kind = wanted or "region"
+    valid = (
+        ", ".join(other for other in (*BUILT_IN, *declared) if wanted in (None, _type_of(other, declared))) or "none"
+    )
     problem = "which is no region" if have is None else f"a {have}, but it needs a {wanted}"
-    raise RecipeError(f"region {region!r}: `{field}` names {name!r}, {problem}; valid {wanted}s: {valid}")
+    hint = (
+        "" if declared else " (this recipe declares no regions of its own: add them with `regions=` or [region.NAME])"
+    )
+    raise RecipeError(f"{owner}: `{field}` names {name!r}, {problem}; valid {kind}s: {valid}{hint}")
 
 
 def _reference(kind: Grid | Shards | Pick) -> str | None:
@@ -449,6 +467,12 @@ class Regions(Mapping[str, Partition | Selection]):
             raise RecipeError(f"region {name!r} is a selection, but a partition is needed here")
         return region
 
+    def pieces(self, name: str) -> Partition:
+        """The region `name` as a partition: a partition as it is, a selection as `as_partition` splits it (KeyError
+        when there is none)."""
+        region = self[name]
+        return region if isinstance(region, Partition) else as_partition(region)
+
     def selection(self, name: str) -> Selection:
         """The region `name` as a selection; RecipeError when it is a partition (KeyError when there is none)."""
         region = self[name]
@@ -475,7 +499,9 @@ class Regions(Mapping[str, Partition | Selection]):
                     raise SubjectNotFoundError(
                         "a region needs the subject of the picture, but no subject finder was given"
                     )
-                matte = np.array(self._subject(), np.float32)
+                matte = np.asarray(
+                    self._subject(), np.float32
+                ).view()  # a view: frozen alone, the finder's array untouched
                 if matte.shape != self._shape:
                     raise SubjectNotFoundError(
                         f"the subject finder gave a matte of shape {matte.shape}, not {self._shape}"
@@ -512,6 +538,42 @@ class Regions(Mapping[str, Partition | Selection]):
         return (left, top, right, bottom), chosen
 
 
+def check(declared: Mapping[str, Grid | Shards | Pick]) -> None:
+    """RecipeError unless the declared regions are consistent: a `fit` names a selection, an `of` a partition, no name
+    is one of the built-ins and regions do not refer to each other in a cycle. Builds nothing, needs no picture; the
+    message names the region and lists the valid names."""
+    for name, kind in declared.items():
+        if name in BUILT_IN:
+            raise RecipeError(f"region {name!r} is a built-in region ({', '.join(BUILT_IN)}) and cannot be declared")
+        if isinstance(kind, Pick):
+            needs(f"region {name!r}", "of", kind.of, "partition", declared)
+        elif kind.fit is not None:
+            needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
+    for start in declared:
+        chain = [start]
+        while (ref := _reference(declared[chain[-1]])) is not None and ref in declared:
+            if ref in chain:
+                loop = " -> ".join(repr(each) for each in [*chain[chain.index(ref) :], ref])
+                raise RecipeError(f"regions refer to each other in a cycle: {loop}")
+            chain.append(ref)
+
+
+def needs_subject(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> bool:
+    """Whether making the regions `names` (checked ones, as `check` leaves them) needs the subject of the picture:
+    one of them is the built-in `subject` or `background`, or is laid over, or picked from, one that does."""
+    seen: set[str] = set()
+    todo = list(names)
+    while todo:
+        name = todo.pop()
+        if name in BUILT_IN:
+            return True
+        if name not in seen:
+            seen.add(name)
+            ref = _reference(declared[name])
+            todo += [] if ref is None else [ref]
+    return False
+
+
 def resolve(
     declared: Mapping[str, Grid | Shards | Pick],
     shape: tuple[int, int],
@@ -524,21 +586,7 @@ def resolve(
     `subject` finds the subject: a function returning its matte, float `(height, width)` in 0..1, called at most once
     and only if a region needs it (this module never loads a picture or a model); None when there is no finder.
 
-    Every reference is checked here, for all declared regions, whether asked for or not: a `fit` must name a selection,
-    an `of` a partition, a name may not be one of the built-ins, and regions may not refer to each other in a
-    cycle. RecipeError naming the region and the valid names."""
-    for name, kind in declared.items():
-        if name in BUILT_IN:
-            raise RecipeError(f"region {name!r} is a built-in region ({', '.join(BUILT_IN)}) and cannot be declared")
-        if isinstance(kind, Pick):
-            _needs(name, "of", kind.of, "partition", declared)
-        elif kind.fit is not None:
-            _needs(name, "fit", kind.fit, "selection", declared)
-    for start in declared:
-        chain = [start]
-        while (ref := _reference(declared[chain[-1]])) is not None and ref in declared:
-            if ref in chain:
-                loop = " -> ".join(repr(each) for each in [*chain[chain.index(ref) :], ref])
-                raise RecipeError(f"regions refer to each other in a cycle: {loop}")
-            chain.append(ref)
+    Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
+    naming the region and the valid names."""
+    check(declared)
     return Regions(declared, shape, subject)

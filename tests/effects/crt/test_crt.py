@@ -172,4 +172,4 @@ def test_a_recipe_file_can_set_every_control_of_the_screen(tmp_path: Path) -> No
         'name = "tube"\n[[step]]\neffect = "crt"\n' + "".join(f"{key} = {value}\n" for key, value in controls.items()),
         encoding="utf-8",
     )
-    assert load_recipe(recipe_file).steps[0].params == controls
+    assert load_recipe(recipe_file).steps[0].runs[0].params == controls

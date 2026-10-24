@@ -22,7 +22,10 @@ from bullterrier_image.core.regions import (
     Selection,
     Shards,
     as_partition,
+    check,
     look_weights,
+    needs,
+    needs_subject,
     resolve,
 )
 
@@ -503,6 +506,74 @@ def test_a_declaration_that_refers_wrongly_is_refused_naming_the_region_and_what
 def test_the_references_are_checked_even_for_regions_no_step_will_ask_for():
     with pytest.raises(RecipeError, match="unused"):
         resolve({"g": Grid(), "unused": Pick(of="missing")}, (20, 30), subject=None)
+
+
+NEEDS = {
+    "a selection where one is wanted": ("step 2", "mask", "head", "selection", True),
+    "a partition where one is wanted": ("step 2", "each", "panes", "partition", True),
+    "a built-in selection": ("step 2", "mask", "background", "selection", True),
+    "any region, a partition": ("step 2", "partition", "panes", None, True),
+    "any region, a selection": ("step 2", "partition", "head", None, True),
+    "a partition where a selection is wanted": ("step 2", "mask", "panes", "selection", False),
+    "a selection where a partition is wanted": ("step 2", "each", "head", "partition", False),
+    "no such region": ("step 2", "mask", "nope", "selection", False),
+}
+
+
+@pytest.mark.parametrize(("owner", "field", "name", "wanted", "fine"), NEEDS.values(), ids=NEEDS.keys())
+def test_needs_accepts_a_region_of_the_wanted_kind_and_otherwise_names_the_owner_field_and_valid_names(
+    owner, field, name, wanted, fine
+):
+    declared: dict[str, Grid | Shards | Pick] = {"panes": Grid(columns=2), "head": Pick(of="panes", pieces=[1])}
+    if fine:
+        needs(owner, field, name, wanted, declared)
+        return
+    with pytest.raises(RecipeError, match=rf"^{owner}: `{field}` names '{name}'.*valid .*s: ") as raised:
+        needs(owner, field, name, wanted, declared)
+    listed = str(raised.value).split("valid ", 1)[1]
+    assert ("panes" in listed) == (wanted != "selection")  # only the regions of the wanted kind are listed
+    assert ("head" in listed) == (wanted != "partition")
+
+
+def test_check_refuses_what_resolve_refuses_without_needing_a_picture():
+    check({"g": Grid(), "p": Pick(of="g")})
+    with pytest.raises(RecipeError, match=r"'p'.*'gone'"):
+        check({"p": Pick(of="gone")})
+
+
+NEEDS_SUBJECT = {
+    "nothing asked": ([], False),
+    "a grid": (["grid"], False),
+    "a pick of a grid": (["pick"], False),
+    "the subject itself": (["subject"], True),
+    "the background": (["background"], True),
+    "shards laid over the subject": (["shards_on_subject"], True),
+    "a pick of a grid laid over the subject": (["grid_on_subject", "grid"], True),
+    "a region and, among others, one that does": (["grid", "shards_on_subject"], True),
+    "a region laid over a pick of a grid": (["over_pick"], False),
+    "a region two steps away from the subject": (["far"], True),
+}
+
+
+@pytest.mark.parametrize(("names", "expected"), NEEDS_SUBJECT.values(), ids=NEEDS_SUBJECT.keys())
+def test_regions_need_the_subject_when_they_are_made_from_it_however_indirectly(names, expected):
+    regions = {
+        **declared(),
+        "over_pick": Shards(fit="pick"),
+        "inner": Grid(fit="subject"),
+        "pick_inner": Pick(of="inner"),
+        "far": Shards(fit="pick_inner"),
+    }
+    check(regions)
+    assert needs_subject(regions, names) is expected
+
+
+def test_a_selection_asked_for_as_pieces_is_split_and_a_partition_is_kept():
+    regions = resolve({"g": Grid(columns=2)}, (4, 6), subject=finder((4, 6)))
+    assert regions.pieces("g") is regions.partition("g")
+    split = regions.pieces("subject")
+    assert split.count == 2
+    np.testing.assert_array_equal(split.labels, as_partition(regions.selection("subject")).labels)
 
 
 # ---- the models ----------------------------------------------------------------------------------------------------

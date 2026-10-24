@@ -122,6 +122,19 @@ def layer_probe(throwaway_effects):
 
 
 @pytest.fixture
+def partition_probe(throwaway_effects):
+    """Registers `partition_probe`, an effect that takes the injected input `partition` (int32 labels, one per pixel):
+    it returns a grey picture of `label / 255`, so its output shows which piece each pixel was given."""
+
+    def partition_probe(rgb: np.ndarray, params: ProbeParams, *, partition: np.ndarray | None = None) -> np.ndarray:
+        """Paints each pixel with its piece number over 255."""
+        assert partition is not None
+        return np.repeat((partition / 255).astype(np.float32)[..., None], 3, axis=2)
+
+    return effect(category="utilities", params=ProbeParams)(partition_probe)
+
+
+@pytest.fixture
 def throwaway_effects():
     """Lets a test register effects of its own: whatever it registered is removed again afterwards, even if the test
     fails, so no other test ever sees it."""

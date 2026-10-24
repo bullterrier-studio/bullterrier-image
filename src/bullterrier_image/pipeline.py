@@ -488,8 +488,10 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
 
 
 def _picture_digests(recipe: Recipe) -> list[str]:
-    """The content digest of every picture the recipe's steps hold, in step order."""
-    return [v.digest for step in recipe.steps for v in step.params.values() if isinstance(v, Picture)]
+    """The content digest of every picture the recipe's steps (and the looks of its `Each` steps) hold, in order."""
+    return [
+        v.digest for step in recipe.steps for run in step.runs for v in run.params.values() if isinstance(v, Picture)
+    ]
 
 
 def _fingerprint(*parts: str) -> str:
