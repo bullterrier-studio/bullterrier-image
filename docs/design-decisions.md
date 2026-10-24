@@ -22,6 +22,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   (`tests/effects/<name>/`), its example and picture live outside the package. *Reason:* a pure function is trivially
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
   each other; shared numeric code goes to `ops/`, named by concept.
+- **A second picture is an asset: a parameter whose value is a picture** (decided, not built yet). An effect that uses a
+  file of its own (a texture to blend, a logo, the photo inside a double exposure, a colour reference, a displacement
+  map) declares a `Picture` field. A recipe file writes a path, relative to the recipe file, and the recipe reader reads
+  it with `imageio` once, when the recipe is loaded; Python passes a path or an array. The effect receives an RGBA
+  float32 picture at its own size and places it itself (cover, tile, anchor and scale are its own parameters), because
+  a logo, a texture and a colour reference are placed differently. *Reason:* the core and the effects never see a file
+  or a folder, `imageio` stays the only reader of pictures, a missing file fails at load naming the step and the path,
+  and video can pass a new array for every frame. Combining several photos as equals (`collage`, `transition`,
+  `morph`, side by side) is not an asset: it needs several inputs or a canvas of its own, so it belongs to video or a
+  layout package, and before/after is the `compare` command. *Consequence:* the recipe reader moves from `core` to the
+  adapters layer, beside `imageio`; the pipeline's fingerprint covers each asset's content, not only the recipe text;
+  a loaded picture counts toward the memory budget; another kind of asset file (a `.cube` LUT, a folder of tiles) gets
+  its own value type and reader in the adapters layer together with its first effect.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
   point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing
@@ -107,6 +120,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   own `opacity` when it means that effect's own element (the brightness of a particle, the share a soft focus replaces);
   the two multiply. *Reason:* one place for the general blend, standard names for the specific one. *Consequence:*
   never add an effect parameter that only mixes the effect's result with the picture.
+- **Size changes frame the photo before the steps; transparency is cut after them** (decided, not built yet). A
+  recipe's framing (flip, rotate, crop to an aspect around the subject or an anchor, pad, then `size`, always in that
+  order) is applied by the runner to the photo and the subject matte together, before the first step. A recipe's
+  transparency (`background`: the subject matte becomes the alpha; `circle`; `rounded` with a corner radius) is applied
+  after the last step. Effects keep the same-shape RGB contract. *Reason:* cropping and rotating decide which picture
+  the look is applied to (a vignette is centred on the final crop), and a masked step after them needs a matte that
+  moved with the photo; one module that owns the geometry of both keeps it out of every effect, where shape-changing
+  effects would each have to transform the matte as well. A fixed order is a decision made once instead of a setting.
+  *Consequence:* `crop`, `smart_crop`, `resize`, `pad`, `rotate`, `flip` and `avatar` are recipe settings, not effects,
+  their fields documented like effect parameters (enlarging by interpolation is a `size` above the photo's own);
+  `render` returns RGBA (h, w, 4) when the recipe asks for transparency, and a project that exports such a recipe to
+  JPEG fails when it is loaded; a frame that needs a canvas larger than the photo (polaroid, film strip) belongs to a
+  layout package; a border drawn inside the picture's edge is an ordinary effect.
 - **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
@@ -121,13 +147,21 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **`imageio` is the only module that knows file formats**, EXIF rotation, colour profiles and 8-bit conversion.
   *Consequence:* everything else works on one in-memory image type.
 
-## Finding the subject
+## Finding the subject and depth
 
 - **Two backends behind one function**, `subject_matte(rgb)`: Apple Vision on macOS (built in, no download) and IS-Net on
   ONNX Runtime everywhere else; `--matte` (or `matte=`) skips both. *Reason:* the best cut-out per platform without making
   the core depend on either. *Consequence:* the portable model (about 180 MB) is downloaded on first use into the user's
   cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
   copy for offline use.
+- **Depth is injected like the subject** (decided, not built yet). An effect that needs distance (`depth_of_field`,
+  `parallax`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth map or a
+  function that finds one, and the public API binds the default: a monocular depth model on ONNX Runtime (Depth
+  Anything V2 Small, for its Apache-2.0 licence, to be confirmed when it is built), downloaded and verified like the
+  portable subject model; `--depth` (or `depth=`) takes a map you already have. *Reason:* the matte's shape keeps the
+  engine testable without a model and lets a phone's own depth map or a better model replace the default without
+  touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is found at most once per
+  photo and cached like the matte.
 
 ## Determinism
 

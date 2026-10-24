@@ -1,4 +1,4 @@
-# A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (decision D1).
+# A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (the sepia preset of gradient_map).
 name = "newsprint"
 size = 768
 

@@ -53,7 +53,7 @@ recipes.
 | `glow` ✓ | Soft bloom around highlights. | `fx.glow(radius=28)` |
 | `sharpen` ✓ | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
 | `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
-| `denoise` | Median, bilateral or non-local-means. | `fx.denoise(method="bilateral", amount=0.4)` |
+| `denoise` | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
 | `shadows_highlights` ✓ | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
 | `dehaze` ✓ | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
 | `tone_map` ✓ | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
@@ -72,7 +72,7 @@ recipes.
 | `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
 | `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
-| `depth_of_field` | Blur by distance from a depth map. | `fx.depth_of_field(focus=0.4)` |
+| `depth_of_field` | Blur by distance, from the injected depth (a model, or a map you supply). | `fx.depth_of_field(focus=0.4)` |
 
 ## Texture and finish
 
@@ -87,13 +87,14 @@ recipes.
 | `bump_light` ✓ | Light a height map from a direction. | `fx.bump_light(angle=45, height=8)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
-| `border` | Solid or rounded border. | `fx.border(width=24, color="#fff", radius=12)` |
+| `border` | Solid or rounded border, drawn inside the picture's edge. | `fx.border(width=24, color="#fff", radius=12)` |
 | `crt` | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.1, mask=0.4)` |
 | `vhs` | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.4, bleed=3)` |
 | `ntsc` | Chroma smear and dot crawl. | `fx.ntsc(bleed=4)` |
-| `polaroid_frame` | Instant-film frame with caption space. | `fx.polaroid_frame(caption="2026")` |
-| `film_strip_frame` | 35 mm frame with sprocket holes. | `fx.film_strip_frame()` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
+
+Frames that need a canvas larger than the photo (a polaroid with caption space, a 35 mm strip with sprocket holes)
+belong to a layout package, not here.
 
 ## Stylised looks
 
@@ -187,18 +188,23 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `droste` | Recursive picture-in-picture spiral. | `fx.droste(scale=0.4)` |
 | `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
 
-**Changing the picture's size**
+**Changing the picture's size and shape**
 
-| Effect | What it does | Example |
+These are settings of the recipe, not effects (see "Size changes frame the photo before the steps" in the
+[design decisions](design-decisions.md)): framing runs before the first step, on the photo and the subject matte
+together, always in the order flip, rotate, crop, pad, size; transparency is cut after the last step.
+
+| Setting | What it does | Example |
 | --- | --- | --- |
-| `crop` | Crop to a box or aspect ratio. | `fx.crop(aspect="1:1", anchor="subject")` |
-| `smart_crop` | Crop around the subject or the salient region. | `fx.smart_crop(aspect="4:5", margin=0.1)` |
-| `resize` | Scale, with a fit mode. | `fx.resize(width=1080, fit="cover")` |
-| `pad` | Extend the canvas with a colour. | `fx.pad(top=80, color="#000")` |
-| `rotate` | Rotate, with fill or crop to fit. | `fx.rotate(angle=3, fit="crop")` |
-| `flip` | Mirror the whole picture. | `fx.flip(axis="x")` |
-| `circle_crop` | Circular avatar with transparency. | `fx.circle_crop()` |
-| `rounded_corners` | Rounded rectangle with transparency. | `fx.rounded_corners(radius=40)` |
+| crop | Crop to a box or aspect ratio. | `aspect = "1:1"`, `anchor = "subject"` |
+| smart crop | Crop around the subject with a margin. | `aspect = "4:5"`, `anchor = "subject"`, `margin = 0.1` |
+| resize | Scale, with a fit mode (today's `size`). | `size = 1080` |
+| pad | Extend the canvas with a colour. | `pad_top = 80`, `pad_color = "#000"` |
+| rotate | Rotate, with fill or crop to fit. | `rotate = 3`, `rotate_fit = "crop"` |
+| flip | Mirror the whole picture. | `flip = "x"` |
+| transparent background | The subject on transparency. | `transparent = "background"` |
+| circle crop | Circular avatar with transparency. | `transparent = "circle"` |
+| rounded corners | Rounded rectangle with transparency. | `transparent = "rounded"`, `corner_radius = 40` |
 
 ## Glitch and signal damage
 
@@ -256,17 +262,18 @@ Use the subject cut-out, so they target the subject or the background.
 
 ## Compositing
 
-Combine the photo with other images, text and blend modes.
+Combine the photo with an asset (a picture that is part of the look, given as a `Picture` parameter), text and blend
+modes.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `blend` | Combine with another layer in any blend mode. | `fx.blend(image="tex.png", mode="overlay", opacity=0.4)` |
+| `blend` | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(image="tex.png", mode="overlay", opacity=0.4)` |
 | `overlay` | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom-right", scale=0.15)` |
 | `gradient_overlay` | Linear, radial or conic colour wash. | `fx.gradient_overlay(["#f0f","#0ff"], kind="linear", mode="screen")` |
 | `text` | Render text with font, outline and shadow. | `fx.text("BULLTERRIER", size=0.08, at="bottom")` |
-| `split_screen` | Before/after or side by side. | `fx.split_screen(vertical=True)` |
-| `collage` | Several recipes' results in one layout. | `fx.collage(columns=3)` |
-| `transition` | Between two images: dissolve, wipe, glitch, pixel. | `fx.transition(to="b.jpg", kind="pixel", progress=0.5)` |
+
+Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a
+canvas of its own, so it belongs to video or a layout package; before/after side by side is the `compare` command.
 
 ## Generated backgrounds
 
@@ -290,8 +297,8 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `auto_enhance` | Sensible levels, white balance and vibrance in one step. | `fx.auto_enhance()` |
-| `avatar` | Square crop on the subject, optional circle. | `fx.avatar(size=512, shape="circle")` |
-| `upscale` | Lanczos, or an optional AI model. | `fx.upscale(factor=2)` |
+| `avatar` | Square crop on the subject, optional circle: a recipe of framing and transparency settings. | `aspect = "1:1"`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
+| `upscale` | Lanczos (a `size` above the photo's own), or an optional AI model. | `size = 4096` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
 | `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml glitch.split 0..20` |
 | `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
@@ -316,11 +323,11 @@ no time of its own.
 | `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=0.5)` |
 | `melt_down` | Drips run down and pool. | `fx.melt_down(progress=0.5)` |
 | `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=0.5)` |
-| `parallax` | 2.5D depth shift from a depth map or layers. | `fx.parallax(amount=0.03)` |
-| `morph` | Blend two photos with optical flow. | `fx.morph(to="b.jpg", progress=0.5)` |
+| `parallax` | 2.5D depth shift, from the injected depth. | `fx.parallax(amount=0.03)` |
 
-Effects that need time or several frames (`flicker`, `breathe`, `camera_shake`, `ken_burns`, `trails`, `slit_scan`) and
-animated values (ramps, easing, keyframes) do not belong here: they are for the video and control packages.
+Effects that need time, several frames or two shots (`flicker`, `breathe`, `camera_shake`, `ken_burns`, `trails`,
+`slit_scan`, `morph`) and animated values (ramps, easing, keyframes) do not belong here: they are for the video and
+control packages.
 
 ## Signature looks
 
@@ -337,4 +344,4 @@ What combining effects can give, once the pieces exist:
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with decision D2, Turn to dust with batch 12).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with the first `Picture` effect, Turn to dust with batch 12).
