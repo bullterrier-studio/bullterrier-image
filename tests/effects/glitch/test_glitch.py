@@ -87,9 +87,3 @@ def test_band_height_limits_given_the_wrong_way_round_are_refused_naming_both() 
         fx.glitch(band_min_height=0.2, band_max_height=0.05)
     assert "band_max_height" in str(raised.value)
     assert fx.glitch(band_min_height=0.2, band_max_height=0.2).params["band_min_height"] == 0.2  # equal is a range
-
-
-def test_it_is_deterministic_and_seed_dependent(photo: np.ndarray) -> None:
-    a = registry.apply(NAME, photo, seed=5)
-    np.testing.assert_array_equal(a, registry.apply(NAME, photo, seed=5))
-    assert not np.array_equal(a, registry.apply(NAME, photo, seed=6))

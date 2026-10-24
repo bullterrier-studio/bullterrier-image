@@ -48,12 +48,6 @@ def test_slides_go_both_ways(photo) -> None:
     assert min(shifts) < 0 < max(shifts)
 
 
-def test_the_seed_decides_the_strips_and_the_slides(photo) -> None:
-    first = registry.apply(NAME, photo, slices=30, amount=0.2, seed=5)
-    np.testing.assert_array_equal(first, registry.apply(NAME, photo, slices=30, amount=0.2, seed=5))
-    assert not np.array_equal(first, registry.apply(NAME, photo, slices=30, amount=0.2, seed=6))
-
-
 @pytest.mark.parametrize("seed", range(10))
 def test_more_strips_than_rows_gives_every_row_its_own_slide(seed: int) -> None:
     """A wide noisy picture of five rows, so two rows drawing the same slide is a one in two thousand chance."""

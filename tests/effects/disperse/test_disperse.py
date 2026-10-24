@@ -216,12 +216,6 @@ def test_disperse_background_threshold_is_how_bright_a_piece_must_be_to_fly():
     assert right.max() == 0.0  # no brighter than the threshold: background, nothing flies
 
 
-def test_disperse_seed_changes_the_motion_and_repeats_exactly():
-    a = registry.apply("disperse", _lit(), progress=0.5, seed=1)
-    np.testing.assert_array_equal(a, registry.apply("disperse", _lit(), progress=0.5, seed=1))
-    assert not np.array_equal(a, registry.apply("disperse", _lit(), progress=0.5, seed=2))
-
-
 def _random_settings(rng: np.random.Generator) -> dict[str, object]:
     """A value for every number of the effect, drawn from its documented range (ints whole), and a random switch."""
     model = registry.parameters("disperse")

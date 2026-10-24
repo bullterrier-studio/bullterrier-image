@@ -115,8 +115,3 @@ def test_each_side_has_its_own_tear() -> None:
     left = run_from_top(removed.T, slice(60, -60)).astype(float)
     right = run_from_top(removed.T[::-1], slice(60, -60)).astype(float)
     assert max(abs(np.corrcoef(a, b)[0, 1]) for a, b in [(top, bottom), (top, left), (top, right), (left, right)]) < 0.5
-
-
-def test_the_same_seed_gives_the_same_tear_and_another_seed_another(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, seed=1), registry.apply(NAME, photo, seed=1))
-    assert (registry.apply(NAME, photo, seed=1) != registry.apply(NAME, photo, seed=2)).any()

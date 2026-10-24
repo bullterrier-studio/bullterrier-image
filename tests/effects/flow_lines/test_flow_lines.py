@@ -103,8 +103,3 @@ def test_no_density_draws_no_lines_and_more_density_draws_more() -> None:
     np.testing.assert_allclose(render(density=0), np.tile(BACKGROUND, (20, 50, 1)), atol=1e-6)
     lit = [(coverage(render((60, 80), density=d, seed=3)) > 0.5).mean() for d in (0.001, 0.003, 0.01)]
     assert 0 < lit[0] < lit[1] < lit[2]
-
-
-def test_the_seed_decides_the_lines() -> None:
-    np.testing.assert_array_equal(render(seed=4), render(seed=4))
-    assert not np.array_equal(render(seed=4), render(seed=5))

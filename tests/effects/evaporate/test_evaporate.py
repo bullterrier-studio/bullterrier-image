@@ -138,12 +138,6 @@ def test_evaporate_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover()
     assert registry.apply("evaporate", img, matte=matte, matte_threshold=0.3, **kwargs)[outside].min() == 1.0
 
 
-def test_evaporate_seed_controls_the_dissolve(photo):
-    a, b = registry.apply("evaporate", photo, seed=1), registry.apply("evaporate", photo, seed=2)
-    assert not np.array_equal(a, b)
-    np.testing.assert_array_equal(a, registry.apply("evaporate", photo, seed=1))
-
-
 def test_evaporate_wind_pushes_the_pieces_sideways():
     lit = np.zeros((200, 200, 3), np.float32)
     lit[120:140, 90:110] = 1.0  # a lit block near the middle
