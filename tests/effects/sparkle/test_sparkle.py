@@ -30,12 +30,6 @@ def glint(**settings: float) -> np.ndarray:
     return light_of(registry.apply(NAME, rgb, count=1, threshold=0.5, **settings), rgb)
 
 
-def test_no_sparkles_leave_the_picture_unchanged(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, count=0, threshold=0.0)
-    np.testing.assert_array_equal(out, photo)
-    assert not np.shares_memory(out, photo)
-
-
 @pytest.mark.parametrize(
     ("threshold", "value", "sparkles"),
     [
@@ -134,11 +128,3 @@ def test_sparkles_only_add_light_and_never_darken(photo: np.ndarray) -> None:
     out = registry.apply(NAME, photo, count=200, threshold=0.3, seed=2)
     assert (out >= photo).all()
     assert (out > photo).any()
-
-
-def test_the_same_seed_gives_the_same_sparkles_and_another_seed_other_sparkles(photo: np.ndarray) -> None:
-    settings = {"count": 30, "threshold": 0.5}
-    np.testing.assert_array_equal(
-        registry.apply(NAME, photo, seed=1, **settings), registry.apply(NAME, photo, seed=1, **settings)
-    )
-    assert (registry.apply(NAME, photo, seed=1, **settings) != registry.apply(NAME, photo, seed=2, **settings)).any()

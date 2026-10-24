@@ -1,5 +1,7 @@
 """Behaviour of the `embers` effect: glowing sparks that rise, each trailing a short streak."""
 
+from functools import partial
+
 import numpy as np
 import pytest
 from scipy import ndimage
@@ -11,29 +13,16 @@ SIZE = 160
 WHITE = {"color": "#ffffff", "opacity": 1.0}
 
 
-def black(size: int = SIZE) -> np.ndarray:
-    return np.zeros((size, size, 3), np.float32)
-
-
 def light(settings: dict, size: int = SIZE) -> np.ndarray:
     """The light the sparks add to a black picture, (h, w) in 0..1 (white sparks at full opacity unless `settings` say
     otherwise, so red is the light itself)."""
-    return registry.apply(NAME, black(size), **{**WHITE, **settings})[..., 0]
+    return registry.apply(NAME, np.zeros((size, size, 3), np.float32), **{**WHITE, **settings})[..., 0]
 
 
-def lone_ember(seed: int, **settings: float) -> np.ndarray:
-    """The light of the single spark of the first seed from `seed` on that is not cut off by the picture's edge."""
-    for candidate in range(seed, seed + 50):
-        ember = light({"count": 1, "seed": candidate, **settings})
-        if ember[0].max() == 0 == ember[-1].max() == ember[:, 0].max() == ember[:, -1].max():
-            return ember
-    raise AssertionError("every one of 50 seeds put the spark on the picture's edge")
-
-
-def test_no_embers_leave_the_picture_unchanged(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, count=0)
-    np.testing.assert_array_equal(out, photo)
-    assert not np.shares_memory(out, photo)
+@pytest.fixture
+def lone_ember(lone_particle):
+    """`lone_ember(seed, **settings)`: the light of one spark, not cut off by the picture's edge."""
+    return partial(lone_particle, light, count=1)
 
 
 @pytest.mark.parametrize("size", [200, 400])
@@ -50,7 +39,7 @@ def test_more_embers_touch_more_of_the_picture() -> None:
 
 
 @pytest.mark.parametrize("angle", [0.0, 15.0, 35.0, -25.0])
-def test_a_spark_drifts_by_the_angle_from_straight_up_trailing_the_other_way(angle: float) -> None:
+def test_a_spark_drifts_by_the_angle_from_straight_up_trailing_the_other_way(angle: float, lone_ember) -> None:
     """Rising, the spark moves tan(angle) px sideways per row up (to the right for a positive angle), so down the
     picture its streak moves -tan(angle) px per row."""
     streak = lone_ember(3, angle=angle, length=60.0, size=3.0)
@@ -59,7 +48,7 @@ def test_a_spark_drifts_by_the_angle_from_straight_up_trailing_the_other_way(ang
     assert np.polyfit(rows, column, 1)[0] == pytest.approx(-np.tan(np.radians(angle)), abs=0.01)
 
 
-def test_a_spark_is_longer_wider_and_brighter_by_the_same_depth() -> None:
+def test_a_spark_is_longer_wider_and_brighter_by_the_same_depth(lone_ember) -> None:
     """A near spark has the full `size`, `length` and `opacity`, a far one half of each; so with s the share of any one
     of them, the streak spans (length + size) x s rows, is size x s wide at brightness opacity x s: peak = s, and the
     light across a row = size x s x s."""
@@ -78,46 +67,16 @@ def test_a_spark_is_longer_wider_and_brighter_by_the_same_depth() -> None:
     assert max(depths) - min(depths) > 0.2  # the depth differs from spark to spark
 
 
-def test_without_length_a_spark_is_a_round_dot() -> None:
+def test_without_length_a_spark_is_a_round_dot(lone_ember) -> None:
     dot = lone_ember(1, length=0.0, size=10.0)
     rows, columns = np.nonzero(dot)
     assert rows.max() - rows.min() == columns.max() - columns.min()
 
 
-def test_a_softer_spark_has_a_wider_ramp_from_full_brightness_to_none() -> None:
+def test_a_softer_spark_has_a_wider_ramp_from_full_brightness_to_none(lone_ember) -> None:
     def ramp_pixels(softness: float) -> int:
         spark = lone_ember(2, size=30.0, length=0.0, softness=softness)
         return int(((spark > 0.05 * spark.max()) & (spark < 0.95 * spark.max())).sum())
 
     widths = [ramp_pixels(softness) for softness in (0.0, 0.5, 1.0)]
     assert widths[0] * 2 < widths[1] < widths[2]
-
-
-def test_the_color_tints_the_light_and_the_opacity_scales_it() -> None:
-    warm = registry.apply(NAME, black(), count=40, color="#ff8000", opacity=1.0, seed=1)
-    assert warm[..., 0].max() > 0.5
-    np.testing.assert_allclose(warm[..., 1], warm[..., 0] * 128 / 255, atol=0.003)  # green is 0x80 of red's 0xff
-    assert warm[..., 2].max() == 0
-    half = registry.apply(NAME, black(), count=40, color="#ff8000", opacity=0.5, seed=1)
-    np.testing.assert_allclose(half, warm / 2, atol=1e-6)
-
-
-def test_embers_are_screened_over_the_picture_so_they_only_lighten_it() -> None:
-    """Screen over mid grey 0.5 with light l gives 1 - (1 - 0.5)(1 - l) = 0.5 + 0.5 l, and over white stays white."""
-    grey = registry.apply(NAME, np.full((SIZE, SIZE, 3), 0.5, np.float32), count=60, seed=3, **WHITE)
-    np.testing.assert_allclose(grey[..., 0], 0.5 + 0.5 * light({"count": 60, "seed": 3}), atol=1e-6)
-    white = np.ones((SIZE, SIZE, 3), np.float32)
-    np.testing.assert_array_equal(registry.apply(NAME, white, count=60, seed=3, **WHITE), white)
-
-
-@pytest.mark.parametrize("shape", [(60, 240), (240, 60)], ids=["wide", "tall"])
-def test_the_embers_are_spread_over_the_whole_of_a_wide_or_a_tall_picture(shape: tuple[int, int]) -> None:
-    lit = registry.apply(NAME, np.zeros((*shape, 3), np.float32), count=300, seed=1)[..., 0] > 0
-    for axis in (0, 1):  # the picture's rows, then its columns: every third of them holds some embers
-        thirds = np.array_split(lit.any(axis=1 - axis), 3)
-        assert all(third.any() for third in thirds)
-
-
-def test_the_same_seed_gives_the_same_embers_and_another_seed_other_embers(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, seed=1), registry.apply(NAME, photo, seed=1))
-    assert (registry.apply(NAME, photo, seed=1) != registry.apply(NAME, photo, seed=2)).any()

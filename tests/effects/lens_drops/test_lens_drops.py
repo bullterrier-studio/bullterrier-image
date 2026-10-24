@@ -39,12 +39,6 @@ def drop_of(
     raise AssertionError("every one of 100 seeds put the drop near the edge")
 
 
-def test_no_drops_leave_the_picture_unchanged(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, count=0)
-    np.testing.assert_array_equal(out, photo)
-    assert not np.shares_memory(out, photo)
-
-
 @pytest.mark.parametrize("refraction", [0.5, 1.0, 2.0, 3.0])
 def test_a_drop_shows_the_scene_upside_down_refraction_times_as_wide(refraction: float) -> None:
     """Inside a drop the picture is read at the centre minus `refraction` times each pixel's offset from it, so a ramp
@@ -164,8 +158,3 @@ def test_a_highlight_brightens_the_upper_rim_of_a_drop_and_leaves_its_middle_and
 def test_a_flat_picture_stays_flat_without_a_highlight() -> None:
     flat = np.full((60, 60, 3), 0.4, np.float32)
     np.testing.assert_allclose(registry.apply(NAME, flat, count=5, seed=1, highlight=0.0), 0.4, atol=1e-6)
-
-
-def test_the_same_seed_gives_the_same_drops_and_another_seed_other_drops(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, seed=1), registry.apply(NAME, photo, seed=1))
-    assert (registry.apply(NAME, photo, seed=1) != registry.apply(NAME, photo, seed=2)).any()

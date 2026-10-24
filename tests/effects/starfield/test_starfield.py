@@ -1,5 +1,6 @@
 """Behaviour of the `starfield` effect: a generated sky of stars that replaces the picture and keeps only its size."""
 
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -18,13 +19,10 @@ def stars(side: int = SIZE, **settings: Any) -> np.ndarray:
     return registry.apply(NAME, np.zeros((side, side, 3), np.float32), **{**BLACK_SKY, **settings})[..., 0]
 
 
-def lone_star(seed: int, **settings: Any) -> np.ndarray:
-    """The light of the single star of the first seed from `seed` on that is not cut off by the picture's edge."""
-    for candidate in range(seed, seed + 50):
-        star = stars(count=1, seed=candidate, **settings)
-        if star[0].max() == 0 == star[-1].max() == star[:, 0].max() == star[:, -1].max():
-            return star
-    raise AssertionError("every one of 50 seeds put the star on the picture's edge")
+@pytest.fixture
+def lone_star(lone_particle):
+    """`lone_star(seed, **settings)`: the light of one star, not cut off by the picture's edge."""
+    return partial(lone_particle, lambda settings: stars(**settings), count=1)
 
 
 def test_with_no_stars_the_sky_is_one_flat_colour() -> None:
@@ -40,7 +38,7 @@ def test_count_stars_are_made_whatever_the_size_of_the_picture(side: int) -> Non
     assert patches == pytest.approx(40, abs=3)  # a few may touch
 
 
-def test_a_star_is_a_dot_as_wide_and_as_bright_as_its_depth() -> None:
+def test_a_star_is_a_dot_as_wide_and_as_bright_as_its_depth(lone_star) -> None:
     """With depth d a star's scale is s = 1 - d x u for u random in 0..1, so from 1 - d to 1: it is `size` x s wide and
     s bright (so the nearest, s = 1, are the biggest and brightest)."""
     peaks = []
@@ -87,8 +85,3 @@ def test_stars_are_screened_over_the_sky_so_they_never_make_it_darker() -> None:
         NAME, np.zeros((SIZE, SIZE, 3), np.float32), count=200, sky="#808080", color="#ffffff", seed=4
     )
     np.testing.assert_allclose(grey[..., 0], (128 / 255) + (1 - 128 / 255) * stars(count=200, seed=4), atol=1e-6)
-
-
-def test_the_same_seed_gives_the_same_stars_and_another_seed_other_stars() -> None:
-    np.testing.assert_array_equal(stars(seed=1), stars(seed=1))
-    assert (stars(seed=1) != stars(seed=2)).any()

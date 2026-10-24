@@ -4,7 +4,7 @@ categories, every parameter across its documented range, and a time and memory b
 import itertools
 import time
 import tracemalloc
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pytest
@@ -440,6 +440,111 @@ def test_each_interpolation_reads_the_picture_its_own_way(name):
     outs = {choice: registry.apply(name, noise, interpolation=choice) for choice in choices}
     for first, second in itertools.combinations(choices, 2):
         assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"
+
+
+SEED_NEEDS = {"disperse": {"progress": 0.5}}  # at its default progress nothing has moved yet, whatever the seed
+
+
+def _assert_the_seed_decides_the_picture(name: str, photo: np.ndarray) -> None:
+    settings = SEED_NEEDS.get(name, {})
+    first = registry.apply(name, photo, seed=1, **settings)
+    np.testing.assert_array_equal(first, registry.apply(name, photo, seed=1, **settings))
+    assert (first != registry.apply(name, photo, seed=2, **settings)).any()
+
+
+@pytest.mark.parametrize("name", [name for name in ALL if "seed" in registry.parameters(name).model_fields])
+def test_the_same_seed_gives_the_same_picture_and_another_seed_another(name, photo):
+    _assert_the_seed_decides_the_picture(name, photo)
+
+
+class _SeedProbeParams(EffectParams):
+    """A seed and nothing else."""
+
+    seed: int = param(0, unit="count", min=0, max=9, doc="Ignored by the probes.")
+
+
+@pytest.mark.parametrize("probe", ["ignores_its_seed", "is_unseeded"])
+def test_the_seed_check_flags_an_effect_that_ignores_its_seed_or_is_not_deterministic(probe, photo, throwaway_effects):
+    @effect(category="utilities", params=_SeedProbeParams)
+    def ignores_its_seed(rgb, params):
+        """Never random."""
+        return rgb
+
+    @effect(category="utilities", params=_SeedProbeParams)
+    def is_unseeded(rgb, params):
+        """Random, but not from its seed."""
+        return rgb + np.random.default_rng().random(rgb.shape, dtype=np.float32) * 0.01
+
+    with pytest.raises(AssertionError):
+        _assert_the_seed_decides_the_picture(probe, photo)
+
+
+# --- the effects that scatter particles of light -----------------------------------------------------------------
+
+# effect: the settings that make it draw many white particles at full opacity (snow has no colour of its own)
+PARTICLES: dict[str, dict[str, Any]] = {
+    "embers": {"count": 300, "color": "#ffffff", "opacity": 1.0},
+    "floating_dust": {"count": 300, "color": "#ffffff", "opacity": 1.0},
+    "rain": {"density": 3.0, "color": "#ffffff", "opacity": 1.0},
+    "snow": {"density": 3.0, "opacity": 1.0},
+}
+TINTED = ["embers", "floating_dust", "rain"]
+
+
+@pytest.mark.parametrize(
+    ("name", "none"),
+    [
+        pytest.param("embers", {"count": 0}, id="embers"),
+        pytest.param("floating_dust", {"count": 0}, id="floating_dust"),
+        pytest.param("rain", {"density": 0.0}, id="rain"),
+        pytest.param("rain", {"density": 0.0, "color": "#e6eefa"}, id="rain, tinted"),
+        pytest.param("snow", {"density": 0.0}, id="snow"),
+        pytest.param("sparkle", {"count": 0, "threshold": 0.0}, id="sparkle"),
+        pytest.param("lens_drops", {"count": 0}, id="lens_drops"),
+    ],
+)
+def test_no_particles_leave_the_picture_unchanged_in_a_new_array(name, none, photo):
+    out = registry.apply(name, photo, **none)
+    np.testing.assert_array_equal(out, photo)
+    assert not np.shares_memory(out, photo)
+
+
+@pytest.mark.parametrize("name", PARTICLES)
+def test_particles_are_screened_over_the_picture_so_they_only_lighten_it(name, photo):
+    """Screen over mid grey 0.5 with light l gives 1 - (1 - 0.5)(1 - l) = 0.5 + 0.5 l, and over white stays white."""
+    settings = {**PARTICLES[name], "seed": 3}
+    on_black = registry.apply(name, np.zeros_like(photo), **settings)[..., 0]
+    assert on_black.max() > 0.4  # there is light to screen
+    grey = registry.apply(name, np.full_like(photo, 0.5), **settings)
+    np.testing.assert_allclose(grey[..., 0], 0.5 + 0.5 * on_black, atol=1e-6)
+    np.testing.assert_array_equal(registry.apply(name, np.ones_like(photo), **settings), 1.0)
+    assert (registry.apply(name, photo, **settings) >= photo).all()
+
+
+@pytest.mark.parametrize("shape", [(60, 240), (240, 60)], ids=["wide", "tall"])
+@pytest.mark.parametrize("name", PARTICLES)
+def test_particles_are_spread_over_the_whole_of_a_wide_or_a_tall_picture(name, shape):
+    lit = registry.apply(name, np.zeros((*shape, 3), np.float32), **PARTICLES[name], seed=1)[..., 0] > 0
+    for axis in (0, 1):  # the picture's rows, then its columns: every third of them holds some particles
+        thirds = np.array_split(lit.any(axis=1 - axis), 3)
+        assert all(third.any() for third in thirds)
+
+
+@pytest.mark.parametrize("name", PARTICLES)
+def test_the_opacity_scales_the_light_of_every_particle(name, photo):
+    black = np.zeros_like(photo)
+    full = registry.apply(name, black, **PARTICLES[name], seed=1)
+    half = registry.apply(name, black, **{**PARTICLES[name], "opacity": 0.5}, seed=1)
+    assert full.max() > 0.4
+    np.testing.assert_allclose(half, full / 2, atol=1e-6)
+
+
+@pytest.mark.parametrize("name", TINTED)
+def test_the_color_tints_the_light(name, photo):
+    warm = registry.apply(name, np.zeros_like(photo), **{**PARTICLES[name], "color": "#ff8000"}, seed=1)
+    assert warm[..., 0].max() > 0.5
+    np.testing.assert_allclose(warm[..., 1], warm[..., 0] * 128 / 255, atol=0.003)  # green is 0x80 of red's 0xff
+    assert warm[..., 2].max() == 0
 
 
 # --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
