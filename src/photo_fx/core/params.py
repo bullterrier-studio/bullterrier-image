@@ -43,7 +43,7 @@ from photo_fx.errors import RecipeError
 
 from .types import Color as ColorForms
 
-UNITS = ("px", "fraction", "degrees", "stops", "seconds", "count", "ratio", "cycles")
+UNITS = ("px", "fraction", "degrees", "stops", "count", "ratio", "cycles")
 
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
 

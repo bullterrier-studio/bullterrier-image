@@ -153,7 +153,7 @@ def test_a_parameter_may_not_be_named_like_an_input(throwaway_effects):
 
 @pytest.mark.parametrize("category", ["lights", "Light", ""], ids=["misspelt", "capitalised", "empty"])
 def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(category, throwaway_effects):
-    with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, animation"):
+    with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, utilities"):
         effect(category=category, params=GainParams)(gain_probe)
     assert "gain_probe" not in registry.describe()
 

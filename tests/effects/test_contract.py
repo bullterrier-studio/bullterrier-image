@@ -236,10 +236,10 @@ def test_the_edge_naming_check_flags_edge_rules_under_another_name_and_passes_th
 def test_categories_maps_every_category_in_catalogue_order_to_its_sorted_effects(fresh_registry, register_probe):
     """A category with no effects is listed too, empty. The catalogue order is `registry.CATEGORIES`, the published
     list effect authors choose from."""
-    for name, category in [("zeta", "animation"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
+    for name, category in [("zeta", "utilities"), ("beta", "colour"), ("alpha", "colour"), ("gamma", "light")]:
         register_probe(name, category)  # registered out of order, on purpose
     expected: dict[str, list[str]] = {category: [] for category in registry.CATEGORIES}
-    expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "animation": ["zeta"]}
+    expected |= {"colour": ["alpha", "beta"], "light": ["gamma"], "utilities": ["zeta"]}
     assert registry.categories() == expected
     assert list(registry.categories()) == list(registry.CATEGORIES)  # dict order is the catalogue order
     assert registry.categories()["distortion"] == []
@@ -332,13 +332,13 @@ def test_every_effect_works_with_each_number_at_its_documented_limit(name, field
 
 def _interior_values() -> list[tuple[str, str, float]]:
     """(effect, numeric field, value) for five values evenly inside the range of every int or float field of every
-    effect (ints rounded, repeats dropped): the values an animation passes through."""
+    effect (ints rounded, repeats dropped): the values a caller may set."""
     found = []
     for name in ALL:
         model = registry.parameters(name)
         for doc in model.fields_doc():
             if doc.minimum is None or doc.maximum is None or not isinstance(doc.default, int | float):
-                continue  # not a number (a list of numbers is not animated as a whole)
+                continue  # not a number
             values = [doc.minimum + (doc.maximum - doc.minimum) * k / 6 for k in range(1, 6)]
             if isinstance(doc.default, int):
                 values = sorted({round(value) for value in values})

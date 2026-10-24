@@ -205,7 +205,7 @@ class EvaporateParams(EffectParams):
     )
 
 
-@effect(category="animation", params=EvaporateParams)
+@effect(category="subject", params=EvaporateParams)
 def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """Dissolve the picture into pieces that float away, thin out and fade.
 

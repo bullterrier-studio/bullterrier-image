@@ -88,12 +88,12 @@ def test_a_category_has_a_page_only_while_it_has_effects(fresh_registry, registe
 
 
 def test_the_index_lists_every_effect_once_alphabetically_linking_to_its_category_page(fresh_registry, register_probe):
-    for name, category in [("zoom", "light"), ("tint", "colour"), ("amber", "colour"), ("drift", "animation")]:
+    for name, category in [("zoom", "light"), ("tint", "colour"), ("amber", "colour"), ("drift", "utilities")]:
         register_probe(name, category)
     listed = re.findall(r"^- \[`(\w+)`\]\((\S+)\)", gallery.render_effects_pages()["README.md"], flags=re.M)
     assert listed == [
         ("amber", "colour.md#amber"),
-        ("drift", "animation.md#drift"),
+        ("drift", "utilities.md#drift"),
         ("tint", "colour.md#tint"),
         ("zoom", "light.md#zoom"),
     ]
@@ -102,14 +102,14 @@ def test_the_index_lists_every_effect_once_alphabetically_linking_to_its_categor
 def test_the_index_gives_each_category_its_count_and_one_line_description_in_catalogue_order(
     fresh_registry, register_probe
 ):
-    for name, category in [("drift", "animation"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
+    for name, category in [("drift", "utilities"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
         register_probe(name, category)  # registered in another order than the catalogue's
     rows = _index_rows(gallery.render_effects_pages())
-    assert list(rows) == ["colour.md", "light.md", "animation.md"]
+    assert list(rows) == ["colour.md", "light.md", "utilities.md"]
     assert [cells[0] for cells in rows.values()] == [
         "[Colour](colour.md)",
         "[Light](light.md)",
-        "[Animation](animation.md)",
+        "[Utilities](utilities.md)",
     ]
     assert [cells[1] for cells in rows.values()] == ["2", "1", "1"]
 

@@ -357,7 +357,7 @@ class DisperseParams(EffectParams):
     )
 
 
-@effect(category="animation", params=DisperseParams)
+@effect(category="subject", params=DisperseParams)
 def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 

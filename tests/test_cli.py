@@ -171,11 +171,11 @@ def test_effects_category_without_effects_is_an_error_naming_it_and_the_choices(
 def test_effects_list_categories_gives_each_category_with_effects_its_count_and_description(
     fresh_registry, register_probe, capsys
 ):
-    for name, category in [("drift", "animation"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
+    for name, category in [("drift", "utilities"), ("tint", "colour"), ("hue", "colour"), ("lamp", "light")]:
         register_probe(name, category)
     assert cli("effects --list-categories") == 0
     rows = [line.split(maxsplit=2) for line in capsys.readouterr().out.splitlines()]
-    assert [(category, count) for category, count, _ in rows] == [("colour", "2"), ("light", "1"), ("animation", "1")]
+    assert [(category, count) for category, count, _ in rows] == [("colour", "2"), ("light", "1"), ("utilities", "1")]
     assert all(description for _, _, description in rows)
 
 

@@ -55,7 +55,6 @@ CATEGORY_DESCRIPTIONS = {
     "compositing": "Ways of combining the picture with other layers.",
     "backgrounds": "Generated or replaced backgrounds behind the subject.",
     "utilities": "Plain helpers such as resizing, cropping and borders.",
-    "animation": "Effects that change over time, such as particles dispersing or evaporating.",
 }
 CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
