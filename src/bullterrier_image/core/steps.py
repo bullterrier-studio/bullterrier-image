@@ -50,7 +50,7 @@ class _Layer(ValidatedModel):
     mask: str | None = Field(
         None,
         description='Apply only where this selection says: the "subject" or the "background" of the photo, or the name '
-        "of a selection the recipe declares (a `Pick`); None: everywhere.",
+        "of a selection the recipe declares (a `Path` or a `Pick`); None: everywhere.",
     )
     opacity: float = Field(
         ge=0,
@@ -188,7 +188,7 @@ class Each(_Layer):
     """
 
     each: str = Field(
-        description="The name of the partition whose pieces get a look each (a `Grid` or `Shards` region)."
+        description="The name of the partition whose pieces get a look each (a grid, shards, cuts or svg region)."
     )
     looks: tuple[Step | Literal["none"], ...] = Field(
         min_length=1,
@@ -330,8 +330,8 @@ class Recipe(ValidatedModel):
         a valid one from any text.
     steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
     regions: the regions the steps can name besides the built-in `subject` and `background`: a name for each `Grid`,
-        `Shards`, `Pick` or `Subject` (see `bullterrier_image.core.regions`). They are checked here, and made for each
-        picture only when a step uses them.
+        `Shards`, `Cuts`, `Path`, `Svg`, `Pick` or `Subject` (see `bullterrier_image.core.regions`). They are checked
+        here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo and the subject matte together before the

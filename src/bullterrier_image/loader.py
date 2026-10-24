@@ -12,7 +12,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     anchor = "subject"             # ...around the subject
     transparent = "circle"         # a circle cut-out: the render has an alpha channel (PNG or WebP, not JPEG)
 
-    [region.panes]                 # format 2: a named region (see "Regions" below); `kind` is grid, shards or pick
+    [region.panes]                 # format 2: a named region (see "Regions" below); `kind` is grid, shards, cuts, ...
     kind = "grid"
     columns = 3
     rows = 2
@@ -39,13 +39,15 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     opacity = 0.6                  # step's own keys win over the preset's
 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
-(`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `pick` (`of`, `pieces`) or `subject` (`per`, `context`,
-`threshold`), the fields of `Grid`, `Shards`, `Pick` and `Subject`; `fit` lays a grid or shards over a
-selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid or
-shards) cuts the picture into numbered pieces, a *selection* (a `pick`, a `subject` or the built-in `subject` and
-`background`) chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition. Steps name
-regions: `mask` (a selection) limits a step to it, and `partition` names the partition an effect such as `seams` draws.
-A step with `each` (a partition) and `looks` gives every piece its own look:
+(`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `cuts` (`lines`: tables `{x, y, angle}` or `{path}`), `path`
+(`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids) or `subject` (`per`,
+`context`, `threshold`), the fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick` and `Subject`; `fit` lays a grid,
+shards, cuts, path or svg over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the
+borders. A *partition* (a grid, shards, cuts or svg) cuts the picture into numbered pieces, a *selection* (a `path`, a
+`pick`, a `subject` or the built-in `subject` and `background`) chooses pixels; a `subject` with `per` finds the subject
+inside each piece of a partition. Steps name regions: `mask` (a selection) limits a step to it, and `partition` names
+the partition an effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own
+look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -92,7 +94,8 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.regions import Grid, Kind, Pick, Shards, Subject
+from .core.regions import Cuts, Grid, Kind, Pick, Shards, Subject, Svg
+from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step, safe_name
 
 __all__ = ["load_recipe", "with_pictures"]
@@ -113,7 +116,15 @@ _KEYS = {
     "step": "[[step]]",
 }
 # the region kinds a `[region.NAME]` table may have, by its `kind`
-_KINDS: dict[str, type[Kind]] = {"grid": Grid, "shards": Shards, "pick": Pick, "subject": Subject}
+_KINDS: dict[str, type[Kind]] = {
+    "grid": Grid,
+    "shards": Shards,
+    "cuts": Cuts,
+    "path": PathRegion,
+    "svg": Svg,
+    "pick": Pick,
+    "subject": Subject,
+}
 
 
 def _located[E: BullterrierImageError](error: E, where: str) -> E:
@@ -199,7 +210,7 @@ def load_recipe(path: str | Path) -> Recipe:
         raise RecipeError(
             f"{path.name}: regions, `each`, `looks` and `partition` need `format = 2` at the top of the file"
         )
-    regions = _regions(tables, path.name)
+    regions = _regions(tables, path.name, path.parent)
     steps = []
     for i, entry in enumerate(entries, start=1):
         where = f"{path.name}: step {i}"
@@ -213,8 +224,9 @@ def load_recipe(path: str | Path) -> Recipe:
         raise _located(error, path.name) from None
 
 
-def _regions(tables: object, file: str) -> dict[str, Kind]:
-    """The regions of the `[region.NAME]` tables, each made by its `kind`; RecipeError naming the file and region."""
+def _regions(tables: object, file: str, folder: Path) -> dict[str, Kind]:
+    """The regions of the `[region.NAME]` tables, each made by its `kind` (an svg's `file` is relative to `folder`, the
+    recipe file's); RecipeError naming the file and region."""
     if not isinstance(tables, dict) or not all(isinstance(table, dict) for table in tables.values()):
         raise RecipeError(f"{file}: write each region as a [region.NAME] table (one table for each name)")
     regions: dict[str, Kind] = {}
@@ -227,6 +239,8 @@ def _regions(tables: object, file: str) -> dict[str, Kind]:
                 if "kind" in table
                 else f"{file}: region {name!r}: missing `kind`; write one of: {', '.join(_KINDS)}"
             )
+        if kind == "svg" and isinstance(fields.get("file"), str):
+            fields["file"] = str(folder / fields["file"])
         try:
             regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
         except RecipeError as error:

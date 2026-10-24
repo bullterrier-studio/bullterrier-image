@@ -13,7 +13,8 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Edge, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Curve, Cuts, Edge, Grid, Line, Pick, Shards, Subject, Svg
+from bullterrier_image.recipe import Path as PathRegion
 
 STEP = "[[step]]\neffect = 'grade'\n"
 
@@ -319,6 +320,75 @@ def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, m
     )
 
 
+SHAPES_FILE = """
+format = 2
+size = 64
+
+[region.halves]
+kind = "cuts"
+lines = [{ x = 0.5, y = 0.5, angle = 62 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]
+edge = { style = "torn", amount = 0.01 }
+
+[region.blob]
+kind = "path"
+d = "M 0.1 0.1 H 0.6 V 0.7 Z"
+samples = 8
+
+[region.shapes]
+kind = "svg"
+file = "../assets/shapes.svg"
+max_shapes = 50
+
+[region.ring]
+kind = "pick"
+of = "shapes"
+pieces = ["ring", 0]
+
+[[step]]
+effect = "fill"
+color = "#ff0000"
+mask = "ring"
+
+[[step]]
+each = "halves"
+looks = ["none", { effect = "fill", color = "#00ff00" }]
+mask = "blob"
+"""
+
+SHAPES_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+  <circle id="ring" cx="5" cy="5" r="4"/><rect id="corner" width="3" height="3"/></svg>"""
+
+
+def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_svg_is_found_beside_the_file(
+    tmp_path, photo, matte
+):
+    from bullterrier_image.core.runner import render
+
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "shapes.svg").write_text(SHAPES_SVG, encoding="utf-8")
+    (tmp_path / "recipes").mkdir()
+    loaded = load_recipe(_write(tmp_path / "recipes", SHAPES_FILE))
+    written = Recipe(
+        "look",
+        size=64,
+        regions={
+            "halves": Cuts(
+                lines=[Line(x=0.5, y=0.5, angle=62), Curve(path="M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1")],
+                edge=Edge(style="torn", amount=0.01),
+            ),
+            "blob": PathRegion(d="M 0.1 0.1 H 0.6 V 0.7 Z", samples=8),
+            "shapes": Svg(file=str(tmp_path / "recipes" / "../assets/shapes.svg"), max_shapes=50),
+            "ring": Pick(of="shapes", pieces=["ring", 0]),
+        },
+        steps=[
+            Step("fill", {"color": "#ff0000"}, mask="ring"),
+            Each("halves", ["none", Step("fill", {"color": "#00ff00"})], mask="blob"),
+        ],
+    )
+    assert loaded == written
+    np.testing.assert_array_equal(render(photo, loaded, matte), render(photo, written, matte))
+
+
 def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):
     _logo(tmp_path / "assets")
     (tmp_path / "recipes").mkdir()
@@ -348,10 +418,13 @@ def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_pa
 REGION_MISTAKES = {
     "a kind that does not exist": (
         '[region.g]\nkind = "hexagons"\n',
-        r"region 'g': .*'hexagons'.*grid, shards, pick, subject",
+        r"region 'g': .*'hexagons'.*grid, shards, cuts, path, svg, pick, subject",
     ),
-    "no kind": ("[region.g]\ncolumns = 2\n", r"region 'g': .*`kind`.*grid, shards, pick"),
-    "a kind that is not text": ("[region.g]\nkind = 3\n", r"region 'g': .*`kind`.*grid, shards, pick"),
+    "no kind": ("[region.g]\ncolumns = 2\n", r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject"),
+    "a kind that is not text": (
+        "[region.g]\nkind = 3\n",
+        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject",
+    ),
     "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),
     "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
     "an edge that is not a table": ('[region.g]\nkind = "grid"\nedge = 3\n', r"region 'g'.*`edge`"),

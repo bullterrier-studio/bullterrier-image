@@ -6,8 +6,10 @@ what a region is for (covering every pixel once, the same pieces at any resoluti
 a property of the result.
 """
 
+import math
 import tracemalloc
 from collections.abc import Callable
+from pathlib import Path as File
 
 import numpy as np
 import pytest
@@ -15,15 +17,21 @@ from scipy import ndimage
 
 from bullterrier_image import RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
+    Curve,
+    Cuts,
     Edge,
     Finder,
     Grid,
     Kind,
+    Line,
     Partition,
+    Path,
     Pick,
+    Regions,
     Selection,
     Shards,
     Subject,
+    Svg,
     as_partition,
     check,
     look_weights,
@@ -35,6 +43,12 @@ from bullterrier_image.core.regions import (
 )
 
 Shape = tuple[int, int]
+MOSAIC = str(File(__file__).resolve().parents[2] / "examples" / "assets" / "mosaic.svg")
+BLOB = (
+    "M 0.08 0.42 C 0.1 0.25, 0.32 0.22, 0.38 0.38 C 0.44 0.52, 0.36 0.74, 0.22 0.72 C 0.08 0.7, 0.06 0.56, 0.08 0.42 Z"
+)
+WAVE = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1"
+CIRCLE = "M 0.25 0.5 A 0.25 0.25 0 1 0 0.75 0.5 A 0.25 0.25 0 1 0 0.25 0.5 Z"
 # Sizes no cell divides: a single pixel, a single row or column, and two odd rectangles (as the effect contract uses).
 ODD_SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)]
 
@@ -78,6 +92,18 @@ def declared() -> dict[str, Kind]:
         "subject_whole": Subject(),
         "subject_per_grid": Subject(per="grid"),
         "subject_per_shards": Subject(per="glass", context=0.5),
+        "cut": Cuts(lines=[Line(x=0.5, y=0.5, angle=62)]),
+        "crossing_cuts": Cuts(lines=[Line(angle=30), Line(x=0.3, y=0.6, angle=120)]),
+        "curve": Cuts(lines=[Curve(path=WAVE)]),
+        "torn_cut": Cuts(lines=[Line(angle=84)], edge=Edge(style="torn")),
+        "cuts_on_subject": Cuts(lines=[Line(angle=10), Curve(path=WAVE)], fit="subject"),
+        "blob": Path(d=BLOB),
+        "torn_blob": Path(d=BLOB, edge=Edge(style="torn")),
+        "blob_on_subject": Path(d=BLOB, fit="subject"),
+        "mosaic": Svg(file=MOSAIC),
+        "torn_mosaic": Svg(file=MOSAIC, edge=Edge(style="torn")),
+        "mosaic_on_subject": Svg(file=MOSAIC, fit="subject"),
+        "pick_of_mosaic": Pick(of="mosaic", pieces=["ring", "sun", 0]),
     }
 
 
@@ -153,6 +179,11 @@ def extremes(model: type, **fixed: object) -> list[tuple[str, dict]]:
 AT_THE_LIMITS: dict[str, Kind] = {
     **{f"shards {id_}": Shards(**values) for id_, values in extremes(Shards)},
     **{f"edge {id_}": Shards(edge=Edge(style="torn", **values)) for id_, values in extremes(Edge)},
+    **{f"line {id_}": Cuts(lines=[Line(**values)]) for id_, values in extremes(Line)},
+    **{f"path {id_}": Path(d=BLOB, **values) for id_, values in extremes(Path)},
+    "cuts of most": Cuts(lines=[Line(x=i / 31, y=1 - i / 31, angle=5.5 * i) for i in range(32)]),
+    "a cut torn at the limit": Cuts(lines=[Curve(path=WAVE)], edge=Edge(style="torn", amount=0.1, scale=1)),
+    "a path torn at the limit": Path(d=BLOB, edge=Edge(style="torn", amount=0.1, scale=0.01)),
     "shards impact at one corner": Shards(impact=(0, 0)),
     "shards impact at the other": Shards(impact=(1, 1)),
     "grid of one": Grid(columns=1, rows=1),
@@ -201,8 +232,23 @@ def test_a_selection_of_a_picture_with_fewer_pieces_than_picked_selects_what_exi
         Shards(count=12, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=5)),
         Shards(preset="torn"),
         Shards(preset="stone"),
+        Cuts(lines=[Line(angle=30), Line(x=0.3, y=0.6, angle=120)]),
+        Cuts(lines=[Curve(path=WAVE)]),
+        Svg(file=MOSAIC),
     ],
-    ids=["grid", "uneven grid", "glass", "mosaic", "torn grid", "wide torn shards", "torn", "stone"],
+    ids=[
+        "grid",
+        "uneven grid",
+        "glass",
+        "mosaic",
+        "torn grid",
+        "wide torn shards",
+        "torn",
+        "stone",
+        "cuts",
+        "curve",
+        "svg",
+    ],
 )
 def test_the_same_pieces_come_out_at_twice_the_resolution(kind):
     """Positions are shares of the frame, so the sites sit at the same share. A coarse pixel's centre is the centre of
@@ -379,13 +425,22 @@ def test_a_straight_edge_ignores_the_other_edge_settings_and_a_torn_one_with_no_
 
 
 @pytest.mark.parametrize("amount", [0.01, 0.05], ids=["a small tear", "a wide tear"])
-@pytest.mark.parametrize("kind", [Grid, Shards], ids=["grid", "shards"])
-def test_a_torn_edge_moves_the_borders_by_about_its_amount_and_nothing_else(kind, amount):
+@pytest.mark.parametrize(
+    "straight",
+    [
+        Grid(columns=3, rows=3),
+        Shards(count=12),
+        Cuts(lines=[Line(angle=84)]),
+        Cuts(lines=[Curve(path=WAVE)]),
+        Svg(file=MOSAIC),
+    ],
+    ids=["grid", "shards", "cut", "curve", "svg"],
+)
+def test_a_torn_edge_moves_the_borders_by_about_its_amount_and_nothing_else(straight, amount):
     """The coordinates are shifted by noise of unit standard deviation times `amount` of the long side, so a pixel
     may change piece only if a straight border lies within a few standard deviations: 6, as the noise is smooth and a
     value that far out has a chance below 1e-8 of showing in a picture of this size."""
     shape = (150, 200)
-    straight = kind(edge=Edge(style="straight"), **({"columns": 3, "rows": 3} if kind is Grid else {"count": 12}))
     torn = straight.model_copy(update={"edge": Edge(style="torn", amount=amount, scale=0.3, seed=4)})
     before = labels_of({"k": straight}, "k", shape)
     after = labels_of({"k": torn}, "k", shape)
@@ -720,7 +775,7 @@ def test_every_shipped_preset_cuts_a_picture_differently_from_the_default(preset
     assert not np.array_equal(named, default)
 
 
-@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge])
+@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge, Cuts, Line, Curve, Path, Svg])
 def test_every_field_is_documented_with_its_unit_and_range(model):
     text = model.documentation()
     for doc in model.fields_doc():
@@ -802,12 +857,20 @@ def test_weights_for_a_4k_picture_need_little_more_memory_than_the_weights_thems
 
 @pytest.mark.parametrize(
     "kind",
-    [Grid(columns=3, rows=2, edge=Edge(style="torn")), Shards(preset="glass"), Shards(preset="stone")],
-    ids=["a torn grid", "glass", "stone"],
+    [
+        Grid(columns=3, rows=2, edge=Edge(style="torn")),
+        Shards(preset="glass"),
+        Shards(preset="stone"),
+        Cuts(lines=[Curve(path=WAVE)], edge=Edge(style="torn")),
+        Path(d=BLOB, edge=Edge(style="torn")),
+        Svg(file=MOSAIC, edge=Edge(style="torn")),
+    ],
+    ids=["a torn grid", "glass", "stone", "a torn curve", "a torn path", "a torn svg"],
 )
 def test_making_the_pieces_of_a_1_mp_picture_needs_a_bounded_amount_of_memory(kind):
     """Measured on a 4K picture: 8.5 float32 picture-sized buffers for a grid, 14.5 for a torn one (the most: the
-    noise is float64), 10 for glass. The budget leaves room for another platform, never for a blow-up."""
+    noise is float64), 10 for glass, 14 for a torn curve, 8 for a torn path and 12 for a torn svg. The budget leaves
+    room for another platform, never for a blow-up."""
     shape = (866, 1155)
     buffer = shape[0] * shape[1] * 4
     regions = resolve({"k": kind}, shape, subject=None)
@@ -966,3 +1029,342 @@ def test_shards_can_be_laid_over_the_subject_found_piece_by_piece():
     cut = regions.partition("cut")
     assert_a_region(cut, shape)
     assert cut.count == 5
+
+
+# ---- cuts ----------------------------------------------------------------------------------------------------------
+
+
+def side_of(shape: Shape, start: tuple[float, float], end: tuple[float, float]) -> np.ndarray:
+    """Which side of the infinite line through `start` and `end` (px) each pixel centre lies on, as 0 for the side of
+    the top left pixel and 1 for the other, by the sign of the cross product."""
+    y, x = np.mgrid[0 : shape[0], 0 : shape[1]] + 0.5
+    cross = (end[0] - start[0]) * (y - start[1]) - (end[1] - start[1]) * (x - start[0])
+    return (cross > 0).astype(np.int32) != (cross[0, 0] > 0)
+
+
+def line_through(shape: Shape, x: float, y: float, angle: float, box: tuple[int, int, int, int] | None = None):
+    """The same line as `Line(x, y, angle)`: through the point at shares (x, y) of `box` (left, top, right, bottom px),
+    running `angle` degrees counter-clockwise from horizontal as seen on the screen, so the direction is (cos, -sin)."""
+    left, top, right, bottom = box or (0, 0, shape[1], shape[0])
+    point = (left + x * (right - left), top + y * (bottom - top))
+    return point, (point[0] + math.cos(math.radians(angle)), point[1] - math.sin(math.radians(angle)))
+
+
+STRAIGHT_CUTS = {
+    "horizontal through the middle": (0.5, 0.5, 0),
+    "vertical off centre": (0.3, 0.5, 90),
+    "diagonal": (0.5, 0.5, 62),
+    "steep, high on the right": (0.8, 0.1, 150),
+    "through a corner": (0, 0, 45),
+    "along the top edge": (0.5, 0, 0),
+    "past the picture": (1, 1, 10),
+}
+
+
+@pytest.mark.parametrize("shape", [(20, 30), (37, 23), (1, 9), (9, 1)], ids=lambda s: f"{s[0]}x{s[1]}")
+@pytest.mark.parametrize(("x", "y", "angle"), STRAIGHT_CUTS.values(), ids=STRAIGHT_CUTS.keys())
+def test_a_straight_cut_is_the_half_plane_test_of_every_pixel_centre(x, y, angle, shape):
+    got = labels_of({"c": Cuts(lines=[Line(x=x, y=y, angle=angle)])}, "c", shape)
+    np.testing.assert_array_equal(got, side_of(shape, *line_through(shape, x, y, angle)))
+
+
+def test_cuts_laid_over_a_selection_take_their_positions_as_shares_of_its_box():
+    shape = (96, 128)
+    inside = np.argwhere(disc(shape) > 0.5)
+    (top, left), (bottom, right) = inside.min(axis=0), inside.max(axis=0) + 1
+    got = labels_of({"c": Cuts(lines=[Line(x=0.25, y=0.6, angle=35)], fit="subject")}, "c", shape)
+    np.testing.assert_array_equal(got, side_of(shape, *line_through(shape, 0.25, 0.6, 35, (left, top, right, bottom))))
+
+
+def arrangement(shape: Shape, lines: list[tuple[tuple[float, float], tuple[float, float]]]) -> np.ndarray:
+    """The pieces several lines make, found by the tuple of sides of each pixel, numbered by first appearance."""
+    sides = np.stack([side_of(shape, *line) for line in lines], axis=-1)
+    numbers: dict[tuple[int, ...], int] = {}
+    return np.array(
+        [
+            [numbers.setdefault(tuple(int(b) for b in sides[i, j]), len(numbers)) for j in range(shape[1])]
+            for i in range(shape[0])
+        ]
+    )
+
+
+def test_several_cuts_make_the_pieces_of_their_arrangement_numbered_in_reading_order():
+    shape = (30, 40)
+    lines = [(0.5, 0.5, 20), (0.3, 0.6, 110), (0.9, 0.2, 70)]
+    got = labels_of({"c": Cuts(lines=[Line(x=x, y=y, angle=a) for x, y, a in lines])}, "c", shape)
+    np.testing.assert_array_equal(got, arrangement(shape, [line_through(shape, *line) for line in lines]))
+
+
+def test_parallel_cuts_make_one_piece_more_than_there_are_cuts():
+    cuts = Cuts(lines=[Line(x=x, y=0.5, angle=90) for x in (0.2, 0.5, 0.8)])
+    assert labels_of({"c": cuts}, "c", (20, 30)).max() + 1 == 4
+
+
+STRAIGHT_CURVES = {
+    "a diagonal": ("M 0.2 0 L 0.8 1", ((0.2, 0), (0.8, 1))),
+    "a cubic that is straight": ("M 0 0.3 C 0.3 0.396, 0.6 0.492, 1 0.62", ((0, 0.3), (1, 0.62))),
+    "relative commands": ("m 0 0.5 l 1 0.25", ((0, 0.5), (1, 0.75))),
+    "ends inside the frame are carried straight on to the border": ("M 0.5 0.2 L 0.5 0.8", ((0.5, 0), (0.5, 1))),
+}
+
+
+@pytest.mark.parametrize(("path", "ends"), STRAIGHT_CURVES.values(), ids=STRAIGHT_CURVES.keys())
+def test_a_curve_that_is_straight_cuts_like_the_line_through_its_ends(path, ends):
+    shape = (40, 60)
+    scale = (shape[1], shape[0])
+    want = side_of(
+        shape, (ends[0][0] * scale[0], ends[0][1] * scale[1]), (ends[1][0] * scale[0], ends[1][1] * scale[1])
+    )
+    np.testing.assert_array_equal(labels_of({"c": Cuts(lines=[Curve(path=path)])}, "c", shape), want)
+
+
+def test_a_bezier_cut_leaves_the_area_on_each_side_that_the_curves_own_formula_gives():
+    """The area left of the curve is the integral of x dy, taken along the curve's Bernstein form (the one the
+    tests write for themselves), against the pixels of the piece."""
+    shape = (100, 200)
+    p = np.array([[0.38, 0], [0.15, 0.45], [0.85, 0.55], [0.62, 1]]) * (200, 100)
+    t = np.linspace(0, 1, 20001)[:, None]
+    curve = (1 - t) ** 3 * p[0] + 3 * (1 - t) ** 2 * t * p[1] + 3 * (1 - t) * t**2 * p[2] + t**3 * p[3]
+    left_area = np.trapezoid(curve[:, 0], curve[:, 1])
+    labels = labels_of({"c": Cuts(lines=[Curve(path=WAVE)])}, "c", shape)
+    assert labels.max() == 1
+    assert (labels == 0).sum() == pytest.approx(left_area, rel=5e-3)
+
+
+def test_a_curve_between_two_other_borders_cuts_the_corner_off_or_the_picture_in_two():
+    shape = (40, 60)
+    labels = labels_of({"c": Cuts(lines=[Curve(path="M 0 0.3 Q 0.5 0.9 1 0.2")])}, "c", shape)
+    assert labels.max() == 1
+    assert labels[0, 0] != labels[39, 0]
+    assert labels[0, 59] != labels[39, 59]
+
+
+def test_a_curve_and_a_line_together_make_the_pieces_of_both():
+    labels = labels_of({"c": Cuts(lines=[Line(x=0.5, y=0.5, angle=0), Curve(path=WAVE)])}, "c", (40, 60))
+    assert labels.max() + 1 == 4
+
+
+# ---- path ----------------------------------------------------------------------------------------------------------
+
+
+def alpha_of(kind: Kind, shape: Shape, subject: Callable | None = None) -> np.ndarray:
+    return resolve({"p": kind}, shape, subject=subject).selection("p").alpha
+
+
+def test_a_pixel_aligned_rectangle_path_chooses_exactly_its_pixels():
+    alpha = alpha_of(Path(d="M 0.25 0.25 H 0.75 V 0.75 H 0.25 Z"), (40, 40))
+    want = np.zeros((40, 40), np.float32)
+    want[10:30, 10:30] = 1
+    np.testing.assert_allclose(alpha, want, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("shape", "area"),
+    [((200, 200), math.pi * 50 * 50), ((100, 300), math.pi * 75 * 25), ((301, 53), math.pi * 13.25 * 75.25)],
+    ids=["a circle", "an ellipse in a wide frame", "an ellipse in a tall one"],
+)
+def test_a_path_circle_covers_the_area_of_the_circle_stretched_to_the_frame(shape, area):
+    """The path's unit square is stretched to the frame: a circle of radius 0.25 is an ellipse with semi-axes 0.25 of
+    the width and 0.25 of the height."""
+    assert alpha_of(Path(d=CIRCLE), shape).sum() == pytest.approx(area, rel=4e-3)
+
+
+def test_the_border_of_a_path_is_soft_by_the_share_of_each_pixel_it_covers():
+    alpha = alpha_of(Path(d="M 0.1 0.1 H 0.5125 V 0.9 H 0.1 Z"), (80, 80))  # the right side is at x = 41, a pixel edge
+    assert alpha[40, 40] == 1
+    assert alpha[40, 41] == 0
+    shifted = alpha_of(
+        Path(d="M 0.1 0.1 H 0.525 V 0.9 H 0.1 Z"), (80, 80)
+    )  # x = 42: pixel 41 half covered... of a pixel
+    assert shifted[40, 41] == pytest.approx(1, abs=1e-6)
+    half = alpha_of(Path(d="M 0.1 0.1 H 0.51875 V 0.9 H 0.1 Z"), (80, 80))  # x = 41.5
+    assert half[40, 41] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_the_samples_only_refine_a_slanting_border_and_one_sample_is_the_pixel_centres_alone():
+    triangle = "M 0.1 0.1 L 0.9 0.3 L 0.3 0.9 Z"
+    coarse, fine = (alpha_of(Path(d=triangle, samples=n), (60, 60)) for n in (1, 16))
+    assert coarse.sum() == pytest.approx(fine.sum(), rel=0.03)
+    assert not np.array_equal(coarse, fine)
+
+
+def test_a_path_chooses_by_the_nonzero_rule_so_a_reversed_inner_outline_is_a_hole():
+    ring = "M 0.1 0.1 H 0.9 V 0.9 H 0.1 Z M 0.3 0.3 V 0.7 H 0.7 V 0.3 Z"
+    solid = "M 0.1 0.1 H 0.9 V 0.9 H 0.1 Z M 0.3 0.3 H 0.7 V 0.7 H 0.3 Z"
+    assert alpha_of(Path(d=ring), (50, 50))[25, 25] == 0
+    assert alpha_of(Path(d=solid), (50, 50))[25, 25] == 1
+
+
+def test_a_path_laid_over_the_subject_takes_its_coordinates_from_the_subjects_box():
+    shape = (96, 128)
+    inside = np.argwhere(disc(shape) > 0.5)
+    (top, left), (bottom, right) = inside.min(axis=0), inside.max(axis=0) + 1
+    alpha = alpha_of(Path(d="M 0 0 H 1 V 1 H 0 Z", fit="subject"), shape, finder(shape))
+    want = np.zeros(shape, np.float32)
+    want[top:bottom, left:right] = 1
+    np.testing.assert_allclose(alpha, want, atol=1e-6)
+
+
+def test_a_torn_path_keeps_its_area_roughly_and_moves_its_border():
+    plain = alpha_of(Path(d=BLOB), (200, 300))
+    torn = alpha_of(Path(d=BLOB, edge=Edge(style="torn", amount=0.02, scale=0.1, seed=3)), (200, 300))
+    assert torn.sum() == pytest.approx(plain.sum(), rel=0.15)
+    assert abs(torn - plain).sum() > 0.02 * plain.sum()
+
+
+@pytest.mark.parametrize(
+    ("d", "complaint"),
+    [("", "empty"), ("L 1 1", "start with M"), ("M 0 0 L x", "no path command"), ("M 0 0 Q", "valid")],
+    ids=["empty", "no start", "not a number", "missing numbers"],
+)
+def test_a_path_that_is_not_path_data_is_refused_when_it_is_declared_naming_the_field(d, complaint):
+    with pytest.raises(RecipeError, match=rf"path.*{complaint}|d.*{complaint}"):
+        Path(d=d)
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [[{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}], [{"x": 0.5, "path": "M 0 0 L 1 1"}], [{"x": 2}], [{"angle": 181}], []],
+    ids=["two subpaths", "a line and a curve at once", "a position outside the frame", "an angle past 180", "no lines"],
+)
+def test_cuts_that_are_not_cuts_are_refused_when_declared(lines):
+    with pytest.raises(RecipeError, match=r"lines|path|x|angle"):
+        Cuts(lines=lines)
+
+
+def test_values_written_as_a_recipe_file_writes_the_cuts_are_the_same_as_the_models():
+    from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 30}, {"path": WAVE}], edge={"style": "torn"})
+    assert from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=30), Curve(path=WAVE)], edge=Edge(style="torn"))
+
+
+# ---- svg -----------------------------------------------------------------------------------------------------------
+
+
+RING_AND_DISC = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path id="ring" fill-rule="evenodd"
+        d="M 10 50 a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0 Z M 30 50 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0 Z"/>
+  <circle id="inner" cx="50" cy="50" r="10"/>
+  <rect id="corner" x="0" y="0" width="12" height="12"/>
+  <circle id="inner-copy" cx="50" cy="50" r="5"/>
+</svg>"""
+
+
+def svg_regions(tmp_path: File, text: str = RING_AND_DISC, **fields: object) -> Regions:
+    path = tmp_path / "shapes.svg"
+    path.write_text(text, encoding="utf-8")
+    return resolve({"s": Svg(file=str(path), **fields)}, (100, 100), subject=None)
+
+
+def test_every_shape_is_a_piece_later_shapes_lie_on_top_and_a_hole_shows_what_is_beneath_or_the_outside(tmp_path):
+    labels = svg_regions(tmp_path).partition("s").labels
+    ids = svg_regions(tmp_path).partition("s").ids
+    assert set(ids) == {"ring", "inner", "corner", "inner-copy"}
+    piece = {name: ids[name][0] for name in ids}
+    y, x = np.mgrid[0:100, 0:100] + 0.5
+    away = np.hypot(x - 50, y - 50)
+    assert (labels[(away > 21) & (away < 39)] == piece["ring"]).all()  # the ring
+    assert (labels[away < 4] == piece["inner-copy"]).all()  # the later, smaller disc is on top of the earlier one
+    assert (labels[(away > 6) & (away < 9)] == piece["inner"]).all()
+    outside = labels[(away > 41) & (x > 14) & (y > 14)]
+    hole = labels[(away > 11) & (away < 19)]
+    assert len(set(outside)) == len(set(hole)) == 1
+    assert outside[0] == hole[0]  # the hole and the area beyond the shapes are the one extra piece
+    assert outside[0] not in piece.values()
+
+
+def test_the_area_outside_every_shape_is_one_extra_piece_numbered_like_any_by_its_first_pixel(tmp_path):
+    partition = svg_regions(tmp_path).partition("s")
+    assert partition.count == 5  # four shapes and the outside
+    # the top left pixel lies in the rect `corner`, so the corner is piece 0 and the outside is met next, on that row
+    assert partition.labels[0, 0] == partition.ids["corner"][0] == 0
+    assert partition.labels[0, 20] == 1
+
+
+def test_a_shape_cut_to_nothing_by_the_shapes_on_top_of_it_leaves_no_piece_but_keeps_its_id(tmp_path):
+    text = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect id="hidden" x="10" y="10" width="20" height="20"/>
+      <rect id="cover" x="0" y="0" width="100" height="100"/></svg>"""
+    partition = svg_regions(tmp_path, text).partition("s")
+    assert partition.count == 1
+    assert partition.ids == {"hidden": (), "cover": (0,)}
+
+
+def test_pick_chooses_pieces_by_svg_id_or_number_and_a_shape_of_many_pieces_by_all_of_them(tmp_path):
+    path = tmp_path / "s.svg"
+    path.write_text(RING_AND_DISC, encoding="utf-8")
+    declared_: dict[str, Kind] = {"s": Svg(file=str(path)), "p": Pick(of="s", pieces=["ring", 0])}
+    regions = resolve(declared_, (100, 100), subject=None)
+    labels = regions.partition("s").labels
+    ids = regions.partition("s").ids
+    np.testing.assert_array_equal(regions.selection("p").alpha, np.isin(labels, [ids["ring"][0], 0]).astype(np.float32))
+
+
+@pytest.mark.parametrize(
+    ("pieces", "complaint"),
+    [(["nope"], "'nope'.*ring"), ([0, "ring", "gone"], "'gone'")],
+    ids=["an id the file lacks", "one among good ones"],
+)
+def test_picking_an_id_the_file_does_not_have_is_refused_listing_the_ids_it_has(tmp_path, pieces, complaint):
+    path = tmp_path / "s.svg"
+    path.write_text(RING_AND_DISC, encoding="utf-8")
+    regions = resolve({"s": Svg(file=str(path)), "p": Pick(of="s", pieces=pieces)}, (100, 100), subject=None)
+    with pytest.raises(RecipeError, match=complaint):
+        regions["p"]
+
+
+def test_picking_an_id_of_a_partition_that_has_no_ids_is_refused():
+    regions = resolve({"g": Grid(columns=2), "p": Pick(of="g", pieces=["left"])}, (10, 10), subject=None)
+    with pytest.raises(RecipeError, match=r"'left'.*no ids"):
+        regions["p"]
+
+
+def test_the_svg_is_placed_in_the_frame_by_its_view_box_and_follows_fit(tmp_path):
+    text = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 5"><rect id="r" width="10" height="5"/></svg>'
+    labels = svg_regions(tmp_path, text).partition("s").labels  # a 2:1 shape fitted in a square: rows 25..74
+    assert (labels[25:75] == labels[50, 50]).all()
+    assert (labels[:25] == labels[0, 0]).all()
+    assert labels[0, 0] != labels[50, 50]
+
+
+def test_an_svg_that_cannot_be_read_is_refused_naming_the_region_and_file(tmp_path):
+    regions = resolve({"s": Svg(file=str(tmp_path / "missing.svg"))}, (10, 10), subject=None)
+    with pytest.raises(RecipeError, match=r"missing\.svg"):
+        regions["s"]
+    with pytest.raises(RecipeError, match="file"):
+        resolve({"s": Svg()}, (10, 10), subject=None)["s"]
+
+
+def test_the_limits_on_an_svg_are_fields_and_fail_naming_the_limit(tmp_path):
+    with pytest.raises(RecipeError, match="max_shapes"):
+        svg_regions(tmp_path, max_shapes=2)["s"]
+    with pytest.raises(RecipeError, match="max_kilobytes"):
+        svg_regions(tmp_path, RING_AND_DISC + " " * 4000, max_kilobytes=1)["s"]
+    assert svg_regions(tmp_path, max_shapes=4, max_kilobytes=1).partition("s").count == 5
+
+
+@pytest.mark.parametrize(
+    "fields", [{"max_shapes": 1}, {"max_shapes": 100000}, {"max_kilobytes": 1}, {"max_kilobytes": 100000}]
+)
+def test_the_svg_limits_work_at_their_minimum_and_maximum(tmp_path, fields):
+    text = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="5" height="5"/></svg>'
+    assert svg_regions(tmp_path, text, **fields).partition("s").count == 2
+
+
+def test_svg_leaves_the_region_a_partition_with_a_piece_for_each_shape_of_a_real_file():
+    regions = resolve({"m": Svg(file=MOSAIC)}, (240, 360), subject=None)
+    partition = regions.partition("m")
+    assert set(partition.ids) == {
+        "hill",
+        "sun",
+        "ring",
+        "leaf",
+        "vein-left",
+        "vein-right",
+        "tile",
+        "star",
+        "pebble",
+        "wave",
+        "drop",
+    }
+    assert all(len(pieces) == 1 for pieces in partition.ids.values())
+    assert partition.count == 12  # eleven shapes and the outside

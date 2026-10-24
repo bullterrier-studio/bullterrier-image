@@ -6,12 +6,12 @@ row, rows from the top). For a grid that is row after row; for any other kind it
 that makes more pieces than a small picture has pixels yields only the pieces that have a pixel, so n can be smaller
 than asked for. A **selection** (`Selection`) says how much each pixel is chosen, 0..1.
 
-The kinds are models declared like an effect's parameters (`Grid`, `Shards`, `Pick`, `Subject`; `Edge` bends the
-borders of the first two), so every field has a unit, a range and a description: `Shards.documentation()` lists them. A
-recipe or a script declares them by name, and `resolve` turns the declarations into the regions of one picture, building
-only what is asked for. `Subject` with `per` is *grid first*: the subject is found inside each piece of a partition, one
-call of the injected finder per piece, and the finds are united. `look_weights` turns a partition and a look for each
-piece into the weights that blend the looks.
+The kinds are models declared like an effect's parameters (partitions `Grid`, `Shards`, `Cuts` and `Svg`; selections
+`Path`, `Pick` and `Subject`; `Edge` bends the borders of all but `Pick` and `Subject`), so every field has a unit, a
+range and a description: `Shards.documentation()` lists them. A recipe or a script declares them by name, and `resolve`
+turns the declarations into the regions of one picture, building only what is asked for. `Subject` with `per` is *grid
+first*: the subject is found inside each piece of a partition, one call of the injected finder per piece, and the finds
+are united. `look_weights` turns a partition and a look for each piece into the weights that blend the looks.
 
 Promises:
 - Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
@@ -27,7 +27,7 @@ Dependency direction: imports `params`, `presets` and `ops`; the steps and the r
 
 import math
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal
 
 import numpy as np
@@ -37,22 +37,29 @@ from scipy import ndimage
 from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.noise import frame_fractal
+from bullterrier_image.ops.raster import coverage, paint
 from bullterrier_image.ops.voronoi import centres, nearest
 
+from .outlines import path_outlines, read_svg
 from .params import EffectParams, param
 from .presets import SHIPPED, read
 
 __all__ = [
+    "Curve",
+    "Cuts",
     "Edge",
     "Finder",
     "Grid",
     "Kind",
+    "Line",
     "Partition",
+    "Path",
     "Pick",
     "Regions",
     "Selection",
     "Shards",
     "Subject",
+    "Svg",
     "as_partition",
     "check",
     "look_weights",
@@ -75,11 +82,13 @@ _MOST = 1000  # the most columns, rows, or shares of a grid
 @dataclass(frozen=True, eq=False)
 class Partition:
     """Every pixel in exactly one piece. `labels` is int32 `(height, width)`: the piece of each pixel, numbered
-    0..`count`-1 in reading order (the module docstring defines it); every number occurs. Read-only when made by
-    `resolve`."""
+    0..`count`-1 in reading order (the module docstring defines it); every number occurs. `ids` maps an SVG id to the
+    numbers of the pieces of the shapes that have it (empty for a shape that is covered completely, and for every
+    kind but `Svg`). Read-only when made by `resolve`."""
 
     labels: np.ndarray
     count: int
+    ids: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, eq=False)
@@ -281,21 +290,159 @@ class Pick(_Model):
         "",
         doc="The name of the partition (a `Grid` or `Shards` region) whose pieces are picked; it must be set.",
     )
-    pieces: tuple[int, ...] = param(
+    pieces: tuple[int | str, ...] = param(
         (0,),
         min_length=1,
-        doc="The numbers of the pieces to choose, counted from 0 in reading order (top to bottom, then left to right): "
-        "at least one. A number the partition has no piece for chooses nothing, so a recipe also works on a picture "
-        "too small to have that many pieces.",
+        doc="The pieces to choose, at least one: numbers counted from 0 in reading order (top to bottom, then left to "
+        "right) or, for an `Svg` partition, the `id` of a shape (text; every piece of every shape with that id). A "
+        "number the partition has no piece for chooses nothing, so a recipe also works on a picture too small to have "
+        "that many pieces; an id the file lacks is an error.",
     )
 
     @field_validator("pieces")
     @classmethod
-    def _numbers(cls, pieces: tuple[int, ...]) -> tuple[int, ...]:
+    def _numbers(cls, pieces: tuple[int | str, ...]) -> tuple[int | str, ...]:
         """Piece numbers count from 0."""
-        if min(pieces) < 0:
+        if min((piece for piece in pieces if isinstance(piece, int)), default=0) < 0:
             raise ValueError(f"piece numbers count from 0, got {list(pieces)}")
         return pieces
+
+
+_UNIT_FRAME = (0.0, 0.0, 1.0, 1.0)  # the frame a path is first checked in, when only its syntax is known
+_MOST_LINES = 32
+
+
+class Line(_Model):
+    """One straight cut: a line through a point at an angle, from border to border."""
+
+    x: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="Where the line passes, across, as a share of the frame's width (0 to 1): 0 is the left edge, 1 the right.",
+    )
+    y: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="Where the line passes, down, as a share of the frame's height (0 to 1): 0 is the top edge, 1 the bottom.",
+    )
+    angle: float = param(
+        0.0,
+        unit="degrees",
+        min=0,
+        max=180,
+        doc="The direction of the line, in degrees counter-clockwise from horizontal as seen on the picture (0 to "
+        "180): 0 and 180 run left to right, 90 straight up and down, 45 rises to the right. The angle is measured on "
+        "the picture's pixels, whatever the frame's shape.",
+    )
+
+
+class Curve(_Model):
+    """One curved cut: an open SVG path from border to border."""
+
+    path: str = param(
+        "M 0 0 L 1 1",
+        doc="An open SVG path (one M, then lines, Béziers or arcs: M L H V C S Q T A, absolute or relative) whose "
+        "coordinates are shares of the frame, 0 to 1 across and down (the unit square is stretched to the frame). It "
+        "should run from one border of the frame to another; an end that does not is carried straight on to the "
+        "nearest border. Example: 'M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1'.",
+    )
+
+    @field_validator("path")
+    @classmethod
+    def _one_open_path(cls, path: str) -> str:
+        """Readable path data of a single subpath."""
+        if len(path_outlines(path, _UNIT_FRAME)) != 1:
+            raise ValueError("must be one path with a single M (a cut is one curve from border to border)")
+        return path
+
+
+def _as_lines(value: object) -> object:
+    """What a list of cuts is written as (tables with `x`, `y`, `angle` or with `path`), as the models they describe;
+    anything else is left for the field to judge."""
+    if not isinstance(value, list | tuple):
+        return value
+    return tuple(
+        (Curve if "path" in each else Line).parse(each, "a cut") if isinstance(each, Mapping) else each
+        for each in value
+    )
+
+
+class Cuts(_Laid):
+    """Straight and curved cuts across the frame: the pieces are the regions the cuts divide it into."""
+
+    lines: Annotated[tuple[Line | Curve, ...], BeforeValidator(_as_lines)] = param(
+        (Line(),),
+        min_length=1,
+        max_length=_MOST_LINES,
+        doc="The cuts, 1 to 32: each a `Line` (`x`, `y`, `angle`: straight, through that point) or a `Curve` (`path`: "
+        "an open SVG path), from border to border of the frame. The pieces are the regions the cuts divide the frame "
+        "into, numbered in reading order: n cuts that cross nowhere make n + 1 pieces, more cuts crossing give more.",
+    )
+
+
+class Path(_Laid):
+    """A selection: everything inside a closed SVG path, softly edged."""
+
+    d: str = param(
+        "M 0 0 H 1 V 1 H 0 Z",
+        doc="A closed SVG path (M L H V C S Q T A Z, absolute or relative) whose coordinates are shares of the "
+        "frame, 0 to 1 across and down: the unit square is stretched to the frame, so an arc `A 0.25 0.25` is a "
+        "circle only in a square frame. Each subpath is closed as filling does, and a pixel is inside by the nonzero "
+        "rule (an inner outline drawn the other way round is a hole). Example: 'M 0.1 0.4 C 0.1 0.2, 0.4 0.2, 0.4 "
+        "0.4 Z'.",
+    )
+    samples: int = param(
+        4,
+        unit="count",
+        min=1,
+        max=16,
+        advanced=True,
+        doc="How many evenly spaced scanlines measure how much of a border pixel the path covers (1 to 16): 1 looks at "
+        "the middle of the pixel row only, more give a smoother slanting border and cost more time.",
+    )
+
+    @field_validator("d")
+    @classmethod
+    def _readable(cls, d: str) -> str:
+        """Readable path data."""
+        path_outlines(d, _UNIT_FRAME)
+        return d
+
+
+class Svg(_Laid):
+    """Shapes from an SVG file: every shape is a piece, and the area outside all of them one more piece."""
+
+    file: str = param(
+        "",
+        doc="The SVG file to read; it must be set. A relative path in a recipe file is relative to that file. The "
+        "file is untrusted input: nothing in it is run or fetched. Each rect, circle, ellipse, polygon, polyline and "
+        "path is a piece (colours, strokes and fill are ignored; the fill rule is kept, so holes are holes); later "
+        "shapes lie on top of earlier ones; a `use` is drawn where it is used. The file's `viewBox` and "
+        "`preserveAspectRatio` (by default fitted inside and centred) place it in the frame. Pieces are numbered in "
+        "reading order like any partition, the area outside every shape included (piece 0 when the top left pixel is "
+        "outside every shape); `Pick` chooses a shape by its `id`.",
+    )
+    max_shapes: int = param(
+        1000,
+        unit="count",
+        min=1,
+        max=100000,
+        advanced=True,
+        doc="The most shapes the file may hold, counting what each `use` repeats (1 to 100000); a file with more is "
+        "refused, which guards against a small file that draws a huge number of shapes.",
+    )
+    max_kilobytes: int = param(
+        1024,
+        unit="count",
+        min=1,
+        max=100000,
+        advanced=True,
+        doc="The largest file to read, in kilobytes (1 to 100000); a bigger one is refused without being read.",
+    )
 
 
 class Subject(_Model):
@@ -330,7 +477,7 @@ class Subject(_Model):
     )
 
 
-Kind = Grid | Shards | Pick | Subject
+Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject
 # Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
 # left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
 Finder = Callable[[tuple[int, int, int, int]], np.ndarray]
@@ -342,14 +489,20 @@ def _frozen(array: np.ndarray) -> np.ndarray:
     return array
 
 
+def _renumber(raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The integer array `raw` (any numbers, same value = same piece) renumbered 0..n-1 by where each value is first met
+    in the raster scan, and the value of each new piece."""
+    values, first, inverse = np.unique(raw.ravel(), return_index=True, return_inverse=True)
+    order = np.argsort(first)
+    number = np.empty(len(values), np.int32)
+    number[order] = np.arange(len(values), dtype=np.int32)
+    return number[inverse].reshape(raw.shape), values[order]
+
+
 def _partition(raw: np.ndarray) -> Partition:
-    """The partition whose pieces are the distinct values of the integer array `raw` (any numbers, same value = same
-    piece), renumbered 0..n-1 by where each is first met in the raster scan."""
-    flat = raw.ravel()
-    values, first = np.unique(flat, return_index=True)
-    number = np.zeros(int(values.max()) + 1, np.int32)
-    number[values[np.argsort(first)]] = np.arange(len(values), dtype=np.int32)
-    return Partition(_frozen(number[raw]), len(values))
+    """The partition whose pieces are the distinct values of the integer array `raw`, in reading order."""
+    labels, values = _renumber(raw)
+    return Partition(_frozen(labels), len(values))
 
 
 def as_partition(selection: Selection) -> Partition:
@@ -423,6 +576,96 @@ def _sites(
     return sites
 
 
+# ---- cuts, paths and svg files: shapes drawn on the picture, read at the (possibly bent) coordinates ----------------
+
+
+def _sample(raster: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """`raster` read at the pixel holding each coordinate pair (which broadcast against each other); a coordinate bent
+    beyond the picture reads the pixel at its edge."""
+    rows = np.clip(np.floor(y), 0, raster.shape[0] - 1).astype(np.intp)
+    columns = np.clip(np.floor(x), 0, raster.shape[1] - 1).astype(np.intp)
+    return raster[rows, columns]
+
+
+def _along(point: np.ndarray, box: tuple[int, int, int, int]) -> float:
+    """Where on the frame's border the point nearest to `point` lies, as a position from 0 to 4 clockwise from the top
+    left corner: the top edge is 0 to 1, the right edge 1 to 2, the bottom 2 to 3 (right to left), the left 3 to 4."""
+    left, top, right, bottom = box
+    u = float(np.clip((point[0] - left) / (right - left), 0, 1))
+    v = float(np.clip((point[1] - top) / (bottom - top), 0, 1))
+    return min((v, u), (1 - u, 1 + v), (1 - v, 3 - u), (u, 4 - v))[1]
+
+
+def _border_point(position: float, box: tuple[int, int, int, int]) -> np.ndarray:
+    """The point on the frame's border at `position` (see `_along`)."""
+    left, top, right, bottom = box
+    corners = np.array([(left, top), (right, top), (right, bottom), (left, bottom)], float)
+    corner, share = int(position) % 4, position - int(position)
+    return corners[corner] + share * (corners[(corner + 1) % 4] - corners[corner])
+
+
+def _beyond(curve: np.ndarray, box: tuple[int, int, int, int], shape: tuple[int, int]) -> np.ndarray:
+    """Which pixel centres lie on one side of the open `curve`: the curve is closed by carrying each end straight to the
+    nearest border and going clockwise along the border from its last end to its first, and what that encloses is
+    one side (which one does not matter: pieces are numbered by where they start)."""
+    end, start = _along(curve[-1], box), _along(curve[0], box)
+    corners = [k for k in sorted(range(4), key=lambda k: (k - end) % 4) if 0 < (k - end) % 4 < (start - end) % 4]
+    closed = np.vstack([curve, *(_border_point(position, box) for position in (end, *corners, start))])
+    side = np.zeros(shape, bool)
+    paint(side, True, [closed], rule="nonzero")
+    return side
+
+
+def _cut(
+    kind: Cuts, shape: tuple[int, int], box: tuple[int, int, int, int], x: np.ndarray, y: np.ndarray
+) -> np.ndarray:
+    """A number for every pixel that is the same exactly for pixels on the same side of every cut of `kind`."""
+    left, top, right, bottom = box
+    x, y = x.astype(np.float64), y.astype(np.float64)
+    pieces = np.zeros(shape, np.int64)
+    for bit, cut in enumerate(kind.lines):
+        if isinstance(cut, Line):
+            angle = math.radians(cut.angle)
+            # the line runs along (cos, -sin) on the screen, so the normal is (sin, cos)
+            side = (x - (left + cut.x * (right - left))) * math.sin(angle) + (
+                y - (top + cut.y * (bottom - top))
+            ) * math.cos(angle) > 0
+        else:
+            (curve,) = path_outlines(cut.path, box)
+            side = _sample(_beyond(curve, box, shape), x, y)
+        pieces |= side.astype(np.int64) << bit
+    return pieces
+
+
+def _enclosed(
+    kind: Path, shape: tuple[int, int], box: tuple[int, int, int, int], x: np.ndarray, y: np.ndarray
+) -> np.ndarray:
+    """How much of each pixel the path of `kind` covers; with a torn edge read (bilinearly) at the bent coordinates."""
+    covered = coverage(path_outlines(kind.d, box), shape, "nonzero", kind.samples)
+    if kind.edge.style == "straight":
+        return covered
+    rows, columns = np.broadcast_arrays(y - 0.5, x - 0.5)  # pixel centres are at half-integers
+    return ndimage.map_coordinates(covered, [rows, columns], order=1, mode="nearest")
+
+
+def _drawn(
+    kind: Svg, shape: tuple[int, int], box: tuple[int, int, int, int], x: np.ndarray, y: np.ndarray
+) -> Partition:
+    """The pieces of the svg file of `kind`: shape k + 1 (later ones on top) or 0 for none, at the bent coordinates."""
+    if not kind.file:
+        raise RecipeError("`file` is not set: name the svg file to read")
+    shapes = read_svg(kind.file, box, max_kilobytes=kind.max_kilobytes, max_shapes=kind.max_shapes)
+    drawing = np.zeros(shape, np.int32)
+    for number, one in enumerate(shapes, start=1):
+        paint(drawing, number, one.outlines, rule=one.rule)
+    labels, drawn = _renumber(_sample(drawing, x, y))
+    ids: dict[str, tuple[int, ...]] = {one.id: () for one in shapes if one.id}
+    for piece, number in enumerate(drawn):
+        if number and shapes[number - 1].id:
+            ids[shapes[number - 1].id] += (piece,)
+    return Partition(_frozen(labels), len(drawn), ids)
+
+
 def look_weights(partition: Partition, assignment: Sequence[int], count: int, *, feather: float) -> np.ndarray:
     """The weights that blend `count` looks over a picture: float32 `(count, height, width)`, between 0 and 1 and
     summing to 1 at every pixel. `assignment[k]` is the look (0..`count`-1) of piece k, so there is one entry per
@@ -446,9 +689,9 @@ def _type_of(name: str, declared: Mapping[str, Kind]) -> Literal["partition", "s
     if name in BUILT_IN:
         return "selection"
     match declared.get(name):
-        case Grid() | Shards():
+        case Grid() | Shards() | Cuts() | Svg():
             return "partition"
-        case Pick() | Subject():
+        case Pick() | Path() | Subject():
             return "selection"
         case _:
             return None
@@ -566,17 +809,45 @@ class Regions(Mapping[str, Partition | Selection]):
         if isinstance(kind, Subject):
             return self._subject_of(name, kind)
         if isinstance(kind, Pick):
-            labels = self.partition(kind.of).labels
-            return Selection(_frozen(np.isin(labels, kind.pieces).astype(np.float32)))
+            return self._pick(name, kind)
         box, chosen = self._frame(name, kind.fit)
         x, y = _coordinates(self._shape, kind.edge)
-        if isinstance(kind, Grid):
-            left, top, right, bottom = box
-            across = _borders(kind.columns, left, right)
-            column = np.searchsorted(across, x, side="right")
-            row = np.searchsorted(_borders(kind.rows, top, bottom), y, side="right")
-            return _partition(row * (len(across) + 1) + column)
-        return _partition(nearest(_sites(kind, self._shape, box, chosen), x, y)[1])
+        try:
+            match kind:
+                case Grid():
+                    left, top, right, bottom = box
+                    across = _borders(kind.columns, left, right)
+                    column = np.searchsorted(across, x, side="right")
+                    row = np.searchsorted(_borders(kind.rows, top, bottom), y, side="right")
+                    return _partition(row * (len(across) + 1) + column)
+                case Shards():
+                    return _partition(nearest(_sites(kind, self._shape, box, chosen), x, y)[1])
+                case Cuts():
+                    return _partition(_cut(kind, self._shape, box, x, y))
+                case Path():
+                    return Selection(_frozen(_enclosed(kind, self._shape, box, x, y)))
+                case Svg():
+                    return _drawn(kind, self._shape, box, x, y)
+        except RecipeError as error:
+            raise RecipeError(f"region {name!r}: {error}") from None
+
+    def _pick(self, name: str, kind: Pick) -> Selection:
+        """The pixels of the pieces `kind` lists: a number as it is, an SVG id as the pieces of its shapes."""
+        partition = self.partition(kind.of)
+        chosen = [piece for piece in kind.pieces if isinstance(piece, int)]
+        for piece in kind.pieces:
+            if isinstance(piece, str):
+                if piece not in partition.ids:
+                    known = (
+                        f"its ids: {', '.join(partition.ids)}"
+                        if partition.ids
+                        else "it has no ids (only svg regions do)"
+                    )
+                    raise RecipeError(
+                        f"region {name!r}: `pieces` names {piece!r}, which is no id of {kind.of!r}; {known}"
+                    )
+                chosen += partition.ids[piece]
+        return Selection(_frozen(np.isin(partition.labels, chosen).astype(np.float32)))
 
     def _subject_of(self, name: str, kind: Subject) -> Selection:
         """The built-in subject without `per`; with it the subject found in every piece, united. For each piece the

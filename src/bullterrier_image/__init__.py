@@ -45,16 +45,21 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .matte import subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import (
+        Curve,
+        Cuts,
         Each,
         Edge,
         Framing,
         Grid,
+        Line,
+        Path,
         Pick,
         Recipe,
         Shards,
         Stage,
         Step,
         Subject,
+        Svg,
         load_recipe,
         render,
         render_all,
@@ -76,8 +81,8 @@ _HOMES = {
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Each", "Edge", "Framing", "Grid", "Pick", "Recipe", "Shards", "Stage", "Step", "Subject",
-        "load_recipe", "render", "render_all", "trace",
+        "Cuts", "Curve", "Each", "Edge", "Framing", "Grid", "Line", "Path", "Pick", "Recipe", "Shards", "Stage",
+        "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -113,12 +118,16 @@ def _installed_version() -> str:
 __all__ = [
     "BackendUnavailableError",
     "BullterrierImageError",
+    "Curve",
+    "Cuts",
     "Each",
     "Edge",
     "Framing",
     "Grid",
     "ImageReadError",
+    "Line",
     "NonFiniteImageError",
+    "Path",
     "Pick",
     "Picture",
     "Project",
@@ -130,6 +139,7 @@ __all__ = [
     "Step",
     "Subject",
     "SubjectNotFoundError",
+    "Svg",
     "UnknownEffectError",
     "__version__",
     "fx",
