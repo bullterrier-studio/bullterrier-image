@@ -57,7 +57,7 @@ def test_sparkles_sit_on_the_highlights_and_stay_within_reach_of_them() -> None:
     by 5 px changes, and a picture whose block is below the threshold does not change at all."""
     rgb = np.full((SIZE, SIZE, 3), 0.2, np.float32)
     rgb[60:80, 60:100] = 0.95
-    near_block = ndimage.binary_dilation(np.zeros(rgb.shape[:2], bool) | (rgb[..., 0] > 0.9), iterations=5)
+    near_block = ndimage.binary_dilation(rgb[..., 0] > 0.9, iterations=5)
     out = registry.apply(NAME, rgb, count=8, threshold=0.9, size=6.0, rays=0.0, seed=2)
     touched = (out != rgb).any(axis=-1)
     assert touched.any()

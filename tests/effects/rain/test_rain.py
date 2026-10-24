@@ -10,7 +10,7 @@ from photo_fx.core import registry
 
 NAME = "rain"
 SIZE = 160
-ONE_STREAK = {"density": 0.04}  # 0.04 per 1000 px^2 on 160 x 160 px = 25.6 thousandths of a streak: exactly one
+ONE_STREAK = {"density": 0.04}  # 0.04 per 1000 px^2 on 160 x 160 px = 1.02 streaks, rounded to one
 WHITE = {"color": "#ffffff", "opacity": 1.0}
 
 

@@ -23,12 +23,14 @@ RAMPS = np.stack(
 STEP = 1 / (SIZE - 1)  # how much each ramp rises per pixel
 
 
-def drop_of(picture: np.ndarray, seed: int, **settings: Any) -> tuple[np.ndarray, np.ndarray, tuple[float, float], int]:
+def drop_of(
+    picture: np.ndarray, seed: int, *, refraction: float, radius: float, **settings: Any
+) -> tuple[np.ndarray, np.ndarray, tuple[float, float], int]:
     """The picture with one drop on it, the drop's pixels (h, w) bool, its centre as (row, column) and the seed that
     made it: the first seed from `seed` on whose drop and the part of the scene it shows lie well inside the picture."""
-    reach = settings.get("refraction", 1.5) * settings.get("radius", 30.0)
+    reach = refraction * radius
     for candidate in range(seed, seed + 100):
-        out = registry.apply(NAME, picture, count=1, seed=candidate, **settings)
+        out = registry.apply(NAME, picture, count=1, seed=candidate, refraction=refraction, radius=radius, **settings)
         touched = (out != picture).any(axis=-1)
         rows, columns = np.nonzero(touched)
         centre = (rows.mean(), columns.mean())
@@ -96,7 +98,7 @@ def test_a_drop_changes_only_the_pixels_inside_its_radius() -> None:
     """Its radius is between half of `radius` and all of it: the changed pixels are one disc of that size."""
     areas = []
     for seed in range(0, 40, 4):
-        _, touched, (row, column), _ = drop_of(RAMPS, seed, radius=30.0, **BARE)
+        _, touched, (row, column), _ = drop_of(RAMPS, seed, refraction=1.5, radius=30.0, **BARE)
         rows, columns = np.nonzero(touched)
         reach = np.hypot(rows - row, columns - column).max()
         areas.append(touched.sum())

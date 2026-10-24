@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from photo_fx import RecipeError
 from photo_fx.core import registry
 
 NAME = "gradient"
@@ -145,5 +146,5 @@ def test_the_picture_only_gives_the_size() -> None:
 
 
 def test_a_gradient_needs_two_colours() -> None:
-    with pytest.raises(ValueError, match="colors"):
+    with pytest.raises(RecipeError, match="colors"):
         registry.apply(NAME, np.zeros((4, 4, 3), np.float32), colors=["#ff0000"])
