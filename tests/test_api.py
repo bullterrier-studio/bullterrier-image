@@ -129,8 +129,9 @@ def test_a_recipe_built_in_code_is_checked_too():
         ({"opacity": 2}, r"`opacity`.*\b2\b"),
         ({"blend_mode": "lighten"}, r"`blend_mode`.*screen.*'lighten'"),
         ({"preset": "sepya"}, r"'sepya'.*sepia"),
+        ({"effect": "blur"}, r"`effect`.*'gradient_map'.*'blur'"),
     ],
-    ids=["mask", "opacity", "blend_mode", "preset"],
+    ids=["mask", "opacity", "blend_mode", "preset", "effect: the function already names it"],
 )
 def test_fx_refuses_a_bad_step_key_naming_it_and_the_value(keys, complaint):
     with pytest.raises(ValueError, match=complaint):

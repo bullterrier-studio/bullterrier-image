@@ -30,6 +30,7 @@ from typing import Any, Literal
 
 from .core import registry
 from .core.steps import Step
+from .errors import RecipeError
 from .loader import with_pictures
 
 # The effect builders are module attributes made on demand (`__getattr__`), one per registered effect.
@@ -71,6 +72,11 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
         positional = dict(zip(fields, args, strict=False))
         for twice in positional.keys() & values.keys():
             raise TypeError(f"fx.{name}() got `{twice}` both by position and by keyword")
+        if "effect" in values:  # the one step key fx does not take: the function's name already chose the effect
+            raise RecipeError(
+                f"`effect`: fx.{name}() always builds the effect {name!r}, so it takes no `effect` "
+                f"(got {values['effect']!r}); call the fx function of the effect you want"
+            )
         keys = {key: values.pop(key) for key in registry.STEP_KEYS if key in values}  # the rest are the parameters
         return Step(name, with_pictures(name, {**positional, **values}, Path()), **keys)
 
