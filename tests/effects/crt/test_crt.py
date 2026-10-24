@@ -1,12 +1,16 @@
 """Behaviour of the `crt` effect: a curved glass screen with a shadow mask, scanlines, bloom and a vignette."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.recipe import load_recipe
 
 NAME = "crt"
-OFF = {"curve": 0.0, "mask": 0.0, "scanlines": 0.0, "bloom": 0.0, "vignette": 0.0}  # every part of the screen off
+# every part of the screen off
+OFF = {"curve": 0.0, "shadow_mask": 0.0, "scanlines": 0.0, "bloom": 0.0, "vignette": 0.0}
 
 
 def crt(rgb: np.ndarray, **settings: object) -> np.ndarray:
@@ -44,7 +48,7 @@ def test_the_shadow_mask_lights_red_green_and_blue_stripes_and_keeps_the_average
     """At mask 0.5 an unlit stripe passes half the light and a lit one all of it; a third of the columns are lit for
     each channel, so the mean gain is (1 + 0.5 + 0.5) / 3 = 2/3 and the gains are divided by it: 1.5 where lit, 0.75
     where not. A grey of 0.4 shows 0.6 on the lit stripe and 0.3 on the others."""
-    out = crt(flat(0.4, 4, 6), mask=0.5, mask_pitch=pitch)
+    out = crt(flat(0.4, 4, 6), shadow_mask=0.5, shadow_mask_pitch=pitch)
     expected = np.full((4, 6, 3), 0.3, np.float32)
     for column, channel in enumerate(lit_channel_of_each_column):
         expected[:, column, channel] = 0.6
@@ -125,7 +129,7 @@ def test_the_border_replaces_whatever_the_other_parts_do_beyond_the_screen() -> 
     """The mask, the scanlines, the bloom and the vignette all work on the whole glass, but beyond the curved screen
     there is only the border colour."""
     out = registry.apply(
-        NAME, flat(0.9, 41, 61), curve=0.6, mask=1.0, scanlines=1.0, bloom=1.0, vignette=1.0, border="#00ff00"
+        NAME, flat(0.9, 41, 61), curve=0.6, shadow_mask=1.0, scanlines=1.0, bloom=1.0, vignette=1.0, border="#00ff00"
     )
     np.testing.assert_allclose(out[0, 0], [0, 1, 0], atol=1e-6)
 
@@ -158,3 +162,14 @@ def test_edge_sets_what_the_bend_reads_beyond_the_picture_where_it_is_blended_wi
     picture[:, -1] = 1.0
     out = crt(picture, curve=0.02, border="#000000", edge=edge, interpolation="bilinear")
     assert (out[20, 0, 0] > 0.05) == shows_far_side
+
+
+def test_a_recipe_file_can_set_every_control_of_the_screen(tmp_path: Path) -> None:
+    """In a recipe `mask` and `opacity` belong to the step, so no control of the screen may be called by either."""
+    controls = {"curve": 0.2, "shadow_mask": 0.5, "scanlines": 0.4, "bloom": 0.2, "vignette": 0.1}
+    recipe_file = tmp_path / "tube.toml"
+    recipe_file.write_text(
+        'name = "tube"\n[[step]]\neffect = "crt"\n' + "".join(f"{key} = {value}\n" for key, value in controls.items()),
+        encoding="utf-8",
+    )
+    assert load_recipe(recipe_file).steps[0].params == controls

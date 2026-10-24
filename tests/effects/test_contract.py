@@ -429,7 +429,7 @@ def test_a_background_that_reads_the_picture_is_caught(throwaway_effects, regist
 
 # Effects that change a flat picture by design, unless the parts that do are off: a screen's mask, scanlines, vignette
 # and the border beyond its curved glass.
-FLAT_NEEDS = {"crt": {"curve": 0.0, "mask": 0.0, "scanlines": 0.0, "bloom": 0.0, "vignette": 0.0}}
+FLAT_NEEDS = {"crt": {"curve": 0.0, "shadow_mask": 0.0, "scanlines": 0.0, "bloom": 0.0, "vignette": 0.0}}
 
 
 def _sampling_cases() -> list[tuple[str, dict[str, str]]]:

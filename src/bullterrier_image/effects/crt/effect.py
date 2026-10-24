@@ -25,7 +25,7 @@ class CrtParams(EffectParams):
         "Brown-Conrady lens model), so straight lines bow outward, more toward the corners, and the corners and "
         "edges reach beyond the picture and show `border` instead. 0 = a flat screen; 1 = a strongly bulged one.",
     )
-    mask: float = param(
+    shadow_mask: float = param(
         0.35,
         unit="fraction",
         min=0,
@@ -67,7 +67,7 @@ class CrtParams(EffectParams):
         "[r, g, b] 0..1. It covers everything else there, and is only seen where `curve` is above 0.",
         advanced=True,
     )
-    mask_pitch: int = param(
+    shadow_mask_pitch: int = param(
         3,
         unit="px",
         min=3,
@@ -137,10 +137,10 @@ def crt(rgb: np.ndarray, params: CrtParams) -> np.ndarray:
     In this order: each pixel d px from the middle reads the picture at d x (1 + `curve` x (d / R)^2), R the distance
     of a corner; the highlights above `bloom_threshold` are blurred by `bloom_radius` and screened over by `bloom`;
     each row is darkened by `scanlines` x sin^2(pi x row / `scanline_spacing`); the red, green and blue stripes of
-    the mask (a triad every `mask_pitch` px) pass their own channel fully and the others by 1 - `mask`, the
-    gains divided by their mean; the picture is darkened by `vignette` x (d / R)^2; and what the bend read from
-    beyond the picture is `border` (blended in over the last pixel). The mask can brighten a lit stripe
-    above 1; the result is clipped to 0..1. With every part off the picture is returned as it is.
+    the mask (a triad every `shadow_mask_pitch` px) pass their own channel fully and the others by
+    1 - `shadow_mask`, the gains divided by their mean; the picture is darkened by `vignette` x (d / R)^2; and what
+    the bend read from beyond the picture is `border` (blended in over the last pixel). The mask can brighten a lit
+    stripe above 1; the result is clipped to 0..1. With every part off the picture is returned as it is.
     """
     height, width = rgb.shape[:2]
     centre = Centre.middle(height, width)
@@ -160,9 +160,10 @@ def crt(rgb: np.ndarray, params: CrtParams) -> np.ndarray:
     out = out * row_gain.astype(np.float32)[:, None, None]
 
     channels = out.shape[-1]
-    stripe = (np.arange(width) % params.mask_pitch) * channels // params.mask_pitch  # which channel a column lights
+    pitch = params.shadow_mask_pitch
+    stripe = (np.arange(width) % pitch) * channels // pitch  # which channel a column lights
     lit = stripe[:, None] == np.arange(channels)
-    column_gain = 1 - params.mask * (1 - lit)
+    column_gain = 1 - params.shadow_mask * (1 - lit)
     out = out * (column_gain / column_gain.mean()).astype(np.float32)[None]
 
     out = out * (1 - params.vignette * share).astype(np.float32)[..., None]
