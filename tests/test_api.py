@@ -74,7 +74,7 @@ def test_effect_queries_live_only_in_the_registry(name):
 @pytest.mark.parametrize(
     ("make", "expect"),
     [
-        (lambda: Step("sparkle"), "unknown effect.*ascii"),
+        (lambda: Step("no_such_effect"), "unknown effect.*ascii"),
         (lambda: Step("glitch", {"spilt": 3}), "spilt"),
         (lambda: Step("grain", mask="sideways"), "mask.*'sideways'"),
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
@@ -127,7 +127,7 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
     with pytest.raises(ValueError, match=r"glitch.*`spilt` is not a parameter"):
         fx.glitch(spilt=3)
     with pytest.raises(AttributeError, match=r"available: .*ascii"):
-        fx.sparkle  # noqa: B018  (the lookup itself is what must raise)
+        fx.no_such_effect  # noqa: B018  (the lookup itself is what must raise)
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():

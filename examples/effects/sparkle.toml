@@ -1,0 +1,9 @@
+# Glints with a cross of rays on the brightest highlights.
+# It also makes the effect's picture in the catalogue.
+name = "sparkle"
+size = 480
+
+[[step]]
+effect = "sparkle"
+count = 60
+seed = 1

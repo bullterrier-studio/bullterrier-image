@@ -45,7 +45,7 @@ def test_recipe_name_defaults_to_the_file_name(tmp_path):
 @pytest.mark.parametrize(
     ("text", "expect"),
     [
-        ('[[step]]\neffect="sparkle"\n', "step 1.*unknown effect"),
+        ('[[step]]\neffect="no_such_effect"\n', "step 1.*unknown effect"),
         ('[[step]]\neffect="grain"\nbogus=1\n', "step 1.*bogus"),
         ('[[step]]\neffect="grain"\n[[step]]\neffect="fill"\nmask="sideways"\n', "step 2.*mask"),
         ('[[step]]\ncolor="red"\n', "missing `effect`"),
