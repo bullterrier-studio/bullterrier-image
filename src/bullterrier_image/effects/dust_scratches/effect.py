@@ -59,14 +59,6 @@ class DustScratchesParams(EffectParams):
         doc="How wide a scratch is in px. Larger = bolder scratches.",
         advanced=True,
     )
-    opacity: float = param(
-        0.8,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How strongly the marks show: each mark's colour is mixed over the picture by this much (at its centre; "
-        "edges are soft). 0 = invisible, 1 = solid.",
-    )
     light: Color = param(
         "#ffffff",
         doc="The colour of the light marks (dust on a dark print, scratches into the emulsion): '#rrggbb', '#rgb' or "
@@ -108,12 +100,13 @@ def _stamp(cover: np.ndarray, start: tuple[float, float], end: tuple[float, floa
 
 @effect(category="texture", params=DustScratchesParams)
 def dust_scratches(rgb: np.ndarray, params: DustScratchesParams) -> np.ndarray:
-    """Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`.
+    """Draw light and dark specks, hairs and scratches at random places over the picture.
 
     `density` marks per 1000 px² are specks (random radius up to `size` / 2, mostly small) or, for a share `hairs` of
     them, one-pixel hairs up to `size` px long; `scratches` long lines lean up to `angle` from vertical and are `width`
-    wide. Each mark is `light` or `dark` with equal chance, with antialiased edges. A higher `density` keeps every
-    mark of a lower one and adds more; the same `seed` always gives the same marks.
+    wide. Each mark is `light` or `dark` with equal chance, solid inside, with antialiased edges (where a light mark
+    crosses a dark one the light one lies on top). A higher `density` keeps every mark of a lower one and adds more;
+    the same `seed` always gives the same marks.
     """
     height, width = rgb.shape[:2]
     light, dark = np.zeros((height, width), np.float32), np.zeros((height, width), np.float32)
@@ -139,6 +132,6 @@ def dust_scratches(rgb: np.ndarray, params: DustScratchesParams) -> np.ndarray:
         _stamp(light if tone < 0.5 else dark, start, end, params.width / 2)
     out = rgb.astype(np.float32)
     for cover, colour in ((dark, params.dark), (light, params.light)):
-        weight = params.opacity * cover[..., None]
+        weight = cover[..., None]
         out = out * (1 - weight) + np.asarray(colour, np.float32) * weight
     return out.astype(np.float32)

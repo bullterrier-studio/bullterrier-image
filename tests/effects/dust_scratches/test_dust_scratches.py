@@ -23,9 +23,9 @@ def changed(settings: dict, size: int = 160) -> np.ndarray:
 
 
 def coverage(settings: dict, size: int = 160) -> np.ndarray:
-    """How far each pixel of a mid-grey picture is covered by marks, 0..1, when both colours are white and fully
-    opaque: grey 0.5 mixed with white by the coverage c is 0.5 + 0.5 c."""
-    out = registry.apply(NAME, grey(size), light=WHITE, dark=WHITE, opacity=1.0, **settings)
+    """How far each pixel of a mid-grey picture is covered by marks, 0..1, when both colours are white: grey 0.5
+    mixed with white by the coverage c is 0.5 + 0.5 c."""
+    out = registry.apply(NAME, grey(size), light=WHITE, dark=WHITE, **settings)
     return (out[..., 0] - 0.5) * 2.0
 
 
@@ -122,14 +122,11 @@ def test_more_scratches_cover_more() -> None:
     assert many > 2 * few
 
 
-def test_light_marks_take_the_light_colour_and_dark_marks_the_dark_colour_at_the_opacity() -> None:
+def test_light_marks_take_the_light_colour_and_dark_marks_the_dark_colour() -> None:
     settings = {"density": 1.0, "size": 20.0, "scratches": 0, "seed": 1, "light": "#ff0000", "dark": "#0000ff"}
-    solid = registry.apply(NAME, grey(), opacity=1.0, **settings)
+    solid = registry.apply(NAME, grey(), **settings)
     assert (solid == np.array([1, 0, 0], np.float32)).all(axis=-1).any()  # a fully covered light pixel
     assert (solid == np.array([0, 0, 1], np.float32)).all(axis=-1).any()  # a fully covered dark pixel
-    half = registry.apply(NAME, grey(), opacity=0.5, **settings)
-    assert (half == np.array([0.75, 0.25, 0.25], np.float32)).all(axis=-1).any()  # half red over 0.5 grey
-    assert (half == np.array([0.25, 0.25, 0.75], np.float32)).all(axis=-1).any()
 
 
 def test_hairs_are_thin_and_specks_are_blobs() -> None:
