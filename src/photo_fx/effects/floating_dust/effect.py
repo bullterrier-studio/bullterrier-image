@@ -4,6 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.light import screen
 from photo_fx.ops.particles import draw_segments
 
 
@@ -72,4 +73,4 @@ def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     centre = np.stack([x * width, y * height], axis=1)
     radius = params.size / 2 * near
     light = draw_segments((height, width), centre, centre, radius, params.opacity * near, params.softness * radius)
-    return (rgb + light[..., None] * np.asarray(params.color, np.float32) * (1 - rgb)).astype(np.float32)
+    return screen(rgb, light[..., None] * np.asarray(params.color, np.float32))

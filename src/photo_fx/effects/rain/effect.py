@@ -4,6 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.light import screen
 from photo_fx.ops.particles import draw_segments
 
 
@@ -84,6 +85,5 @@ def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     layer = draw_segments(
         (height, width), start, end, params.thickness * near / 2, params.opacity * near, feather=1.0
     )  # constant: a one-pixel antialiased edge
-    # screen, 1 - (1 - rgb)(1 - light), written as rgb + light x (1 - rgb) so rgb is exactly unchanged where light is 0
     light = layer[..., None] * np.asarray(params.color, np.float32)
-    return (rgb + light * (1 - rgb)).astype(np.float32)
+    return screen(rgb, light)

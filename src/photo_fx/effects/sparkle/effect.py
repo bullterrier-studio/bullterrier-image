@@ -5,6 +5,7 @@ import numpy as np
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.color import luminance
+from photo_fx.ops.light import screen
 from photo_fx.ops.particles import draw_segments
 
 
@@ -86,4 +87,4 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     rays = draw_segments(
         (height, width), np.tile(centre, (len(tips), 1)), np.concatenate(tips), 0.5, np.tile(brightness, len(tips)), 1.0
     )
-    return (rgb + np.maximum(dots, rays)[..., None] * (1 - rgb)).astype(np.float32)
+    return screen(rgb, np.maximum(dots, rays)[..., None])

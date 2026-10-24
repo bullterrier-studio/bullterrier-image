@@ -4,6 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.light import screen
 from photo_fx.ops.particles import draw_segments
 
 
@@ -71,4 +72,4 @@ def starfield(rgb: np.ndarray, params: StarfieldParams) -> np.ndarray:
     # constant: a one-pixel antialiased edge
     light = draw_segments((height, width), centre, centre, params.size / 2 * scale, scale, 1.0)
     sky = np.zeros((height, width, 3), np.float32) + np.asarray(params.sky, np.float32)
-    return (sky + light[..., None] * np.asarray(params.color, np.float32) * (1 - sky)).astype(np.float32)
+    return screen(sky, light[..., None] * np.asarray(params.color, np.float32))

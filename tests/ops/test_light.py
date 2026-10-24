@@ -54,3 +54,8 @@ def test_screen_blends_light_over_the_base_as_one_minus_the_product_of_the_compl
 def test_screen_takes_a_light_per_channel() -> None:
     out = screen(np.full((1, 1, 3), 0.5, np.float32), np.array([[[0.0, 0.5, 1.0]]], np.float32))
     np.testing.assert_allclose(out, [[[0.5, 0.75, 1.0]]], atol=1e-6)
+
+
+def test_no_light_leaves_every_value_exactly_as_it_is() -> None:
+    base = np.random.default_rng(0).random((16, 16, 3), dtype=np.float32) * 0.3
+    np.testing.assert_array_equal(screen(base, np.zeros_like(base)), base)

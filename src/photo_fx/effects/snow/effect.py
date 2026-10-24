@@ -4,6 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.light import screen
 from photo_fx.ops.particles import draw_segments
 
 
@@ -80,4 +81,4 @@ def snow(rgb: np.ndarray, params: SnowParams) -> np.ndarray:
     light = draw_segments(
         (height, width), centre, centre, radius, params.opacity * (0.5 + 0.5 * depth), params.softness * radius
     )
-    return (rgb + light[..., None] * (1 - rgb)).astype(np.float32)  # screen: unchanged where there is no light
+    return screen(rgb, light[..., None])

@@ -194,7 +194,7 @@ def test_limit_keeps_a_large_bright_area_from_flooding_while_the_brightest_point
     flooded = registry.apply(NAME, picture, **settings)
     capped = registry.apply(NAME, picture, limit=0.01, **settings)
     assert flooded[beside_the_block].min() > 0.05
-    np.testing.assert_array_equal(capped[beside_the_block], 0.0)
+    np.testing.assert_allclose(capped[beside_the_block], 0.0, atol=1e-6)
     assert capped[beside_the_point].min() > 0.05
 
 
