@@ -48,8 +48,10 @@ def _block():
 
 
 def test_evaporate_edge_sheds_the_outline_and_keeps_the_inside():
-    out = registry.apply("evaporate", _block(), cell=5, start=0, edge=0.1, outward=0.5, seed=1)
-    assert out[150:190, 90:110].min() == 1.0  # deep inside, more than `edge` from any edge, and the bottom is no edge
+    out = registry.apply("evaporate", _block(), cell=5, start=0, outline=0.1, outward=0.5, seed=1)
+    assert (
+        out[150:190, 90:110].min() == 1.0
+    )  # deep inside, more than `outline` from any edge, and the bottom is no edge
     assert not np.array_equal(out, _block())
     # pieces flew out of both sides
     assert out[:, :55].max() > 0
@@ -58,7 +60,7 @@ def test_evaporate_edge_sheds_the_outline_and_keeps_the_inside():
 
 def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
     sides = lambda img: img[:, :55].sum() + img[:, 145:].sum()  # noqa: E731  (a one-line helper)
-    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "seed": 1}
+    kwargs = {"cell": 5, "start": 0, "outline": 0.1, "seed": 1}
     assert sides(registry.apply("evaporate", _block(), outward=0.8, **kwargs)) > sides(
         registry.apply("evaporate", _block(), outward=0.0, **kwargs)
     )
@@ -66,14 +68,14 @@ def test_evaporate_outward_sends_pieces_away_from_the_edge_they_came_from():
 
 def test_evaporate_wind_makes_the_outward_drift_lopsided():
     left_and_right = lambda img: (img[:, :55].sum(), img[:, 145:].sum())  # noqa: E731  (a one-line helper)
-    out = registry.apply("evaporate", _block(), cell=5, start=0, edge=0.1, outward=0.4, wind=3.0)
+    out = registry.apply("evaporate", _block(), cell=5, start=0, outline=0.1, outward=0.4, wind=3.0)
     left, right = left_and_right(out)
     assert right > left
 
 
 def test_evaporate_treats_the_left_right_and_top_borders_as_edges_but_not_the_bottom():
     lit = np.ones((100, 120, 3), np.float32)
-    out = registry.apply("evaporate", lit, cell=5, start=0, edge=0.2, seed=2)
+    out = registry.apply("evaporate", lit, cell=5, start=0, outline=0.2, seed=2)
     assert out[:5, 50:70].mean() < 1.0
     assert out[40:80, :5].mean() < 1.0
     assert out[40:80, -5:].mean() < 1.0
@@ -99,7 +101,7 @@ def _figure_with_a_dark_gap():
 
 def test_evaporate_does_not_treat_dark_parts_of_the_figure_as_its_edge():
     img, matte = _figure_with_a_dark_gap()
-    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "outward": 0.5, "seed": 1}
+    kwargs = {"cell": 5, "start": 0, "outline": 0.1, "outward": 0.5, "seed": 1}
     for given in (matte, None):  # with the real silhouette, and with the fallback that fills enclosed gaps
         out = registry.apply("evaporate", img, matte=given, **kwargs)
         assert out[100:140, 80:120][img[100:140, 80:120] > 0].min() == 1.0  # lit pieces around the gap survive
@@ -109,11 +111,11 @@ def test_evaporate_takes_its_edge_from_the_matte_when_given():
     img = np.ones((200, 200, 3), np.float32)  # everything is lit...
     matte = np.zeros((200, 200), np.float32)
     matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
-    kwargs = {"cell": 5, "start": 0, "edge": 0.05, "seed": 1}
+    kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
     with_matte = registry.apply("evaporate", img, matte=matte, **kwargs)
     without = registry.apply("evaporate", img, **kwargs)
     assert with_matte[150:, 20:60].mean() < 1.0  # outside the silhouette: sheds
-    assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure is further than `edge` from its outline
+    assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure is further than `outline` from its outline
     assert without[150:, 20:60].min() == 1.0  # with no matte there is no such outline (only the picture borders)
 
 
@@ -130,8 +132,8 @@ def test_evaporate_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover()
     img = np.ones((200, 200, 3), np.float32)
     matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
     matte[:, 80:120] = 1.0  # and a solid column
-    kwargs = {"cell": 5, "start": 0, "edge": 0.05, "seed": 1}
-    outside = (slice(150, None), slice(20, 60))  # more than `edge` (10 px) from the picture's borders
+    kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
+    outside = (slice(150, None), slice(20, 60))  # more than `outline` (10 px) from the picture's borders
     assert registry.apply("evaporate", img, matte=matte, **kwargs)[outside].mean() < 1.0  # 0.4 < 0.5: not figure
     assert registry.apply("evaporate", img, matte=matte, matte_threshold=0.3, **kwargs)[outside].min() == 1.0
 
@@ -155,7 +157,7 @@ def test_evaporate_wind_pushes_the_pieces_sideways():
 
 def test_evaporate_bottom_border_is_an_edge_only_when_open_bottom_is_off():
     lit = np.ones((100, 120, 3), np.float32)
-    kwargs = {"cell": 5, "start": 0, "edge": 0.2, "seed": 2}
+    kwargs = {"cell": 5, "start": 0, "outline": 0.2, "seed": 2}
     assert registry.apply("evaporate", lit, **kwargs)[-10:, 50:70].min() == 1.0
     assert registry.apply("evaporate", lit, open_bottom=False, **kwargs)[-10:, 50:70].mean() < 1.0
 
@@ -254,10 +256,32 @@ def _ragged_picture() -> np.ndarray:
 
 
 def test_evaporate_normal_smoothing_changes_which_way_pieces_are_thrown():
-    kwargs = {"cell": 5, "start": 0, "edge": 0.1, "outward": 1.0, "seed": 1}
+    kwargs = {"cell": 5, "start": 0, "outline": 0.1, "outward": 1.0, "seed": 1}
     sharp = registry.apply("evaporate", _ragged_picture(), normal_smoothing=1.0, **kwargs)
     blurred = registry.apply("evaporate", _ragged_picture(), normal_smoothing=8.0, **kwargs)
     assert not np.array_equal(sharp, blurred)
     for out in (sharp, blurred):
         assert out.min() >= 0.0
         assert out.max() <= 1.0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        pytest.param("normal_truncate", 1.0, id="a shorter cutoff changes the direction read from the blurred outline"),
+        pytest.param("edge", "wrap", id="reading the opposite border beyond the picture changes it"),
+        pytest.param("edge", "nearest", id="repeating the border row beyond the picture changes it"),
+        pytest.param("edge", "constant", id="open space beyond the picture changes it"),
+    ],
+)
+def test_evaporate_normal_blur_options_change_which_way_pieces_are_thrown(field, value):
+    kwargs = {"cell": 5, "start": 0, "outline": 0.1, "outward": 1.0, "seed": 1, "normal_smoothing": 3.0}
+    default = registry.apply("evaporate", _ragged_picture(), **kwargs)
+    changed = registry.apply("evaporate", _ragged_picture(), **kwargs, **{field: value})
+    assert not np.array_equal(default, changed)
+
+
+@pytest.mark.parametrize(("field", "value"), [("edge", "bogus"), ("normal_truncate", 0.5)])
+def test_evaporate_refuses_a_normal_blur_option_it_does_not_offer(field, value):
+    with pytest.raises(ValueError, match=field):
+        registry.apply("evaporate", np.ones((20, 20, 3), np.float32), **{field: value})

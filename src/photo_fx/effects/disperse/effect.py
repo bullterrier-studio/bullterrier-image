@@ -7,6 +7,8 @@ travelling against the wind. Times are shares of the moving part of the clip (`p
 clip's length.
 """
 
+from typing import Literal
+
 import numpy as np
 
 from photo_fx.core.params import EffectParams, param
@@ -45,7 +47,7 @@ class DisperseParams(EffectParams):
         max=10,
         doc="Weight of height in the order pieces leave: higher pieces go first. 0 = height does not matter.",
     )
-    edge: float = param(
+    outline: float = param(
         1.0,
         unit="ratio",
         min=0,
@@ -59,7 +61,7 @@ class DisperseParams(EffectParams):
         min=-1,
         max=1,
         doc="Weight of side in the order: positive starts at the left, negative at the right; its size is how much it "
-        "matters next to `top` and `edge`.",
+        "matters next to `top` and `outline`.",
     )
     reach: float = param(
         1.0,
@@ -123,13 +125,13 @@ class DisperseParams(EffectParams):
         max=2**31 - 1,
         doc="Random seed: each piece's fate is fixed by it, so every frame of one seed fits together.",
     )
-    edge_depth: float = param(
+    outline_depth: float = param(
         0.15,
         unit="fraction",
         min=0.01,
         max=1,
         doc="Distance from the outline (fraction of the picture width) beyond which a piece counts as fully inside, "
-        "for `edge` and `hover_spread`. Raising it makes closeness to the edge matter deeper in.",
+        "for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in.",
     )
     jitter: float = param(
         0.2,
@@ -182,7 +184,7 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="With `hover`: how far into the clip a piece `edge_depth` inside starts to float (the outline starts at "
+        doc="With `hover`: how far into the clip a piece `outline_depth` inside starts to float (the outline starts at "
         "0). 0 = everything floats at once.",
     )
     bob: float = param(
@@ -284,7 +286,7 @@ class DisperseParams(EffectParams):
     )
     open_bottom: bool = param(
         True,
-        doc="True: the bottom border is not an edge for `edge` and `hover` (a portrait is cut off there). False: it "
+        doc="True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut off there). False: it "
         "counts like the other borders.",
     )
     normal_smoothing: float = param(
@@ -295,13 +297,29 @@ class DisperseParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    normal_truncate: float = param(
+        4.0,
+        unit="ratio",
+        min=1,
+        max=10,
+        doc="Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` "
+        "characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more "
+        "exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0.",
+    )
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+        "reflect",
+        doc="What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row "
+        "repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row "
+        "repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs "
+        "the outline toward the border).",
+    )
     matte_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
         doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
-        "the figure whose outline `edge` and `hover` start at; 0.5 = more than half. Lowering it takes in more of a "
+        "the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a "
         "soft edge (hair, fur), raising it less. Ignored without a matte.",
     )
     background_threshold: float = param(
@@ -323,11 +341,11 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     has a fixed, random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches,
     drifts, wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
 
-    When a piece detaches is set by where it is (`top`, `edge`, `sweep`, with `jitter`); `reach` is how much of the
+    When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
     figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
     makes the edges loosen all round first; `ambient` with `clock` keeps the pieces that stay alive.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `edge`.
+    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
     """
     p = params
     height, width = rgb.shape[:2]
@@ -339,7 +357,12 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     present = cells.lit(pieces, threshold=p.background_threshold)
     figure = cells.figure(present, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
     edges = distance.edge_distance(
-        figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing
+        figure,
+        sampling=(cell_h, cell_w),
+        open_bottom=p.open_bottom,
+        smoothing=p.normal_smoothing,
+        truncate=p.normal_truncate,
+        edge=p.edge,
     )
     inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
     rng = np.random.default_rng(p.seed)
@@ -349,8 +372,8 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     # Order of detaching: 0 = first, 1 = last.
     y = np.broadcast_to(((np.arange(rows) + 0.5) * cell_h / height)[:, None], (rows, cols))
     x = np.broadcast_to(((np.arange(cols) + 0.5) * cell_w / width)[None, :], (rows, cols))
-    depth = np.clip(inside / (p.edge_depth * width), 0.0, 1.0)  # 0 on the outline, 1 well inside
-    factors = [(p.top, y), (p.edge, depth), (abs(p.sweep), x if p.sweep >= 0 else 1.0 - x)]
+    depth = np.clip(inside / (p.outline_depth * width), 0.0, 1.0)  # 0 on the outline, 1 well inside
+    factors = [(p.top, y), (p.outline, depth), (abs(p.sweep), x if p.sweep >= 0 else 1.0 - x)]
     total_weight = sum(weight for weight, _ in factors)
     order = sum(weight * value for weight, value in factors) / total_weight if total_weight > 0 else np.zeros_like(y)
     if present.any():

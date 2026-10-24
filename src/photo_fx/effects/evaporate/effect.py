@@ -1,5 +1,7 @@
 """The `evaporate` effect: the picture dissolves into character-sized pieces that drift away and fade, like smoke."""
 
+from typing import Literal
+
 import numpy as np
 
 from photo_fx.core.params import EffectParams, param
@@ -40,7 +42,7 @@ class EvaporateParams(EffectParams):
         doc="Height (fraction of the picture, 0 = top) above which every piece has detached. Between `end` and "
         "`start` the chance rises smoothly.",
     )
-    edge: float = param(
+    outline: float = param(
         0.0,
         unit="fraction",
         min=0,
@@ -141,8 +143,8 @@ class EvaporateParams(EffectParams):
     )
     open_bottom: bool = param(
         True,
-        doc="True: the bottom border is not an edge for `edge` (a portrait is simply cut off there). False: it sheds "
-        "like the other borders.",
+        doc="True: the bottom border is not an edge for `outline` (a portrait is simply cut off there). False: it "
+        "sheds like the other borders.",
     )
     normal_smoothing: float = param(
         1.0,
@@ -152,13 +154,29 @@ class EvaporateParams(EffectParams):
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
     )
+    normal_truncate: float = param(
+        4.0,
+        unit="ratio",
+        min=1,
+        max=10,
+        doc="Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` "
+        "characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more "
+        "exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0.",
+    )
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
+        "reflect",
+        doc="What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row "
+        "repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row "
+        "repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs "
+        "the outline toward the border).",
+    )
     matte_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
         doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
-        "the figure whose outline `edge` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge "
+        "the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge "
         "(hair, fur), raising it less. Ignored without a matte.",
     )
     background_threshold: float = param(
@@ -178,12 +196,12 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
 
     The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
     make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
-    the top down, between `start` and `end`; and from the outline, within `edge` of the edge of the figure and of the
+    the top down, between `start` and `end`; and from the outline, within `outline` of the edge of the figure and of the
     left, right and top borders of the picture (and the bottom unless `open_bottom`).
 
     A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
     sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
-    leaving the picture are gone. With `edge` and `outward` at 0 pieces only move up, so everything more than one
+    leaving the picture are gone. With `outline` and `outward` at 0 pieces only move up, so everything more than one
     character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
     `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
@@ -208,11 +226,16 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     )  # constant: smoothstep polynomial 3t^2 - 2t^3
     figure = cells.figure(lit, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
     edges = distance.edge_distance(
-        figure, sampling=(cell_h, cell_w), open_bottom=p.open_bottom, smoothing=p.normal_smoothing
+        figure,
+        sampling=(cell_h, cell_w),
+        open_bottom=p.open_bottom,
+        smoothing=p.normal_smoothing,
+        truncate=p.normal_truncate,
+        edge=p.edge,
     )  # px from the nearest edge; direction out
     inside, normal_x, normal_y = edges.distance, edges.normal_x, edges.normal_y
-    if p.edge > 0:
-        t = np.clip(1.0 - inside / max(p.edge * width, 1.0), 0.0, 1.0)
+    if p.outline > 0:
+        t = np.clip(1.0 - inside / max(p.outline * width, 1.0), 0.0, 1.0)
         strength = np.maximum(strength, t * t * (3.0 - 2.0 * t))  # constant: smoothstep polynomial 3t^2 - 2t^3
 
     detached = u[0] < strength

@@ -27,13 +27,13 @@ def test_disperse_fades_steadily():
     ("sweep", "first_half", "last_half"), [(1.0, slice(0, 80), slice(80, 160)), (-1.0, slice(80, 160), slice(0, 80))]
 )
 def test_disperse_sweep_chooses_which_side_goes_first(sweep, first_half, last_half):
-    out = registry.apply("disperse", _lit(), progress=0.5, top=0, edge=0, sweep=sweep, wind=0, angle=0, seed=1)
+    out = registry.apply("disperse", _lit(), progress=0.5, top=0, outline=0, sweep=sweep, wind=0, angle=0, seed=1)
     assert out[:, first_half].mean() < out[:, last_half].mean() / 3
 
 
 def test_disperse_reach_leaves_the_rest_standing():
-    whole = registry.apply("disperse", _lit(), progress=1.0, reach=1.0, edge=0, seed=1)
-    part = registry.apply("disperse", _lit(), progress=1.0, reach=0.4, edge=0, seed=1)
+    whole = registry.apply("disperse", _lit(), progress=1.0, reach=1.0, outline=0, seed=1)
+    part = registry.apply("disperse", _lit(), progress=1.0, reach=0.4, outline=0, seed=1)
     assert whole.mean() == 0.0
     assert 0.4 < part.mean() < 0.8
 
@@ -42,7 +42,7 @@ def test_disperse_wind_carries_pieces_in_its_direction():
     blob = np.zeros((120, 200, 3), np.float32)
     blob[40:80, 80:120] = 1.0
     centre = lambda img: float((img.max(axis=(0, 2)) * np.arange(200)).sum() / img.max(axis=(0, 2)).sum())  # noqa: E731  (a one-line helper)
-    kwargs = {"progress": 0.25, "top": 0, "edge": 0, "sweep": 0, "angle": 0, "seed": 2}
+    kwargs = {"progress": 0.25, "top": 0, "outline": 0, "sweep": 0, "angle": 0, "seed": 2}
     assert (
         centre(registry.apply("disperse", blob, wind=0.3, **kwargs))
         > 100
@@ -129,7 +129,7 @@ def test_disperse_hover_floats_a_piece_slowly_with_the_wind_long_before_it_goes(
 def test_disperse_hover_starts_at_the_outline_and_leaves_the_inside_alone():
     block = np.ones((200, 400, 3), np.float32)
     out = registry.apply(
-        "disperse", block, progress=0.3, hover=0.3, wind=0.3, angle=30, sweep=-1.0, top=0, edge=0, seed=1
+        "disperse", block, progress=0.3, hover=0.3, wind=0.3, angle=30, sweep=-1.0, top=0, outline=0, seed=1
     )
     assert out[100:140, 120:160].min() == 1.0  # well inside, and the front has not got here: not moving
     assert not np.array_equal(out[:, :10], block[:, :10])  # the picture's left border has been floating for a while
@@ -192,12 +192,12 @@ def _share_in_flight(frame: np.ndarray) -> float:
 
 @pytest.mark.parametrize(("reach", "goes"), [(0.5, 0.5), (1.0, 1.0)])
 def test_disperse_sweeping_across_keeps_fewer_than_half_of_the_pieces_in_flight_and_uses_the_whole_clip(reach, goes):
-    """With the order set by a side-to-side sweep alone. The share depends on the order: other mixes of `top`, `edge`
+    """With the order set by a side-to-side sweep alone. The share depends on the order: other mixes of `top`, `outline`
     and `sweep` on a fragmented picture reach more than half, so this is not a promise for every setting."""
     img = _isolated_pieces()
     moments = np.linspace(0.0, 1.0, 51)
     frames = [
-        registry.apply("disperse", img, progress=p, top=0, edge=0, sweep=1.0, wind=0.0, reach=reach, seed=1)
+        registry.apply("disperse", img, progress=p, top=0, outline=0, sweep=1.0, wind=0.0, reach=reach, seed=1)
         for p in moments
     ]
     in_flight = [_share_in_flight(frame) for frame in frames]
@@ -264,14 +264,14 @@ def test_disperse_a_shorter_flight_keeps_at_most_a_third_of_the_pieces_in_flight
     """The motion-design 1/3 rule (no more than a third of the elements moving at once) is reachable by shortening the
     flight; the default flight is not promised to meet it."""
     img = _isolated_pieces()
-    kwargs = {"top": 0, "edge": 0, "sweep": 1.0, "wind": 0.0, "seed": 1}
+    kwargs = {"top": 0, "outline": 0, "sweep": 1.0, "wind": 0.0, "seed": 1}
     frames = [registry.apply("disperse", img, progress=p, flight=0.1, **kwargs) for p in np.linspace(0, 1, 51)]
     assert max(_share_in_flight(frame) for frame in frames) <= 1 / 3
 
 
 def test_disperse_without_falloff_or_flare_pieces_keep_their_brightness_until_they_vanish():
     img = _isolated_pieces()
-    kwargs = {"progress": 0.5, "top": 0, "edge": 0, "sweep": 1.0, "wind": 0.2, "seed": 1}
+    kwargs = {"progress": 0.5, "top": 0, "outline": 0, "sweep": 1.0, "wind": 0.2, "seed": 1}
     plain = registry.apply("disperse", img, falloff=0.0, flare=0.0, **kwargs)
     assert set(np.unique(plain)) == {0.0, 1.0}
     shaded = registry.apply("disperse", img, **kwargs)
@@ -319,14 +319,14 @@ def test_disperse_without_jitter_a_side_to_side_front_is_a_straight_line():
         return {int(np.argmax(row)) for row in at_home}
 
     # no glow, so a piece that has left is dimmer than one at home
-    kwargs = {"progress": 0.4, "top": 0, "edge": 0, "sweep": 1.0, "wind": 0.0, "sway": 0.0, "flare": 0.0, "seed": 1}
+    kwargs = {"progress": 0.4, "top": 0, "outline": 0, "sweep": 1.0, "wind": 0.0, "sway": 0.0, "flare": 0.0, "seed": 1}
     assert len(front_columns(registry.apply("disperse", _lit(), jitter=0.0, **kwargs))) == 1  # the same in every row
     assert len(front_columns(registry.apply("disperse", _lit(), **kwargs))) > 3  # by default the front is ragged
 
 
 def test_disperse_without_wind_or_sway_pieces_fade_where_they_are():
     img = _isolated_pieces()
-    kwargs = {"progress": 0.5, "top": 0, "edge": 0, "sweep": 1.0, "wind": 0.0, "seed": 1}
+    kwargs = {"progress": 0.5, "top": 0, "outline": 0, "sweep": 1.0, "wind": 0.0, "seed": 1}
     still = registry.apply("disperse", img, sway=0.0, **kwargs)
     swaying = registry.apply("disperse", img, **kwargs)
     dark = img[..., 0] == 0
@@ -352,7 +352,7 @@ def test_disperse_acceleration_holds_a_piece_back_early_in_its_flight():
 
 def test_disperse_hover_without_spread_floats_the_whole_figure_at_once():
     block = np.ones((200, 400, 3), np.float32)
-    kwargs = {"progress": 0.3, "hover": 0.3, "wind": 0.3, "angle": 30, "sweep": -1.0, "top": 0, "edge": 0, "seed": 1}
+    kwargs = {"progress": 0.3, "hover": 0.3, "wind": 0.3, "angle": 30, "sweep": -1.0, "top": 0, "outline": 0, "seed": 1}
     inside = (slice(100, 140), slice(120, 160))
     assert registry.apply("disperse", block, hover_spread=0.0, **kwargs)[inside].min() < 1.0
     assert registry.apply("disperse", block, **kwargs)[inside].min() == 1.0  # by default the inside waits its turn
@@ -378,7 +378,7 @@ def test_disperse_outward_needs_a_distance_to_throw_pieces():
 
 
 def test_disperse_bottom_goes_with_the_other_edges_only_when_open_bottom_is_off():
-    kwargs = {"progress": 0.3, "top": 0, "edge": 1.0, "sweep": 0, "wind": 0.0, "seed": 1}
+    kwargs = {"progress": 0.3, "top": 0, "outline": 1.0, "sweep": 0, "wind": 0.0, "seed": 1}
     bottom_centre = (slice(-10, None), slice(70, 90))
     assert registry.apply("disperse", _lit(), **kwargs)[bottom_centre].min() == 1.0
     assert registry.apply("disperse", _lit(), open_bottom=False, **kwargs)[bottom_centre].min() < 1.0
@@ -386,7 +386,16 @@ def test_disperse_bottom_goes_with_the_other_edges_only_when_open_bottom_is_off(
 
 # With no ordering and no jitter every piece detaches at `anticipation`; with no wind, sway, fade or glow it stays where
 # it is at full brightness until it vanishes, so a frame shows exactly which pieces have vanished.
-_ALL_AT_ONCE = {"top": 0, "edge": 0, "sweep": 0, "jitter": 0.0, "wind": 0.0, "sway": 0.0, "falloff": 0.0, "flare": 0.0}
+_ALL_AT_ONCE = {
+    "top": 0,
+    "outline": 0,
+    "sweep": 0,
+    "jitter": 0.0,
+    "wind": 0.0,
+    "sway": 0.0,
+    "falloff": 0.0,
+    "flare": 0.0,
+}
 
 
 def test_disperse_without_flight_variation_every_piece_vanishes_exactly_flight_after_it_leaves():
@@ -455,7 +464,7 @@ def test_disperse_distance_minimum_one_carries_every_piece_the_whole_wind():
     img = np.zeros((16 * cell_h, 400, 3), np.float32)
     for row in range(0, 16, 2):
         img[row * cell_h : (row + 1) * cell_h, :cell_w] = 1.0
-    level = {"wind": 0.3, "angle": 0, "angle_spread": 0.0, "sway": 0.0, "pullback": 0.0, "top": 0, "edge": 0}
+    level = {"wind": 0.3, "angle": 0, "angle_spread": 0.0, "sway": 0.0, "pullback": 0.0, "top": 0, "outline": 0}
     late = registry.apply(
         "disperse", img, progress=_through_flight(0.98), distance_minimum=1.0, seed=1, **level, **_TIMED
     )
@@ -464,11 +473,11 @@ def test_disperse_distance_minimum_one_carries_every_piece_the_whole_wind():
         assert columns.min() > 0.9 * 0.3 * 400, row  # nearly the whole journey (it ends at 1 as it vanishes)
 
 
-def test_disperse_edge_depth_is_how_deep_closeness_to_the_edge_decides_the_order():
-    """Deeper than `edge_depth` every piece counts as fully inside, so they all go last, together."""
-    settings = {"progress": 0.5, **_ALL_AT_ONCE, "edge": 1.0, "flight_variation": 0.0, "seed": 1}
-    shallow = (registry.apply("disperse", _lit(), edge_depth=0.05, **settings) == 1.0).mean()
-    deep = (registry.apply("disperse", _lit(), edge_depth=1.0, **settings) == 1.0).mean()
+def test_disperse_outline_depth_is_how_deep_closeness_to_the_edge_decides_the_order():
+    """Deeper than `outline_depth` every piece counts as fully inside, so they all go last, together."""
+    settings = {"progress": 0.5, **_ALL_AT_ONCE, "outline": 1.0, "flight_variation": 0.0, "seed": 1}
+    shallow = (registry.apply("disperse", _lit(), outline_depth=0.05, **settings) == 1.0).mean()
+    deep = (registry.apply("disperse", _lit(), outline_depth=1.0, **settings) == 1.0).mean()
     assert shallow > deep + 0.2
 
 
@@ -476,7 +485,7 @@ def test_disperse_takes_its_edge_from_the_matte_when_given():
     img = np.ones((200, 200, 3), np.float32)  # everything is lit...
     matte = np.zeros((200, 200), np.float32)
     matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
-    kwargs = {"progress": 0.5, "top": 0, "edge": 1.0, "sweep": 0, "seed": 1}
+    kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
     with_matte = registry.apply("disperse", img, matte=matte, **kwargs)
     without = registry.apply("disperse", img, **kwargs)
     outside = (slice(150, None), slice(20, 60))
@@ -489,7 +498,7 @@ def test_disperse_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
     img = np.ones((200, 200, 3), np.float32)
     matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
     matte[:, 80:120] = 1.0  # and a solid column
-    kwargs = {"progress": 0.5, "top": 0, "edge": 1.0, "sweep": 0, "seed": 1}
+    kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
     outside = (slice(150, None), slice(20, 60))
     assert registry.apply("disperse", img, matte=matte, **kwargs)[outside].max() == 0.0  # 0.4 < 0.5: edge, gone
     kept = registry.apply("disperse", img, matte=matte, matte_threshold=0.3, **kwargs)[outside]
@@ -511,3 +520,25 @@ def test_disperse_normal_smoothing_changes_which_way_pieces_are_thrown():
     for out in (sharp, blurred):
         assert out.min() >= 0.0
         assert out.max() <= 1.0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        pytest.param("normal_truncate", 1.0, id="a shorter cutoff changes the direction read from the blurred outline"),
+        pytest.param("edge", "wrap", id="reading the opposite border beyond the picture changes it"),
+        pytest.param("edge", "nearest", id="repeating the border row beyond the picture changes it"),
+        pytest.param("edge", "constant", id="open space beyond the picture changes it"),
+    ],
+)
+def test_disperse_normal_blur_options_change_which_way_pieces_are_thrown(field, value):
+    kwargs = {"progress": 0.4, "outward": 1.0, "seed": 1, "normal_smoothing": 3.0}
+    default = registry.apply("disperse", _ragged_picture(), **kwargs)
+    changed = registry.apply("disperse", _ragged_picture(), **kwargs, **{field: value})
+    assert not np.array_equal(default, changed)
+
+
+@pytest.mark.parametrize(("field", "value"), [("edge", "bogus"), ("normal_truncate", 0.5)])
+def test_disperse_refuses_a_normal_blur_option_it_does_not_offer(field, value):
+    with pytest.raises(ValueError, match=field):
+        registry.apply("disperse", np.ones((20, 20, 3), np.float32), **{field: value})
