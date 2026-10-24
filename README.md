@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/logo.svg" alt="bullterrier-image logo: a bull terrier head in glitching vaporwave colours" height="160">
+</p>
+
 <h1 align="center">bullterrier-image</h1>
 
 <p align="center">
