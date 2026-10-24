@@ -1,0 +1,9 @@
+# A picture inside itself: each copy half the size of the one around it and turned 20 degrees into the middle.
+name = "droste"
+size = 480
+
+[[step]]
+effect = "droste"
+scale = 0.5
+turn = 20
+repeats = 4
