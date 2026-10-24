@@ -4,6 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.particles import draw_segments
 
 
 class RainParams(EffectParams):
@@ -63,28 +64,6 @@ class RainParams(EffectParams):
     )
 
 
-def _draw(
-    shape: tuple[int, int], start: np.ndarray, end: np.ndarray, radius: np.ndarray, weight: np.ndarray
-) -> np.ndarray:
-    """The (h, w) float32 layer of the segments from `start` to `end` (n x 2 arrays of x, y), each `radius` px (n)
-    to either side and as bright as its `weight` (n) at its centre line, with a one-pixel soft edge; where segments
-    overlap the brighter one shows."""
-    height, width = shape
-    layer = np.zeros(shape, np.float32)
-    for (x0, y0), (x1, y1), reach, light in zip(start, end, radius, weight, strict=True):
-        top, bottom = max(int(min(y0, y1) - reach - 1), 0), min(int(max(y0, y1) + reach + 1) + 1, height)
-        left, right = max(int(min(x0, x1) - reach - 1), 0), min(int(max(x0, x1) + reach + 1) + 1, width)
-        rows, cols = np.mgrid[top:bottom, left:right]
-        along = (x1 - x0, y1 - y0)
-        # how far along the segment (0..1) the nearest point to each pixel is
-        nearest = np.clip(((cols - x0) * along[0] + (rows - y0) * along[1]) / (along[0] ** 2 + along[1] ** 2), 0.0, 1.0)
-        distance = np.hypot(cols - x0 - nearest * along[0], rows - y0 - nearest * along[1])
-        # a pixel is a unit box: covered fully within `reach` - 0.5 of the segment, not at all beyond `reach` + 0.5
-        cover = light * np.clip(reach + 0.5 - distance, 0.0, 1.0)
-        layer[top:bottom, left:right] = np.maximum(layer[top:bottom, left:right], cover)
-    return layer
-
-
 @effect(category="atmosphere", params=RainParams)
 def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
@@ -102,7 +81,9 @@ def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     start = np.stack([x * width, y * height], axis=1)
     lean = np.radians(params.angle)
     end = start + params.length * near[:, None] * np.array([np.sin(lean), np.cos(lean)])
-    layer = _draw((height, width), start, end, params.thickness * near / 2, params.opacity * near)
+    layer = draw_segments(
+        (height, width), start, end, params.thickness * near / 2, params.opacity * near, feather=1.0
+    )  # constant: a one-pixel antialiased edge
     # screen, 1 - (1 - rgb)(1 - light), written as rgb + light x (1 - rgb) so rgb is exactly unchanged where light is 0
     light = layer[..., None] * np.asarray(params.color, np.float32)
     return (rgb + light * (1 - rgb)).astype(np.float32)
