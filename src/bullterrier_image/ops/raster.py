@@ -15,15 +15,15 @@ __all__ = ["FillRule", "coverage", "paint"]
 
 FillRule = Literal["nonzero", "evenodd"]
 
+_NO_CORNERS = np.empty((0, 2))  # constant: no corners, each with two coordinates (x and y)
+_RAMP_EXTRA = 3  # constant: a ramp row has width + 1 pixel boundaries and two more cells for the second difference
 _ROWS_AT_ONCE = 64  # constant: pixel rows handled together; bounds the memory of the crossings, never changes a result
 
 
 def _edges(polygons: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     """The edges of the closed `polygons` that are not horizontal (they cross no scanline): start and end, `(m, 2)`."""
-    if not polygons:
-        return np.empty((0, 2)), np.empty((0, 2))
-    start = np.concatenate(polygons)
-    end = np.concatenate([np.roll(polygon, -1, axis=0) for polygon in polygons])
+    start = np.concatenate([_NO_CORNERS, *polygons])
+    end = np.concatenate([_NO_CORNERS, *(np.concatenate([polygon[1:], polygon[:1]]) for polygon in polygons)])
     slanting = start[:, 1] != end[:, 1]
     return start[slanting], end[slanting]
 
@@ -95,16 +95,16 @@ def coverage(polygons: list[np.ndarray], shape: tuple[int, int], rule: FillRule,
         ys = (np.arange(top * samples, bottom * samples) + 0.5) / samples
         scan, x0, x1 = _spans(start, end, ys, rule)
         row = scan // samples
-        size = (bottom - top) * (width + 3)
+        size = (bottom - top) * (width + _RAMP_EXTRA)
         steps = np.zeros(size)
         # A stretch from a to b covers pixel i by clip(i + 1 - a, 0, b - a) - clip(i - a, 0, b - a), the difference of
         # two ramps `max(i - a, 0)` and `max(i - b, 0)`; a ramp starting at `a` is a second difference of
         # `ceil(a) - a` at ceil(a) and `1 - (ceil(a) - a)` after it.
         for edge, weight in ((np.clip(x0, 0, width), 1 / samples), (np.clip(x1, 0, width), -1 / samples)):
             cell = np.ceil(edge).astype(np.int64)
-            index = row * (width + 3) + cell
+            index = row * (width + _RAMP_EXTRA) + cell
             steps += np.bincount(index, weight * (cell - edge), minlength=size)
             steps += np.bincount(index + 1, weight * (1 - (cell - edge)), minlength=size)
-        ramps = np.cumsum(np.cumsum(steps.reshape(bottom - top, width + 3), axis=1), axis=1)
+        ramps = np.cumsum(np.cumsum(steps.reshape(bottom - top, width + _RAMP_EXTRA), axis=1), axis=1)
         out[top:bottom] = np.diff(ramps[:, : width + 1], axis=1)
     return out
