@@ -63,6 +63,10 @@ CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 # (h, w) 0..1. An effect declares the ones it needs as keyword-only parameters after `params`, each with a default.
 INPUTS = ("matte",)
 
+# The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
+# effect, where it applies, how much of it shows, how it combines with the picture below it, and one of its presets.
+STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset")
+
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
 # never followed by a space; "e.g." and "i.e." are, so they are skipped.
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")

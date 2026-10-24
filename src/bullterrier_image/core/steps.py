@@ -1,17 +1,19 @@
-"""The data model of a look: a `Step` (one effect, its parameters, optional mask and opacity) and a `Recipe` (a named,
-ordered tuple of steps with an output size and a `Framing`).
+"""The data model of a look: a `Step` (one effect, its parameters, and how it is laid over the picture below it: a
+mask, an opacity and a blend mode) and a `Recipe` (a named, ordered tuple of steps with an output size and a
+`Framing`).
 
 Promises:
 - Everything is validated when it is made, wherever it comes from (a TOML file, `fx`, or your own code): an unknown
-  effect, a misspelt or out-of-range parameter, a bad mask or opacity, or an empty recipe fails at once with a
-  `RecipeError` (a `ValueError`; an unknown effect is an `UnknownEffectError`, also a `KeyError`) saying what is valid.
-  A step's parameters are checked by its effect's own parameter model.
+  effect, a misspelt or out-of-range parameter, a bad mask, opacity or blend mode, or an empty recipe fails at once
+  with a `RecipeError` (a `ValueError`; an unknown effect is an `UnknownEffectError`, also a `KeyError`) saying what is
+  valid. A step's parameters are checked by its effect's own parameter model.
 - Steps and recipes are immutable values (frozen Pydantic models): `where` and `blend` return changed copies. A step
   keeps its parameters as they were written, so `describe` shows them that way; with a `preset` they are the preset's
   parameters under the ones given, which is all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
 
-Dependency direction: imports the effect registry, `framing`, `params` and `errors` only. The recipe-file reader
+Dependency direction: imports the effect registry, `framing`, `params`, `ops.composite` (the blend modes' names) and
+`errors` only. The recipe-file reader
 `loader` (TOML to `Recipe`, in the adapters layer) and `runner` (running a `Recipe` on a photo) both build on this
 module and do not know each other.
 """
@@ -23,6 +25,7 @@ from typing import Any, Literal
 from pydantic import Field, field_validator, model_validator
 
 from bullterrier_image.errors import RecipeError
+from bullterrier_image.ops.composite import BlendMode
 
 from . import registry
 from .framing import Framing
@@ -30,10 +33,13 @@ from .params import ValidatedModel
 
 
 class Step(ValidatedModel):
-    """One effect with its parameters, optionally limited to the subject or the background and blended in partway.
+    """One effect with its parameters, laid over the picture below it (the step's input) as a layer is in an image
+    editor: optionally limited to the subject or the background, combined by a blend mode and mixed in partway.
 
-    Steps are checked when they are made, wherever they come from (a recipe file, `fx`, or your own code): an unknown
-    effect, a misspelt or out-of-range parameter or opacity fails at once with a message saying what is valid.
+    The runner first combines the input (the backdrop) and the effect's result (the source) by `blend_mode`, then mixes
+    that over the input by `opacity`, only where `mask` says. Steps are checked when they are made, wherever they come
+    from (a recipe file, `fx`, or your own code): an unknown effect, a misspelt or out-of-range parameter, mask, opacity
+    or blend mode fails at once with a message saying what is valid.
     """
 
     effect: str = Field(description="The name of a registered effect.")
@@ -44,6 +50,12 @@ class Step(ValidatedModel):
     opacity: float = Field(
         1.0, ge=0, le=1, strict=True, allow_inf_nan=False, description="How much of the step shows: 0 none, 1 fully."
     )
+    blend_mode: BlendMode = Field(
+        "normal",
+        description="How the result combines with the step's input, as the W3C blend modes: 'normal' shows the result, "
+        "'multiply' darkens, 'screen' lightens, 'overlay' and 'soft_light' deepen contrast, 'difference' subtracts, "
+        "'color' takes the result's hue and saturation and keeps the input's brightness.",
+    )
 
     def __init__(
         self,
@@ -51,6 +63,7 @@ class Step(ValidatedModel):
         params: Mapping[str, Any] | None = None,
         mask: str | None = None,
         opacity: float = 1.0,
+        blend_mode: str = "normal",
         preset: str | None = None,
         **unknown: Any,
     ) -> None:
@@ -67,7 +80,9 @@ class Step(ValidatedModel):
                 has = f"its presets: {', '.join(found)}" if found else "it has no presets"
                 raise RecipeError(f"effect {effect!r} has no preset {preset!r}; {has}")
             values = {**found[preset].params, **values}
-        self._init_checked("", effect=effect, params=values, mask=mask, opacity=opacity, **unknown)
+        self._init_checked(
+            "", effect=effect, params=values, mask=mask, opacity=opacity, blend_mode=blend_mode, **unknown
+        )
 
     @model_validator(mode="after")
     def _valid_for_the_effect(self) -> "Step":
@@ -80,11 +95,11 @@ class Step(ValidatedModel):
 
     def where(self, region: str) -> "Step":
         """The same step applied only to the "subject" or only to the "background" of the photo."""
-        return Step(self.effect, self.params, region, self.opacity)
+        return Step(self.effect, self.params, region, self.opacity, self.blend_mode)
 
     def blend(self, amount: float) -> "Step":
         """The same step mixed in partway: 0 = no effect, 1 = fully (the default)."""
-        return Step(self.effect, self.params, self.mask, amount)
+        return Step(self.effect, self.params, self.mask, amount, self.blend_mode)
 
     @property
     def wants_matte(self) -> bool:
@@ -92,9 +107,12 @@ class Step(ValidatedModel):
         return "matte" in registry.inputs(self.effect)
 
     def describe(self, width: int = 56) -> str:
-        """A short readable form, e.g. `fill(color='#000000') on background`, cut to `width` characters."""
+        """A short readable form, e.g. `fill(color='#000000') on background` or `glow() screen x0.8` (the blend mode,
+        then the opacity), cut to `width` characters."""
         shown = ", ".join(f"{k}={_short(v)}" for k, v in self.params.items())
         text = f"{self.effect}({shown})"
+        if self.blend_mode != "normal":
+            text += f" {self.blend_mode}"
         if self.mask:
             text += f" on {self.mask}"
         if self.opacity < 1.0:

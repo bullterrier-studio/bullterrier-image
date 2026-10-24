@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -84,12 +85,70 @@ def test_opacity_combines_with_a_mask(photo, matte):
     np.testing.assert_allclose(out[matte == 1], photo[matte == 1], atol=1e-6)
 
 
-def test_opacity_is_read_from_the_file_and_validated(tmp_path):
-    ok = load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=0.4\n'))
-    assert ok.steps[0].opacity == 0.4
-    assert "opacity" not in ok.steps[0].params
-    with pytest.raises(ValueError, match=r"step 1.*opacity"):
-        load_recipe(write(tmp_path, '[[step]]\neffect="grain"\nopacity=1.5\n', "bad.toml"))
+@pytest.mark.parametrize(
+    ("key", "good", "bad"),
+    [pytest.param("opacity", 0.4, 1.5, id="opacity"), pytest.param("blend_mode", "screen", "lighten", id="blend_mode")],
+)
+def test_a_step_key_is_read_from_the_file_onto_the_step_and_validated(tmp_path, key, good, bad):
+    (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(good)}\n')).steps
+    assert getattr(step, key) == good
+    assert key not in step.params
+    with pytest.raises(ValueError, match=rf"step 1.*{key}.*{bad}"):
+        load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(bad)}\n', "bad.toml"))
+
+
+# --- blend_mode: the step's result is laid over its input as a layer is in an image editor ----------------------
+
+MODES = ["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"]
+ORANGE = np.array([1.0, 0.5, 0.0], np.float32)  # "#ff8000" to within 1/510
+
+
+def fill(color: str, **keys) -> Recipe:
+    return Recipe("b", (Step("fill", {"color": color}, **keys),), size=None)
+
+
+@pytest.mark.parametrize(
+    ("mode", "color"),
+    [("multiply", "#ffffff"), ("screen", "#000000"), ("difference", "#000000"), ("overlay", "#808080")],
+    ids=["multiply by white", "screen by black", "difference with black", "overlay with mid grey"],
+)
+def test_a_neutral_result_leaves_the_photo_as_it_was_under_its_mode(photo, mode, color):
+    np.testing.assert_allclose(render(photo, fill(color, blend_mode=mode)), photo, atol=0.003)  # 0x80 is 0.502
+
+
+@pytest.mark.parametrize(
+    ("mode", "by_hand"),
+    [
+        ("multiply", lambda photo: photo * ORANGE),
+        ("screen", lambda photo: photo + ORANGE - photo * ORANGE),
+        ("difference", lambda photo: np.abs(photo - ORANGE)),
+    ],
+)
+def test_the_mode_combines_the_steps_input_with_its_result(photo, mode, by_hand):
+    np.testing.assert_allclose(render(photo, fill("#ff8000", blend_mode=mode)), by_hand(photo), atol=0.002)
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_opacity_0_leaves_the_photo_as_it_was_under_every_mode(photo, mode):
+    np.testing.assert_array_equal(render(photo, fill("#ff8000", blend_mode=mode, opacity=0.0)), photo)
+
+
+def test_the_mode_combines_first_and_the_opacity_mixes_that_in(photo):
+    grey = np.float32(0x80 / 255)
+    out = render(photo, fill("#808080", blend_mode="multiply", opacity=0.5))
+    np.testing.assert_allclose(out, photo + 0.5 * (photo * grey - photo), atol=1e-6)
+
+
+def test_a_mode_on_the_background_leaves_the_subject_untouched(photo, matte):
+    out = render(photo, fill("#ff8000", blend_mode="multiply", mask="background"), matte)
+    np.testing.assert_array_equal(out[matte == 1], photo[matte == 1])
+    np.testing.assert_allclose(out[matte == 0], photo[matte == 0] * ORANGE, atol=0.002)
+
+
+def test_a_step_says_its_mode_and_by_default_it_is_normal():
+    assert Step("grain").blend_mode == "normal"
+    assert Step("grain", blend_mode="screen") != Step("grain")
+    assert Step("glow", blend_mode="screen", opacity=0.8).describe() == "glow() screen x0.8"
 
 
 def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, matte, throwaway_effects):

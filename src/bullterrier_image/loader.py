@@ -21,7 +21,12 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     effect = "fill"
     color = "#000000"
     mask = "background"            # "subject" or "background": apply only there (needs a clear subject in the photo)
-    opacity = 0.3                  # optional, 0..1: blend the effect in partway (default 1 = fully)
+    opacity = 0.3                  # optional, 0..1: mix the effect in partway (default 1 = fully)
+
+    [[step]]
+    effect = "gradient"
+    blend_mode = "screen"          # optional: how the result combines with the picture below (default "normal"):
+                                   # normal, multiply, screen, overlay, soft_light, difference or color
 
     [[step]]
     effect = "gradient_map"
@@ -157,12 +162,11 @@ def load_recipe(path: str | Path) -> Recipe:
     for i, entry in enumerate(entries, start=1):
         where = f"{path.name}: step {i}"
         entry = dict(entry)
-        name = entry.pop("effect", None)
-        if name is None:
+        keys = {key: entry.pop(key) for key in registry.STEP_KEYS if key in entry}  # the rest are the parameters
+        if "effect" not in keys:
             raise RecipeError(f"{where}: missing `effect`")
-        mask, opacity, preset = entry.pop("mask", None), entry.pop("opacity", 1.0), entry.pop("preset", None)
         try:
-            steps.append(Step(name, with_pictures(name, entry, path.parent), mask, opacity, preset))
+            steps.append(Step(**keys, params=with_pictures(keys["effect"], entry, path.parent)))
         except (RecipeError, ImageReadError) as error:
             raise _located(error, where) from None
     try:

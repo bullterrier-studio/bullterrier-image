@@ -54,10 +54,10 @@ def test_a_sweep_keeps_the_recipes_framing():
 
 
 def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():
-    masked = Step("grain", GRAIN_PARAMS, mask="subject", opacity=0.5)
+    masked = Step("grain", GRAIN_PARAMS, mask="subject", opacity=0.5, blend_mode="screen")
     recipe = Recipe("masked", [GLITCH, masked], size=48)
     for _, tile in sweep(recipe, "grain.amount", 0, 0.2, 3):
-        assert (tile.steps[1].mask, tile.steps[1].opacity) == ("subject", 0.5)
+        assert (tile.steps[1].mask, tile.steps[1].opacity, tile.steps[1].blend_mode) == ("subject", 0.5, "screen")
         assert tile.steps[0] == GLITCH
 
 

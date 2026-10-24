@@ -12,8 +12,8 @@ only if the recipe needs the subject. It never loads a file or looks for the sub
 recipe's `Framing` is applied, so a crop can follow the subject and the matte moves with the photo; the framed photo is
 then scaled to the recipe's size.
 
-Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never the recipe-file
-reader `loader`, so recipes built in Python run without it.
+Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo and blend a step); never the
+recipe-file reader `loader`, so recipes built in Python run without it.
 """
 
 from collections import deque
@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from bullterrier_image.errors import SubjectNotFoundError
+from bullterrier_image.ops.composite import composite
 from bullterrier_image.ops.resample import resize
 
 from . import registry
@@ -42,8 +43,9 @@ def render(
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
     The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; the subject
-    matte is framed and scaled with it. Steps run in order, each on the previous step's output. A masked
-    step is blended in through the subject matte, so only the subject or only the background changes.
+    matte is framed and scaled with it. Steps run in order, each on the previous step's output, which the step's result
+    is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the subject
+    matte, so only the subject or only the background changes.
     Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically. After the
     last step a recipe whose framing is `transparent` is cut out: the result then has four channels, RGB and straight
     alpha (h, w, 4), instead of three.
@@ -163,17 +165,17 @@ def _stages(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None) ->
         result = registry.apply(step.effect, out, **step.params, **extra)
         if result.shape != out.shape:
             raise RuntimeError(f"effect {step.effect!r} changed the image shape {out.shape} -> {result.shape}")
-        if step.mask or step.opacity < 1.0:
+        if step.mask or step.opacity < 1.0 or step.blend_mode != "normal":
             result = _blend(out, result, step, matte)
         out = result
         yield step, out
 
 
 def _blend(before: np.ndarray, after: np.ndarray, step: Step, matte: np.ndarray | None) -> np.ndarray:
-    """`after` blended over `before` by the step's opacity and mask. A function of its own so that its weights, a third
-    of a picture, are freed before the next step runs rather than kept by the generator."""
+    """`after` laid over `before` by the step's blend mode, then mixed in by its opacity and mask. A function of its own
+    so that its weights, a third of a picture, are freed before the next step runs rather than kept by the generator."""
     alpha: np.floating | np.ndarray = np.float32(step.opacity)
     if step.mask:
         # `_prepare` gave the matte every masked step needs
         alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]  # type: ignore[index,operator]
-    return before + (after - before) * alpha
+    return composite(before, after, step.blend_mode, alpha)
