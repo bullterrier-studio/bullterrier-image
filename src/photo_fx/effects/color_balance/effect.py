@@ -88,6 +88,7 @@ class ColorBalanceParams(EffectParams):
         "taken off or put back on all three channels, so only the colour changes (Photoshop's 'Preserve "
         "Luminosity'); off, the shifts also lighten or darken. Where a channel reaches 0 or 1 the luma is only "
         "kept as far as the clipping allows.",
+        advanced=True,
     )
 
 
