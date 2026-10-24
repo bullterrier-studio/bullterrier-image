@@ -1,0 +1,8 @@
+# A corrupted JPEG: a few damaged coefficients leave streaks and patterned blocks.
+name = "byte_corrupt"
+size = 480
+
+[[step]]
+effect = "byte_corrupt"
+hits = 60
+seed = 5
