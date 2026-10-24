@@ -1,0 +1,9 @@
+# Coloured speckle, like a high-ISO sensor.
+# It also makes the effect's picture in the catalogue.
+name = "noise"
+size = 480
+
+[[step]]
+effect = "noise"
+amount = 0.1
+seed = 1
