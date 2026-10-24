@@ -8,8 +8,8 @@ Dependency direction: the bottom layer, below `ops`: it imports nothing from pho
 """
 
 __all__ = [
-    "BackendUnavailableError", "ImageReadError", "PhotoFxError", "ProjectError", "RecipeError", "SubjectNotFoundError",
-    "UnknownEffectError",
+    "BackendUnavailableError", "ImageReadError", "NoFramesError", "PhotoFxError", "ProjectError", "RecipeError",
+    "SubjectNotFoundError", "UnknownEffectError",
 ]  # fmt: skip
 
 
@@ -43,6 +43,10 @@ class UnknownEffectError(RecipeError, KeyError):
 class SubjectNotFoundError(PhotoFxError, RuntimeError):
     """The subject of a photo was needed (a masked step, an effect that takes the matte) but could not be found or
     used: no `matte` and no finder given, a finder that found nothing, or a matte of another size than the photo."""
+
+
+class NoFramesError(PhotoFxError, ValueError):
+    """A video or animation was asked for with no frames to write."""
 
 
 class BackendUnavailableError(PhotoFxError, NotImplementedError):

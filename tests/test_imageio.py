@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image, ImageCms
 
-from photo_fx import BackendUnavailableError, ImageReadError, imageio
+from photo_fx import BackendUnavailableError, ImageReadError, NoFramesError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -339,7 +339,7 @@ def test_save_video_mp4_streams_frames_and_copes_with_odd_sizes(tmp_path):
 def test_save_video_rejects_unknown_formats_and_no_frames(tmp_path):
     with pytest.raises(BackendUnavailableError, match=r"\.avi.*use \.mp4"):
         imageio.save_video(_frames(), tmp_path / "a.avi")
-    with pytest.raises(ValueError, match="no frames"):
+    with pytest.raises(NoFramesError, match="no frames"):
         imageio.save_video([], tmp_path / "a.gif")
 
 

@@ -19,7 +19,7 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.errors import BackendUnavailableError, ImageReadError
+from photo_fx.errors import BackendUnavailableError, ImageReadError, NoFramesError
 from photo_fx.ops import resample
 
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
@@ -128,8 +128,8 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
     .mp4 / .mov: H.264 through ffmpeg (the one on the PATH, else the one the `[video]` extra installs:
     `pip install "photo-fx[video]"`); frames are streamed, so a long clip never has to fit in memory. .gif: no extra
     tools, but every frame is held in memory and colours are limited to 256, so use it for small, short clips.
-    Returns the number of frames written. BackendUnavailableError when the extension is none of those, or when
-    ffmpeg is needed and found nowhere, or fails.
+    Returns the number of frames written. NoFramesError when there are none; BackendUnavailableError when the
+    extension is none of those, or when ffmpeg is needed and found nowhere, or fails.
 
     `max_side` shrinks frames larger than that (longest side, in px) while keeping the aspect ratio: 1600 px square
     needs an unusually high H.264 level that some players struggle with, 1080 is playable almost everywhere.
@@ -142,7 +142,7 @@ def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, ma
             for frame in frames
         ]
         if not images:
-            raise ValueError("no frames to write")
+            raise NoFramesError("no frames to write")
         images[0].save(path, save_all=True, append_images=images[1:], duration=round(1000 / fps), loop=0)
         return len(images)
     if suffix in {".mp4", ".mov"}:
@@ -173,7 +173,7 @@ def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_si
     frames = iter(frames)
     first = next(frames, None)
     if first is None:
-        raise ValueError("no frames to write")
+        raise NoFramesError("no frames to write")
     height, width = first.shape[:2]
     filters = "pad=ceil(iw/2)*2:ceil(ih/2)*2"  # H.264 in yuv420p needs even dimensions
     if max_side is not None and max(height, width) > max_side:
