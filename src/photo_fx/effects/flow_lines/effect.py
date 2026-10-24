@@ -33,6 +33,7 @@ class FlowLinesParams(EffectParams):
         max=16,
         doc="The distance in px a line moves each step. Keep it at or below the line's thickness for a solid line; "
         "larger steps leave dotted lines.",
+        advanced=True,
     )
     thickness: float = param(
         1.5,
@@ -64,6 +65,7 @@ class FlowLinesParams(EffectParams):
         min=0,
         max=1,
         doc="How much weaker each finer layer of the flow is than the one before. 0 = only the coarsest layer.",
+        advanced=True,
     )
     lacunarity: float = param(
         2.0,
@@ -71,6 +73,7 @@ class FlowLinesParams(EffectParams):
         min=1,
         max=4,
         doc="How much finer each layer of the flow is than the one before: the lattice spacing is divided by this.",
+        advanced=True,
     )
     twist: float = param(
         180.0,
