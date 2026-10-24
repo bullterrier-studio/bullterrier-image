@@ -71,6 +71,5 @@ def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     near = 0.5 + 0.5 * depth
     centre = np.stack([x * width, y * height], axis=1)
     radius = params.size / 2 * near
-    feather = np.maximum(params.softness * radius, 1)
-    light = draw_segments((height, width), centre, centre, radius, params.opacity * near, feather)
+    light = draw_segments((height, width), centre, centre, radius, params.opacity * near, params.softness * radius)
     return (rgb + light[..., None] * np.asarray(params.color, np.float32) * (1 - rgb)).astype(np.float32)

@@ -16,7 +16,8 @@ def draw_segments(
     `start` and `end` are (n, 2) arrays of x, y positions in px, a pixel's centre at whole numbers; every `start`
     lies inside the picture, an `end` may lie beyond it. A segment whose ends are equal is a disc. `radius` (the
     half-width of the segment, px), `weight` (its brightness along its centre line, 0..1) and `feather` (the width of
-    its soft edge, px, at least 1) are each one number for every segment or an array of n.
+    its soft edge, px) are each one number for every segment or an array of n. A feather under 1 is taken as 1: a
+    narrower edge is aliasing, the pixel grid's own limit.
 
     A pixel's value is `weight` times how far the segment covers it: 1 within `radius` - `feather` / 2 of the segment
     (its centre line, or the point of a disc), 0 beyond `radius` + `feather` / 2, and falling linearly between, so
@@ -27,6 +28,7 @@ def draw_segments(
     layer = np.zeros(shape, np.float32)
     count = len(start)
     radii, weights, feathers = (np.broadcast_to(value, count) for value in (radius, weight, feather))
+    feathers = np.maximum(feathers, 1.0)
     for (x0, y0), (x1, y1), reach, light, edge in zip(start, end, radii, weights, feathers, strict=True):
         margin = reach + edge / 2 + 1
         top, bottom = max(int(min(y0, y1) - margin), 0), min(int(max(y0, y1) + margin) + 1, height)

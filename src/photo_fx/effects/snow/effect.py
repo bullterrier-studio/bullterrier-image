@@ -77,6 +77,7 @@ def snow(rgb: np.ndarray, params: SnowParams) -> np.ndarray:
     depth = (np.floor(layer * params.layers) + 1) / params.layers
     centre = np.stack([x * width, y * height], axis=1)
     radius = params.size / 2 * depth
-    feather = np.maximum(params.softness * radius, 1)
-    light = draw_segments((height, width), centre, centre, radius, params.opacity * (0.5 + 0.5 * depth), feather)
+    light = draw_segments(
+        (height, width), centre, centre, radius, params.opacity * (0.5 + 0.5 * depth), params.softness * radius
+    )
     return (rgb + light[..., None] * (1 - rgb)).astype(np.float32)  # screen: unchanged where there is no light

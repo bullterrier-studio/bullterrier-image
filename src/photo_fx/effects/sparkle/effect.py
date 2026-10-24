@@ -77,7 +77,7 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     centre = np.stack([chosen % width, chosen // width], axis=1).astype(np.float64)
     brightness = params.opacity * scale
     radius = params.size / 2 * scale
-    dots = draw_segments((height, width), centre, centre, radius, brightness, np.maximum(radius, 1))
+    dots = draw_segments((height, width), centre, centre, radius, brightness, radius)
     # the rays: from the middle left, right, up and down, each a hairline
     reach = params.rays * params.size * scale[:, None]
     # constant: the unit vectors of the four ray directions

@@ -90,7 +90,5 @@ def embers(rgb: np.ndarray, params: EmbersParams) -> np.ndarray:
     drift = np.radians(params.angle)
     tail = head + params.length * near[:, None] * np.array([-np.sin(drift), np.cos(drift)])
     radius = params.size / 2 * near
-    light = draw_segments(
-        (height, width), head, tail, radius, params.opacity * near, np.maximum(params.softness * radius, 1)
-    )
+    light = draw_segments((height, width), head, tail, radius, params.opacity * near, params.softness * radius)
     return (rgb + light[..., None] * np.asarray(params.color, np.float32) * (1 - rgb)).astype(np.float32)

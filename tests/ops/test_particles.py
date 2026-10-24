@@ -48,6 +48,13 @@ def test_a_feather_makes_the_edge_fall_linearly_across_its_width_centred_on_the_
     assert layer[20, 30 - distance] == pytest.approx(expected)
 
 
+@pytest.mark.parametrize("feather", [0.0, 0.2, 0.99])
+def test_a_feather_under_one_pixel_is_drawn_as_one_pixel(feather: float) -> None:
+    assert np.array_equal(
+        one((30.0, 20.0), (30.0, 20.0), radius=3.0, feather=feather), one((30.0, 20.0), (30.0, 20.0), radius=3.0)
+    )
+
+
 @pytest.mark.parametrize(
     ("start", "end"),
     [
