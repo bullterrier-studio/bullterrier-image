@@ -13,7 +13,7 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Edge, Grid, Pick, Shards
+from bullterrier_image.recipe import Edge, Grid, Pick, Shards, Subject
 
 STEP = "[[step]]\neffect = 'grade'\n"
 
@@ -246,10 +246,22 @@ kind = "pick"
 of = "panes"
 pieces = [4]
 
+[region.found]
+kind = "subject"
+per = "panes"
+context = 0.3
+threshold = 0.8
+max_coverage = 0.9
+
 [[step]]
 effect = "fill"
 color = "#ff0000"
 mask = "head"
+
+[[step]]
+effect = "fill"
+color = "#0000ff"
+mask = "found"
 
 [[step]]
 each = "glass"
@@ -272,9 +284,11 @@ REGIONS_RECIPE = Recipe(
         "panes": Grid(columns=[0.2, 0.17, 0.63], rows=2),
         "glass": Shards(preset="glass", fit="subject", impact=(0.6, 0.2), edge=Edge(style="torn", amount=0.02)),
         "head": Pick(of="panes", pieces=[4]),
+        "found": Subject(per="panes", context=0.3, threshold=0.8, max_coverage=0.9),
     },
     steps=[
         Step("fill", {"color": "#ff0000"}, mask="head"),
+        Step("fill", {"color": "#0000ff"}, mask="found"),
         Each(
             "glass",
             [
@@ -300,7 +314,10 @@ def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, m
     from bullterrier_image.core.runner import render
 
     loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
-    np.testing.assert_array_equal(render(photo, loaded, matte), render(photo, REGIONS_RECIPE, matte))
+    finder = lambda crop: np.where(crop[..., 0] > 0.5, 1.0, 0.0).astype(np.float32)  # noqa: E731  (a stand-in model)
+    np.testing.assert_array_equal(
+        render(photo, loaded, matte, find_subject=finder), render(photo, REGIONS_RECIPE, matte, find_subject=finder)
+    )
 
 
 def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):
@@ -330,7 +347,10 @@ def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_pa
 
 
 REGION_MISTAKES = {
-    "a kind that does not exist": ('[region.g]\nkind = "hexagons"\n', r"region 'g': .*'hexagons'.*grid, shards, pick"),
+    "a kind that does not exist": (
+        '[region.g]\nkind = "hexagons"\n',
+        r"region 'g': .*'hexagons'.*grid, shards, pick, subject",
+    ),
     "no kind": ("[region.g]\ncolumns = 2\n", r"region 'g': .*`kind`.*grid, shards, pick"),
     "a kind that is not text": ("[region.g]\nkind = 3\n", r"region 'g': .*`kind`.*grid, shards, pick"),
     "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),

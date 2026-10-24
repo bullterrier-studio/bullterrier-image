@@ -14,7 +14,7 @@ from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Grid, Pick, Shards
+from bullterrier_image.recipe import Grid, Pick, Shards, Subject
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
@@ -615,3 +615,74 @@ def test_a_feather_is_a_share_of_the_long_side_so_the_blend_is_the_same_at_two_r
     halved = large.reshape(96, 2, 128, 2, 3).mean(axis=(1, 3))  # the large one at the small one's resolution
     np.testing.assert_allclose(halved, small, atol=0.03)
     assert 0.1 < small[0, 63, 1] < 0.4  # and it is a real blend at the border, not a hard edge
+
+
+# --- the subject found piece by piece (grid first) ------------------------------------------------------------------
+
+
+class PieceFinder:
+    """A stand-in subject finder for pieces: records the crops it is asked about and finds a 4 x 4 subject at the top
+    left of each crop."""
+
+    def __init__(self) -> None:
+        self.crops: list[np.ndarray] = []
+
+    def __call__(self, rgb: np.ndarray) -> np.ndarray:
+        self.crops.append(rgb.copy())
+        matte = np.zeros(rgb.shape[:2], np.float32)
+        matte[2:6, 2:6] = 1
+        return matte
+
+
+GRID_FIRST = Recipe(
+    "grid-first",
+    [fill(RED, mask="found")],
+    size=64,
+    regions={"cells": Grid(columns=2, rows=2), "found": Subject(per="cells", context=0)},
+)
+
+
+FINAL_PICTURE = {
+    "render": lambda photo, recipe, **k: runner.render(photo, recipe, **k),
+    "trace": lambda photo, recipe, **k: runner.trace(photo, recipe, **k)[-1].image,
+    "render_all": lambda photo, recipe, **k: runner.render_all(photo, [PLAIN, recipe], **k)[1],
+}
+
+
+@pytest.mark.parametrize("run_it", FINAL_PICTURE.values(), ids=FINAL_PICTURE.keys())
+def test_the_finder_is_asked_about_the_crop_of_each_piece_of_the_working_picture_and_the_finds_are_laid_where_found(
+    run_it, photo
+):
+    finder = PieceFinder()
+    out = run_it(photo, GRID_FIRST, find_subject=finder)
+    working = resize(photo, 64)  # 48 x 64: four pieces of 24 x 32
+    assert sorted(crop.tobytes() for crop in finder.crops) == sorted(
+        working[y : y + 24, x : x + 32].tobytes() for y in (0, 24) for x in (0, 32)
+    )
+    expected = working.copy()
+    for y in (0, 24):
+        for x in (0, 32):
+            expected[y + 2 : y + 6, x + 2 : x + 6] = RGB[RED]
+    np.testing.assert_array_equal(out, expected)
+
+
+def test_a_matte_of_the_whole_photo_does_not_stand_in_for_the_finder_of_pieces(photo, matte):
+    with pytest.raises(SubjectNotFoundError, match=r"'found'.*cells"):
+        runner.render(photo, GRID_FIRST, matte)
+    finder = PieceFinder()
+    runner.render(photo, GRID_FIRST, matte, find_subject=finder)
+    assert [crop.shape for crop in finder.crops] == [(24, 32, 3)] * 4  # the pieces, never the whole photo
+
+
+@pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
+def test_a_subject_found_piece_by_piece_is_refused_without_a_finder(run_it, photo):
+    with pytest.raises(SubjectNotFoundError, match=r"'found'.*finder"):
+        run_it(photo, GRID_FIRST)
+
+
+def test_a_subject_found_piece_by_piece_that_no_step_uses_asks_nobody():
+    finder = PieceFinder()
+    photo = np.zeros((20, 30, 3), np.float32)
+    recipe = Recipe("unused", [Step("grade", {"exposure": 0.5})], size=None, regions=GRID_FIRST.regions)
+    runner.render(photo, recipe, find_subject=finder)
+    assert finder.crops == []

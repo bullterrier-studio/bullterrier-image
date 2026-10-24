@@ -6,10 +6,12 @@ row, rows from the top). For a grid that is row after row; for any other kind it
 that makes more pieces than a small picture has pixels yields only the pieces that have a pixel, so n can be smaller
 than asked for. A **selection** (`Selection`) says how much each pixel is chosen, 0..1.
 
-The kinds are models declared like an effect's parameters (`Grid`, `Shards`, `Pick`; `Edge` bends the borders of the
-first two), so every field has a unit, a range and a description: `Shards.documentation()` lists them. A recipe or a
-script declares them by name, and `resolve` turns the declarations into the regions of one picture, building only what
-is asked for. `look_weights` turns a partition and a look for each piece into the weights that blend the looks.
+The kinds are models declared like an effect's parameters (`Grid`, `Shards`, `Pick`, `Subject`; `Edge` bends the
+borders of the first two), so every field has a unit, a range and a description: `Shards.documentation()` lists them. A
+recipe or a script declares them by name, and `resolve` turns the declarations into the regions of one picture, building
+only what is asked for. `Subject` with `per` is *grid first*: the subject is found inside each piece of a partition, one
+call of the injected finder per piece, and the finds are united. `look_weights` turns a partition and a look for each
+piece into the weights that blend the looks.
 
 Promises:
 - Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
@@ -30,6 +32,7 @@ from typing import Annotated, Any, Literal
 
 import numpy as np
 from pydantic import BeforeValidator, field_validator, model_validator
+from scipy import ndimage
 
 from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
@@ -41,16 +44,20 @@ from .presets import SHIPPED, read
 
 __all__ = [
     "Edge",
+    "Finder",
     "Grid",
+    "Kind",
     "Partition",
     "Pick",
     "Regions",
     "Selection",
     "Shards",
+    "Subject",
     "as_partition",
     "check",
     "look_weights",
     "needs",
+    "needs_finder",
     "needs_subject",
     "resolve",
     "used",
@@ -291,6 +298,53 @@ class Pick(_Model):
         return pieces
 
 
+class Subject(_Model):
+    """A selection: the subject of the picture, or, with `per`, the subject found inside each piece of a partition
+    (grid first). Without `per` it is the built-in `subject`, and the other fields do nothing."""
+
+    per: str | None = param(
+        None,
+        doc="The name of a partition (a `Grid` or `Shards` region): the subject is found inside each of its pieces "
+        "separately and the finds are united, so small things a whole-picture search misses (a calf behind its "
+        "mother, a fox on a rock) are found. Not set = the subject of the whole picture, as the built-in 'subject'.",
+    )
+    context: float = param(
+        0.25,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How much of its surroundings the finder sees round a piece, as a share of the piece's own size added on "
+        "each side (0 to 1); the view is clipped to the picture. Only the piece's own pixels count. Raising it shows "
+        "the finder more context, so a subject cut by the piece's border is recognised; 0 shows the bare piece. "
+        "Only matters with `per`.",
+    )
+    threshold: float = param(
+        0.9,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How sure the finder must be of a pixel for it to count as subject (0 to 1): a pixel it gives a value of "
+        "this or less is dropped. Raising it keeps only what the finder is certain of and drops the faint subjects it "
+        "invents in a plain piece, but also the uncertain parts of a real one; 0 keeps every pixel the finder gives. "
+        "Only matters with `per`.",
+    )
+    max_coverage: float = param(
+        0.99,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The most of a piece a find may fill (0 to 1), after `threshold`: a find that fills more is dropped, for a "
+        "finder that calls a whole plain piece (sky, water) the subject. Lowering it drops large subjects that fill "
+        "their piece too; 1 never drops one. Only matters with `per`.",
+    )
+
+
+Kind = Grid | Shards | Pick | Subject
+# Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
+# left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
+Finder = Callable[[tuple[int, int, int, int]], np.ndarray]
+
+
 def _frozen(array: np.ndarray) -> np.ndarray:
     """`array`, read-only: regions are shared by every step that asks for them."""
     array.setflags(write=False)
@@ -396,14 +450,14 @@ def look_weights(partition: Partition, assignment: Sequence[int], count: int, *,
     return weights
 
 
-def _type_of(name: str, declared: Mapping[str, Grid | Shards | Pick]) -> Literal["partition", "selection"] | None:
+def _type_of(name: str, declared: Mapping[str, Kind]) -> Literal["partition", "selection"] | None:
     """What the region `name` is, or None when no such region is declared or built in."""
     if name in BUILT_IN:
         return "selection"
     match declared.get(name):
         case Grid() | Shards():
             return "partition"
-        case Pick():
+        case Pick() | Subject():
             return "selection"
         case _:
             return None
@@ -414,7 +468,7 @@ def needs(
     field: str,
     name: str,
     wanted: Literal["partition", "selection"] | None,
-    declared: Mapping[str, Grid | Shards | Pick],
+    declared: Mapping[str, Kind],
 ) -> None:
     """RecipeError unless `name` (what `owner`'s `field` refers to, say "region 'glass'" or "step 2") is a region of
     the `wanted` kind, or any region when `wanted` is None. The message names the owner, field and name and lists the
@@ -433,9 +487,15 @@ def needs(
     raise RecipeError(f"{owner}: `{field}` names {name!r}, {problem}; valid {kind}s: {valid}{hint}")
 
 
-def _reference(kind: Grid | Shards | Pick) -> str | None:
+def _reference(kind: Kind) -> str | None:
     """The name of the region that `kind` is made from, if any."""
-    return kind.of if isinstance(kind, Pick) else kind.fit
+    match kind:
+        case Pick():
+            return kind.of
+        case Subject():
+            return kind.per
+        case _:
+            return kind.fit
 
 
 class Regions(Mapping[str, Partition | Selection]):
@@ -445,12 +505,13 @@ class Regions(Mapping[str, Partition | Selection]):
 
     def __init__(
         self,
-        declared: Mapping[str, Grid | Shards | Pick],
+        declared: Mapping[str, Kind],
         shape: tuple[int, int],
         subject: Callable[[], np.ndarray] | None,
+        find: Finder | None,
     ) -> None:
         """Made by `resolve`, which checks `declared` first."""
-        self._declared, self._shape, self._subject = declared, shape, subject
+        self._declared, self._shape, self._subject, self._find = declared, shape, subject, find
         self._made: dict[str, Partition | Selection] = {}
 
     def __getitem__(self, name: str) -> Partition | Selection:
@@ -511,6 +572,8 @@ class Regions(Mapping[str, Partition | Selection]):
             case "background":
                 return Selection(_frozen(1 - self.selection("subject").alpha))
         kind = self._declared[name]
+        if isinstance(kind, Subject):
+            return self._subject_of(name, kind)
         if isinstance(kind, Pick):
             labels = self.partition(kind.of).labels
             return Selection(_frozen(np.isin(labels, kind.pieces).astype(np.float32)))
@@ -523,6 +586,45 @@ class Regions(Mapping[str, Partition | Selection]):
             row = np.searchsorted(_borders(kind.rows, top, bottom), y, side="right")
             return _partition(row * (len(across) + 1) + column)
         return _partition(nearest(_sites(kind, self._shape, box, chosen), x, y)[1])
+
+    def _subject_of(self, name: str, kind: Subject) -> Selection:
+        """The built-in subject without `per`; with it the subject found in every piece, united. For each piece the
+        finder is asked once about the piece's box grown by `context`; of its answer only the piece's own pixels the
+        finder is surer of than `threshold` are kept, and the whole find is dropped when it fills more of the piece than
+        `max_coverage`. A piece the finder finds nothing in (SubjectNotFoundError) adds nothing."""
+        if kind.per is None:
+            return self.selection("subject")
+        if self._find is None:
+            raise SubjectNotFoundError(
+                f"region {name!r} finds the subject in each piece of {kind.per!r}, but no subject finder was given"
+            )
+        labels = self.partition(kind.per).labels
+        height, width = self._shape
+        found = np.zeros(self._shape, np.float32)
+        for piece, (rows, columns) in enumerate(ndimage.find_objects(labels + 1)):
+            grow_y = round(kind.context * (rows.stop - rows.start))
+            grow_x = round(kind.context * (columns.stop - columns.start))
+            box = (
+                max(0, columns.start - grow_x),
+                max(0, rows.start - grow_y),
+                min(width, columns.stop + grow_x),
+                min(height, rows.stop + grow_y),
+            )
+            try:
+                matte = np.asarray(self._find(box), np.float32)
+            except SubjectNotFoundError:
+                continue
+            left, top, right, bottom = box
+            if matte.shape != (bottom - top, right - left):
+                view = (bottom - top, right - left)
+                raise SubjectNotFoundError(
+                    f"the subject finder gave a matte of shape {matte.shape} for a view of {view}"
+                )
+            own = labels[top:bottom, left:right] == piece
+            sure = own & (matte > kind.threshold)
+            if sure.sum() <= kind.max_coverage * own.sum():
+                found[top:bottom, left:right][sure] = matte[sure]
+        return Selection(_frozen(found))
 
     def _frame(self, name: str, fit: str | None) -> tuple[tuple[int, int, int, int], np.ndarray | None]:
         """The frame region `name` is laid over, `(left, top, right, bottom)` in px, and the pixels chosen by its
@@ -539,7 +641,7 @@ class Regions(Mapping[str, Partition | Selection]):
         return (left, top, right, bottom), chosen
 
 
-def check(declared: Mapping[str, Grid | Shards | Pick]) -> None:
+def check(declared: Mapping[str, Kind]) -> None:
     """RecipeError unless the declared regions are consistent: a `fit` names a selection, an `of` a partition, no name
     is one of the built-ins and regions do not refer to each other in a cycle. Builds nothing, needs no picture; the
     message names the region and lists the valid names."""
@@ -548,6 +650,9 @@ def check(declared: Mapping[str, Grid | Shards | Pick]) -> None:
             raise RecipeError(f"region {name!r} is a built-in region ({', '.join(BUILT_IN)}) and cannot be declared")
         if isinstance(kind, Pick):
             needs(f"region {name!r}", "of", kind.of, "partition", declared)
+        elif isinstance(kind, Subject):
+            if kind.per is not None:
+                needs(f"region {name!r}", "per", kind.per, "partition", declared)
         elif kind.fit is not None:
             needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
     for start in declared:
@@ -559,7 +664,7 @@ def check(declared: Mapping[str, Grid | Shards | Pick]) -> None:
             chain.append(ref)
 
 
-def used(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> set[str]:
+def used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
     """The regions made when `names` (checked ones, as `check` leaves them) are asked for: those, and every region they
     are laid over or picked from, down to the built-in ones."""
     seen: set[str] = set()
@@ -573,25 +678,40 @@ def used(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> 
     return seen
 
 
-def needs_subject(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> bool:
-    """Whether making the regions `names` needs the subject of the picture: one of the regions `used` is the built-in
-    `subject` or `background`."""
-    return not set(BUILT_IN).isdisjoint(used(declared, names))
+def needs_subject(declared: Mapping[str, Kind], names: Iterable[str]) -> bool:
+    """Whether making the regions `names` needs the subject of the whole picture: one of the regions `used` is the
+    built-in `subject` or `background`, or a `Subject` without `per`."""
+    return any(
+        name in BUILT_IN or (isinstance(kind := declared[name], Subject) and kind.per is None)
+        for name in used(declared, names)
+    )
+
+
+def needs_finder(declared: Mapping[str, Kind], names: Iterable[str]) -> bool:
+    """Whether making the regions `names` needs a finder to ask about pieces: one of the regions `used` is a `Subject`
+    with `per`."""
+    return any(
+        name not in BUILT_IN and isinstance(kind := declared[name], Subject) and kind.per is not None
+        for name in used(declared, names)
+    )
 
 
 def resolve(
-    declared: Mapping[str, Grid | Shards | Pick],
+    declared: Mapping[str, Kind],
     shape: tuple[int, int],
     *,
     subject: Callable[[], np.ndarray] | None,
+    find: Finder | None = None,
 ) -> Regions:
     """The regions `declared` (name -> kind) make over a picture of `shape` (height, width), plus the built-in
     `subject` and `background`, built when asked for (`regions[name]`).
 
     `subject` finds the subject: a function returning its matte, float `(height, width)` in 0..1, called at most once
     and only if a region needs it (this module never loads a picture or a model); None when there is no finder.
+    `find` finds the subject inside a box of the picture (see `Finder`), once for each piece of a `Subject` with `per`;
+    None when there is none.
 
     Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
     naming the region and the valid names."""
     check(declared)
-    return Regions(declared, shape, subject)
+    return Regions(declared, shape, subject, find)

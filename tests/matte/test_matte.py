@@ -13,7 +13,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import BackendUnavailableError, SubjectNotFoundError, imageio
+from bullterrier_image import BackendUnavailableError, Grid, Subject, SubjectNotFoundError, imageio
+from bullterrier_image.core.regions import resolve
 from bullterrier_image.matte import onnx_model_path, refine_edge, segmenter_identity, subject_matte
 from bullterrier_image.ops.resample import resize
 
@@ -257,6 +258,30 @@ def test_the_real_model_finds_the_dog(monkeypatch):
     assert alpha[height // 2, width // 2] > 0.9  # the dog's chest, in the middle of the picture
     assert alpha[: height // 10, : width // 10].max() < 0.1  # the window, top left
     np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx"), alpha)
+
+
+def test_the_real_model_finds_the_dog_cell_by_cell_with_the_defaults_and_nothing_in_the_plain_window(monkeypatch):
+    """Grid first with the pinned model (skipped like the test above): the dog's head is found in the cells it lies in,
+    with certainty, and the window top left, where the model has nothing to find, stays out."""
+    monkeypatch.delenv("BT_IMAGE_MODEL")
+    cached = onnx_model_path()
+    if not cached.is_file() or sha256_of(cached) != ISNET_SHA256:
+        pytest.skip("the pinned portable model is not in the cache; `bt-image cutout` downloads it")
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(cached))
+    photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
+    height, width = photo.shape[:2]
+
+    def find(box: tuple[int, int, int, int]) -> np.ndarray:
+        left, top, right, bottom = box
+        return subject_matte(photo[top:bottom, left:right], segmenter="onnx")
+
+    regions = resolve(
+        {"cells": Grid(columns=2, rows=2), "found": Subject(per="cells")}, (height, width), subject=None, find=find
+    )
+    alpha = regions.selection("found").alpha
+    assert alpha[height // 4, width * 9 // 20] > 0.9  # the head, left of the middle
+    assert alpha[height // 4, width * 11 // 20] > 0.9  # and right of it, in the other cell
+    assert alpha[: height // 10, : width // 10].max() == 0  # the window
 
 
 # --- refine_edge ----------------------------------------------------------------------------------------------------

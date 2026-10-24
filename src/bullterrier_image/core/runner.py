@@ -8,11 +8,13 @@ own (that step's input, scratch and output) plus the scaled matte, whatever the 
 every stage. The runner is given everything it uses: the photo, and the subject either as a
 `matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
 only if the recipe needs the subject: a step on it, an effect that takes it, or a region in use that is made from it
-(regions declared but unused need nothing). It never loads a file or looks for the subject on its own;
-`bullterrier_image.recipe` binds the default finder for users. The subject is found on the photo as given, before the
-recipe's `Framing` is applied, so a crop can follow the subject and the matte moves with the photo; the framed photo is
-then scaled to the recipe's size. The recipe's regions are made once per render, for that scaled picture, and only as
-steps ask for them.
+(regions declared but unused need nothing). A region that finds the subject piece by piece (`Subject` with `per`) asks
+`find_subject` about the crop of the working picture of each piece, once per piece per render, even when a `matte` was
+given (a matte of the whole photo does not answer for a part). It never loads a file or looks for the subject on its
+own; `bullterrier_image.recipe` binds the default finder for users. The subject is found on the photo as given, before
+the recipe's `Framing` is applied, so a crop can follow the subject and the matte moves with the photo; the framed
+photo is then scaled to the recipe's size. The recipe's regions are made once per render, for that scaled picture,
+and only as steps ask for them.
 
 Dependency direction: imports `steps`, `regions`, the effect registry and `ops` (to scale the photo and blend a step);
 never the recipe-file reader `loader`, so recipes built in Python run without it.
@@ -30,7 +32,7 @@ from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import Partition, Regions, Selection, look_weights, resolve, used
+from .regions import Finder, Partition, Regions, Selection, look_weights, resolve, used
 from .steps import Each, Recipe, Step
 
 # Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).
@@ -58,9 +60,10 @@ def render(
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
     height and width, 0..1 (white = subject), or None. find_subject: called with the photo as given (before it is
-    framed or scaled) when the recipe needs the subject and no `matte` was given. Raises SubjectNotFoundError when the
-    recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's size, or the
-    framing crops around a subject that is not there.
+    framed or scaled) when the recipe needs the subject and no `matte` was given, and with the crop of the working
+    picture of each piece for a `Subject` region with `per`. Raises SubjectNotFoundError when the recipe needs the
+    subject and neither was given, the finder returns None, the matte is not the photo's size, a `per` region has no
+    finder or the finder's matte does not fit its crop, or the framing crops around a subject that is not there.
     """
     image, matte, regions = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte, regions)
@@ -130,7 +133,7 @@ def render_all(
     """
     masked = next((recipe for recipe in recipes if recipe.needs_matte), None)
     matte = None if masked is None else _find_subject(rgb, masked, find_subject)
-    return [render(rgb, recipe, matte) for recipe in recipes]
+    return [render(rgb, recipe, matte, find_subject=find_subject) for recipe in recipes]
 
 
 def _prepare(
@@ -148,7 +151,15 @@ def _prepare(
         rgb = resize(rgb, recipe.size)
         matte = None if matte is None else resize(matte, recipe.size)
     found = None if matte is None else (lambda: matte)  # the subject of the working picture, for a region that needs it
-    return rgb, matte, resolve(recipe.regions, rgb.shape[:2], subject=found)
+    return rgb, matte, resolve(recipe.regions, rgb.shape[:2], subject=found, find=_finder_in(rgb, find_subject))
+
+
+def _finder_in(rgb: np.ndarray, find_subject: SubjectFinder | None) -> Finder | None:
+    """The finder for the pieces of the working picture `rgb` (see `regions.Finder`): `find_subject` asked about the
+    crop of the box. None when no finder was given."""
+    if find_subject is None:
+        return None
+    return lambda box: find_subject(rgb[box[1] : box[3], box[0] : box[2]])
 
 
 def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder | None) -> np.ndarray:

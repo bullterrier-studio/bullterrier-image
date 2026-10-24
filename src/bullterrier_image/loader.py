@@ -39,12 +39,13 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     opacity = 0.6                  # step's own keys win over the preset's
 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
-(`count`, `jitter`, `impact`, `focus`, `seed`, `preset`) or `pick` (`of`, `pieces`), the fields of `Grid`, `Shards`
-and `Pick`; `fit` lays a grid or shards over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`)
-that tears the borders. A *partition* (a grid or shards) cuts the picture into numbered pieces, a *selection* (a
-`pick`, or the built-in `subject` and `background`) chooses pixels. Steps name regions: `mask` (a selection) limits
-a step to it, and `partition` names the partition an effect such as `seams` draws. A step with `each` (a partition)
-and `looks` gives every piece its own look:
+(`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `pick` (`of`, `pieces`) or `subject` (`per`, `context`,
+`threshold`, `max_coverage`), the fields of `Grid`, `Shards`, `Pick` and `Subject`; `fit` lays a grid or shards over a
+selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid or
+shards) cuts the picture into numbered pieces, a *selection* (a `pick`, a `subject` or the built-in `subject` and
+`background`) chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition. Steps name
+regions: `mask` (a selection) limits a step to it, and `partition` names the partition an effect such as `seams` draws.
+A step with `each` (a partition) and `looks` gives every piece its own look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -91,7 +92,7 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.regions import Grid, Pick, Shards
+from .core.regions import Grid, Kind, Pick, Shards, Subject
 from .core.steps import Each, Recipe, Step, safe_name
 
 __all__ = ["load_recipe", "with_pictures"]
@@ -112,7 +113,7 @@ _KEYS = {
     "step": "[[step]]",
 }
 # the region kinds a `[region.NAME]` table may have, by its `kind`
-_KINDS: dict[str, type[Grid | Shards | Pick]] = {"grid": Grid, "shards": Shards, "pick": Pick}
+_KINDS: dict[str, type[Kind]] = {"grid": Grid, "shards": Shards, "pick": Pick, "subject": Subject}
 
 
 def _located[E: BullterrierImageError](error: E, where: str) -> E:
@@ -212,11 +213,11 @@ def load_recipe(path: str | Path) -> Recipe:
         raise _located(error, path.name) from None
 
 
-def _regions(tables: object, file: str) -> dict[str, Grid | Shards | Pick]:
+def _regions(tables: object, file: str) -> dict[str, Kind]:
     """The regions of the `[region.NAME]` tables, each made by its `kind`; RecipeError naming the file and region."""
     if not isinstance(tables, dict) or not all(isinstance(table, dict) for table in tables.values()):
         raise RecipeError(f"{file}: write each region as a [region.NAME] table (one table for each name)")
-    regions: dict[str, Grid | Shards | Pick] = {}
+    regions: dict[str, Kind] = {}
     for name, table in tables.items():
         fields = dict(table)
         kind = fields.pop("kind", None)

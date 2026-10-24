@@ -1,12 +1,11 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
-regions (`Grid`, `Shards`, `Pick`) its steps name: `mask` limits a step to one, `Each` gives each piece of one its own
-look. The machinery lives in `bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`; this module
-re-exports
-its public names and binds the one thing the core leaves open: how the subject is found. `render`, `trace` and
-`render_all` take the same arguments as the core's, but when a masked step needs the subject and no `matte` or
-`find_subject` is given, they find it with `bullterrier_image.matte.subject_matte`.
+regions (`Grid`, `Shards`, `Pick`, `Subject`) its steps name: `mask` limits a step to one, `Each` gives each piece of
+one its own look. The machinery lives in `bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`;
+this module re-exports its public names and binds the one thing the core leaves open: how the subject is found.
+`render`, `trace` and `render_all` take the same arguments as the core's, but when a masked step needs the subject and
+no `matte` or `find_subject` is given, they find it with `bullterrier_image.matte.subject_matte`.
 """
 
 import numpy as np
@@ -14,7 +13,7 @@ import numpy as np
 from . import matte as subject
 from .core import runner
 from .core.framing import Framing
-from .core.regions import Edge, Grid, Pick, Shards
+from .core.regions import Edge, Grid, Pick, Shards, Subject
 from .core.runner import Stage, SubjectFinder
 from .core.steps import Each, Recipe, Step
 from .loader import load_recipe
@@ -29,6 +28,7 @@ __all__ = [
     "Shards",
     "Stage",
     "Step",
+    "Subject",
     "SubjectFinder",
     "load_recipe",
     "render",

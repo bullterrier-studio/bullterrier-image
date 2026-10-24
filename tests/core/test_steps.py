@@ -12,11 +12,12 @@ from bullterrier_image import fx
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, Picture, param
+from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Each, Grid, Pick, Shards
+from bullterrier_image.recipe import Each, Grid, Pick, Shards, Subject
 
 
 class GainParams(EffectParams):
@@ -262,7 +263,7 @@ def test_an_effect_receives_the_picture_a_step_holds(layer_probe):
 
 # --- regions: steps name them, the recipe declares them ---------------------------------------------------------------
 
-REGIONS: dict[str, Grid | Shards | Pick] = {
+REGIONS: dict[str, Kind] = {
     "panes": Grid(columns=3, rows=2),
     "glass": Shards(count=5),
     "head": Pick(of="panes", pieces=[1]),
@@ -410,6 +411,30 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
 )
 def test_a_recipe_needs_the_subject_only_when_a_region_it_uses_does(steps, regions, needs_matte):
     assert Recipe("look", steps, regions=regions).needs_matte is needs_matte
+
+
+FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
+
+
+@pytest.mark.parametrize(
+    ("steps", "regions", "needs_matte", "needs_finder"),
+    [
+        pytest.param([Step("grade", mask="found")], FOUND, False, True, id="a mask from the subject found by pieces"),
+        pytest.param([Step("grade", mask="whole")], FOUND, True, False, id="the subject without per is the subject"),
+        pytest.param([Step("grade", mask="head")], REGIONS, False, False, id="a mask from a grid"),
+        pytest.param([Step("grade", mask="subject")], FOUND, True, False, id="the built-in subject"),
+        pytest.param([Step("grade")], FOUND, False, False, id="found by pieces but no step uses it"),
+        pytest.param(
+            [Each("cut", ["none"])], {**FOUND, "cut": Shards(fit="found")}, False, True, id="shards laid over that find"
+        ),
+        pytest.param([Step("grade", mask="found"), Step("grade", mask="subject")], FOUND, True, True, id="both"),
+    ],
+)
+def test_a_recipe_needs_a_finder_for_pieces_only_when_a_region_it_uses_finds_the_subject_by_pieces(
+    steps, regions, needs_matte, needs_finder
+):
+    recipe = Recipe("look", steps, regions={**REGIONS, **regions})
+    assert (recipe.needs_matte, recipe.needs_finder) == (needs_matte, needs_finder)
 
 
 def test_an_each_step_describes_itself_with_its_partition_and_looks():

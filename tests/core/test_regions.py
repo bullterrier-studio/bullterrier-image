@@ -16,15 +16,19 @@ from scipy import ndimage
 from bullterrier_image import RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
     Edge,
+    Finder,
     Grid,
+    Kind,
     Partition,
     Pick,
     Selection,
     Shards,
+    Subject,
     as_partition,
     check,
     look_weights,
     needs,
+    needs_finder,
     needs_subject,
     resolve,
     used,
@@ -47,8 +51,20 @@ def finder(shape: Shape) -> Callable[[], np.ndarray]:
     return lambda: disc(shape)
 
 
-def declared() -> dict[str, Grid | Shards | Pick]:
-    """One region of each kind, with the shared fields used: `fit`, `edge`, a preset, and a pick of a grid."""
+def true_boundary(shape: Shape) -> Finder:
+    """A finder for a picture of `shape` that answers with the disc where it lies in the box asked about: the subject
+    exactly as the picture has it, however the picture is cut (the model's stand-in at the external boundary)."""
+    whole = disc(shape)
+
+    def find(box: tuple[int, int, int, int]) -> np.ndarray:
+        left, top, right, bottom = box
+        return whole[top:bottom, left:right]
+
+    return find
+
+
+def declared() -> dict[str, Kind]:
+    """One region of each kind, with the shared fields used: `fit`, `edge`, a preset, a pick of a grid, the subject."""
     return {
         "grid": Grid(columns=3, rows=2),
         "uneven": Grid(columns=[1, 3, 0.5], rows=[2, 1]),
@@ -59,6 +75,9 @@ def declared() -> dict[str, Grid | Shards | Pick]:
         "shards_on_subject": Shards(count=7, fit="subject"),
         "pick": Pick(of="grid", pieces=[0, 3]),
         "pick_of_nothing": Pick(of="grid", pieces=[99]),
+        "subject_whole": Subject(),
+        "subject_per_grid": Subject(per="grid"),
+        "subject_per_shards": Subject(per="glass", context=0.5),
     }
 
 
@@ -90,7 +109,7 @@ def assert_a_region(region: Partition | Selection, shape: Shape) -> None:
 
 def labels_of(regions: dict, name: str, shape: Shape) -> np.ndarray:
     """The pieces of the partition `name` of `regions` over a picture of `shape`."""
-    return resolve(regions, shape, subject=finder(shape)).partition(name).labels
+    return resolve(regions, shape, subject=finder(shape), find=true_boundary(shape)).partition(name).labels
 
 
 def same_pieces(labels: np.ndarray, other: np.ndarray) -> np.ndarray:
@@ -109,8 +128,8 @@ def same_pieces(labels: np.ndarray, other: np.ndarray) -> np.ndarray:
 @pytest.mark.parametrize("size", ODD_SIZES, ids=lambda s: f"{s[0]}x{s[1]}")
 @pytest.mark.parametrize("name", list(declared()))
 def test_every_kind_gives_a_partition_or_selection_at_any_size_and_the_same_one_every_time(name, size):
-    first = resolve(declared(), size, subject=finder(size))[name]
-    again = resolve(declared(), size, subject=finder(size))[name]
+    first = resolve(declared(), size, subject=finder(size), find=true_boundary(size))[name]
+    again = resolve(declared(), size, subject=finder(size), find=true_boundary(size))[name]
     assert_a_region(first, size)
     match first, again:
         case Partition(), Partition():
@@ -131,7 +150,7 @@ def extremes(model: type, **fixed: object) -> list[tuple[str, dict]]:
     ]
 
 
-AT_THE_LIMITS: dict[str, Grid | Shards] = {
+AT_THE_LIMITS: dict[str, Kind] = {
     **{f"shards {id_}": Shards(**values) for id_, values in extremes(Shards)},
     **{f"edge {id_}": Shards(edge=Edge(style="torn", **values)) for id_, values in extremes(Edge)},
     "shards impact at one corner": Shards(impact=(0, 0)),
@@ -141,13 +160,15 @@ AT_THE_LIMITS: dict[str, Grid | Shards] = {
     "grid of one share": Grid(columns=[1], rows=[1]),
     "grid of tiny and huge shares": Grid(columns=[0.001, 1000], rows=[1000, 0.001]),
     "grid on the subject, torn": Grid(columns=3, rows=3, fit="subject", edge=Edge(style="torn", amount=0.1)),
+    **{f"subject {id_}": Subject(per="panes", **values) for id_, values in extremes(Subject)},
 }
 
 
 @pytest.mark.parametrize("size", [(13, 29), (61, 37), (1, 1)], ids=lambda s: f"{s[0]}x{s[1]}")
 @pytest.mark.parametrize("name", AT_THE_LIMITS)
 def test_every_field_works_at_its_minimum_and_maximum(name, size):
-    resolved = resolve({"it": AT_THE_LIMITS[name]}, size, subject=finder(size))["it"]
+    regions = {"panes": Grid(columns=3, rows=2), "it": AT_THE_LIMITS[name]}
+    resolved = resolve(regions, size, subject=finder(size), find=true_boundary(size))["it"]
     assert_a_region(resolved, size)
 
 
@@ -507,6 +528,9 @@ BAD_DECLARATIONS = {
     "a region that picks itself": ({"p": Pick(of="p")}, "'p'.*`of`.*selection.*partition"),
     "a cycle through two": ({"s": Shards(fit="p"), "p": Pick(of="s")}, "cycle.*'s'.*'p'"),
     "a name taken by a built-in": ({"subject": Grid()}, "'subject'.*built-in"),
+    "per names a selection": ({"s": Subject(per="subject")}, "'s'.*per.*'subject'.*selection.*partition"),
+    "per names no region": ({"g": Grid(), "s": Subject(per="gone")}, "'s'.*'gone'.*valid.*g"),
+    "a cycle through per": ({"s": Subject(per="p"), "p": Shards(fit="s")}, "cycle.*'s'.*'p'"),
 }
 
 
@@ -537,7 +561,7 @@ NEEDS = {
 def test_needs_accepts_a_region_of_the_wanted_kind_and_otherwise_names_the_owner_field_and_valid_names(
     owner, field, name, wanted, fine
 ):
-    declared: dict[str, Grid | Shards | Pick] = {"panes": Grid(columns=2), "head": Pick(of="panes", pieces=[1])}
+    declared: dict[str, Kind] = {"panes": Grid(columns=2), "head": Pick(of="panes", pieces=[1])}
     if fine:
         needs(owner, field, name, wanted, declared)
         return
@@ -565,6 +589,9 @@ NEEDS_SUBJECT = {
     "a region and, among others, one that does": (["grid", "shards_on_subject"], True),
     "a region laid over a pick of a grid": (["over_pick"], False),
     "a region two steps away from the subject": (["far"], True),
+    "the subject found piece by piece needs no subject of the whole picture": (["subject_per_grid"], False),
+    "the subject without `per` is the subject": (["subject_whole"], True),
+    "a region laid over the subject found piece by piece": (["over_found"], False),
 }
 
 
@@ -576,6 +603,7 @@ def test_regions_need_the_subject_when_they_are_made_from_it_however_indirectly(
         "inner": Grid(fit="subject"),
         "pick_inner": Pick(of="inner"),
         "far": Shards(fit="pick_inner"),
+        "over_found": Shards(fit="subject_per_grid"),
     }
     check(regions)
     assert needs_subject(regions, names) is expected
@@ -615,6 +643,23 @@ def test_a_selection_asked_for_as_pieces_is_split_and_a_partition_is_kept():
 
 # ---- the models ----------------------------------------------------------------------------------------------------
 
+NEEDS_FINDER = {
+    "nothing asked": ([], False),
+    "a grid": (["grid"], False),
+    "the built-in subject": (["subject"], False),
+    "the subject without `per`": (["subject_whole"], False),
+    "the subject found piece by piece": (["subject_per_grid"], True),
+    "a pick of shards laid over that subject": (["pick_found"], True),
+}
+
+
+@pytest.mark.parametrize(("names", "expected"), NEEDS_FINDER.values(), ids=NEEDS_FINDER.keys())
+def test_regions_need_a_finder_to_ask_about_pieces_only_when_one_found_piece_by_piece_is_used(names, expected):
+    regions = {**declared(), "over_found": Shards(fit="subject_per_grid"), "pick_found": Pick(of="over_found")}
+    check(regions)
+    assert needs_finder(regions, names) is expected
+
+
 BAD_VALUES = {
     "no columns": (Grid, {"columns": 0}, "columns"),
     "too many rows": (Grid, {"rows": 1001}, "rows"),
@@ -635,6 +680,12 @@ BAD_VALUES = {
     "an edge with a misspelt field": (Grid, {"edge": {"stlye": "torn"}}, "stlye"),
     "no pieces to pick": (Pick, {"pieces": []}, "pieces"),
     "a negative piece": (Pick, {"pieces": [0, -1]}, "pieces"),
+    "context past 1": (Subject, {"context": 1.5}, "context"),
+    "negative context": (Subject, {"context": -0.1}, "context"),
+    "threshold past 1": (Subject, {"threshold": 1.1}, "threshold"),
+    "negative threshold": (Subject, {"threshold": -0.1}, "threshold"),
+    "coverage past 1": (Subject, {"max_coverage": 2}, "max_coverage"),
+    "a per that is no text": (Subject, {"per": 3}, "per"),
 }
 
 
@@ -670,7 +721,7 @@ def test_every_shipped_preset_cuts_a_picture_differently_from_the_default(preset
     assert not np.array_equal(named, default)
 
 
-@pytest.mark.parametrize("model", [Grid, Shards, Pick, Edge])
+@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge])
 def test_every_field_is_documented_with_its_unit_and_range(model):
     text = model.documentation()
     for doc in model.fields_doc():
@@ -768,3 +819,166 @@ def test_making_the_pieces_of_a_1_mp_picture_needs_a_bounded_amount_of_memory(ki
     finally:
         tracemalloc.stop()
     assert peak <= 20 * buffer
+
+
+# ---- the subject found piece by piece (grid first) -----------------------------------------------------------------
+
+
+class Recorder:
+    """A finder that records the boxes it is asked about and answers by `answer(box)`: the model's stand-in."""
+
+    def __init__(self, answer: Finder) -> None:
+        self.answer = answer
+        self.boxes: list[tuple[int, int, int, int]] = []
+
+    def __call__(self, box: tuple[int, int, int, int]) -> np.ndarray:
+        self.boxes.append(box)
+        return self.answer(box)
+
+
+def size_of(box: tuple[int, int, int, int]) -> tuple[int, int]:
+    """The (height, width) of a view `(left, top, right, bottom)`."""
+    return box[3] - box[1], box[2] - box[0]
+
+
+def found(find: Finder, shape: Shape = (20, 30), per: Kind | None = None, **fields: object) -> np.ndarray:
+    """The alpha of `Subject(per="panes", **fields)` over `shape`: a 2 x 2 grid (or `per`) found in by `find`."""
+    regions = resolve(
+        {"panes": per or Grid(columns=2, rows=2), "it": Subject(per="panes", **fields)}, shape, subject=None, find=find
+    )
+    return regions.selection("it").alpha
+
+
+@pytest.mark.parametrize("context", [0, 0.25, 1], ids=lambda c: f"context {c}")
+@pytest.mark.parametrize("per", [Grid(columns=3, rows=2), Shards(count=7, seed=3)], ids=["a grid", "shards"])
+def test_a_finder_that_knows_the_true_boundary_is_united_into_that_boundary_whatever_the_pieces_and_context(
+    per, context
+):
+    shape = (40, 60)
+    assert_equal = np.testing.assert_array_equal
+    assert_equal(found(true_boundary(shape), shape, per, context=context, max_coverage=1), disc(shape))
+
+
+def test_without_per_the_subject_is_the_built_in_subject_and_the_finder_of_pieces_is_not_asked():
+    shape = (20, 30)
+    asked = Recorder(true_boundary(shape))
+    regions = resolve({"it": Subject(threshold=1, max_coverage=0, context=1)}, shape, subject=finder(shape), find=asked)
+    np.testing.assert_array_equal(regions.selection("it").alpha, regions.selection("subject").alpha)
+    assert asked.boxes == []
+
+
+def test_the_finder_is_asked_once_about_the_box_of_each_piece_however_often_the_region_is_asked_for():
+    asked = Recorder(true_boundary((20, 30)))
+    regions = resolve(
+        {"panes": Grid(columns=2, rows=2), "it": Subject(per="panes", context=0)}, (20, 30), subject=None, find=asked
+    )
+    regions["it"], regions["it"]
+    # (left, top, right, bottom): each piece is 15 px wide and 10 high
+    assert sorted(asked.boxes) == [(0, 0, 15, 10), (0, 10, 15, 20), (15, 0, 30, 10), (15, 10, 30, 20)]
+
+
+def test_context_widens_the_view_by_its_share_of_the_pieces_size_on_each_side_up_to_the_pictures_edge():
+    asked = Recorder(true_boundary((20, 30)))
+    found(asked, context=0.2)
+    # a piece is 15 wide and 10 high: 0.2 of that is 3 px sideways and 2 px up and down, and the picture cuts the rest
+    assert sorted(asked.boxes) == [(0, 0, 18, 12), (0, 8, 18, 20), (12, 0, 30, 12), (12, 8, 30, 20)]
+
+
+def test_a_pixel_takes_its_value_from_the_view_of_its_own_piece_only():
+    """Every view overlaps its neighbours' pieces; each answers with a value of its own over the whole view."""
+    values = iter(
+        [0.91, 0.93, 0.95, 0.97]
+    )  # in the order of the pieces: top left, top right, bottom left, bottom right
+    alpha = found(lambda box: np.full(size_of(box), next(values), np.float32), context=0.5, max_coverage=1)
+    assert alpha[:10, :15] == pytest.approx(0.91)
+    assert alpha[:10, 15:] == pytest.approx(0.93)
+    assert alpha[10:, :15] == pytest.approx(0.95)
+    assert alpha[10:, 15:] == pytest.approx(0.97)
+
+
+def test_pixels_the_finder_is_not_surer_of_than_the_threshold_are_dropped_and_the_rest_kept_as_they_are():
+    def blobs(box: tuple[int, int, int, int]) -> np.ndarray:
+        left, top, _, _ = box
+        matte = np.zeros(size_of(box), np.float32)
+        if (left, top) == (0, 0):
+            matte[2:5, 2:5] = 0.5  # exactly the threshold: dropped
+            matte[6:8, 2:5] = 0.75
+        if (left, top) == (15, 10):
+            matte[2:5, 2:5] = 0.95
+        return matte
+
+    alpha = found(blobs, context=0, threshold=0.5)
+    expected = np.zeros((20, 30), np.float32)
+    expected[6:8, 2:5] = 0.75
+    expected[12:15, 17:20] = 0.95
+    np.testing.assert_array_equal(alpha, expected)
+    strict = found(blobs, context=0, threshold=0.8)
+    np.testing.assert_array_equal(strict, np.where(expected == 0.95, expected, 0))  # only the confident blob is left
+
+
+@pytest.mark.parametrize(
+    ("max_coverage", "painted"),
+    [(1.0, 400), (0.99, 240), (0.5, 240), (0.49, 0)],
+    ids=lambda v: str(v),
+)
+def test_a_find_that_fills_more_of_a_piece_than_the_limit_is_dropped_whole_and_one_that_fills_exactly_it_is_kept(
+    max_coverage, painted
+):
+    """On a 20 x 32 picture the 2 x 2 pieces are 16 x 10: the finder paints the top 5 rows of its view (half a piece)
+    and all of the view of the bottom right piece."""
+
+    def half_or_all(box: tuple[int, int, int, int]) -> np.ndarray:
+        matte = np.zeros(size_of(box), np.float32)
+        matte[: matte.shape[0] if box[:2] == (16, 10) else 5] = 1
+        return matte
+
+    assert found(half_or_all, (20, 32), context=0, max_coverage=max_coverage).sum() == painted
+
+
+def test_an_invented_subject_that_fills_a_plain_piece_is_dropped_and_the_true_ones_are_kept():
+    shape = (20, 30)
+
+    def invents_in_the_last_piece(box: tuple[int, int, int, int]) -> np.ndarray:
+        return np.ones(size_of(box), np.float32) if box[:2] == (15, 10) else true_boundary(shape)(box)
+
+    expected = disc(shape)
+    expected[10:, 15:] = 0
+    np.testing.assert_array_equal(found(invents_in_the_last_piece, context=0), expected)
+    assert found(invents_in_the_last_piece, context=0, max_coverage=1)[10:, 15:].all()  # limit lifted: kept
+
+
+def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_not_affected():
+    shape = (20, 30)
+
+    def nothing_on_the_right(box: tuple[int, int, int, int]) -> np.ndarray:
+        if box[0] == 15:
+            raise SubjectNotFoundError("nothing stands out")
+        return true_boundary(shape)(box)
+
+    expected = disc(shape)
+    expected[:, 15:] = 0
+    np.testing.assert_array_equal(found(nothing_on_the_right, context=0, max_coverage=1), expected)
+
+
+def test_a_finder_that_answers_a_matte_that_does_not_fit_its_view_is_refused_naming_both_sizes():
+    with pytest.raises(SubjectNotFoundError, match=r"\(7, 7\).*\(10, 15\)"):
+        found(lambda box: np.ones((7, 7), np.float32), context=0)
+
+
+def test_a_subject_found_piece_by_piece_says_so_when_there_is_no_finder_for_pieces():
+    regions = resolve({"panes": Grid(), "it": Subject(per="panes")}, (20, 30), subject=finder((20, 30)))
+    with pytest.raises(SubjectNotFoundError, match=r"'it'.*panes"):
+        regions["it"]
+
+
+def test_shards_can_be_laid_over_the_subject_found_piece_by_piece():
+    shape = (40, 60)
+    regions = resolve(
+        {"panes": Grid(columns=2, rows=2), "it": Subject(per="panes", context=0), "cut": Shards(count=5, fit="it")},
+        shape,
+        subject=None,
+        find=true_boundary(shape),
+    )
+    cut = regions.partition("cut")
+    assert_a_region(cut, shape)
+    assert cut.count == 5

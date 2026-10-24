@@ -34,7 +34,7 @@ from bullterrier_image.ops.composite import BlendMode
 from . import registry
 from .framing import Framing
 from .params import ValidatedModel
-from .regions import Grid, Pick, Shards, check, needs, needs_subject
+from .regions import Kind, check, needs, needs_finder, needs_subject
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
 Reference = tuple[str, str, Literal["partition", "selection"] | None]
@@ -330,8 +330,8 @@ class Recipe(ValidatedModel):
         a valid one from any text.
     steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
     regions: the regions the steps can name besides the built-in `subject` and `background`: a name for each `Grid`,
-        `Shards` or `Pick` (see `bullterrier_image.core.regions`). They are checked here, and made for each picture only
-        when a step uses them.
+        `Shards`, `Pick` or `Subject` (see `bullterrier_image.core.regions`). They are checked here, and made for each
+        picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo and the subject matte together before the
@@ -344,7 +344,7 @@ class Recipe(ValidatedModel):
         description="Used for output file names: 1 to 64 of A-Z a-z 0-9 . _ -, starting with a letter or digit.",
     )
     steps: tuple[Step | Each, ...] = Field(description="The steps, run in order, each on the previous one's output.")
-    regions: dict[str, Grid | Shards | Pick] = Field(
+    regions: dict[str, Kind] = Field(
         default_factory=dict,
         description="The regions the steps name, by name, besides the built-in 'subject' and 'background'.",
     )
@@ -361,7 +361,7 @@ class Recipe(ValidatedModel):
         steps: Sequence[Step | Each],
         size: int | None = 1024,
         frame: Framing | None = None,
-        regions: Mapping[str, Grid | Shards | Pick] | None = None,
+        regions: Mapping[str, Kind] | None = None,
         **unknown: Any,
     ) -> None:
         """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name).
@@ -398,7 +398,19 @@ class Recipe(ValidatedModel):
         """True if a step takes the matte, or a region a step uses is made from the subject (the subject or background
         itself, or a region laid over it), or the framing crops around the subject or keeps only it: rendering must
         find the subject first (the slow part). Regions that are declared but not used need nothing."""
-        used = (name for step in self.steps for _, name, _ in step.references())
         return (
-            self.frame.needs_matte or any(step.wants_matte for step in self.steps) or needs_subject(self.regions, used)
+            self.frame.needs_matte
+            or any(step.wants_matte for step in self.steps)
+            or needs_subject(self.regions, self._names_used())
         )
+
+    @property
+    def needs_finder(self) -> bool:
+        """True if a region a step uses finds the subject piece by piece (a `Subject` with `per`): rendering must be
+        given a subject finder, whatever else it is given, because it is asked about parts of the working picture, which
+        no matte of the whole photo answers."""
+        return needs_finder(self.regions, self._names_used())
+
+    def _names_used(self) -> list[str]:
+        """The names of the regions the steps refer to."""
+        return [name for step in self.steps for _, name, _ in step.references()]

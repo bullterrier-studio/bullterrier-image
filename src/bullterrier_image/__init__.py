@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Shards,
         Stage,
         Step,
+        Subject,
         load_recipe,
         render,
         render_all,
@@ -75,7 +76,7 @@ _HOMES = {
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Each", "Edge", "Framing", "Grid", "Pick", "Recipe", "Shards", "Stage", "Step",
+        "Each", "Edge", "Framing", "Grid", "Pick", "Recipe", "Shards", "Stage", "Step", "Subject",
         "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
@@ -127,6 +128,7 @@ __all__ = [
     "Shards",
     "Stage",
     "Step",
+    "Subject",
     "SubjectNotFoundError",
     "UnknownEffectError",
     "__version__",
