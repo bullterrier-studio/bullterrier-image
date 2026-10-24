@@ -1,9 +1,12 @@
 """Seeded noise fields: fractal value noise, and the normalisation noise fields share."""
 
 import math
+from typing import Literal
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
+
+from photo_fx.ops.blur import gaussian_blur
 
 
 def standardise(field: np.ndarray) -> np.ndarray:
@@ -48,3 +51,25 @@ def fractal(
         spline = RectBivariateSpline(np.arange(rows), np.arange(cols), lattice)
         field += persistence**octave * spline(np.arange(height) / spacing, np.arange(width) / spacing)
     return standardise(field)
+
+
+def clumped_noise(
+    shape: tuple[int, int],
+    *,
+    size: float,
+    seed: int,
+    truncate: float,
+    edge: Literal["reflect", "nearest", "mirror", "wrap"],
+) -> np.ndarray:
+    """Seeded white noise of `shape` (height, width), float32, clumped into specks about `size` px wide.
+
+    Up to a `size` of 1 every pixel is an independent standard-normal value. Above 1 the noise is blurred by a Gaussian
+    of sigma `size / 2` (cut off at `truncate` sigmas, `edge` deciding what lies beyond the border, as in
+    `ops.blur.gaussian_blur`) and scaled back to unit standard deviation, so its strength does not depend on `size`.
+    A pure function of its arguments.
+    """
+    noise = np.random.default_rng(seed).standard_normal(shape).astype(np.float32)
+    if size > 1.0:  # a speck of 1 px or less is a single pixel: nothing to clump
+        noise = gaussian_blur(noise, size / 2.0, truncate=truncate, edge=edge)
+        noise /= max(float(noise.std()), 1e-6)  # constant: guard against dividing by zero on a 1-pixel picture
+    return noise

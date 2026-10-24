@@ -6,7 +6,7 @@ import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
-from photo_fx.ops.blur import gaussian_blur
+from photo_fx.ops.noise import clumped_noise
 
 
 class GrainParams(EffectParams):
@@ -58,8 +58,5 @@ def grain(rgb: np.ndarray, params: GrainParams) -> np.ndarray:
     The same noise is added to every channel, so the grain is monochrome; the result is clipped to 0..1. The same
     `seed` always gives the same grain, so renders are repeatable.
     """
-    noise = np.random.default_rng(params.seed).standard_normal(rgb.shape[:2]).astype(np.float32)
-    if params.size > 1.0:  # a speck of 1 px or less is a single pixel: nothing to clump
-        noise = gaussian_blur(noise, params.size / 2.0, truncate=params.truncate, edge=params.edge)
-        noise /= max(float(noise.std()), 1e-6)  # constant: guard against dividing by zero on a 1-pixel picture
+    noise = clumped_noise(rgb.shape[:2], size=params.size, seed=params.seed, truncate=params.truncate, edge=params.edge)
     return np.clip(rgb + params.amount * noise[..., None], 0.0, 1.0).astype(np.float32)
