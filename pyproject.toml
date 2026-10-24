@@ -337,15 +337,16 @@ type = "independence"
 modules = ["bullterrier_image.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core: runner > steps > framing|registry > presets > params|vocabulary > types"
+name = "Core: runner > steps > framing|registry|regions > presets > params|vocabulary > types"
 type = "layers"
 containers = ["bullterrier_image.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
 # (types); the registry lists an effect's presets, which are read and checked with its parameter model; a recipe's
-# framing is declared with the same parameter model and used by the steps' recipe. Each edge points down, so each gets a
-# layer of its own (the framing beside the registry: neither knows the other); nothing else changes.
-layers = ["runner", "steps", "framing | registry", "presets", "params | vocabulary", "types"]
+# framing is declared with the same parameter model and used by the steps' recipe; the region kinds are declared with it
+# too, read their presets, and are built into regions the runner uses. Each edge points down, so each gets a layer of its
+# own (the framing, the registry and the regions side by side: none knows another); nothing else changes.
+layers = ["runner", "steps", "framing | registry | regions", "presets", "params | vocabulary", "types"]
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since
 # the last tag, grouped as Keep a Changelog does. A commit only appears if a parser below names its group; the rest

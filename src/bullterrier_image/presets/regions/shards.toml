@@ -1,0 +1,24 @@
+# Presets of the `shards` region kind: named sets of its fields, laid under whatever a declaration gives beside them.
+
+[glass]
+description = "Dozens of splinters crowded round an impact point in the middle, big pieces far out, straight cracks."
+count = 46
+jitter = 1.0
+focus = 2.5
+
+[torn]
+description = "A few big pieces with wide ragged edges, like paper torn apart by hand."
+count = 6
+jitter = 0.7
+edge = { style = "torn", amount = 0.012, scale = 0.07 }
+
+[stone]
+description = "About a dozen cracked slabs with slightly rough edges, like a broken pavement."
+count = 14
+jitter = 0.8
+edge = { style = "torn", amount = 0.005, scale = 0.018 }
+
+[mosaic]
+description = "Many small, nearly even tiles with straight edges, like a mosaic of cut glass."
+count = 70
+jitter = 0.25
