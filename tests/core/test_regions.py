@@ -1213,10 +1213,13 @@ def test_a_path_laid_over_the_subject_takes_its_coordinates_from_the_subjects_bo
 def test_a_torn_edge_of_no_amount_is_the_straight_drawing_exactly(kind):
     torn = kind.model_copy(update={"edge": Edge(style="torn", amount=0)})
     plain, bent = (resolve({"k": k}, (60, 80), subject=None)["k"] for k in (kind, torn))
-    if isinstance(plain, Selection):
-        np.testing.assert_allclose(bent.alpha, plain.alpha, atol=1e-6)
-    else:
-        np.testing.assert_array_equal(bent.labels, plain.labels)
+    match plain, bent:
+        case Selection(), Selection():
+            np.testing.assert_allclose(bent.alpha, plain.alpha, atol=1e-6)
+        case Partition(), Partition():
+            np.testing.assert_array_equal(bent.labels, plain.labels)
+        case _:
+            pytest.fail("the same declaration made two kinds of region")
 
 
 def test_a_torn_path_has_soft_values_inside_a_pixel_aligned_shape_because_it_reads_between_pixels():
