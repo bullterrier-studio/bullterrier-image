@@ -50,13 +50,6 @@ def test_any_leading_shape_is_kept_and_the_input_is_not_modified() -> None:
     np.testing.assert_array_equal(image, before)
 
 
-@pytest.mark.parametrize("shape", [(4,), (2, 2), (3, 4), ()], ids=["four", "two by two", "three by four", "scalar"])
-def test_an_array_whose_last_axis_is_not_rgb_is_refused(shape: tuple[int, ...]) -> None:
-    for convert in (srgb_to_linear, linear_to_srgb):
-        with pytest.raises(ValueError, match="last axis"):
-            convert(np.zeros(shape))
-
-
 HSV_PAIRS = [
     pytest.param((1, 0, 0), (0, 1, 1), id="red is hue 0"),
     pytest.param((1, 1, 0), (1 / 6, 1, 1), id="yellow is a sixth of the way round"),
@@ -95,9 +88,3 @@ def test_hue_is_always_below_one_even_for_a_red_with_a_trace_of_blue() -> None:
 def test_hue_wraps_around_the_colour_circle() -> None:
     np.testing.assert_allclose(hsv_to_rgb(np.array([1.25, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
     np.testing.assert_allclose(hsv_to_rgb(np.array([-0.75, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
-
-
-def test_the_last_axis_of_hsv_conversions_must_be_three() -> None:
-    for convert in (rgb_to_hsv, hsv_to_rgb):
-        with pytest.raises(ValueError, match="last axis"):
-            convert(np.zeros((2, 4)))

@@ -2,7 +2,7 @@
 
 Every function takes an array whose last axis has length 3 (any leading shape: one colour, an image, a stack of
 images) and returns a new float32 array of the same shape; the input is never modified and may have any numeric
-dtype. A last axis of any other length raises ``ValueError``.
+dtype.
 
 Unless stated otherwise, "RGB" means gamma-encoded sRGB with channels in 0..1, the format used everywhere in photo-fx.
 Values outside 0..1 are not rejected or clipped: the conversions carry them through (the sRGB transfer function is
@@ -16,14 +16,6 @@ _SRGB_ENCODED_BREAK = 0.04045  # constant: encoded value where the sRGB linear s
 _SRGB_LINEAR_BREAK = 0.0031308  # constant: the same point in linear light (IEC 61966-2-1)
 
 
-def _as_triplets(array: np.ndarray) -> np.ndarray:
-    """Return ``array`` as float32 (a copy only if the dtype differs), after checking that its last axis is RGB."""
-    array = np.asarray(array, dtype=np.float32)
-    if array.ndim == 0 or array.shape[-1] != 3:  # constant: three colour channels
-        raise ValueError(f"expected an array whose last axis has length 3 (RGB channels), got shape {array.shape}")
-    return array
-
-
 def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
     """Decode gamma-encoded sRGB into linear light with the sRGB transfer function (IEC 61966-2-1).
 
@@ -34,7 +26,7 @@ def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
     Returns:
         float32 array of the same shape holding linear-light values, 0..1 for in-range input.
     """
-    rgb = _as_triplets(rgb)
+    rgb = np.asarray(rgb, dtype=np.float32)
     magnitude = np.abs(rgb)
     linear = np.where(
         magnitude <= _SRGB_ENCODED_BREAK,
@@ -54,7 +46,7 @@ def linear_to_srgb(rgb: np.ndarray) -> np.ndarray:
     Returns:
         float32 array of the same shape holding sRGB values, 0..1 for in-range input.
     """
-    rgb = _as_triplets(rgb)
+    rgb = np.asarray(rgb, dtype=np.float32)
     magnitude = np.abs(rgb)
     encoded = np.where(
         magnitude <= _SRGB_LINEAR_BREAK,
@@ -75,7 +67,7 @@ def rgb_to_hsv(rgb: np.ndarray) -> np.ndarray:
         (0 = red, 1/3 = green, 2/3 = blue) in [0, 1); it is 0 for greys, whose hue is undefined. Saturation is 0 for
         greys and black.
     """
-    rgb = _as_triplets(rgb)
+    rgb = np.asarray(rgb, dtype=np.float32)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     value = rgb.max(axis=-1)
     chroma = value - rgb.min(axis=-1)
@@ -103,7 +95,7 @@ def hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
     Returns:
         float32 array of the same shape holding sRGB (r, g, b), 0..1 for in-range saturation and value.
     """
-    hsv = _as_triplets(hsv)
+    hsv = np.asarray(hsv, dtype=np.float32)
     hue, saturation, value = hsv[..., 0:1], hsv[..., 1:2], hsv[..., 2:3]  # constant: slices of the three channels
     # For channel offset n (5, 3, 1 for r, g, b) the channel is value, dipping to value*(1-saturation) over a
     # trapezoid of the hue circle: the standard branch-free HSV formula.
