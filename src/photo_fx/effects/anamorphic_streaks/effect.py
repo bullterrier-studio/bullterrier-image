@@ -12,7 +12,7 @@ class AnamorphicStreaksParams(EffectParams):
     """Anamorphic lens streaks: the highlights are stretched sideways into thin lines of light and screened back."""
 
     length: float = param(
-        0.25,
+        0.35,
         unit="fraction",
         min=0.001,
         max=1,
@@ -21,7 +21,7 @@ class AnamorphicStreaksParams(EffectParams):
         "longer, fainter streaks.",
     )
     threshold: float = param(
-        0.8,
+        0.7,
         unit="fraction",
         min=0,
         max=0.99,
@@ -29,7 +29,7 @@ class AnamorphicStreaksParams(EffectParams):
         "rising to full at 1. Raising it limits the streaks to the brightest highlights.",
     )
     amount: float = param(
-        3.0,
+        6.0,
         unit="ratio",
         min=0,
         max=10,

@@ -14,7 +14,7 @@ class HalationParams(EffectParams):
     """Film halation: the brightest parts of the picture are blurred, tinted and screened back over it."""
 
     radius: float = param(
-        20.0,
+        30.0,
         unit="px",
         min=0,
         max=500,
@@ -22,7 +22,7 @@ class HalationParams(EffectParams):
         "highlights; 0 keeps it on the highlights themselves.",
     )
     threshold: float = param(
-        0.7,
+        0.5,
         unit="fraction",
         min=0,
         max=0.99,
@@ -30,7 +30,7 @@ class HalationParams(EffectParams):
         "values above it glow, rising to full at 1. Raising it limits the halation to the brightest highlights.",
     )
     amount: float = param(
-        0.7,
+        1.8,
         unit="ratio",
         min=0,
         max=10,

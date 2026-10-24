@@ -4,6 +4,3 @@ size = 480
 
 [[step]]
 effect = "anamorphic_streaks"
-length = 0.3
-threshold = 0.75
-amount = 4

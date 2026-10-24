@@ -4,6 +4,3 @@ size = 480
 
 [[step]]
 effect = "halation"
-radius = 22
-threshold = 0.6
-amount = 0.9
