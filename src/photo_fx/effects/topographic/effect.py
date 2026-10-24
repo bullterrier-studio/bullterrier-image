@@ -70,7 +70,7 @@ class TopographicParams(EffectParams):
     )
 
 
-@effect(category="backgrounds", params=TopographicParams)
+@effect(category="stylised", params=TopographicParams)
 def topographic(rgb: np.ndarray, params: TopographicParams) -> np.ndarray:
     """Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights.
 
