@@ -17,7 +17,8 @@ from photo_fx.core import registry
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.matte import subject_matte
-from photo_fx.recipe import load_recipe, render
+from photo_fx.recipe import Recipe, Step, load_recipe, render
+from photo_fx.sheet import contact_sheet
 
 ROOT = Path(__file__).resolve().parents[1]
 CUT = '[[step]]\neffect="fill"\ncolor="#000000"\nmask="background"\n'  # black wherever the matte is 0
@@ -206,6 +207,42 @@ def test_sheet_combines_recipes_into_one_image(files):
         assert sheet.height < 2 * 480
 
 
+def test_sweep_puts_the_recipe_at_each_value_of_a_parameter_side_by_side(files, capsys):
+    assert cli("sweep me.png recipes/a.toml grain.amount 0..0.2 -o out/s.png --count 5 --columns 2") == 0
+    assert capsys.readouterr().out.splitlines() == [str(Path("out") / "s.png")]
+    photo = imageio.load(files / "me.png")  # as the command reads it
+    values = (0, 0.05, 0.1, 0.15, 0.2)
+    expected = contact_sheet(
+        [(f"amount={v}", render(photo, Recipe("a", [Step("grain", {"amount": v})], size=64))) for v in values],
+        columns=2,
+    )
+    imageio.save(expected, files / "expected.png")
+    np.testing.assert_array_equal(imageio.load(files / "out" / "s.png"), imageio.load(files / "expected.png"))
+
+
+def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that_needs_the_subject(cut):
+    (cut / "masked.toml").write_text(
+        'name="masked"\nsize=128\n[[step]]\neffect="glitch"\nmask="subject"\nbands=3\nseed=5\n', encoding="utf-8"
+    )
+    assert cli("sweep me.png masked.toml glitch.split --count 3 --matte matte.png -o s.png -- -6..6") == 0
+    photo = imageio.load(cut / "me.png")
+    tiles = []
+    for split in (-6, 0, 6):
+        look = Recipe("masked", [Step("glitch", {"split": split, "bands": 3, "seed": 5}, mask="subject")], size=128)
+        tiles.append((f"split={split}", render(photo, look, imageio.load_matte(cut / "matte.png"))))
+    imageio.save(contact_sheet(tiles), cut / "expected.png")
+    np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))
+
+
+@pytest.mark.parametrize("span", ["0-20", "a..b", "5", "1..", "..2", "1..2..3", "nan..1"])
+def test_sweep_range_must_be_two_numbers_joined_by_two_dots(files, capsys, span):
+    with pytest.raises(SystemExit) as caught:
+        cli(f"sweep me.png recipes/a.toml grain.amount {span} -o s.png")
+    assert caught.value.code == 2
+    assert span in capsys.readouterr().err
+    assert cli("sweep me.png recipes/a.toml grain.amount 0..0.2 -o s.png") == 0  # the known-good side
+
+
 def test_bad_recipe_is_reported_before_any_work(files, capsys):
     (files / "recipes" / "c.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
     assert cli("render me.png recipes -o o") == 1
@@ -313,6 +350,13 @@ MISTAKES = {
     "a project file that does not exist": ("run gone.toml", "gone.toml"),
     "a matte that is not an image": ("cutout me.png -o out --matte notimage.png", "notimage"),
     "a folder with no recipe in it": ("render me.png empty -o out", "empty"),
+    "a sweep of an effect the recipe does not have": ("sweep me.png recipes/a.toml blur.radius 0..1 -o s.png", "blur"),
+    "a sweep of a parameter the effect does not have": (
+        "sweep me.png recipes/a.toml grain.amoun 0..1 -o s.png",
+        "amoun",
+    ),
+    "a sweep beyond the parameter's range": ("sweep me.png recipes/a.toml grain.amount 0..5 -o s.png", "amount"),
+    "a sweep of one tile": ("sweep me.png recipes/a.toml grain.amount 0..1 -o s.png --count 1", "count"),
     "a picture type nothing can write": ("sheet me.png recipes/a.toml -o sheet.xyz", ".xyz"),
     "a video type nothing can write": ("animate me.png clip.toml -o c.avi", ".avi"),
     # (the suite's PHOTO_FX_MODEL names no file, so the portable model cannot run)

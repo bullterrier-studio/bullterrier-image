@@ -1,4 +1,4 @@
-"""Command line: `photo-fx render|sheet|cutout|animate|run|steps|init|effects`.
+"""Command line: `photo-fx render|sheet|sweep|cutout|animate|run|steps|init|effects`.
 
 A thin layer over the library; no logic of its own.
 
@@ -8,6 +8,7 @@ so `--help`, `--version` and a usage error answer without loading numpy, scipy, 
 
 import argparse
 import os
+import re
 import sys
 import textwrap
 from collections.abc import Callable, Iterable, Iterator
@@ -113,6 +114,29 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--columns", type=_positive_int, default=3, help="pictures per row (default: 3)")
 
     p = command(
+        "sweep",
+        _sweep,
+        summary="render one parameter of a recipe across a range of values, side by side in one image",
+        example="examples/photos/bullterrier.jpeg examples/recipes/02-glitch.toml glitch.split 0..20",
+    )
+    p.add_argument("photo", help="the photo to style")
+    p.add_argument("recipe", help="the recipe .toml whose parameter is swept")
+    p.add_argument(
+        "target",
+        help="effect.parameter, e.g. glitch.split; effect#2.parameter for the second step of an effect used twice",
+    )
+    p.add_argument(
+        "range",
+        metavar="START..END",
+        type=_span,
+        help="the values to show, e.g. 0..20; a negative start goes after `--`: `... -o s.png -- -2..2`",
+    )
+    _subject_options(p)
+    p.add_argument("-o", "--out", default="out/sweep.png", help="output file (default: out/sweep.png)")
+    p.add_argument("--count", type=int, default=5, help="how many values, 2 to 24, evenly spaced (default: 5)")
+    p.add_argument("--columns", type=_positive_int, default=3, help="pictures per row (default: 3)")
+
+    p = command(
         "cutout",
         _cutout,
         summary="save just the subject on a transparent background",
@@ -210,6 +234,15 @@ def _positive_int(text: str) -> int:
     if not text.isdigit() or int(text) < 1:
         raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of 1 or more")
     return int(text)
+
+
+def _span(text: str) -> tuple[float, float]:
+    """An argparse type: `START..END`, two numbers (`0..20`, `-2..2`, `0..0.5`)."""
+    number = r"(-?\d*\.?\d+)"
+    found = re.fullmatch(f"{number}\\.\\.{number}", text)
+    if not found:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a range of two numbers like 0..20")
+    return float(found[1]), float(found[2])
 
 
 def _progress(args: argparse.Namespace, message: str) -> None:
@@ -314,6 +347,24 @@ def _sheet(args: argparse.Namespace) -> int:
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
     imageio.save(contact_sheet([(r.name, img) for r, img in zip(recipes, results, strict=True)], args.columns), target)
+    print(target)
+    return 0
+
+
+def _sweep(args: argparse.Namespace) -> int:
+    from . import imageio
+    from .recipe import load_recipe
+    from .sheet import contact_sheet, sweep
+
+    start, end = args.range
+    tiles = sweep(load_recipe(args.recipe), args.target, start, end, args.count)  # all validated before any work
+    _progress(args, f"rendering {len(tiles)} value(s) of {args.target}...")
+    results = _render_recipes(args, [recipe for _, recipe in tiles])
+    target = Path(args.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    imageio.save(
+        contact_sheet([(label, image) for (label, _), image in zip(tiles, results, strict=True)], args.columns), target
+    )
     print(target)
     return 0
 
