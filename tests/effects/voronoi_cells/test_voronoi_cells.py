@@ -12,7 +12,7 @@ WHITE = np.ones(3)
 
 def render(shape: tuple[int, int] = (HEIGHT, WIDTH), **settings: object) -> np.ndarray:
     """The cells over a picture of `shape` (h, w): flat colours, no borders, unless `settings` say otherwise."""
-    settings = {"shade": 0, "edge_width": 0, **settings}
+    settings = {"shade": 0, "line_width": 0, **settings}
     return registry.apply(NAME, np.zeros((*shape, 3), np.float32), **settings)
 
 
@@ -79,11 +79,11 @@ def test_shade_darkens_a_pixel_by_how_far_it_is_from_its_site_toward_the_border(
 
 
 @pytest.mark.parametrize("seed", [3, 4, 9])
-def test_borders_are_drawn_edge_width_wide_about_the_cell_borders(seed: int) -> None:
+def test_borders_are_drawn_line_width_wide_about_the_cell_borders(seed: int) -> None:
     """A line 6 px wide is solid within 3 px of a border and fades out over the next pixel (1 px ramp across its edge,
     half a pixel each side of 3 px), so a pixel a distance b from the border is covered by clip(3 - b + 0.5, 0, 1)."""
     flat = render(cells=6, seed=seed)
-    out = render(cells=6, seed=seed, edge_width=6, edge_color="#ffffff")
+    out = render(cells=6, seed=seed, line_width=6, line_color="#ffffff")
     border = distances_to_cell_border(distances_to_sites(flat, sites(6, seed)), sites(6, seed))
     coverage = np.clip(3 - border + 0.5, 0, 1)[..., None]
     np.testing.assert_allclose(out, flat + (WHITE - flat) * coverage, atol=1e-3)
@@ -93,14 +93,14 @@ def test_borders_are_drawn_edge_width_wide_about_the_cell_borders(seed: int) -> 
 def test_a_line_thinner_than_a_pixel_is_fainter_in_proportion() -> None:
     """A 0.5 px line can colour no more than half of a pixel: the same ramp as above, half as strong."""
     flat = render(cells=6, seed=3)
-    out = render(cells=6, seed=3, edge_width=0.5, edge_color="#ffffff")
+    out = render(cells=6, seed=3, line_width=0.5, line_color="#ffffff")
     border = distances_to_cell_border(distances_to_sites(flat, sites(6, 3)), sites(6, 3))
     coverage = 0.5 * np.clip(0.25 - border + 0.5, 0, 1)[..., None]
     np.testing.assert_allclose(out, flat + (WHITE - flat) * coverage, atol=1e-3)
 
 
-def test_edge_width_zero_draws_no_border() -> None:
-    out = render(cells=30, edge_width=0, edge_color="#ffffff", colors=["#000000", "#808080"])
+def test_line_width_zero_draws_no_border() -> None:
+    out = render(cells=30, line_width=0, line_color="#ffffff", colors=["#000000", "#808080"])
     assert out.max() < 0.51  # no white anywhere
 
 

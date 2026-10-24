@@ -9,7 +9,7 @@ from photo_fx.ops.ramp import ramp
 
 
 class VoronoiCellsParams(EffectParams):
-    """Random points, each owning the area nearer to it than to any other, filled with a colour and edged."""
+    """Random points, each owning the area nearer to it than to any other, filled with a colour and lined."""
 
     cells: int = param(
         80,
@@ -43,7 +43,7 @@ class VoronoiCellsParams(EffectParams):
         "darkening is the distance to the site over the distance to the site plus the distance to the border, so "
         "it grows steadily from the site to the border and gives every cell a dome look.",
     )
-    edge_width: float = param(
+    line_width: float = param(
         1.5,
         unit="px",
         min=0,
@@ -51,7 +51,7 @@ class VoronoiCellsParams(EffectParams):
         doc="The width of the border lines between cells in px, with anti-aliased edges; 0 = no borders (below 1 px "
         "the lines get fainter). Tuned for a picture about 480 px high.",
     )
-    edge_color: Color = param("#0a0014", doc="The colour of the border lines.")
+    line_color: Color = param("#0a0014", doc="The colour of the border lines.")
 
 
 @effect(category="backgrounds", params=VoronoiCellsParams)
@@ -60,7 +60,7 @@ def voronoi_cells(rgb: np.ndarray, params: VoronoiCellsParams) -> np.ndarray:
 
     A generated background: the input is used only for its height and width, its content is ignored. Every pixel
     belongs to the cell of its nearest site; a cell's colour is a random point on `colors`, darkened toward its
-    border by `shade`, and the border lines are drawn in `edge_color`.
+    border by `shade`, and the border lines are drawn in `line_color`.
     """
     height, width = rgb.shape[:2]
     rng = np.random.default_rng(params.seed)
@@ -85,9 +85,9 @@ def voronoi_cells(rgb: np.ndarray, params: VoronoiCellsParams) -> np.ndarray:
         np.minimum(border, offset[own, k] - normal[own, k, 0] * px - normal[own, k, 1] * py, out=border)
     dome = own_distance / (own_distance + border)  # 0 at the site, 1 on the border
     out = palette[own] * (1 - params.shade * dome)[:, None]
-    # coverage of a pixel by a line `edge_width` wide: a one-pixel ramp across the line's edge, fainter below 1 px
+    # coverage of a pixel by a line `line_width` wide: a one-pixel ramp across the line's edge, fainter below 1 px
     # constant: a pixel is one px wide, so its edge ramp spans 1 px (half of it each side)
-    coverage = np.clip(params.edge_width / 2 - border + 0.5, 0.0, 1.0) * min(params.edge_width, 1.0)
-    edge = np.array(params.edge_color, np.float32)
-    out = out + (edge - out) * coverage[:, None]
+    coverage = np.clip(params.line_width / 2 - border + 0.5, 0.0, 1.0) * min(params.line_width, 1.0)
+    line = np.array(params.line_color, np.float32)
+    out = out + (line - out) * coverage[:, None]
     return out.reshape(height, width, 3).astype(np.float32)
