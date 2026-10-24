@@ -1,0 +1,9 @@
+# A logo (here the dog's own cut-out) in a corner, sized as a share of the photo's width, keeping its transparency.
+name = "overlay"
+size = 480
+
+[[step]]
+effect = "overlay"
+logo = "../assets/bullterrier-cutout.png"
+at = "bottom_right"
+scale = 0.3
