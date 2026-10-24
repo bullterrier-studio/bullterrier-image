@@ -30,8 +30,9 @@ classifiers = [
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
 # exactly these). Below them: Pillow 10.1.0 writes different JPEG bytes for the same pixels and Pillow 11.0.0 cannot
 # build the geotagged picture of the metadata test, pydantic 2.7.0 fails at import, pyobjc 9.2 cannot read Vision's
-# pixel buffer, and numpy 1.26, scipy 1.11 and onnxruntime 1.17 are the first series with Python 3.12 wheels. No upper
-# bounds: nothing is known to break on a newer release.
+# pixel buffer, scipy before 1.16 warns on every `affine_transform` with a 1-D matrix (the radial effects use it, and the
+# suite turns warnings into errors), and numpy 1.26 and onnxruntime 1.17 are the first series with Python 3.12 wheels.
+# No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
     "numpy>=1.26.4",
@@ -42,7 +43,7 @@ dependencies = [
     "pydantic>=2.7.1",
     "pyobjc-framework-quartz>=10.0 ; sys_platform == 'darwin'",
     "pyobjc-framework-vision>=10.0 ; sys_platform == 'darwin'",
-    "scipy>=1.11.4",
+    "scipy>=1.16.0",
 ]
 
 [project.urls]

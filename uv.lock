@@ -154,7 +154,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7.1" },
     { name = "pyobjc-framework-quartz", marker = "sys_platform == 'darwin'", specifier = ">=10.0" },
     { name = "pyobjc-framework-vision", marker = "sys_platform == 'darwin'", specifier = ">=10.0" },
-    { name = "scipy", specifier = ">=1.11.4" },
+    { name = "scipy", specifier = ">=1.16.0" },
 ]
 
 [package.metadata.requires-dev]
