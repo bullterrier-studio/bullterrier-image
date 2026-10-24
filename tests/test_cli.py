@@ -1,3 +1,4 @@
+import itertools
 import os
 import re
 import subprocess
@@ -74,6 +75,64 @@ def test_effects_prints_every_parameter_of_a_modelled_effect(capsys, throwaway_e
     assert "    Lights a candle." in entry
     assert "    length : number, px, 0 to 9, default 2.0" in entry
     assert "Length of the candle wick, a rather distinctive phrase." in entry
+
+
+class TunedParams(EffectParams):
+    """A look control and two technique options."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of the look; a rather distinctive phrase.")
+    softness: float = param(2.0, unit="px", min=0, max=9, advanced=True, doc="Blur of the technique's mask.")
+    edge: str = param("reflect", advanced=True, doc="Past the border, e.g. reflect.")
+
+
+@pytest.fixture
+def tuned_probe(throwaway_effects):
+    @effect(category="light", params=TunedParams)
+    def tuned_probe(rgb, params):
+        """Tunes the light."""
+        return rgb
+
+
+@pytest.mark.parametrize(
+    ("command", "shows_advanced"),
+    [
+        pytest.param("effects", False, id="listing-hides-advanced"),
+        pytest.param("effects --category light", False, id="category-listing-hides-advanced"),
+        pytest.param("effects --advanced", True, id="advanced-switch-shows-all"),
+        pytest.param("effects tuned_probe", True, id="naming-an-effect-shows-all"),
+    ],
+)
+def test_effects_shows_advanced_parameters_only_when_asked_or_when_one_effect_is_named(
+    command, shows_advanced, tuned_probe, capsys
+):
+    assert cli(command) == 0
+    out = capsys.readouterr().out
+    lines = out[out.index("tuned_probe\n") :].splitlines()[1:]
+    entry = "\n".join(itertools.takewhile(lambda line: not line or line.startswith(" "), lines))
+    assert "amount : number, fraction, 0 to 1, default 0.5" in entry
+    assert ("softness : number, px, 0 to 9, default 2.0" in entry) is shows_advanced
+    assert ("edge : text" in entry) is shows_advanced
+    assert ("(+2 advanced parameters)" in entry) is not shows_advanced
+
+
+def test_effects_naming_one_effect_prints_only_that_effect(tuned_probe, capsys):
+    assert cli("effects tuned_probe") == 0
+    assert _headings(capsys.readouterr().out) == ["tuned_probe"]
+
+
+def test_effects_naming_an_unknown_effect_is_an_error_listing_the_available_ones(tuned_probe, capsys):
+    assert cli("effects no_such_effect") == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "no_such_effect" in captured.err
+    assert "tuned_probe" in captured.err
+
+
+def test_effects_naming_an_effect_and_a_category_exclude_each_other(capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli("effects tuned_probe --category light")
+    assert caught.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
 
 
 def _headings(out: str) -> list[str]:

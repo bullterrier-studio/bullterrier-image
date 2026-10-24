@@ -182,6 +182,7 @@ def _parser() -> argparse.ArgumentParser:
         example="--category light",
     )
     which = p.add_mutually_exclusive_group()
+    which.add_argument("effect", nargs="?", help="show only this effect, with all its parameters")
     which.add_argument(
         "--category", metavar="NAME", help="list only the effects of this category (see --list-categories)"
     )
@@ -190,6 +191,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="list the categories that have effects, with their number of effects and what each holds",
     )
+    p.add_argument("--advanced", action="store_true", help="also list the advanced parameters of every effect")
     return parser
 
 
@@ -421,12 +423,16 @@ def _effects(args: argparse.Namespace) -> int:
         for category, names in used.items():
             print(f"{category:<{width}}  {len(names):>3}  {registry.CATEGORY_DESCRIPTIONS[category]}")
         return 0
-    if args.category is None:
+    if args.effect is not None:
+        registry.get(args.effect)  # a misspelt name raises UnknownEffectError listing the available ones
+        names = [args.effect]
+    elif args.category is None:
         names = sorted(registry.describe())
     elif args.category in used:
         names = used[args.category]
     else:
         raise RecipeError(f"no effects in category {args.category!r}; categories with effects: {', '.join(used)}")
+    full = args.advanced or args.effect is not None  # one named effect is asked for in full
     for name in names:  # line by line, so the parameter list stays a list
-        print(f"{name}\n{textwrap.indent(registry.documentation(name), '    ')}\n")
+        print(f"{name}\n{textwrap.indent(registry.documentation(name, advanced=full), '    ')}\n")
     return 0
