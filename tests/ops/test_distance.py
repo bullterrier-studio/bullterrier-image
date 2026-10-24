@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from photo_fx.ops.blur import Edge
-from photo_fx.ops.distance import EdgeField, edge_distance
+from photo_fx.ops.distance import EdgeField, edge_distance, signed_distance
 
 HEIGHT, WIDTH = 40, 60
 TOP, BOTTOM, LEFT, RIGHT = 10, 29, 15, 44  # inclusive bounds of the rectangle in the middle of the array
@@ -262,3 +262,46 @@ def test_edge_sets_what_the_smoothing_sees_beyond_the_array():
     wrapped = field_of(shape, smoothing=3.0, edge="wrap")
     assert mirrored.normal_x[45, 59] == pytest.approx(1.0)
     assert wrapped.normal_x[45, 59] == pytest.approx(-1.0)
+
+
+def brute_force_signed_distance(subject: np.ndarray) -> np.ndarray:
+    """Independent oracle, by definition: a background pixel is as far from the subject as its nearest subject pixel,
+    a subject pixel as far (negative) as its nearest background pixel, both as the distance between pixel centres."""
+    out = np.zeros(subject.shape)
+    for r, c in np.ndindex(subject.shape):
+        others = np.argwhere(~subject if subject[r, c] else subject)
+        nearest = np.hypot(others[:, 0] - r, others[:, 1] - c).min()
+        out[r, c] = -nearest if subject[r, c] else nearest
+    return out
+
+
+def test_signed_distance_is_the_distance_to_the_other_side_negative_inside():
+    subject = np.zeros((14, 17), dtype=bool)
+    subject[3:9, 4:12] = True
+    subject[10, 14] = True  # a lone pixel too
+    np.testing.assert_allclose(signed_distance(subject), brute_force_signed_distance(subject), atol=1e-5)
+
+
+def test_a_lone_pixel_is_one_px_from_its_neighbours_and_the_picture_border_is_not_an_edge():
+    subject = np.zeros((5, 5), dtype=bool)
+    subject[0, 0] = True  # in the corner: its only background is to the right and below
+    distance = signed_distance(subject)
+    assert distance[0, 0] == -1.0
+    assert distance[0, 1] == 1.0
+    assert distance[4, 4] == pytest.approx(np.hypot(4, 4))
+
+
+@pytest.mark.parametrize(
+    ("subject", "expected"),
+    [(False, np.inf), (True, -np.inf)],
+    ids=["no subject: nothing is near it", "no background: nothing is near it"],
+)
+def test_a_picture_without_one_of_the_two_regions_has_infinite_distance_to_it(subject, expected):
+    np.testing.assert_array_equal(signed_distance(np.full((3, 4), subject)), expected)
+
+
+def test_signed_distance_does_not_modify_its_input():
+    subject = rectangle()
+    before = subject.copy()
+    signed_distance(subject)
+    np.testing.assert_array_equal(subject, before)

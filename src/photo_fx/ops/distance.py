@@ -1,4 +1,5 @@
-"""How far each cell (or pixel) of a shape is from the shape's edge, and which way is out.
+"""How far each cell (or pixel) of a shape is from the shape's edge, and which way is out; how far a pixel is from a
+silhouette.
 
 For effects that act on a subject's outline or grow things away from it: outlines, shadows, rim light, auras, or pieces
 that detach from the edge first. Works on any 2-D bool mask: a full-resolution matte or a coarse grid of pieces.
@@ -72,3 +73,22 @@ def edge_distance(
         normal_x=np.where(flat, 0.0, -grad_x / safe),
         normal_y=np.where(flat, -1.0, -grad_y / safe),
     )
+
+
+def signed_distance(subject: np.ndarray) -> np.ndarray:
+    """How far every pixel is from the other side of a silhouette: positive outside it, negative inside it.
+
+    `subject` is a 2-D bool mask (True = the subject). A background pixel gets the distance in px, between pixel
+    centres, to the nearest subject pixel (1 beside it, then 1.41, 2...); a subject pixel gets minus the distance to the
+    nearest background pixel (-1 on its outermost pixels). Only the boundary between the two regions counts: the
+    picture's own border is no edge, so a subject cropped by it has no edge there. A mask with no subject is infinitely
+    far from it everywhere (+inf), one that is all subject infinitely far from any background (-inf).
+    Returns float32 of the mask's shape; the mask is left alone.
+    """
+    if not subject.any():
+        return np.full(subject.shape, np.inf, np.float32)
+    if subject.all():
+        return np.full(subject.shape, -np.inf, np.float32)
+    outside = ndimage.distance_transform_edt(~subject)
+    inside = ndimage.distance_transform_edt(subject)
+    return np.where(subject, -inside, outside).astype(np.float32)

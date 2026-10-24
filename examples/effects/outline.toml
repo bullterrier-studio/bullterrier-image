@@ -1,0 +1,9 @@
+# A bright sticker-style stroke around the subject, with a soft halo beyond it.
+name = "outline"
+size = 480
+
+[[step]]
+effect = "outline"
+width = 7
+color = "#ffd23f"
+glow = 24
