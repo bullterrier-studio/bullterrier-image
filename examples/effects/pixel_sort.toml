@@ -1,0 +1,9 @@
+# Sorted streaks: the mid-tones of every row are put in order of brightness, the shadows and highlights stay.
+name = "pixel_sort"
+size = 480
+
+[[step]]
+effect = "pixel_sort"
+by = "brightness"
+low = 0.25
+high = 0.75
