@@ -7,8 +7,10 @@ an error; `render` keeps alive only the image the next step needs, so a render's
 own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps, while `trace` keeps
 every stage. The runner is given everything it uses: the photo, and the subject either as a
 `matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
-only if some step needs the subject. It never loads a file or looks for the subject on its own;
-`bullterrier_image.recipe` binds the default finder for users.
+only if the recipe needs the subject. It never loads a file or looks for the subject on its own;
+`bullterrier_image.recipe` binds the default finder for users. The subject is found on the photo as given, before the
+recipe's `Framing` is applied, so a crop can follow the subject and the matte moves with the photo; the framed photo is
+then scaled to the recipe's size.
 
 Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never the recipe-file
 reader `loader`, so recipes built in Python run without it.
@@ -39,14 +41,16 @@ def render(
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
-    The photo is first scaled to `recipe.size`. Steps run in order, each on the previous step's output. A masked
+    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; the subject
+    matte is framed and scaled with it. Steps run in order, each on the previous step's output. A masked
     step is blended in through the subject matte, so only the subject or only the background changes.
     Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically.
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
-    height and width, 0..1 (white = subject), or None. find_subject: called with the photo (already scaled to
-    `recipe.size`) when a step needs the subject and no `matte` was given. Raises SubjectNotFoundError when a step
-    needs the subject and neither was given, the finder returns None, or the matte is not the photo's size.
+    height and width, 0..1 (white = subject), or None. find_subject: called with the photo as given (before it is
+    framed or scaled) when the recipe needs the subject and no `matte` was given. Raises SubjectNotFoundError when the
+    recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's size, or the
+    framing crops around a subject that is not there.
     """
     image, matte = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte)
@@ -104,14 +108,16 @@ def render_all(
 def _prepare(
     rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None, find_subject: SubjectFinder | None
 ) -> tuple[np.ndarray, np.ndarray | None]:
-    """Scale the photo and matte to the recipe's size, and find the subject if a step needs it."""
+    """Find the subject if the recipe needs it, then frame the photo and the matte together and scale both to the
+    recipe's size. The one place the photo is framed (a depth map, later, moves with it here too)."""
+    if matte is None and recipe.needs_matte:
+        matte = _find_subject(rgb, recipe, find_subject)
     if matte is not None and matte.shape[:2] != rgb.shape[:2]:
         raise SubjectNotFoundError(f"matte is {matte.shape[:2]} but the photo is {rgb.shape[:2]}")
+    rgb, matte = recipe.frame.apply(rgb, matte)
     if recipe.size:
         rgb = resize(rgb, recipe.size)
         matte = None if matte is None else resize(matte, recipe.size)
-    if recipe.needs_matte and matte is None:
-        matte = _find_subject(rgb, recipe, find_subject)
     return rgb, matte
 
 

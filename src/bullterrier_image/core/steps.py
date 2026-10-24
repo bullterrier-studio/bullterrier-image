@@ -1,5 +1,5 @@
 """The data model of a look: a `Step` (one effect, its parameters, optional mask and opacity) and a `Recipe` (a named,
-ordered tuple of steps with an output size).
+ordered tuple of steps with an output size and a `Framing`).
 
 Promises:
 - Everything is validated when it is made, wherever it comes from (a TOML file, `fx`, or your own code): an unknown
@@ -11,9 +11,9 @@ Promises:
   parameters under the ones given, which is all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
 
-Dependency direction: imports the effect registry, `params` and `errors` only. The recipe-file reader `loader` (TOML to
-`Recipe`, in the adapters layer) and `runner` (running a `Recipe` on a photo) both build on this module and do not know
-each other.
+Dependency direction: imports the effect registry, `framing`, `params` and `errors` only. The recipe-file reader
+`loader` (TOML to `Recipe`, in the adapters layer) and `runner` (running a `Recipe` on a photo) both build on this
+module and do not know each other.
 """
 
 import re
@@ -25,6 +25,7 @@ from pydantic import Field, field_validator, model_validator
 from bullterrier_image.errors import RecipeError
 
 from . import registry
+from .framing import Framing
 from .params import ValidatedModel
 
 
@@ -137,7 +138,7 @@ def safe_name(text: str) -> str:
 
 
 class Recipe(ValidatedModel):
-    """A named look: ordered steps and the size the photo is scaled to.
+    """A named look: ordered steps, how the photo is framed before them and the size it is scaled to.
 
     name: used for output file names, so it must be a safe one: 1 to 64 letters, digits, `.`, `_` or `-`, starting with
         a letter or digit (no folders, no hidden files), and not a device name Windows reserves (CON, PRN, AUX, NUL,
@@ -145,7 +146,10 @@ class Recipe(ValidatedModel):
         a valid one from any text.
     steps: at least one `Step`, run in order (a list is accepted and kept as a tuple).
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
-        None to keep the photo's own size.
+        None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
+    frame: a `Framing` (default: none): flips, turns, crops and pads the photo and the subject matte together before the
+        first step, and may cut the finished picture out (a circle, rounded corners, the subject) after the last, so the
+        render has an alpha channel.
     """
 
     name: str = Field(
@@ -156,10 +160,22 @@ class Recipe(ValidatedModel):
     size: int | None = Field(
         1024, ge=1, strict=True, description="Longest side of the working image in px; None keeps the photo's size."
     )
+    frame: Framing = Field(
+        default_factory=Framing, description="How the photo is framed before the steps and cut out after them."
+    )
 
-    def __init__(self, name: str, steps: Sequence[Step], size: int | None = 1024, **unknown: Any) -> None:
-        """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name)."""
-        self._init_checked("", name=name, steps=tuple(steps), size=size, **unknown)
+    def __init__(
+        self,
+        name: str,
+        steps: Sequence[Step],
+        size: int | None = 1024,
+        frame: Framing | None = None,
+        **unknown: Any,
+    ) -> None:
+        """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name).
+        `frame` is the recipe's `Framing`; without one the photo is only scaled."""
+        given = {} if frame is None else {"frame": frame}
+        self._init_checked("", name=name, steps=tuple(steps), size=size, **given, **unknown)
 
     @field_validator("name")
     @classmethod
@@ -180,5 +196,6 @@ class Recipe(ValidatedModel):
 
     @property
     def needs_matte(self) -> bool:
-        """True if any step is masked, i.e. rendering must find the subject first (the slow part)."""
-        return any(step.mask or step.wants_matte for step in self.steps)
+        """True if any step is masked or takes the matte, or the framing crops around the subject or keeps only it:
+        rendering must find the subject first (the slow part)."""
+        return self.frame.needs_matte or any(step.mask or step.wants_matte for step in self.steps)

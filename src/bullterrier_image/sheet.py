@@ -56,7 +56,7 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
     for value in values:
         swept = Step(step.effect, {**step.params, name: value}, step.mask, step.opacity)
         steps = [*recipe.steps[:index], swept, *recipe.steps[index + 1 :]]
-        tiles.append((f"{name}={value:g}", Recipe(recipe.name, steps, recipe.size)))
+        tiles.append((f"{name}={value:g}", recipe.model_copy(update={"steps": tuple(steps)})))  # keeps the rest
     return tiles
 
 

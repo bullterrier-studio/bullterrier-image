@@ -8,9 +8,11 @@ import pytest
 
 from bullterrier_image import SubjectNotFoundError
 from bullterrier_image.core import runner
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.ops.resample import resize
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
@@ -72,11 +74,16 @@ def test_the_finders_matte_is_the_one_the_recipe_uses(photo, matte):
     assert not np.array_equal(found, runner.render(photo, MASKED, 1.0 - matte))
 
 
-def test_the_finder_sees_the_photo_already_scaled_to_the_recipes_size(photo, matte):
-    finder = CountingFinder(matte[::2, ::2])  # what the 48x64 photo's matte looks like
-    small = Recipe("small", MASKED.steps, size=64)
-    assert runner.render(photo, small, find_subject=finder).shape == (48, 64, 3)
-    assert finder.seen == [(48, 64, 3)]
+def test_the_finder_sees_the_photo_as_given_before_it_is_framed_or_scaled(photo, matte):
+    finder = CountingFinder(matte)
+    small = Recipe("small", MASKED.steps, size=64, frame=Framing(aspect=1.0))
+    assert runner.render(photo, small, find_subject=finder).shape == (64, 64, 3)
+    assert finder.seen == [(96, 128, 3)]  # not the 64 px square it is rendered as
+
+
+def test_a_finders_matte_of_another_size_than_the_photo_is_refused(photo, matte):
+    with pytest.raises(SubjectNotFoundError, match="matte is"):
+        runner.render(photo, MASKED, find_subject=CountingFinder(matte[::2, ::2]))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -84,6 +91,71 @@ def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     """A finder returning None (instead of raising) would otherwise make `trace` drop the subject stage silently."""
     with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
         run(photo, MASKED, find_subject=lambda rgb: None)
+
+
+# --- framing: the photo and its matte are framed together, before the steps -------------------------------------------
+
+
+def test_a_recipe_without_framing_runs_its_steps_on_the_photo_scaled_to_its_size(photo):
+    scaled = Recipe("scaled", PLAIN.steps, size=64)
+    by_hand = runner.render(resize(photo, 64), PLAIN)
+    np.testing.assert_array_equal(runner.render(photo, scaled), by_hand)
+
+
+@pytest.mark.parametrize(
+    ("frame", "by_hand"),
+    [
+        pytest.param(Framing(aspect=1.0), lambda a: a[:, 16:112], id="a square crop"),
+        pytest.param(Framing(aspect=1.0, anchor="left"), lambda a: a[:, :96], id="a square crop at the left"),
+        pytest.param(Framing(flip="x"), lambda a: a[:, ::-1], id="a flip"),
+        pytest.param(Framing(angle=90, fit="expand"), lambda a: np.rot90(a), id="a quarter turn"),
+    ],
+)
+def test_the_steps_run_on_the_framed_photo_and_a_masked_step_still_finds_the_subject_where_it_moved(
+    photo, matte, frame, by_hand
+):
+    framed = Recipe("framed", MASKED.steps, size=None, frame=frame)
+    expected = runner.render(by_hand(photo), MASKED, by_hand(matte))  # background black, by hand
+    np.testing.assert_array_equal(runner.render(photo, framed, matte), expected)
+    assert (expected == 0).any()
+    assert np.array_equal(runner.render(photo, framed, matte)[by_hand(matte) == 1], by_hand(photo)[by_hand(matte) == 1])
+
+
+def test_framing_comes_before_the_size(photo):
+    framed = Recipe("framed", PLAIN.steps, size=48, frame=Framing(aspect=1.0))
+    by_hand = runner.render(resize(photo[:, 16:112], 48), PLAIN)  # crop 96 px square, then scale it to 48
+    np.testing.assert_array_equal(runner.render(photo, framed), by_hand)
+
+
+def test_a_crop_around_the_subject_uses_the_matte_that_the_finder_found_on_the_whole_photo(photo, matte):
+    framed = Recipe("framed", PLAIN.steps, size=None, frame=Framing(anchor="subject", aspect=1.0, margin=0.1))
+    for result in (
+        runner.render(photo, framed, matte),
+        runner.render(photo, framed, find_subject=CountingFinder(matte)),
+    ):
+        np.testing.assert_array_equal(result, runner.render(photo[13:84, 29:100], PLAIN))  # the disc and 6 px each way
+
+
+def test_a_subject_crop_needs_the_subject_even_when_no_step_does(photo):
+    framed = Recipe("framed", PLAIN.steps, size=None, frame=Framing(anchor="subject"))
+    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
+        runner.render(photo, framed)
+
+
+def test_trace_shows_the_framed_photo_and_matte_and_ends_in_the_render(photo, matte):
+    framed = Recipe("framed", MASKED.steps, size=None, frame=Framing(aspect=1.0))
+    stages = runner.trace(photo, framed, matte)
+    np.testing.assert_array_equal(stages[0].image, photo[:, 16:112])
+    np.testing.assert_array_equal(stages[1].image[..., 0], matte[:, 16:112])
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, framed, matte))
+
+
+def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, matte):
+    finder = CountingFinder(matte)
+    framed = Recipe("framed", PLAIN.steps, size=None, frame=Framing(anchor="subject"))
+    results = runner.render_all(photo, [PLAIN, framed], find_subject=finder)
+    assert [r.shape[:2] for r in results] == [(96, 128), (59, 59)]
+    assert len(finder.seen) == 1
 
 
 # --- memory: the runner keeps only the image the next step needs ---------------------------------------------------

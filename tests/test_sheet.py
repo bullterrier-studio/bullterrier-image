@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image import RecipeError
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.recipe import Recipe, Step, render
 from bullterrier_image.sheet import sweep
 
@@ -44,6 +45,11 @@ def test_a_sweep_renders_the_recipe_once_for_each_value_of_the_parameter(photo, 
 def test_a_sweep_keeps_the_other_steps_as_they_are():
     tiles = sweep(LOOK, "grain.amount", 0, 0.2, 3)
     assert all(tile.steps[0] == GLITCH and tile.size == LOOK.size and tile.name == LOOK.name for _, tile in tiles)
+
+
+def test_a_sweep_keeps_the_recipes_framing():
+    framed = Recipe("framed", [GLITCH, GRAIN], size=48, frame=Framing(aspect=1.0, transparent="circle"))
+    assert all(tile.frame == framed.frame for _, tile in sweep(framed, "grain.amount", 0, 0.2, 3))
 
 
 def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():

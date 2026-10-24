@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, Picture, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
@@ -110,6 +111,31 @@ def test_an_explicit_name_in_a_file_is_not_repaired(tmp_path):
     path.write_text("name = 'my look'\n[[step]]\neffect = 'grade'\n", encoding="utf-8")
     with pytest.raises(RecipeError, match=r"^fine\.toml: .*'my look'"):
         load_recipe(path)
+
+
+def test_a_recipe_holds_the_framing_it_is_given_and_by_default_none():
+    framing = Framing(aspect=1.0, anchor="subject")
+    assert Recipe("framed", [Step("grade")], frame=framing).frame == framing
+    assert Recipe("plain", [Step("grade")]).frame == Framing()
+
+
+def test_a_recipe_refuses_a_frame_that_is_not_a_framing():
+    with pytest.raises(RecipeError, match="frame"):
+        Recipe("framed", [Step("grade")], frame="square")  # type: ignore[arg-type]  # the point of the test
+
+
+@pytest.mark.parametrize(
+    ("steps", "frame", "needs_matte"),
+    [
+        pytest.param([Step("grade")], Framing(), False, id="nothing masked, nothing framed"),
+        pytest.param([Step("grade", mask="subject")], Framing(), True, id="a masked step"),
+        pytest.param([Step("grade")], Framing(anchor="subject"), True, id="a crop around the subject"),
+        pytest.param([Step("grade")], Framing(transparent="background"), True, id="the subject as the alpha"),
+        pytest.param([Step("grade")], Framing(aspect=1.0, transparent="circle"), False, id="a crop and a circle"),
+    ],
+)
+def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame, needs_matte):
+    assert Recipe("look", steps, frame=frame).needs_matte is needs_matte
 
 
 def test_the_recipe_objects_are_frozen():
