@@ -56,6 +56,12 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `blue_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output blue, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
 | `blue_from_blue` | number | ratio | -3 to 3 | `1.0` | Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
 
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `infrared` | False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale. |
+
 ### `color_balance`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -104,6 +110,12 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 
 </details>
 
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `cross_process` | Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows. |
+
 ### `equalize`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -142,6 +154,16 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `quantile_method` | one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased' |  |  | `'linear'` | How the stretch's clip points are read from the picture's brightness (numpy's quantile methods): 'linear' interpolates between the two nearest pixels; 'lower', 'higher', 'nearest' and 'midpoint' take the darker, the brighter, the nearer pixel or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and 'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or flat pictures. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `sepia` | Warm brown monochrome, from dark chocolate to cream, like an aged print. |
+| `cyanotype` | Prussian-blue monochrome fading to pale cyan, like a blueprint print. |
+| `thermal` | Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot. |
+| `night_vision` | Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette). |
+| `xray` | Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest). |
 
 ### `hue_shift`
 
@@ -216,6 +238,12 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `balance` | number | fraction | 0 to 1 | `0.5` | The brightness (0..1) where the shadow tint hands over to the highlight tint. Raising it tints more of the picture with the shadow colour. |
 | `softness` | number | fraction | 0.01 to 1 | `0.5` | Width of the brightness band (0.01..1), centred on balance, over which one tint blends into the other. Smaller makes a sharper hand-over. |
 | `black_fade` | number | fraction | 0.001 to 1 | `0.1` | The brightness (0.001..1) up to which the tints fade in from nothing, so pure black stays black. Larger keeps more of the shadows untinted. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `teal_orange` | The blockbuster grade: teal in the shadows, orange in the highlights. |
 
 ### `threshold`
 

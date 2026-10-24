@@ -96,3 +96,11 @@ Effects that change over time, such as particles dispersing or evaporating.
 | `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also decides the figure's outline. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `halo` | The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces. |
+| `windblown` | The edges dissolve and everything is blown to the right, like dust in a wind. |
+| `disintegrate` | Heavy: the whole outline and the top come apart, in long plumes in every direction. |

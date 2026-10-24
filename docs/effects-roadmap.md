@@ -237,20 +237,20 @@ Use the subject cut-out, so they target the subject or the background.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000").where("background")` |
-| `outline` | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
-| `drop_shadow` | Soft shadow behind the subject. | `fx.drop_shadow(dx=12, dy=18, blur=24)` |
-| `long_shadow` | Flat-design shadow at an angle. | `fx.long_shadow(angle=45, length=300)` |
-| `rim_light` | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
-| `reflection` | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
-| `background` | Replace the background: colour, gradient, blur or image. | `fx.background(gradient=["#111","#2a0f4a"])` |
-| `background_blur` | Portrait-mode blur. | `fx.background_blur(radius=24)` |
-| `sticker` | White border and shadow: a die-cut sticker. | `fx.sticker(border=14)` |
-| `silhouette` | Flat colour subject. | `fx.silhouette(color="#000", background="#ffd400")` |
-| `color_pop` | Subject in colour, background in grey. | `fx.color_pop()` |
-| `spotlight` | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
-| `aura` | Soft coloured halo around the subject. | `fx.aura(color="#7a2cff", size=40)` |
+| `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
+| `drop_shadow` ✓ | Soft shadow behind the subject. | `fx.drop_shadow(dx=12, dy=18, blur=24)` |
+| `long_shadow` ✓ | Flat-design shadow at an angle. | `fx.long_shadow(angle=45, length=300)` |
+| `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
+| `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
+| `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `fill`, `gradient` or any other effect. | `fill / gradient with mask = "background"` |
+| `background_blur` ✓ | Portrait-mode blur. A recipe step: `gaussian_blur` with `mask = "background"`. | `gaussian_blur(radius=24) with mask = "background"` |
+| `sticker` ✓ | White border and shadow: a die-cut sticker. A recipe: `outline` then `drop_shadow` (examples/recipes/sticker.toml). | `outline(width=14) + drop_shadow` |
+| `silhouette` ✓ | Flat colour subject. A recipe: `fill` masked to the subject, then to the background. | `fill(color="#000") mask = "subject"` |
+| `color_pop` ✓ | Subject in colour, background in grey. A recipe: `black_and_white` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `black_and_white mask = "background"` |
+| `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
+| `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
 | `double_exposure` | Another picture blended inside the silhouette. | `fx.double_exposure(image="forest.jpg")` |
-| `layered_cutouts` | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
+| `layered_cutouts` ✓ | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
 | decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
 
@@ -327,14 +327,15 @@ Time-based effects, plus every effect above that has a numeric parameter can be 
 
 What combining effects can give, once the pieces exist:
 
-- **Cyberpunk** ✓ ([recipe](../examples/looks/01-cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain
+- **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain
 - **Risograph poster**: levels, risograph inks, paper texture, border
-- **Terminal** ✓ ([recipe](../examples/looks/03-terminal.toml); gains `crt` with batch 6): green ASCII, CRT, scanlines, vignette
-- **Vaporwave** ✓ ([recipe](../examples/looks/02-vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
-- **Newspaper** ✓ ([recipe](../examples/looks/04-newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
+- **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml); gains `crt` with batch 6): green ASCII, CRT, scanlines, vignette
+- **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
+- **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure**: black and white, a second photo inside the silhouette, vignette
-- **Sticker**: cut-out with a white border and drop shadow
+- **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
+- **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
 - **Turn to dust** (animation): ASCII, disperse, embers, camera shake
-- **Northern lights** ✓ ([recipe](../examples/looks/05-northern-lights.toml)): aurora and stars behind a cold-tinted subject; gains a rim light with batch 11
+- **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/looks/` by the batch that builds its last missing effect (Risograph poster with batch 9, Sticker with batch 11, Double exposure with decision D2, Turn to dust with batch 12).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with decision D2, Turn to dust with batch 12).

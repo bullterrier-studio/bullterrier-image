@@ -278,7 +278,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seam)."""
     ...
 
-def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0) -> Step:
+def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, preset: Literal['infrared'] | None = None) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
 
 The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
@@ -313,7 +313,11 @@ blue_from_green : number, ratio, -3 to 3, default 0.0
     negative weight subtracts it.
 blue_from_blue : number, ratio, -3 to 3, default 1.0
     Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes
-    it, above 1 amplifies it, a negative weight inverts it."""
+    it, above 1 amplifies it, a negative weight inverts it.
+
+Presets
+-------
+infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale."""
     ...
 
 def chromatic_aberration(amount: float = 4.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -432,7 +436,7 @@ preserve_luminosity : true or false, default True
     allows."""
     ...
 
-def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75) -> Step:
+def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, preset: Literal['cross_process'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
 
 The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
@@ -495,7 +499,11 @@ blue_midtones : number, fraction, 0 to 1, default 0.5
 blue_highlights : number, fraction, 0 to 1, default 0.75
     The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
     unchanged), applied after the master curve: raising it adds blue to the highlights,
-    lowering it takes blue away. Its ends stay at black and white."""
+    lowering it takes blue away. Its ends stay at black and white.
+
+Presets
+-------
+cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows."""
     ...
 
 def dehaze(amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
@@ -765,6 +773,45 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
+def drop_shadow(dx: float = 12.0, dy: float = 18.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', opacity: float = 0.6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
+    """A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`.
+
+The shadow is the subject's silhouette moved, blurred and mixed over the background in `color` by `opacity`; the
+subject itself is never changed, and the shadow only ever shows where the subject is not.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+no subject and so no shadow: the picture comes back unchanged.
+
+Parameters
+----------
+dx : number, px, -500 to 500, default 12.0
+    How far the shadow is moved to the right, in px at the recipe's size; negative moves
+    it left. 0 with `dy` 0 hides the shadow behind the subject, leaving only what the
+    blur spreads past its edge.
+dy : number, px, -500 to 500, default 18.0
+    How far the shadow is moved down, in px at the recipe's size; negative moves it up.
+blur : number, px, 0 to 200, default 24.0
+    Gaussian sigma of the shadow's soft edge in px: raising it makes the shadow larger
+    and fainter at its edge; 0 = a hard-edged copy of the subject's silhouette.
+color : colour, default '#000000'
+    The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what
+    lies behind the subject; another colour tints it.
+opacity : number, fraction, 0 to 1, default 0.6
+    How much of the picture behind the subject the shadow replaces with its colour where
+    it is fullest: 0 = no shadow, 1 = the picture is fully covered there.
+
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the shadow's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the shadow sees beyond the picture's edge, when it is moved and softened:
+    'nearest' (the outermost row repeated, so a subject cut off by the border casts its
+    shadow on without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror'
+    (mirrored about the edge pixel) or 'wrap' (the opposite edge)."""
+    ...
+
 def dust_scratches(density: float = 0.6, size: float = 8.0, hairs: float = 0.15, scratches: int = 2, angle: float = 4.0, width: float = 1.0, opacity: float = 0.8, light: str | list[float] | tuple[float, float, float] = '#ffffff', dark: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0) -> Step:
     """Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`.
 
@@ -963,7 +1010,7 @@ bins : whole number, count, 2 to 256, default 256
     (rounded to the nearest whole number)."""
     ...
 
-def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
+def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
@@ -1069,7 +1116,13 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never drifts (it simply vanishes
     if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also
-    decides the figure's outline."""
+    decides the figure's outline.
+
+Presets
+-------
+halo : The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces.
+windblown : The edges dissolve and everything is blown to the right, like dust in a wind.
+disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
 def fade(amount: float = 0.12) -> Step:
@@ -1582,7 +1635,7 @@ reflect : true or false, default False
     `repeat` 1."""
     ...
 
-def gradient_map(stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear') -> Step:
+def gradient_map(stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', *, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
 
 Two stops make a duotone, three a tritone; e.g. stops = ["#0b0020", "#ff2bd6", "#00f0ff"] is a neon scheme.
@@ -1610,7 +1663,15 @@ quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'in
     or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation',
     'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and
     'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan).
-    Only visible on small or flat pictures."""
+    Only visible on small or flat pictures.
+
+Presets
+-------
+sepia : Warm brown monochrome, from dark chocolate to cream, like an aged print.
+cyanotype : Prussian-blue monochrome fading to pale cyan, like a blueprint print.
+thermal : Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot.
+night_vision : Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette).
+xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
     ...
 
 def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -1826,6 +1887,46 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
     pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def layered_cutouts(layers: int = 4, offset: float = 14.0, angle: float = 45.0, color: str | list[float] | tuple[float, float, float] = '#ff8a5b', end_color: str | list[float] | tuple[float, float, float] = '#3b1f6b', opacity: float = 1.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
+    """Copies of the subject's silhouette stacked behind it, each `offset` px farther along `angle`, like cut paper.
+
+The layers run in colour from `color` (nearest the subject) to `end_color` (farthest); a nearer layer lies in
+front of the ones beyond it, and the subject on top of all of them, so the subject itself is never changed.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+no subject and so no layers: the picture comes back unchanged.
+
+Parameters
+----------
+layers : whole number, count, 1 to 20, default 4
+    How many copies of the silhouette are stacked behind the subject. Raising it makes a
+    deeper stack. Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+offset : number, px, 0 to 200, default 14.0
+    How far each layer lies beyond the one before it, in px at the recipe's size: the
+    first is `offset` from the subject, the last `layers` x `offset`. 0 = every layer
+    hidden behind the subject.
+angle : number, degrees, -180 to 180, default 45.0
+    The direction the layers step away in, clockwise as seen in the picture: 0 = to the
+    right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up.
+color : colour, default '#ff8a5b'
+    The colour of the layer nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+end_color : colour, default '#3b1f6b'
+    The colour of the farthest layer; the layers between step evenly from `color` to it.
+    With one layer only `color` is used.
+opacity : number, fraction, 0 to 1, default 1.0
+    How much of what lies behind each layer it covers: 1 = fully (paper), below 1 the
+    layers show through each other and the picture; 0 = no layers.
+
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the layers see beyond the picture's edge when the silhouette is moved:
+    'nearest' (the outermost row repeated, so a subject cut off by the border has layers
+    that go on past it), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
+    about the edge pixel) or 'wrap' (the opposite edge)."""
     ...
 
 def lens_blur(radius: float = 8.0, highlights: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -2176,6 +2277,47 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seam)."""
     ...
 
+def long_shadow(angle: float = 45.0, length: float = 300.0, color: str | list[float] | tuple[float, float, float] = '#000000', opacity: float = 0.5, fade: float = 1.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
+    """A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it.
+
+The shadow is every copy of the silhouette moved along the ray, one per pixel of travel, the farther ones fainter
+by `fade`; it is laid behind the subject in `color` at `opacity`, so the subject itself is never changed.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+no subject and so no shadow: the picture comes back unchanged.
+
+Parameters
+----------
+angle : number, degrees, -180 to 180, default 45.0
+    The direction the shadow is cast, clockwise as seen in the picture: 0 = to the
+    right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. Angles that
+    are not a multiple of 45 leave the shadow's edges about a pixel soft.
+length : number, px, 0 to 5000, default 300.0
+    How far the shadow reaches from the subject's outline, in px at the recipe's size; 0
+    = no shadow (the silhouette behind itself, which shows only as a faint fringe where
+    the cut-out is soft). Raising it makes the shadow longer; the effect's time grows
+    only with the logarithm of it.
+color : colour, default '#000000'
+    The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what
+    lies behind the subject; another colour tints it.
+opacity : number, fraction, 0 to 1, default 0.5
+    How much of the picture behind the subject the shadow replaces with its colour where
+    it is fullest, at the subject: 0 = no shadow, 1 = the picture is fully covered
+    there.
+fade : number, fraction, 0 to 1, default 1.0
+    How much of its opacity the shadow loses along its length, in a straight line: 0 =
+    solid to the end, 0.5 = half as opaque at the end, 1 = fades out completely at
+    `length`.
+
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the shadow sees beyond the picture's edge when the silhouette is moved:
+    'nearest' (the outermost row repeated, so a subject cut off by the border casts its
+    shadow on without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror'
+    (mirrored about the edge pixel) or 'wrap' (the opposite edge)."""
+    ...
+
 def melt(amount: float = 40.0, scale: float = 12.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
     """Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.
 
@@ -2326,6 +2468,42 @@ colors : list of colours, default ('#0b1d3a', '#2a7f9e', '#f4e9c8')
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same picture, another seed a different
     one. Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def outline(width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, opacity: float = 1.0, matte_threshold: float = 0.5) -> Step:
+    """A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px.
+
+The stroke follows the edge of the subject on the side `position` says; 'outside' leaves the subject's own pixels
+exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the matte
+is soft the stroke lies behind the subject. The edge is antialiased over one pixel.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+no subject to outline and the picture is returned unchanged.
+
+Parameters
+----------
+width : number, px, 0 to 200, default 6.0
+    Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0
+    = no stroke.
+color : colour, default '#ffffff'
+    The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+position : one of 'outside', 'inside', 'center', default 'outside'
+    Which side of the silhouette's edge the stroke lies on: 'outside' (around the
+    subject, whose own pixels stay untouched), 'inside' (painted over the subject's rim)
+    or 'center' (half of `width` on each side).
+glow : number, px, 0 to 200, default 0.0
+    How far a soft halo of the same colour reaches beyond the stroke, in px; it fades
+    smoothly from the stroke to nothing. Raising it spreads the halo (a large value
+    makes an aura). 0 = no halo.
+opacity : number, fraction, 0 to 1, default 1.0
+    How solid the stroke and halo are: 0 = invisible, 1 = fully covering the picture.
+
+Advanced parameters
+-------------------
+matte_threshold : number, fraction, 0 to 1, default 0.5
+    The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is
+    outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
+    (hair, fur), raising it less."""
     ...
 
 def palette_quantize(palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'] = 'photo', colors: int = 8, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0) -> Step:
@@ -2821,6 +2999,51 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles)."""
     ...
 
+def reflection(height: float = 0.4, fade: float = 0.7, blur: float = 2.0, opacity: float = 0.6, threshold: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth.
+
+The floor line is the bottom of the subject; the reflection is `height` of the subject's height deep, blurred by
+`blur`, and mixed into the floor below by `opacity` at the floor line and by less and less down to `fade` of that
+at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+when nothing in it counts as the subject (see `threshold`), there is no floor line and so no reflection: the
+picture comes back unchanged.
+
+Parameters
+----------
+height : number, fraction, 0 to 1, default 0.4
+    How tall the reflection is, as a fraction of the subject's height: 0.4 = 40% of it
+    is mirrored into the floor below the subject's lowest row, 1 = all of it; 0 = no
+    reflection. Where the picture ends first, the reflection is cut there.
+fade : number, fraction, 0 to 1, default 0.7
+    How much of its strength the reflection loses between the floor line and its end, in
+    a straight line: 0 = as strong at the end as at the floor line, 1 = fades out
+    completely at its end.
+blur : number, px, 0 to 100, default 2.0
+    Gaussian sigma of the reflection's softness in px at the recipe's size: raising it
+    makes a blurrier mirror, as on a rough floor; 0 = a sharp mirror image.
+opacity : number, fraction, 0 to 1, default 0.6
+    How much of the floor the reflection replaces at the floor line, where it is
+    strongest: 0 = no reflection, 1 = a perfect mirror.
+
+Advanced parameters
+-------------------
+threshold : number, fraction, 0 to 1, default 0.5
+    How much of a matte row, 0 to 1, must be subject for the row to count as part of it
+    when its lowest and highest rows are found: 0.5 = a pixel of at least half. Lowering
+    it counts faint fringes, so the floor line moves down and the subject's height
+    grows.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge, and beyond the floor line, where the
+    reflection is mirrored: 'reflect' (mirrored, edge pixel repeated, which continues
+    the mirror image), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated) or 'wrap' (the opposite edge)."""
+    ...
+
 def rgb_split(angle: float = 30.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest') -> Step:
     """Push the red and blue channels `amount` px apart along `angle`, leaving green where it is.
 
@@ -2848,6 +3071,56 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
     left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
     'mirror' mirrors it about the edge line."""
+    ...
+
+def rim_light(angle: float = 40.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5) -> Step:
+    """Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`.
+
+Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
+direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`.
+It is screened over the picture, so it only ever brightens, and never reaches the background or the subject's
+interior beyond `width`. The picture's own border is no edge.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+with a matte that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
+
+Parameters
+----------
+angle : number, degrees, -180 to 180, default 40.0
+    The direction the light comes from, counter-clockwise from the right: 0 = from the
+    right, 90 = from above, 180 or -180 = from the left, -90 = from below. Only edges
+    whose outward direction faces it are lit.
+color : colour, default '#ff9a4d'
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
+    orange.
+width : number, px, 1 to 200, default 12.0
+    Depth of the lit band inside the subject's edge, in px at the recipe's size: raising
+    it lets the light reach further in.
+amount : number, ratio, 0 to 5, default 1.0
+    How strong the light is where it is brightest (an edge that faces the light head-
+    on): 0 = off, 1 = the colour at full strength, above 1 saturates sooner.
+falloff : number, ratio, 0.1 to 10, default 1.5
+    How the light fades from the edge into the band: it is (1 - depth / width)^falloff
+    of its strength. 1 = evenly, above 1 stays close to the edge, below 1 carries
+    further in.
+
+Advanced parameters
+-------------------
+smoothing : number, px, 0 to 50, default 2.0
+    Gaussian sigma, in px, with which the silhouette is smoothed before the edge's
+    direction is read: raising it evens out the jaggedness of a pixel edge (fur), at the
+    cost of detail in small features. 0 uses the raw edge.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the `smoothing` blur is cut off, in sigmas: it reaches truncate x smoothing
+    px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored,
+    border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
+    border pixel repeated) or 'wrap' (the opposite border).
+matte_threshold : number, fraction, 0 to 1, default 0.5
+    The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is
+    lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
+    fur), raising it less."""
     ...
 
 def ripple(wavelength: float = 40.0, amplitude: float = 6.0, phase: float = 0.0, angle: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -3313,7 +3586,7 @@ seed : whole number, count, 0 to 4294967295, default 0
     number)."""
     ...
 
-def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1) -> Step:
+def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1, *, preset: Literal['teal_orange'] | None = None) -> Step:
     """Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness.
 
 The subtle way to get a neon or cinematic cast: skin tones and detail stay, the colour shifts toward the tints.
@@ -3337,7 +3610,58 @@ softness : number, fraction, 0.01 to 1, default 0.5
     blends into the other. Smaller makes a sharper hand-over.
 black_fade : number, fraction, 0.001 to 1, default 0.1
     The brightness (0.001..1) up to which the tints fade in from nothing, so pure black
-    stays black. Larger keeps more of the shadows untinted."""
+    stays black. Larger keeps more of the shadows untinted.
+
+Presets
+-------
+teal_orange : The blockbuster grade: teal in the shadows, orange in the highlights."""
+    ...
+
+def spotlight(amount: float = 0.8, falloff: float = 0.8, radius: float = 200.0, feather: float = 10.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5) -> Step:
+    """Light the subject and darken the rest: the further from the silhouette, the more the picture goes to `color`.
+
+Darkness is `amount` x (distance / `radius`)^`falloff` (full from `radius` px out), times the share of the
+surroundings that `feather` leaves unlit, so a feathered spotlight bleeds light softly past the silhouette. The
+subject itself is never touched. With a matte that covers nothing, everything is the rest and is darkened fully.
+
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+no subject to light and the picture is returned unchanged.
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.8
+    How far the picture is darkened where it is darkest, far from the subject: 0 =
+    unchanged, 1 = fully `color`.
+falloff : number, ratio, 0.1 to 10, default 0.8
+    How fast the darkening grows with distance from the subject: it is (distance /
+    radius)^falloff of its full strength. 1 = evenly, below 1 darkens quickly near the
+    subject, above 1 stays light near it and darkens late.
+radius : number, px, 1 to 5000, default 200.0
+    The distance from the subject's silhouette, in px at the recipe's size, at which the
+    darkening reaches full strength; beyond it the picture stays that dark. Raising it
+    spreads the light further.
+feather : number, px, 0 to 200, default 10.0
+    How softly the light spills from the subject, as a Gaussian sigma in px: the area
+    around the silhouette stays lit through this much of its surroundings. Raising it
+    makes a softer pool of light round the subject; 0 = the darkening starts right at
+    the silhouette.
+color : colour, default '#000000'
+    The colour the surroundings darken toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Black darkens; a dark blue gives a night look.
+
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the `feather` blur is cut off, in sigmas: it reaches truncate x feather px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `feather` blur sees beyond the picture's border: 'reflect' (mirrored,
+    border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
+    border pixel repeated) or 'wrap' (the opposite border).
+matte_threshold : number, fraction, 0 to 1, default 0.5
+    The matte value, 0 to 1, from which a pixel belongs to the subject that stays lit:
+    0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur),
+    raising it less."""
     ...
 
 def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
