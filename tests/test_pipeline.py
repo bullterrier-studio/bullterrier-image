@@ -11,7 +11,7 @@ from PIL import Image
 from bullterrier_image import Each, Grid, Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.errors import BackendUnavailableError, ProjectError
+from bullterrier_image.errors import BackendUnavailableError, ProjectError, SubjectNotFoundError
 from bullterrier_image.pipeline import init_project, load_project, run
 
 
@@ -557,3 +557,103 @@ def test_the_steps_of_a_recipe_with_transparency_are_saved_and_the_cut_is_a_png(
     ]
     with Image.open(steps / "02-transparent.png") as img:
         assert img.mode == "RGBA"
+
+
+GRID_FIRST_RECIPE = """format = 2
+name = "grid-first"
+size = 64
+
+[region.cells]
+kind = "grid"
+columns = 2
+rows = 2
+
+[region.found]
+kind = "subject"
+per = "cells"
+context = 0
+
+[[step]]
+effect = "fill"
+mask = "found"
+"""
+
+
+class PieceFinder:
+    """Stands in for the subject-finding model: records the crops it is asked about, finds a soft square in each (a
+    value a 16-bit store rounds), and finds nothing in the crops it is told to leave empty."""
+
+    def __init__(self, empty: tuple[int, ...] = ()):
+        self.empty = empty
+        self.crops: list[np.ndarray] = []
+
+    def __call__(self, rgb: np.ndarray) -> np.ndarray:
+        self.crops.append(rgb.copy())
+        if len(self.crops) in self.empty:
+            raise SubjectNotFoundError("nothing stands out")
+        matte = np.zeros(rgb.shape[:2], np.float32)
+        matte[2:8, 2:8] = 0.9001  # not a value 16 bits hold exactly
+        return matte
+
+
+def grid_first_project(folder) -> Project:
+    (folder / "recipes" / "grid-first.toml").write_text(GRID_FIRST_RECIPE, encoding="utf-8")
+    write_project(folder, '[export]\nformats = ["png"]\n')
+    return load_project(folder / "bt-image.toml")
+
+
+def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_not_asked_again(folder):
+    project = grid_first_project(folder)
+    finder = PieceFinder()
+    run(project, only="a.png", subject=finder)
+    assert len(finder.crops) == 4  # one for each piece of the picture, at the recipe's size
+    assert {crop.shape for crop in finder.crops} == {(24, 32, 3)}
+    first = (folder / "out" / "a" / "grid-first.png").read_bytes()
+    run(project, only="a.png", force=True, subject=finder)
+    assert len(finder.crops) == 4  # the repeat render reads what was found
+    assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first  # and comes out the same picture
+
+
+def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
+    project = grid_first_project(folder)
+    finder = PieceFinder(empty=(1, 3))
+    run(project, only="a.png", subject=finder)
+    first = (folder / "out" / "a" / "grid-first.png").read_bytes()
+    run(project, only="a.png", force=True, subject=finder)
+    assert len(finder.crops) == 4
+    assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
+
+
+def test_another_photo_and_a_recipe_that_cuts_other_pieces_ask_about_their_own_crops(folder):
+    project = grid_first_project(folder)
+    finder = PieceFinder()
+    run(project, subject=finder)
+    assert len(finder.crops) == 8  # a.png and b.png (the photo flipped) have other pixels in their pieces
+    (folder / "recipes" / "grid-first.toml").write_text(
+        GRID_FIRST_RECIPE.replace("columns = 2", "columns = 3"), encoding="utf-8"
+    )
+    run(project, only="a.png", subject=finder)
+    assert len(finder.crops) == 8 + 6  # other pieces of the same photo: other crops, asked about once each
+
+
+def finds_a_square(rgb):
+    matte = np.zeros(rgb.shape[:2], np.float32)
+    matte[2:8, 2:8] = 1
+    return matte
+
+
+def finds_another_square(rgb):
+    matte = np.zeros(rgb.shape[:2], np.float32)
+    matte[4:9, 4:9] = 1
+    return matte
+
+
+def test_switching_the_finder_finds_the_pieces_again(folder):
+    project = grid_first_project(folder)
+    run(project, only="a.png", subject=finds_a_square)
+    picture = folder / "out" / "a" / "grid-first.png"
+    before = picture.read_bytes()
+    by_recipe = {i.recipe: i.status for i in run(project, only="a.png", subject=finds_another_square)}
+    assert by_recipe["grid-first"] == "done"  # a recipe that uses what the finder finds is redone
+    assert by_recipe["grainy"] == "skipped"
+    assert picture.read_bytes() != before  # the other finder's squares, not the remembered ones

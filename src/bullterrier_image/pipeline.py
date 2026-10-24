@@ -3,7 +3,8 @@
 Stages, in order, for every photo:
 
     ingest    read the photo (orientation and colour profile applied, see `imageio`)
-    analyse   find the subject once per photo, if any recipe needs it; the result is cached on disk
+    analyse   find the subject once per photo, if any recipe needs it; the result is cached on disk (so is what the
+              finder finds in each piece, for a recipe that finds the subject piece by piece)
     style     run each recipe on the photo
     check     automatic quality checks (see `checks`); problems become warnings in the report
     export    write every format and size
@@ -55,7 +56,7 @@ from . import matte as finding
 from .checks import matte_warnings, still_warnings
 from .core.params import Picture, describe_error
 from .core.runner import subject_from
-from .errors import BullterrierImageError, ProjectError
+from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .matte import segmenter_identity, subject_matte
 from .ops.resample import resize
 from .recipe import Recipe, load_recipe, render, trace
@@ -245,7 +246,9 @@ def run(
     `segmenter_identity` (the backend and its model), so switching segmenter or model finds the subjects again and
     redoes the recipes that use them (BackendUnavailableError at once if it cannot run). A function of your own is
     known by its qualified name alone, a callable object by its class: give one whose answers differ another name or
-    delete `project.cache`. A damaged cache entry is found again, also with `force`.
+    delete `project.cache`. A damaged cache entry is found again, also with `force`. A recipe whose regions find the
+    subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working picture, once for each
+    crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -274,7 +277,7 @@ def run(
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
     # (only asked of the segmenter when a recipe needs the subject: a setting nobody uses cannot stop the project)
-    subject_key = _subject_key(subject) if any(r.needs_matte for _, r in recipes) else ""
+    subject_key = _subject_key(subject) if any(r.needs_matte or r.needs_finder for _, r in recipes) else ""
     finder = subject if callable(subject) else functools.partial(subject_matte, segmenter=subject)
     items: list[Item] = []
     total = len(photos) * len(recipes)
@@ -292,7 +295,7 @@ def run(
                 *_picture_digests(recipe),
                 settings,
                 code,
-                *((subject_key,) if recipe.needs_matte else ()),
+                *((subject_key,) if recipe.needs_matte or recipe.needs_finder else ()),
             )
             fingerprint = _fingerprint(*parts)
             old = previous.get((photo.name, recipe.name))
@@ -393,6 +396,28 @@ class _Photo:
                 _write_atomically(cached, packed.getvalue())
         return self._matte
 
+    def find_in_crop(self, crop: np.ndarray) -> np.ndarray:
+        """The subject matte of `crop`, a part of one of this photo's working pictures (a recipe's `Subject` with `per`
+        asks about each piece), from the on-disk cache when the same finder has been asked about the same pixels before:
+        a repeat run asks the model nothing. A crop in which nothing stands out is remembered as an empty matte, so
+        the finder is not asked again about it either. The key is the finder, the photo and the crop's pixels, whatever
+        recipe, framing or size made it; the answer is kept in 16 bits, so the first run and every later one see the
+        same matte."""
+        pixels = np.ascontiguousarray(crop)
+        key = _fingerprint(self.subject_key, str(pixels.shape), hashlib.sha256(pixels).hexdigest())
+        cached = _inside(self.project.output, self.project.cache / f"crop-{key}.npz")
+        remembered = _remembered(cached, pixels.shape[:2])
+        if remembered is not None:
+            return remembered
+        try:
+            matte = np.asarray(self.find_subject(pixels), np.float32)
+        except SubjectNotFoundError:
+            matte = np.zeros(pixels.shape[:2], np.float32)
+        packed = io.BytesIO()
+        np.savez_compressed(packed, matte=matte.astype(np.float16))
+        _write_atomically(cached, packed.getvalue())
+        return matte.astype(np.float16).astype(np.float32)
+
 
 def _remembered(cached: Path, shape: tuple[int, ...]) -> np.ndarray | None:
     """The matte stored in `cached` if it is there, readable and of the photo's `shape`; None otherwise, and a
@@ -444,8 +469,10 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
         warnings += matte_warnings(matte, project.subject_share)
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
-    stages = trace(photo.rgb(), recipe, matte) if project.steps else None
-    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte)  # style (a trace ends in the render)
+    find = photo.find_in_crop if recipe.needs_finder else None
+    stages = trace(photo.rgb(), recipe, matte, find_subject=find) if project.steps else None
+    # style (a trace ends in the render)
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte, find_subject=find)
     warnings += still_warnings(image)  # check
     outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None
