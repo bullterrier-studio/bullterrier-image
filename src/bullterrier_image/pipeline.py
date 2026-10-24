@@ -53,7 +53,7 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 from . import imageio
 from . import matte as finding
 from .checks import matte_warnings, still_warnings
-from .core.params import describe_error
+from .core.params import Picture, describe_error
 from .core.runner import subject_from
 from .errors import BullterrierImageError, ProjectError
 from .matte import segmenter_identity, subject_matte
@@ -277,8 +277,16 @@ def run(
         for path, recipe in recipes:
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
             recipe_text = repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8")
-            # a recipe that uses the subject is redone when another finder would find it
-            parts = (photo_hash, recipe_text, settings, code, *((subject_key,) if recipe.needs_matte else ()))
+            # a recipe that uses the subject is redone when another finder would find it; one that uses a picture is
+            # redone when that picture's pixels change, whether the recipe is a file or an object (repr: no pixels)
+            parts = (
+                photo_hash,
+                recipe_text,
+                *_picture_digests(recipe),
+                settings,
+                code,
+                *((subject_key,) if recipe.needs_matte else ()),
+            )
             fingerprint = _fingerprint(*parts)
             old = previous.get((photo.name, recipe.name))
             if (
@@ -470,6 +478,11 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
             imageio.save(picture, target, quality=project.quality)
             outputs.append(target)
     return outputs
+
+
+def _picture_digests(recipe: Recipe) -> list[str]:
+    """The content digest of every picture the recipe's steps hold, in step order."""
+    return [v.digest for step in recipe.steps for v in step.params.values() if isinstance(v, Picture)]
 
 
 def _fingerprint(*parts: str) -> str:

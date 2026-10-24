@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from bullterrier_image import Project, imageio
+from bullterrier_image import Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
 from bullterrier_image.errors import BackendUnavailableError, ProjectError
 from bullterrier_image.pipeline import init_project, load_project, run
@@ -95,6 +95,41 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     mark_outputs(folder)
     assert {i.status for i in run(project, force=True)} == {"done"}
     assert len(remade(folder)) == 8
+
+
+def write_texture(folder, value) -> None:
+    """assets/tex.png: a flat picture of grey level `value`."""
+    (folder / "assets").mkdir(exist_ok=True)
+    imageio.save(np.full((4, 4, 3), value, np.float32), folder / "assets" / "tex.png")
+
+
+def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_else(folder, layer_probe):
+    write_texture(folder, 0.25)
+    write_recipe(folder, "layered", 'effect = "layer_probe"\ntexture = "../assets/tex.png"')
+    project = load_project(folder / "bt-image.toml")
+    run(project)
+    mark_outputs(folder)
+    assert {i.status for i in run(project)} == {"skipped"}  # nothing changed: nothing made
+
+    write_texture(folder, 0.75)  # the recipe file is the same text, the picture it names is not
+    items = run(project)
+    assert (
+        sorted((i.recipe, i.status) for i in items)
+        == [("grainy", "skipped")] * 2 + [("layered", "done")] * 2 + [("warm", "skipped")] * 2
+    )
+    assert {recipe for _, recipe in remade(folder)} == {"layered.jpg", "layered.png"}
+
+
+def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe):
+    def project_with(texture: Picture) -> Project:
+        recipe = Recipe("layered", [fx.layer_probe(texture)], size=64)
+        return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out")
+
+    dark = Picture(np.full((4, 4, 3), 0.25, np.float32), "tex")
+    light = Picture(np.full((4, 4, 3), 0.75, np.float32), "tex")  # same label and size
+    assert {i.status for i in run(project_with(dark))} == {"done"}
+    assert {i.status for i in run(project_with(dark))} == {"skipped"}
+    assert {i.status for i in run(project_with(light))} == {"done"}
 
 
 def test_a_missing_output_file_is_made_again(folder):
