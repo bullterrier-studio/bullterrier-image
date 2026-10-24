@@ -157,3 +157,23 @@ def test_smoothing_steadies_the_direction_along_a_staircase_edge(smoothing, stea
     )
     lit = 1.0 - (1.0 - out[..., 0]) / (1.0 - BASE)
     assert (np.abs(lit[edge] - 1.0).max() < 0.01) == steady
+
+
+def test_edge_sets_what_the_smoothing_sees_beyond_the_picture_border():
+    """A thin subject running off the right border, lit from the right: mirrored, the border stays no edge and its
+    last column is dark; wrapped round, the background at the left border seems to lie just beyond it."""
+    matte = np.zeros((40, 40), np.float32)
+    matte[17:24, 10:] = 1.0
+    kwargs = {"matte": matte, "angle": 0, "width": 6, "color": WHITE, "smoothing": 3}
+    assert lit_at(registry.apply(NAME, grey(), edge="reflect", **kwargs), 20, 39) == pytest.approx(0.0, abs=0.02)
+    assert lit_at(registry.apply(NAME, grey(), edge="wrap", **kwargs), 20, 39) > 0.2
+
+
+def test_truncate_sets_how_far_the_smoothing_reaches():
+    """The same wrapped-round scene: column 30 is 9 px from the border, within the 12 px a sigma-3 blur cut off at 4
+    sigma reaches (it sees the background beyond the border), but not the 3 px of one cut off at 1 sigma."""
+    matte = np.zeros((40, 40), np.float32)
+    matte[17:24, 10:] = 1.0
+    kwargs = {"matte": matte, "angle": 0, "width": 6, "color": WHITE, "smoothing": 3, "edge": "wrap"}
+    assert lit_at(registry.apply(NAME, grey(), truncate=4, **kwargs), 20, 30) > 0.2
+    assert lit_at(registry.apply(NAME, grey(), truncate=1, **kwargs), 20, 30) == pytest.approx(0.0, abs=0.02)
