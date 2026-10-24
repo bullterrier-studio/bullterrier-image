@@ -234,6 +234,31 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   "The Coming Loop", 2026); the repo's own instances were library options hidden behind `# constant:` and two copies of the same edge table. *Consequence:* the rules live in `CLAUDE.md` ("Fixing defects"),
   duplicated knowledge (code or tests) is merged, and what a tool can see becomes a gate (blind `except`, literal library options, the marker rule).
 
+## Regions
+
+- **A recipe declares named regions; a region is a partition or a selection.** `[region.<name>]` with a `kind`. A
+  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in reading order: top to bottom, then
+  left to right); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
+  SVG shapes and the subject are all "which pixels", so one idea serves them all and effects never learn about regions.
+- **Steps use regions by name, with one word per idea.** `mask` is where a step applies (on every step, any selection;
+  `subject` and `background` are built in); `each` + `looks` gives each piece of a partition its own look; `partition`
+  is the partition an edge-aware effect draws. A hard-edged selection is also a two-piece partition. *Reason:* `mask`
+  already means "where".
+- **A look is a single inline step, or `"none"` (the piece is left as it is).** Named multi-step looks wait for a real
+  need. Each distinct look is rendered once over the whole picture and blended through its pieces' weights, which sum
+  to 1 and are then multiplied by `mask`: the cost is the number of looks, not pieces.
+- **Positions are shares of the frame, lengths shares of the picture's long side.** The frame is the picture, or the
+  box of the selection named by `fit`. The same look comes out at any resolution.
+- **Region kinds are a closed set in one module, with presets as data.** Not plugins: nobody else writes kinds, and a
+  shared plugin registry would be speculative. Python writes regions with the kinds' own Pydantic models. *Revisit
+  when* another package wants to add kinds.
+- **Seams are solid lines or bands; no faked materials.** A paper or metal look may come only from a real texture
+  picture. *Reason:* generated paper fringes read as 2000s camera presets.
+- **The portable model is the default subject finder on every platform.** Apple Vision is used only when asked.
+  *Reason:* `fit = "subject"` must cut the same on a Mac and on Linux.
+- Grids, cuts, shards, Bezier paths, SVG shapes and grid-first subjects are built in slices; the plan and the
+  deferred list (each item with the need that would justify it) are in `.superpowers/plans/regions.md`.
+
 ## Testing and gates
 
 - **Properties, not golden images.** Tests assert the property that defines a behaviour (a blur stays in range, a sort
