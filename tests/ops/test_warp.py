@@ -5,6 +5,7 @@ from typing import Literal
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from photo_fx.ops.warp import Centre, remap
 
@@ -81,6 +82,66 @@ def test_edge_sets_what_lies_beyond_the_picture(edge: Edge, expected: float) -> 
     rows = grey(np.tile((np.arange(21) / 20.0)[:, None], (1, 5)))
     out = remap(rows, np.array([[-3.0]]), np.array([[2.0]]), interpolation="nearest", edge=edge)
     assert out[0, 0, 0] == pytest.approx(expected, abs=1e-6)
+
+
+@pytest.mark.parametrize("edge", EDGES)
+@pytest.mark.parametrize(
+    ("interpolation", "columns", "expected"),
+    [
+        ("bilinear", [99.5, 100.0, 100.5, -0.5, 250.5, -70.0], [0.495, 0.0, 0.005, 0.495, 0.505, 0.3]),
+        ("nearest", [99.4, 99.6, 100.4, -0.4, 250.2, -70.3], [0.99, 0.0, 0.0, 0.0, 0.5, 0.3]),
+    ],
+    ids=["bilinear blends the last column with the first", "nearest takes the closest, the first beyond the last"],
+)
+def test_wrapped_columns_continue_the_picture_from_its_last_column_to_its_first(
+    interpolation: Interpolation, columns: list[float], expected: list[float], edge: Edge
+) -> None:
+    """A picture of 100 columns with the value column / 100 (0 to 0.99): with `wrap_columns` the column after the last
+    is the first, whatever the edge rule, which is for the rows. Halfway between the last and the first is
+    (0.99 + 0) / 2 = 0.495 by 'bilinear'; at 100.5 it is (0 + 0.01) / 2 = 0.005; -0.5 is 99.5 again. A column
+    however far, 250.5 or -70, is read modulo the width: 50.5 (0.505) or 30 (0.3)."""
+    ramp = grey(np.tile(np.arange(100) / 100.0, (5, 1)))
+    where = np.array([columns])
+    out = remap(ramp, np.full_like(where, 2.0), where, interpolation=interpolation, edge=edge, wrap_columns=True)
+    np.testing.assert_allclose(out[0, :, 0], expected, atol=1e-6)
+
+
+def test_bicubic_carries_a_smooth_picture_across_the_seam_of_wrapped_columns() -> None:
+    columns = np.arange(100)
+    smooth = grey(np.tile(0.5 + 0.4 * np.sin(2 * np.pi * columns / 100), (5, 1)))
+    where = np.array([[99.5, 100.25, 0.5, -0.75]])
+    out = remap(smooth, np.full_like(where, 2.0), where, interpolation="bicubic", edge="reflect", wrap_columns=True)
+    np.testing.assert_allclose(out[0, :, 0], 0.5 + 0.4 * np.sin(2 * np.pi * where[0] / 100), atol=2e-4)
+
+
+def test_bicubic_across_the_seam_matches_a_spline_through_three_copies_side_by_side_on_noise() -> None:
+    """Reference built in the test: the picture tiled three times along the columns, read at the same positions
+    shifted by one picture width, where the seam lies far from the tiled picture's own ends."""
+    noise = np.random.default_rng(8).random((6, 40, 3), dtype=np.float32)
+    rows = np.full((1, 6), 2.5)
+    cols = np.array([[39.5, 0.25, -0.5, 40.75, 20.5, 38.1]])
+    tiled = np.tile(noise, (1, 3, 1))
+    reference = np.stack(
+        [ndimage.map_coordinates(tiled[..., c], np.stack([rows, cols + 40]), order=3, mode="mirror") for c in range(3)],
+        axis=-1,
+    )
+    out = remap(noise, rows, cols, interpolation="bicubic", edge="mirror", wrap_columns=True)
+    np.testing.assert_allclose(out, np.clip(reference, 0, 1), atol=1e-5)
+
+
+def test_wrapped_columns_leave_the_edge_rule_to_the_rows() -> None:
+    """Row -3 of a picture of 21 rows with the value row / 20 is, under 'nearest', the first row (0); row 5 is 0.25;
+    the column 21 or 22 of 21 is the first or second, which no row value depends on."""
+    values = grey(np.tile((np.arange(21) / 20.0)[:, None], (1, 21)))
+    out = remap(
+        values,
+        np.array([[-3.0, 5.0]]),
+        np.array([[21.0, 22.0]]),
+        interpolation="nearest",
+        edge="nearest",
+        wrap_columns=True,
+    )
+    np.testing.assert_allclose(out[0, :, 0], [0.0, 0.25], atol=1e-6)
 
 
 def test_a_smooth_interpolation_never_leaves_0_to_1_even_where_a_spline_overshoots() -> None:

@@ -11,6 +11,9 @@ from scipy import ndimage
 _BEYOND_THE_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
 # constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
 _SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
+# constant: columns copied from the far side when columns wrap; a cubic spline's end effect falls by a factor of
+# 0.27 per pixel (2 - sqrt 3), so 16 leave under 1e-8
+_SEAM = 16
 
 
 def remap(
@@ -20,6 +23,7 @@ def remap(
     *,
     interpolation: Literal["nearest", "bilinear", "bicubic"],
     edge: Literal["reflect", "mirror", "nearest", "wrap"],
+    wrap_columns: bool = False,
 ) -> np.ndarray:
     """The picture `rgb` read at the float positions (`rows`, `cols`), each colour channel on its own.
 
@@ -30,7 +34,15 @@ def remap(
     beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). Reading every pixel where it is returns the
     picture; `rgb` is never modified.
+
+    With `wrap_columns` the picture is periodic across its columns, as an angle is: the column after the last is the
+    first, whatever the `edge` rule, which then only applies to the rows (a position at any column, however far,
+    is read modulo the width).
     """
+    if wrap_columns:
+        width = rgb.shape[1]
+        rgb = rgb[:, np.arange(-_SEAM, width + _SEAM) % width]  # the picture with its far side copied on each side
+        cols = cols % width + _SEAM
     where = np.stack([rows, cols])
     out = np.stack(
         [
