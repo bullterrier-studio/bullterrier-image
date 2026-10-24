@@ -41,10 +41,13 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
     24. A value outside the parameter's range is refused as in any recipe, naming it, never clamped.
 
     Raises RecipeError for a target the recipe does not have (naming what it does have), a parameter the effect does
-    not have or that is not a number (naming the valid ones), a count outside 2 to 24 or a value outside the range.
+    not have or that is not a number (naming the valid ones), a count outside 2 to 24, a start equal to the end, or a
+    value outside the range.
     """
     if not 2 <= count <= 24:
         raise RecipeError(f"count must be 2 to 24 tiles, got {count}")
+    if start == end:
+        raise RecipeError(f"a sweep needs a range: start and end are both {start:g}")
     index, name = _locate(recipe, target)
     step = recipe.steps[index]
     values = np.linspace(start, end, count).tolist()

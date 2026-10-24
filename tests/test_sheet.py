@@ -43,7 +43,7 @@ def test_a_sweep_renders_the_recipe_once_for_each_value_of_the_parameter(photo, 
 
 def test_the_value_replaces_an_animation_of_the_parameter(photo):
     animated = Recipe("moving", [Step("grain", {"amount": ramp(0.5, 0.9)})], size=48, animation=Animation(1, 5))
-    _, tile = sweep(animated, "grain.amount", 0.2, 0.2, 2)[0]
+    _, tile = sweep(animated, "grain.amount", 0.2, 0.4, 2)[0]
     by_hand = Recipe("by-hand", [Step("grain", {"amount": 0.2})], size=48)
     np.testing.assert_array_equal(render(photo, tile), render(photo, by_hand))
 
@@ -83,6 +83,7 @@ MISTAKES = {
     "a value above the parameter's range": (("grain#1.amount", 0, 5, 5), "amount"),
     "a value below the parameter's range": (("grain#1.amount", -1, 0.2, 5), "amount"),
     "one tile": (("grain#1.amount", 0, 0.2, 1), "count"),
+    "a range of one value": (("grain#1.amount", 0.1, 0.1, 5), "start and end"),
     "more tiles than a sheet can show": (("grain#1.amount", 0, 0.2, 25), "count"),
 }
 
