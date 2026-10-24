@@ -1,0 +1,11 @@
+# A dusty, scratched print: light and dark specks, a few hairs and two scratches.
+# It also makes the effect's picture in the catalogue.
+name = "dust_scratches"
+size = 480
+
+[[step]]
+effect = "dust_scratches"
+density = 1.0
+size = 10
+scratches = 3
+seed = 1
