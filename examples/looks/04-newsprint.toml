@@ -1,0 +1,32 @@
+# A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (decision D1).
+name = "newsprint"
+size = 768
+
+[[step]]
+effect = "black_and_white"
+
+[[step]]
+effect = "clarity"
+amount = 0.8
+
+[[step]]
+effect = "levels"
+gamma = 0.7
+
+[[step]]
+effect = "halftone"
+cell = 5
+angle = 45
+ink = "#141414"
+paper = "#f2ead8"
+
+[[step]]
+effect = "paper_texture"
+amount = 0.1
+
+[[step]]
+effect = "torn_edge"
+depth = 18
+roughness = 0.4
+fill = "#e9e2d0"
+seed = 2

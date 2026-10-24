@@ -1,0 +1,31 @@
+# A sunset gradient with a grid behind a duotoned dog, split into colour ghosts. Would gain blend modes (decision D2) for the grid.
+name = "vaporwave"
+size = 768
+
+[[step]]
+effect = "gradient"
+kind = "linear"
+colors = ["#ff71ce", "#b967ff", "#01cdfe"]
+angle = 90
+mask = "background"
+
+[[step]]
+effect = "pattern"
+kind = "grid"
+cell = 48
+foreground = "#fffb96"
+background = "#7a3cff"
+thickness = 0.1
+mask = "background"
+opacity = 0.4
+
+[[step]]
+effect = "gradient_map"
+stops = ["#3a0ca3", "#ff71ce", "#fffb96"]
+mask = "subject"
+opacity = 0.6
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 6
