@@ -9,7 +9,7 @@ import pytest
 
 from bullterrier_image.core import registry
 from bullterrier_image.core.loader import load_recipe
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, Picture, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
@@ -174,3 +174,39 @@ def test_a_preset_for_an_effect_without_presets_says_so(gain):
 def test_a_preset_for_an_unknown_effect_lists_the_effects():
     with pytest.raises(UnknownEffectError, match=r"no_such_effect.*gradient_map"):
         Step("no_such_effect", preset="sepia")
+
+
+# --- a Picture parameter -------------------------------------------------------------------------------------------
+
+
+class LayerParams(EffectParams):
+    """A picture laid over the photo."""
+
+    texture: Picture = param("#808080", doc="The picture laid over.")
+
+
+@pytest.fixture
+def layer(throwaway_effects):
+    def layer_probe(rgb: np.ndarray, params: LayerParams) -> np.ndarray:
+        """Lays a picture's average colour over the photo."""
+        return np.broadcast_to(params.texture.pixels[..., :3].mean(axis=(0, 1)), rgb.shape).astype(np.float32)
+
+    return effect(category="compositing", params=LayerParams)(layer_probe)
+
+
+def test_steps_holding_pictures_compare_by_pixels_and_describe_without_them(layer):
+    rng = np.random.default_rng(5)
+    pixels = rng.random((240, 320, 3), dtype=np.float32)
+    first = Step("layer_probe", {"texture": Picture(pixels, "tex.png")})
+    assert first == Step("layer_probe", {"texture": Picture(pixels.copy(), "other.png")})
+    assert first != Step("layer_probe", {"texture": Picture(pixels[::-1].copy(), "tex.png")})
+    assert first != Step("layer_probe", {"texture": "#808080"})
+    assert first.describe().startswith("layer_probe(texture=Picture('tex")
+    assert len(first.describe()) <= 56
+
+
+def test_an_effect_receives_the_picture_a_step_holds(layer):
+    picture = Picture(np.full((3, 3, 3), 0.25, np.float32))
+    out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), texture=picture)
+    np.testing.assert_allclose(out, 0.25)
+    assert Step("layer_probe", {"texture": picture}).where("subject").params["texture"] is picture

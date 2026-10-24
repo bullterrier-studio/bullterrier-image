@@ -17,7 +17,7 @@ import bullterrier_image.plugin
 from bullterrier_image import Project, Recipe, Step, fx, imageio, load_recipe, render, run, trace
 from bullterrier_image.cli import main
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import Color, EffectParams, Picture, param
 from bullterrier_image.core.registry import effect
 
 # --- the public surface: explicit, one home per name ------------------------------------------------------------
@@ -251,6 +251,27 @@ def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     assert "lantern_probe" in functions
     assert sorted(functions) == sorted(registry.describe())  # one per effect, no more, no less
+
+
+class SceneParams(EffectParams):
+    """A picture field, for the stub."""
+
+    texture: Picture = param("#808080", doc="A texture.")
+
+
+def test_the_editor_stub_names_a_picture_field_by_its_forms_and_every_name_it_uses_resolves(throwaway_effects):
+    from bullterrier_image.core.registry import effect
+
+    def scene_probe(rgb, params: SceneParams):
+        """Does nothing."""
+        return rgb
+
+    effect(category="compositing", params=SceneParams)(scene_probe)
+    text = fx.stub_text()
+    (function,) = [n for n in ast.parse(text).body if isinstance(n, ast.FunctionDef) and n.name == "scene_probe"]
+    annotation = ast.unparse(function.args.args[0].annotation)  # type: ignore[arg-type]
+    assert annotation.startswith("Picture | os.PathLike[str] | numpy.ndarray | str")
+    exec(compile(text, "fx.pyi", "exec"), {"__package__": "bullterrier_image"})  # noqa: S102  (our own generated stub)
 
 
 class OldParams(EffectParams):

@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr__` imports each name on first use
     from . import fx, imageio, recipe
+    from .core.params import Picture
     from .errors import (
         BackendUnavailableError,
         BullterrierImageError,
@@ -56,6 +57,7 @@ _HOMES = {
         "BackendUnavailableError", "ImageReadError", "NonFiniteImageError",
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
+    ".core.params": ("Picture",),
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": ("Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"),
@@ -95,6 +97,7 @@ __all__ = [
     "BullterrierImageError",
     "ImageReadError",
     "NonFiniteImageError",
+    "Picture",
     "Project",
     "ProjectError",
     "Recipe",

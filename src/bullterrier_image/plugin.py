@@ -15,6 +15,10 @@
         colour = np.asarray(params.colour, np.float32)
         return (rgb * (1 - params.amount) + colour * params.amount).astype(np.float32)
 
+A parameter that is a second picture (a texture, a logo) is declared `texture: Picture = param("#808080", doc="...")`:
+it holds a `Picture` (read-only RGBA float32 `pixels`, straight alpha, at its own size) and its default is a colour,
+which gives a flat 1x1 picture. A recipe file writes a path, `fx` takes a path, an array, a `Picture` or a colour.
+
 Declare the module as an entry point of the group `bullterrier_image.effects` in your package's `pyproject.toml`, and
 install the package (`pip install`, or `uv sync` for an editable checkout):
 
@@ -34,7 +38,7 @@ in a definition raise when the module is imported. An effect that needs the subj
 `*, matte: np.ndarray | None = None`. Names must be unique across every installed package.
 """
 
-from .core.params import Color, EffectParams, param
+from .core.params import Color, EffectParams, Picture, param
 from .core.registry import CATEGORIES, effect
 
-__all__ = ["CATEGORIES", "Color", "EffectParams", "effect", "param"]
+__all__ = ["CATEGORIES", "Color", "EffectParams", "Picture", "effect", "param"]

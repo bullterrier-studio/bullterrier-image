@@ -20,12 +20,17 @@ Promises:
   specific `RecipeError` raised by a validator (an `UnknownEffectError`) keeps its class when it is the only problem.
 - `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
   command line, in a caller's types (a `Color` is shown as the forms one may write).
+- A `Picture` field (a second picture an effect uses: a texture, a logo) holds a `Picture`, read-only RGBA pixels with a
+  content digest; it is given a `Picture` or a colour (a flat picture), and must have a default such as `"#808080"`.
+  Recipe files and `fx` turn a path or an array into a `Picture` before validation (see `loader`).
 - `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
 
+import hashlib
 import inspect
 import math
+import os
 import re
 import textwrap
 import types
@@ -37,7 +42,7 @@ from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_orig
 import annotated_types
 import numpy as np
 from PIL import ImageColor
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, WithJsonSchema
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainValidator, ValidationError, WithJsonSchema
 
 from bullterrier_image.errors import RecipeError
 
@@ -87,6 +92,101 @@ Color = Annotated[
 ]
 """A colour parameter: written '#rrggbb', '#rgb' or as three numbers 0..1; held as three floats 0..1 (red, green,
 blue): `np.asarray(color, np.float32)` is the colour as an array."""
+
+
+class Picture:
+    """A picture an effect uses besides the photo (a texture, a logo, a cut-out): read-only RGBA float32 pixels.
+
+    `Picture(array)`: `array` is float (height, width, 3 or 4), values 0..1, RGB or straight-alpha RGBA (RGB gets
+    alpha 1); anything else is a `RecipeError`. The pixels are copied and locked, so a Picture never changes.
+    `Picture.of_color` makes a flat 1x1 picture. Two pictures are equal when their pixels are, and hash alike, so a
+    `Step` holding one compares, hashes and prints without touching an array; `label` (a file name, say) is only for
+    messages.
+    """
+
+    __slots__ = ("digest", "label", "pixels")
+
+    def __init__(self, array: np.ndarray, label: str = "array") -> None:
+        """The picture of `array`, called `label` in messages."""
+        data = np.asarray(array)
+        if data.ndim != 3 or data.shape[2] not in (3, 4) or min(data.shape[:2]) < 1 or data.dtype.kind != "f":
+            raise RecipeError(
+                f"a picture is a float array of shape (height, width, 3 or 4) with values 0..1, got {data.dtype} "
+                f"of shape {data.shape}"
+            )
+        if not (np.isfinite(data).all() and data.min() >= 0 and data.max() <= 1):
+            raise RecipeError(f"a picture's values are 0..1 and finite; {label!r} has others")
+        pixels = np.ones((*data.shape[:2], 4), np.float32)
+        pixels[..., : data.shape[2]] = data
+        pixels.setflags(write=False)
+        self.pixels, self.label = pixels, label
+        self.digest = hashlib.sha256(np.asarray(pixels.shape, np.int64).tobytes() + pixels.tobytes()).hexdigest()
+
+    @classmethod
+    def of_color(cls, color: object) -> Self:
+        """A flat 1x1 picture of `color` ('#rrggbb', '#rgb' or three numbers 0..1), opaque."""
+        red, green, blue = _to_color(color)
+        label = "#" + "".join(f"{round(channel * 255):02x}" for channel in (red, green, blue))  # constant: 8-bit levels
+        return cls(np.array([[[red, green, blue]]], np.float32), label)
+
+    @property
+    def width(self) -> int:
+        """Pixels across."""
+        return int(self.pixels.shape[1])
+
+    @property
+    def height(self) -> int:
+        """Pixels down."""
+        return int(self.pixels.shape[0])
+
+    def __eq__(self, other: object) -> bool:
+        """Equal pixels (by digest), whatever the labels."""
+        return self.digest == other.digest if isinstance(other, Picture) else NotImplemented
+
+    def __hash__(self) -> int:
+        """By digest, as `==`."""
+        return hash(self.digest)
+
+    def __repr__(self) -> str:
+        """`Picture('tex.png', 480x640)`: label, then width x height; never the pixels."""
+        return f"Picture({self.label!r}, {self.width}x{self.height})"
+
+
+def _to_picture(value: object) -> Picture:
+    """A `Picture` as it is (validation runs at every apply: no copy), or a colour as a flat picture."""
+    if isinstance(value, Picture):
+        return value
+    try:
+        return Picture.of_color(value)
+    except ValueError:
+        shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
+        raise ValueError(
+            f"a picture is a Picture or a colour ('#rrggbb', '#rgb' or three numbers 0..1); a path or an array is "
+            f"turned into a Picture by a recipe file or fx, got {shown}"
+        ) from None
+
+
+_PICTURE = Annotated[
+    Picture,
+    PlainValidator(_to_picture),
+    WithJsonSchema(
+        {
+            "anyOf": [
+                {"type": "string", "description": "a path, relative to the recipe file, or a colour '#rrggbb'"},
+                {
+                    "type": "array",
+                    "items": {"type": "number", "minimum": 0, "maximum": 1},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+            ]
+        }
+    ),
+]
+"""What a `Picture` field is made of: a `Picture` or a colour is accepted (a path or an array only through `loader`)."""
+
+PictureForms = Picture | os.PathLike[str] | np.ndarray | ColorForms
+"""A picture as a caller may write it in `fx`: a Picture, a path, an array, or a colour."""
 
 
 def _as_tuple(value: object) -> object:
@@ -337,6 +437,8 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             constraints["allow_inf_nan"] = False  # so a nan is reported as such, not as out of range
     elif get_origin(annotation) is tuple:
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
+    elif annotation is Picture:
+        typed = _PICTURE
     made = Field(
         spec.default,
         description=spec.doc,
@@ -375,6 +477,8 @@ def _public(annotation: Any) -> Any:
     """The type a caller writes for a field: `Color` becomes the colour forms; other metadata is dropped."""
     if annotation == Color:
         return ColorForms
+    if annotation is Picture:
+        return PictureForms
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _public(args[0])
@@ -395,6 +499,8 @@ def _type_text(annotation: Any) -> str:
     """A field's type in words, for the documentation."""
     if annotation == Color:
         return "colour"
+    if annotation is Picture:
+        return "picture"
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _type_text(args[0])

@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bullterrier_image.core.params import Color, EffectParams, describe_error, param
+from bullterrier_image.core.params import Color, EffectParams, Picture, describe_error, param
+from bullterrier_image.errors import RecipeError
 
 
 class Probe(EffectParams):
@@ -117,6 +118,136 @@ def test_a_colour_holds_exactly_the_float32_values_effects_compute_with():
 def test_a_malformed_colour_is_rejected_naming_the_field(written):
     with pytest.raises(ValidationError, match="tint"):
         Probe(tint=written)
+
+
+# --- Picture ---------------------------------------------------------------------------------------------------------
+
+
+class Textured(EffectParams):
+    """A model with a picture field."""
+
+    texture: Picture = param("#808080", doc="A texture laid over the photo.")
+
+
+def noise_picture(shape=(4, 6, 4), seed=0, label="noise.png") -> Picture:
+    return Picture(np.random.default_rng(seed).random(shape, dtype=np.float32), label)
+
+
+def test_a_picture_field_has_a_colour_default_that_is_a_flat_opaque_picture():
+    texture = Textured().texture
+    assert (texture.width, texture.height) == (1, 1)
+    np.testing.assert_allclose(texture.pixels[0, 0], [128 / 255, 128 / 255, 128 / 255, 1.0], atol=1e-7)
+
+
+@pytest.mark.parametrize(
+    ("written", "rgb"),
+    [("#ff8000", (1.0, 128 / 255, 0.0)), ("#f80", (1.0, 136 / 255, 0.0)), ((0.25, 0.5, 1.0), (0.25, 0.5, 1.0))],
+)
+def test_a_colour_is_a_flat_picture(written, rgb):
+    np.testing.assert_allclose(Textured(texture=written).texture.pixels[0, 0], [*rgb, 1.0], atol=1e-7)
+
+
+def test_a_picture_is_kept_as_it_is_not_copied_when_validated_again():
+    picture = noise_picture()
+    assert Textured(texture=picture).texture is picture
+    assert Textured(texture=Textured(texture=picture).texture).texture is picture
+
+
+@pytest.mark.parametrize(
+    "written",
+    ["tex.png", "#zzzzzz", [1, 0], 7, None, np.zeros((5, 5, 3), np.float32), np.zeros((5, 5, 3)).tolist()],
+    ids=["a path", "bad hex", "two numbers", "a number", "none", "an array", "nested lists"],
+)
+def test_anything_but_a_picture_or_a_colour_is_rejected_naming_the_field_and_never_printing_pixels(written):
+    with pytest.raises(RecipeError, match="`texture`") as raised:
+        Textured.parse({"texture": written})
+    assert len(str(raised.value)) < 300
+
+
+@pytest.mark.parametrize(
+    "array",
+    [
+        pytest.param(np.zeros((4, 6, 3), np.float32), id="rgb"),
+        pytest.param(np.zeros((4, 6, 4), np.float64), id="rgba, double precision"),
+        pytest.param(np.zeros((1, 1, 3), np.float32), id="one pixel"),
+    ],
+)
+def test_a_picture_is_made_from_a_float_array_with_three_or_four_channels(array):
+    picture = Picture(array)
+    assert picture.pixels.shape == (*array.shape[:2], 4)
+    assert picture.pixels.dtype == np.float32
+
+
+@pytest.mark.parametrize(
+    "array",
+    [
+        pytest.param(np.zeros((4, 6, 3), np.uint8), id="integers"),
+        pytest.param(np.zeros((4, 6), np.float32), id="no channels"),
+        pytest.param(np.zeros((4, 6, 2), np.float32), id="two channels"),
+        pytest.param(np.zeros((0, 6, 3), np.float32), id="no rows"),
+        pytest.param(np.full((4, 6, 3), 1.5, np.float32), id="above one"),
+        pytest.param(np.full((4, 6, 3), np.nan, np.float32), id="nan"),
+    ],
+)
+def test_an_array_that_is_not_a_picture_is_refused(array):
+    with pytest.raises(RecipeError, match="picture"):
+        Picture(array)
+
+
+def test_a_picture_is_straight_alpha_and_opaque_when_it_has_none():
+    rgba = np.array([[[0.2, 0.4, 0.6, 0.25]]], np.float32)
+    np.testing.assert_array_equal(Picture(rgba).pixels, rgba)
+    np.testing.assert_array_equal(Picture(rgba[..., :3]).pixels, np.array([[[0.2, 0.4, 0.6, 1.0]]], np.float32))
+
+
+def test_a_picture_never_changes_not_through_its_pixels_nor_through_the_array_it_was_made_from():
+    source = np.full((2, 2, 3), 0.5, np.float32)
+    picture = Picture(source)
+    source[:] = 0.0
+    assert picture.pixels.min() == 0.5
+    with pytest.raises(ValueError, match="read-only"):
+        picture.pixels[0, 0, 0] = 1.0
+
+
+def test_pictures_are_equal_when_their_pixels_are_whatever_their_labels_and_hash_alike():
+    a, same, other = noise_picture(label="a.png"), noise_picture(label="b.png"), noise_picture(seed=1)
+    assert a == same
+    assert hash(a) == hash(same)
+    assert a != other
+    assert a != Picture(a.pixels[:2])  # the same first pixels, another size
+    assert a != "a.png"
+
+
+def test_a_pictures_repr_names_the_label_and_the_size_never_the_pixels():
+    assert repr(noise_picture((640, 480, 3), label="tex.png")) == "Picture('tex.png', 480x640)"
+
+
+def test_the_json_schema_of_a_picture_is_a_path_or_a_colour():
+    schema = Textured.model_json_schema()["properties"]["texture"]
+    assert {option["type"] for option in schema["anyOf"]} == {"string", "array"}
+    assert schema["default"] == "#808080"
+
+
+def test_a_picture_is_documented_as_a_picture_and_called_with_the_forms_a_caller_writes():
+    (doc,) = Textured.fields_doc()
+    assert (doc.type, doc.unit, doc.range, doc.default) == ("picture", None, "", "#808080")
+    text = str(Textured.signature())
+    assert "Picture" in text
+    assert "PathLike" in text
+    assert "pydantic" not in text
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        pytest.param(lambda: param("#808080", unit="px", doc="d"), id="a unit"),
+        pytest.param(lambda: param("#808080", min=0, max=1, doc="d"), id="a range"),
+        pytest.param(lambda: param("not a colour", doc="d"), id="a default that is no colour"),
+    ],
+)
+def test_a_picture_field_takes_no_unit_or_range_and_needs_a_default_colour(make):
+    with pytest.raises(ValueError, match="Broken"):
+        _declare(Picture, make())
 
 
 # --- the rules of a declaration, checked when the class is made ------------------------------------------------------
