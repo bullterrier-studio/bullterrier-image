@@ -8,7 +8,7 @@ from bullterrier_image.core import registry
 NAME = "reflection"
 HEIGHT, WIDTH = 30, 24
 TOP, FLOOR = 2, 10  # the subject fills rows 2..9, so its lowest row is 9 and the floor starts at row 10
-FLAT = {"fade": 0.0, "opacity": 1.0, "blur": 0.0}
+FLAT = {"fade": 0.0, "blur": 0.0}
 
 
 def subject(top: int = TOP, floor: int = FLOOR) -> np.ndarray:
@@ -48,24 +48,17 @@ def test_the_picture_is_mirrored_about_the_lowest_row_of_the_subject_for_height_
 
 
 @pytest.mark.parametrize(
-    ("fade", "opacity", "weights"),
+    ("fade", "weights"),
     [
-        pytest.param(0.0, 1.0, [1.0] * 8, id="fade 0 keeps the reflection as strong all the way"),
-        pytest.param(
-            1.0,
-            1.0,
-            [1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125],
-            id="fade 1 falls in a straight line to nothing",
-        ),
-        pytest.param(0.5, 1.0, [1.0, 0.9375, 0.875, 0.8125, 0.75, 0.6875, 0.625, 0.5625], id="fade 0.5 falls to half"),
-        pytest.param(1.0, 0.5, [0.5, 0.4375, 0.375, 0.3125, 0.25, 0.1875, 0.125, 0.0625], id="opacity scales it all"),
+        pytest.param(0.0, [1.0] * 8, id="fade 0 keeps the reflection as strong all the way"),
+        pytest.param(1.0, [1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125], id="fade 1 falls in a line to nothing"),
+        pytest.param(0.5, [1.0, 0.9375, 0.875, 0.8125, 0.75, 0.6875, 0.625, 0.5625], id="fade 0.5 falls to half"),
     ],
 )
-def test_the_reflection_fades_with_distance_from_the_floor_line(
-    fade: float, opacity: float, weights: list[float]
-) -> None:
-    """White above the floor over black below it: a mirrored row shows white by exactly its weight."""
-    out = registry.apply(NAME, white_over_black(), matte=subject(), height=1.0, fade=fade, opacity=opacity, blur=0.0)
+def test_the_reflection_fades_with_distance_from_the_floor_line(fade: float, weights: list[float]) -> None:
+    """White above the floor over black below it: a mirrored row shows white by exactly its weight, a perfect mirror
+    at the floor line."""
+    out = registry.apply(NAME, white_over_black(), matte=subject(), height=1.0, fade=fade, blur=0.0)
     np.testing.assert_allclose(out[FLOOR : FLOOR + 8, 5, 0], weights, atol=1e-6)
     np.testing.assert_array_equal(out[:FLOOR], 1.0)  # the picture above the floor is never changed
     np.testing.assert_array_equal(out[FLOOR + 8 :], 0.0)  # and beyond the reflection's height
@@ -87,7 +80,7 @@ def test_a_cut_reflection_fades_as_if_it_had_its_whole_height() -> None:
     matte = subject(top=HEIGHT - 11, floor=HEIGHT - 3)
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[: HEIGHT - 3] = 1.0
-    out = registry.apply(NAME, picture, matte=matte, height=1.0, fade=1.0, opacity=1.0, blur=0.0)
+    out = registry.apply(NAME, picture, matte=matte, height=1.0, fade=1.0, blur=0.0)
     np.testing.assert_allclose(out[HEIGHT - 3 :, 5, 0], [1.0, 0.875, 0.75], atol=1e-6)
 
 
@@ -124,7 +117,7 @@ def test_blur_softens_the_reflection_as_a_gaussian_of_that_sigma() -> None:
     sigma = 1.5
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[4, 12] = 1.0
-    out = registry.apply(NAME, picture, matte=subject(), height=1.0, fade=0.0, opacity=1.0, blur=sigma)
+    out = registry.apply(NAME, picture, matte=subject(), height=1.0, fade=0.0, blur=sigma)
     peak = 1 / (2 * np.pi * sigma**2)
     assert out[15, 12, 0] == pytest.approx(peak, abs=1e-4)
     assert out[15, 14, 0] == pytest.approx(peak * np.exp(-4 / (2 * sigma**2)), abs=1e-4)
@@ -136,7 +129,7 @@ def test_the_blur_continues_the_mirror_image_across_the_floor_line() -> None:
     sigma = 1.5
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[FLOOR - 1, 12] = 1.0
-    out = registry.apply(NAME, picture, matte=subject(), height=1.0, fade=0.0, opacity=1.0, blur=sigma)
+    out = registry.apply(NAME, picture, matte=subject(), height=1.0, fade=0.0, blur=sigma)
     peak = 1 / (2 * np.pi * sigma**2)
     assert out[FLOOR, 12, 0] == pytest.approx(peak * (1 + np.exp(-1 / (2 * sigma**2))), abs=1e-4)
 

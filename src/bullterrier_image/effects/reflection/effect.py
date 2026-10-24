@@ -10,7 +10,7 @@ from bullterrier_image.ops.blur import gaussian_blur
 
 
 class ReflectionParams(EffectParams):
-    """The settings of `reflection`: how tall the reflection is, how it fades and how soft and strong it is."""
+    """The settings of `reflection`: how tall the reflection is, how it fades and how soft it is."""
 
     height: float = param(
         0.4,
@@ -36,14 +36,6 @@ class ReflectionParams(EffectParams):
         max=100,
         doc="Gaussian sigma of the reflection's softness in px at the recipe's size: raising it makes a blurrier "
         "mirror, as on a rough floor; 0 = a sharp mirror image.",
-    )
-    opacity: float = param(
-        0.6,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How much of the floor the reflection replaces at the floor line, where it is strongest: 0 = no "
-        "reflection, 1 = a perfect mirror.",
     )
     threshold: float = param(
         0.5,
@@ -78,7 +70,7 @@ def reflection(rgb: np.ndarray, params: ReflectionParams, *, matte: np.ndarray |
     """A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth.
 
     The floor line is the bottom of the subject; the reflection is `height` of the subject's height deep, blurred by
-    `blur`, and mixed into the floor below by `opacity` at the floor line and by less and less down to `fade` of that
+    `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
     at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
 
     `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
@@ -95,7 +87,7 @@ def reflection(rgb: np.ndarray, params: ReflectionParams, *, matte: np.ndarray |
     depth = min(reach, rgb.shape[0] - floor)  # rows it has: it is cut where the picture ends
     mirror = gaussian_blur(rgb[:floor], params.blur, truncate=params.truncate, edge=params.edge)
     mirrored = mirror[floor - depth : floor][::-1]  # the row just above the floor line comes first
-    strength = (params.opacity * (1.0 - params.fade * np.arange(depth, dtype=np.float32) / reach))[:, None, None]
+    strength = (1.0 - params.fade * np.arange(depth, dtype=np.float32) / reach)[:, None, None]
     out = rgb.copy()
     out[floor : floor + depth] = (1.0 - strength) * rgb[floor : floor + depth] + strength * mirrored
     return out

@@ -12,4 +12,4 @@ effect = "reflection"
 height = 0.6
 fade = 0.5
 blur = 2
-opacity = 0.9
+opacity = 0.54                # the mirror mixed into the floor at 54% at the floor line
