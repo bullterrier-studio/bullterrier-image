@@ -22,7 +22,8 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false # these files may be published: nothing restored from a cache goes into them
-      - run: uv run --locked poe build-check
+      - name: Build the sdist and wheel and check them (twine, check-wheel-contents)
+        run: uv run --locked poe build-check
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
@@ -63,4 +64,5 @@ jobs:
           "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
           printf 'name = "smoke"\n\n[[step]]\neffect = "grade"\n\n[[step]]\neffect = "halftone"\n' > smoke.toml
           "$bin/bt-image" render photo.png smoke.toml -o out
-          test -s out/photo__smoke.png
+          ls -l out
+          test -s out/photo__smoke.png && echo "rendered out/photo__smoke.png from the installed wheel"

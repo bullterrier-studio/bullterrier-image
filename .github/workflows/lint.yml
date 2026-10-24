@@ -21,10 +21,17 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: true
-      - run: uv sync --locked
-      - run: uv run --locked ruff format --check .
-      - run: uv run --locked ruff check .
-      - run: uv run --locked vulture
-      - run: uv run --locked deptry .
-      - run: uv run --locked mypy
-      - run: uv run --locked poe lint-workflows
+      - name: Install the locked dependencies
+        run: uv sync --locked
+      - name: Format (ruff format)
+        run: uv run --locked ruff format --check .
+      - name: Lint (ruff check)
+        run: uv run --locked ruff check .
+      - name: Dead code (vulture)
+        run: uv run --locked vulture && echo "vulture found no dead code"
+      - name: Dependencies (deptry)
+        run: uv run --locked deptry .
+      - name: Types (mypy)
+        run: uv run --locked mypy
+      - name: Workflows (actionlint, zizmor)
+        run: uv run --locked poe lint-workflows
