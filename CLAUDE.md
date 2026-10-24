@@ -30,7 +30,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 ## The rules
 
 1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before. An `ops` module is added together with its first consumer, never ahead of it (`vulture` fails the gate on code nothing uses; earlier modules wait in git history). `photo_fx.ops` is internal, not API.
-2. **Presets are data, not code**: a preset is a recipe fragment (TOML), so it never needs to import effects.
+2. **Presets are data, not code**: a preset is a named parameter set of one effect (TOML, `src/photo_fx/presets/<effect>.toml`), so it never needs to import effects.
 3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects/`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects/`, stop: something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
@@ -40,7 +40,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 
 ## Standards
 
-- `src/` holds only code. Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
+- `src/` holds only code and the data the package runs on (its presets, `src/photo_fx/presets/<effect>.toml`). Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
 - The public API is explicit: `photo_fx`, `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio`, `photo_fx.plugin`, each with `__all__`. Everything else is internal;
   `photo_fx.core` and `photo_fx.ops` are not API.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.

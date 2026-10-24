@@ -275,6 +275,11 @@ opacity = 0.6                     # mix this step in at 60%
 Removing a background is just a `fill` step masked to the background. Every step can take `mask` and `opacity`. Unknown
 effects, misspelt parameters and bad values fail when the recipe loads, naming the file and the step.
 
+**Presets.** Some built-in effects ship named parameter sets for common looks: `preset = "sepia"` on a `gradient_map` step,
+or `fx.gradient_map(preset="sepia")` in Python. Parameters you write next to it win over the preset's
+(`fx.gradient_map(preset="sepia", shadow_clip=0.05)`), and `photo-fx effects gradient_map` lists the presets of an effect.
+They are data (`src/photo_fx/presets/<effect>.toml`), checked like any step; third-party effects have none.
+
 ## Python API
 
 The same recipes can be written in Python with `fx`. Every effect is a function with its real signature and docstring, so
@@ -443,10 +448,12 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   imageio.py     adapters  file formats, EXIF and colour profiles, video; defines the one in-memory image type
   matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (Apple Vision, or IS-Net on
                            ONNX Runtime, downloaded on first use) is hidden here
+  presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
   plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, effect)
-  core/          core      registry.py (effects register here), params.py (parameter models), types.py,
+  core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
+                           data in presets/), types.py,
                            vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
                            (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;
                            given the photo and the subject)

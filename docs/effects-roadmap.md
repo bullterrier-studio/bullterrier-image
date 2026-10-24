@@ -4,8 +4,9 @@ What photo-fx can do today and what could come next. **✓ marks what exists now
 parameter); everything else is a proposal. Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
 is `effect = "<effect>"` plus the same parameters.
 
-Many looks (sepia, VHS, Polaroid, pop art) are combinations of simpler effects and will ship as presets rather than as
-separate code.
+Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
+`src/photo_fx/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
+recipes.
 
 ## Colour and tone
 
@@ -33,15 +34,15 @@ separate code.
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` | Apply a `.cube` 3D colour lookup table. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
-| `sepia` | Warm monochrome. | `fx.sepia()` |
-| `cyanotype` | Prussian-blue print. | `fx.cyanotype()` |
-| `cross_process` | Shifted curves per channel. | `fx.cross_process()` |
+| `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
+| `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |
+| `cross_process` ✓ (a preset of `curves`) | Shifted curves per channel. | `fx.curves(preset="cross_process")` |
 | `bleach_bypass` | Desaturated, high-contrast film look. | `fx.bleach_bypass(amount=0.6)` |
-| `teal_orange` | The blockbuster grade. | `fx.teal_orange(amount=0.5)` |
-| `thermal` | Heat-camera false colour. | `fx.thermal()` |
-| `infrared` | False-colour infrared (swapped channels, bright foliage). | `fx.infrared()` |
-| `xray` | Inverted, blue, edge-lit. | `fx.xray()` |
-| `night_vision` | Green phosphor, noise, vignette. | `fx.night_vision()` |
+| `teal_orange` ✓ (a preset of `split_tone`) | The blockbuster grade. | `fx.split_tone(preset="teal_orange", amount=0.4)` |
+| `thermal` ✓ (a preset of `gradient_map`) | Heat-camera false colour. | `fx.gradient_map(preset="thermal")` |
+| `infrared` ✓ (a preset of `channel_mixer`) | False-colour infrared (swapped channels, bright foliage). | `fx.channel_mixer(preset="infrared")` |
+| `xray` ✓ (a preset of `gradient_map`) | Inverted and blue (not edge-lit). | `fx.gradient_map(preset="xray")` |
+| `night_vision` ✓ (a preset of `gradient_map`) | Green phosphor (no noise or vignette: add `film_grain` and `vignette`). | `fx.gradient_map(preset="night_vision")` |
 | `film_stock` | Approximations of named stocks (portra, tri-x, velvia). | `fx.film_stock("portra")` |
 
 ## Light, focus and detail
@@ -330,7 +331,7 @@ What combining effects can give, once the pieces exist:
 - **Risograph poster**: levels, risograph inks, paper texture, border
 - **Terminal** ✓ ([recipe](../examples/looks/03-terminal.toml); gains `crt` with batch 6): green ASCII, CRT, scanlines, vignette
 - **Vaporwave** ✓ ([recipe](../examples/looks/02-vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
-- **Newspaper** ✓ ([recipe](../examples/looks/04-newsprint.toml), black and white until `cmyk_halftone` and `sepia` exist): CMYK halftone, paper texture, faded sepia, torn edge
+- **Newspaper** ✓ ([recipe](../examples/looks/04-newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure**: black and white, a second photo inside the silhouette, vignette
 - **Sticker**: cut-out with a white border and drop shadow
 - **Turn to dust** (animation): ASCII, disperse, embers, camera shake
