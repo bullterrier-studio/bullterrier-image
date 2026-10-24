@@ -317,14 +317,19 @@ neon_glitch = Recipe(
     size=1024,
     steps=[
         fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
-        fx.fill("#000000").where("background"),  # only where the photo's background is
+        fx.fill("#000000", mask="background"),  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
-        fx.glow(radius=26, amount=0.65).blend(0.8),  # mixed in at 80%
+        fx.glow(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
     ],
 )
 
 imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
+
+A step is written with the same keys as in a recipe file: after the effect's own parameters, every `fx` function takes
+`mask`, `opacity`, `blend_mode` and (for an effect with presets) `preset` as keywords, so
+`fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`, `opacity = 0.8`,
+`blend_mode = "screen"`.
 
 `fx.glitch(spilt=8)` raises at once and lists the valid parameters, the same as a typo in a TOML file does. Code-built
 recipes can be handed straight to the pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`. See

@@ -7,9 +7,9 @@ Promises:
   effect, a misspelt or out-of-range parameter, a bad mask, opacity or blend mode, or an empty recipe fails at once
   with a `RecipeError` (a `ValueError`; an unknown effect is an `UnknownEffectError`, also a `KeyError`) saying what is
   valid. A step's parameters are checked by its effect's own parameter model.
-- Steps and recipes are immutable values (frozen Pydantic models): `where` and `blend` return changed copies. A step
-  keeps its parameters as they were written, so `describe` shows them that way; with a `preset` they are the preset's
-  parameters under the ones given, which is all the runner and the cache see of it.
+- Steps and recipes are immutable values (frozen Pydantic models). A step keeps its parameters as they were written,
+  so `describe` shows them that way; with a `preset` they are the preset's parameters under the ones given, which is
+  all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
 
 Dependency direction: imports the effect registry, `framing`, `params`, `ops.composite` (the blend modes' names) and
@@ -92,14 +92,6 @@ class Step(ValidatedModel):
                 raise RecipeError(f"`{name}` is supplied by the recipe itself and cannot be set")
         registry.get(self.effect).validate(self.params)  # an unknown effect: UnknownEffectError listing them
         return self
-
-    def where(self, region: str) -> "Step":
-        """The same step applied only to the "subject" or only to the "background" of the photo."""
-        return Step(self.effect, self.params, region, self.opacity, self.blend_mode)
-
-    def blend(self, amount: float) -> "Step":
-        """The same step mixed in partway: 0 = no effect, 1 = fully (the default)."""
-        return Step(self.effect, self.params, self.mask, amount, self.blend_mode)
 
     @property
     def wants_matte(self) -> bool:

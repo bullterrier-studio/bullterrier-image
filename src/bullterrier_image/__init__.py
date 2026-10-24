@@ -5,7 +5,7 @@
     photo = imageio.load("dog.jpg")
     look = Recipe("neon", size=1024, steps=[
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
-        fx.fill("#000000").where("background"),
+        fx.fill("#000000", mask="background"),
         fx.glow(radius=26),
     ])
     imageio.save(render(photo, look), "dog-neon.jpg")

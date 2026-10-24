@@ -133,7 +133,7 @@ def test_a_misspelt_top_level_key_lists_the_keys_a_recipe_has(tmp_path):
 def test_a_step_may_name_a_preset_and_its_own_keys_win_over_it(tmp_path):
     path = _write(tmp_path, "[[step]]\neffect = 'gradient_map'\npreset = 'sepia'\nshadow_clip = 0.2\nopacity = 0.5\n")
     (step,) = load_recipe(path).steps
-    assert step == Step("gradient_map", {"shadow_clip": 0.2}, preset="sepia").blend(0.5)
+    assert step == Step("gradient_map", {"shadow_clip": 0.2}, opacity=0.5, preset="sepia")
     assert "preset" not in step.params  # a step's key, not an effect's parameter
 
 

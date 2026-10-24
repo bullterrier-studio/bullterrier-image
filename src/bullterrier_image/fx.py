@@ -4,14 +4,18 @@
 
     look = Recipe("neon-glitch", size=1024, steps=[
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
-        fx.fill("#000000").where("background"),            # only where the photo's background is
+        fx.fill("#000000", mask="background"),                  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
-        fx.glow(radius=26, amount=0.65).blend(0.8),      # mixed in at 80%
+        fx.glow(radius=26, amount=0.65, opacity=0.8),           # mixed in at 80%
+        fx.gradient(blend_mode="screen", opacity=0.5),          # a gradient screened over the picture
     ])
     image = render(photo, look)
 
 Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
-(`help(fx.glitch)`). A misspelt parameter fails when the step is made, not when the photo is rendered.
+(`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask`
+("subject" or "background"), `opacity` (0..1), `blend_mode` (normal, multiply, screen, overlay, soft_light,
+difference, color) and, for an effect with presets, `preset`. A misspelt parameter or key fails when the step is made,
+not when the photo is rendered.
 
 `fx.pyi` lets editors complete effect names and parameters. It is written from `stub_text()` by
 `uv run poe regenerate`, once at integration rather than on every branch, so it can lag behind a branch's effects.
@@ -50,22 +54,25 @@ def __dir__() -> list[str]:
 
 @cache  # keyed by the function too, so an effect replaced under the same name (a reload) gets a new builder
 def _builder(name: str, function: Callable) -> Callable[..., Step]:
-    """The function behind `fx.<name>`: takes the effect's parameters (not the image) and returns a Step.
+    """The function behind `fx.<name>`: takes the effect's parameters (not the image), then the step keys, and returns
+    a Step.
 
-    Values may be given by position, in the model's field order, or by keyword; the Step checks them with the model,
-    so a misspelt or out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the
-    effect's presets (see `registry.presets`); the values given win over the preset's. A picture parameter takes a
-    `Picture`, a colour, a path (read now, relative to the current folder) or an array (float, height x width x 3 or 4).
+    Values may be given by position, in the model's field order, or by keyword; the step keys (`mask`, `opacity`,
+    `blend_mode`, `preset`) only by keyword. The Step checks them all, so a misspelt or out-of-range value fails here
+    exactly as it would in a recipe file. `preset=` names one of the effect's presets (see `registry.presets`); the
+    values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path (read now, relative to
+    the current folder) or an array (float, height x width x 3 or 4).
     """
     fields = tuple(registry.parameters(name).model_fields)
 
-    def build(*args: Any, preset: str | None = None, **values: Any) -> Step:
+    def build(*args: Any, **values: Any) -> Step:
         if len(args) > len(fields):
             raise TypeError(f"fx.{name}() takes at most {len(fields)} positional values ({len(args)} given)")
         positional = dict(zip(fields, args, strict=False))
         for twice in positional.keys() & values.keys():
             raise TypeError(f"fx.{name}() got `{twice}` both by position and by keyword")
-        return Step(name, with_pictures(name, {**positional, **values}, Path()), preset=preset)
+        keys = {key: values.pop(key) for key in registry.STEP_KEYS if key in values}  # the rest are the parameters
+        return Step(name, with_pictures(name, {**positional, **values}, Path()), **keys)
 
     build.__name__, build.__qualname__ = name, f"fx.{name}"
     build.__doc__ = registry.documentation(name)
@@ -75,18 +82,26 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
 
 
 def _signature(name: str) -> inspect.Signature:
-    """The effect's parameters as a call signature, then `preset` (a keyword, one of the names) if it has presets."""
+    """The effect's parameters as a call signature, then the step keys as keywords, typed and defaulted as `Step`
+    declares them (`effect` is the builder's own name), and `preset` (one of the names) if the effect has presets."""
     signature = registry.parameters(name).signature()
+    # TODO(step keys): a field named like a step key is shadowed by the key, as in a recipe file, until the registry
+    # refuses such fields; then this filter goes.
+    fields = [p for p in signature.parameters.values() if p.name not in registry.STEP_KEYS]
+    step = Step.model_fields
+    keys = [
+        inspect.Parameter(
+            key, inspect.Parameter.KEYWORD_ONLY, default=step[key].default, annotation=step[key].annotation
+        )
+        for key in registry.STEP_KEYS
+        if key in step and key != "effect"
+    ]
     names = tuple(registry.presets(name))
-    if not names:
-        return signature
-    chosen = inspect.Parameter(
-        "preset",
-        inspect.Parameter.KEYWORD_ONLY,
-        default=None,
-        annotation=Literal[names] | None,
-    )
-    return signature.replace(parameters=[*signature.parameters.values(), chosen])
+    if names:
+        keys.append(
+            inspect.Parameter("preset", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=Literal[names] | None)
+        )
+    return signature.replace(parameters=[*fields, *keys])
 
 
 def stub_text() -> str:

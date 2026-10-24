@@ -121,20 +121,25 @@ def test_a_recipe_built_in_code_is_checked_too():
     assert Recipe("ok", [fx.grain()]).steps == (fx.grain(),)  # a list is fine; it becomes a tuple
 
 
-def test_steps_can_be_limited_to_a_region_and_blended_without_changing_the_original():
-    base = fx.fill("#000000")
-    masked = base.where("background").blend(0.5)
-    assert (masked.mask, masked.opacity) == ("background", 0.5)
-    assert (base.mask, base.opacity) == (None, 1.0)
-    with pytest.raises(ValueError, match="left half"):
-        base.where("left half")
-    with pytest.raises(ValueError, match="opacity"):
-        base.blend(2)
+@pytest.mark.parametrize(
+    ("keys", "complaint"),
+    [
+        ({"mask": "left half"}, r"`mask`.*'left half'"),
+        ({"opacity": 2}, r"`opacity`.*\b2\b"),
+        ({"blend_mode": "lighten"}, r"`blend_mode`.*screen.*'lighten'"),
+        ({"preset": "sepya"}, r"'sepya'.*sepia"),
+    ],
+    ids=["mask", "opacity", "blend_mode", "preset"],
+)
+def test_fx_refuses_a_bad_step_key_naming_it_and_the_value(keys, complaint):
+    with pytest.raises(ValueError, match=complaint):
+        fx.gradient_map(**keys)
 
 
 def test_a_step_describes_itself_briefly_for_labels():
-    assert str(fx.fill("#000000").where("background")) == "fill(color='#000000') on background"
-    assert str(fx.grade(exposure=0.5).blend(0.3)) == "grade(exposure=0.5) x0.3"
+    assert str(fx.fill("#000000", mask="background")) == "fill(color='#000000') on background"
+    assert str(fx.grade(exposure=0.5, opacity=0.3)) == "grade(exposure=0.5) x0.3"
+    assert str(fx.glow(radius=26, blend_mode="screen")) == "glow(radius=26) screen"
     assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
     assert len(fx.ascii(chars="xy" * 100).describe(width=30)) == 30
 
@@ -197,11 +202,13 @@ def test_help_on_a_modelled_effects_builder_shows_every_parameters_description(l
         assert description in " ".join(text.split()), description  # help() may wrap long lines
 
 
-def test_a_modelled_effects_builder_has_the_models_signature(lantern):
+def test_a_modelled_effects_builder_has_the_models_signature_then_the_step_keys(lantern):
     signature = inspect.signature(fx.lantern_probe)
-    assert list(signature.parameters) == ["radius", "style", "tint"]  # no image, no matte
-    assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00"]
+    assert list(signature.parameters) == ["radius", "style", "tint", "mask", "opacity", "blend_mode"]  # no image, matte
+    assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00", None, 1.0, "normal"]
     assert "tint: str | list[float] | tuple[float, float, float]" in str(signature)
+    keyword_only = [p.name for p in signature.parameters.values() if p.kind is inspect.Parameter.KEYWORD_ONLY]
+    assert keyword_only == ["mask", "opacity", "blend_mode"]
 
 
 def test_a_modelled_effects_builder_takes_positional_and_keyword_values(lantern):
@@ -242,14 +249,25 @@ def _stub_functions() -> dict[str, ast.FunctionDef]:
     return {node.name: node for node in ast.parse(fx.stub_text()).body if isinstance(node, ast.FunctionDef)}
 
 
-def test_the_stub_and_the_builder_take_a_preset_exactly_where_an_effect_has_presets():
+STEP_KEYWORDS = {
+    "mask": ("Literal['subject', 'background'] | None", None),
+    "opacity": ("float", 1.0),
+    "blend_mode": ("Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color']", "normal"),
+}
+
+
+def _keywords(function: ast.FunctionDef) -> dict[str, tuple[str, object]]:
+    """A stub function's keyword-only arguments: name -> (annotation, default); the stub writes both for each."""
+    pairs = zip(function.args.kwonlyargs, function.args.kw_defaults, strict=True)
+    return {a.arg: (ast.unparse(a.annotation), ast.literal_eval(d)) for a, d in pairs}  # type: ignore[arg-type]
+
+
+def test_the_stub_shows_the_step_keys_with_their_choices_and_a_preset_exactly_where_an_effect_has_presets():
     for name, function in _stub_functions().items():
         names = list(registry.presets(name))
-        keyword_only = [a.arg for a in function.args.kwonlyargs]
-        assert keyword_only == (["preset"] if names else [])
+        presets = {"preset": (f"Literal{names!r} | None", None)} if names else {}
+        assert _keywords(function) == {**STEP_KEYWORDS, **presets}, name
         if names:
-            assert ast.unparse(function.args.kwonlyargs[0].annotation) == f"Literal{names!r} | None"  # type: ignore[arg-type]
-            assert function.args.kw_defaults[0].value is None  # type: ignore[union-attr]
             assert "preset" in inspect.signature(getattr(fx, name)).parameters
         else:
             assert "preset" not in inspect.signature(getattr(fx, name)).parameters
@@ -313,7 +331,7 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
         """First version."""
         return rgb
 
-    assert list(inspect.signature(fx.renamed_probe).parameters) == ["old"]
+    assert list(inspect.signature(fx.renamed_probe).parameters)[:1] == ["old"]
     unregister("renamed_probe")
 
     # a different effect under the same name, on purpose (mypy reports a redefinition at the decorator)
@@ -322,20 +340,35 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
         """Second version."""
         return rgb
 
-    assert list(inspect.signature(fx.renamed_probe).parameters) == ["new"]
+    assert list(inspect.signature(fx.renamed_probe).parameters)[:1] == ["new"]
     assert fx.renamed_probe(new=2.0) == Step("renamed_probe", {"new": 2.0})
 
 
-def test_python_and_toml_recipes_are_the_same_thing(tmp_path):
-    (tmp_path / "r.toml").write_text(
-        'name = "r"\nsize = 64\n[[step]]\neffect = "fill"\ncolor = "#000000"\nmask = "background"\n'
-        '[[step]]\neffect = "glitch"\nsplit = 4\nseed = 1\n[[step]]\neffect = "glow"\nopacity = 0.5\n',
-        encoding="utf-8",
-    )
-    built = Recipe(
-        "r", size=64, steps=[fx.fill("#000000").where("background"), fx.glitch(split=4, seed=1), fx.glow().blend(0.5)]
-    )
-    assert built == load_recipe(tmp_path / "r.toml")
+@pytest.mark.parametrize(
+    ("toml", "python"),
+    [
+        pytest.param(
+            'effect = "fill"\ncolor = "#000000"\nmask = "background"',
+            lambda: fx.fill("#000000", mask="background"),
+            id="mask",
+        ),
+        pytest.param(
+            'effect = "glow"\nradius = 26\nopacity = 0.8', lambda: fx.glow(radius=26, opacity=0.8), id="opacity"
+        ),
+        pytest.param(
+            'effect = "gradient"\nblend_mode = "screen"', lambda: fx.gradient(blend_mode="screen"), id="blend_mode"
+        ),
+        pytest.param('effect = "gradient_map"\npreset = "sepia"', lambda: fx.gradient_map(preset="sepia"), id="preset"),
+        pytest.param(
+            'effect = "glitch"\nsplit = 4\nmask = "subject"\nopacity = 0.5\nblend_mode = "difference"',
+            lambda: fx.glitch(split=4, mask="subject", opacity=0.5, blend_mode="difference"),
+            id="every key at once",
+        ),
+    ],
+)
+def test_a_step_is_written_with_the_same_keys_in_a_recipe_file_and_in_fx(tmp_path, toml, python):
+    (tmp_path / "r.toml").write_text(f"[[step]]\n{toml}\n", encoding="utf-8")
+    assert load_recipe(tmp_path / "r.toml").steps == (python(),)
 
 
 # --- trace: the picture after every step -----------------------------------------------------------------------
@@ -351,12 +384,13 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
 
 
 def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, matte):
-    look = Recipe("t", size=64, steps=[fx.gradient_map(), fx.fill("#102030").where("background"), fx.glow().blend(0.7)])
+    steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.glow(opacity=0.7, blend_mode="screen")]
+    look = Recipe("t", size=64, steps=steps)
     np.testing.assert_array_equal(trace(photo, look, matte)[-1].image, render(photo, look, matte))
 
 
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, matte):
-    stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000").where("background")]), matte)
+    stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), matte)
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], matte)  # white where the subject is
     assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe("t", [fx.grain()], size=None)))

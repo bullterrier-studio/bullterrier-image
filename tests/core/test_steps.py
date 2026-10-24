@@ -182,11 +182,6 @@ def test_a_preset_step_renders_as_the_step_with_the_same_parameters_written_out(
     assert not np.array_equal(first, registry.apply("gradient_map", photo))  # and it is not the default look
 
 
-def test_a_preset_survives_where_and_blend():
-    step = Step("gradient_map", preset="sepia")
-    assert step.where("subject").blend(0.5).params == step.params
-
-
 def test_an_unknown_preset_names_the_effect_and_lists_its_presets():
     with pytest.raises(RecipeError, match=r"gradient_map.*'sepya'.*sepia.*cyanotype"):
         Step("gradient_map", preset="sepya")
@@ -220,4 +215,4 @@ def test_an_effect_receives_the_picture_a_step_holds(layer_probe):
     picture = Picture(np.full((3, 3, 3), 0.25, np.float32))
     out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), texture=picture)
     np.testing.assert_allclose(out, 0.25)
-    assert Step("layer_probe", {"texture": picture}).where("subject").params["texture"] is picture
+    assert Step("layer_probe", {"texture": picture}, mask="subject").params["texture"] is picture
