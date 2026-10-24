@@ -38,6 +38,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio` and `photo_fx.plugin`, each with `__all__`. *Reason:* two paths to one name with
   different behaviour (a `render` that finds the subject and one that does not) is a trap. *Consequence:* `photo_fx.core`
   and `photo_fx.ops` are internal and re-export nothing; no compatibility shims before 1.0.
+- **No time in the library.** Effects are pure functions of one picture and a set of values; a parameter describes a state
+  (`progress`, `phase`, `seed`), never a duration. Easing, ramps, animated values, the animation timeline, frame
+  rendering and GIF/MP4 output were removed. *Reason:* photo-fx is the image package of a wider ecosystem
+  (`bullterrier-design`) in which one package owns each concept: `control` shapes values over time, `video` maps them
+  onto parameters and renders frames, `audio` supplies the beats. Animation done here would exist twice, and a parameter
+  measured in seconds would tie an effect to one clip and one clock. *Consequence:* a parameter that moved with time
+  becomes a state parameter in `cycles` or `fraction` (disperse's shimmer is `ambient_phase`); the removed code is in git
+  history (before the "remove animation" commits) for when video is built.
 
 ## Parameters
 

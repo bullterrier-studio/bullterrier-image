@@ -1,8 +1,30 @@
 # CLAUDE.md: photo-fx
 
-Python library and CLI that styles photos with composable effects (ASCII, glitch, halftone, colour grades, particle animations). A look is a **recipe**
+Python library and CLI that styles photos with composable effects (ASCII, glitch, halftone, colour grades, particle dispersal). A look is a **recipe**
 (TOML or Python): an ordered list of effects. Read `README.md` for usage, `docs/design-decisions.md` for why it is built this way and
 `docs/effects-roadmap.md` for what is planned.
+
+## Responsibility
+
+This repository is the **image package** of the Bullterrier ecosystem (`~/github/bullterrier-design`; it will be renamed `bullterrier-image`).
+It changes and understands **single pictures** and has **no concept of time**. Its siblings are `audio` (finds beats and sections in sound),
+`control` (values that change over time: keyframes, envelopes, LFOs) and `video` (decides what happens when, maps control signals onto
+parameters, renders frames). Image, audio and control never depend on each other; only video knows the others.
+
+| Responsible for | Not responsible for |
+|---|---|
+| Effects: one picture in, one picture out | Effects that need several frames (trails, frame echo, datamosh) → video |
+| Looks (recipes): an ordered list of effects and their values, stored as data | Values changing over time (ramps, easing, keyframes, envelopes) → control |
+| Describing every parameter: name, unit, range, meaning | Mapping a control signal onto a parameter → video |
+| Finding the subject in one picture; aiming effects at subject or background | Keeping the subject stable across frames → video |
+| Reading and writing still images | Video files, GIF/MP4, frame rates, filmstrips → video |
+| The same result for the same inputs and seed; the same look at any resolution | Sound of any kind → audio |
+| Rendering one look many times with different values cheaply | Layered layouts, posters, multi-element canvases → video (compositing) |
+
+**No time in this library.** No seconds, frames, clips, easing or fps, in code, parameters or docs. A parameter describes a *state*
+(`progress`, `phase`, `seed`, `offset`); whoever animates it sets it for each frame. This is what lets video drive any parameter from a beat,
+a ramp or an LFO, and it keeps the parameter descriptions (unit, range, meaning) the only thing video must read. Filter-shaped compositing
+(text block, overlay, blend, sticker) stays here; anything that needs a canvas of its own or several inputs does not.
 
 ## Architecture in one paragraph
 
