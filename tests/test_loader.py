@@ -9,9 +9,10 @@ from PIL import Image
 
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.steps import Step
+from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
+from bullterrier_image.recipe import Edge, Grid, Pick, Shards
 
 STEP = "[[step]]\neffect = 'grade'\n"
 
@@ -55,13 +56,22 @@ def test_a_file_name_that_leaves_no_usable_name_asks_for_a_name_or_a_new_file_na
         load_recipe(_write(tmp_path, STEP, file))
 
 
-def test_a_recipe_without_a_format_or_with_format_1_loads(tmp_path):
+def test_a_recipe_without_a_format_or_with_format_1_or_2_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].runs[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
+    assert load_recipe(_write(tmp_path, "format = 2\nname = 'c'\n" + STEP, "c.toml")).name == "c"
+
+
+def test_a_format_1_file_means_the_same_in_format_2(tmp_path):
+    body = "size = 64\n[frame]\naspect = 1\n" + STEP + "mask = 'subject'\nopacity = 0.5\n"
+    assert (
+        load_recipe(_write(tmp_path, "format = 1\n" + body, "one.toml")).steps
+        == load_recipe(_write(tmp_path, "format = 2\n" + body, "two.toml")).steps
+    )
 
 
 @pytest.mark.parametrize(
-    ("written", "value"), [("2", "2"), ("0", "0"), ("'1'", "'1'"), ("1.0", "1.0"), ("true", "True")]
+    ("written", "value"), [("3", "3"), ("0", "0"), ("'1'", "'1'"), ("1.0", "1.0"), ("true", "True"), ("'2'", "'2'")]
 )
 def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_release_reads(tmp_path, written, value):
     path = _write(tmp_path, f"format = {written}\n" + STEP, "future.toml")
@@ -69,7 +79,7 @@ def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_relea
         load_recipe(path)
     message = str(raised.value)
     assert value in message
-    assert re.search(r"reads\D*\b1\b", message)  # the format this release reads
+    assert re.search(r"reads\D*\b1\b.*\b2\b", message)  # the formats this release reads
 
 
 # A broken file: each is refused with a RecipeError that starts with the file's name and says what is wrong.
@@ -123,7 +133,7 @@ def test_a_mistake_in_the_frame_table_names_the_file_the_table_and_the_key(tmp_p
 
 
 def test_a_misspelt_top_level_key_lists_the_keys_a_recipe_has(tmp_path):
-    with pytest.raises(RecipeError, match=r"`frames`.*format, name, size, \[frame\], \[\[step\]\]"):
+    with pytest.raises(RecipeError, match=r"`frames`.*format, name, size, \[frame\], \[region\.NAME\], \[\[step\]\]"):
         load_recipe(_write(tmp_path, "[frames]\n" + STEP))
 
 
@@ -210,3 +220,185 @@ def test_a_picture_that_cannot_be_used_fails_at_load_naming_file_step_parameter_
     make(tmp_path)
     with pytest.raises(kind, match=r"^look\.toml: step 2: .*`image`.*" + re.escape(written.strip("'"))):
         load_recipe(_layer(tmp_path, written))
+
+
+# --- format 2: regions, and steps that give each piece of one a look -----------------------------------------------
+
+REGIONS_FILE = """
+format = 2
+size = 64
+
+[region.panes]
+kind = "grid"
+columns = [0.2, 0.17, 0.63]
+rows = 2
+
+[region.glass]
+kind = "shards"
+preset = "glass"
+fit = "subject"
+impact = [0.6, 0.2]
+edge = { style = "torn", amount = 0.02 }
+
+[region.head]
+kind = "pick"
+of = "panes"
+pieces = [4]
+
+[[step]]
+effect = "fill"
+color = "#ff0000"
+mask = "head"
+
+[[step]]
+each = "glass"
+looks = [
+    { effect = "grade", exposure = 0.5, opacity = 0.7 },
+    "none",
+    { effect = "fill", color = "#00ff00", blend_mode = "multiply" },
+]
+assign = "random"
+seed = 4
+feather = 2
+mask = "subject"
+opacity = 0.9
+"""
+
+REGIONS_RECIPE = Recipe(
+    "look",
+    size=64,
+    regions={
+        "panes": Grid(columns=[0.2, 0.17, 0.63], rows=2),
+        "glass": Shards(preset="glass", fit="subject", impact=(0.6, 0.2), edge=Edge(style="torn", amount=0.02)),
+        "head": Pick(of="panes", pieces=[4]),
+    },
+    steps=[
+        Step("fill", {"color": "#ff0000"}, mask="head"),
+        Each(
+            "glass",
+            [
+                Step("grade", {"exposure": 0.5}, opacity=0.7),
+                "none",
+                Step("fill", {"color": "#00ff00"}, blend_mode="multiply"),
+            ],
+            mask="subject",
+            opacity=0.9,
+            assign="random",
+            seed=4,
+            feather=2,
+        ),
+    ],
+)
+
+
+def test_a_format_2_file_with_regions_and_an_each_step_loads_as_the_recipe_written_in_python(tmp_path):
+    assert load_recipe(_write(tmp_path, REGIONS_FILE)) == REGIONS_RECIPE
+
+
+def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, matte):
+    from bullterrier_image.core.runner import render
+
+    loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
+    np.testing.assert_array_equal(render(photo, loaded, matte), render(photo, REGIONS_RECIPE, matte))
+
+
+def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):
+    _logo(tmp_path / "assets")
+    (tmp_path / "recipes").mkdir()
+    path = _write(
+        tmp_path / "recipes",
+        'format = 2\n[region.g]\nkind = "grid"\n[[step]]\neach = "g"\n'
+        "looks = [{ effect = 'layer_probe', image = '../assets/logo.png' }]\n",
+    )
+    (each,) = load_recipe(path).steps
+    assert each.runs[0].params["image"].label == "../assets/logo.png"
+
+
+NEW_IN_FORMAT_2 = {
+    "a region table": '[region.g]\nkind = "grid"\n' + STEP,
+    "an each step": '[[step]]\neach = "subject"\nlooks = ["none"]\n',
+    "a partition key": "[[step]]\neffect = 'grade'\npartition = 'subject'\n",
+}
+
+
+@pytest.mark.parametrize("text", NEW_IN_FORMAT_2.values(), ids=NEW_IN_FORMAT_2.keys())
+@pytest.mark.parametrize("header", ["", "format = 1\n"], ids=["no format", "format 1"])
+def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_path, header, text):
+    with pytest.raises(RecipeError, match=r"^old\.toml: .*format = 2"):
+        load_recipe(_write(tmp_path, header + text, "old.toml"))
+
+
+REGION_MISTAKES = {
+    "a kind that does not exist": ('[region.g]\nkind = "hexagons"\n', r"region 'g': .*'hexagons'.*grid, shards, pick"),
+    "no kind": ("[region.g]\ncolumns = 2\n", r"region 'g': .*`kind`.*grid, shards, pick"),
+    "a kind that is not text": ("[region.g]\nkind = 3\n", r"region 'g': .*`kind`.*grid, shards, pick"),
+    "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),
+    "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
+    "an edge that is not a table": ('[region.g]\nkind = "grid"\nedge = 3\n', r"region 'g'.*`edge`"),
+    "a region that is not a table": ("region = 3\n", r"\[region\.NAME\]"),
+    "a fit that no region has": (
+        '[region.g]\nkind = "grid"\nfit = "nope"\n',
+        r"region 'g': `fit` names 'nope'.*valid selections: subject, background",
+    ),
+    "a fit that is a partition": (
+        '[region.a]\nkind = "grid"\n[region.b]\nkind = "grid"\nfit = "a"\n',
+        r"region 'b': `fit` names 'a', a partition",
+    ),
+    "a pick of nothing": ('[region.p]\nkind = "pick"\nof = "gone"\n', r"region 'p': `of` names 'gone'"),
+    "a cycle": ('[region.a]\nkind = "shards"\nfit = "b"\n[region.b]\nkind = "pick"\nof = "a"\n', r"cycle"),
+    "a name taken by a built-in": ('[region.subject]\nkind = "grid"\n', r"region 'subject' is a built-in"),
+}
+
+
+@pytest.mark.parametrize(("text", "complaint"), REGION_MISTAKES.values(), ids=REGION_MISTAKES.keys())
+def test_a_mistake_in_a_region_names_the_file_the_region_and_the_problem(tmp_path, text, complaint):
+    with pytest.raises(RecipeError, match=rf"^bad\.toml: .*{complaint}"):
+        load_recipe(_write(tmp_path, "format = 2\n" + text + STEP, "bad.toml"))
+
+
+EACH = '[region.g]\nkind = "grid"\n'
+EACH_MISTAKES = {
+    "looks that are not a list": ('[[step]]\neach = "g"\nlooks = "none"\n', r"step 1: .*`looks`.*list"),
+    "no looks": ('[[step]]\neach = "g"\n', r"step 1: .*`looks`"),
+    "looks without each": ('[[step]]\nlooks = ["none"]\n', r"step 1: .*`each`"),
+    "an effect beside each": ('[[step]]\neach = "g"\nlooks = ["none"]\neffect = "grade"\n', r"step 1: .*`effect`"),
+    "an effect parameter on the each step": (
+        '[[step]]\neach = "g"\nlooks = ["none"]\nexposure = 1\n',
+        r"step 1: .*`exposure`",
+    ),
+    "a look that is a word other than none": (
+        '[[step]]\neach = "g"\nlooks = ["grade"]\n',
+        r"step 1: look 1 is 'grade'.*none",
+    ),
+    "a look that is a number": ('[[step]]\neach = "g"\nlooks = [3]\n', r"step 1: .*look 1.*table"),
+    "a look without an effect": (
+        '[[step]]\neach = "g"\nlooks = ["none", { exposure = 1 }]\n',
+        r"step 1: look 2: .*`effect`",
+    ),
+    "a look with a misspelt parameter": (
+        '[[step]]\neach = "g"\nlooks = [{ effect = "grade", exposur = 1 }]\n',
+        r"step 1: look 1: .*`exposur`",
+    ),
+    "a look with an opacity out of range": (
+        '[[step]]\neach = "g"\nlooks = [{ effect = "grade", opacity = 2 }]\n',
+        r"step 1: look 1: .*opacity.*2",
+    ),
+    "an assignment that does not exist": (
+        '[[step]]\neach = "g"\nlooks = ["none"]\nassign = "shuffle"\n',
+        r"step 1: .*`assign`.*cycle.*random",
+    ),
+    "an each that is no region": (
+        '[[step]]\neach = "h"\nlooks = ["none"]\n',
+        r"step 1: `each` names 'h'.*valid partitions: g",
+    ),
+    "a mask that is no region": (
+        '[[step]]\neffect = "grade"\nmask = "h"\n',
+        r"step 1: `mask` names 'h'.*valid selections: subject, background",
+    ),
+}
+
+
+@pytest.mark.parametrize(("text", "complaint"), EACH_MISTAKES.values(), ids=EACH_MISTAKES.keys())
+def test_a_mistake_in_an_each_step_names_the_file_the_step_and_the_problem(tmp_path, text, complaint):
+    with pytest.raises(RecipeError, match=rf"^bad\.toml: .*{complaint}"):
+        load_recipe(_write(tmp_path, "format = 2\n" + EACH + text, "bad.toml"))

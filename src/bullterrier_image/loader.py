@@ -3,7 +3,7 @@
 Promises: every error is a `RecipeError` that starts with the file's name, then names the step and the offending key
 (a TOML syntax error keeps its line and column); nothing is read except that one file. The format (UTF-8 TOML):
 
-    format = 1                     # optional: the recipe format version; this release reads 1 (the default)
+    format = 2                     # optional: the recipe format version; this release reads 1 (the default) and 2
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
 
@@ -11,6 +11,11 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     aspect = 1                     # crop to this width over height...
     anchor = "subject"             # ...around the subject
     transparent = "circle"         # a circle cut-out: the render has an alpha channel (PNG or WebP, not JPEG)
+
+    [region.panes]                 # format 2: a named region (see "Regions" below); `kind` is grid, shards or pick
+    kind = "grid"
+    columns = 3
+    rows = 2
 
     [[step]]
     effect = "ascii"               # any effect from bullterrier_image.effects; the other keys are its parameters
@@ -20,7 +25,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     [[step]]
     effect = "fill"
     color = "#000000"
-    mask = "background"            # "subject" or "background": apply only there (needs a clear subject in the photo)
+    mask = "background"            # "subject", "background" or a region that is a selection: apply only there
     opacity = 0.3                  # optional, 0..1: mix the effect in partway (default 1 = fully)
 
     [[step]]
@@ -32,6 +37,22 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     effect = "gradient_map"
     preset = "sepia"               # optional: one of the effect's presets (`bt-image effects NAME` lists them); the
     opacity = 0.6                  # step's own keys win over the preset's
+
+Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
+(`count`, `jitter`, `impact`, `focus`, `seed`, `preset`) or `pick` (`of`, `pieces`), the fields of `Grid`, `Shards`
+and `Pick`; `fit` lays a grid or shards over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`)
+that tears the borders. A *partition* (a grid or shards) cuts the picture into numbered pieces, a *selection* (a
+`pick`, or the built-in `subject` and `background`) chooses pixels. Steps name regions: `mask` (a selection) limits
+a step to it, and `partition` names the partition an effect such as `seams` draws. A step with `each` (a partition)
+and `looks` gives every piece its own look:
+
+    [[step]]
+    each = "panes"                 # a partition
+    looks = [{ effect = "halftone", cell = 9 }, "none"]   # each look is a step table, or "none": the piece stays
+    assign = "cycle"               # or "random" (with `seed`): how the pieces get looks; `feather`: soft borders, px
+    mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
+
+Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them.
 
 A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
 it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
@@ -52,8 +73,8 @@ table with the geometry because it is the same model, `Recipe(..., frame=Framing
 recipe's picture is framed and cut. Any other top-level key is refused, so a misspelt `size` or `format` is not
 silently ignored; so is any other key in `[frame]`.
 
-Dependency direction: imports `core` (steps, framing, registry, params), `imageio` and `errors`; it does not know
-`runner`.
+Dependency direction: imports `core` (steps, framing, regions, registry, params), `imageio` and `errors`; it does
+not know `runner`.
 """
 
 import tomllib
@@ -69,16 +90,28 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.steps import Recipe, Step, safe_name
+from .core.regions import Grid, Pick, Shards
+from .core.steps import Each, Recipe, Step, safe_name
 
 __all__ = ["load_recipe", "with_pictures"]
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
-# format adds its number here and keeps reading the old ones.
-_FORMATS = (1,)
+# format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`,
+# `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes.
+_FORMATS = (1, 2)
+_NEW_IN_2 = ("each", "looks", "partition")
 # the top-level keys of a recipe file, each as it is written (a table or a list of tables in brackets), in the order the
 # error for an unknown one lists them
-_KEYS = {"format": "format", "name": "name", "size": "size", "frame": "[frame]", "step": "[[step]]"}
+_KEYS = {
+    "format": "format",
+    "name": "name",
+    "size": "size",
+    "frame": "[frame]",
+    "region": "[region.NAME]",
+    "step": "[[step]]",
+}
+# the region kinds a `[region.NAME]` table may have, by its `kind`
+_KINDS: dict[str, type[Grid | Shards | Pick]] = {"grid": Grid, "shards": Shards, "pick": Pick}
 
 
 def _located[E: BullterrierImageError](error: E, where: str) -> E:
@@ -159,18 +192,75 @@ def load_recipe(path: str | Path) -> Recipe:
     entries = raw.get("step", [])
     if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
         raise RecipeError(f"{path.name}: write each step as a [[step]] table (two brackets: there may be several)")
+    tables = raw.get("region", {})
+    if raw.get("format", _FORMATS[0]) == 1 and (tables or any(key in entry for entry in entries for key in _NEW_IN_2)):
+        raise RecipeError(
+            f"{path.name}: regions, `each`, `looks` and `partition` need `format = 2` at the top of the file"
+        )
+    regions = _regions(tables, path.name)
     steps = []
     for i, entry in enumerate(entries, start=1):
         where = f"{path.name}: step {i}"
-        entry = dict(entry)
-        keys = {key: entry.pop(key) for key in registry.STEP_KEYS if key in entry}  # the rest are the parameters
-        if "effect" not in keys:
-            raise RecipeError(f"{where}: missing `effect`")
         try:
-            steps.append(Step(**keys, params=with_pictures(keys["effect"], entry, path.parent)))
+            steps.append(_step(entry, where, path.parent))
         except (RecipeError, ImageReadError) as error:
             raise _located(error, where) from None
     try:
-        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame)
+        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame, regions)
     except RecipeError as error:
         raise _located(error, path.name) from None
+
+
+def _regions(tables: object, file: str) -> dict[str, Grid | Shards | Pick]:
+    """The regions of the `[region.NAME]` tables, each made by its `kind`; RecipeError naming the file and region."""
+    if not isinstance(tables, dict) or not all(isinstance(table, dict) for table in tables.values()):
+        raise RecipeError(f"{file}: write each region as a [region.NAME] table (one table for each name)")
+    regions: dict[str, Grid | Shards | Pick] = {}
+    for name, table in tables.items():
+        fields = dict(table)
+        kind = fields.pop("kind", None)
+        if not isinstance(kind, str) or kind not in _KINDS:
+            raise RecipeError(
+                f"{file}: region {name!r}: `kind` is {kind!r}; write one of: {', '.join(_KINDS)}"
+                if "kind" in table
+                else f"{file}: region {name!r}: missing `kind`; write one of: {', '.join(_KINDS)}"
+            )
+        try:
+            regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
+        except RecipeError as error:
+            raise _located(error, file) from None
+    return regions
+
+
+def _step(entry: dict, where: str, folder: Path) -> Step | Each:
+    """The step a `[[step]]` table (or, in `looks`, an inline table) describes: an `Each` when it has `each` or
+    `looks`, otherwise an effect step. RecipeError and ImageReadError as the models and pictures raise them."""
+    if "each" not in entry and "looks" not in entry:
+        return _effect_step(entry, where, folder)
+    values = dict(entry)
+    looks = values.pop("looks", None)
+    if "each" not in values:
+        raise RecipeError("`looks` needs `each`, the name of the partition whose pieces get them")
+    if not isinstance(looks, list):
+        raise RecipeError('an `each` step needs `looks`, a list of tables (one effect each) or "none"')
+    made = []
+    for number, look in enumerate(looks, start=1):
+        if look == "none":
+            made.append(look)
+        elif isinstance(look, dict):
+            try:
+                made.append(_effect_step(look, f"look {number}", folder))
+            except (RecipeError, ImageReadError) as error:
+                raise _located(error, f"look {number}") from None
+        else:
+            raise RecipeError(f'look {number} is {look!r}: write a table with an `effect`, or "none"')
+    return Each(looks=made, **values)
+
+
+def _effect_step(entry: dict, where: str, folder: Path) -> Step:
+    """The `Step` of a table: its step keys, and the rest as the parameters of its effect."""
+    entry = dict(entry)
+    keys = {key: entry.pop(key) for key in registry.STEP_KEYS if key in entry}  # the rest are the parameters
+    if "effect" not in keys:
+        raise RecipeError("missing `effect`")
+    return Step(**keys, params=with_pictures(keys["effect"], entry, folder))
