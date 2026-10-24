@@ -8,4 +8,4 @@ mode = "zoom"
 amount = 0.25
 x = 0.5
 y = 0.4
-samples = 48
+samples = 16
