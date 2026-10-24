@@ -7,7 +7,7 @@ effect = "black_and_white"
 
 [[step]]
 effect = "blend"
-texture = "../assets/night-sky.jpg"
+image = "../assets/night-sky.jpg"
 mode = "multiply"
 mask = "subject"
 opacity = 0.75

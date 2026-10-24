@@ -106,7 +106,7 @@ def write_texture(folder, value) -> None:
 
 def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_else(folder, layer_probe):
     write_texture(folder, 0.25)
-    write_recipe(folder, "layered", 'effect = "layer_probe"\ntexture = "../assets/tex.png"')
+    write_recipe(folder, "layered", 'effect = "layer_probe"\nimage = "../assets/tex.png"')
     project = load_project(folder / "bt-image.toml")
     run(project)
     mark_outputs(folder)
@@ -122,8 +122,8 @@ def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_e
 
 
 def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe):
-    def project_with(texture: Picture) -> Project:
-        recipe = Recipe("layered", [fx.layer_probe(texture)], size=64)
+    def project_with(image: Picture) -> Project:
+        recipe = Recipe("layered", [fx.layer_probe(image)], size=64)
         return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out")
 
     dark = Picture(np.full((4, 4, 3), 0.25, np.float32), "tex")

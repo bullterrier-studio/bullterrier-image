@@ -160,25 +160,25 @@ def _logo(folder, name="logo.png"):
     return folder / name
 
 
-def _layer(folder, texture, name="look.toml"):
-    """A recipe file in `folder` whose second step gives the picture parameter `texture` (TOML text)."""
+def _layer(folder, image, name="look.toml"):
+    """A recipe file in `folder` whose second step gives the picture parameter `image` (TOML text)."""
     folder.mkdir(exist_ok=True)
-    return _write(folder, f"{STEP}\n[[step]]\neffect = 'layer_probe'\ntexture = {texture}\n", name)
+    return _write(folder, f"{STEP}\n[[step]]\neffect = 'layer_probe'\nimage = {image}\n", name)
 
 
 def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(layer_probe, tmp_path, monkeypatch):
     _logo(tmp_path / "assets")
     recipe = load_recipe(_layer(tmp_path / "recipes", "'../assets/logo.png'"))
     monkeypatch.chdir(tmp_path)  # the folder the process runs in does not matter
-    texture = recipe.steps[1].params["texture"]
-    assert (texture.width, texture.height, texture.label) == (2, 1, "../assets/logo.png")
-    np.testing.assert_allclose(texture.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
+    image = recipe.steps[1].params["image"]
+    assert (image.width, image.height, image.label) == (2, 1, "../assets/logo.png")
+    np.testing.assert_allclose(image.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
 
 
 def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     logo = _logo(tmp_path / "elsewhere")
     recipe = load_recipe(_layer(tmp_path / "recipes", f"'{logo}'"))
-    assert recipe.steps[1].params["texture"].width == 2
+    assert recipe.steps[1].params["image"].width == 2
 
 
 @pytest.mark.parametrize(
@@ -208,5 +208,5 @@ def test_a_picture_that_cannot_be_used_fails_at_load_naming_file_step_parameter_
     layer_probe, tmp_path, written, make, kind
 ):
     make(tmp_path)
-    with pytest.raises(kind, match=r"^look\.toml: step 2: .*`texture`.*" + re.escape(written.strip("'"))):
+    with pytest.raises(kind, match=r"^look\.toml: step 2: .*`image`.*" + re.escape(written.strip("'"))):
         load_recipe(_layer(tmp_path, written))

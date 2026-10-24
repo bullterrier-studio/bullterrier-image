@@ -33,12 +33,13 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     preset = "sepia"               # optional: one of the effect's presets (`bt-image effects NAME` lists them); the
     opacity = 0.6                  # step's own keys win over the preset's
 
-A parameter that is a picture (a texture, a logo; the effect's documentation says which) is written as a path, relative
-to the recipe file's folder, or as a colour (a string starting with `#`, or three numbers):
+A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
+it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
+three numbers):
 
     [[step]]
     effect = "blend"
-    texture = "../assets/grain.png"
+    image = "../assets/grain.png"
 
 The picture is read once, when the recipe is loaded; a file that is missing or not a picture fails there, naming the
 file, the step, the parameter and the path.

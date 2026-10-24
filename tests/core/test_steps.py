@@ -203,16 +203,16 @@ def test_a_preset_for_an_unknown_effect_lists_the_effects():
 def test_steps_holding_pictures_compare_by_pixels_and_describe_without_them(layer_probe):
     rng = np.random.default_rng(5)
     pixels = rng.random((240, 320, 3), dtype=np.float32)
-    first = Step("layer_probe", {"texture": Picture(pixels, "tex.png")})
-    assert first == Step("layer_probe", {"texture": Picture(pixels.copy(), "other.png")})
-    assert first != Step("layer_probe", {"texture": Picture(pixels[::-1].copy(), "tex.png")})
-    assert first != Step("layer_probe", {"texture": "#808080"})
-    assert first.describe().startswith("layer_probe(texture=Picture('tex")
+    first = Step("layer_probe", {"image": Picture(pixels, "tex.png")})
+    assert first == Step("layer_probe", {"image": Picture(pixels.copy(), "other.png")})
+    assert first != Step("layer_probe", {"image": Picture(pixels[::-1].copy(), "tex.png")})
+    assert first != Step("layer_probe", {"image": "#808080"})
+    assert first.describe().startswith("layer_probe(image=Picture('tex")
     assert len(first.describe()) <= 56
 
 
 def test_an_effect_receives_the_picture_a_step_holds(layer_probe):
     picture = Picture(np.full((3, 3, 3), 0.25, np.float32))
-    out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), texture=picture)
+    out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), image=picture)
     np.testing.assert_allclose(out, 0.25)
-    assert Step("layer_probe", {"texture": picture}, mask="subject").params["texture"] is picture
+    assert Step("layer_probe", {"image": picture}, mask="subject").params["image"] is picture

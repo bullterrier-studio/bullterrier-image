@@ -105,17 +105,17 @@ def register_probe():
 class LayerParams(EffectParams):
     """The one parameter of the layer probe: a picture."""
 
-    texture: Picture = param("#808080", doc="The picture whose average colour fills the photo.")
+    image: Picture = param("#808080", doc="The picture whose average colour fills the photo.")
 
 
 @pytest.fixture
 def layer_probe(throwaway_effects):
     """Registers `layer_probe`, an effect with a Picture parameter: it returns the photo's shape filled with the
-    average colour of the texture's RGB (alpha ignored), so its output tells which picture it received."""
+    average colour of the image's RGB (alpha ignored), so its output tells which picture it received."""
 
     def layer_probe(rgb: np.ndarray, params: LayerParams) -> np.ndarray:
         """Fills the photo with the average colour of a picture."""
-        mean = params.texture.pixels[..., :3].mean(axis=(0, 1))
+        mean = params.image.pixels[..., :3].mean(axis=(0, 1))
         return np.broadcast_to(mean, rgb.shape).astype(np.float32)
 
     return effect(category="compositing", params=LayerParams)(layer_probe)

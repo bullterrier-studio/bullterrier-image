@@ -8,16 +8,17 @@ from bullterrier_image.ops.place import Anchor, Resample, place
 
 
 class OverlayParams(EffectParams):
-    """The logo, its size and where it sits."""
+    """The image, its size and where it sits."""
 
-    logo: Picture = param(
+    image: Picture = param(
         "#ffffff",
-        doc="The picture put on the photo: a path in a recipe file (relative to the file; a PNG with transparency "
-        "keeps its cut-out shape), a colour such as '#ffffff' (a flat square) or, in Python, a Picture or an array.",
+        doc="The picture put on the photo (a logo, a sticker): a path in a recipe file (relative to the file; a PNG "
+        "with transparency keeps its cut-out shape), a colour such as '#ffffff' (a flat square) or, in Python, a "
+        "Picture or an array.",
     )
     at: Anchor = param(
         "bottom_right",
-        doc="Where the logo sits: 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', "
+        doc="Where the image sits: 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', "
         "'bottom' or 'bottom_right'.",
     )
     scale: float = param(
@@ -25,21 +26,21 @@ class OverlayParams(EffectParams):
         unit="fraction",
         min=0.01,
         max=1,
-        doc="The logo's width as a share of the photo's width, 0.01 to 1; its height follows its aspect. Raising it "
-        "makes the logo larger.",
+        doc="The image's width as a share of the photo's width, 0.01 to 1; its height follows its aspect. Raising it "
+        "makes the image larger.",
     )
     margin: float = param(
         0.03,
         unit="fraction",
         min=0,
         max=0.45,
-        doc="Space between the logo and the photo's edge, as a share of the photo's shorter side, 0 to 0.45. "
-        "Raising it moves a logo at an edge or corner inward.",
+        doc="Space between the image and the photo's edge, as a share of the photo's shorter side, 0 to 0.45. "
+        "Raising it moves an image at an edge or corner inward.",
     )
     resample: Resample = param(
         "lanczos",
         advanced=True,
-        doc="The filter that sizes the logo: 'nearest' keeps hard pixels, 'bilinear' is soft, 'bicubic' is sharper, "
+        doc="The filter that sizes the image: 'nearest' keeps hard pixels, 'bilinear' is soft, 'bicubic' is sharper, "
         "'lanczos' is sharpest and the best for shrinking.",
     )
 
@@ -48,7 +49,7 @@ class OverlayParams(EffectParams):
 def overlay(rgb: np.ndarray, params: OverlayParams) -> np.ndarray:
     """Put a logo on the photo at one of nine anchors, sized as a share of the photo's width, with its alpha."""
     layer = place(
-        params.logo.pixels,
+        params.image.pixels,
         rgb.shape[:2],
         fit="width",
         at=params.at,

@@ -293,7 +293,7 @@ def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
 class SceneParams(EffectParams):
     """A picture field, for the stub."""
 
-    texture: Picture = param("#808080", doc="A texture.")
+    image: Picture = param("#808080", doc="A picture.")
 
 
 def test_the_editor_stub_names_a_picture_field_by_its_forms_and_every_name_it_uses_resolves(throwaway_effects):
@@ -463,23 +463,23 @@ def test_fx_turns_a_path_or_an_array_into_a_picture_and_leaves_a_picture_or_a_co
     pixels = np.random.default_rng(2).random((5, 7, 4), dtype=np.float32)
     imageio.save(pixels, tmp_path / "tex.png")
     monkeypatch.chdir(tmp_path)  # a path is relative to the folder the program runs in
-    from_path, from_pathlib = fx.layer_probe("tex.png"), fx.layer_probe(texture=Path("tex.png"))
+    from_path, from_pathlib = fx.layer_probe("tex.png"), fx.layer_probe(image=Path("tex.png"))
     from_array, picture = fx.layer_probe(pixels), Picture(pixels)
-    assert from_path.params["texture"].label == "tex.png"
-    assert from_array.params["texture"] == picture == fx.layer_probe(picture).params["texture"]
-    assert from_path.params["texture"] == from_pathlib.params["texture"]
-    np.testing.assert_allclose(from_path.params["texture"].pixels, pixels, atol=1 / 255)
-    assert fx.layer_probe("#102030").params["texture"] == "#102030"  # a colour stays as written
+    assert from_path.params["image"].label == "tex.png"
+    assert from_array.params["image"] == picture == fx.layer_probe(picture).params["image"]
+    assert from_path.params["image"] == from_pathlib.params["image"]
+    np.testing.assert_allclose(from_path.params["image"].pixels, pixels, atol=1 / 255)
+    assert fx.layer_probe("#102030").params["image"] == "#102030"  # a colour stays as written
 
 
 @pytest.mark.parametrize(
-    ("texture", "kind", "complaint"),
+    ("image", "kind", "complaint"),
     [
-        pytest.param("missing.png", ImageReadError, r"layer_probe.*`texture`.*missing\.png", id="missing file"),
+        pytest.param("missing.png", ImageReadError, r"layer_probe.*`image`.*missing\.png", id="missing file"),
         pytest.param(np.zeros((4, 4, 3), np.uint8), RecipeError, r"picture.*uint8", id="integer array"),
         pytest.param(np.full((4, 4, 3), 2.0, np.float32), RecipeError, r"picture.*0\.\.1", id="values above one"),
     ],
 )
-def test_fx_refuses_a_picture_it_cannot_use_naming_the_problem(layer_probe, texture, kind, complaint):
+def test_fx_refuses_a_picture_it_cannot_use_naming_the_problem(layer_probe, image, kind, complaint):
     with pytest.raises(kind, match=complaint):
-        fx.layer_probe(texture)
+        fx.layer_probe(image)

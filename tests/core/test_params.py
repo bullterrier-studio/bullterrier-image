@@ -126,7 +126,7 @@ def test_a_malformed_colour_is_rejected_naming_the_field(written):
 class Textured(EffectParams):
     """A model with a picture field."""
 
-    texture: Picture = param("#808080", doc="A texture laid over the photo.")
+    image: Picture = param("#808080", doc="A picture laid over the photo.")
 
 
 def noise_picture(shape=(4, 6, 4), seed=0, label="noise.png") -> Picture:
@@ -134,9 +134,9 @@ def noise_picture(shape=(4, 6, 4), seed=0, label="noise.png") -> Picture:
 
 
 def test_a_picture_field_has_a_colour_default_that_is_a_flat_opaque_picture():
-    texture = Textured().texture
-    assert (texture.width, texture.height) == (1, 1)
-    np.testing.assert_allclose(texture.pixels[0, 0], [128 / 255, 128 / 255, 128 / 255, 1.0], atol=1e-7)
+    image = Textured().image
+    assert (image.width, image.height) == (1, 1)
+    np.testing.assert_allclose(image.pixels[0, 0], [128 / 255, 128 / 255, 128 / 255, 1.0], atol=1e-7)
 
 
 @pytest.mark.parametrize(
@@ -144,13 +144,13 @@ def test_a_picture_field_has_a_colour_default_that_is_a_flat_opaque_picture():
     [("#ff8000", (1.0, 128 / 255, 0.0)), ("#f80", (1.0, 136 / 255, 0.0)), ((0.25, 0.5, 1.0), (0.25, 0.5, 1.0))],
 )
 def test_a_colour_is_a_flat_picture(written, rgb):
-    np.testing.assert_allclose(Textured(texture=written).texture.pixels[0, 0], [*rgb, 1.0], atol=1e-7)
+    np.testing.assert_allclose(Textured(image=written).image.pixels[0, 0], [*rgb, 1.0], atol=1e-7)
 
 
 def test_a_picture_is_kept_as_it_is_not_copied_when_validated_again():
     picture = noise_picture()
-    assert Textured(texture=picture).texture is picture
-    assert Textured(texture=Textured(texture=picture).texture).texture is picture
+    assert Textured(image=picture).image is picture
+    assert Textured(image=Textured(image=picture).image).image is picture
 
 
 @pytest.mark.parametrize(
@@ -159,8 +159,8 @@ def test_a_picture_is_kept_as_it_is_not_copied_when_validated_again():
     ids=["a path", "bad hex", "two numbers", "a number", "none", "an array", "nested lists"],
 )
 def test_anything_but_a_picture_or_a_colour_is_rejected_naming_the_field_and_never_printing_pixels(written):
-    with pytest.raises(RecipeError, match="`texture`") as raised:
-        Textured.parse({"texture": written})
+    with pytest.raises(RecipeError, match="`image`") as raised:
+        Textured.parse({"image": written})
     assert len(str(raised.value)) < 300
 
 
@@ -225,7 +225,7 @@ def test_a_pictures_repr_names_the_label_and_the_size_never_the_pixels():
 
 
 def test_the_json_schema_of_a_picture_is_a_path_or_a_colour():
-    schema = Textured.model_json_schema()["properties"]["texture"]
+    schema = Textured.model_json_schema()["properties"]["image"]
     assert {option["type"] for option in schema["anyOf"]} == {"string", "array"}
     assert schema["default"] == "#808080"
 

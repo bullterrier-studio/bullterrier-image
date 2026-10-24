@@ -33,7 +33,7 @@ mv out/bullterrier__avatar.png examples/output/bullterrier/avatar.png
 
 ## Assets
 
-Recipes name a second picture by a path relative to the recipe file (`texture = "../assets/grain-texture.png"`).
+Recipes name a second picture by a path relative to the recipe file (`image = "../assets/grain-texture.png"`).
 The assets here were made with the library, so none carries a licence; run these from the repository root to make them again:
 
 ```bash

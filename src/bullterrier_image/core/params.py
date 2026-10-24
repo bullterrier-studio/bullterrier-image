@@ -20,8 +20,9 @@ Promises:
   specific `RecipeError` raised by a validator (an `UnknownEffectError`) keeps its class when it is the only problem.
 - `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
   command line, in a caller's types (a `Color` is shown as the forms one may write).
-- A `Picture` field (a second picture an effect uses: a texture, a logo) holds a `Picture`, read-only RGBA pixels with a
-  content digest; it is given a `Picture` or a colour (a flat picture), and must have a default such as `"#808080"`.
+- A `Picture` field (a second picture an effect uses: a texture, a logo; named `image` when an effect has one) holds a
+  `Picture`, read-only RGBA pixels with a content digest; it is given a `Picture` or a colour (a flat picture), and
+  must have a default such as `"#808080"`.
   Recipe files and `fx` turn a path or an array into a `Picture` before validation (see `loader`).
 - `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.

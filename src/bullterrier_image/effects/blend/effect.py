@@ -13,10 +13,11 @@ from bullterrier_image.ops.place import Anchor, Resample, place
 class BlendParams(EffectParams):
     """The picture, how it is fitted to the photo, and the blend mode."""
 
-    texture: Picture = param(
+    image: Picture = param(
         "#808080",
-        doc="The picture laid over the photo: a path in a recipe file (relative to the file), a colour such as "
-        "'#808080' (a flat picture) or, in Python, a Picture or an array. Its own transparency is respected.",
+        doc="The picture laid over the photo (a texture, a light leak): a path in a recipe file (relative to the "
+        "file), a colour such as '#808080' (a flat picture) or, in Python, a Picture or an array. Its own "
+        "transparency is respected.",
     )
     mode: BlendMode = param(
         "multiply",
@@ -66,7 +67,7 @@ class BlendParams(EffectParams):
 def blend(rgb: np.ndarray, params: BlendParams) -> np.ndarray:
     """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch or tile."""
     layer = place(
-        params.texture.pixels,
+        params.image.pixels,
         rgb.shape[:2],
         fit=params.fit,
         at=params.at,

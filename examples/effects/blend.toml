@@ -4,5 +4,5 @@ size = 480
 
 [[step]]
 effect = "blend"
-texture = "../assets/grain-texture.png"
+image = "../assets/grain-texture.png"
 mode = "soft_light"

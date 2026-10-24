@@ -15,7 +15,7 @@
         colour = np.asarray(params.colour, np.float32)
         return (rgb * (1 - params.amount) + colour * params.amount).astype(np.float32)
 
-A parameter that is a second picture (a texture, a logo) is declared `texture: Picture = param("#808080", doc="...")`:
+A parameter that is a second picture (a texture, a logo) is declared `image: Picture = param("#808080", doc="...")`:
 it holds a `Picture` (read-only RGBA float32 `pixels`, straight alpha, at its own size) and its default is a colour,
 which gives a flat 1x1 picture. A recipe file writes a path, `fx` takes a path, an array, a `Picture` or a colour.
 
