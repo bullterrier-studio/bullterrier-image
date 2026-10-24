@@ -1328,7 +1328,7 @@ seed : whole number, count, 0 to 4294967295, default 0
     the nearest whole number)."""
     ...
 
-def light_rays(x: float = 0.5, y: float = 0.3, length: float = 0.5, threshold: float = 0.7, amount: float = 2.5, samples: int = 16, decay: float = 0.95, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def light_rays(x: float = 0.5, y: float = 0.3, length: float = 0.5, threshold: float = 0.7, amount: float = 2.5, samples: int = 8, decay: float = 0.9, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by
 `amount`.
 
@@ -1359,12 +1359,12 @@ amount : number, ratio, 0 to 10, default 2.5
     brightness; above 1 they saturate to white sooner. The rays are an average along the
     pixel's line to the light, so a highlight far from the pixel gives them much less
     than the highlight itself: a few times 1 is usual.
-samples : whole number, count, 1 to 256, default 16
+samples : whole number, count, 1 to 256, default 8
     How many readings of the picture along each ray are added up, spread evenly over its
     length: more is smoother and slower (the time grows with it); few show as separate
     ghost copies of a highlight. With 1 the highlights only brighten themselves.
     Animated, it moves in whole steps (rounded to the nearest whole number).
-decay : number, ratio, 0 to 1, default 0.95
+decay : number, ratio, 0 to 1, default 0.9
     How much less each reading counts than the one nearer the pixel (the weights are
     decay^0, decay^1... scaled to add up to 1): 1 = all alike, rays of even brightness
     to their tips; lower values make them fade away from the highlight; 0 = no rays at

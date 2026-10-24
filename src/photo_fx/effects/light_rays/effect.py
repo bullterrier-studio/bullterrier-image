@@ -58,7 +58,7 @@ class LightRaysParams(EffectParams):
         "far from the pixel gives them much less than the highlight itself: a few times 1 is usual.",
     )
     samples: int = param(
-        16,
+        8,
         unit="count",
         min=1,
         max=256,
@@ -67,7 +67,7 @@ class LightRaysParams(EffectParams):
         "highlights only brighten themselves.",
     )
     decay: float = param(
-        0.95,
+        0.9,
         unit="ratio",
         min=0,
         max=1,
