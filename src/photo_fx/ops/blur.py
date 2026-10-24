@@ -69,8 +69,8 @@ def _convolve_axis(
     length = array.shape[axis]
     widths = [(0, 0)] * array.ndim
     widths[axis] = (radius, radius)
-    if edge == "constant" and constant_value is not None:
-        padded = np.pad(array, widths, mode="constant", constant_values=constant_value)
+    if edge == "constant" and constant_value is not None:  # numpy takes a value for that rule only
+        padded = np.pad(array, widths, mode=NUMPY_PAD[edge], constant_values=constant_value)
     else:
         padded = np.pad(array, widths, mode=NUMPY_PAD[edge])
     size = fft.next_fast_len(length + 2 * radius, real=True)
