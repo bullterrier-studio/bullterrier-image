@@ -4,7 +4,7 @@ import sees. Each layer may import only the layers below it:
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte, loader (recipe files)
     effects    one folder per effect; never import each other
-    core       runner > steps > framing | registry | regions > presets > params | vocabulary > types; may import ops
+    core       runner > steps > framing | registry | regions > presets | outlines > params | vocabulary > types
     ops        may import errors
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
 
@@ -31,7 +31,7 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
-CORE_ORDER = "Core: runner > steps > framing|registry|regions > presets > params|vocabulary > types"
+CORE_ORDER = "Core: runner > steps > framing|registry|regions > presets|outlines > params|vocabulary > types"
 CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
 
 

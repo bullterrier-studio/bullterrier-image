@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A stylised landscape made of closed shapes (the fill colours are not used, only the outlines): a sun, a ring with a
+     hole, a leaf with two veins in rotated and scaled groups, a hill, a pebble, a star, a tile, and a wave. Absolute
+     and relative commands, lines, Beziers, arcs, a non-square viewBox. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200">
+  <defs>
+    <path id="drop" d="M0 -9 C6 -2 8 3 0 9 C-8 3 -6 -2 0 -9 Z"/>
+  </defs>
+  <path id="hill" fill="#7a9" d="M0 200 V158 C55 128 120 178 180 150 S270 138 300 152 V200 Z"/>
+  <g id="sky" transform="translate(-10 5)">
+    <circle id="sun" cx="255" cy="48" r="28" fill="#fc3"/>
+  </g>
+  <path id="ring" fill="#369" fill-rule="evenodd"
+        d="M30 105 a32 32 0 1 0 64 0 a32 32 0 1 0 -64 0 Z M46 105 a16 16 0 1 1 32 0 a16 16 0 1 1 -32 0 Z"/>
+  <g transform="translate(160 98) rotate(-14)">
+    <g transform="scale(0.8)">
+      <path id="leaf" fill="#4a4" d="M0 -82 C62 -62 100 -10 0 84 C-100 -10 -62 -62 0 -82 Z"/>
+      <path id="vein-left" fill="#272" d="m-6 -52 c-22 14 -34 34 -34 56 c20 -8 32 -28 34 -56 z"/>
+      <path id="vein-right" fill="#272" d="m6 -52 c22 14 34 34 34 56 c-20 -8 -32 -28 -34 -56 z"/>
+    </g>
+  </g>
+  <rect id="tile" fill="#c63" x="222" y="104" width="58" height="38" rx="9" transform="rotate(8 251 123)"/>
+  <polygon id="star" fill="#fd5" points="60,150 70,176 46,160 74,160 50,176"/>
+  <ellipse id="pebble" fill="#889" cx="108" cy="176" rx="20" ry="9"/>
+  <path id="wave" fill="#58c" d="M214 24 q12 -14 24 0 t24 0 t24 0 v12 q-12 14 -24 0 t-24 0 t-24 0 z"/>
+  <use id="drop-copy" href="#drop" x="40" y="40" fill="#8cf"/>
+</svg>
