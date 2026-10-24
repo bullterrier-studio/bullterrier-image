@@ -1,0 +1,8 @@
+# A cheap wide-angle barrel: straight lines bow outward and the dog's face fills the frame.
+name = "lens_distortion"
+size = 480
+
+[[step]]
+effect = "lens_distortion"
+distortion = 0.5
+fit = "frame"
