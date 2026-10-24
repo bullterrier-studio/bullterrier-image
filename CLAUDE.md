@@ -195,6 +195,7 @@ How a test file is written (`src/bullterrier_image/effects/_template/test_effect
 - **No change-detectors:** test a rule with a known-bad input, never restate configuration (a category, a list of names, a pinned limit). Cross-effect rules live only in `tests/effects/test_contract.py`.
 - **Slow tests in groups:** a module whose module-scoped fixture spawns tools (ruff, mypy, poe, git) carries `pytestmark = pytest.mark.xdist_group("<module>")`, so with `--dist=loadgroup` one worker builds it once.
 - **Running:** one file or folder in one process with `uv run pytest tests/ops/test_blur.py -n 0` (add `-p no:randomly` for a fixed order); the whole suite with `uv run poe test`.
+- **Fast feedback while building (agents):** the suite has about 14,000 tests and takes minutes. While doing red-green TDD or iterating, run only the tests that cover what you are changing (the mirror test file or folder, or `-k <name>`), never the full suite. Run the full gate (`uv run poe check`, then `uv run lint-imports`) once, when the feature work is finished and before you report; if it fails, fix and rerun only the failing tests until they pass, then run the full gate once more.
 
 ## Skills
 
