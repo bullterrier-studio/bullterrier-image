@@ -137,9 +137,9 @@ def smoke(rgb: np.ndarray, params: SmokeParams) -> np.ndarray:
         "persistence": params.persistence,
         "lacunarity": params.lacunarity,
     }
-    # constant: seeds are below 2**32, so seed + n x 2**32 gives each of the three fields its own stream per seed
+    # constant: one stream per field, numbered from 0 (the seed itself)
     field, sway_down, sway_across = (
-        fractal((height, width), seed=params.seed + stream * 2**32, **noise) for stream in range(3)
+        fractal((height, width), seed=[params.seed, stream], **noise) for stream in range(3)
     )
     rows = (height - 1) * (1 - 1 / params.rise) + np.arange(height)[:, None] / params.rise
     cols = np.arange(width)[None, :]

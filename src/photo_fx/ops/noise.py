@@ -1,6 +1,7 @@
 """Seeded noise fields: fractal value noise, and the normalisation noise fields share."""
 
 import math
+from collections.abc import Sequence
 from typing import Literal
 
 import numpy as np
@@ -26,11 +27,12 @@ def fractal(
     octaves: int,
     persistence: float,
     lacunarity: float,
-    seed: int,
+    seed: int | Sequence[int],
 ) -> np.ndarray:
     """Seeded fractal value noise of `shape` (height, width): float32, zero mean and unit standard deviation.
 
-    The field is a pure function of its arguments (same arguments, same array, on any machine). Each octave i is a
+    The field is a pure function of its arguments (same arguments, same array, on any machine); `seed` is an int, or
+    a list of ints such as [seed, n] for the n-th independent field of one seed. Each octave i is a
     lattice of independent standard-normal values spaced `scale / lacunarity**i` px apart, interpolated up to the
     picture by an interpolating bicubic spline (so the field passes through its lattice values and is smooth between
     them); the octaves are summed with weights `persistence**i`, so octave 0 is the coarsest and, with persistence 0,

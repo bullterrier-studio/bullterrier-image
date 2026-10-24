@@ -33,6 +33,12 @@ def test_the_field_is_a_pure_function_of_shape_settings_and_seed() -> None:
     assert np.abs(fractal((64, 64), **SETTINGS) - other).mean() > 0.1
 
 
+def test_a_list_of_ints_is_a_seed_and_each_list_of_one_seed_is_its_own_field() -> None:
+    first, second = (fractal((64, 64), **{**SETTINGS, "seed": [4, n]}) for n in (0, 1))
+    np.testing.assert_array_equal(first, fractal((64, 64), **{**SETTINGS, "seed": [4, 0]}))
+    assert np.abs(first - second).mean() > 0.1
+
+
 @pytest.mark.parametrize(
     ("scale", "smoother_than"),
     [(4.0, 0.8), (16.0, 0.97), (64.0, 0.995)],

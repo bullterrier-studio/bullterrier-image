@@ -28,11 +28,11 @@ def reference_coverage(
     fractions of the width and height, lines = round(density x pixels). A line stamps a soft disc of diameter
     `thickness` at its start and at each of the next `length` - 1 points, `step` px apart along the flow: the
     direction at a point is radians(twist) x the fractal noise (`flow`: scale, octaves, persistence, lacunarity,
-    seed `seed`) at the pixel containing it. A line ends at the first point outside the picture, which is not
+    seed [`seed`, 1]) at the pixel containing it. A line ends at the first point outside the picture, which is not
     stamped. A disc covers a pixel by clip(radius - distance from the pixel centre to the point + 1/2, 0, 1) and a
     pixel takes the strongest disc over it."""
     height, width = shape
-    heading = np.radians(drawing["twist"]) * fractal(shape, seed=seed, **flow)
+    heading = np.radians(drawing["twist"]) * fractal(shape, seed=[seed, 1], **flow)
     starts = np.random.default_rng(seed).random((round(density * height * width), 2)) * (width, height)
     rows, cols = np.mgrid[0:height, 0:width] + 0.5
     out = np.zeros(shape)

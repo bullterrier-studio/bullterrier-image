@@ -137,8 +137,8 @@ def aurora(rgb: np.ndarray, params: AuroraParams) -> np.ndarray:
     }
     # constant: a one-row field, so the noise runs along the picture only
     ripple = fractal((1, width), scale=params.scale, seed=params.seed, **noise)[0]
-    # constant: a one-row field; seeds are below 2**32, so seed + 2**32 gives the rays their own stream per seed
-    rank = ndtr(fractal((1, width), scale=params.ray_width, seed=params.seed + 2**32, **noise))[0]
+    # constant: stream 1 of the seed, independent of the ripple's stream 0 (the seed itself)
+    rank = ndtr(fractal((1, width), scale=params.ray_width, seed=[params.seed, 1], **noise))[0]
     above = (params.base * rows + params.waviness * ripple)[None, :] - np.arange(rows)[:, None]  # px above the base
     up = above / (params.height * rows)  # 0 at the base, 1 at the curtain's top
     brightness = np.clip(above + 0.5, 0.0, 1.0) * np.clip(1 - up, 0.0, 1.0) ** params.falloff

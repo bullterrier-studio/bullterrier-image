@@ -86,8 +86,8 @@ class FlowLinesParams(EffectParams):
         unit="count",
         min=0,
         max=2**31 - 1,
-        doc="Seeds the flow and the line starts: the same seed gives the same picture. The starts are "
-        "numpy.random.default_rng(seed).random((lines, 2)), columns x and y as fractions of the width and the height.",
+        doc="Seeds the flow and the line starts: the same seed gives the same picture. The starts and the flow "
+        "are independent random streams of it.",
     )
     line: Color = param("#ffd84a", doc="The colour of the lines.")
     background: Color = param("#12002b", doc="The colour behind the lines.")
@@ -108,13 +108,14 @@ def flow_lines(rgb: np.ndarray, params: FlowLinesParams) -> np.ndarray:
     lines = round(params.density * height * width)
     extent = np.array([width, height])  # x then y
     where = rng.random((lines, len(extent))) * extent  # px
+    # constant: stream 1 of the seed, independent of the starts' stream 0 (the seed itself)
     heading = np.radians(params.twist) * fractal(
         (height, width),
         scale=params.scale,
         octaves=params.octaves,
         persistence=params.persistence,
         lacunarity=params.lacunarity,
-        seed=params.seed,
+        seed=[params.seed, 1],
     )
     # follow all the lines together; `running` marks those that have not left the picture
     trail = np.empty((params.length, *where.shape))
