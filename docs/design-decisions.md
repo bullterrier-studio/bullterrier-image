@@ -93,7 +93,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   contract's "a constant picture stays constant under every interpolation" does not hold for them. *Reason:* the contract
   rule is about warping the photo; a second name keeps it simple instead of an exemption list. *Consequence:* a field
   named `interpolation` promises that rule; use `resampling` when the effect does not.
-- **The picture an effect takes is called `image`** (decided, not built yet). `blend` and `overlay` both take a
+- **The picture an effect takes is called `image`.** `blend` and `overlay` both take a
   `Picture` and place it with the same `at`, `scale` and `margin`; their pictures were `texture` and `logo`. *Reason:*
   the same kind of parameter has the same name, so a developer who has used one picture effect knows the next.
   *Consequence:* a later effect with one picture names it `image`; one with several names each for its role.
@@ -123,7 +123,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   a recipe, not a preset.
 - **Every step can be limited and blended: `mask`, `opacity` and `blend_mode` belong to the step, not to the effect.**
   `mask` (`subject` or `background`), `opacity` (0 to 1) and `blend_mode` (normal, multiply, screen, overlay,
-  soft_light, difference, color; decided, not built yet) are applied by the runner after any effect, so a gradient can
+  soft_light, difference, color) are applied by the runner after any effect, so a gradient can
   sit behind the subject, be screened over the photo, or an effect can be mixed in at 40%, with no effect knowing about
   it: every step is a layer over the picture below it, as a filtered copy of a layer is in an image editor. *Reason:*
   one place for the general blend. Eleven effects (`drop_shadow`, `dust_scratches`, `embers`, `floating_dust`,
@@ -132,14 +132,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   word meant two things depending on whether a look was written in TOML or Python; `crt`'s `mask` could not be set
   from a recipe at all. *Consequence:* no effect parameter is named like a step key (`effect`, `mask`, `opacity`,
   `blend_mode`, `preset`), and registering one fails, as a parameter named like an injected input does; the eleven
-  fields are removed (recipes that used them multiply the old default into the step's `opacity`, and each effect's
-  default is retuned so it stays subtle); a strength that is not a plain mix keeps a name of its own
+  fields are removed; an effect whose natural strength is below full declares the default of its steps' opacity
+  instead (`@effect(..., opacity=0.7)`, read through `registry.opacity`): `Step`, `fx` and a recipe file use it when no
+  opacity is given, an explicit value replaces it, and `fx.pyi`, `help(fx.<effect>)`, `bt-image effects` and the
+  catalogue show it, so every bare default looks as it did and `opacity` still means one thing; a strength that is not
+  a plain mix keeps a name of its own
   (`layered_cutouts`' `layer_opacity`, whose overlapping copies compound); never add an effect parameter that only mixes
   the effect's result with the picture. The blend-mode formulas live in one `ops` module that the runner and the
   `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
   knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a
   `blend_mode`, not an effect.
-- **A step is written with the same keys in Python as in a recipe file** (decided, not built yet). `fx.<effect>(...)`
+- **A step is written with the same keys in Python as in a recipe file.** `fx.<effect>(...)`
   takes `mask`, `opacity`, `blend_mode` and `preset` as keywords beside the effect's own parameters:
   `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`,
   `opacity = 0.8`, `blend_mode = "screen"`. *Reason:* one name per concept across the recipe file, Python and the docs;

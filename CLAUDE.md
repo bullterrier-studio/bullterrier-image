@@ -105,6 +105,8 @@ def glow(rgb: np.ndarray, params: GlowParams, *, matte: np.ndarray | None = None
 ```
 It returns an array of the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum and maximum.
 `matte` (the subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if the effect needs the subject. The contract tests check all of this for every registered effect.
+A step's `mask`, `opacity` and `blend_mode` are applied by the runner, never by the effect: no parameter may be named like a step key (`effect`, `mask`, `opacity`,
+`blend_mode`, `preset`) or an injected input, and registering one fails. An effect whose natural strength is below full declares the default of its steps' opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.
 
 ## Parameters
 
