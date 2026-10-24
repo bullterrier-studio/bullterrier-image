@@ -22,7 +22,7 @@ uv run python examples/python_api.py
 ## Assets
 
 Recipes name a second picture by a path relative to the recipe file (`texture = "../assets/grain-texture.png"`).
-The two assets here were made with the library from the demo photo; run these from the repository root to make them again:
+The assets here were made with the library, so none carries a licence; run these from the repository root to make them again:
 
 ```bash
 # bullterrier-cutout.png: the dog on a transparent background (the alpha channel is kept)
@@ -32,4 +32,9 @@ uv run bt-image cutout examples/photos/bullterrier.jpeg -o examples/assets/bullt
 uv run python -c "import numpy as np; from bullterrier_image import imageio; imageio.save(np.full((512, 512, 3), 0.5, np.float32), 'out/grey.png')"
 uv run bt-image render out/grey.png examples/assets/grain-texture.toml -o out
 mv out/grey__grain-texture.png examples/assets/grain-texture.png
+
+# night-sky.jpg: aurora and stars (assets/night-sky.toml), made from a flat grey picture of the photo's shape
+uv run python -c "import numpy as np; from bullterrier_image import imageio; imageio.save(np.full((768, 614, 3), 0.5, np.float32), 'out/sky.png')"
+uv run bt-image render out/sky.png examples/assets/night-sky.toml -o out --format jpg
+mv out/sky__night-sky.jpg examples/assets/night-sky.jpg
 ```

@@ -1,0 +1,13 @@
+# Makes examples/assets/night-sky.jpg from a flat grey picture of the photo's shape (see examples/README.md): green and
+# violet aurora curtains over a field of stars, the second picture of the double-exposure look.
+name = "night-sky"
+size = 768
+
+[[step]]
+effect = "aurora"
+colors = ["#2bff9a", "#7a2cff"]
+
+[[step]]
+effect = "starfield"
+count = 900
+opacity = 0.6

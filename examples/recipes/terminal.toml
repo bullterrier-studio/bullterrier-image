@@ -1,4 +1,4 @@
-# The photo as a green phosphor terminal: characters, scanlines and glow. Would gain a CRT curve and flicker (batch 6).
+# The photo as a green phosphor terminal: characters on a curved CRT screen with a shadow mask, scanlines and glow.
 name = "terminal"
 size = 768
 
@@ -15,16 +15,10 @@ photo = 0.45
 gamma = 0.6
 
 [[step]]
-effect = "scanlines"
-spacing = 3
-darkness = 0.2
-
-[[step]]
-effect = "bloom"
-radius = 10
-amount = 0.6
-threshold = 0.55
-
-[[step]]
-effect = "vignette"
-amount = 0.5
+effect = "crt"
+curve = 0.12
+shadow_mask = 0.25
+scanlines = 0.25
+bloom = 0.5
+bloom_threshold = 0.55
+vignette = 0.4

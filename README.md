@@ -67,9 +67,9 @@ Every picture here is made from one photo by the recipe linked under it (`exampl
     <td align="center" width="20%"><img src="examples/output/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
   </tr>
   <tr>
-    <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>A neon night street: magenta and violet grade, colour fringes, scanlines, a glow and rain. Would gain a CRT curve (batch 6) and neon edges (batch 8).<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code></sub></td>
-    <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient with a grid behind a duotoned dog, split into colour ghosts. Would gain blend modes for the grid.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
-    <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters, scanlines and glow. Would gain a CRT curve and flicker (batch 6).<br><code>clarity</code> <code>ascii</code> <code>scanlines</code> <code>bloom</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>A neon night street: magenta and violet grade, colour fringes, scanlines, a glow, rain and the curved glass of a tube. Would gain neon edges (batch 8).<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code> <code>crt</code></sub></td>
+    <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient with a grid behind a duotoned dog, split into colour ghosts.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
+    <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters on a curved CRT screen with a shadow mask, scanlines and glow.<br><code>clarity</code> <code>ascii</code> <code>crt</code></sub></td>
     <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (the sepia preset of gradient_map).<br><code>black_and_white</code> <code>clarity</code> <code>levels</code> <code>halftone</code> <code>paper_texture</code> <code>torn_edge</code></sub></td>
     <td valign="top"><a href="examples/recipes/northern-lights.toml"><b>northern-lights</b></a><br><sub>The dog under a night sky: aurora curtains and stars behind, a cold tint on the fur, a rim of aurora light on the edge, a soft glow.<br><code>aurora</code> <code>starfield</code> <code>split_tone</code> <code>rim_light</code> <code>bloom</code> <code>grain</code></sub></td>
   </tr>
@@ -77,11 +77,13 @@ Every picture here is made from one photo by the recipe linked under it (`exampl
     <td align="center" width="20%"><img src="examples/output/bullterrier/sticker.jpg" alt="sticker"></td>
     <td align="center" width="20%"><img src="examples/output/bullterrier/portrait-pop.jpg" alt="portrait-pop"></td>
     <td align="center" width="20%"><img src="examples/output/bullterrier/evaporate.jpg" alt="evaporate"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/double-exposure.jpg" alt="double-exposure"></td>
   </tr>
   <tr>
     <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.<br><code>gradient</code> <code>outline</code> <code>drop_shadow</code></sub></td>
     <td valign="top"><a href="examples/recipes/portrait-pop.toml"><b>portrait-pop</b></a><br><sub>Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.<br><code>black_and_white</code> <code>gaussian_blur</code> <code>vibrance</code> <code>vignette</code></sub></td>
     <td valign="top"><a href="examples/recipes/evaporate.toml"><b>evaporate</b></a><br><sub>The dog drawn as text, caught part-way through dispersing: the right side lets go first and is blown right and up.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code> <code>disperse</code></sub></td>
+    <td valign="top"><a href="examples/recipes/double-exposure.toml"><b>double-exposure</b></a><br><sub>The dog in black and white with a night sky of aurora and stars multiplied into its silhouette: a second picture used by a recipe.<br><code>black_and_white</code> <code>blend</code> <code>vignette</code></sub></td>
   </tr>
 </table>
 

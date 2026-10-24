@@ -1,4 +1,4 @@
-# A neon night street: magenta and violet grade, colour fringes, scanlines, a glow and rain. Would gain a CRT curve (batch 6) and neon edges (batch 8).
+# A neon night street: magenta and violet grade, colour fringes, scanlines, a glow and rain. Would gain neon edges (batch 8).
 name = "cyberpunk"
 size = 768
 
@@ -34,3 +34,11 @@ seed = 3
 [[step]]
 effect = "vignette"
 amount = 0.5
+
+[[step]]
+effect = "crt"
+curve = 0.1
+shadow_mask = 0
+scanlines = 0
+bloom = 0
+vignette = 0

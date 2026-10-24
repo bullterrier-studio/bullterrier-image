@@ -1,0 +1,17 @@
+# A double exposure: the dog in black and white, a night sky of aurora and stars multiplied into its silhouette, a dark edge.
+name = "double-exposure"
+size = 768
+
+[[step]]
+effect = "black_and_white"
+
+[[step]]
+effect = "blend"
+texture = "../assets/night-sky.jpg"
+mode = "multiply"
+mask = "subject"
+opacity = 0.75
+
+[[step]]
+effect = "vignette"
+amount = 0.5
