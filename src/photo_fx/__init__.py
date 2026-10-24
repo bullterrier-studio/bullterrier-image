@@ -92,4 +92,9 @@ def _installed_version() -> str:
         return "0+unknown"
 
 
-__all__ = ["__version__", *_HOME]  # noqa: PLE0604  (the names of the table above: one list, not a copy of it)
+__all__ = [
+    "Animation", "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError", "PhotoFxError",
+    "Project", "ProjectError", "Recipe", "RecipeError", "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError",
+    "__version__", "fx", "imageio", "load_project", "load_recipe", "ramp", "recipe", "render", "render_all",
+    "render_frames", "run", "subject_matte", "trace",
+]  # fmt: skip
