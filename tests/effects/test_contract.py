@@ -260,10 +260,14 @@ def _small(photo: np.ndarray) -> np.ndarray:
 
 
 def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
-    """The injected inputs the effect declares, made for `photo`: a soft disc as the subject's matte."""
-    y, x = np.mgrid[0 : photo.shape[0], 0 : photo.shape[1]].astype(np.float32)
-    disc = np.clip(min(photo.shape[:2]) / 3 - np.hypot(x - photo.shape[1] / 2, y - photo.shape[0] / 2), 0, 1)
-    return {"matte": disc.astype(np.float32)} if "matte" in registry.inputs(name) else {}
+    """The injected inputs the effect declares, made for `photo`: a soft disc as the subject's matte, the four quarters
+    of the picture as its partition."""
+    height, width = photo.shape[:2]
+    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
+    disc = np.clip(min(height, width) / 3 - np.hypot(x - width / 2, y - height / 2), 0, 1)
+    quarters = (y * 2 // height) * 2 + x * 2 // width
+    made = {"matte": disc.astype(np.float32), "partition": quarters.astype(np.int32)}
+    return {key: value for key, value in made.items() if key in registry.inputs(name)}
 
 
 def _bounds() -> list[tuple[str, str, str]]:

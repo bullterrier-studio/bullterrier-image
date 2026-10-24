@@ -1,0 +1,15 @@
+# A short recipe showing the effect on the demo photo (1 to 3 steps).
+# It also makes the effect's picture in the catalogue.
+format = 2
+name = "seams"
+size = 480
+
+[region.glass]
+kind = "shards"
+preset = "glass"
+
+[[step]]
+effect = "seams"
+partition = "glass"
+width = 0.004
+color = "#ffffff"

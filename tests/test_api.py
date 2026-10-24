@@ -200,7 +200,8 @@ def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
 
 def test_every_effect_is_available_as_a_step_builder():
     for name in registry.describe():
-        assert getattr(fx, name)().effect == name
+        needs = {"partition": "panes"} if "partition" in registry.inputs(name) else {}  # an effect that draws pieces
+        assert getattr(fx, name)(**needs).effect == name
 
 
 class LanternParams(EffectParams):
@@ -288,12 +289,13 @@ def _keywords(function: ast.FunctionDef) -> dict[str, tuple[str, object]]:
     return {a.arg: (ast.unparse(a.annotation), ast.literal_eval(d)) for a, d in pairs}  # type: ignore[arg-type]
 
 
-def test_the_stub_shows_the_step_keys_with_their_choices_and_a_preset_exactly_where_an_effect_has_presets():
+def test_the_stub_shows_the_step_keys_and_a_preset_or_a_partition_exactly_where_an_effect_has_one():
     for name, function in _stub_functions().items():
         names = list(registry.presets(name))
         presets = {"preset": (f"Literal{names!r} | None", None)} if names else {}
         step_keys = {"mask": MASK, "opacity": ("float", registry.opacity(name)), "blend_mode": BLEND_MODE}
-        assert _keywords(function) == {**step_keys, **presets}, name
+        partition = {"partition": ("str | None", None)} if "partition" in registry.inputs(name) else {}
+        assert _keywords(function) == {**step_keys, **partition, **presets}, name
         if names:
             assert "preset" in inspect.signature(getattr(fx, name)).parameters
         else:
