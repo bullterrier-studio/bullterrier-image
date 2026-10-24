@@ -44,7 +44,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     )
     from .matte import subject_matte
     from .pipeline import Project, load_project, run
-    from .recipe import Recipe, Stage, Step, load_recipe, render, render_all, trace
+    from .recipe import Framing, Recipe, Stage, Step, load_recipe, render, render_all, trace
 
     __version__: str
 
@@ -60,7 +60,7 @@ _HOMES = {
     ".core.params": ("Picture",),
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
-    ".recipe": ("Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"),
+    ".recipe": ("Framing", "Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
 
@@ -95,6 +95,7 @@ def _installed_version() -> str:
 __all__ = [
     "BackendUnavailableError",
     "BullterrierImageError",
+    "Framing",
     "ImageReadError",
     "NonFiniteImageError",
     "Picture",

@@ -117,7 +117,7 @@ class Framing(EffectParams):
         "0 is square, 0.5 is as round as the picture allows). Unused by the other cuts.",
     )
 
-    def __init__(self, **values: Any) -> None:
+    def __init__(self, /, **values: Any) -> None:
         """The framing of `values` (field name -> value, all optional); RecipeError naming each bad field, the
         constraint and the value, and listing the fields when an unknown one is given."""
         self._init_checked("", **values)

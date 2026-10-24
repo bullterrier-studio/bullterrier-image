@@ -11,11 +11,12 @@ import numpy as np
 
 from . import matte as subject
 from .core import runner
+from .core.framing import Framing
 from .core.runner import Stage, SubjectFinder
 from .core.steps import Recipe, Step
 from .loader import load_recipe
 
-__all__ = ["Recipe", "Stage", "Step", "SubjectFinder", "load_recipe", "render", "render_all", "trace"]
+__all__ = ["Framing", "Recipe", "Stage", "Step", "SubjectFinder", "load_recipe", "render", "render_all", "trace"]
 
 
 def render(

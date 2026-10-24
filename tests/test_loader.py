@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.steps import Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
@@ -87,6 +88,43 @@ BROKEN = {
 def test_a_broken_file_is_a_recipe_error_naming_the_file_and_the_problem(tmp_path, text, complaint):
     with pytest.raises(RecipeError, match=rf"^broken\.toml: .*{complaint}"):
         load_recipe(_write(tmp_path, text, "broken.toml"))
+
+
+# --- the framing: a [frame] table ---------------------------------------------------------------------------------
+
+
+def test_a_frame_table_is_the_recipes_framing_and_without_one_the_recipe_is_not_framed(tmp_path):
+    text = (
+        "size = 512\n[frame]\naspect = 1\nanchor = 'subject'\nmargin = 0.1\nangle = -5\nfill = '#102030'\n"
+        "transparent = 'circle'\n" + STEP
+    )
+    framed = load_recipe(_write(tmp_path, text, "framed.toml"))
+    assert framed.frame == Framing(
+        aspect=1.0, anchor="subject", margin=0.1, angle=-5, fill="#102030", transparent="circle"
+    )
+    assert framed.size == 512
+    assert load_recipe(_write(tmp_path, STEP, "plain.toml")).frame == Framing()
+
+
+FRAME_MISTAKES = {
+    "a value out of range": ("[frame]\naspect = 0\n", r"\[frame\]: .*`aspect`.*0"),
+    "a value of the wrong kind": ("[frame]\nflip = 3\n", r"\[frame\]: .*`flip`"),
+    "a choice that is not offered": ("[frame]\nanchor = 'middle'\n", r"\[frame\]: .*`anchor`.*middle"),
+    "a misspelt key": ("[frame]\nrotate = 10\n", r"\[frame\]: .*`rotate`.*angle"),
+    "frame given as a list of tables": ("[[frame]]\naspect = 1\n", r"\[frame\] table"),
+    "frame given as a value": ("frame = 'square'\n", r"\[frame\] table"),
+}
+
+
+@pytest.mark.parametrize(("text", "complaint"), FRAME_MISTAKES.values(), ids=FRAME_MISTAKES.keys())
+def test_a_mistake_in_the_frame_table_names_the_file_the_table_and_the_key(tmp_path, text, complaint):
+    with pytest.raises(RecipeError, match=rf"^broken\.toml: .*{complaint}"):
+        load_recipe(_write(tmp_path, text + STEP, "broken.toml"))
+
+
+def test_a_misspelt_top_level_key_lists_the_keys_a_recipe_has(tmp_path):
+    with pytest.raises(RecipeError, match=r"`frames`.*format, name, size, \[frame\], \[\[step\]\]"):
+        load_recipe(_write(tmp_path, "[frames]\n" + STEP))
 
 
 # --- presets in a recipe file ------------------------------------------------------------------------------------

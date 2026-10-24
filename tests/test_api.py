@@ -55,6 +55,12 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
     assert missing == []
 
 
+def test_a_recipe_is_framed_with_a_framing_from_the_public_names():
+    framing = bullterrier_image.Framing(aspect=1.0, transparent="circle")
+    assert bullterrier_image.Recipe("look", [fx.grade()], frame=framing).frame is framing
+    assert bullterrier_image.recipe.Framing is bullterrier_image.Framing
+
+
 def test_the_version_is_looked_up_when_asked_for_not_on_import():
     """Finding the installed version loads the packaging machinery (importlib.metadata), so `import bullterrier_image`
     waits

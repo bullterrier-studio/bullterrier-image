@@ -278,6 +278,25 @@ opacity = 0.6                     # mix this step in at 60%
 Removing a background is just a `fill` step masked to the background. Every step can take `mask` and `opacity`. Unknown
 effects, misspelt parameters and bad values fail when the recipe loads, naming the file and the step.
 
+**Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
+before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the
+subject, so a masked step after it still finds the subject:
+
+```toml
+size = 512
+
+[frame]
+aspect = 1                        # crop to this width over height...
+anchor = "subject"                # ...around the subject (or "center", "top", "bottom", "left", "right")
+margin = 0.1                      # room kept around the subject, as a share of its size
+transparent = "circle"            # "background" (the subject), "circle" or "rounded": the render has an alpha channel
+```
+
+The order is fixed: `flip`, `angle` (with `fit` and `resample`), the crop, the `pad_*` borders (with `fill`), then
+`size`. `Recipe(..., frame=Framing(...))` is the same in Python; `Framing.documentation()` lists every field with its unit
+and range. A recipe with `transparent` renders to PNG or WebP (RGBA), never JPEG: a project that exports it to `jpg`
+fails before anything is rendered.
+
 **Presets.** Some built-in effects ship named parameter sets for common looks: `preset = "sepia"` on a `gradient_map` step,
 or `fx.gradient_map(preset="sepia")` in Python. Parameters you write next to it win over the preset's
 (`fx.gradient_map(preset="sepia", shadow_clip=0.05)`), and `bt-image effects gradient_map` lists the presets of an effect.
@@ -424,10 +443,10 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
   core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
                            data in presets/), types.py,
-                           vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`),
+                           vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`), framing.py (`Framing`),
                            runner.py (render, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
-                           glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
+                           frame, glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
   errors.py      errors    BullterrierImageError and its subclasses: the bottom layer, importable from every other one
 examples/        the demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/), older experiments (experiments/), a Python example; see examples/README.md
   effects/       one short example recipe per effect, <effect>.toml

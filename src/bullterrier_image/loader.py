@@ -7,6 +7,11 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
 
+    [frame]                        # optional: frame the photo before the steps, cut it out after them (see below)
+    aspect = 1                     # crop to this width over height...
+    anchor = "subject"             # ...around the subject
+    transparent = "circle"         # a circle cut-out: the render has an alpha channel (PNG or WebP, not JPEG)
+
     [[step]]
     effect = "ascii"               # any effect from bullterrier_image.effects; the other keys are its parameters
     cell = 9
@@ -33,10 +38,16 @@ to the recipe file's folder, or as a colour (a string starting with `#`, or thre
 The picture is read once, when the recipe is loaded; a file that is missing or not a picture fails there, naming the
 file, the step, the parameter and the path.
 
-Removing the background is not a feature of its own: it is a `fill` step masked to the background. Any other top-level
-key is refused, so a misspelt `size` or `format` is not silently ignored.
+The `[frame]` table holds the fields of `Framing` (`Framing.documentation()` lists them with their units and ranges):
+`flip`, `angle` (with `fit` and `resample`), `aspect` (with `anchor` and `margin`), `pad_top`, `pad_right`, `pad_bottom`
+and `pad_left` (with `fill`), applied to the photo and the subject matte in that order, before the first step and
+before `size`; and `transparent` (with `corner_radius`), applied after the last step. The transparency lives in the
+table with the geometry because it is the same model, `Recipe(..., frame=Framing(...))` in Python: one place says how a
+recipe's picture is framed and cut. Any other top-level key is refused, so a misspelt `size` or `format` is not
+silently ignored; so is any other key in `[frame]`.
 
-Dependency direction: imports `core` (steps, registry, params), `imageio` and `errors`; it does not know `runner`.
+Dependency direction: imports `core` (steps, framing, registry, params), `imageio` and `errors`; it does not know
+`runner`.
 """
 
 import tomllib
@@ -50,6 +61,7 @@ from bullterrier_image.errors import BullterrierImageError, ImageReadError, Reci
 
 from . import imageio
 from .core import registry
+from .core.framing import Framing
 from .core.params import Picture
 from .core.steps import Recipe, Step, safe_name
 
@@ -58,7 +70,9 @@ __all__ = ["load_recipe", "with_pictures"]
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones.
 _FORMATS = (1,)
-_KEYS = ("format", "name", "size", "step")
+# the top-level keys of a recipe file, each as it is written (a table or a list of tables in brackets), in the order the
+# error for an unknown one lists them
+_KEYS = {"format": "format", "name": "name", "size": "size", "frame": "[frame]", "step": "[[step]]"}
 
 
 def _located[E: BullterrierImageError](error: E, where: str) -> E:
@@ -106,9 +120,7 @@ def _read(path: Path) -> dict:
         )
     unknown = sorted(set(raw) - set(_KEYS))
     if unknown:
-        raise RecipeError(
-            f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: format, name, size, [[step]]"
-        )
+        raise RecipeError(f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: {', '.join(_KEYS.values())}")
     return raw
 
 
@@ -129,6 +141,15 @@ def load_recipe(path: str | Path) -> Recipe:
             f'{path.name}: the file name gives no usable recipe name: add name = "..." (letters, digits, . _ -) or '
             "rename the file"
         )
+    table = raw.get("frame", {})
+    if not isinstance(table, dict):
+        raise RecipeError(
+            f"{path.name}: write the framing as a [frame] table (one: its keys are the fields of Framing)"
+        )
+    try:
+        frame = Framing(**table)
+    except RecipeError as error:
+        raise _located(error, f"{path.name}: [frame]") from None
     entries = raw.get("step", [])
     if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
         raise RecipeError(f"{path.name}: write each step as a [[step]] table (two brackets: there may be several)")
@@ -145,6 +166,6 @@ def load_recipe(path: str | Path) -> Recipe:
         except (RecipeError, ImageReadError) as error:
             raise _located(error, where) from None
     try:
-        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024))
+        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame)
     except RecipeError as error:
         raise _located(error, path.name) from None

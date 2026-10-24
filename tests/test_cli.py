@@ -257,6 +257,58 @@ def test_photo_without_a_subject_is_reported_clearly(files, capsys):
     assert "no subject" in capsys.readouterr().err.lower()
 
 
+# --- a recipe with transparency: PNG and WebP, never JPEG ------------------------------------------------------------
+
+
+@pytest.fixture
+def avatar(files):
+    """Adds avatar.toml: a square crop of the photo, as a circle with a clear background."""
+    (files / "avatar.toml").write_text(
+        'name="avatar"\nsize=64\n[frame]\naspect=1\ntransparent="circle"\n[[step]]\neffect="grain"\n', encoding="utf-8"
+    )
+    return files
+
+
+@pytest.mark.parametrize(
+    "command", ["render me.png avatar.toml -o out", "render me.png avatar.toml -o out --format webp"]
+)
+def test_render_writes_a_recipe_with_transparency_as_a_picture_with_alpha(avatar, command):
+    assert cli(command) == 0
+    (written,) = (avatar / "out").iterdir()
+    with Image.open(written) as img:
+        assert img.mode == "RGBA"
+        assert img.size == (64, 64)
+        alpha = np.asarray(img)[..., 3]
+    assert (alpha[0, 0], alpha[32, 32]) == (0, 255)
+
+
+def test_render_to_jpg_is_refused_for_a_recipe_with_transparency_in_plain_words(avatar, capsys):
+    assert cli("render me.png avatar.toml -o out --format jpg") == 1
+    error = capsys.readouterr().err
+    assert "transparency" in error
+    assert "Traceback" not in error
+    assert cli("render me.png recipes/a.toml -o out2 --format jpg") == 0  # known good: the same format, no transparency
+
+
+def test_sheet_shows_a_recipe_with_transparency_over_a_checkerboard(avatar):
+    assert cli("sheet me.png avatar.toml -o s.png") == 0
+    with Image.open(avatar / "s.png") as sheet:
+        assert sheet.mode == "RGB"
+        corner = np.asarray(sheet)[14:20, 14:20]  # the tile's top-left corner, which the circle leaves clear
+    assert len({tuple(pixel) for pixel in corner.reshape(-1, 3)}) == 1
+    assert corner[0, 0, 0] == corner[0, 0, 1] == corner[0, 0, 2]  # a grey of the board, not a colour of the photo
+
+
+def test_steps_saves_the_cut_as_a_png_and_the_steps_before_it_as_jpg(avatar):
+    assert cli("steps me.png avatar.toml -o st") == 0
+    assert sorted(path.name for path in (avatar / "st").iterdir()) == [
+        "00-input.jpg",
+        "01-grain.jpg",
+        "02-transparent.png",
+        "_sheet.jpg",
+    ]
+
+
 # --- the subject: --matte (bring your own) and --segmenter (which model finds it) -----------------------------------
 
 
