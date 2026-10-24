@@ -21,9 +21,8 @@ def _wave(
 ) -> np.ndarray:
     """One plane sine wave of `wavelength` px in a random direction and phase, read at the positions x and y (a row and
     a column of pixel places) pushed along by `push_x` and `push_y` px."""
-    turn = 2 * math.pi  # constant: a full turn in radians, the range of a random direction or phase
-    angle, phase = turn * rng.random(), turn * rng.random()
-    return np.sin(turn / wavelength * ((x + push_x) * math.cos(angle) + (y + push_y) * math.sin(angle)) + phase)
+    angle, phase = math.tau * rng.random(), math.tau * rng.random()
+    return np.sin(math.tau / wavelength * ((x + push_x) * math.cos(angle) + (y + push_y) * math.sin(angle)) + phase)
 
 
 class PlasmaParams(EffectParams):
