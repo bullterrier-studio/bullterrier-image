@@ -297,10 +297,10 @@ which it fits to the photo and blends by its own transparency.
 
 **Regions.** A recipe says *where* a step goes by naming regions. With `format = 2`, `[region.NAME]` declares one by its
 `kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
-stone, with presets `glass`, `torn`, `stone` and `mosaic`) or a `pick` of some pieces of one of those. Grids and shards
-are *partitions*: every pixel is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps`
-draws them numbered). A `pick`, `subject` and `background` are *selections*. `fit = "subject"` lays a grid or shards over
-the subject instead of the whole picture, and `edge = { style = "torn" }` tears their borders. A step uses regions by
+stone, with presets `glass`, `torn`, `stone` and `mosaic`), a `pick` of some pieces of one of those, or a `subject`.
+Grids and shards are *partitions*: every pixel is in one piece, and the pieces are numbered from 0 in reading order
+(`bt-image steps` draws them numbered). A `pick`, a `subject` and the built-in `background` are *selections*.
+`fit = "subject"` lays a grid or shards over the subject instead of the whole picture, and `edge = { style = "torn" }` tears their borders. A step uses regions by
 name: `mask` limits it to a selection, `each` + `looks` gives every piece of a partition its own look (each look is
 rendered once over the whole picture, so the cost is the number of looks, not pieces), and `partition` names the
 partition the `seams` effect draws lines along:
@@ -345,6 +345,27 @@ glass = Recipe(
     ],
 )
 ```
+
+**Grid first.** `kind = "subject"` with `per` finds the subject inside each piece of a partition on its own and unites the
+finds, so small things a search of the whole picture misses show up (a calf behind its mother). Without `per` it is the
+built-in `subject`:
+
+```toml
+[region.cells]
+kind = "grid"
+columns = 3
+rows = 4
+
+[region.found]
+kind = "subject"
+per = "cells"            # one run of the subject finder per cell; `found` is a selection like any other
+context = 0.25           # the finder sees each cell grown by this share of its size on every side (default 0.25)
+threshold = 0.9          # keep only pixels the finder is surer of than this: it invents faint subjects in plain cells
+max_coverage = 0.99      # drop a find that fills more of its cell than this (a finder that calls a plain cell all subject)
+```
+
+`bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a
+repeat run asks the model nothing. A `--matte` file does not stand in for the finder here: a cell is a part of the picture.
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
 examples are in [`examples/regions/`](examples/regions/).

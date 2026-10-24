@@ -49,12 +49,19 @@ def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     assert max(render(photo, recipe, matte).shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
+def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
+    """A stand-in subject finder (the model is an external boundary): the disc in the middle of whatever it is shown."""
+    height, width = view.shape[:2]
+    y, x = np.mgrid[0:height, 0:width]
+    return (np.hypot(x - width / 2, y - height / 2) <= 0.3 * max(height, width)).astype(np.float32)
+
+
 @pytest.mark.parametrize("path", sorted((EXAMPLES / "regions").glob("*.toml")), ids=lambda path: path.stem)
 def test_every_regions_example_declares_regions_and_renders_to_something_other_than_the_photo(path, photo, matte):
     recipe = load_recipe(path)
     assert recipe.name == path.stem
     assert recipe.regions
-    out = render(photo, recipe, matte)
+    out = render(photo, recipe, matte, find_subject=a_disc_in_every_view)
     assert max(out.shape[:2]) == recipe.size
     assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
 

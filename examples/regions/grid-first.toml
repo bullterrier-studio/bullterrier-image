@@ -1,0 +1,42 @@
+# Grid first: the picture is cut into cells and the subject is found inside each cell on its own, so what is found is
+# what the finder is sure of in a cell (the head, a patch of chest, the chew toy), not one cut-out of the whole dog. That
+# is cut into stone-like shards with a look each, and a thin white line marks every crack. Needs recipe format 2.
+format = 2
+name = "grid-first"
+size = 1024
+
+[region.cells]
+kind = "grid"
+columns = 3
+rows = 4
+
+[region.found]
+kind = "subject"
+per = "cells"                  # the subject of each cell, found in that cell (and a quarter of its size round it)
+
+[region.shards]
+kind = "shards"
+preset = "stone"
+fit = "found"                  # laid over what was found, not the whole picture
+count = 28
+
+[[step]]
+each = "shards"
+mask = "found"
+assign = "random"
+seed = 2
+looks = [
+    { effect = "gradient_map", preset = "cyanotype" },
+    "none",
+    { effect = "gradient_map", preset = "thermal", opacity = 0.8 },
+    "none",
+    { effect = "halftone", cell = 8 },
+    "none",
+]
+
+[[step]]
+effect = "seams"
+partition = "shards"
+mask = "found"
+width = 0.0016
+color = "#ffffff"

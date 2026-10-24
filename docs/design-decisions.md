@@ -289,7 +289,26 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   (named by a step, or what such a region is laid over or picked from) is made from it, so declaring a region that
   nothing uses costs nothing. Recipe format 2 adds regions and the new keys; a file of format 1 may not use them, so its
   meaning never changes.
-- Grids, cuts, shards, Bezier paths, SVG shapes and grid-first subjects are built in slices; the plan and the
+- **Grid first is a `Subject` kind with `per`: one finder call per piece, the finds united.** The finder sees the
+  piece's box grown by `context` (0.25 of the piece's size on each side, clipped to the picture) and only the piece's own
+  pixels count, so a subject cut by a border is seen whole yet belongs to the piece it lies in. The finder is the injected
+  one (portable IS-Net by default), asked about crops of the *working* picture, so a `matte` of the whole photo never
+  stands in for it. Without `per` it is the built-in `subject`. *Reason:* a search of the whole picture misses small
+  things beside big ones (the calf, the fox on its rock, the peak), and the model, made to find a subject in every crop,
+  invents faint ones in plain pieces.
+- **Two filters against invented subjects; a third was measured and left out.** `threshold` (0.9) keeps only pixels the
+  finder is surer of than that; `max_coverage` (0.99) drops a find that fills more of its piece. On eight photos (study
+  grids of 3 cells on the short side, real model, `.superpowers/reports/G-grid-first.md`) the invented blobs the study
+  showed peak at 0.83 or less, while the sure finds (calf, fox, cormorants, the elephants) are at 0.9 and up; legit
+  subjects fill a whole piece up to 0.98 and touch the view's edge up to 100%, so a limit on the share of the view's
+  border a find touches would drop real subjects before invented ones and is not offered. *Cost:* the finder is unsure of
+  big plain parts of a real subject seen in a crop (the white head of the eagle, a dog's chest), so those are dropped
+  too; lower `threshold` to keep them with the invented ones. *Revisit when* a model is calibrated better.
+- **The pipeline remembers each crop by what it holds.** A find in a crop is stored by the finder, the photo and the
+  crop's pixels (and its size), so whatever recipe, framing or size made the crop, a repeat run asks the model nothing;
+  "nothing found" is remembered too. The existing whole-photo entries and their keys are unchanged. The answer is kept in
+  16 bits and the first run uses the kept value, so the first and later runs give the same pixels.
+- Grids, cuts, shards, Bezier paths and SVG shapes are built in slices; the plan and the
   deferred list (each item with the need that would justify it) are in `.superpowers/plans/regions.md`.
 
 ## Testing and gates
