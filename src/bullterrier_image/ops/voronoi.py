@@ -11,6 +11,23 @@ import numpy as np
 from scipy.spatial import Delaunay, cKDTree
 
 
+def centres(shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
+    """The `(x, y)` of every pixel centre of a picture of `shape` (height, width), as float32 arrays that broadcast
+    against each other: `x` is `(1, width)` and `y` is `(height, 1)`."""
+    height, width = shape
+    return (np.arange(width) + 0.5).astype(np.float32)[None, :], (np.arange(height) + 0.5).astype(np.float32)[:, None]
+
+
+def nearest(sites: np.ndarray, x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """For every coordinate pair `(x, y)` (arrays that broadcast against each other, in px) the distance in px to the
+    closest of `sites` and that site's index, as arrays of the broadcast shape. The coordinates need not be a grid:
+    a torn edge classifies the pixels by coordinates it has bent. A pixel exactly between two sites goes to one of
+    them, the same one every time."""
+    x, y = np.broadcast_arrays(x, y)
+    distance, index = cKDTree(sites).query(np.stack([x.ravel(), y.ravel()], axis=1))
+    return distance.reshape(x.shape), index.reshape(x.shape)
+
+
 class Cells(NamedTuple):
     """The cells of a set of sites over a picture, each array of shape (height, width)."""
 
@@ -24,10 +41,9 @@ def cells(shape: tuple[int, int], sites: np.ndarray) -> Cells:
     the cell's site and its distance to the cell's border (the cell is convex, so that is the least distance to one of
     the bisector lines that bound it, which are those between the site and the sites its Delaunay triangles join it
     to; it is exact, also for a pixel near the edge of the picture)."""
-    height, width = shape
-    y, x = np.mgrid[0:height, 0:width]
-    px, py = (x.ravel() + 0.5).astype(np.float32), (y.ravel() + 0.5).astype(np.float32)
-    own_distance, own = cKDTree(sites).query(np.stack([px, py], axis=1))
+    x, y = centres(shape)
+    own_distance, own = (a.ravel() for a in nearest(sites, x, y))
+    px, py = (a.ravel() for a in np.broadcast_arrays(x, y))
     # Neighbours are the sites the Delaunay triangulation joins to a site; short lists are padded by repeating one,
     # which changes no minimum.
     indptr, indices = Delaunay(sites).vertex_neighbor_vertices
