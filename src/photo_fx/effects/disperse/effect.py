@@ -442,7 +442,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     yy = row[:, None, None] * cell_h + np.rint(dy).astype(int)[:, None, None] + np.arange(cell_h)[None, :, None]
     xx = col[:, None, None] * cell_w + np.rint(dx).astype(int)[:, None, None] + np.arange(cell_w)[None, None, :]
     yy, xx = np.broadcast_arrays(yy, xx)  # both (pieces, cell_h, cell_w)
-    canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.float32)  # constant: the three RGB channels
+    canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.float32)
     on_canvas = (yy >= 0) & (yy < canvas.shape[0]) & (xx >= 0) & (xx < canvas.shape[1])
     shaded = pieces[row, col] * brightness[:, None, None, None]
     np.maximum.at(canvas, (yy[on_canvas], xx[on_canvas]), shaded[on_canvas])

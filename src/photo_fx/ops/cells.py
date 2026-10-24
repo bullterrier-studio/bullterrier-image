@@ -19,7 +19,7 @@ def cut(rgb: np.ndarray, cell_w: int, cell_h: int) -> np.ndarray:
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)
     padded = np.pad(rgb, ((0, rows * cell_h - height), (0, cols * cell_w - width), (0, 0)))
-    return padded.reshape(rows, cell_h, cols, cell_w, 3).transpose(0, 2, 1, 3, 4)  # constant: three colour channels
+    return padded.reshape(rows, cell_h, cols, cell_w, 3).transpose(0, 2, 1, 3, 4)
 
 
 def join(pieces: np.ndarray, height: int, width: int) -> np.ndarray:
@@ -29,7 +29,6 @@ def join(pieces: np.ndarray, height: int, width: int) -> np.ndarray:
     must not exceed rows * cell_h and cols * cell_w. Returns a float32 (height, width, 3) picture.
     """
     rows, cols, cell_h, cell_w, _ = pieces.shape
-    # constant: a picture has three colour channels
     return pieces.transpose(0, 2, 1, 3, 4).reshape(rows * cell_h, cols * cell_w, 3)[:height, :width].astype(np.float32)
 
 

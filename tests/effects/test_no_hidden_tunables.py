@@ -7,6 +7,9 @@ they share (`ops/*.py`), so it reads them with `ast`. A numeric literal fails un
   squares and square roots are mathematics), a comparison operand, an index or slice bound, or a positional bound, fill
   or matrix entry of a `BOUND_CALLS` function (`np.clip(x, 0, 1)`), or
 - an array axis (`axis=`, `axes=`, or a positional of `transpose`), or
+- the integer 3, the colour channels, as a size: a slice bound (`hsv[..., 2:3]`) or an argument or shape element of
+  `SIZE_CALLS` (`zeros((h, w, 3))`, `reshape(h, w, 3)`, `repeat(grey, 3, axis=-1)`); anywhere else a 3 is a number like
+  any other (`rgb * 3` fails), or
 - marked `# constant: <reason of at least three words>`: a trailing marker covers its own statement, a marker on a
   line of its own covers the next statement (a standard, such as Rec. 709 weights, or a pure guard, such as an epsilon).
 Anything else fails, whatever its value: an option of a call, by keyword or position (`sigma=2`, `iterations=1`,
@@ -45,6 +48,7 @@ import photo_fx
 PACKAGE = Path(photo_fx.__file__).parent
 SCANNED = sorted([*(PACKAGE / "effects").glob("*/effect.py"), *(PACKAGE / "ops").glob("*.py")])
 TRIVIAL = {0, 1, 2, 0.5, 255}
+CHANNELS = 3
 MARKER = re.compile(r"#\s*constant:(.*)")
 MIN_REASON_WORDS = 3
 LIBRARIES = {"numpy", "scipy", "PIL"}
@@ -52,6 +56,8 @@ LIBRARIES = {"numpy", "scipy", "PIL"}
 PLUMBING_KEYWORDS = {"axis", "axes", "dtype"}
 # calls whose positional numbers are array axes (exempt, like `axis=`)
 AXIS_CALLS = {"transpose", "moveaxis", "swapaxes"}
+# calls whose positional 3 is the number of colour channels, a size
+SIZE_CALLS = {"zeros", "ones", "empty", "reshape", "repeat"}
 # calls whose trivial positional numbers are bounds, fills or matrix entries, never a library's option: in any other
 # call (`gaussian_filter(rgb, 2)`) a positional number is an option like a keyword one
 BOUND_CALLS = {
@@ -94,6 +100,12 @@ def _hidden(node: ast.Constant, parents: dict[ast.AST, ast.AST]) -> bool:
     if isinstance(parent, ast.keyword):
         return not (parent.arg in ("axis", "axes") and isinstance(node.value, int))
     if called in AXIS_CALLS and isinstance(node.value, int):
+        return False
+    if (
+        node.value == CHANNELS
+        and isinstance(node.value, int)
+        and (isinstance(parent, ast.Slice) or called in SIZE_CALLS)
+    ):
         return False
     if isinstance(parent, ast.arguments) or node.value not in TRIVIAL:
         return True
@@ -272,6 +284,7 @@ GOOD = '''
         # constant: 1e-9 only keeps a flat picture from dividing by zero
         safe = max(float(rgb.max()), 1e-9)
         mixed = np.clip(rgb * 0.5 / safe * 2 - 1, 0, 255) * params.radius
+        grey = np.repeat(mixed[..., :1], 3, axis=-1).reshape(rows, 3) + np.zeros((rows, rows, 3))[..., 2:3]
         if mixed.shape[0] > 1 and rgb[..., 0].mean() < 0.5:
             mixed[1:-1] += mixed.sum(axis=(0, 1)) ** 2 + rgb[:, :, 2] ** 0.5
         pieces = np.pad(mixed, ((1, 0 if params.radius else 1), (0, 0))).transpose(0, 2, 1, 3, 4)
@@ -291,6 +304,8 @@ BAD = {
     "a trivial keyword option of a library call": ("return gaussian_filter(rgb, sigma=2)", [2]),
     "a trivial iteration count": ("return binary_dilation(mask, iterations=1)", [1]),
     "a trivial positional option of a library call": ("return gaussian_filter(rgb, 2)", [2]),
+    "a three that is a factor, not a size": ("return rgb * 3", [3]),
+    "a three that is a library's option": ("return np.pad(rgb, 3)", [3]),
     "a non-trivial bound": ("return np.clip(rgb, 0.0, 0.9)", [0.9]),
     "a trivial default of a helper": ("def _mix(a, b, weight=0.5):\n        return a", [0.5]),
     "a trivial value assigned to a name": ("weight = 0.5", [0.5]),

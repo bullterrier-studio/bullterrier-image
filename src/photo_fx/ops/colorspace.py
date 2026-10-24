@@ -96,7 +96,7 @@ def hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
         float32 array of the same shape holding sRGB (r, g, b), 0..1 for in-range saturation and value.
     """
     hsv = np.asarray(hsv, dtype=np.float32)
-    hue, saturation, value = hsv[..., 0:1], hsv[..., 1:2], hsv[..., 2:3]  # constant: slices of the three channels
+    hue, saturation, value = hsv[..., 0:1], hsv[..., 1:2], hsv[..., 2:3]
     # For channel offset n (5, 3, 1 for r, g, b) the channel is value, dipping to value*(1-saturation) over a
     # trapezoid of the hue circle: the standard branch-free HSV formula.
     k = (np.array([5, 3, 1], dtype=np.float32) + hue * 6) % 6  # constant: channel offsets and six sectors, standard HSV

@@ -59,7 +59,6 @@ def text_art(
     ]
 
     # The colour and brightness of each character cell is the average of the pixels it covers.
-    # constant: three colour channels, red, green and blue
     cells = padded.reshape(rows, cell_h, cols, cell_w, 3).mean(axis=(1, 3))
     amount = np.clip(ink_amount(luminance(cells), paper, threshold=paper_threshold), 0.0, 1.0) ** gamma
     glyph = np.rint(amount * (n - 1)).astype(int)

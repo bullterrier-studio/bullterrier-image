@@ -51,5 +51,4 @@ def black_and_white(rgb: np.ndarray, params: BlackAndWhiteParams) -> np.ndarray:
     weights = np.array([params.red, params.green, params.blue], dtype=np.float32)
     weights = weights / max(float(weights.sum()), _NO_LIGHT)
     grey = rgb @ weights
-    # constant: the grey goes into all 3 colour channels
     return np.repeat(np.clip(grey, 0.0, 1.0)[..., None], 3, axis=-1).astype(np.float32)
