@@ -125,7 +125,7 @@ def test_a_soft_matte_edge_carries_the_light_in_proportion_to_the_matte():
     matte[20, 30] = 0.4  # not the subject (< 0.5): no light, though 40 % of it is
     out = registry.apply(NAME, grey(), matte=matte, angle=0, width=3, color=WHITE)
     assert lit_at(out, 20, 29) == pytest.approx(0.6, abs=0.03)
-    assert lit_at(out, 20, 30) == 0.0
+    assert lit_at(out, 20, 30) == pytest.approx(0.0, abs=1e-6)  # float32 rounding of `lit_at`'s inversion is below that
 
 
 @pytest.mark.parametrize(
