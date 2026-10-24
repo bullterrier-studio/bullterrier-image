@@ -8,7 +8,7 @@ Grain and other surface texture laid over the picture.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/bump_light.jpg" width="160" alt="bump_light"> | `bump_light` | Light the picture's brightness, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=8.0` `blur=1.0` +2 advanced | [bump_light.toml](../../examples/effects/bump_light.toml) |
 | <img src="../gallery/crt.jpg" width="160" alt="crt"> | `crt` | Show the picture on a CRT: bulged glass, a glow, scanlines, a shadow mask, a dim edge and the bezel `border`. | `curve=0.15` `shadow_mask=0.35` `scanlines=0.3` `bloom=0.3` `vignette=0.35` +8 advanced | [crt.toml](../../examples/effects/crt.toml) |
-| <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`. | `density=0.6` `size=8.0` `scratches=2` `opacity=0.8` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
+| <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places over the picture. | `density=0.6` `size=8.0` `scratches=2` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
 | <img src="../gallery/emboss.jpg" width="160" alt="emboss"> | `emboss` | Read the brightness as a relief `depth` px tall and light it from `angle`. | `angle=315.0` `depth=6.0` `saturation=0.0` +1 advanced | [emboss.toml](../../examples/effects/emboss.toml) |
 | <img src="../gallery/film_grain.jpg" width="160" alt="film_grain"> | `film_grain` | Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white. | `shadows=0.1` `highlights=0.03` `size=1.0` `seed=0` +2 advanced | [film_grain.toml](../../examples/effects/film_grain.toml) |
 | <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px. | `amount=0.08` `size=1.0` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
@@ -68,7 +68,6 @@ Grain and other surface texture laid over the picture.
 | `density` | number | count | 0 to 5 | `0.6` | How many specks and hairs there are: marks per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none, 0.6 is a light dusting, 3 is filthy. |
 | `size` | number | px | 1 to 50 | `8.0` | The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most marks are smaller (speck radii are random, with many tiny ones); larger = bigger blotches and longer hairs. |
 | `scratches` | whole number | count | 0 to 100 | `2` | How many scratches: thin, long, nearly vertical lines, each running over half to all of the picture's height. 0 = none. |
-| `opacity` | number | fraction | 0 to 1 | `0.8` | How strongly the marks show: each mark's colour is mixed over the picture by this much (at its centre; edges are soft). 0 = invisible, 1 = solid. |
 | `light` | colour |  |  | `'#ffffff'` | The colour of the light marks (dust on a dark print, scratches into the emulsion): '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance. |
 | `dark` | colour |  |  | `'#000000'` | The colour of the dark marks (dust on the scanner glass): '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same marks in the same places, another seed others. |
@@ -82,6 +81,8 @@ Grain and other surface texture laid over the picture.
 | `width` | number | px | 0.5 to 10 | `1.0` | How wide a scratch is in px. Larger = bolder scratches. |
 
 </details>
+
+A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 
 ### `emboss`
 

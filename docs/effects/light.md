@@ -23,7 +23,7 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +2 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
-| <img src="../gallery/soft_focus.jpg" width="160" alt="soft_focus"> | `soft_focus` | A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one. | `radius=12.0` `opacity=0.5` +2 advanced | [soft_focus.toml](../../examples/effects/soft_focus.toml) |
+| <img src="../gallery/soft_focus.jpg" width="160" alt="soft_focus"> | `soft_focus` | A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one. | `radius=12.0` +2 advanced | [soft_focus.toml](../../examples/effects/soft_focus.toml) |
 | <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `limit=1.0` `amount=0.8` `angle=0.0` `color='#ffffff'` | [starburst.toml](../../examples/effects/starburst.toml) |
 | <img src="../gallery/tilt_shift.jpg" width="160" alt="tilt_shift"> | `tilt_shift` | A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to `radius` and its colour raised by `saturation`. | `focus=0.5` `width=0.2` `feather=0.25` `angle=0.0` `radius=10.0` `saturation=0.3` `levels=4` +2 advanced | [tilt_shift.toml](../../examples/effects/tilt_shift.toml) |
 | <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
@@ -318,7 +318,6 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `radius` | number | px | 0 to 500 | `12.0` | Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier and softer; 0 blurs nothing, so the picture is only brightened by screening it with itself. |
-| `opacity` | number | fraction | 0 to 1 | `0.5` | How much of the screened result replaces the sharp picture: 0 = off (the picture unchanged), 1 = the full soft focus. Raising it brightens and softens more. |
 
 <details><summary>Advanced parameters (2)</summary>
 
@@ -328,6 +327,8 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
 
 </details>
+
+A step of `soft_focus` has `opacity = 0.5` unless it sets its own.
 
 ### `starburst`
 
