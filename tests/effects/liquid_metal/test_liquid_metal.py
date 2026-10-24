@@ -20,7 +20,7 @@ def ramp(direction: float) -> np.ndarray:
 
 
 def test_relief_0_gives_a_flat_picture_of_the_tint_colour_whatever_the_picture(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, relief=0, tint=TINT)
+    out = registry.apply(NAME, photo, relief=0, horizon=0.5, tint=TINT)
     np.testing.assert_allclose(out, np.broadcast_to(TINT, out.shape), atol=1e-6)
 
 
@@ -79,7 +79,7 @@ def test_on_a_ramp_the_colour_is_the_metal_gradient_at_the_height_the_reflection
 )
 def test_edge_decides_the_slope_in_the_first_row_and_nowhere_else(edge: str, first_row_rise: float) -> None:
     """With the horizon at 0.5 the environment is t itself; the metal then runs black, tint, white over t 0..1."""
-    out = registry.apply(NAME, ramp(180), relief=100, tint=TINT, smoothing=0, edge=edge)
+    out = registry.apply(NAME, ramp(180), relief=100, horizon=0.5, tint=TINT, smoothing=0, edge=edge)
     t = 0.5 + first_row_rise / (1 + first_row_rise**2)
     expected = np.array(TINT) * min(2 * t, 1) + (1 - np.array(TINT)) * max(2 * t - 1, 0)
     np.testing.assert_allclose(out[0], np.broadcast_to(expected, out[0].shape), atol=1e-4)

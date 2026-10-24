@@ -16,7 +16,7 @@ class LiquidMetalParams(EffectParams):
     and a ground, coloured as a metal of `tint`."""
 
     smoothing: float = param(
-        4.0,
+        3.0,
         unit="px",
         min=0,
         max=20,
@@ -24,16 +24,17 @@ class LiquidMetalParams(EffectParams):
         "is a bump and the metal is rough with the picture's texture and noise, larger = broad, flowing swells.",
     )
     relief: float = param(
-        60.0,
+        35.0,
         unit="px",
         min=0,
         max=200,
         doc="How tall the relief is: a white pixel stands this many px above a black one, so the slope between "
         "neighbours is their brightness difference times this. 0 = a flat mirror (one tint-coloured picture when the "
-        "horizon is at 0.5), larger = steeper relief and a more contrasty, more broken-up reflection.",
+        "horizon is at 0.5), larger = steeper relief and a more contrasty, more broken-up reflection. Sizes are in px, "
+        "so the defaults suit a picture about 480 px high: scale `smoothing` and `relief` with the picture's size.",
     )
     horizon: float = param(
-        0.5,
+        0.65,
         unit="fraction",
         min=0.05,
         max=0.95,
