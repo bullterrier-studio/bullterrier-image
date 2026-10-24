@@ -45,6 +45,7 @@ class LensFlareParams(EffectParams):
         "centre: ghost number i sits i x spacing of the way from the light toward the centre. 1 puts the first on "
         "the centre, 2 mirrors the light through it, more goes beyond; 0 piles them on the light. A light at the "
         "centre gives them no line, so they sit on it.",
+        advanced=True,
     )
     size: float = param(
         0.05,
@@ -77,6 +78,7 @@ class LensFlareParams(EffectParams):
         max=0.5,
         doc="How far each side of its radius the ring reaches, as a fraction of the picture's diagonal: it falls "
         "smoothly from full brightness on the radius to nothing this far off. Raising it makes a wider, softer ring.",
+        advanced=True,
     )
     amount: float = param(
         0.8,
