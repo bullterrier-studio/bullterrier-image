@@ -9,6 +9,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` +3 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
+| <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=0.004` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
 | <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights. | `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
 
 ### `halftone`
@@ -71,6 +72,13 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What lies beyond the picture's border for the diffusion and for reading: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles). |
 
 </details>
+
+### `seams`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `width` | number | fraction | 0 to 0.1 | `0.004` | Width of the line as a share of the picture's long side (0 to 0.1), centred on each border: 0 draws nothing, about 0.002 is a hairline, 0.02 or more a band. Raising it widens the line. |
+| `color` | colour |  |  | `'#ffffff'` | Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1. |
 
 ### `topographic`
 
