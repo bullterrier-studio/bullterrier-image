@@ -1,4 +1,4 @@
-# Maximum damage: many wide bands, strong channel split, more text, grain, strong glow.
+# Maximum damage: many wide bands, strong channel split, grain, strong glow.
 name = "neon-glitch-heavy"
 size = 1024
 
@@ -16,8 +16,6 @@ effect = "glitch"
 split = 16
 bands = 18
 shift = 0.09
-ascii_share = 0.4
-ascii_cell = 10
 seed = 33
 
 [[step]]

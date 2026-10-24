@@ -1,4 +1,4 @@
-# Mono print dots, then glitch with a little text: black-and-white, graphic.
+# Mono print dots, then glitch: black-and-white, graphic.
 name = "halftone-glitch"
 size = 1024
 
@@ -18,6 +18,4 @@ effect = "glitch"
 split = 6
 bands = 9
 shift = 0.06
-ascii_share = 0.3
-ascii_cell = 11
 seed = 21

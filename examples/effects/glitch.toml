@@ -1,12 +1,10 @@
-# Torn strips slid sideways and red and blue pulled apart; some strips turn into text.
+# Torn strips slid sideways and red and blue pulled apart, as in a corrupted video frame.
 name = "glitch"
 size = 480
 
 [[step]]
 effect = "glitch"
-split = 4
-bands = 5
-shift = 0.03
-ascii_share = 0.1
-ascii_cell = 6
+split = 6
+bands = 7
+shift = 0.05
 seed = 4

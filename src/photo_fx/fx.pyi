@@ -1088,14 +1088,12 @@ constant_value : number, fraction, 0 to 1, default 0.0
     'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
-def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, ascii_share: float = 0.0, ascii_cell: int = 9, ascii_photo: float = 0.0, seed: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, ascii_rows: int = 3, ascii_gamma: float = 0.55, ascii_chars: str = ' .:-=+*#%@', ascii_ink: str | list[float] | tuple[float, float, float] | None = None, ascii_ink_floor: float = 0.35, ascii_paper: str | list[float] | tuple[float, float, float] = '#000000', ascii_paper_threshold: float = 0.5, ascii_font: str | None = None) -> Step:
+def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, seed: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06) -> Step:
     """`bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed
 `split` px apart.
 
-The same `seed` always gives the same damage. `ascii_share` of the strips also dissolve into text drawn with the
-`ascii_*` settings; the text has its own random stream, so the sliding is identical whether or not text is on. The
-colour split runs last, so the text gets the same red and blue fringes as the rest of the damage. A text font that
-cannot be opened raises OSError.
+The same `seed` always gives the same damage. The colour split runs last, so the bands get the same red and blue
+fringes as the rest of the picture.
 
 Parameters
 ----------
@@ -1109,15 +1107,6 @@ bands : whole number, count, 0 to 500, default 7
 shift : number, fraction, 0 to 1, default 0.06
     The furthest a strip slides, as a fraction 0 to 1 of the picture's width; each strip
     slides a random distance up to this, left or right, wrapping around.
-ascii_share : number, fraction, 0 to 1, default 0.0
-    The fraction 0 to 1 of the strips that also dissolve into text (rounded up to whole
-    strips); 0 = no text.
-ascii_cell : whole number, px, 1 to 200, default 9
-    Width of one character of the text strips, 1 to 200 px. Larger = bigger, fewer
-    characters. Animated, it moves in whole steps (rounded to the nearest whole number).
-ascii_photo : number, fraction, 0 to 1, default 0.0
-    How much of the strip shows through behind its characters, 0 to 1: 0 = text on flat
-    `ascii_paper`, 1 = text laid over the strip, keeping all its detail.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same damage; any other gives different
     strips. Animated, it moves in whole steps (rounded to the nearest whole number).
@@ -1127,43 +1116,7 @@ band_min_height : number, fraction, 0 to 1, default 0.01
     which it may not exceed.
 band_max_height : number, fraction, 0 to 1, default 0.06
     The tallest a strip can be, as a fraction 0 to 1 of the picture's height. Raising it
-    gives taller strips.
-ascii_rows : whole number, count, 1 to 100, default 3
-    The fewest rows of characters a text strip holds, 1 to 100: a thinner strip is
-    widened (each row counted as tall as the font's character cell, see `ascii_font`) so
-    its text stays legible, up to the whole picture. Animated, it moves in whole steps
-    (rounded to the nearest whole number).
-ascii_gamma : number, ratio, 0.1 to 10, default 0.55
-    Exponent on the amount of ink each character puts down, 0.1 to 10: below 1 (the
-    default) more ink, so the text carries enough light to read against dark paper;
-    above 1 less.
-ascii_chars : text, default ' .:-=+*#%@'
-    The character palette of the text strips, in any order, at least two different
-    characters; sorted by how much ink each glyph puts down, so the densest is used for
-    the brightest areas on dark paper and the darkest on light paper (see
-    `ascii_paper`).
-ascii_ink : colour or none, default None
-    The ink colour of the text strips ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
-    default) colours each character from the average colour of the strip under it,
-    brightened as in the ascii effect (strongest channel scaled to full, by at most 1 /
-    `ascii_ink_floor`).
-ascii_ink_floor : number, fraction, 0.01 to 1, default 0.35
-    With no `ascii_ink`: the most a character's colour is brightened, as a floor 0.01 to
-    1 on its strongest channel: a colour whose strongest channel is below it is scaled
-    by 1 / ascii_ink_floor instead of up to full, so dark strips stay dark. Lowering it
-    brightens dark colours more; 1 = colours as they are.
-ascii_paper : colour, default '#000000'
-    The paper colour behind the text strips' characters. Dark paper (Rec. 709 luminance
-    below `ascii_paper_threshold`) puts dense characters on bright areas; lighter paper
-    puts them on dark areas.
-ascii_paper_threshold : number, fraction, 0 to 1, default 0.5
-    The Rec. 709 luminance, 0 to 1, below which `ascii_paper` counts as dark (dense
-    characters on bright areas) rather than light (dense characters on dark areas); 0.5
-    = mid grey. Raising it lets lighter paper count as dark: 0 treats every paper as
-    light, 1 every paper but white as dark.
-ascii_font : text or none, default None
-    Path to a monospaced .ttf/.ttc font for the text strips; none (the default) uses the
-    first system monospaced font found."""
+    gives taller strips."""
     ...
 
 def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
@@ -1215,6 +1168,48 @@ pivot : number, fraction, 0 to 1, default 0.5
 saturation : number, ratio, 0 to 5, default 1.0
     Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more
     vivid."""
+    ...
+
+def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False) -> Step:
+    """Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep.
+
+A generated background: the input is used only for its height and width, its content is ignored. Sizes in
+fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
+"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet.
+
+Parameters
+----------
+kind : one of 'linear', 'radial', 'conic', default 'linear'
+    The layout: 'linear' (colours run in a straight band across the whole picture, at
+    `angle`), 'radial' (rings round the centre `x`, `y`, the last colour `radius` away)
+    or 'conic' (a clockwise sweep round the centre, starting at `angle`; the last colour
+    meets the first at a hard seam).
+colors : list of colours, default ('#12002b', '#ff2bd6')
+    The gradient's colours in order, evenly spaced; at least two. Linear: from the start
+    of the band to its end. Radial: from the centre outwards. Conic: round the turn.
+angle : number, degrees, 0 to 360, default 90.0
+    Linear: the direction the colours run, measured clockwise on screen from the right:
+    0 = left to right, 90 = top to bottom. Conic: where the sweep starts, on the same
+    scale (0 = right of the centre, 90 = below it). Ignored by 'radial'.
+x : number, fraction, 0 to 1, default 0.5
+    Horizontal position of the centre as a fraction of the width (0 = left edge, 1 =
+    right edge). Used by 'radial' and 'conic'; 'linear' is always centred.
+y : number, fraction, 0 to 1, default 0.5
+    Vertical position of the centre as a fraction of the height (0 = top edge, 1 =
+    bottom edge). Used by 'radial' and 'conic'; 'linear' is always centred.
+radius : number, fraction, 0.01 to 4, default 0.75
+    Radial only: the distance from the centre at which the last colour is reached, as a
+    fraction of the picture's shorter side; farther out stays on the last colour. Larger
+    = a wider, softer glow. Ignored by 'linear' and 'conic'.
+repeat : whole number, count, 1 to 64, default 1
+    How many times the list of colours is fitted along the gradient (the band, the
+    radius, one turn): 1 = once, 2 = twice as fast. Radial stays on the last colour
+    beyond the radius. Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+reflect : true or false, default False
+    Run every second repeat backwards, so neighbouring repeats meet on the same colour
+    instead of jumping from the last colour back to the first. Has no effect with
+    `repeat` 1."""
     ...
 
 def gradient_map(stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear') -> Step:

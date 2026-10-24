@@ -1,4 +1,4 @@
-# A fire palette, then glitch where some of the torn strips dissolve into text laid over the picture.
+# A fire palette, then torn glitch strips with a red and blue split.
 name = "ember-glitch"
 size = 1024
 
@@ -16,9 +16,6 @@ effect = "glitch"
 split = 10
 bands = 10
 shift = 0.05
-ascii_share = 0.5
-ascii_cell = 9
-ascii_photo = 1.0
 seed = 4
 
 [[step]]

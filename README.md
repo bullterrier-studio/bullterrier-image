@@ -53,7 +53,7 @@ Every picture here is made from one photo by the recipe linked next to it. Repro
     <td valign="top"><a href="examples/recipes/02-glitch.toml"><b>glitch</b></a><br><sub>The subject on black, digitally damaged, with film grain.<br><code>fill</code> <code>glitch</code> <code>grain</code></sub></td>
     <td valign="top"><a href="examples/recipes/03-ascii-colour.toml"><b>ascii-colour</b></a><br><sub>Redrawn as text, every character in the photo's own colour.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code></sub></td>
     <td valign="top"><a href="examples/recipes/04-halftone-print.toml"><b>halftone-print</b></a><br><sub>Newsprint dot screen in warm white ink.<br><code>clarity</code> <code>halftone</code> <code>fill</code></sub></td>
-    <td valign="top"><a href="examples/recipes/05-ember-glitch.toml"><b>ember-glitch</b></a><br><sub>Fire palette, with some torn strips dissolving into text.<br><code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code> <code>grain</code></sub></td>
+    <td valign="top"><a href="examples/recipes/05-ember-glitch.toml"><b>ember-glitch</b></a><br><sub>Fire palette, torn glitch strips, glow and grain.<br><code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code> <code>grain</code></sub></td>
   </tr>
 </table>
 
@@ -235,7 +235,7 @@ mask = "background"               # "subject" or "background": apply only there
 effect = "glitch"
 split = 10
 bands = 10
-ascii_share = 0.5                 # some torn strips turn into text
+shift = 0.05                      # how far a strip may slide, as a share of the width
 seed = 4                          # same seed, same result, every time
 
 [[step]]

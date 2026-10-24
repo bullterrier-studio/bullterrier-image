@@ -203,7 +203,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `glitch` ✓ | Channel split, sliding bands, text strips. | `fx.glitch(split=9, bands=8)` |
+| `glitch` ✓ | Channel split and sliding bands. | `fx.glitch(split=9, bands=8)` |
 | `rgb_split` ✓ | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
 | `jpeg_crush` | Re-encode at very low quality. | `fx.jpeg_crush(quality=4)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
