@@ -1,0 +1,7 @@
+# Contour lines of the photo's brightness, drawn over the photo.
+# It also makes the effect's picture in the catalogue.
+name = "topographic"
+size = 480
+
+[[step]]
+effect = "topographic"
