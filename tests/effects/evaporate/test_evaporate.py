@@ -198,12 +198,6 @@ def test_evaporate_thinning_and_vanish_decide_how_many_risen_pieces_survive():
     assert thinned < every
 
 
-@pytest.mark.parametrize(("field", "value"), [("vanish", 1.5), ("cell", 0), ("rise_gamma", -1.0), ("wind", 99.0)])
-def test_evaporate_refuses_a_value_outside_its_range_naming_the_field(field, value):
-    with pytest.raises(ValueError, match=field):
-        registry.apply("evaporate", np.ones((20, 20, 3), np.float32), **{field: value})
-
-
 def _one_row_of_pieces(row: int = 30) -> np.ndarray:
     """40 rows of 64 pieces, black but for piece row `row`."""
     cell_w, cell_h = cell_size(5)
@@ -279,9 +273,3 @@ def test_evaporate_normal_blur_options_change_which_way_pieces_are_thrown(field,
     default = registry.apply("evaporate", _ragged_picture(), **kwargs)
     changed = registry.apply("evaporate", _ragged_picture(), **kwargs, **{field: value})
     assert not np.array_equal(default, changed)
-
-
-@pytest.mark.parametrize(("field", "value"), [("edge", "bogus"), ("normal_truncate", 0.5)])
-def test_evaporate_refuses_a_normal_blur_option_it_does_not_offer(field, value):
-    with pytest.raises(ValueError, match=field):
-        registry.apply("evaporate", np.ones((20, 20, 3), np.float32), **{field: value})

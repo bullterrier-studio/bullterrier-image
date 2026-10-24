@@ -164,20 +164,6 @@ def test_edge_sets_which_pixels_the_airlight_search_ranks_haziest_at_the_border(
     np.testing.assert_allclose(out[6, 2], expected, atol=1e-5)
 
 
-@pytest.mark.parametrize("edge", ["nearest", "reflect", "mirror", "wrap"])
-def test_every_edge_choice_gives_a_picture_of_the_same_shape_within_0_to_1(edge, photo) -> None:
-    odd = photo[:51, :67] * 0.5 + 0.3
-    out = registry.apply(NAME, odd, patch=9, edge=edge)
-    assert out.shape == odd.shape
-    assert out.min() >= 0.0
-    assert out.max() <= 1.0
-
-
-def test_an_edge_the_patch_search_cannot_use_is_refused() -> None:
-    with pytest.raises(ValueError, match="edge"):
-        registry.apply(NAME, scene(), edge="constant")
-
-
 def candidate_picture(*candidates: tuple[float, float, float]) -> np.ndarray:
     """10 x 10 of P with two pixels in each of the given colours, so that the airlight search sees them first when it
     looks at the 4 or 8 haziest pixels of 100 (their darkest channel, 0.5 or more, is above P's 0.1)."""

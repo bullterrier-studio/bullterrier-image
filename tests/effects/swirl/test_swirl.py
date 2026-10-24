@@ -163,14 +163,3 @@ def test_bicubic_overshoot_is_clipped_to_the_range_of_a_picture() -> None:
     out = registry.apply(NAME, edge, angle=150.0, radius=0.9, interpolation="bicubic")
     assert out.min() >= 0.0
     assert out.max() <= 1.0
-
-
-@pytest.mark.parametrize(
-    "setting",
-    [{"interpolation": "lanczos"}, {"edge": "constant"}, {"angle": 721.0}, {"radius": -0.1}],
-    ids=["unknown interpolation", "unknown edge", "angle beyond a double turn", "negative radius"],
-)
-def test_a_value_outside_the_documented_choices_is_refused(setting: dict[str, object], photo: np.ndarray) -> None:
-    (field,) = setting
-    with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(NAME, photo, **setting)

@@ -197,8 +197,3 @@ def test_bicubic_reproduces_a_cubic_gradient_where_bilinear_and_quadratic_fits_d
     }
     assert errors["bicubic"] < 4e-7
     assert errors["bilinear"] > 1e-4
-
-
-def test_an_unknown_interpolation_is_refused(photo: np.ndarray) -> None:
-    with pytest.raises(ValueError, match="`interpolation`"):
-        registry.apply(NAME, photo, interpolation="lanczos")

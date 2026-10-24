@@ -98,20 +98,3 @@ def test_a_corner_direction_copies_that_quarter_into_the_other_three(direction: 
     quarters = np.array([[1, 2], [3, 4]], np.float32)[:, :, None] / 10 + np.zeros((2, 2, 3), np.float32)
     out = registry.apply(NAME, quarters, direction=direction)
     np.testing.assert_allclose(out, np.full((2, 2, 3), quarter / 10), atol=1e-7)
-
-
-@pytest.mark.parametrize(
-    ("setting", "refused"),
-    [
-        pytest.param({"direction": "diagonal"}, True, id="a direction that is not offered is refused"),
-        pytest.param({"direction": "both"}, True, id="the old axis choice is not a direction"),
-        pytest.param({"axis": "vertical"}, True, id="the old axis field is gone"),
-        pytest.param({"direction": "bottom_right"}, False, id="every offered choice works"),
-    ],
-)
-def test_only_the_documented_choices_are_accepted(setting: dict, refused: bool, photo) -> None:
-    if refused:
-        with pytest.raises(ValueError, match=next(iter(setting))):
-            registry.apply(NAME, photo, **setting)
-    else:
-        registry.apply(NAME, photo, **setting)

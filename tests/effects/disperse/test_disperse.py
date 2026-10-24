@@ -536,9 +536,3 @@ def test_disperse_normal_blur_options_change_which_way_pieces_are_thrown(field, 
     default = registry.apply("disperse", _ragged_picture(), **kwargs)
     changed = registry.apply("disperse", _ragged_picture(), **kwargs, **{field: value})
     assert not np.array_equal(default, changed)
-
-
-@pytest.mark.parametrize(("field", "value"), [("edge", "bogus"), ("normal_truncate", 0.5)])
-def test_disperse_refuses_a_normal_blur_option_it_does_not_offer(field, value):
-    with pytest.raises(ValueError, match=field):
-        registry.apply("disperse", np.ones((20, 20, 3), np.float32), **{field: value})

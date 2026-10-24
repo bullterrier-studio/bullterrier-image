@@ -92,11 +92,6 @@ def test_a_roll_the_other_way_opens_the_gap_at_the_far_end(edge: str, expected: 
     np.testing.assert_allclose(out[:, 2, 0], np.array(expected) / 4, atol=1e-6)
 
 
-def test_edge_rejects_a_rule_that_is_not_offered(photo) -> None:
-    with pytest.raises(ValueError, match="edge"):
-        registry.apply(NAME, photo, edge="constant")
-
-
 @pytest.mark.parametrize("edge", ["wrap", "nearest", "reflect", "mirror"])
 def test_a_flat_picture_stays_flat(edge: str) -> None:
     out = registry.apply(NAME, np.full((9, 11, 3), 0.3, np.float32), offset=0.37, edge=edge)

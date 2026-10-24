@@ -77,15 +77,3 @@ def test_greys_are_unchanged_at_every_amount() -> None:
 
 def test_the_default_leaves_a_photo_unchanged(photo: np.ndarray) -> None:
     np.testing.assert_allclose(registry.apply(NAME, photo), photo, atol=1e-6)
-
-
-@pytest.mark.parametrize(
-    "settings",
-    [
-        pytest.param({"amount": 1.5}, id="above the maximum"),
-        pytest.param({"amount": -0.1}, id="negative: vibrance never desaturates"),
-    ],
-)
-def test_an_amount_outside_the_range_is_refused(settings: dict[str, float], photo: np.ndarray) -> None:
-    with pytest.raises(ValueError, match="amount"):
-        registry.apply(NAME, photo, **settings)

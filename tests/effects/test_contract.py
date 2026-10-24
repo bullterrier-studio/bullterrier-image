@@ -260,13 +260,25 @@ def _bounds() -> list[tuple[str, str, str]]:
     return found
 
 
+def _choices() -> list[tuple[str, str, str]]:
+    """(effect, choice field, choice) for every choice of every `Literal` field of every effect."""
+    return [
+        (name, field, choice)
+        for name in ALL
+        for field, prop in registry.schema(name)["properties"].items()
+        for choice in prop.get("enum", ())
+    ]
+
+
 def _bound_value(name: str, field: str, side: str, beyond: bool = False) -> float:
     model = registry.parameters(name)
     doc = next(d for d in model.fields_doc() if d.name == field)
     bound = doc.minimum if side == "min" else doc.maximum
     assert bound is not None
-    value = bound + ((-1 if side == "min" else 1) if beyond else 0)
-    return int(value) if isinstance(doc.default, int) else float(value)
+    if isinstance(doc.default, int):
+        return int(bound) + ((-1 if side == "min" else 1) if beyond else 0)
+    # the very next float: a limit that is off by any amount lets it through
+    return float(np.nextafter(bound, -np.inf if side == "min" else np.inf)) if beyond else float(bound)
 
 
 def _setting(name: str, field: str, value: float) -> dict[str, float]:
@@ -329,6 +341,18 @@ def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, 
         registry.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
 
 
+@pytest.mark.parametrize(("name", "field", "choice"), _choices())
+def test_every_effect_works_with_each_choice_it_offers(name, field, choice, photo):
+    small = _small(photo)
+    assert_a_picture_like(registry.apply(name, small, **{field: choice}, **_inputs(name, small)), small)
+
+
+@pytest.mark.parametrize(("name", "field"), sorted({(name, field) for name, field, _ in _choices()}))
+def test_a_choice_that_is_not_offered_is_refused(name, field, photo):
+    with pytest.raises(ValueError, match=f"`{field}`"):
+        registry.apply(name, _small(photo), **{field: "not_a_choice"})
+
+
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_refuses_an_unknown_parameter(name, photo):
     with pytest.raises(ValueError, match="not_a_parameter"):
@@ -346,16 +370,6 @@ def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
 
 
 # --- what holds for every effect that has the setting ----------------------------------------------------------------
-
-
-def _choices() -> list[tuple[str, str, str]]:
-    """(effect, choice field, choice) for every choice of every `Literal` field of every effect."""
-    return [
-        (name, field, choice)
-        for name in ALL
-        for field, prop in registry.schema(name)["properties"].items()
-        for choice in prop.get("enum", ())
-    ]
 
 
 # Effects whose `amount` of 0 is the identity only together with another setting.

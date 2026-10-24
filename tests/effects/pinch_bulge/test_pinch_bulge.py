@@ -134,20 +134,3 @@ def test_nearest_only_moves_whole_pixels_where_bilinear_blends_them() -> None:
     bilinear = registry.apply(NAME, noise, amount=0.6, radius=0.8, interpolation="bilinear")
     assert np.isin(nearest, noise).all()
     assert not np.isin(bilinear, noise).all()
-
-
-@pytest.mark.parametrize(
-    "setting",
-    [{"interpolation": "lanczos"}, {"edge": "constant"}, {"amount": 1.1}, {"amount": -1.1}, {"radius": -0.1}],
-    ids=[
-        "unknown interpolation",
-        "unknown edge",
-        "amount beyond a full bulge",
-        "amount beyond a full pinch",
-        "negative radius",
-    ],
-)
-def test_a_value_outside_the_documented_choices_is_refused(setting: dict[str, object], photo: np.ndarray) -> None:
-    (field,) = setting
-    with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(NAME, photo, **setting)

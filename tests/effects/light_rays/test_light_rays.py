@@ -150,11 +150,6 @@ def test_a_light_in_a_corner_streaks_across_the_whole_picture_without_error(phot
     assert out.shape == photo.shape
 
 
-def test_an_unknown_edge_rule_is_refused(photo: np.ndarray) -> None:
-    with pytest.raises(ValueError, match="`edge`"):
-        shine(photo, edge="constant")
-
-
 def test_nearest_reads_whole_pixels_where_bilinear_and_bicubic_blend_them() -> None:
     """With decay 1 and amount 1 every reading weighs 1/64, so light that comes only from whole pixels is a whole
     number of 64ths; blended readings are not."""
