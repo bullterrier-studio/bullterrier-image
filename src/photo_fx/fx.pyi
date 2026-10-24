@@ -874,9 +874,9 @@ band_max_height : number, fraction, 0 to 1, default 0.06
     gives taller strips.
 ascii_rows : whole number, count, 1 to 100, default 3
     The fewest rows of characters a text strip holds, 1 to 100: a thinner strip is
-    widened (each row counted as twice `ascii_cell` tall) so its text stays legible, up
-    to the whole picture. Animated, it moves in whole steps (rounded to the nearest
-    whole number).
+    widened (each row counted as tall as the font's character cell, see `ascii_font`) so
+    its text stays legible, up to the whole picture. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
 ascii_gamma : number, ratio, 0.1 to 10, default 0.55
     Exponent on the amount of ink each character puts down, 0.1 to 10: below 1 (the
     default) more ink, so the text carries enough light to read against dark paper;
