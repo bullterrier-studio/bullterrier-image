@@ -1,0 +1,12 @@
+# A fine pink grid, turned 15 degrees, on deep violet. The picture only gives the size.
+name = "pattern"
+size = 480
+
+[[step]]
+effect = "pattern"
+kind = "grid"
+cell = 40
+foreground = "#ff2bd6"
+background = "#12002b"
+thickness = 0.06
+angle = 15
