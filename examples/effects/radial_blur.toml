@@ -5,7 +5,7 @@ size = 480
 [[step]]
 effect = "radial_blur"
 mode = "zoom"
-amount = 0.25
+amount = 0.06
 x = 0.5
 y = 0.4
 samples = 16

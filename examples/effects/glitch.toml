@@ -4,9 +4,9 @@ size = 480
 
 [[step]]
 effect = "glitch"
-split = 6
-bands = 9
-shift = 0.05
-ascii_share = 0.3
+split = 4
+bands = 5
+shift = 0.03
+ascii_share = 0.1
 ascii_cell = 6
 seed = 4

@@ -4,7 +4,7 @@ size = 480
 
 [[step]]
 effect = "swirl"
-angle = 150
-radius = 0.6
+angle = 90
+radius = 0.5
 x = 0.5
 y = 0.4

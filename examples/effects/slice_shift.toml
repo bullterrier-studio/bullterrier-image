@@ -1,9 +1,9 @@
-# A torn, glitching frame: thirty strips slide a few percent of the width to either side.
+# A torn, glitching frame: sixteen strips slide a few percent of the width to either side.
 name = "slice_shift"
 size = 480
 
 [[step]]
 effect = "slice_shift"
-slices = 30
-amount = 0.06
+slices = 16
+amount = 0.03
 seed = 3

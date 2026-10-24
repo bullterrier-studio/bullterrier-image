@@ -4,6 +4,6 @@ size = 480
 
 [[step]]
 effect = "threshold"
-level = 0.45
+level = 0.6
 dark = "#1b1f3a"
 light = "#f4ecd8"
