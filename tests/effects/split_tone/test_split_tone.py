@@ -3,14 +3,14 @@
 import numpy as np
 
 from photo_fx.core import registry
-from photo_fx.ops.color import luminance
 
 
 def test_split_tone_tints_without_changing_brightness(photo: np.ndarray) -> None:
     midtones = 0.25 + photo * 0.5  # away from pure black and white, where a tint would clip and change brightness
     out = registry.apply("split_tone", midtones, amount=0.2)
     assert not np.allclose(out, midtones)
-    np.testing.assert_allclose(luminance(out), luminance(midtones), atol=1e-4)
+    rec_709 = [0.2126, 0.7152, 0.0722]  # ITU-R BT.709 luma weights of red, green, blue
+    np.testing.assert_allclose(out @ rec_709, midtones @ rec_709, atol=1e-4)
     np.testing.assert_array_equal(registry.apply("split_tone", photo, amount=0.0), photo)
 
 
