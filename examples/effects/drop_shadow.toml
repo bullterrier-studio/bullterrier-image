@@ -1,0 +1,15 @@
+# The subject on a flat backdrop with a soft shadow falling to the lower right.
+name = "drop_shadow"
+size = 480
+
+[[step]]
+effect = "fill"
+color = "#c9d6d9"
+mask = "background"           # a plain backdrop, so the shadow shows
+
+[[step]]
+effect = "drop_shadow"
+dx = 26
+dy = 32
+blur = 12
+opacity = 0.85
