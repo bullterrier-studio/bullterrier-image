@@ -6,6 +6,7 @@ import re
 import pytest
 
 from photo_fx.core.loader import load_recipe
+from photo_fx.core.steps import Step
 from photo_fx.errors import RecipeError
 
 STEP = "[[step]]\neffect = 'grade'\n"
@@ -84,3 +85,26 @@ BROKEN = {
 def test_a_broken_file_is_a_recipe_error_naming_the_file_and_the_problem(tmp_path, text, complaint):
     with pytest.raises(RecipeError, match=rf"^broken\.toml: .*{complaint}"):
         load_recipe(_write(tmp_path, text, "broken.toml"))
+
+
+# --- presets in a recipe file ------------------------------------------------------------------------------------
+
+
+def test_a_step_may_name_a_preset_and_its_own_keys_win_over_it(tmp_path):
+    path = _write(tmp_path, "[[step]]\neffect = 'gradient_map'\npreset = 'sepia'\nshadow_clip = 0.2\nopacity = 0.5\n")
+    (step,) = load_recipe(path).steps
+    assert step == Step("gradient_map", {"shadow_clip": 0.2}, preset="sepia").blend(0.5)
+    assert "preset" not in step.params  # a step's key, not an effect's parameter
+
+
+@pytest.mark.parametrize(
+    ("effect", "preset", "complaint"),
+    [
+        pytest.param("gradient_map", "sepya", r"gradient_map.*'sepya'.*sepia", id="a preset the effect lacks"),
+        pytest.param("grade", "sepia", r"grade.*'sepia'.*no presets", id="an effect without presets"),
+    ],
+)
+def test_a_wrong_preset_in_a_file_names_the_file_the_step_and_the_preset(tmp_path, effect, preset, complaint):
+    path = _write(tmp_path, f"[[step]]\neffect = 'grade'\n\n[[step]]\neffect = '{effect}'\npreset = '{preset}'\n")
+    with pytest.raises(RecipeError, match=rf"^look\.toml: step 2: .*{complaint}"):
+        load_recipe(path)

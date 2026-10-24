@@ -36,7 +36,9 @@ import numpy as np
 
 from photo_fx.errors import PhotoFxError, UnknownEffectError
 
+from . import presets as preset_files
 from .params import EffectParams
+from .presets import Preset
 
 # The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
 # catalogue's index shows it). Every effect is in exactly one category. A dict, so no category lacks its description.
@@ -192,6 +194,11 @@ def parameters(name: str) -> type[EffectParams]:
     return get(name).params_model
 
 
+def presets(name: str) -> dict[str, Preset]:
+    """The presets of the effect called `name` by name (empty if it has none; KeyError like `get`)."""
+    return preset_files.read(name, parameters(name))
+
+
 def inputs(name: str) -> tuple[str, ...]:
     """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("matte",) (KeyError like `get`)."""
     return get(name).inputs
@@ -212,9 +219,13 @@ def describe() -> dict[str, str]:
 def documentation(name: str, *, advanced: bool = True) -> str:
     """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every basic
     field's type, unit, range, default and description, then an "Advanced parameters" section (or, with
-    `advanced=False`, one line counting them). KeyError like `get`."""
+    `advanced=False`, one line counting them), then a "Presets" section if it has any. KeyError like `get`."""
     fn = get(name)
-    return f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
+    text = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
+    if not (found := presets(name)):
+        return text
+    lines = [f"{preset} : {found[preset].description}" for preset in found]
+    return f"{text}\n\nPresets\n-------\n" + "\n".join(lines)
 
 
 def summary(name: str) -> str:

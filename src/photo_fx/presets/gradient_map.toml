@@ -1,0 +1,21 @@
+# Looks that are one gradient map: the picture recoloured by brightness, darkest stop first.
+
+[sepia]
+description = "Warm brown monochrome, from dark chocolate to cream, like an aged print."
+stops = ["#1c1008", "#8a5a30", "#f1dfb8"]
+
+[cyanotype]
+description = "Prussian-blue monochrome fading to pale cyan, like a blueprint print."
+stops = ["#001d3d", "#1b5c8f", "#e3f3f5"]
+
+[thermal]
+description = "Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot."
+stops = ["#07002b", "#4a0f8c", "#c2185b", "#f4511e", "#ffc400", "#fffbe0"]
+
+[night_vision]
+description = "Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette)."
+stops = ["#000500", "#07400f", "#6dff7a"]
+
+[xray]
+description = "Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."
+stops = ["#e8f6ff", "#3d86c6", "#030c1c"]

@@ -18,6 +18,11 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     mask = "background"            # "subject" or "background": apply only there (needs a clear subject in the photo)
     opacity = 0.3                  # optional, 0..1: blend the effect in partway (default 1 = fully)
 
+    [[step]]
+    effect = "gradient_map"
+    preset = "sepia"               # optional: one of the effect's presets (`photo-fx effects NAME` lists them); the
+    opacity = 0.6                  # step's own keys win over the preset's
+
 Removing the background is not a feature of its own: it is a `fill` step masked to the background. Any other top-level
 key is refused, so a misspelt `size` or `format` is not silently ignored.
 
@@ -146,10 +151,10 @@ def load_recipe(path: str | Path) -> Recipe:
         name = entry.pop("effect", None)
         if name is None:
             raise RecipeError(f"{where}: missing `effect`")
-        mask, opacity = entry.pop("mask", None), entry.pop("opacity", 1.0)
+        mask, opacity, preset = entry.pop("mask", None), entry.pop("opacity", 1.0), entry.pop("preset", None)
         params = {key: _animated_value(value, where, key) for key, value in entry.items()}
         try:
-            steps.append(Step(name, params, mask, opacity))
+            steps.append(Step(name, params, mask, opacity, preset))
         except ValueError as error:
             raise _located(error, where) from None
     try:

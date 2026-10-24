@@ -13,6 +13,7 @@ from scipy import ndimage
 from photo_fx.core import registry
 from photo_fx.core.params import UNITS, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.core.steps import Step
 
 ALL = sorted(registry.describe())
 
@@ -33,6 +34,20 @@ def test_every_effect_keeps_shape_dtype_and_range_is_deterministic_and_leaves_it
     assert_a_picture_like(first, photo)
     np.testing.assert_array_equal(first, second)
     np.testing.assert_array_equal(photo, before)
+
+
+SHIPPED_PRESETS = [(name, preset) for name in ALL for preset in registry.presets(name)]
+
+
+@pytest.mark.parametrize(("name", "preset"), SHIPPED_PRESETS, ids=[f"{n}-{p}" for n, p in SHIPPED_PRESETS])
+def test_every_shipped_preset_is_valid_for_its_effect_and_makes_a_picture_that_differs_from_the_default(
+    name, preset, photo
+):
+    step = Step(name, preset=preset)  # validated by the effect's own model, like a recipe's step
+    inputs = _inputs(name, photo)
+    out = registry.apply(name, photo, **step.params, **inputs)
+    assert_a_picture_like(out, photo)
+    assert not np.array_equal(out, registry.apply(name, photo, **inputs))
 
 
 # Sizes no cell, tile or block divides: a single pixel, a single row or column, and two odd rectangles.

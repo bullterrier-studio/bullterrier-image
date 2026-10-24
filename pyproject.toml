@@ -332,13 +332,14 @@ type = "independence"
 modules = ["photo_fx.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core order: loader | runner > steps > registry > params | timing > types"  # vocabulary sits with timing
+name = "Core: loader|runner > steps > registry > presets > params|timing > types"  # vocabulary sits with timing
 type = "layers"
 containers = ["photo_fx.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
-# (types). Both edges point down, so each gets a layer of its own; nothing else changes.
-layers = ["loader | runner", "steps", "registry", "params | timing | vocabulary", "types"]
+# (types); the registry lists an effect's presets, which are read and checked with its parameter model. Each edge points
+# down, so each gets a layer of its own; nothing else changes.
+layers = ["loader | runner", "steps", "registry", "presets", "params | timing | vocabulary", "types"]
 
 [[tool.importlinter.contracts]]
 name = "loader imports only steps and timing from core"

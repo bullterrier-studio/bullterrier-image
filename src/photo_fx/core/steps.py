@@ -11,7 +11,8 @@ Promises:
   ends: a bad animation fails when the recipe is made, not at some frame later. An animated whole-number parameter
   moves in whole steps (rounded to the nearest whole number) and is checked that way.
 - Steps and recipes are immutable values (frozen Pydantic models): `where` and `blend` return changed copies. A step
-  keeps its parameters as they were written, so `describe` shows them that way.
+  keeps its parameters as they were written, so `describe` shows them that way; with a `preset` they are the preset's
+  parameters under the ones given, which is all the runner and the cache see of it.
 - `Step.params_at` works out animated parameters for a moment of the clip; `Step.describe` gives a short readable form.
 
 Dependency direction: imports `timing`, the effect registry, `params` and `errors` only. `loader` (TOML to `Recipe`)
@@ -59,11 +60,23 @@ class Step(ValidatedModel):
         params: Mapping[str, Any] | None = None,
         mask: str | None = None,
         opacity: float = 1.0,
+        preset: str | None = None,
         **unknown: Any,
     ) -> None:
         """Validate and make the step; RecipeError saying what is wrong and what is valid (`unknown` keywords, which
-        pydantic's own validation may pass, are refused by name)."""
-        self._init_checked("", effect=effect, params=dict(params or {}), mask=mask, opacity=opacity, **unknown)
+        pydantic's own validation may pass, are refused by name).
+
+        preset: the name of one of the effect's presets (see `registry.presets`). The step holds the preset's
+        parameters with `params` laid over them, so a parameter you give wins; an effect without that preset is a
+        RecipeError listing the ones it has."""
+        values = dict(params or {})
+        if preset is not None:
+            found = registry.presets(effect)  # an unknown effect: UnknownEffectError listing them
+            if preset not in found:
+                has = f"its presets: {', '.join(found)}" if found else "it has no presets"
+                raise RecipeError(f"effect {effect!r} has no preset {preset!r}; {has}")
+            values = {**found[preset].params, **values}
+        self._init_checked("", effect=effect, params=values, mask=mask, opacity=opacity, **unknown)
 
     @model_validator(mode="after")
     def _valid_for_the_effect(self) -> "Step":

@@ -2,16 +2,19 @@
 objects (Step, Recipe, Animated, Animation) are validated, frozen models wherever they are made."""
 
 import re
+import tomllib
+from importlib.resources import files
 
 import numpy as np
 import pytest
 
+from photo_fx.core import registry
 from photo_fx.core.loader import load_recipe
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.steps import Recipe, Step
 from photo_fx.core.timing import Animated, Animation
-from photo_fx.errors import RecipeError
+from photo_fx.errors import RecipeError, UnknownEffectError
 
 
 class GainParams(EffectParams):
@@ -288,3 +291,55 @@ def test_the_recipe_objects_refuse_unknown_fields():
         Animation.model_validate({"seconds": 1, "speed": 2})
     with pytest.raises(ValueError, match="colour"):
         Step.model_validate({"effect": "grade", "colour": "red"})
+
+
+# --- presets: an effect's named parameter sets, merged under the parameters a step is given ------------------------
+
+
+def _shipped(effect: str, preset: str) -> dict:
+    """What the shipped file says about a preset, read here with tomllib (not through photo-fx), without its text."""
+    table = tomllib.loads((files("photo_fx") / "presets" / f"{effect}.toml").read_text(encoding="utf-8"))[preset]
+    return {key: value for key, value in table.items() if key != "description"}
+
+
+EXPLICIT = {"shadow_clip": 0.2}  # a gradient_map parameter the sepia preset does not set
+
+
+def test_a_steps_parameters_are_the_presets_with_the_given_ones_over_them():
+    assert Step("gradient_map", preset="sepia").params == _shipped("gradient_map", "sepia")
+    assert Step("gradient_map", EXPLICIT, preset="sepia").params == {**_shipped("gradient_map", "sepia"), **EXPLICIT}
+
+
+def test_a_given_parameter_wins_over_the_presets():
+    sepia = _shipped("gradient_map", "sepia")
+    chosen = ["#000000", "#ff0000"]
+    step = Step("gradient_map", {"stops": chosen}, preset="sepia")
+    assert step.params["stops"] == chosen != sepia["stops"]
+
+
+def test_a_preset_step_renders_as_the_step_with_the_same_parameters_written_out(photo):
+    preset = Step("gradient_map", EXPLICIT, preset="sepia")
+    written = Step("gradient_map", {**_shipped("gradient_map", "sepia"), **EXPLICIT})
+    first = registry.apply("gradient_map", photo, **preset.params)
+    np.testing.assert_array_equal(first, registry.apply("gradient_map", photo, **written.params))
+    assert not np.array_equal(first, registry.apply("gradient_map", photo))  # and it is not the default look
+
+
+def test_a_preset_survives_where_and_blend():
+    step = Step("gradient_map", preset="sepia")
+    assert step.where("subject").blend(0.5).params == step.params
+
+
+def test_an_unknown_preset_names_the_effect_and_lists_its_presets():
+    with pytest.raises(RecipeError, match=r"gradient_map.*'sepya'.*sepia.*cyanotype"):
+        Step("gradient_map", preset="sepya")
+
+
+def test_a_preset_for_an_effect_without_presets_says_so(gain):
+    with pytest.raises(RecipeError, match=r"gain_probe.*'sepia'.*no presets"):
+        Step("gain_probe", preset="sepia")
+
+
+def test_a_preset_for_an_unknown_effect_lists_the_effects():
+    with pytest.raises(UnknownEffectError, match=r"no_such_effect.*gradient_map"):
+        Step("no_such_effect", preset="sepia")

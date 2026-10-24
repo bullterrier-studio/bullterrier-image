@@ -300,6 +300,14 @@ def test_documentation_lists_the_advanced_parameters_unless_told_not_to(throwawa
     assert "(+1 advanced)" in short
 
 
+def test_documentation_lists_the_presets_of_an_effect_that_has_some_and_only_then(gain):
+    listed = registry.documentation("gradient_map")
+    assert "\nPresets\n-------\n" in listed
+    for name, preset in registry.presets("gradient_map").items():
+        assert f"{name} : {preset.description}" in listed
+    assert "Presets" not in registry.documentation("gain_probe")
+
+
 def test_queries_about_an_unknown_effect_list_the_known_ones(gain):
     for query in (registry.parameters, registry.inputs):
         with pytest.raises(KeyError, match="gain_probe"):
