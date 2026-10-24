@@ -1,0 +1,6 @@
+# The photo poured into silvery chrome that follows its brightness.
+name = "liquid_metal"
+size = 480
+
+[[step]]
+effect = "liquid_metal"
