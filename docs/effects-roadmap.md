@@ -190,21 +190,22 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 
 **Changing the picture's size and shape**
 
-These are settings of the recipe, not effects (see "Size changes frame the photo before the steps" in the
-[design decisions](design-decisions.md)): framing runs before the first step, on the photo and the subject matte
-together, always in the order flip, rotate, crop, pad, size; transparency is cut after the last step.
+These are settings of the recipe's `[frame]` table, not effects (see "Size changes frame the photo before the steps" in
+the [design decisions](design-decisions.md)): framing runs before the first step, on the photo and the subject matte
+together, always in the order flip, rotate, crop, pad, size; transparency is cut after the last step. Lengths are shares
+of the picture, so a look does not depend on the resolution. `Framing.documentation()` lists every field.
 
 | Setting | What it does | Example |
 | --- | --- | --- |
-| crop | Crop to a box or aspect ratio. | `aspect = "1:1"`, `anchor = "subject"` |
-| smart crop | Crop around the subject with a margin. | `aspect = "4:5"`, `anchor = "subject"`, `margin = 0.1` |
-| resize | Scale, with a fit mode (today's `size`). | `size = 1080` |
-| pad | Extend the canvas with a colour. | `pad_top = 80`, `pad_color = "#000"` |
-| rotate | Rotate, with fill or crop to fit. | `rotate = 3`, `rotate_fit = "crop"` |
-| flip | Mirror the whole picture. | `flip = "x"` |
-| transparent background | The subject on transparency. | `transparent = "background"` |
-| circle crop | Circular avatar with transparency. | `transparent = "circle"` |
-| rounded corners | Rounded rectangle with transparency. | `transparent = "rounded"`, `corner_radius = 40` |
+| crop ✓ | Crop to a width-over-height ratio around the middle or a side. | `aspect = 1.0`, `anchor = "top"` |
+| smart crop ✓ | Crop around the subject with a margin. | `aspect = 0.8`, `anchor = "subject"`, `margin = 0.1` |
+| resize ✓ | Scale to a longest side (the recipe's `size`). | `size = 1080` |
+| pad ✓ | Extend the canvas with a colour, per side. | `pad_top = 0.1`, `fill = "#000000"` |
+| rotate ✓ | Rotate, expanding the canvas or cropping to fit. | `angle = 3`, `fit = "crop"` |
+| flip ✓ | Mirror the whole picture. | `flip = "x"` |
+| transparent background ✓ | The subject on transparency. | `transparent = "background"` |
+| circle crop ✓ | Circular cut with transparency. | `transparent = "circle"` |
+| rounded corners ✓ | Rounded rectangle with transparency. | `transparent = "rounded"`, `corner_radius = 0.1` |
 
 ## Glitch and signal damage
 
@@ -297,8 +298,8 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `auto_enhance` | Sensible levels, white balance and vibrance in one step. | `fx.auto_enhance()` |
-| `avatar` | Square crop on the subject, optional circle: a recipe of framing and transparency settings. | `aspect = "1:1"`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
-| `upscale` | Lanczos (a `size` above the photo's own), or an optional AI model. | `size = 4096` |
+| `avatar` ✓ (a recipe, [avatar.toml](../examples/transparent/avatar.toml)) | Square crop on the subject, optional circle: framing and transparency settings. | `aspect = 1.0`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
+| `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
 | `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml glitch.split 0..20` |
 | `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
