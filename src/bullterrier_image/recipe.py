@@ -1,19 +1,19 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo. The
-machinery lives in `bullterrier_image.core` (`steps`, `loader`, `runner`); this module re-exports its public names and
-binds the one thing the core leaves open: how the subject is found. `render`, `trace` and `render_all` take the same
-arguments as the core's, but when a masked step needs the subject and no `matte` or `find_subject` is given, they
-find it with `bullterrier_image.matte.subject_matte`.
+machinery lives in `bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`; this module re-exports
+its public names and binds the one thing the core leaves open: how the subject is found. `render`, `trace` and
+`render_all` take the same arguments as the core's, but when a masked step needs the subject and no `matte` or
+`find_subject` is given, they find it with `bullterrier_image.matte.subject_matte`.
 """
 
 import numpy as np
 
 from . import matte as subject
 from .core import runner
-from .core.loader import load_recipe
 from .core.runner import Stage, SubjectFinder
 from .core.steps import Recipe, Step
+from .loader import load_recipe
 
 __all__ = ["Recipe", "Stage", "Step", "SubjectFinder", "load_recipe", "render", "render_all", "trace"]
 

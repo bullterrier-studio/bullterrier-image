@@ -2,9 +2,9 @@
 import sees. Each layer may import only the layers below it:
 
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
-    adapters   imageio, matte
+    adapters   imageio, matte, loader (recipe files)
     effects    one folder per effect; never import each other
-    core       loader | runner > steps > registry > presets > params | vocabulary > types; may import ops
+    core       runner > steps > registry > presets > params | vocabulary > types; may import ops
     ops        may import errors
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
 
@@ -31,9 +31,8 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
-CORE_ORDER = "Core: loader|runner > steps > registry > presets > params|vocabulary > types"
-LOADER_DIRECT = "loader imports only steps from core"
-CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT]
+CORE_ORDER = "Core: runner > steps > registry > presets > params|vocabulary > types"
+CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
 
 
 def fresh_python(code: str) -> subprocess.CompletedProcess:
@@ -96,29 +95,13 @@ FORBIDDEN = {
     "recipe to pipeline": ("recipe.py", "import bullterrier_image.pipeline", "bullterrier_image.recipe", LAYERS),
     "fx to gallery": ("fx.py", "import bullterrier_image.gallery", "bullterrier_image.fx", LAYERS),
     "pipeline to cli": ("pipeline.py", "import bullterrier_image.cli", "bullterrier_image.pipeline", LAYERS),
-    "loader to runner": (
-        "core/loader.py",
-        "import bullterrier_image.core.runner",
-        "bullterrier_image.core.loader",
-        CORE_ORDER,
-    ),
-    "steps to loader": (
-        "core/steps.py",
-        "import bullterrier_image.core.loader",
-        "bullterrier_image.core.steps",
-        CORE_ORDER,
-    ),
+    "core to loader": ("core/steps.py", "import bullterrier_image.loader", "bullterrier_image.core.steps", LAYERS),
+    "loader to recipe": ("loader.py", "import bullterrier_image.recipe", "bullterrier_image.loader", LAYERS),
     "registry to steps": (
         "core/registry.py",
         "import bullterrier_image.core.steps",
         "bullterrier_image.core.registry",
         CORE_ORDER,
-    ),
-    "loader to registry": (
-        "core/loader.py",
-        "import bullterrier_image.core.registry",
-        "bullterrier_image.core.loader",
-        LOADER_DIRECT,
     ),
     "presets to registry": (
         "core/presets.py",

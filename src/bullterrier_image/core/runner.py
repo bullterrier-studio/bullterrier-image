@@ -10,8 +10,8 @@ every stage. The runner is given everything it uses: the photo, and the subject 
 only if some step needs the subject. It never loads a file or looks for the subject on its own;
 `bullterrier_image.recipe` binds the default finder for users.
 
-Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never `loader`, so recipes
-built in Python run without the TOML reader.
+Dependency direction: imports `steps`, the effect registry and `ops` (to scale the photo); never the recipe-file
+reader `loader`, so recipes built in Python run without it.
 """
 
 from collections import deque

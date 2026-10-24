@@ -18,8 +18,8 @@ from bullterrier_image import (
     fx,
 )
 from bullterrier_image.core import registry
-from bullterrier_image.core.loader import load_recipe
 from bullterrier_image.core.steps import Step
+from bullterrier_image.loader import load_recipe
 
 GREY = np.full((4, 4, 3), 0.25, dtype=np.float32)
 

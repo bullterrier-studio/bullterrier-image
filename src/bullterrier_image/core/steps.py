@@ -11,8 +11,9 @@ Promises:
   parameters under the ones given, which is all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
 
-Dependency direction: imports the effect registry, `params` and `errors` only. `loader` (TOML to `Recipe`)
-and `runner` (running a `Recipe` on a photo) both build on this module and do not know each other.
+Dependency direction: imports the effect registry, `params` and `errors` only. The recipe-file reader `loader` (TOML to
+`Recipe`, in the adapters layer) and `runner` (running a `Recipe` on a photo) both build on this module and do not know
+each other.
 """
 
 import re

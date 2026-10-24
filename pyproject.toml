@@ -321,7 +321,7 @@ layers = [
     "pipeline | gallery",
     "sheet | checks | fx",
     "recipe",
-    "imageio : matte",  # adapters
+    "imageio : matte : loader",  # adapters: file formats, the subject, recipe files (the loader reads pictures through imageio)
     "effects",
     "plugin",  # the effect-author API for other packages: core's names, so bullterrier-image's own effects may use it too
     "core",  # may import ops
@@ -337,21 +337,14 @@ type = "independence"
 modules = ["bullterrier_image.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core: loader|runner > steps > registry > presets > params|vocabulary > types"
+name = "Core: runner > steps > registry > presets > params|vocabulary > types"
 type = "layers"
 containers = ["bullterrier_image.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
 # (types); the registry lists an effect's presets, which are read and checked with its parameter model. Each edge points
 # down, so each gets a layer of its own; nothing else changes.
-layers = ["loader | runner", "steps", "registry", "presets", "params | vocabulary", "types"]
-
-[[tool.importlinter.contracts]]
-name = "loader imports only steps from core"
-type = "forbidden"
-source_modules = ["bullterrier_image.core.loader"]
-forbidden_modules = ["bullterrier_image.core.registry", "bullterrier_image.core.types", "bullterrier_image.core.vocabulary"]
-allow_indirect_imports = true  # through steps is fine: the TOML reader itself only builds Steps and Recipes
+layers = ["runner", "steps", "registry", "presets", "params | vocabulary", "types"]
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since
 # the last tag, grouped as Keep a Changelog does. A commit only appears if a parser below names its group; the rest

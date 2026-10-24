@@ -45,7 +45,7 @@ place that knows these paths. Shared numeric code lives in `ops/`, named by conc
 
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
-adapters   imageio (files), matte (finding the subject)               (may import core, ops)
+adapters   imageio (files), matte (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)

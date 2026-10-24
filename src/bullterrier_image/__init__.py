@@ -17,9 +17,9 @@
 Layers, each importing only from the ones below it (import-linter checks this in the test suite):
     app        cli, pipeline (many photos x many recipes), gallery (the effect catalogue), sheet (comparison images),
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
-    adapters   imageio (files and the one in-memory image type), matte (finding the subject)
+    adapters   imageio (files and the one in-memory image type), matte (finding the subject), loader (recipe files)
     effects    the effect library: pure functions image -> image, found automatically
-    core       the registry and the recipe engine (steps, loader, runner)
+    core       the registry and the recipe engine (steps, runner)
     ops        shared numeric primitives, named by concept
 
 Importing bullterrier_image is cheap: each public name loads its module the first time it is used, and the effects load

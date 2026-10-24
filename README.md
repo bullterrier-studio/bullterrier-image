@@ -413,6 +413,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
   imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
+  loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
   matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (Apple Vision, or IS-Net on
                            ONNX Runtime, downloaded on first use) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
@@ -422,7 +423,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
                            data in presets/), types.py,
                            vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`),
-                           loader.py (TOML), runner.py (render, render_all, trace; given the photo and the subject)
+                           runner.py (render, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
                            glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
   errors.py      errors    BullterrierImageError and its subclasses: the bottom layer, importable from every other one

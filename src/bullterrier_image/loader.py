@@ -26,7 +26,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 Removing the background is not a feature of its own: it is a `fill` step masked to the background. Any other top-level
 key is refused, so a misspelt `size` or `format` is not silently ignored.
 
-Dependency direction: imports `steps` and `errors` only; it does not know `runner`.
+Dependency direction: imports `core.steps` and `errors` only; it does not know `runner`.
 """
 
 import tomllib
@@ -34,7 +34,7 @@ from pathlib import Path
 
 from bullterrier_image.errors import RecipeError
 
-from .steps import Recipe, Step, safe_name
+from .core.steps import Recipe, Step, safe_name
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones.

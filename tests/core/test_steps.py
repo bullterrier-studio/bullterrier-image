@@ -8,11 +8,11 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.loader import load_recipe
 from bullterrier_image.core.params import EffectParams, Picture, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
+from bullterrier_image.loader import load_recipe
 
 
 class GainParams(EffectParams):
