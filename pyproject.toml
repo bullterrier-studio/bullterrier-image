@@ -272,6 +272,9 @@ ignore_decorators = [
     "@field_validator",
 ]
 ignore_names = [
+    "StartDoctypeDeclHandler",  # expat calls the function assigned to each of these callback attributes
+    "StartElementHandler",
+    "EndElementHandler",
     "model_config",  # pydantic reads each model's settings from this class attribute
     "__signature__",  # `inspect.signature` reads it (the documented way to give a callable a signature)
     "__call__",  # Python calls it when a registered effect object is called

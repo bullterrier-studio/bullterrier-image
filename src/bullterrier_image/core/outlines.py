@@ -177,7 +177,7 @@ def _tree(data: bytes, what: str) -> _Node:
     root = _Node("", "", "", [])
     open_nodes = [root]
 
-    def doctype(name: str, system: str | None, public: str | None, internal: bool) -> None:
+    def doctype(_name: str, _system: str | None, _public: str | None, internal: bool) -> None:
         if internal:
             raise RecipeError(f"{what} declares XML entities (a DOCTYPE with an internal subset), which are refused")
 
