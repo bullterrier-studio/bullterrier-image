@@ -137,14 +137,6 @@ def test_repeat_on_a_radial_gradient_ends_on_the_last_colour_beyond_the_radius()
     np.testing.assert_allclose(out[0, 0], BLUE, atol=1e-6)
 
 
-def test_the_picture_only_gives_the_size() -> None:
-    rng = np.random.default_rng(0)
-    busy = rng.random((40, 60, 3), dtype=np.float32)
-    np.testing.assert_array_equal(
-        registry.apply(NAME, busy, kind="conic"), registry.apply(NAME, np.zeros((40, 60, 3), np.float32), kind="conic")
-    )
-
-
 def test_a_gradient_needs_two_colours() -> None:
     with pytest.raises(RecipeError, match="colors"):
         registry.apply(NAME, np.zeros((4, 4, 3), np.float32), colors=["#ff0000"])

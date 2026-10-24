@@ -27,14 +27,6 @@ def lone_star(seed: int, **settings: Any) -> np.ndarray:
     raise AssertionError("every one of 50 seeds put the star on the picture's edge")
 
 
-def test_the_picture_is_replaced_and_only_its_size_is_kept(photo: np.ndarray) -> None:
-    other = np.random.default_rng(9).random(photo.shape, dtype=np.float32)
-    out = registry.apply(NAME, photo, seed=1)
-    assert out.shape == photo.shape
-    np.testing.assert_array_equal(out, registry.apply(NAME, other, seed=1))
-    np.testing.assert_array_equal(out, registry.apply(NAME, np.zeros_like(photo), seed=1))
-
-
 def test_with_no_stars_the_sky_is_one_flat_colour() -> None:
     out = registry.apply(NAME, np.ones((20, 30, 3), np.float32), count=0, sky="#336699")
     expected = np.array([0x33, 0x66, 0x99], np.float32) / 255

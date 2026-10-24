@@ -21,14 +21,6 @@ def autocorrelation(values: np.ndarray, lag: int) -> float:
     return float(np.corrcoef(values[:, :-lag].ravel(), values[:, lag:].ravel())[0, 1])
 
 
-@pytest.mark.parametrize("size", [(40, 64), (97, 33)], ids=["wide", "tall"])
-def test_the_picture_takes_only_its_size_from_the_input(size: tuple[int, int]) -> None:
-    dark, light = np.zeros((*size, 3), np.float32), np.ones((*size, 3), np.float32)
-    out = registry.apply(NAME, dark, seed=3)
-    assert out.shape == (*size, 3)
-    np.testing.assert_array_equal(out, registry.apply(NAME, light, seed=3))
-
-
 @pytest.mark.parametrize("kind", KINDS)
 def test_a_two_colour_ramp_mixes_the_colours_and_uses_all_of_it(kind: str) -> None:
     """Red-to-blue: every pixel is red x (1 - t) + blue x t, so red + blue = 1 and green = 0; t covers the ramp."""

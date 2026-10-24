@@ -131,8 +131,3 @@ def test_a_two_colour_ramp_mixes_its_two_colours_and_reaches_both_ends() -> None
     np.testing.assert_allclose(outside[:, 0], outside[:, 2], atol=1e-6)
     assert outside[:, 0].min() < 0.1
     assert outside[:, 0].max() > 0.9
-
-
-def test_the_picture_only_gives_the_size() -> None:
-    busy = np.random.default_rng(0).random((31, 41, 3), dtype=np.float32)
-    np.testing.assert_array_equal(registry.apply(NAME, busy), registry.apply(NAME, np.zeros_like(busy)))

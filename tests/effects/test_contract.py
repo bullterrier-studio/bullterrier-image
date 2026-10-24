@@ -395,6 +395,22 @@ def test_an_amount_of_zero_returns_the_picture_as_it_is_in_a_new_array(name, set
     assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
 
 
+def _picture_changes_the_background(name: str) -> bool:
+    """Whether the effect's output depends on more than the picture's size."""
+    busy = np.random.default_rng(0).random((31, 41, 3), dtype=np.float32)
+    return not np.array_equal(registry.apply(name, busy), registry.apply(name, np.zeros_like(busy)))
+
+
+@pytest.mark.parametrize("name", registry.categories()["backgrounds"])
+def test_a_background_takes_only_its_size_from_the_picture(name):
+    assert not _picture_changes_the_background(name)
+
+
+def test_a_background_that_reads_the_picture_is_caught(throwaway_effects, register_probe):
+    register_probe("reading_probe", "backgrounds")  # returns the picture, so the picture shows through
+    assert _picture_changes_the_background("reading_probe")
+
+
 def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
     """(effect, choices) for every combination of the choice fields (`mode`, `edge`, `interpolation`...) of the
     effects that read the picture between its pixels (those with an `interpolation` field)."""

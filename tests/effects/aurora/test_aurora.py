@@ -21,14 +21,6 @@ def autocorrelation(values: np.ndarray, lag: int, axis: int) -> float:
     return float(np.corrcoef(a.ravel(), b.ravel())[0, 1])
 
 
-@pytest.mark.parametrize("size", [(40, 64), (97, 33)], ids=["wide", "tall"])
-def test_the_picture_takes_only_its_size_from_the_input(size: tuple[int, int]) -> None:
-    dark, light = np.zeros((*size, 3), np.float32), np.ones((*size, 3), np.float32)
-    out = registry.apply(NAME, dark, seed=3)
-    assert out.shape == (*size, 3)
-    np.testing.assert_array_equal(out, registry.apply(NAME, light, seed=3))
-
-
 def test_the_sky_is_dark_below_the_curtain_base_and_above_the_curtain_top() -> None:
     """Base at 80 % of 100 rows, curtain 30 rows tall: rows from 81 down and rows above row 50 are the sky colour."""
     out = registry.apply(

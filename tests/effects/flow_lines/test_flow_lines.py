@@ -107,8 +107,3 @@ def test_no_density_draws_no_lines_and_more_density_draws_more() -> None:
 def test_the_seed_decides_the_lines() -> None:
     np.testing.assert_array_equal(render(seed=4), render(seed=4))
     assert not np.array_equal(render(seed=4), render(seed=5))
-
-
-def test_the_picture_only_gives_the_size() -> None:
-    busy = np.random.default_rng(0).random((20, 50, 3), dtype=np.float32)
-    np.testing.assert_array_equal(registry.apply(NAME, busy), registry.apply(NAME, np.zeros_like(busy)))

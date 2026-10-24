@@ -107,8 +107,3 @@ def test_line_width_zero_draws_no_border() -> None:
 def test_the_seed_decides_the_cells() -> None:
     np.testing.assert_array_equal(render(cells=12, seed=5), render(cells=12, seed=5))
     assert not np.array_equal(render(cells=12, seed=5), render(cells=12, seed=6))
-
-
-def test_the_picture_only_gives_the_size() -> None:
-    busy = np.random.default_rng(0).random((HEIGHT, WIDTH, 3), dtype=np.float32)
-    np.testing.assert_array_equal(registry.apply(NAME, busy), registry.apply(NAME, np.zeros_like(busy)))

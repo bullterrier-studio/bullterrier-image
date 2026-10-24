@@ -101,10 +101,3 @@ def test_thickness_and_radius_only_matter_to_the_kinds_that_use_them() -> None:
     np.testing.assert_array_equal(render(kind="checks", thickness=0.1, radius=0.1), render(kind="checks"))
     np.testing.assert_array_equal(render(kind="dots", thickness=0.1), render(kind="dots"))
     np.testing.assert_array_equal(render(kind="grid", radius=0.7), render(kind="grid"))
-
-
-def test_the_picture_only_gives_the_size() -> None:
-    busy = np.random.default_rng(0).random((40, 60, 3), dtype=np.float32)
-    np.testing.assert_array_equal(
-        registry.apply(NAME, busy, kind="dots"), registry.apply(NAME, np.zeros((40, 60, 3), np.float32), kind="dots")
-    )
