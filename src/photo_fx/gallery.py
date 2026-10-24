@@ -11,7 +11,6 @@ developer commands; they need a source checkout of photo-fx.
 """
 
 import ast
-import inspect
 import keyword
 import re
 from collections.abc import Sequence
@@ -290,8 +289,11 @@ def _category_page(category: str, names: list[str]) -> str:
 
 
 def _row(name: str) -> str:
-    # fx's signature is the one a recipe author sees: without the image, and without `matte`, which the recipe supplies
-    parameters = inspect.signature(getattr(fx, name)).parameters.values()
+    # what a recipe sets: the parameters, not the image or `matte`, which the recipe supplies
+    docs = registry.parameters(name).fields_doc()
+    shown = [f"`{doc.name}={doc.default!r}`" for doc in docs if not doc.advanced]
+    if hidden := sum(doc.advanced for doc in docs):
+        shown.append(f"+{hidden} advanced")
     files = effect_files(name)
     page_folder = CHECKOUT / "docs" / "effects"  # links are relative to the page, docs/effects/<category>.md
     example = files.example.relative_to(page_folder, walk_up=True).as_posix()
@@ -300,7 +302,7 @@ def _row(name: str) -> str:
         f'<img src="{picture}" width="160" alt="{name}">',
         f"`{name}`",
         registry.summary(name),
-        " ".join(f"`{p.name}={p.default!r}`" for p in parameters) or "none",
+        " ".join(shown) or "none",
         f"[{files.example.name}]({example})",
     ]
     return "| " + " | ".join(_cell(text) for text in cells) + " |"
@@ -308,13 +310,29 @@ def _row(name: str) -> str:
 
 def _parameter_table(name: str) -> list[str]:
     """The lines of an effect's parameter table (name, type, unit, range, default, description), under a heading of its
-    own."""
-    model = registry.parameters(name)
-    lines = ["", f"### `{name}`", "", "| Parameter | Type | Unit | Range | Default | Description |"]
-    lines.append("| --- | --- | --- | --- | --- | --- |")
-    for doc in model.fields_doc():
-        cells = [f"`{doc.name}`", doc.type, doc.unit or "", doc.range, f"`{doc.default!r}`", doc.doc]
-        lines.append("| " + " | ".join(_cell(text) for text in cells) + " |")
+    own; the advanced parameters follow in a collapsed block of the same form."""
+    docs = registry.parameters(name).fields_doc()
+    head = ["| Parameter | Type | Unit | Range | Default | Description |", "| --- | --- | --- | --- | --- | --- |"]
+
+    def rows(advanced: bool) -> list[str]:
+        cells = (
+            [f"`{d.name}`", d.type, d.unit or "", d.range, f"`{d.default!r}`", d.doc]
+            for d in docs
+            if d.advanced == advanced
+        )
+        return ["| " + " | ".join(_cell(text) for text in row) + " |" for row in cells]
+
+    lines = ["", f"### `{name}`", "", *head, *rows(False)]
+    if hidden := rows(True):
+        lines += [
+            "",
+            f"<details><summary>Advanced parameters ({len(hidden)})</summary>",
+            "",
+            *head,
+            *hidden,
+            "",
+            "</details>",
+        ]
     return lines
 
 

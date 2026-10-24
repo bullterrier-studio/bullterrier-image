@@ -207,6 +207,54 @@ def test_a_modelled_effect_gets_a_table_of_its_parameters(fresh_registry):
     )
 
 
+class TunedParams(EffectParams):
+    """The tuned probe's settings: a technique option between two look controls."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, doc="Width of the halo.")
+    edge: Literal["reflect", "wrap"] = param("reflect", advanced=True, doc="Past the border: 'reflect' or 'wrap'.")
+    mode: Literal["screen", "add"] = param("screen", doc="How the halo meets the picture: 'screen' or 'add'.")
+    softness: float = param(2.0, unit="px", min=0, max=10, advanced=True, doc="Blur of the mask.")
+
+
+def test_advanced_parameters_leave_the_row_and_fill_a_collapsed_table_under_the_basic_one(fresh_registry):
+    @effect(category="light", params=TunedParams)
+    def tuned_probe(rgb, params):
+        """Tunes the halo."""
+        return rgb
+
+    page = gallery.render_effects_pages()["light.md"]
+    row = _row(page, "tuned_probe")
+    assert "`radius=24.0` `mode='screen'` +2 advanced" in row
+    assert "edge" not in row
+    assert "softness" not in row
+    table = page[page.index("### `tuned_probe`") :]
+    basic, collapsed = table.split("<details><summary>Advanced parameters (2)</summary>")
+    assert [line.split(" | ")[0] for line in basic.splitlines() if line.startswith("| `")] == ["| `radius`", "| `mode`"]
+    body, after = collapsed.split("</details>")
+    assert body.startswith(
+        "\n\n| Parameter | Type | Unit | Range | Default | Description |\n"
+    )  # blank line: GitHub renders it
+    assert body.endswith("|\n\n")
+    assert [line.split(" | ")[0] for line in body.splitlines() if line.startswith("| `")] == [
+        "| `edge`",
+        "| `softness`",
+    ]
+    assert "| `softness` | number | px | 0 to 10 | `2.0` | Blur of the mask. |" in body
+    assert "`radius`" not in body
+    assert "tuned_probe" not in after
+
+
+def test_an_effect_without_advanced_parameters_has_no_collapsed_block_and_no_count(fresh_registry):
+    @effect(category="light", params=HaloParams)
+    def halo_probe(rgb, params):
+        """Puts a halo around the bright parts."""
+        return rgb
+
+    page = gallery.render_effects_pages()["light.md"]
+    assert "<details>" not in page
+    assert "advanced" not in _row(page, "halo_probe")
+
+
 class PipeParams(EffectParams):
     """The pipe probe's settings."""
 
