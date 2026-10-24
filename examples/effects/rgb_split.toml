@@ -1,0 +1,8 @@
+# Red and blue fringes: the channels pulled eight pixels apart along a rising diagonal, green left in place.
+name = "rgb_split"
+size = 480
+
+[[step]]
+effect = "rgb_split"
+angle = 30
+amount = 8
