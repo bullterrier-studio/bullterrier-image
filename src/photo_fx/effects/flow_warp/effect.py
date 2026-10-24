@@ -31,6 +31,7 @@ class FlowWarpParams(EffectParams):
         "pixel moves straight `amount` px in the direction of the flow where it stands; more steps follow the "
         "bends of the flow and smear the picture into streaks along it, a little softer each time. Raising it costs "
         "time in proportion.",
+        advanced=True,
     )
     scale: float = param(
         80.0,
@@ -56,6 +57,7 @@ class FlowWarpParams(EffectParams):
         max=1,
         doc="How much weaker each finer layer is than the one before: each layer's weight is this to the power of its "
         "number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough).",
+        advanced=True,
     )
     lacunarity: float = param(
         2.0,
@@ -64,6 +66,7 @@ class FlowWarpParams(EffectParams):
         max=4,
         doc="How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = "
         "every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size.",
+        advanced=True,
     )
     seed: int = param(
         0,
