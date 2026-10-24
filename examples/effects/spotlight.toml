@@ -1,0 +1,10 @@
+# The subject stays lit; the surroundings fall into shadow the further they are from it.
+name = "spotlight"
+size = 480
+
+[[step]]
+effect = "spotlight"
+amount = 0.92
+falloff = 0.7
+radius = 90
+feather = 12
