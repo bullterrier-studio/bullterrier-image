@@ -125,7 +125,7 @@ blue : number, ratio, 0 to 1, default 0.0722
     and darkens skin. The default is the Rec. 709 luma weight of blue."""
     ...
 
-def bloom(radius: float = 32.0, threshold: float = 0.6, amount: float = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def bloom(radius: float = 32.0, threshold: float = 0.6, amount: float = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
 
 The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
@@ -157,7 +157,7 @@ persistence : number, ratio, 0 to 1, default 0.5
 truncate : number, ratio, 1 to 10, default 4.0
     Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma
     px. Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated) or 'wrap' (the opposite edge)."""
@@ -201,7 +201,41 @@ blue_from_blue : number, ratio, -3 to 3, default 1.0
     it, above 1 amplifies it, a negative weight inverts it."""
     ...
 
-def clarity(radius: float = 30.0, amount: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+def chromatic_aberration(amount: float = 4.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Shift red outward and blue inward from the centre `x`, `y` by up to `amount` px, leaving green alone.
+
+Each pixel d px from the centre shows red read at d x (1 - amount / R) and blue at d x (1 + amount / R) on the
+same ray, R the distance of the farthest corner, so the shift grows linearly from nothing at the centre to
+`amount` px there; green is the picture itself. Each channel is read by `interpolation`; the result never leaves
+0..1.
+
+Parameters
+----------
+amount : number, px, 0 to 100, default 4.0
+    How far red and blue are pulled apart, in pixels at the farthest corner of the
+    picture: there the red is shifted this far outward from the centre and the blue this
+    far inward, while green stays where it is. The shift grows in proportion to the
+    distance from the centre, so it is half as much halfway out and nothing at the
+    centre. A larger amount is wider fringes; 0 leaves the picture unchanged. A shift
+    larger than the distance to the farthest corner is limited to it.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from a colour channel: 'nearest' takes the
+    closest pixel (fastest, but the fringes step), 'bilinear' blends the four pixels
+    around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the
+    neighbouring pixels (sharpest, a little slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blue sees beyond the picture's edge (it reads from farther out than it
+    shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
+    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def clarity(radius: float = 30.0, amount: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when
 the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
 Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
@@ -217,12 +251,12 @@ amount : number, ratio, 0 to 5, default 1.0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
     Larger is more exact and slower.
-mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge), 'constant' (constant_value).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored
+    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
     otherwise."""
     ...
 
@@ -529,6 +563,39 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     without a matte it also decides the figure's outline."""
     ...
 
+def echo(copies: int = 4, dx: float = 14.0, dy: float = 0.0, fade: float = 0.5, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest') -> Step:
+    """Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.
+
+The result is the weighted average of the picture (weight 1) and copy k, the picture moved by k times (`dx`,
+`dy`) (weight (1 - fade)^k), so the weights add up to one: the picture's brightness is kept, a flat picture stays
+flat and nothing leaves the range 0..1. What a copy shows where it moved off the picture is set by `edge`.
+
+Parameters
+----------
+copies : whole number, count, 0 to 32, default 4
+    How many copies are laid over the picture, 0 to 32; 0 leaves the picture unchanged.
+    More copies make a longer trail (the time grows with the count). Animated, it moves
+    in whole steps (rounded to the nearest whole number).
+dx : number, px, -500 to 500, default 14.0
+    How far each copy lies to the right of the one before it, in pixels, -500 to 500
+    (negative is to the left); copy k is k times this far from the picture. A fraction
+    of a pixel blends the two pixels it lies between.
+dy : number, px, -500 to 500, default 0.0
+    How far each copy lies below the one before it, in pixels, -500 to 500 (negative is
+    above); copy k is k times this far from the picture. With dx and dy both 0 the
+    copies lie on the picture and change nothing.
+fade : number, fraction, 0 to 1, default 0.5
+    How much weaker each copy is than the one before it, 0 to 1: the original counts 1,
+    copy k counts (1 - fade) to the power k. 0 gives every copy the strength of the
+    original; 0.5 halves each; 1 makes the copies vanish and leaves the picture
+    unchanged.
+edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
+    What a copy shows where it has moved off the picture's edge: 'nearest' repeats the
+    picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the
+    other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror'
+    mirrors it about the edge line."""
+    ...
+
 def equalize(tiles: int = 8, limit: float = 3.0, bins: int = 256) -> Step:
     """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.
 
@@ -680,7 +747,39 @@ color : colour, default '#000000'
     The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
-def gaussian_blur(radius: float = 4.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+def fisheye(amount: float = 0.6, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear') -> Step:
+    """Bend the picture as a fisheye lens with its axis at `x`, `y` would, magnifying the middle.
+
+The picture is taken as a flat scene seen by a lens that sees a half angle of `amount` x 90 degrees out to the
+farthest corner, and drawn as an equidistant fisheye (distance from the axis proportional to the angle). A pixel at
+distance d from the axis, the farthest corner at R and w the half angle, shows the picture at R x tan(d / R x w) /
+tan(w) on the same ray: always nearer the axis than the pixel, and exactly there at the axis and at the corner. So
+the whole result lies inside the picture, with no edge to fill, and never leaves 0..1.
+
+Parameters
+----------
+amount : number, fraction, 0 to 0.9, default 0.6
+    How wide the lens sees, as a fraction of 90 degrees: the half angle of its field of
+    view, reaching the farthest corner of the picture, is amount x 90 degrees (0.5 is a
+    90 degree lens, 0.9 a 162 degree one). Larger bends the picture more: the middle
+    swells and the edges are squeezed in toward the corner; 0 leaves the picture
+    unchanged. Wider than 0.9 is not offered, as the middle would grow beyond all
+    reason.
+x : number, fraction, 0 to 1, default 0.5
+    The lens axis's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The lens axis's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but the magnified middle turns
+    blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
+    slower, and may ring beside hard edges)."""
+    ...
+
+def gaussian_blur(radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Soften the picture with a Gaussian blur of standard deviation `radius` px.
 
 Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
@@ -693,13 +792,13 @@ radius : number, px, 0 to 500, default 4.0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
     Larger is more exact and slower; below 3 the blur turns visibly boxy.
-mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the edge fades
     toward it).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1, every channel) assumed beyond the edge when mode is
+    The brightness (0..1, every channel) assumed beyond the edge when edge is
     'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
@@ -781,7 +880,7 @@ ascii_font : text or none, default None
     first system monospaced font found."""
     ...
 
-def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Soft bloom around the bright parts: what is brighter than `threshold` is blurred by `radius` px and screened
 over the picture by `amount`.
 
@@ -802,13 +901,13 @@ threshold : number, fraction, 0 to 0.99, default 0.55
 truncate : number, ratio, 1 to 10, default 4.0
     Where the halo's Gaussian is cut off, in sigmas: the halo reaches truncate x radius
     px. Larger is more exact and slower.
-mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the glow fades
     toward the edge when it is 0).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The highlight (0..1) assumed beyond the edge when mode is 'constant'; ignored
+    The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored
     otherwise."""
     ...
 
@@ -860,7 +959,7 @@ quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'in
     Only visible on small or flat pictures."""
     ...
 
-def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px.
 
 The same noise is added to every channel, so the grain is monochrome; the result is clipped to 0..1. The same
@@ -881,14 +980,14 @@ seed : whole number, count, 0 to 4294967295, default 0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1).
     Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the clumping blur sees beyond the picture's edge (only when size > 1):
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
     seamlessly)."""
     ...
 
-def halation(radius: float = 20.0, threshold: float = 0.7, amount: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def halation(radius: float = 20.0, threshold: float = 0.7, amount: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by
 `radius` px, tinted `color` and screened over the picture by `amount`.
 
@@ -914,13 +1013,13 @@ color : colour, default '#ff4a14'
 truncate : number, ratio, 1 to 10, default 4.0
     Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
     Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the glow's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated) or 'wrap' (the opposite edge)."""
     ...
 
-def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, mode: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
+def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
     """Print-style dot screen: tone becomes dot size. `cell` = distance between dots in px, `angle` = screen rotation.
 
 A dot's area is proportional to the ink its tone needs, so the screen keeps the picture's tones; dots touch at
@@ -964,16 +1063,16 @@ feather : number, px, 0.1 to 50, default 1.0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma
     cells. Larger is more exact and slower.
-mode : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge), 'constant' (constant_value).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1) assumed beyond the edge when mode is 'constant'; ignored
+    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
     otherwise."""
     ...
 
-def highpass(radius: float = 4.0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def highpass(radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey.
 
 A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each
@@ -988,7 +1087,7 @@ radius : number, px, 0 to 100, default 4.0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
     px. Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
@@ -1018,7 +1117,7 @@ Parameters
 """
     ...
 
-def lens_blur(radius: float = 8.0, highlights: float = 0.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def lens_blur(radius: float = 8.0, highlights: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.
 
 Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it
@@ -1035,10 +1134,105 @@ highlights : number, ratio, 0 to 50, default 0.0
     1 + highlights x b times as much as a black one, so with 0 every pixel counts the
     same (a plain average), and raising it turns bright lights into distinct, luminous
     discs (bokeh) while dark areas hardly bleed into them.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def lens_distortion(distortion: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does.
+
+Each pixel at distance d from the axis shows the picture on the same ray at d x (1 + distortion x (d / R)^2), R the
+distance of the farthest corner (the Brown-Conrady radial term, k1 only), divided by 1 + distortion for `fit`
+'frame' so that the corner stays put (a barrel then reads only inside the picture). The axis never moves, and the
+result never leaves 0..1.
+
+Parameters
+----------
+distortion : number, ratio, -0.3 to 1, default 0.2
+    The lens's radial distortion coefficient (the k1 of the Brown-Conrady model), with
+    the distance from the axis measured in units of the farthest corner's. Positive is
+    barrel distortion: straight lines bow outward and the picture looks wrapped around a
+    ball. Negative is pincushion: lines bow inward and the corners are pulled out. The
+    size is how much farther from the axis than its own place each pixel's source lies
+    at the farthest corner: 0.2 is 20% farther. -0.3 is the most pincushion that does
+    not fold the picture over, 1 the strongest barrel; 0 leaves the picture unchanged.
+fit : one of 'frame', 'centre', default 'frame'
+    How the picture is scaled back after the bend: 'frame' keeps the farthest corner in
+    its corner, so the picture fills the frame (a barrel is zoomed in and loses its
+    sides, and nothing beyond the picture is shown; a pincushion is zoomed out toward
+    the middle and pulls in what lies beyond the middle of each edge, which the edge
+    rule fills); 'centre' keeps the scale at the lens axis, so a barrel shrinks toward
+    the middle, and the edge rule fills the corners it exposes.
+x : number, fraction, 0 to 1, default 0.5
+    The lens axis's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The lens axis's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but lines turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
+    ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What shows where the bend reads from beyond the picture (with fit 'centre', or a
+    pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def lens_flare(x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 0.05, halo: float = 0.2, ring: float = 0.12, ring_width: float = 0.02, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8') -> Step:
+    """A lens flare: a halo and a ring round the light at (`x`, `y`) and `ghosts` discs along the line through the
+picture's centre, tinted `color` and screened over the picture by `amount`.
+
+Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its
+radius (`halo`, `size`) or half-width (`ring_width`), drawn straight from its formula with no blur or warp. Ghost
+i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
+ghosts. The picture only ever gets brighter.
+
+Parameters
+----------
+x : number, fraction, 0 to 1, default 0.75
+    The light's horizontal position as a fraction of the way across the picture: 0 = the
+    first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.25
+    The light's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+ghosts : whole number, count, 0 to 12, default 5
+    How many ghosts (soft discs, the lens's reflections of the light) lie along the line
+    from the light through the picture's centre; each is dimmer than the one before, the
+    last 1/ghosts as bright as the first. 0 = none. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+spacing : number, ratio, 0 to 3, default 0.45
+    Where the ghosts lie on that line, as multiples of the distance from the light to
+    the picture's centre: ghost number i sits i x spacing of the way from the light
+    toward the centre. 1 puts the first on the centre, 2 mirrors the light through it,
+    more goes beyond; 0 piles them on the light. A light at the centre gives them no
+    line, so they sit on it.
+size : number, fraction, 0.002 to 0.5, default 0.05
+    The radius of each ghost as a fraction of the picture's diagonal: the disc is
+    brightest at its middle and falls smoothly to nothing at this distance. Raising it
+    makes bigger, softer ghosts.
+halo : number, fraction, 0 to 1, default 0.2
+    The radius of the soft glow round the light, as a fraction of the picture's
+    diagonal: brightest at the light and falling smoothly to nothing at this distance. 0
+    = no halo.
+ring : number, fraction, 0 to 1, default 0.12
+    The radius of the thin ring round the light, as a fraction of the picture's
+    diagonal: the distance from the light at which the ring is brightest. 0 = no ring.
+ring_width : number, fraction, 0.002 to 0.5, default 0.02
+    How far each side of its radius the ring reaches, as a fraction of the picture's
+    diagonal: it falls smoothly from full brightness on the radius to nothing this far
+    off. Raising it makes a wider, softer ring.
+amount : number, ratio, 0 to 10, default 0.8
+    How strongly the flare is screened over the picture: 0 = off, 1 = the light at full
+    brightness where it is brightest (the light itself and the first ghost); above 1 it
+    saturates to white sooner.
+color : colour, default '#ffe2b8'
+    The tint of the flare: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
+    white; white keeps the flare colourless."""
     ...
 
 def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float = 0.0, output_white: float = 1.0) -> Step:
@@ -1067,7 +1261,121 @@ output_white : number, fraction, 0 to 1, default 1.0
     The brightest value that can be output (0..1): lowering it dims the whites."""
     ...
 
-def motion_blur(angle: float = 0.0, length: float = 24.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def light_leak(color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 0.25, angle: float = 0.0, blobs: int = 3, seed: int = 0) -> Step:
+    """Warm washes of light coming in from the side `angle` points to: `blobs` seeded patches, tinted `color` and
+screened over the picture by `amount`.
+
+Each patch is a Gaussian bump, centred a random depth (up to `size` x the diagonal) in from that side and a random
+place along it, with a random width of half to all of `size` x the diagonal, stretched along the edge by up to
+twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so
+overlaps never clip into flat plateaus. The picture only ever gets brighter.
+
+Parameters
+----------
+color : colour, default '#ff8a3d'
+    The tint of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
+    orange of a leaking film back; red or yellow give other leaks.
+amount : number, ratio, 0 to 2, default 0.8
+    How strongly the light is screened over the picture: 0 = off, 1 = the brightest
+    patch at full brightness in `color`; above 1 it saturates to white sooner.
+size : number, fraction, 0.01 to 1, default 0.25
+    How big the patches are and how deep they reach into the picture, as a fraction of
+    its diagonal: each patch is a soft bump whose width is between half of this and all
+    of it, centred between the edge and this far in. Raising it floods more of the
+    picture.
+angle : number, degrees, 0 to 360, default 0.0
+    The side the light comes in from, as the direction from the picture's centre,
+    counterclockwise as seen on it: 0 = the right edge, 90 = the top, 180 = the left,
+    270 = the bottom; in between, the corner.
+blobs : whole number, count, 1 to 16, default 3
+    How many patches of light there are, at random places along that side (each brighter
+    or fainter and stretched along the edge by chance). Overlapping patches merge into
+    one wash; raising it gives a more even, wider leak. Animated, it moves in whole
+    steps (rounded to the nearest whole number).
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same leak (the same patches in the same
+    places), another seed a different one. Animated, it moves in whole steps (rounded to
+    the nearest whole number)."""
+    ...
+
+def light_rays(x: float = 0.5, y: float = 0.3, length: float = 0.5, threshold: float = 0.7, amount: float = 2.5, samples: int = 16, decay: float = 0.95, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by
+`amount`.
+
+Every pixel gathers the highlights from `samples` points on the line between itself and the light, from itself
+to `length` of the way there, each reading `decay` times as strong as the one before and the weights adding up to
+1. A highlight streaks outward from the light, up to 1 / (1 - length) times its distance from it. The picture
+only ever gets brighter, and black stays black.
+
+Parameters
+----------
+x : number, fraction, 0 to 1, default 0.5
+    The light's horizontal position as a fraction of the way across the picture: 0 = the
+    first pixel column, 0.5 = the middle, 1 = the last. The rays point away from it.
+y : number, fraction, 0 to 1, default 0.3
+    The light's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last. The rays point away from it.
+length : number, fraction, 0 to 1, default 0.5
+    How far the rays reach back toward the light, as a fraction of each pixel's distance
+    from it: a pixel gathers light from the line between itself and the light, as far as
+    this share of the way (0.5 = half way, 1 = all the way to the light). A highlight
+    streaks outward from itself up to 1 / (1 - length) times its distance from the
+    light; 0 gives no rays.
+threshold : number, fraction, 0 to 0.99, default 0.7
+    The brightness (0..1, per channel) where light starts: only values above it make
+    rays, rising to full at 1. Raising it limits the rays to the brightest highlights.
+amount : number, ratio, 0 to 10, default 2.5
+    How strongly the rays are screened over the picture: 0 = off, 1 = the rays at full
+    brightness; above 1 they saturate to white sooner. The rays are an average along the
+    pixel's line to the light, so a highlight far from the pixel gives them much less
+    than the highlight itself: a few times 1 is usual.
+samples : whole number, count, 1 to 256, default 16
+    How many readings of the picture along each ray are added up, spread evenly over its
+    length: more is smoother and slower (the time grows with it); few show as separate
+    ghost copies of a highlight. With 1 the highlights only brighten themselves.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+decay : number, ratio, 0 to 1, default 0.95
+    How much less each reading counts than the one nearer the pixel (the weights are
+    decay^0, decay^1... scaled to add up to 1): 1 = all alike, rays of even brightness
+    to their tips; lower values make them fade away from the highlight; 0 = no rays at
+    all.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, but steps and ghosts show), 'bilinear' blends the four pixels around
+    it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring
+    pixels (sharpest, a little slower).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a reading sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge). The readings lie between a pixel and the
+    light, so they leave the picture only when the light itself is outside it; this rule
+    then matters at the border for 'bicubic' only, whose spline fit reads it."""
+    ...
+
+def mirror(axis: Literal['vertical', 'horizontal', 'both'] = 'vertical', keep: Literal['first', 'last'] = 'first') -> Step:
+    """Make the picture symmetric: keep one half and replace the other by its reflection.
+
+The mirror line is a vertical line down the middle (`axis` 'vertical'), a horizontal one across it ('horizontal')
+or both ('both'). The kept side (`keep`) is copied untouched, pixel for pixel, so the result is exactly
+symmetric and uses only the picture's own values.
+
+Parameters
+----------
+axis : one of 'vertical', 'horizontal', 'both', default 'vertical'
+    The mirror line, named for the line itself: 'vertical' puts a vertical line down the
+    middle, so the two sides are each other's reflection (left against right, as a face
+    made symmetric); 'horizontal' puts a horizontal line across the middle (top against
+    bottom, as a reflection in water); 'both' does both, so the picture is symmetric in
+    four quarters.
+keep : one of 'first', 'last', default 'first'
+    Which side of each mirror line stays as it is: 'first' keeps the left half (and, for
+    'horizontal' or 'both', the top half), 'last' keeps the right half (and the bottom
+    half). The other side is replaced by the reflection of the kept one. On a picture
+    with an odd width or height the middle column or row lies on the line and stays,
+    whichever side is kept."""
+    ...
+
+def motion_blur(angle: float = 0.0, length: float = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.
 
 Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay
@@ -1082,7 +1390,7 @@ angle : number, degrees, 0 to 360, default 0.0
 length : number, px, 0 to 500, default 24.0
     How far the smear reaches along the line, end to end, in px at the recipe's size:
     larger is a faster motion; 0 leaves the picture unchanged.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
@@ -1131,6 +1439,83 @@ seed : whole number, count, 0 to 4294967295, default 0
     Random seed for the choice of sample pixels and starting colours: the same seed
     always gives the same picture, another seed may find slightly different colours.
     Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def pinch_bulge(amount: float = 0.5, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.
+
+Each pixel at distance d from the centre, d inside the radius, shows the picture on the same ray from the centre
+at distance d x (1 - amount x (1 - d / radius)^2), read by `interpolation`: nearer the centre for a bulge, so
+the middle is magnified, and farther out for a pinch. Pixels at the radius or beyond, and the centre itself, keep
+their place, no pixel is folded over, and the result never leaves 0..1.
+
+Parameters
+----------
+amount : number, fraction, -1 to 1, default 0.5
+    How far the middle is pushed. Positive is a bulge: the picture at the centre is
+    magnified, as seen through a lens or a bubble, ever more toward the centre and
+    without limit at 1 (the pixels around the centre all show the centre pixel).
+    Negative is a pinch: the picture at the centre is shrunk, as if drawn into a point,
+    down to half size at -1. The push fades smoothly to nothing at the radius, so no
+    pixel is folded over; 0 leaves the picture unchanged.
+radius : number, fraction, 0 to 2, default 0.5
+    How far from the centre the effect reaches, as a fraction of the shorter side of the
+    picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
+    it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
+    untouched; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but a bulge turns blocky),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
+    ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pinch sees beyond the picture's edge (it reads from farther out than it
+    shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
+    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def polar(mode: Literal['to', 'from'] = 'to', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
+    """Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from').
+
+The planet has the radius of half the shorter side, from the first pixel to the last. 'to': a pixel d px from the
+centre shows the row (1 - d / radius) down the picture, from the top, and the column that is the fraction of a
+whole turn, clockwise from straight up, of the width; the columns wrap round, so the seam shows nothing. 'from':
+each pixel reads the planet at the distance and angle that its row and column name, the same relation the other way.
+
+Parameters
+----------
+mode : one of 'to', 'from', default 'to'
+    Which way to convert: 'to' wraps the picture round the centre into a tiny planet
+    (its bottom row at the centre, its top row on the rim of a circle as wide as the
+    shorter side, the left edge straight up and the columns running clockwise, so the
+    sky of a panorama ends up outside); 'from' is the opposite, it takes a picture that
+    is such a planet round the centre and unwraps it into a flat picture, so 'from'
+    undoes 'to'.
+x : number, fraction, 0 to 1, default 0.5
+    The planet's centre horizontal position as a fraction of the way across the picture:
+    0 = the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The planet's centre vertical position as a fraction of the way down the picture: 0 =
+    the first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but the middle of a planet turns
+    blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
+    slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre
+    planet leaves it in 'from' (the angle itself never has an edge; it wraps round):
+    'nearest' (the edge pixel repeated: the sky stays one flat tone of the top row),
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'wrap' (the opposite edge)."""
     ...
 
 def posterize(levels: int = 256) -> Step:
@@ -1191,6 +1576,58 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the smear sees beyond the picture's edge (arcs and rays near the corners leave
     it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def rgb_split(angle: float = 30.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest') -> Step:
+    """Push the red and blue channels `amount` px apart along `angle`, leaving green where it is.
+
+Red moves `amount` px in the direction `angle` (degrees counter-clockwise from pointing right: 0 right, 90 up),
+blue moves `amount` px the opposite way, green stays: on a grey picture the three channels end up exactly `amount`
+px from each other in a row, which shows as a red fringe on one side of an edge and a blue one on the other. Whole
+or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
+
+Parameters
+----------
+angle : number, degrees, 0 to 360, default 30.0
+    The direction red moves, in degrees counter-clockwise from pointing right (as on a
+    protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the
+    opposite way.
+amount : number, px, 0 to 500, default 8.0
+    How far red and blue each move from where they were, in pixels, 0 to 500; they end
+    up twice this far apart. 0 leaves the picture unchanged. A fraction of a pixel
+    blends the two pixels it lies between. Raising it pulls the colour fringes further
+    apart.
+edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
+    What a moved channel shows where it has left the picture's edge: 'nearest' repeats
+    the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
+    left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
+    'mirror' mirrors it about the edge line."""
+    ...
+
+def scan_roll(axis: Literal['vertical', 'horizontal'] = 'vertical', offset: float = 0.2, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap') -> Step:
+    """Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does.
+
+Every line moves by the same distance, by whole or fractional pixels (a fraction blends the two lines it lies
+between). What comes into view where the picture left is set by `edge`: with 'wrap' it is the part that left on the
+other side, so nothing is lost and a whole-picture roll is the picture itself.
+
+Parameters
+----------
+axis : one of 'vertical', 'horizontal', default 'vertical'
+    The direction of the roll: 'vertical' slides the picture up or down, as a television
+    whose vertical hold slipped; 'horizontal' slides it left or right, as a horizontal
+    hold would.
+offset : number, fraction, -1 to 1, default 0.2
+    How far the picture rolls, as a fraction of its height ('vertical') or width
+    ('horizontal'), -1 to 1: positive moves it down or to the right, negative up or to
+    the left, 0 leaves it where it is. A whole picture (1 or -1) with 'wrap' brings it
+    back to where it was. A distance that ends between two pixels blends the two (linear
+    interpolation along the roll).
+edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
+    What fills the gap the roll opens: 'wrap' brings back what left on the other side, a
+    true roll; 'nearest' holds the picture's first or last line there (a smear);
+    'reflect' mirrors the picture (the edge line repeated once); 'mirror' mirrors it
+    about the edge line."""
     ...
 
 def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float = 0.0, saturation: float = 1.0, lightness: float = 0.0) -> Step:
@@ -1262,7 +1699,7 @@ edge_threshold : number, fraction, 0.001 to 1, default 0.1
     and more like a plain blur; lowering it follows ever smaller edges."""
     ...
 
-def sharpen(radius: float = 2.0, amount: float = 0.8, threshold: float = 0.0, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def sharpen(radius: float = 2.0, amount: float = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
 
 Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
@@ -1284,13 +1721,38 @@ threshold : number, fraction, 0 to 1, default 0.0
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
     px. Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def soft_focus(radius: float = 12.0, opacity: float = 0.5, truncate: float = 4.0, mode: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0) -> Step:
+    """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance.
+
+A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip
+moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts and the
+slides depend only on `seed`, `slices`, `amount` and the picture's size.
+
+Parameters
+----------
+slices : whole number, count, 1 to 500, default 30
+    How many horizontal strips the picture is cut into, 1 to 500 (never more than it has
+    rows). The cuts fall at random rows, so the strips differ in height; 1 slides the
+    whole picture as one. More strips make a finer, busier tear. Animated, it moves in
+    whole steps (rounded to the nearest whole number).
+amount : number, fraction, 0 to 1, default 0.05
+    The furthest a strip slides, as a fraction 0 to 1 of the picture's width: each strip
+    slides by a random whole number of pixels between that far left and that far right,
+    so a strip may also stay put. 0 leaves the picture unchanged; 1 can slide a strip by
+    a whole picture width.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the cuts fall and how far each strip slides: the same seed
+    always gives the same tear, any other seed gives a different one. Animated, it moves
+    in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def soft_focus(radius: float = 12.0, opacity: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
 
 `opacity` sets how much of that replaces the sharp picture. This is the Orton effect of film photography (a sharp
@@ -1309,7 +1771,7 @@ opacity : number, fraction, 0 to 1, default 0.5
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
     Larger is more exact and slower.
-mode : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated) or 'wrap' (the opposite edge)."""
@@ -1356,6 +1818,80 @@ black_fade : number, fraction, 0.001 to 1, default 0.1
     stays black. Larger keeps more of the shadows untinted."""
     ...
 
+def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
+    """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
+screened over the picture by `amount`.
+
+Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
+picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
+inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays
+black.
+
+Parameters
+----------
+rays : whole number, count, 1 to 32, default 4
+    How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a
+    six-pointed star, 1 = a single comet tail. Raising it makes a denser star. Animated,
+    it moves in whole steps (rounded to the nearest whole number).
+length : number, fraction, 0.001 to 1, default 0.1
+    How far each spike reaches, as a fraction of the picture's diagonal: it fades
+    linearly from the point to nothing at this distance. Raising it makes longer,
+    fainter-tipped spikes.
+threshold : number, fraction, 0 to 0.99, default 0.95
+    The brightness (0..1, per channel) where a spike starts: only values above it make
+    light, rising to full at 1. Raising it limits the spikes to the brightest points;
+    lowered, large bright areas flood the picture with light.
+amount : number, ratio, 0 to 10, default 0.8
+    How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
+    bright as the point that makes it, at the point; above 1 it saturates to white
+    sooner.
+angle : number, degrees, 0 to 360, default 0.0
+    The direction of the first spike, counterclockwise as seen on the picture: 0 = to
+    the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45
+    turns the cross into an X.
+color : colour, default '#ffffff'
+    The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
+    of the light that makes them."""
+    ...
+
+def swirl(angle: float = 90.0, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`.
+
+Each pixel at distance d from the centre, d inside the radius, shows the picture at the point turned about the
+centre by angle x (1 - d / radius)^2, clockwise for a positive angle, read by `interpolation`. Pixels at the radius
+or beyond, and the centre itself, keep their place, and the result never leaves 0..1.
+
+Parameters
+----------
+angle : number, degrees, -720 to 720, default 90.0
+    How far the picture is turned at the centre, in degrees: positive turns clockwise,
+    negative counter-clockwise, 360 is a whole turn. The turn falls off with the square
+    of the distance left to the radius, so the picture is twisted into a spiral and
+    unturned at the radius. Larger is a tighter spiral; 0 leaves the picture unchanged.
+radius : number, fraction, 0 to 2, default 0.5
+    How far from the centre the swirl reaches, as a fraction of the shorter side of the
+    picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
+    it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
+    untouched; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
+    ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the swirl sees beyond the picture's edge (a swirl near the border turns pixels
+    in from outside): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
+    about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite
+    edge)."""
+    ...
+
 def threshold(level: float = 0.5, dark: str | list[float] | tuple[float, float, float] = '#000000', light: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
     """Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere.
 
@@ -1371,6 +1907,81 @@ dark : colour, default '#000000'
     Colour of the pixels darker than `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1.
 light : colour, default '#ffffff'
     Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
+    ...
+
+def tile(columns: int = 3, rows: int = 3) -> Step:
+    """Repeat the whole picture, scaled down, in a grid of `columns` by `rows`.
+
+The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a
+pixel counted in part) to a cell of whole pixels, width // columns by height // rows and at least 1 px each, and the
+cell is repeated across the picture. When the grid does not divide the picture, the leftover pixels
+(width mod columns on the right, height mod rows at the bottom) show the start of the next copy, cut off. One
+column and one row give the picture itself.
+
+Parameters
+----------
+columns : whole number, count, 1 to 100, default 3
+    How many copies of the picture sit side by side, 1 to 100; 1 keeps the picture whole
+    across. Each copy is the width of the picture divided by this, rounded down (at
+    least 1 px). Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+rows : whole number, count, 1 to 100, default 3
+    How many copies sit one above another, 1 to 100; 1 keeps the picture whole down.
+    Each copy is the height of the picture divided by this, rounded down (at least 1
+    px). Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def tilt_shift(focus: float = 0.5, width: float = 0.2, feather: float = 0.25, angle: float = 0.0, radius: float = 10.0, saturation: float = 0.3, levels: int = 4, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to
+`radius` and its colour raised by `saturation`.
+
+A pixel's distance from the band's middle, as a fraction of the picture's extent across it, less half the band's
+width, over `feather`, clipped to 0..1, is its blur weight w. The blur is `levels` copies of the picture with
+sigma radius x k / levels, and a pixel mixes the two copies (the sharp picture being copy 0) either side of
+w x `levels`; its colour is moved from its grey by 1 + `saturation` x w. Pixels with w = 0, the whole band, are
+returned exactly as they are.
+
+Parameters
+----------
+focus : number, fraction, 0 to 1, default 0.5
+    Where the middle of the sharp band lies across the picture, as a fraction of its
+    extent at right angles to the band: 0 = the top (for angle 0), 0.5 = the middle, 1 =
+    the bottom.
+width : number, fraction, 0 to 1, default 0.2
+    How wide the sharp band is, as a fraction of the picture's extent at right angles to
+    it: the whole band stays exactly as it is. Raising it keeps more of the picture
+    sharp.
+feather : number, fraction, 0.01 to 1, default 0.25
+    How far from the band's edge the blur takes to reach its full radius, as a fraction
+    of the picture's extent at right angles to the band: the blur and the colour boost
+    grow evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt
+    one.
+angle : number, degrees, 0 to 360, default 0.0
+    The direction of the band, counterclockwise as seen on the picture: 0 = horizontal,
+    with the focus counted from the top; 90 = vertical, counted from the left; 45 runs
+    from the lower left to the upper right.
+radius : number, px, 0 to 100, default 10.0
+    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
+    distance from the band (a further `feather` from its edge): larger blurs the far
+    picture more; 0 = no blur.
+saturation : number, ratio, 0 to 2, default 0.3
+    How much colour is added away from the band, the usual miniature look: where the
+    blur is at its full radius each colour moves this much further (1 + saturation
+    times) from the grey of the pixel, and partway through the feather by the same
+    share; nothing in the band. 0 = no change in colour.
+levels : whole number, count, 1 to 16, default 4
+    How many blurred copies of the picture the blur is built from: copy k has the sigma
+    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
+    the first) nearest its distance from the band. More is smoother between levels and
+    slower; 1 mixes the sharp picture with one blur. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
+    sigma px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 def tone_map(contrast: float = 0.5, amount: float = 0.5, radius: float = 30.0, edge_threshold: float = 0.5) -> Step:

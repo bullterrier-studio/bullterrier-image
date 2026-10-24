@@ -63,14 +63,14 @@ separate code.
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
 | `bloom` ✓ | Multi-scale glow (upgrade of `glow`). | `fx.bloom(radius=40, threshold=0.7)` |
 | `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
-| `starburst` | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=60)` |
-| `lens_flare` | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
-| `light_rays` | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
-| `chromatic_aberration` | Radial red/blue fringing. | `fx.chromatic_aberration(amount=4)` |
+| `starburst` ✓ | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=0.15)` |
+| `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
+| `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
+| `chromatic_aberration` ✓ | Radial red/blue fringing. | `fx.chromatic_aberration(amount=4)` |
 | `soft_focus` ✓ | Dreamy glow over a sharp image (Orton). | `fx.soft_focus(opacity=0.5)` |
 | `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
-| `tilt_shift` | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
-| `light_leak` | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
+| `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
+| `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
 | `depth_of_field` | Blur by distance from a depth map. | `fx.depth_of_field(focus=0.4)` |
 
 ## Texture and finish
@@ -165,16 +165,16 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `swirl` | Twist around a point. | `fx.swirl(angle=2.0, radius=0.5)` |
-| `pinch_bulge` | Push in or out. | `fx.pinch_bulge(amount=0.5)` |
+| `swirl` ✓ | Twist around a point. | `fx.swirl(angle=120, radius=0.5)` |
+| `pinch_bulge` ✓ | Push in or out. | `fx.pinch_bulge(amount=0.5)` |
 | `ripple` | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
 | `displace` | Move pixels by noise or a map. | `fx.displace(map="noise", amount=12)` |
-| `lens_distortion` | Barrel or pincushion. | `fx.lens_distortion(k=0.2)` |
-| `fisheye` | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
-| `polar` | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
-| `mirror` | Symmetry on an axis, or four-way. | `fx.mirror(axis="vertical")` |
+| `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
+| `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
+| `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
+| `mirror` ✓ | Symmetry on an axis, or four-way. | `fx.mirror(axis="vertical")` |
 | `kaleidoscope` | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
-| `tile` | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
+| `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
 | `shear` | Skew with edge fill. | `fx.shear(x=0.2)` |
 | `perspective` | Corner-pin to a quad. | `fx.perspective(corners=[...])` |
 | `pixel_sort` | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", angle=90, low=0.2, high=0.8)` |
@@ -184,7 +184,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `scatter` | Random pixel displacement. | `fx.scatter(radius=6, seed=1)` |
 | `shatter` | Cracked-glass pieces, slightly offset and rotated. | `fx.shatter(pieces=60, gap=2, seed=1)` |
 | `droste` | Recursive picture-in-picture spiral. | `fx.droste(scale=0.4)` |
-| `slice_shift` | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
+| `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
 
 **Changing the picture's size**
 
@@ -204,12 +204,12 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `glitch` ✓ | Channel split, sliding bands, text strips. | `fx.glitch(split=9, bands=8)` |
-| `rgb_split` | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
+| `rgb_split` ✓ | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
 | `jpeg_crush` | Re-encode at very low quality. | `fx.jpeg_crush(quality=4)` |
-| `scan_roll` | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
+| `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
 | `interlace` | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `signal_noise` | Static bands and dropouts. | `fx.signal_noise(bands=5, seed=1)` |
-| `echo` | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
+| `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `prism` | Rainbow dispersion. | `fx.prism(amount=10)` |
 | `anaglyph` | Red/cyan 3D look. | `fx.anaglyph(shift=10)` |
 | `dead_pixels` | Stuck and dead LCD pixels. | `fx.dead_pixels(count=40, seed=1)` |
