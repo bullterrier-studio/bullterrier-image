@@ -1,0 +1,8 @@
+# Two views interlaced as under a lenticular lens: every second 6 px strip slides 5 px sideways.
+name = "lenticular"
+size = 480
+
+[[step]]
+effect = "lenticular"
+strip = 6
+shift = 5
