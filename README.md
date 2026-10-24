@@ -460,7 +460,7 @@ add effects never conflict over them; each effect's picture is a file of its own
 commit. Pictures that exist are kept (`uv run poe gallery --force` renders them again).
 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
-[CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook; pushes to other branches are checked by CI when the pull request opens.
+[CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook, unless it changes only documentation (pages and `docs/images/`); pushes to other branches are checked by CI when the pull request opens.
 
 Tests that need Apple Vision are skipped off macOS. The portable backend is tested with tiny stand-in models built in the tests: the suite never
 downloads the real model, and its one test of the real model runs only when the model is already in the cache.

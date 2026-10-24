@@ -210,7 +210,7 @@ Where they pull against this file: tests follow this file (no goldens); fixes fo
 
 ## Git conventions
 
-Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (every gate, see "Lint, types and the other gates"; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs the whole gate only for a push to `main` or a tag (a feature branch is checked by CI when its pull request opens).
+Once per clone: `uv run poe setup` (installs the hooks and the commit template). Before every push or merge: `uv run poe check` (every gate, see "Lint, types and the other gates"; `uv run poe fix` repairs what it can). Commit hooks run ruff only, so commits stay fast; the pre-push hook runs the whole gate only for a push to `main` or a tag that changes more than documentation (a feature branch, or a push of only pages and pictures, is left to CI).
 - **Trunk-based:** work on a short-lived branch (in a worktree only when the project owner asks for one; the controller says so in the brief) named `<type>/<short-description>` (`feat/glow-falloff`), rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Scope is optional and lowercase: the effect name, `core`, `ops`, `cli`, `pipeline`, `docs` or `deps`. `!` or a `BREAKING CHANGE:` footer marks a breaking change.
 - **Subject:** imperative present tense ("add", not "added"), lowercase start (acronyms and identifiers excepted), no final period, header at most 72 characters. Imperative mood is a convention, not checked by the hook.
