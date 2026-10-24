@@ -74,7 +74,7 @@ class EmbersParams(EffectParams):
     )
 
 
-@effect(category="atmosphere", params=EmbersParams)
+@effect(category="atmosphere", params=EmbersParams, opacity=0.9)
 def embers(rgb: np.ndarray, params: EmbersParams) -> np.ndarray:
     """Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it.
 

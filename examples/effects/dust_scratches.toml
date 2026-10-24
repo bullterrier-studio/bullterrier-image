@@ -9,4 +9,3 @@ density = 1.0
 size = 10
 scratches = 3
 seed = 1
-opacity = 0.8                 # the marks are mixed in at 80%

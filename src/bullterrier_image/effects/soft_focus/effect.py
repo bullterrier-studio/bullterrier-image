@@ -38,7 +38,7 @@ class SoftFocusParams(EffectParams):
     )
 
 
-@effect(category="light", params=SoftFocusParams)
+@effect(category="light", params=SoftFocusParams, opacity=0.5)
 def soft_focus(rgb: np.ndarray, params: SoftFocusParams) -> np.ndarray:
     """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
 

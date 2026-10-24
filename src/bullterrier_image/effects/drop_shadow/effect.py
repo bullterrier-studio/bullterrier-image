@@ -60,7 +60,7 @@ class DropShadowParams(EffectParams):
     )
 
 
-@effect(category="subject", params=DropShadowParams)
+@effect(category="subject", params=DropShadowParams, opacity=0.6)
 def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`.
 

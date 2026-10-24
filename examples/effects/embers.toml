@@ -7,4 +7,3 @@ size = 480
 effect = "embers"
 count = 120
 seed = 1
-opacity = 0.9                 # the sparks mixed in at 90%

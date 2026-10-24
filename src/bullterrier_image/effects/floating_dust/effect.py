@@ -58,7 +58,7 @@ class FloatingDustParams(EffectParams):
     )
 
 
-@effect(category="atmosphere", params=FloatingDustParams)
+@effect(category="atmosphere", params=FloatingDustParams, opacity=0.55)
 def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
 

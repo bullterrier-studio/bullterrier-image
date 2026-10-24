@@ -53,7 +53,7 @@ class LongShadowParams(EffectParams):
     )
 
 
-@effect(category="subject", params=LongShadowParams)
+@effect(category="subject", params=LongShadowParams, opacity=0.5)
 def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it.
 

@@ -98,7 +98,7 @@ def _stamp(cover: np.ndarray, start: tuple[float, float], end: tuple[float, floa
     )
 
 
-@effect(category="texture", params=DustScratchesParams)
+@effect(category="texture", params=DustScratchesParams, opacity=0.8)
 def dust_scratches(rgb: np.ndarray, params: DustScratchesParams) -> np.ndarray:
     """Draw light and dark specks, hairs and scratches at random places over the picture.
 

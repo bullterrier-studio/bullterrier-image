@@ -66,7 +66,7 @@ class RainParams(EffectParams):
     )
 
 
-@effect(category="atmosphere", params=RainParams)
+@effect(category="atmosphere", params=RainParams, opacity=0.7)
 def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
 

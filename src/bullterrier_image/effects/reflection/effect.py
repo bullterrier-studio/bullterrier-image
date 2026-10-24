@@ -65,7 +65,7 @@ class ReflectionParams(EffectParams):
     )
 
 
-@effect(category="subject", params=ReflectionParams)
+@effect(category="subject", params=ReflectionParams, opacity=0.6)
 def reflection(rgb: np.ndarray, params: ReflectionParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth.
 

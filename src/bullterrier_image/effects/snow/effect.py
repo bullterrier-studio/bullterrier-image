@@ -62,7 +62,7 @@ class SnowParams(EffectParams):
     )
 
 
-@effect(category="atmosphere", params=SnowParams)
+@effect(category="atmosphere", params=SnowParams, opacity=0.8)
 def snow(rgb: np.ndarray, params: SnowParams) -> np.ndarray:
     """Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers.
 
