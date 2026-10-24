@@ -293,7 +293,7 @@ class EffectParams(ValidatedModel):
             return text
         if advanced:
             return text + "\n\nAdvanced parameters\n-------------------\n" + "\n".join(sections[True])
-        return text + f"\n\n(+{len(sections[True])} advanced parameters)"
+        return text + f"\n\n(+{len(sections[True])} advanced)"
 
 
 _MISSING = object()

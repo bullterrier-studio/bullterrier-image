@@ -112,7 +112,7 @@ def test_effects_shows_advanced_parameters_only_when_asked_or_when_one_effect_is
     assert "amount : number, fraction, 0 to 1, default 0.5" in entry
     assert ("softness : number, px, 0 to 9, default 2.0" in entry) is shows_advanced
     assert ("edge : text" in entry) is shows_advanced
-    assert ("(+2 advanced parameters)" in entry) is not shows_advanced
+    assert ("(+2 advanced)" in entry) is not shows_advanced
 
 
 def test_effects_naming_one_effect_prints_only_that_effect(tuned_probe, capsys):

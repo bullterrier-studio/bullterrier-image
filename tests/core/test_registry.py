@@ -297,7 +297,7 @@ def test_documentation_lists_the_advanced_parameters_unless_told_not_to(throwawa
     assert "softness : " in full
     assert short.startswith("Gains, tuned.")
     assert "softness" not in short
-    assert "(+1 advanced parameters)" in short
+    assert "(+1 advanced)" in short
 
 
 def test_queries_about_an_unknown_effect_list_the_known_ones(gain):

@@ -243,7 +243,7 @@ def test_the_documentation_lists_basic_fields_then_an_advanced_section_in_declar
     assert "edge : " not in basic
     assert "softness : " not in basic
     assert "amount : " not in advanced
-    assert "advanced parameters)" not in text  # the full text has no pointer to itself
+    assert "advanced)" not in text  # the full text has no pointer to itself
 
 
 def test_the_short_documentation_hides_the_advanced_fields_and_counts_them():
@@ -252,7 +252,7 @@ def test_the_short_documentation_hides_the_advanced_fields_and_counts_them():
     assert "angle : " in text
     assert "edge" not in text
     assert "softness" not in text
-    assert text.rstrip().endswith("(+2 advanced parameters)")
+    assert text.rstrip().endswith("(+2 advanced)")
 
 
 def test_a_model_without_advanced_fields_has_no_advanced_section_and_no_count():
