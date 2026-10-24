@@ -237,6 +237,23 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
 | `embers` ✓ | Rising sparks. | `fx.embers(count=120, seed=1)` |
 
+## Depth and light from geometry
+
+A feature to consider: effects that read the injected depth (`docs/design-decisions.md`, "Depth is injected like the
+subject"; the open depth round) and, from it, the surface normals, so light and atmosphere follow the scene's geometry
+instead of the subject's silhouette. A model only estimates the map; every effect stays plain, deterministic maths on
+the photo's own pixels, never a generative model that repaints them. Why: grading the background apart from the
+subject makes it look pasted in (a sticker); depth lets the ground under the subject's feet be treated like the
+subject, and falloff follow the distance.
+
+| Effect | What it does | Example |
+| --- | --- | --- |
+| `depth_haze` | Aerial perspective: mix toward a haze colour by distance. | `fx.depth_haze(density=0.3, color="#d9dccf")` |
+| `depth_grade` | Exposure, contrast and saturation that fall off with distance from a focus depth. | `fx.depth_grade(focus=0.8, exposure=-0.6)` |
+| `relight` | Shade with a directional light from normals estimated from the depth (Lambert, a soft ambient term). | `fx.relight(angle=135, elevation=30, amount=0.4)` |
+| `ambient_occlusion` | Soft darkening in creases and where surfaces meet, from the depth (screen-space). | `fx.ambient_occlusion(radius=24, amount=0.5)` |
+| `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
+
 ## Subject-aware effects
 
 Use the subject cut-out, so they target the subject or the background.
