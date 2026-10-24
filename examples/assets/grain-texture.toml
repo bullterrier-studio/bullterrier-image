@@ -1,0 +1,11 @@
+# Makes examples/assets/grain-texture.png from a flat mid-grey picture (see examples/README.md): fine paper fibres
+# around grey 0.5, so blended with `overlay` or `soft_light` it adds grain without changing the photo's brightness.
+name = "grain-texture"
+size = 512
+
+[[step]]
+effect = "paper_texture"
+kind = "paper"
+amount = 0.2
+scale = 3
+octaves = 4
