@@ -17,7 +17,7 @@ from PIL import Image, ImageCms, ImageOps
 
 from bullterrier_image.errors import BackendUnavailableError, ImageReadError, NonFiniteImageError
 
-__all__ = ["from_pil", "load", "load_matte", "save", "to_pil"]
+__all__ = ["from_pil", "load", "load_matte", "load_picture", "save", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 # littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
@@ -58,6 +58,21 @@ def load_matte(path: str | Path) -> np.ndarray:
         if img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info:
             return np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
         return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
+
+
+def load_picture(path: str | Path) -> np.ndarray:
+    """Read a picture to use inside an effect (a texture, a logo, a cut-out): RGBA float32 (height, width, 4), 0..1.
+
+    The colour is what `load` gives (upright, in sRGB, EXIF and colour profile applied) but the transparency is kept
+    as straight alpha instead of being composited over white; an opaque file gets alpha 1. The first-frame rule and
+    ImageReadError, naming the path, are as in `load`.
+    """
+    with _picture(path) as img:
+        colour, alpha = _split_alpha(img)
+        rgb = _srgb(colour, img.info.get("icc_profile"))
+        if alpha is None:
+            alpha = np.ones((*rgb.shape[:2], 1), np.float32)
+        return np.concatenate([rgb, alpha], axis=2)
 
 
 @contextmanager

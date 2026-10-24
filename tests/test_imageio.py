@@ -93,6 +93,37 @@ def test_the_colour_under_a_transparent_pixel_never_shows(tmp_path):
     np.testing.assert_array_equal(imageio.load(tmp_path / "clear.png"), np.ones((4, 6, 3), np.float32))
 
 
+def test_a_picture_keeps_its_transparency_instead_of_taking_white_paper_under_it(tmp_path):
+    pixels = np.array([[(255, 0, 0, 255), (0, 0, 255, 128), (10, 20, 30, 0)]], np.uint8)
+    Image.fromarray(pixels, "RGBA").save(tmp_path / "logo.png")
+    picture = imageio.load_picture(tmp_path / "logo.png")
+    assert picture.dtype == np.float32
+    assert picture.shape == (1, 3, 4)
+    np.testing.assert_allclose(picture[0, 0], [1, 0, 0, 1], atol=1e-6)
+    np.testing.assert_allclose(picture[0, 1], [0, 0, 1, 128 / 255], atol=1e-6)  # straight alpha: colour untouched
+    assert picture[0, 2, 3] == 0
+
+
+def test_an_opaque_picture_loads_with_alpha_one_and_the_colours_load_gives(photo, tmp_path):
+    imageio.save(photo, tmp_path / "a.png")
+    picture = imageio.load_picture(tmp_path / "a.png")
+    np.testing.assert_array_equal(picture[..., :3], imageio.load(tmp_path / "a.png"))
+    np.testing.assert_array_equal(picture[..., 3], 1.0)
+
+
+def test_a_picture_is_upright_and_in_srgb_as_a_photo_is(tmp_path):
+    grey = Image.fromarray(np.array([[(128, 255), (128, 0)]], np.uint8), "LA")
+    grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())
+    picture = imageio.load_picture(tmp_path / "linear.png")
+    np.testing.assert_allclose(picture[0, 0, :3], srgb_encode(128 / 255), atol=1 / 255)  # the profile is applied
+    np.testing.assert_allclose(picture[0, :, 3], [1.0, 0.0], atol=1e-6)
+    img = Image.new("RGB", (40, 20), "red")
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    img.save(tmp_path / "r.jpg", exif=exif)
+    assert imageio.load_picture(tmp_path / "r.jpg").shape == (40, 20, 4)
+
+
 # --- colour profiles: converted to sRGB from the picture's own mode -----------------------------------------------
 # Real CMYK and greyscale profiles are large licensed files, so the tests build minimal ICC v2 profiles (ICC.1:2001)
 # by hand. The expected values come from the standards, not from littlecms: CIE L* to luminance Y (CIE 15) and the
@@ -221,7 +252,9 @@ UNREADABLE = [
 
 
 @pytest.mark.parametrize("make", UNREADABLE)
-@pytest.mark.parametrize("read", [imageio.load, imageio.load_matte], ids=["load", "load_matte"])
+@pytest.mark.parametrize(
+    "read", [imageio.load, imageio.load_matte, imageio.load_picture], ids=["load", "load_matte", "load_picture"]
+)
 def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_it(tmp_path, read, make):
     path = tmp_path / "broken-photo.png"
     make(path)
