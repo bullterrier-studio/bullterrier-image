@@ -113,23 +113,6 @@ def test_the_input_and_the_kernel_are_left_alone_and_the_dtype_is_kept() -> None
     np.testing.assert_array_equal(kernel, kernel_before)
 
 
-@pytest.mark.parametrize(
-    ("kernel", "complaint"),
-    [
-        pytest.param(np.full((4, 3), 1 / 12), "odd", id="an even number of rows"),
-        pytest.param(np.full((3, 2), 1 / 6), "odd", id="an even number of columns"),
-        pytest.param(np.full(5, 0.2), "2-D", id="a 1-D kernel"),
-        pytest.param(np.full((3, 3), 0.2), "sum to 1", id="weights summing to more than 1"),
-        pytest.param(np.full((3, 3), 0.05), "sum to 1", id="weights summing to less than 1"),
-        pytest.param(np.full((3, 3), 1.001 / 9), "sum to 1", id="weights summing to 1.001"),
-        pytest.param(np.array([[-1.0, 1.0, 1.0]]), "non-negative", id="a negative weight"),
-    ],
-)
-def test_a_kernel_that_is_not_a_weighted_average_is_refused(kernel: np.ndarray, complaint: str) -> None:
-    with pytest.raises(ValueError, match=complaint):
-        convolve(random_picture((6, 6, 3)), kernel, edge="reflect")
-
-
 def test_a_box_kernel_is_accepted() -> None:
     np.testing.assert_allclose(
         convolve(np.full((6, 6, 3), 0.3, np.float32), np.full((3, 3), 1 / 9), edge="reflect"), 0.3

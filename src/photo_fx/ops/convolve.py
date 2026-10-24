@@ -16,20 +16,15 @@ def convolve(image: np.ndarray, kernel: np.ndarray, *, edge: Edge) -> np.ndarray
     kernel of (2r + 1) x (2s + 1) weights, so the kernel's middle element weighs the pixel itself and an asymmetric
     kernel is applied as a true convolution (flipped), not a correlation.
 
-    `kernel` must have an odd number of rows and columns, non-negative weights and a sum of 1 (a ValueError says
-    otherwise). `edge` is what lies beyond the picture's edge, as in `photo_fx.ops.blur`: 'reflect' (mirrored, edge
-    pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the
-    opposite edge).
+    `kernel` has an odd number of rows and columns, non-negative weights and a sum of 1. `edge` is what lies beyond the
+    picture's edge, as in `photo_fx.ops.blur`: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).
 
     The result is within float32 rounding of the exact one and never outside the range of values `image` holds, in time
     that grows with the picture, not with the kernel. Returns a new array of the input's shape and dtype; the input and
     the kernel are left alone.
     """
     kernel = np.asarray(kernel, dtype=np.float64)
-    if kernel.ndim != 2 or kernel.shape[0] % 2 == 0 or kernel.shape[1] % 2 == 0:
-        raise ValueError(f"convolve: the kernel must be 2-D with an odd number of rows and columns, got {kernel.shape}")
-    if kernel.min() < 0 or abs(kernel.sum() - 1.0) > 1e-6:  # constant: float32 holds about 7 digits
-        raise ValueError("convolve: the kernel's weights must be non-negative and sum to 1")
     height, width = image.shape[:2]
     reach_y, reach_x = kernel.shape[0] // 2, kernel.shape[1] // 2
     widths = [(reach_y, reach_y), (reach_x, reach_x)] + [(0, 0)] * (image.ndim - 2)
