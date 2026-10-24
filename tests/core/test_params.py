@@ -219,11 +219,6 @@ def test_the_documentation_has_each_fields_type_unit_range_default_and_descripti
     assert "#ff8000" in _entry(text, "tint")
 
 
-def test_the_documentation_says_an_animated_whole_number_moves_in_whole_steps():
-    assert "whole steps" in _entry(Probe.documentation(), "count")
-    assert "whole steps" not in _entry(Probe.documentation(), "radius")
-
-
 class Tiered(EffectParams):
     """A model whose advanced fields sit between its basic ones."""
 

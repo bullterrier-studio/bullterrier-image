@@ -26,28 +26,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 Removing the background is not a feature of its own: it is a `fill` step masked to the background. Any other top-level
 key is refused, so a misspelt `size` or `format` is not silently ignored.
 
-A recipe becomes an animation with an [animation] table, and any numeric parameter can then change over the clip (a
-whole-number parameter moves in whole steps, rounded to the nearest; every frame is checked against the range when
-the recipe loads):
-
-    [animation]
-    seconds = 5
-    fps = 30
-    hold_start = 0.5               # optional: seconds the first frame is held
-    hold_end = 0.5                 # optional: seconds the last frame is held
-    loop = "pingpong"              # optional: "once" (default), or play forward then backward for a seamless loop
-
-    [[step]]
-    effect = "disperse"
-    progress = { from = 0.0, to = 1.0, ease = "gentle" }
-
-`ease` is a name (linear, the default; in, out, in-out; or the cubic-bezier presets gentle, standard, accelerate,
-decelerate, emphasized, sine) or your own cubic-bezier as four numbers, `ease = [0.4, 0.0, 0.2, 1.0]`. Spatial motion
-should not stay linear. A value normally moves only while the animation itself runs (after `hold_start`, before
-`hold_end`); add `over = "clip"` to make it run across the whole clip including the holds, e.g. a clock
-for ambient motion.
-
-Dependency direction: imports `steps`, `timing` and `errors` only; it does not know `runner`.
+Dependency direction: imports `steps` and `errors` only; it does not know `runner`.
 """
 
 import tomllib
@@ -56,34 +35,17 @@ from pathlib import Path
 from photo_fx.errors import RecipeError
 
 from .steps import Recipe, Step, safe_name
-from .timing import EASE_NAMES, Animated, Animation
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones.
 _FORMATS = (1,)
-_KEYS = ("format", "name", "size", "animation", "step")
+_KEYS = ("format", "name", "size", "step")
 
 
-def _located(error: ValueError, where: str) -> RecipeError:
-    """`error` with `where` (the file, and the step) in front; a `RecipeError` keeps its class (an unknown effect stays
-    an `UnknownEffectError`), anything else (timing's plain `ValueError`) becomes a `RecipeError`."""
-    kind = type(error) if isinstance(error, RecipeError) else RecipeError
-    return kind(f"{where}: {error}")
-
-
-def _animated_value(value: object, where: str, key: str) -> object:
-    """Turn `{ from, to, ease, over }` into an Animated; any other value is returned unchanged."""
-    if not isinstance(value, dict):
-        return value
-    if set(value) - {"from", "to", "ease", "over"} or not {"from", "to"} <= set(value):
-        raise RecipeError(
-            f"{where}: `{key}` must be {{ from = number, to = number, ease = one of {', '.join(EASE_NAMES)} or "
-            f'[x1, y1, x2, y2] with x1, x2 in 0..1, over = "motion" or "clip" }}'
-        )
-    try:
-        return Animated(value["from"], value["to"], value.get("ease", "linear"), value.get("over", "motion"))
-    except ValueError as error:
-        raise _located(error, f"{where}: `{key}`") from None
+def _located(error: RecipeError, where: str) -> RecipeError:
+    """`error` with `where` (the file, and the step) in front, keeping its class (an unknown effect stays an
+    `UnknownEffectError`)."""
+    return type(error)(f"{where}: {error}")
 
 
 def _read(path: Path) -> dict:
@@ -104,23 +66,9 @@ def _read(path: Path) -> dict:
     unknown = sorted(set(raw) - set(_KEYS))
     if unknown:
         raise RecipeError(
-            f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: format, name, size, [animation], [[step]]"
+            f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: format, name, size, [[step]]"
         )
     return raw
-
-
-def _load_animation(table: object, filename: str) -> Animation:
-    if not isinstance(table, dict):
-        raise RecipeError(f"{filename}: write the animation as an [animation] table")
-    unknown = set(table) - {"seconds", "fps", "hold_start", "hold_end", "loop"}
-    if unknown or "seconds" not in table:
-        raise RecipeError(
-            f"{filename}: [animation] needs `seconds`; allowed keys: seconds, fps, hold_start, hold_end, loop"
-        )
-    try:
-        return Animation(**table)
-    except ValueError as error:
-        raise _located(error, f"{filename}: [animation]") from None
 
 
 def load_recipe(path: str | Path) -> Recipe:
@@ -140,7 +88,6 @@ def load_recipe(path: str | Path) -> Recipe:
             f'{path.name}: the file name gives no usable recipe name: add name = "..." (letters, digits, . _ -) or '
             "rename the file"
         )
-    animation = _load_animation(raw["animation"], path.name) if "animation" in raw else None
     entries = raw.get("step", [])
     if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
         raise RecipeError(f"{path.name}: write each step as a [[step]] table (two brackets: there may be several)")
@@ -152,12 +99,11 @@ def load_recipe(path: str | Path) -> Recipe:
         if name is None:
             raise RecipeError(f"{where}: missing `effect`")
         mask, opacity, preset = entry.pop("mask", None), entry.pop("opacity", 1.0), entry.pop("preset", None)
-        params = {key: _animated_value(value, where, key) for key, value in entry.items()}
         try:
-            steps.append(Step(name, params, mask, opacity, preset))
-        except ValueError as error:
+            steps.append(Step(name, entry, mask, opacity, preset))
+        except RecipeError as error:
             raise _located(error, where) from None
     try:
-        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), animation)
-    except ValueError as error:
+        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024))
+    except RecipeError as error:
         raise _located(error, path.name) from None

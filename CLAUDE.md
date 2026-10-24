@@ -58,7 +58,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
-8. **Errors:** callers catch `PhotoFxError` (`photo_fx.errors`, the bottom layer, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NoFramesError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
+8. **Errors:** callers catch `PhotoFxError` (`photo_fx.errors`, the bottom layer, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
 
 ## Standards
 
@@ -107,8 +107,8 @@ A Pydantic model per effect: a subclass of `EffectParams` (`photo_fx.core.params
 - **Other fields** take no unit, min or max: `bool` switches, `Literal[...]` choices (the doc must mention every choice), `str`, `Color` (`'#rrggbb'` or `'#rgb'`
   with the leading `#`, or three numbers 0..1), and lists of those. A list may be written as a list or an array.
 - **Basic and advanced:** `advanced=True` marks a field the user would change to tune the technique rather than to choose the look; it is listed apart (after the basic ones, collapsed in the catalogue, counted in `photo-fx effects`) and stays settable, validated and in the schema; aim at six or fewer basic fields per effect.
-- **Animation:** any numeric parameter may be animated; an `int` field moves in whole steps (rounded to the nearest), and every rendered frame is checked
-  against the range when the recipe loads.
+- **State, not time:** a parameter that changes with a process is a state (`progress` or a share in `fraction`, a position in a cycle in `cycles`), never a
+  duration; whoever animates the effect sets it per frame (see "Responsibility").
 
 Names are the field's own terms (radius, sigma, amount, threshold, feather, falloff, gamma, gain, lift, exposure, contrast, saturation, hue, temperature, tint,
 angle, spacing, opacity, blend, octaves, persistence, lacunarity, seed), never `strength`, `intensity`, `factor`, `val`, `k`, nor the name of the unit. A misspelt
@@ -165,7 +165,7 @@ Tests must follow the testing-best-practices skill, no exceptions. A test that i
 
 **Tests describe behaviour, not implementation.** A test must still pass after any behaviour-preserving refactor: renaming or moving private helpers, replacing the algorithm with another correct one, splitting or merging functions, changing internal data structures.
 - Never import underscore-prefixed names, read production constants or private attributes, or call private functions. If something deserves a test it deserves a public name; otherwise test it through the behaviour it serves.
-- Never monkeypatch, patch or mock our own modules, functions or classes, and never assert call counts or call order on our own code. Substitute only true external boundaries (the subject-finding model, the clock, the network, the filesystem via `tmp_path`, the `ffmpeg` binary), and prefer injecting through a public parameter (`find_subject=`) over patching.
+- Never monkeypatch, patch or mock our own modules, functions or classes, and never assert call counts or call order on our own code. Substitute only true external boundaries (the subject-finding model, the clock, the network, the filesystem via `tmp_path`), and prefer injecting through a public parameter (`find_subject=`) over patching.
 - No source or AST inspection in behaviour tests. The architecture tests (import-linter, the module-graph checks) are the one exception, because their subject is structure; their docstring says so.
 - Assert observable outputs only: returned arrays (as properties), files written, exceptions raised. For errors, assert the exception type and a short substring naming the offending argument or value, never the whole sentence.
 - Hard to test through the public interface is a design signal: change the interface (inject a dependency, expose a parameter), do not reach inside.
@@ -189,7 +189,7 @@ How a test file is written (`src/photo_fx/effects/_template/test_effect.py.tmpl`
 ## Skills
 
 Use them; they are installed globally. `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion` for process; `testing-best-practices`
-for tests; `software-design-philosophy` for design (deep modules, no pass-throughs, no information leakage; interface docstrings state promises); `motion-design` for anything animated.
+for tests; `software-design-philosophy` for design (deep modules, no pass-throughs, no information leakage; interface docstrings state promises); `motion-design` for effects that depict motion (`disperse`, `evaporate`).
 The `superpowers:*` skills are process aids, not authority: they are known to produce verbose, over-engineered and over-defensive code (extra layers of validation, speculative generality, long ceremony). This file, `testing-best-practices` and `software-design-philosophy` keep them in check; where a superpowers skill asks for more validation, more layers, more documents or more steps than this file does, do what this file says.
 Where they pull against this file: tests follow this file (no goldens); fixes follow "Fixing defects" (structural, never defensive); design follows the skill (do not add shallow wrappers; per-effect boilerplate is the price of uniformity, so keep `apply` bodies substantial).
 

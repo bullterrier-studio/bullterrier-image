@@ -1,4 +1,4 @@
-"""photo-fx: style photos with composable effects, optionally on a cut-out subject, and animate them.
+"""photo-fx: style photos with composable effects, optionally on a cut-out subject.
 
     from photo_fx import Recipe, fx, render, imageio
 
@@ -19,7 +19,7 @@ Layers, each importing only from the ones below it (import-linter checks this in
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
     adapters   imageio (files and the one in-memory image type), matte (finding the subject)
     effects    the effect library: pure functions image -> image, found automatically
-    core       the registry and the recipe engine (timing, steps, loader, runner)
+    core       the registry and the recipe engine (steps, loader, runner)
     ops        shared numeric primitives, named by concept
 
 Importing photo_fx is cheap: each public name loads its module the first time it is used, and the effects load on the
@@ -34,7 +34,6 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .errors import (
         BackendUnavailableError,
         ImageReadError,
-        NoFramesError,
         NonFiniteImageError,
         PhotoFxError,
         ProjectError,
@@ -44,7 +43,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     )
     from .matte import subject_matte
     from .pipeline import Project, load_project, run
-    from .recipe import Animation, Recipe, Stage, Step, load_recipe, ramp, render, render_all, render_frames, trace
+    from .recipe import Recipe, Stage, Step, load_recipe, render, render_all, trace
 
     __version__: str
 
@@ -53,14 +52,12 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError",
+        "BackendUnavailableError", "ImageReadError", "NonFiniteImageError",
         "PhotoFxError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
-    ".recipe": (
-        "Animation", "Recipe", "Stage", "Step", "load_recipe", "ramp", "render", "render_all", "render_frames", "trace",
-    ),
+    ".recipe": ("Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
 
@@ -93,8 +90,7 @@ def _installed_version() -> str:
 
 
 __all__ = [
-    "Animation", "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError", "PhotoFxError",
-    "Project", "ProjectError", "Recipe", "RecipeError", "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError",
-    "__version__", "fx", "imageio", "load_project", "load_recipe", "ramp", "recipe", "render", "render_all",
-    "render_frames", "run", "subject_matte", "trace",
+    "BackendUnavailableError", "ImageReadError", "NonFiniteImageError", "PhotoFxError", "Project", "ProjectError",
+    "Recipe", "RecipeError", "Stage", "Step", "SubjectNotFoundError", "UnknownEffectError", "__version__", "fx",
+    "imageio", "load_project", "load_recipe", "recipe", "render", "render_all", "run", "subject_matte", "trace",
 ]  # fmt: skip

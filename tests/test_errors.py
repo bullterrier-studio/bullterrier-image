@@ -8,7 +8,6 @@ import pytest
 from photo_fx import (
     BackendUnavailableError,
     ImageReadError,
-    NoFramesError,
     NonFiniteImageError,
     PhotoFxError,
     ProjectError,
@@ -68,7 +67,6 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
         (SubjectNotFoundError, RuntimeError),
         (BackendUnavailableError, NotImplementedError),
         (ImageReadError, OSError),
-        (NoFramesError, ValueError),
         (NonFiniteImageError, ValueError),
     ],
 )

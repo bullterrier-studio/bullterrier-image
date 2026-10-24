@@ -11,16 +11,9 @@ from photo_fx.core import runner
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.core.steps import Recipe, Step
-from photo_fx.core.timing import Animated, Animation
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
-CLIP = Recipe(
-    "clip",
-    (Step("fill", {"color": "#000000"}, "background"), Step("grade", {"exposure": Animated(0.0, 1.0)})),
-    size=None,
-    animation=Animation(seconds=3, fps=1),  # three frames
-)
 
 
 class CountingFinder:
@@ -38,18 +31,16 @@ class CountingFinder:
 RUNS = {
     "render": lambda photo, recipe, **k: runner.render(photo, recipe, **k),
     "trace": lambda photo, recipe, **k: runner.trace(photo, recipe, **k),
-    "render_frames": lambda photo, recipe, **k: list(runner.render_frames(photo, recipe, **k)),
     "render_all": lambda photo, recipe, **k: runner.render_all(photo, [PLAIN, recipe], **k),
 }
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways(run, photo):
-    recipe = CLIP if run is RUNS["render_frames"] else MASKED
     with pytest.raises(SubjectNotFoundError, match="needs the subject") as raised:
-        run(photo, recipe)
+        run(photo, MASKED)
     message = str(raised.value)  # names the recipe and both ways to give the subject
-    assert f"'{recipe.name}'" in message
+    assert f"'{MASKED.name}'" in message
     assert "`matte`" in message
     assert "`find_subject`" in message
 
@@ -57,8 +48,8 @@ def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_the_finder_is_called_exactly_once_per_render(run, photo, matte):
     finder = CountingFinder(matte)
-    run(photo, CLIP if run is RUNS["render_frames"] else MASKED, find_subject=finder)
-    assert len(finder.seen) == 1  # once for a still, a trace, a whole clip, or all the recipes of render_all
+    run(photo, MASKED, find_subject=finder)
+    assert len(finder.seen) == 1  # once for a render, a trace, or all the recipes of render_all
 
 
 def test_render_all_asks_once_however_many_recipes_need_the_subject(photo, matte):
@@ -88,21 +79,11 @@ def test_the_finder_sees_the_photo_already_scaled_to_the_recipes_size(photo, mat
     assert finder.seen == [(48, 64, 3)]
 
 
-def test_an_animation_whose_parameters_never_change_is_the_still_held_for_the_whole_clip(photo):
-    held = Recipe("held", PLAIN.steps, size=None, animation=Animation(seconds=3, fps=1))  # three frames, none moving
-    frames = list(runner.render_frames(photo, held))
-    assert len(frames) == 3
-    still = runner.render(photo, PLAIN)
-    for frame in frames:
-        np.testing.assert_array_equal(frame, still)
-
-
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     """A finder returning None (instead of raising) would otherwise make `trace` drop the subject stage silently."""
-    recipe = CLIP if run is RUNS["render_frames"] else MASKED
     with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
-        run(photo, recipe, find_subject=lambda rgb: None)
+        run(photo, MASKED, find_subject=lambda rgb: None)
 
 
 # --- memory: the runner keeps only the image the next step needs ---------------------------------------------------

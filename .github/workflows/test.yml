@@ -31,8 +31,7 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python }}
-      # the text effects draw with the first monospaced system font found (DejaVu Sans Mono on Linux); ffmpeg needs
-      # no install: the dev environment has imageio-ffmpeg's bundled binary, so the video tests run everywhere
+      # the text effects draw with the first monospaced system font found (DejaVu Sans Mono on Linux)
       - name: Install a monospaced font
         if: runner.os == 'Linux'
         run: >-

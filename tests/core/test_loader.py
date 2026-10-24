@@ -74,10 +74,9 @@ BROKEN = {
     "misspelt size": ("sise = 2\n" + STEP, "`sise`"),
     "misspelt format": ("formt = 2\n" + STEP, "`formt`"),
     "steps for step": ("steps = 2\n" + STEP, "`steps`"),
-    "animations for animation": ("animations = 2\n" + STEP, "`animations`"),
+    "an [animation] table, which no longer exists": ("[animation]\nseconds = 2\n" + STEP, "`animation`"),
     "a single [step] table instead of a list": ("[step]\neffect = 'grade'\n", r"\[\[step\]\]"),
-    "a bad animation": ("[animation]\nseconds = -1\n" + STEP, "seconds"),
-    "a bad easing": (STEP + "exposure = { from = 0, to = 1, ease = 'wobbly' }\n", "step 1: .*ease"),
+    "an animated value, which no longer exists": (STEP + "exposure = { from = 0, to = 1 }\n", "step 1: .*exposure"),
 }
 
 

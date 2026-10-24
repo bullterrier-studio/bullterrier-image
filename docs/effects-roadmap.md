@@ -266,7 +266,7 @@ Combine the photo with other images, text and blend modes.
 | `text` | Render text with font, outline and shadow. | `fx.text("PHOTO-FX", size=0.08, at="bottom")` |
 | `split_screen` | Before/after or side by side. | `fx.split_screen(vertical=True)` |
 | `collage` | Several recipes' results in one layout. | `fx.collage(columns=3)` |
-| `transition` | Between two images: dissolve, wipe, glitch, pixel. | `fx.transition(to="b.jpg", kind="pixel", progress=ramp(0,1))` |
+| `transition` | Between two images: dissolve, wipe, glitch, pixel. | `fx.transition(to="b.jpg", kind="pixel", progress=0.5)` |
 
 ## Generated backgrounds
 
@@ -297,31 +297,31 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `compare` (CLI) | Before/after slider page. | `photo-fx compare a.jpg b.jpg` |
 | `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
 
-## Animation
+## One moment of a process
 
-Time-based effects, plus every effect above that has a numeric parameter can be animated with `ramp()`.
+Effects that show one picture of something that unfolds. `progress` (0 to 1) is the moment shown; whoever animates it
+(the future `bullterrier-video` package) sets it for each frame, from a ramp, a beat or anything else. This library has
+no time of its own.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `disperse` ✓ | Pieces detach, drift on the wind and fade. | `fx.disperse(progress=ramp(0,0.9), wind=0.3)` |
-| `assemble` | The reverse: pieces fly in and settle. | `fx.disperse(progress=ramp(0.9,0))` |
-| `dissolve` | Pixels vanish in noise order, with a burning edge. | `fx.dissolve(progress=ramp(0,1), edge="#ff7a2b")` |
-| `pixel_dissolve` | Dissolve into blocks. | `fx.pixel_dissolve(progress=ramp(0,1), cell=16)` |
-| `scan_reveal` | A bright line sweeps and reveals the effect. | `fx.scan_reveal(progress=ramp(0,1), angle=90)` |
-| `wipe` | Linear, iris or clock reveal. | `fx.wipe(kind="iris", progress=ramp(0,1))` |
-| `type_on` | Text appears character by character. | `fx.type_on(progress=ramp(0,1))` |
-| `explode` | Pieces burst radially from a point. | `fx.explode(progress=ramp(0,1), center=[0.5,0.4])` |
-| `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=ramp(0,1))` |
-| `melt_down` | Drips run down and pool. | `fx.melt_down(progress=ramp(0,1))` |
-| `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=ramp(0,1))` |
-| `flicker` | Random brightness pulses. | `fx.flicker(rate=8, depth=0.2, seed=1)` |
-| `breathe` | Slow scale or brightness pulse. | `fx.breathe(period=3, amount=0.02)` |
-| `camera_shake` | Smoothed-noise offsets. | `fx.camera_shake(amount=6, seed=1)` |
-| `ken_burns` | Slow pan and zoom. | `fx.ken_burns(from_box=[...], to_box=[...])` |
+| `disperse` ✓ | Pieces detach, drift on the wind and fade. | `fx.disperse(progress=0.45, wind=0.3)` |
+| `assemble` | The reverse: pieces fly in and settle. | `fx.assemble(progress=0.5)` |
+| `dissolve` | Pixels vanish in noise order, with a burning edge. | `fx.dissolve(progress=0.5, edge="#ff7a2b")` |
+| `pixel_dissolve` | Dissolve into blocks. | `fx.pixel_dissolve(progress=0.5, cell=16)` |
+| `scan_reveal` | A bright line sweeps and reveals the effect. | `fx.scan_reveal(progress=0.5, angle=90)` |
+| `wipe` | Linear, iris or clock reveal. | `fx.wipe(kind="iris", progress=0.5)` |
+| `type_on` | Text appears character by character. | `fx.type_on(progress=0.5)` |
+| `explode` | Pieces burst radially from a point. | `fx.explode(progress=0.5, center=[0.5,0.4])` |
+| `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=0.5)` |
+| `melt_down` | Drips run down and pool. | `fx.melt_down(progress=0.5)` |
+| `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=0.5)` |
 | `parallax` | 2.5D depth shift from a depth map or layers. | `fx.parallax(amount=0.03)` |
-| `trails` | Motion trails from earlier frames. | `fx.trails(length=8, fade=0.7)` |
-| `slit_scan` | Time smeared across space. | `fx.slit_scan()` |
-| `morph` | Blend two photos with optical flow. | `fx.morph(to="b.jpg", progress=ramp(0,1))` |
+| `morph` | Blend two photos with optical flow. | `fx.morph(to="b.jpg", progress=0.5)` |
+
+Effects that need time or several frames (`flicker`, `breathe`, `camera_shake`, `ken_burns`, `trails`, `slit_scan`) and
+animated values (ramps, easing, keyframes) do not belong here: they are for the video and control packages
+(`bullterrier-design`).
 
 ## Signature looks
 
@@ -335,7 +335,7 @@ What combining effects can give, once the pieces exist:
 - **Double exposure**: black and white, a second photo inside the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
-- **Turn to dust** (animation): ASCII, disperse, embers, camera shake
+- **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
 A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with decision D2, Turn to dust with batch 12).

@@ -8,8 +8,8 @@ Dependency direction: the bottom layer, below `ops`: it imports nothing from pho
 """
 
 __all__ = [
-    "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError", "PhotoFxError", "ProjectError",
-    "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
+    "BackendUnavailableError", "ImageReadError", "NonFiniteImageError", "PhotoFxError", "ProjectError", "RecipeError",
+    "SubjectNotFoundError", "UnknownEffectError",
 ]  # fmt: skip
 
 
@@ -18,7 +18,7 @@ class PhotoFxError(Exception):
 
 
 class RecipeError(PhotoFxError, ValueError):
-    """A recipe, a step, an animation or an effect's parameters are invalid: a misspelt or out-of-range value, an unsafe
+    """A recipe, a step or an effect's parameters are invalid: a misspelt or out-of-range value, an unsafe
     recipe name, a broken or unsupported recipe file. Raised when the value is made or the file is read, wherever it
     comes from (a TOML file, `fx`, a direct call), naming what is wrong and what is valid."""
 
@@ -43,10 +43,6 @@ class UnknownEffectError(RecipeError, KeyError):
 class SubjectNotFoundError(PhotoFxError, RuntimeError):
     """The subject of a photo was needed (a masked step, an effect that takes the matte) but could not be found or
     used: no `matte` and no finder given, a finder that found nothing, or a matte of another size than the photo."""
-
-
-class NoFramesError(PhotoFxError, ValueError):
-    """A video or animation was asked for with no frames to write."""
 
 
 class NonFiniteImageError(PhotoFxError, ValueError):

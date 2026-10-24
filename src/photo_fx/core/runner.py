@@ -1,11 +1,11 @@
-"""Running a `Recipe` on a photo: `render` (one still), `render_frames` (an animation), `render_all` (several recipes
-on one photo) and `trace` (every intermediate picture, as `Stage`s).
+"""Running a `Recipe` on a photo: `render` (one still), `render_all` (several recipes on one photo) and `trace` (every
+intermediate picture, as `Stage`s).
 
 Promises: the input photo is never modified; the same photo, recipe and matte always give the same pixels; `trace`'s
 last stage is exactly what `render` returns, because both run the same code; an effect that changes the image shape is
-an error; `render` and `render_frames` keep alive only the image the next step needs, so a render's memory peak is
-its busiest step's own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps,
-while `trace` keeps every stage. The runner is given everything it uses: the photo, and the subject either as a
+an error; `render` keeps alive only the image the next step needs, so a render's memory peak is its busiest step's
+own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps, while `trace` keeps
+every stage. The runner is given everything it uses: the photo, and the subject either as a
 `matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
 only if some step needs the subject. It never loads a file or looks for the subject on its own; `photo_fx.recipe` binds
 the default finder for users.
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from photo_fx.errors import RecipeError, SubjectNotFoundError
+from photo_fx.errors import SubjectNotFoundError
 from photo_fx.ops.resample import resize
 
 from . import registry
@@ -34,7 +34,6 @@ def render(
     rgb: np.ndarray,
     recipe: Recipe,
     matte: np.ndarray | None = None,
-    at: float = 0.0,
     *,
     find_subject: SubjectFinder | None = None,
 ) -> np.ndarray:
@@ -44,39 +43,15 @@ def render(
     step is blended in through the subject matte, so only the subject or only the background changes.
     Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically.
 
-    For an animated recipe this is one still: the frame at position `at` (0..1) of the clip.
-
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
-    height and width, 0..1 (white = subject), or None. at: position in the clip, 0..1 (ignored by a still recipe).
-    find_subject: called with the photo (already scaled to `recipe.size`) when a step needs the subject and no `matte`
-    was given. Raises SubjectNotFoundError when a step needs the subject and neither was given, the finder returns
-    None, or the matte is not the photo's size.
+    height and width, 0..1 (white = subject), or None. find_subject: called with the photo (already scaled to
+    `recipe.size`) when a step needs the subject and no `matte` was given. Raises SubjectNotFoundError when a step
+    needs the subject and neither was given, the finder returns None, or the matte is not the photo's size.
     """
     image, matte = _prepare(rgb, recipe, matte, find_subject)
-    stages = _stages(image, recipe.steps, matte, at, at)
+    stages = _stages(image, recipe.steps, matte)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     return _last(stages)
-
-
-def render_frames(
-    rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None, *, find_subject: SubjectFinder | None = None
-) -> Iterator[np.ndarray]:
-    """Yield every frame of an animated recipe, in order (see `Animation.positions`).
-
-    The steps before the first animated one cannot change between frames, so they run once for the whole clip, and the
-    subject is found once for the whole clip. A recipe with an animation but no animated parameter gives the same still
-    picture in every frame.
-
-    rgb, matte, find_subject: as for `render`. recipe: must have an animation (RecipeError otherwise).
-    """
-    if recipe.animation is None:
-        raise RecipeError(f"recipe {recipe.name!r} has no animation: add an [animation] table (seconds, fps)")
-    rgb, matte = _prepare(rgb, recipe, matte, find_subject)
-    # With no animated step every step is still: the clip is the still picture, held for every frame.
-    first_moving = next((i for i, step in enumerate(recipe.steps) if step.animated), len(recipe.steps))
-    still = _run(rgb, recipe.steps[:first_moving], matte, 0.0, 0.0)
-    for motion, clip in recipe.animation.frames():
-        yield _run(still, recipe.steps[first_moving:], matte, motion, clip)
 
 
 @dataclass(frozen=True)
@@ -91,7 +66,6 @@ def trace(
     rgb: np.ndarray,
     recipe: Recipe,
     matte: np.ndarray | None = None,
-    at: float = 0.0,
     *,
     find_subject: SubjectFinder | None = None,
 ) -> list[Stage]:
@@ -99,17 +73,16 @@ def trace(
 
     The stages are the photo as the recipe receives it, the subject matte if the recipe uses one (white = subject),
     and the image after each step, in order. The last stage is exactly what `render` returns, because both run the
-    same code. For an animated recipe the stages are for the frame at position `at` (0..1) of the clip. Every stage
-    stays in memory: one picture per step, plus the input and the matte.
+    same code. Every stage stays in memory: one picture per step, plus the input and the matte.
 
-    rgb, recipe, matte, at, find_subject: as for `render`.
+    rgb, recipe, matte, find_subject: as for `render`.
     """
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
     stages = [Stage("input", rgb)]
     if recipe.needs_matte:
         subject = np.repeat(matte[..., None], 3, axis=2)  # type: ignore[index]  # `_prepare` gave the matte this recipe needs
         stages.append(Stage("subject matte (white = subject)", subject))
-    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, at, at), start=1):
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     return stages
 
@@ -164,24 +137,17 @@ def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
     return matte
 
 
-def _run(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None, motion: float, clip: float) -> np.ndarray:
-    """The image after `steps` (`out` itself when there are none); `out` stays alive as long as the caller holds it."""
-    return _last(_stages(out, steps, matte, motion, clip)) if steps else out
-
-
 def _last(stages: Iterator[tuple[Step, np.ndarray]]) -> np.ndarray:
     """The image after the final stage (there must be one). Only the newest image is kept while the stages run: each
     step's input is freed once the next step has its output, unless something else still holds it."""
     return deque(stages, maxlen=1)[0][1]
 
 
-def _stages(
-    out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None, motion: float, clip: float
-) -> Iterator[tuple[Step, np.ndarray]]:
+def _stages(out: np.ndarray, steps: Sequence[Step], matte: np.ndarray | None) -> Iterator[tuple[Step, np.ndarray]]:
     """Run the steps in order, yielding each step with the image after it. The one place a step is applied."""
     for step in steps:
         extra = {"matte": matte} if step.wants_matte else {}
-        result = registry.apply(step.effect, out, **step.params_at(motion, clip), **extra)
+        result = registry.apply(step.effect, out, **step.params, **extra)
         if result.shape != out.shape:
             raise RuntimeError(f"effect {step.effect!r} changed the image shape {out.shape} -> {result.shape}")
         if step.mask or step.opacity < 1.0:

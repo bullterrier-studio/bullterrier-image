@@ -14,12 +14,11 @@ import photo_fx
 import photo_fx.core.runner
 import photo_fx.effects
 import photo_fx.plugin
-from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, ramp, render, run, trace
+from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, render, run, trace
 from photo_fx.cli import main
 from photo_fx.core import registry
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
-from photo_fx.core.timing import Animated, Animation
 
 # --- the public surface: explicit, one home per name ------------------------------------------------------------
 
@@ -53,7 +52,7 @@ def test_the_version_is_looked_up_when_asked_for_not_on_import():
     assert listed is True
 
 
-@pytest.mark.parametrize("name", ["render", "render_frames", "trace", "render_all"])
+@pytest.mark.parametrize("name", ["render", "trace", "render_all"])
 def test_the_render_family_has_one_public_home_and_core_does_not_offer_its_own(name):
     """`photo_fx.render` is `photo_fx.recipe.render` (with the default subject finder); the core's version, which
     finds no subject by itself, is reachable only by its module path."""
@@ -91,8 +90,6 @@ def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
 def test_a_recipe_built_in_code_is_checked_too():
     with pytest.raises(ValueError, match="at least one step"):
         Recipe("empty", [])
-    with pytest.raises(ValueError, match="no animation"):
-        Recipe("x", [fx.grade(exposure=ramp(0, 1))])
     assert Recipe("ok", [fx.grain()]).steps == (fx.grain(),)  # a list is fine; it becomes a tuple
 
 
@@ -110,7 +107,7 @@ def test_steps_can_be_limited_to_a_region_and_blended_without_changing_the_origi
 def test_a_step_describes_itself_briefly_for_labels():
     assert str(fx.fill("#000000").where("background")) == "fill(color='#000000') on background"
     assert str(fx.grade(exposure=0.5).blend(0.3)) == "grade(exposure=0.5) x0.3"
-    assert str(fx.disperse(progress=ramp(0, 0.9))) == "disperse(progress=0->0.9)"
+    assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
     assert len(fx.ascii(chars="xy" * 100).describe(width=30)) == 30
 
 
@@ -292,12 +289,6 @@ def test_python_and_toml_recipes_are_the_same_thing(tmp_path):
     assert built == load_recipe(tmp_path / "r.toml")
 
 
-def test_ramp_makes_an_animated_value():
-    assert ramp(0, 1, "gentle") == Animated(0.0, 1.0, "gentle")
-    assert ramp(0, 1, [0.4, 0, 0.2, 1]).ease == (0.4, 0, 0.2, 1)
-    assert ramp(0, 5, over="clip").over == "clip"
-
-
 # --- trace: the picture after every step -----------------------------------------------------------------------
 
 
@@ -320,13 +311,6 @@ def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, matte):
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], matte)  # white where the subject is
     assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe("t", [fx.grain()], size=None)))
-
-
-def test_trace_of_an_animation_is_a_still_from_the_chosen_moment(photo):
-    look = Recipe("a", size=None, animation=Animation(seconds=2), steps=[fx.grade(exposure=ramp(0, 1))])
-    start, end = trace(photo, look, at=0.0)[-1].image, trace(photo, look, at=1.0)[-1].image
-    np.testing.assert_allclose(start, photo, atol=1e-6)
-    np.testing.assert_allclose(end, np.clip(photo * 2, 0, 1), atol=1e-5)
 
 
 # --- Python recipes and per-step output in the pipeline ---------------------------------------------------------

@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -13,8 +12,6 @@ from photo_fx import Project, imageio
 from photo_fx.cli import main
 from photo_fx.errors import BackendUnavailableError, ProjectError
 from photo_fx.pipeline import init_project, load_project, run
-
-FFMPEG = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
 
 
 def write_recipe(folder: Path, name: str, step: str, file: str | None = None) -> None:
@@ -404,8 +401,6 @@ def test_two_photos_with_the_same_name_are_refused(folder):
         ({"formats": ()}, "formats"),
         ({"sizes": (4,)}, "sizes.*4"),
         ({"subject_share": (0.9, 0.1)}, "subject_share"),
-        ({"frozen_tail": 0.0}, "frozen_tail.*0"),
-        ({"steps_at": 2.0}, "steps_at.*2"),
         ({"steps": "yes"}, "steps.*yes"),
         ({"colour": "red"}, "colour"),
     ],
@@ -479,47 +474,3 @@ def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, 
     assert (tmp_path / "fresh" / "photo-fx.toml").is_file()
     assert main(["run", str(tmp_path / "fresh" / "photo-fx.toml")]) == 1  # no photos yet: explained, not a traceback
     assert "no photos match" in capsys.readouterr().err
-
-
-ANIMATED = """name = "{name}"
-size = 48
-[animation]
-seconds = 1.0
-fps = 20
-hold_end = {hold_end}
-[[step]]
-effect = "grade"
-exposure = {{ from = 0.0, to = 1.0 }}
-"""
-
-
-def video_size(path) -> tuple[int, int]:
-    """(width, height) of a video file, read back with ffprobe."""
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0",
-         str(path)],
-        capture_output=True, encoding="utf-8", check=True,
-    ).stdout  # fmt: skip
-    width, height = map(int, out.strip().split(","))
-    return width, height
-
-
-@FFMPEG
-def test_animations_are_exported_as_video_and_a_dead_tail_is_flagged(folder):
-    for name, hold_end in (("steady", 0.0), ("stalls", 0.7)):
-        (folder / "recipes" / f"{name}.toml").write_text(
-            ANIMATED.format(name=name, hold_end=hold_end), encoding="utf-8"
-        )
-    write_project(folder, "[export]\nsizes = [24]\n")
-    items = {i.recipe: i for i in run(load_project(folder / "photo-fx.toml")) if i.photo == "a.png"}
-    out = folder / "out" / "a"
-    assert video_size(out / "steady.mp4") == (48, 36)  # the recipe's 48 px, from the 128x96 photo
-    assert video_size(out / "steady_24.mp4") == (24, 18)  # and a smaller copy
-    assert items["steady"].warnings == ()
-    assert "motion stops early" in items["stalls"].warnings[0]
-    page = (folder / "out" / "index.html").read_text(encoding="utf-8")
-    assert "<video" in page
-    assert 'href="a/steady.frames.png"' in page
-    with Image.open(out / "steady.frames.png") as strip:  # a picture of the animation: six frames side by side
-        assert strip.size[0] > 5 * 24
-        assert strip.format == "PNG"

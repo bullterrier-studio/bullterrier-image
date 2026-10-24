@@ -34,7 +34,6 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects
     recipes = [load_recipe(f) for f in files]
     assert len({r.name for r in recipes}) == len(recipes)
-    assert any(r.animation for r in recipes)
     assert any(r.needs_matte for r in recipes)
 
 
@@ -95,7 +94,7 @@ def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists(
     assert re.search(r"\]\(docs/effects/README\.md\)", readme), "the README must link to the effect catalogue"
     assert (EXAMPLES.parent / "docs" / "effects" / "README.md").is_file()
     local = [p for p in re.findall(r'src="([^"]+)"', readme) if not p.startswith("http")]
-    assert len(local) >= 8  # the banner, the gallery, the step sheet and the filmstrip
+    assert len(local) >= 8  # the banner, the gallery and the step sheet
     for path in local:
         assert (EXAMPLES.parent / path).is_file(), f"README shows {path}, which does not exist"
     links = re.findall(r'href="((?:examples|docs|src)/[^"]+)"', readme)

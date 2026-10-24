@@ -4,7 +4,6 @@
     params      `EffectParams`, `param`, `Color`: how an effect declares its validated, documented parameters
     types       the forms a colour may be written in
     vocabulary  parameter names effects must not use, and what to use instead
-    timing      values changing over a clip: easing, `Animated`, `ramp`, `Animation`
     steps       `Step` and `Recipe`: the data model of a look and its validation
     loader      `load_recipe`: the TOML format
     runner      running a recipe on a photo; the subject is given to it (a matte or a `find_subject` function)
@@ -15,6 +14,6 @@ effects, adapters and the app change around it. Its names are imported from thei
 Users import from `photo_fx` / `photo_fx.recipe`, whose `render` & co. also know how to find the subject.
 """
 
-from . import loader, params, registry, runner, steps, timing, types, vocabulary
+from . import loader, params, registry, runner, steps, types, vocabulary
 
-__all__ = ["loader", "params", "registry", "runner", "steps", "timing", "types", "vocabulary"]
+__all__ = ["loader", "params", "registry", "runner", "steps", "types", "vocabulary"]

@@ -79,7 +79,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   named `interpolation` promises that rule; use `resampling` when the effect does not.
 - **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
   nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
-  channel), not a `matrix` or a `points` list. *Reason:* only scalars can be animated with `ramp()`, become a slider
+  channel), not a `matrix` or a `points` list. *Reason:* only scalars can be driven by a control signal from outside, become a slider
   with a unit and range in the UI generated from the effect metadata, and carry their own documentation and error
   message; a list is validated per item only, and a free-point curve needs a curve editor that sliders cannot give.
   *Consequence:* a draggable-point curve or a free-length LUT is a separate, later effect (`point_curve`, `lut`) with
@@ -114,7 +114,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Errors and I/O
 
 - **One error hierarchy.** Library code raises `PhotoFxError` subclasses (`RecipeError`, `UnknownEffectError`,
-  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NoFramesError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
+  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
   *Reason:* callers catch one type; `except ValueError` keeps working. *Consequence:* the CLI catches them and prints a
   message, never a traceback, for a user's mistake; a broken effect definition is a programming error (plain
   `ValueError`/`TypeError` at import).
@@ -163,7 +163,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   keeps each column's pixels) against an independent oracle. *Reason:* a golden image written with the code proves
   nothing and churns binary diffs. *Consequence:* no goldens, no change-detector tests of configuration.
 - **Behaviour through the public interface.** No private imports, no mocks of our own code, no call-count assertions;
-  only true external boundaries (the model, the network, `ffmpeg`, the clock) are substituted, preferably by injection.
+  only true external boundaries (the model, the network, the clock) are substituted, preferably by injection.
   *Reason:* a test must survive any behaviour-preserving refactor. *Consequence:* hard-to-test code gets a better
   interface, not a reach-in.
 - **The gates are the review.** `uv run poe check` runs format, lint, dead code, dependencies, build, types and tests;

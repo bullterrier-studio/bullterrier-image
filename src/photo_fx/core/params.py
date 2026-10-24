@@ -24,7 +24,6 @@ Promises:
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
 
-import functools
 import inspect
 import math
 import re
@@ -130,7 +129,6 @@ def param(
     validated and in the schema like any other.
     field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
-    A whole-number (`int`) field may be animated: its value then moves in whole steps, rounded to the nearest.
     The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
     """
     return _Spec(default, doc, unit, min, max, advanced, field_kwargs)
@@ -228,7 +226,7 @@ class EffectParams(ValidatedModel):
 
     @classmethod
     def whole_number_fields(cls) -> frozenset[str]:
-        """The fields that hold a whole number (`int`): an animated value for one is rounded to the nearest."""
+        """The fields that hold a whole number (`int`): a range of values for one is rounded to whole numbers."""
         return _whole_number_fields(cls)
 
     @classmethod
@@ -274,7 +272,6 @@ class EffectParams(ValidatedModel):
         """A "Parameters" section (numpydoc style) with each basic field's type, unit, range, default and description,
         then an "Advanced parameters" section of the same form if there are advanced fields. With `advanced=False` those
         are left out and one line says how many."""
-        whole = cls.whole_number_fields()
         sections: dict[bool, list[str]] = {False: [], True: []}
         for doc in cls.fields_doc():
             parts = [doc.type]
@@ -284,8 +281,6 @@ class EffectParams(ValidatedModel):
                 parts.append(doc.range)
             parts.append(f"default {doc.default!r}")
             words = " ".join(doc.doc.split())
-            if doc.name in whole:
-                words += " Animated, it moves in whole steps (rounded to the nearest whole number)."
             description = textwrap.fill(words, 88, initial_indent="    ", subsequent_indent="    ")
             sections[doc.advanced].append(f"{doc.name} : {', '.join(parts)}\n{description}")
         text = "Parameters\n----------\n" + "\n".join(sections[False])
@@ -299,7 +294,6 @@ class EffectParams(ValidatedModel):
 _MISSING = object()
 
 
-@functools.cache  # a model's fields are fixed when its class is made; every animated frame asks again
 def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
     hints = typing.get_type_hints(model)
     return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})

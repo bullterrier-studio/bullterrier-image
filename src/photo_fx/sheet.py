@@ -36,8 +36,7 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
 
     target: `effect.parameter`, e.g. `glitch.split`; `effect#2.parameter` picks the second step of an effect the recipe
     has twice (the number is required then). The parameter must be a number. The value replaces whatever the recipe
-    has there, an animation included, so each tile is a still; an animated recipe's other parameters are at the start
-    of the clip. A whole-number parameter takes the values rounded to the nearest whole number, each once. count: 2 to
+    has there. A whole-number parameter takes the values rounded to the nearest whole number, each once. count: 2 to
     24. A value outside the parameter's range is refused as in any recipe, naming it, never clamped.
 
     Raises RecipeError for a target the recipe does not have (naming what it does have), a parameter the effect does
@@ -57,7 +56,7 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
     for value in values:
         swept = Step(step.effect, {**step.params, name: value}, step.mask, step.opacity)
         steps = [*recipe.steps[:index], swept, *recipe.steps[index + 1 :]]
-        tiles.append((f"{name}={value:g}", Recipe(recipe.name, steps, recipe.size, recipe.animation)))
+        tiles.append((f"{name}={value:g}", Recipe(recipe.name, steps, recipe.size)))
     return tiles
 
 

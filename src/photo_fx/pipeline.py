@@ -4,7 +4,7 @@ Stages, in order, for every photo:
 
     ingest    read the photo (orientation and colour profile applied, see `imageio`)
     analyse   find the subject once per photo, if any recipe needs it; the result is cached on disk
-    style     run each recipe: a still image, or the frames of an animation
+    style     run each recipe on the photo
     check     automatic quality checks (see `checks`); problems become warnings in the report
     export    write every format and size
     report    `manifest.json` (machine-readable) and `index.html` (a quick look) in the output folder
@@ -19,15 +19,13 @@ A pipeline is described by a small project file, `photo-fx.toml` (`init_project`
     output  = "out"
 
     [export]
-    formats = ["jpg"]       # jpg, png or webp, for stills (animations are always .mp4)
+    formats = ["jpg"]       # jpg, png or webp
     sizes   = [2048, 1080]  # longest side in px; empty = the size the recipe renders at
     quality = 92
     steps   = false         # true: also save the picture after every step, to see what each one did
-    steps_at = 0.5          # for animations: the moment (0..1) those pictures are taken at
 
     [checks]
     subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
-    frozen_tail   = 0.3            # an animation frozen for more than this share of its length is flagged
 """
 
 import fnmatch
@@ -41,7 +39,7 @@ import tempfile
 import time
 import tomllib
 import zipfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime
 from importlib import metadata
@@ -54,18 +52,18 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import imageio
 from . import matte as finding
-from .checks import MotionMeter, matte_warnings, still_warnings
+from .checks import matte_warnings, still_warnings
 from .core.params import describe_error
 from .core.runner import subject_from
 from .errors import PhotoFxError, ProjectError
 from .matte import segmenter_identity, subject_matte
 from .ops.resample import resize
-from .recipe import Animation, Recipe, load_recipe, render, render_frames, trace
-from .sheet import contact_sheet, write_stages
+from .recipe import Recipe, load_recipe, render, trace
+from .sheet import write_stages
 
 _PROJECT_FILE = "photo-fx.toml"
 # The project file's tables and the `Project` fields each one holds (top-level keys map to fields of their own name).
-_TABLES = {"export": ("formats", "sizes", "quality", "steps", "steps_at"), "checks": ("subject_share", "frozen_tail")}
+_TABLES = {"export": ("formats", "sizes", "quality", "steps"), "checks": ("subject_share",)}
 _DEFAULT_PHOTOS = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.webp"]
 
 _Share = Annotated[float, Field(strict=True, ge=0, le=1)]
@@ -102,9 +100,8 @@ class Project:
         everything is written to.
     formats: how stills are saved, one or more of jpg, png, webp. sizes: longest sides in px (each >= 16) of smaller
         copies; empty = as rendered. quality: 1..100, for jpg and webp.
-    subject_share: (low, high), within 0..1: a cut-out covering less or more of the photo is flagged. frozen_tail: above
-        0 and up to 1: an animation frozen for more than this share of its length is flagged.
-    steps: also save the picture after every step; steps_at: the moment (0..1) of an animated recipe they are taken at.
+    subject_share: (low, high), within 0..1: a cut-out covering less or more of the photo is flagged.
+    steps: also save the picture after every step.
     """
 
     photos: Annotated[tuple[Path, ...], Field(min_length=1)]
@@ -117,11 +114,7 @@ class Project:
     ] = ()
     quality: int = Field(default=92, strict=True, ge=1, le=100)
     subject_share: tuple[_Share, _Share] = (0.02, 0.97)
-    frozen_tail: float = Field(default=0.3, strict=True, gt=0, le=1)
     steps: bool = Field(default=False, strict=True)  # also save the picture after every step of every recipe
-    steps_at: float = Field(
-        default=0.5, strict=True, ge=0, le=1
-    )  # for animated recipes: the moment (0..1) of those pictures
 
     @model_validator(mode="after")
     def _consistent(self) -> "Project":
@@ -269,9 +262,7 @@ def run(
             project.sizes,
             project.quality,
             project.subject_share,
-            project.frozen_tail,
             project.steps,
-            project.steps_at,
         )
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
@@ -306,7 +297,7 @@ def run(
                 started = time.perf_counter()
                 try:
                     item = _process(project, state, recipe, fingerprint)
-                # one bad photo or recipe must not stop the batch: whatever a photo, a recipe, the finder, ffmpeg or
+                # one bad photo or recipe must not stop the batch: whatever a photo, a recipe, the finder or
                 # the disk can raise fails this pair (a photo too large for memory included); a bug still stops it
                 except (PhotoFxError, OSError, ValueError, RuntimeError, MemoryError) as error:
                     item = Item(
@@ -438,13 +429,10 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
         warnings += matte_warnings(matte, project.subject_share)
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
-    stages = trace(photo.rgb(), recipe, matte, at=project.steps_at) if project.steps else None
-    if recipe.animation is not None:
-        outputs = _export_animation(project, photo, recipe, recipe.animation, matte, folder, warnings)
-    else:
-        image = stages[-1].image if stages else render(photo.rgb(), recipe, matte)  # style (a trace ends in the render)
-        warnings += still_warnings(image)  # check
-        outputs = _export_still(project, image, recipe.name, folder)  # export
+    stages = trace(photo.rgb(), recipe, matte) if project.steps else None
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte)  # style (a trace ends in the render)
+    warnings += still_warnings(image)  # check
+    outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None
     if stages:
         sheet = write_stages(stages, _inside(project.output, folder / "steps" / recipe.name), project.quality)
@@ -481,50 +469,6 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
             target = _inside(project.output, folder / (f"{name}.{fmt}" if size is None else f"{name}_{size}.{fmt}"))
             imageio.save(picture, target, quality=project.quality)
             outputs.append(target)
-    return outputs
-
-
-_FILMSTRIP_FRAMES = 6  # how many frames of an animation go into its preview picture
-
-
-def _export_animation(
-    project: Project,
-    photo: _Photo,
-    recipe: Recipe,
-    animation: Animation,
-    matte: np.ndarray | None,
-    folder: Path,
-    warnings: list[str],
-) -> list[Path]:
-    """Render the clip of `recipe` (whose timeline is `animation`) to video, plus a filmstrip picture of a few of its
-    frames, and check its motion."""
-    meter = MotionMeter()
-    fps = animation.fps
-    total = len(animation.frames())
-    keep = {int(i) for i in np.linspace(0, total - 1, _FILMSTRIP_FRAMES).round()}
-    strip: list[tuple[str, np.ndarray]] = []
-
-    def frames() -> Iterator[np.ndarray]:
-        for number, frame in enumerate(render_frames(photo.rgb(), recipe, matte)):  # style
-            meter.add(frame)  # check
-            if number in keep:
-                strip.append((f"t = {number / fps:.1f} s", frame))
-            yield frame
-
-    native = _inside(project.output, folder / f"{recipe.name}.mp4")
-    imageio.save_video(frames(), native, fps=fps)  # export
-    warnings += meter.warnings(project.frozen_tail)
-    filmstrip = _inside(
-        project.output, folder / f"{recipe.name}.frames.png"
-    )  # a picture of the animation, for places a video cannot go
-    imageio.save(contact_sheet(strip, columns=len(strip), tile=340), filmstrip)
-    outputs = [native, filmstrip]
-    # (an empty clip leaves no measured size; `save_video` refuses one first, but then there is nothing to shrink)
-    for size in _sizes(project, max(meter.shape) if meter.shape is not None else 0):
-        if size is not None:
-            smaller = _inside(project.output, folder / f"{recipe.name}_{size}.mp4")
-            imageio.resize_video(native, smaller, size)
-            outputs.append(smaller)
     return outputs
 
 
@@ -602,21 +546,13 @@ def _link(target: Path, folder: Path) -> str:
 
 
 def _card(item: Item) -> str:
-    """One result: the video or picture, its name and status, and anything the checks or the run complained about."""
-    videos = [o for o in item.outputs if o.endswith(".mp4")]
-    shown = html.escape((videos or item.outputs or [""])[0])
-    if videos:
-        media = f'<video src="{shown}" controls loop muted playsinline></video>'
-    elif item.outputs:
-        media = f'<a href="{shown}"><img src="{shown}" loading="lazy"></a>'
-    else:
-        media = ""
+    """One result: the picture, its name and status, and anything the checks or the run complained about."""
+    shown = html.escape((item.outputs or [""])[0])
+    media = f'<a href="{shown}"><img src="{shown}" loading="lazy"></a>' if item.outputs else ""
     notes = "".join(f'<p class="warn">{html.escape(w)}</p>' for w in item.warnings)
     if item.error:
         notes += f'<p class="error">{html.escape(item.error)}</p>'
     link = f' <a href="{html.escape(item.steps)}">steps</a>' if item.steps else ""
-    for strip in (o for o in item.outputs if o.endswith(".frames.png")):
-        link += f' <a href="{html.escape(strip)}">frames</a>'
     caption = f"<b>{html.escape(item.recipe)}</b> <span>{item.status}</span>{link}{notes}"
     return f'<figure class="{item.status}">{media}<figcaption>{caption}</figcaption></figure>'
 
@@ -630,7 +566,7 @@ _PAGE = """<!doctype html>
  img.src{{height:36px;border-radius:4px}}
  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}}
  figure{{margin:0;background:#181a20;border-radius:8px;overflow:hidden;border:1px solid #23262e}}
- figure.failed{{border-color:#a33}} figure img,figure video{{width:100%;display:block;background:#000}}
+ figure.failed{{border-color:#a33}} figure img{{width:100%;display:block;background:#000}}
  figcaption{{padding:10px 12px}} figcaption span{{color:#8b8f9a;font-size:12px;margin-left:6px}}
  figcaption a{{color:#7fb2ff;font-size:12px;margin-left:8px}}
  .warn{{margin:6px 0 0;color:#e0b050;font-size:13px}} .error{{margin:6px 0 0;color:#f07070;font-size:13px}}
@@ -644,13 +580,12 @@ recipes = ["recipes"]                                         # recipe files, or
 output  = "out"                                               # results, plus index.html to look through them
 
 [export]
-formats = ["jpg"]       # jpg, png or webp for stills (animations are always .mp4)
+formats = ["jpg"]       # jpg, png or webp
 sizes   = []            # longest side(s) in px, e.g. [2048, 1080]; empty = the size each recipe renders at
 quality = 92
 
 [checks]                # problems are reported as warnings; they never stop an export
 subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
-frozen_tail   = 0.3            # an animation frozen for more than this share of its length is flagged
 """
 
 _STARTER_RECIPES = {

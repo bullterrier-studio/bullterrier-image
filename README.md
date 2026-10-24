@@ -3,7 +3,7 @@
 <p align="center">
   <b>A photo-effects pipeline you can script.</b><br>
   Describe a look as a short recipe, run it on one photo or a thousand, and get ASCII art, glitch, halftone,<br>
-  neon grades and evaporating-particle animations, with caching, quality checks and an HTML report.
+  neon grades and dispersing particles, with caching, quality checks and an HTML report.
 </p>
 
 <p align="center">
@@ -31,8 +31,8 @@ background separately.
   </tr>
   <tr>
     <td width="33%" valign="top"><b>Transparent</b><br>See the picture after every step with <code>photo-fx steps</code>, so a look that is not right can be debugged, not guessed at.</td>
-    <td width="33%" valign="top"><b>Checked automatically</b><br>A missed cut-out, a blank result or an animation that stops moving is flagged without anyone having to look.</td>
-    <td width="33%" valign="top"><b>Animates too</b><br>Time-based effects render to video and a filmstrip PNG, with real easing curves and per-piece motion that stays continuous.</td>
+    <td width="33%" valign="top"><b>Checked automatically</b><br>A missed cut-out or a blank result is flagged without anyone having to look.</td>
+    <td width="33%" valign="top"><b>One picture, any moment</b><br>Effects like <code>disperse</code> show one moment of a process, set by a plain parameter (<code>progress</code>), so a video tool can drive it from anything, a beat included.</td>
   </tr>
 </table>
 
@@ -72,19 +72,21 @@ Every picture here is made from one photo by the recipe linked under it (`exampl
   <tr>
     <td align="center" width="20%"><img src="examples/output/bullterrier/sticker.jpg" alt="sticker"></td>
     <td align="center" width="20%"><img src="examples/output/bullterrier/portrait-pop.jpg" alt="portrait-pop"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/evaporate.jpg" alt="evaporate"></td>
   </tr>
   <tr>
     <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.<br><code>gradient</code> <code>outline</code> <code>drop_shadow</code></sub></td>
     <td valign="top"><a href="examples/recipes/portrait-pop.toml"><b>portrait-pop</b></a><br><sub>Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.<br><code>black_and_white</code> <code>gaussian_blur</code> <code>vibrance</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/recipes/evaporate.toml"><b>evaporate</b></a><br><sub>The dog drawn as text, caught part-way through dispersing: the right side lets go first and is blown right and up.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code> <code>disperse</code></sub></td>
   </tr>
 </table>
 
-The last recipe, `evaporate`, is an [animation](#animation). Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`).
+Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`).
 
 ## Contents
 
 [Gallery](#gallery) | [Install](#install) | [Platforms](#platforms) | [Quick start](#quick-start) | [The pipeline](#the-pipeline) | [Recipes](#recipes) |
-[Python API](#python-api) | [Seeing what each step does](#seeing-what-each-step-does) | [Animation](#animation) |
+[Python API](#python-api) | [Seeing what each step does](#seeing-what-each-step-does) |
 [Effects](#effects) | [Automatic checks](#automatic-checks) | [Project layout](#project-layout) | [Development](#development)
 
 ## Install
@@ -92,13 +94,12 @@ The last recipe, `evaporate`, is an [animation](#animation). Effects are meant t
 Requires Python 3.12+. As a package:
 
 ```bash
-pip install photo-fx               # everything but .mp4 / .mov export (unless ffmpeg is already installed)
-pip install "photo-fx[video]"      # also a bundled ffmpeg, for video on any OS
+pip install photo-fx
 photo-fx effects                   # lists every effect and its main parameters (--advanced: all of them; --category NAME: one category;
                                    # --list-categories: the categories with their number of effects; NAME: one effect in full)
 ```
 
-From a checkout, with [uv](https://docs.astral.sh/uv/) (installs the `video` extra too):
+From a checkout, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 git clone https://github.com/jcakstins/photo-fx.git
@@ -138,12 +139,9 @@ files listed in `PHOTO_FX_FONTS` (paths separated like `PATH`), or else of the u
 Courier on macOS, DejaVu Sans Mono on Linux, Consolas on Windows). A machine with none of them, such as a slim Linux
 container, still works with Pillow's built-in font, which is not monospaced.
 
-**Video** (`.mp4`, `.mov`) needs ffmpeg: the one on your `PATH` if there is one, otherwise the one
-`pip install "photo-fx[video]"` brings along. GIF export needs neither.
-
 ## Quick start
 
-The repository ships a demo project: one photo and a dozen recipes (stills and an animation) in the layout `photo-fx init` makes.
+The repository ships a demo project: one photo and a dozen recipes in the layout `photo-fx init` makes.
 
 ```bash
 uv run photo-fx run examples/photo-fx.toml
@@ -165,7 +163,7 @@ uv run photo-fx run my-project/photo-fx.toml
 
 ### The command line
 
-`photo-fx --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `animate`, `run`, `steps`, `init`, `effects`) and
+`photo-fx --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `run`, `steps`, `init`, `effects`) and
 `photo-fx COMMAND --help` shows one command's options and an example. `photo-fx --version` prints the version, and
 `python -m photo_fx` is the same program for when the `photo-fx` script is not on your `PATH`. Results are printed to
 stdout and progress and errors to stderr. A mistake (a file that is not an image, an unknown effect in a recipe, an
@@ -190,17 +188,17 @@ uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.t
  │ ingest  │ → │ analyse │ → │  style  │ → │  check  │ → │ export  │ → │  report  │
  └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘   └──────────┘
   orientation    find the      run the       cut-out       jpg/png/webp   manifest.json
-  + colour       subject       recipe's      sensible?     mp4, several   index.html
-  profile        (cached)      steps         motion?       sizes
+  + colour       subject       recipe's      sensible?     several        index.html
+  profile        (cached)      steps                       sizes
 ```
 
 | Stage | What it does |
 | --- | --- |
 | **ingest** | Reads the photo, applying EXIF rotation and colour profile, into one internal format (float RGB). |
 | **analyse** | Finds the subject once per photo, only if a recipe needs it, and caches the result on disk by photo hash. |
-| **style** | Runs each recipe's steps in order. Animated recipes render every frame. |
-| **check** | Flags a cut-out that covers an implausible share of the photo, blank or blown-out results, and animations whose motion stops early. |
-| **export** | Writes every format and size you asked for (animations as `.mp4`, plus a filmstrip PNG). |
+| **style** | Runs each recipe's steps in order. |
+| **check** | Flags a cut-out that covers an implausible share of the photo, and blank or blown-out results. |
+| **export** | Writes every format and size you asked for. |
 | **report** | `manifest.json` (machine-readable) and `index.html` (browse everything, warnings included). |
 
 **Image files in and out** (`photo_fx.imageio`):
@@ -218,7 +216,6 @@ uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.t
   timestamp, so the same picture always gives the same file. JPEG and WebP quality is the project's `quality` export
   setting (92 unless set; also used by `photo-fx steps`), or 95 for `imageio.save`, `photo-fx render`, `sheet` and
   `cutout`; JPEGs keep full-resolution colour.
-  Videos are H.264 in BT.709, tagged so.
 
 Good batch behaviour is built in, and tested:
 
@@ -234,14 +231,13 @@ recipes = ["recipes"]                        # recipe files, or folders of them
 output  = "output"
 
 [export]
-formats = ["jpg"]          # jpg, png or webp for stills; animations are always .mp4
+formats = ["jpg"]          # jpg, png or webp
 sizes   = [2048, 1080]     # longest side in px; sizes larger than the render are never enlarged
 quality = 92
 steps   = false            # true: also save the picture after every step of every recipe
 
 [checks]
 subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
-frozen_tail   = 0.3            # an animation frozen for more than this share of its length is flagged
 ```
 
 ## Recipes
@@ -369,42 +365,9 @@ The sheet (written to `out/steps/<photo>__<recipe>/`, with one picture per step)
 (white = subject), and the result of each step, with the exact parameters. In Python it is `trace(photo, recipe)`, and `photo-fx run --steps` does it for a whole batch (linked from the report).
 The last picture is exactly what `render` returns, because both run the same code.
 
-## Animation
-
-Add an `[animation]` table and any numeric parameter can change over the clip. `photo-fx run` (or `photo-fx animate`) renders
-it to `.mp4` and also saves a filmstrip PNG, so the animation can be shown where a video cannot go.
-
-<p align="center">
-  <img src="examples/output/bullterrier/evaporate.frames.png" alt="Evaporation, six frames over five seconds">
-</p>
-<p align="center"><sub><code>evaporate.toml</code>: the dog, drawn as text, evaporates. Frames at 0, 1, 2, 3, 4 and 5 seconds.</sub></p>
-
-```toml
-[animation]
-seconds = 5
-fps = 30
-hold_start = 0.5            # still frames before the motion starts
-hold_end = 0.3
-
-[[step]]
-effect = "disperse"
-progress = { from = 0.0, to = 0.88, ease = [0.25, 0.1, 0.75, 0.9] }   # a name or four cubic-bezier numbers
-clock = { from = 0.0, to = 5.0, over = "clip" }                      # keeps running through the holds
-wind = 0.3
-angle = 30                  # degrees above the horizontal
-```
-
-The `disperse` effect cuts the picture into character-sized pieces, each with its own fixed path, so frames fit together.
-The outline floats first, a front sweeps across, and each piece lets go when it arrives and is carried off on the wind. It
-follows the motion-design principles of anticipation, easing and three layers of movement, and a test checks that no piece
-travels more than a third of the picture. Easing can be `linear`, `in`, `out`, `in-out`, a cubic-bezier preset (`gentle`,
-`standard`, `accelerate`, `decelerate`, `emphasized`, `sine`) or your own four numbers.
-
-Generated videos are not committed to this repository: only the filmstrip is.
-
 ## Effects
 
-Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and evaporating
+Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and dispersing
 particles, grouped by category. **[The effect catalogue](docs/effects/README.md)** (an index and a page per category) shows every effect with a picture of it, a
 one-line description, its parameters and defaults, and the example recipe that made the picture.
 `uv run photo-fx effects` prints the main parameters of every effect (`--advanced` adds the technique options, `photo-fx effects NAME` shows one effect in full).
@@ -433,7 +396,6 @@ never block an export, and `--strict` turns them into a failing exit code:
 | --- | --- |
 | Subject coverage | A cut-out covering under 2% or over 97% of the photo (the subject was missed, or there is no background to separate). |
 | Blank or broken result | An all-black or all-white picture, a flat colour with no detail, or invalid pixel values. |
-| Frozen tail | An animation whose motion stops early, so the last part of the clip is frozen (the file is fine, the motion died). |
 
 ## Project layout
 
@@ -446,7 +408,7 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   checks.py                automatic quality checks
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
-  imageio.py     adapters  file formats, EXIF and colour profiles, video; defines the one in-memory image type
+  imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
   matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (Apple Vision, or IS-Net on
                            ONNX Runtime, downloaded on first use) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
@@ -455,9 +417,8 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, effect)
   core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
                            data in presets/), types.py,
-                           vocabulary.py, and the recipe engine: timing.py (easing, `ramp`, `Animation`), steps.py
-                           (`Step`, `Recipe`), loader.py (TOML), runner.py (render, render_frames, render_all, trace;
-                           given the photo and the subject)
+                           vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`),
+                           loader.py (TOML), runner.py (render, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
                            glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
   errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
@@ -497,8 +458,7 @@ commit. Pictures that exist are kept (`uv run poe gallery --force` renders them 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook; pushes to other branches are checked by CI when the pull request opens.
 
-Tests that need Apple Vision are skipped off macOS, and tests that read videos back with `ffprobe` are skipped when no
-ffmpeg is on the `PATH`. The portable backend is tested with tiny stand-in models built in the tests: the suite never
+Tests that need Apple Vision are skipped off macOS. The portable backend is tested with tiny stand-in models built in the tests: the suite never
 downloads the real model, and its one test of the real model runs only when the model is already in the cache.
 
 ## License

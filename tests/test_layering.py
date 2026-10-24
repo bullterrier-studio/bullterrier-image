@@ -4,7 +4,7 @@ import sees. Each layer may import only the layers below it:
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, matte
     effects    one folder per effect; never import each other
-    core       loader | runner > steps > registry > presets > params | timing | vocabulary > types; may import ops
+    core       loader | runner > steps > registry > presets > params | vocabulary > types; may import ops
     ops        may import errors
     errors     the exceptions; import nothing from photo_fx, so every layer may raise them
 
@@ -31,10 +31,9 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
-CORE_ORDER = "Core: loader|runner > steps > registry > presets > params|timing > types"
-LOADER_DIRECT = "loader imports only steps and timing from core"
-TIMING_ALONE = "timing imports only errors from photo_fx"
-CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT, TIMING_ALONE]
+CORE_ORDER = "Core: loader|runner > steps > registry > presets > params|vocabulary > types"
+LOADER_DIRECT = "loader imports only steps from core"
+CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER, LOADER_DIRECT]
 
 
 def fresh_python(code: str) -> subprocess.CompletedProcess:
@@ -77,9 +76,9 @@ FORBIDDEN = {
         "photo_fx.effects.glitch.effect",
         EFFECTS_APART,
     ),
-    "ops to core": ("ops/cells.py", "import photo_fx.core.timing", "photo_fx.ops.cells", LAYERS),
+    "ops to core": ("ops/cells.py", "import photo_fx.core.params", "photo_fx.ops.cells", LAYERS),
     "errors to ops": ("errors.py", "import photo_fx.ops.cells", "photo_fx.errors", LAYERS),
-    "errors to core": ("errors.py", "import photo_fx.core.timing", "photo_fx.errors", LAYERS),
+    "errors to core": ("errors.py", "import photo_fx.core.params", "photo_fx.errors", LAYERS),
     "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
     "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
     "effects to imageio": (
@@ -104,8 +103,6 @@ FORBIDDEN = {
     "presets to registry": ("core/presets.py", "import photo_fx.core.registry", "photo_fx.core.presets", CORE_ORDER),
     "params to presets": ("core/params.py", "import photo_fx.core.presets", "photo_fx.core.params", CORE_ORDER),
     "params to registry": ("core/params.py", "import photo_fx.core.registry", "photo_fx.core.params", CORE_ORDER),
-    "timing to registry": ("core/timing.py", "import photo_fx.core.registry", "photo_fx.core.timing", CORE_ORDER),
-    "timing to ops": ("core/timing.py", "import photo_fx.ops.cells", "photo_fx.core.timing", TIMING_ALONE),
 }
 
 
@@ -177,8 +174,7 @@ def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query()
 
 def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
     """`import photo_fx; photo_fx.recipe` worked before the split, with every public name of the old module."""
-    names = ["Animated", "Animation", "Recipe", "Stage", "Step", "load_recipe", "ramp", "render", "render_all",
-             "render_frames", "trace"]  # fmt: skip
+    names = ["Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"]
     code = (
         "import photo_fx\n"
         f"names = {names!r}\n"

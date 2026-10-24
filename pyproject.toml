@@ -1,7 +1,7 @@
 [project]
 name = "photo-fx"
 version = "0.1.0"
-description = "Style photos with composable effects (ASCII, halftone, glitch, colour schemes, evaporating particles) and animate them."
+description = "Style photos with composable effects (ASCII, halftone, glitch, colour schemes, dispersing particles)."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -11,7 +11,7 @@ authors = [
 # 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12, 3.13
 # and 3.14. 3.15 is not listed until onnxruntime has wheels for it.
 requires-python = ">=3.12"
-keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "animation", "recipe"]
+keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "recipe"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -57,12 +57,6 @@ photo-fx = "photo_fx.cli:main"
 [project.entry-points."photo_fx.effects"]
 photo_fx = "photo_fx.effects"
 
-[project.optional-dependencies]
-# a static ffmpeg for macOS, Linux and Windows, used when no ffmpeg is on the PATH (only .mp4 / .mov need it)
-video = [
-    "imageio-ffmpeg>=0.6.0",
-]
-
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
@@ -75,7 +69,7 @@ wheel-exclude = ["photo_fx/effects/_template"]
 # template, picture or test fails (W102), and so does library code left out of the wheel (W101).
 [tool.check-wheel-contents]
 package = "src/photo_fx"
-package_omit = ["__pycache__", "*.pyc", ".*", "_template", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.mp4", "test_*.py"]
+package_omit = ["__pycache__", "*.pyc", ".*", "_template", "*.jpg", "*.jpeg", "*.png", "*.gif", "test_*.py"]
 
 [dependency-groups]
 dev = [
@@ -88,7 +82,6 @@ dev = [
     "mypy>=2.4.0",
     "onnx>=1.23.2",
     "packaging>=26.3",
-    "photo-fx[video]",
     "pip-audit>=2.10.1",
     "poethepoet>=0.49.0",
     "pre-commit>=4.7.0",
@@ -160,8 +153,6 @@ filterwarnings = [
     "error",
     # Pillow's ImageFile.load opens the image file in text mode only to memory-map it; no text is read
     "ignore:'encoding' argument not specified:EncodingWarning:PIL.ImageFile",
-    # imageio-ffmpeg opens os.devnull in text mode to silence `ffmpeg -version` while it checks the bundled binary
-    "ignore:'encoding' argument not specified:EncodingWarning:imageio_ffmpeg._utils",
 ]
 
 [tool.ruff]
@@ -212,7 +203,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 # Tests are exempt from annotations, docstrings, PLW, naming and assert-False; NOT from SLF001 / PLC2701, on purpose: a
 # test must not reach into the implementation. Of bandit only these: assert is how pytest checks (S101), and a test
-# runs our own interpreter and the developer's tools (python, git, uv, ffmpeg) with argv it wrote itself (S603, S607).
+# runs our own interpreter and the developer's tools (python, git, uv) with argv it wrote itself (S603, S607).
 "tests/**" = ["ANN", "D", "S101", "S603", "S607", "PLW", "N", "B011"]
 "src/photo_fx/cli.py" = ["T20"]  # the CLI prints; add other presentation modules only with a reason
 # scripts run by hand (the commit-message and config checks, the banner, the API example): printing is their output
@@ -258,7 +249,7 @@ show_error_codes = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*", "imageio_ffmpeg"]
+module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -290,6 +281,7 @@ ignore_names = [
     "DISCOURAGED",  # the parameter vocabulary, read by the contract test over every registered effect
     "regenerate",  # `gallery.regenerate` and `new_effect`: run by tools/dev.py (`poe regenerate`, `poe new-effect`), which
     "new_effect",  # is a source-checkout script outside the scanned package
+    "seconds",  # `pipeline.Item.seconds`: how long a pair took, written to manifest.json by `asdict`
 ]
 
 # Every import is declared, and only once in the right place (`uv run deptry .`, in `poe check`): a missing, unused,
@@ -343,28 +335,21 @@ type = "independence"
 modules = ["photo_fx.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core: loader|runner > steps > registry > presets > params|timing > types"  # vocabulary sits with timing
+name = "Core: loader|runner > steps > registry > presets > params|vocabulary > types"
 type = "layers"
 containers = ["photo_fx.core"]
 exhaustive = true  # a new core module must be placed in a layer here
 # registry registers effects by their parameter model (params); params shows a colour field in the forms a caller writes
 # (types); the registry lists an effect's presets, which are read and checked with its parameter model. Each edge points
 # down, so each gets a layer of its own; nothing else changes.
-layers = ["loader | runner", "steps", "registry", "presets", "params | timing | vocabulary", "types"]
+layers = ["loader | runner", "steps", "registry", "presets", "params | vocabulary", "types"]
 
 [[tool.importlinter.contracts]]
-name = "loader imports only steps and timing from core"
+name = "loader imports only steps from core"
 type = "forbidden"
 source_modules = ["photo_fx.core.loader"]
 forbidden_modules = ["photo_fx.core.registry", "photo_fx.core.types", "photo_fx.core.vocabulary"]
 allow_indirect_imports = true  # through steps is fine: the TOML reader itself only builds Steps and Recipes
-
-[[tool.importlinter.contracts]]
-name = "timing imports only errors from photo_fx"
-type = "forbidden"
-source_modules = ["photo_fx.core.timing"]
-# the layers contracts already keep it from everything above core; overlaps (timing itself) are skipped
-forbidden_modules = ["photo_fx.ops", "photo_fx.core.*"]
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since
 # the last tag, grouped as Keep a Changelog does. A commit only appears if a parser below names its group; the rest
@@ -403,6 +388,3 @@ commit_parsers = [
     { message = "^(perf|revert)", group = "<!-- 1 -->Changed" },
 ]
 
-# the dev group installs this project's own `video` extra (so the bundled-ffmpeg fallback is tested)
-[tool.uv.sources]
-photo-fx = { workspace = true }

@@ -4,11 +4,6 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 dist/
-# generated animations stay out of git: a filmstrip picture of each one is saved next to it
-*.mp4
-*.mov
-*.webm
-*.gif
 
 # photos are inputs and renders are outputs: personal, large and reproducible, so they stay out of git
 inputs/*

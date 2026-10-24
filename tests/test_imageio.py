@@ -1,17 +1,13 @@
 import io
 import itertools
-import re
-import shutil
 import struct
-import subprocess
-import sys
 import warnings
 
 import numpy as np
 import pytest
-from PIL import GifImagePlugin, Image, ImageCms
+from PIL import Image, ImageCms
 
-from photo_fx import BackendUnavailableError, ImageReadError, NoFramesError, NonFiniteImageError, imageio
+from photo_fx import BackendUnavailableError, ImageReadError, NonFiniteImageError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -294,54 +290,6 @@ def test_the_embedded_profile_carries_a_fixed_date_not_the_time_of_saving(photo,
         assert img.info["icc_profile"][24:36] == ICC_FIXED_DATE
 
 
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-def test_a_saved_video_carries_no_creation_time(photo, tmp_path):
-    """The movie, track and media headers (ISO/IEC 14496-12 mvhd, tkhd, mdhd, version 0) hold their creation and
-    modification times, in seconds since 1904, in the first two u32 after the version and flags; 0 is no time."""
-    imageio.save_video([photo, photo[::-1]], tmp_path / "a.mp4", fps=2)
-    data = (tmp_path / "a.mp4").read_bytes()
-    for box in (b"mvhd", b"tkhd", b"mdhd"):
-        start = data.index(box) + 4
-        assert data[start] == 0  # version 0: 32-bit times
-        assert struct.unpack(">II", data[start + 4 : start + 12]) == (0, 0), box
-
-
-@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf], ids=["nan", "infinity", "negative infinity"])
-def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp_path, bad):
-    rgb = np.full((2, 4, 3), 0.4, np.float32)
-    rgb[1, 2, 1] = bad
-    with pytest.raises(NonFiniteImageError, match="row 1, column 2"):
-        imageio.save(rgb, tmp_path / "odd.png")
-    assert not (tmp_path / "odd.png").exists()
-
-
-def _frames(count=4, height=47, width=63):
-    rng = np.random.default_rng(0)
-    return [rng.random((height, width, 3), dtype=np.float32) for _ in range(count)]
-
-
-def test_save_video_gif_keeps_every_frame(tmp_path):
-    assert imageio.save_video(iter(_frames(5)), tmp_path / "a.gif", fps=10) == 5
-    with Image.open(tmp_path / "a.gif") as gif:
-        assert isinstance(gif, GifImagePlugin.GifImageFile)
-        assert gif.n_frames == 5
-        assert gif.size == (63, 47)
-
-
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-def test_save_video_mp4_streams_frames_and_copes_with_odd_sizes(tmp_path):
-    assert imageio.save_video(iter(_frames(6)), tmp_path / "a.mp4", fps=12) == 6  # 63x47 is odd; H.264 needs even
-    width, height, frames = map(int, _probe(tmp_path / "a.mp4", "stream=width,height,nb_frames"))
-    assert (width, height, frames) == (64, 48, 6)  # every frame, made even by adding a row and a column
-
-
-def test_save_video_rejects_unknown_formats_and_no_frames(tmp_path):
-    with pytest.raises(BackendUnavailableError, match=r"\.avi.*use \.mp4"):
-        imageio.save_video(_frames(), tmp_path / "a.avi")
-    with pytest.raises(NoFramesError, match="no frames"):
-        imageio.save_video([], tmp_path / "a.gif")
-
-
 def test_save_names_a_file_type_it_cannot_write_and_writes_a_known_one(tmp_path):
     rgb = np.full((4, 5, 3), 0.5, np.float32)
     with pytest.raises(BackendUnavailableError, match=r"\.xyz"):
@@ -351,111 +299,13 @@ def test_save_names_a_file_type_it_cannot_write_and_writes_a_known_one(tmp_path)
     assert imageio.load(tmp_path / "a.png").shape == (4, 5, 3)
 
 
-def _probe(path, entries) -> list[str]:
-    """The values ffprobe reads for `entries` of the video's first stream, in order (one per packet for packet ones)."""
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", entries, "-of", "csv=p=0:s=,", str(path)],
-        capture_output=True,
-        encoding="utf-8",
-        check=True,
-    ).stdout
-    return re.split(r"[,\s]+", out.strip())
-
-
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-def test_save_video_mp4_has_a_keyframe_every_second_so_it_is_seekable(tmp_path):
-    imageio.save_video(iter(_frames(70, height=48, width=64)), tmp_path / "k.mp4", fps=10)
-    flags = _probe(tmp_path / "k.mp4", "packet=flags")  # one entry per packet: "K_" for a keyframe
-    assert sum("K" in f for f in flags) >= 7  # 70 frames at 10 fps = 7 s: one keyframe per second, not one per clip
-
-
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-@pytest.mark.parametrize(
-    ("shape", "expected"),  # shape is (height, width); the result is (width, height), rounded to even numbers
-    [((120, 160), (100, 76)), ((160, 120), (76, 100)), ((60, 80), (80, 60))],
-)
-def test_save_video_max_side_shrinks_big_frames_only_and_keeps_the_aspect(tmp_path, shape, expected):
-    imageio.save_video(iter(_frames(3, *shape)), tmp_path / "s.mp4", fps=10, max_side=100)
-    assert tuple(map(int, _probe(tmp_path / "s.mp4", "stream=width,height"))) == expected
-
-
-def decoded_as_bt709(path) -> np.ndarray:
-    """The first frame of a video as 8-bit RGB, decoded with the BT.709 matrix whatever the file's tags say."""
-    raw = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path), "-frames:v", "1", "-vf", "scale=in_color_matrix=bt709:in_range=tv",
-         "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
-        capture_output=True, check=True,
-    ).stdout  # fmt: skip
-    return np.frombuffer(raw, np.uint8).reshape(-1, 3)
-
-
-@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
-@pytest.mark.parametrize("max_side", [None, 16])
-def test_an_mp4_is_bt709_in_its_tags_and_in_its_pixels(tmp_path, max_side):
-    green = np.zeros((24, 32, 3), np.float32)
-    green[..., 1] = 1.0  # pure green: where the BT.601 and BT.709 matrices differ most
-    imageio.save_video([green, green], tmp_path / "g.mp4", fps=10, max_side=max_side)
-    imageio.resize_video(tmp_path / "g.mp4", tmp_path / "small.mp4", 8)
-    for name in ("g.mp4", "small.mp4"):
-        tags = _probe(tmp_path / name, "stream=color_space,color_transfer,color_primaries")
-        assert tags == ["bt709", "bt709", "bt709"]
-        pixels = decoded_as_bt709(tmp_path / name).astype(int)
-        assert np.abs(pixels - [0, 255, 0]).max() <= 4  # BT.601 pixels read as BT.709 would be off by over 15
-
-
-def test_save_video_gif_max_side_shrinks_frames(tmp_path):
-    imageio.save_video(iter(_frames(3, 100, 200)), tmp_path / "s.gif", fps=10, max_side=50)
-    with Image.open(tmp_path / "s.gif") as gif:
-        assert gif.size == (50, 25)
-
-
-# --- which ffmpeg: the one on the PATH, else the `[video]` extra's (imageio-ffmpeg, a dev dependency here) -----------
-# PATH and IMAGEIO_FFMPEG_EXE (imageio-ffmpeg's documented override) are set through the environment; ffmpeg itself is
-# the external boundary, stood in for by a script where its choice must be seen.
-
-
-def is_mp4(path) -> bool:
-    return path.read_bytes()[4:8] == b"ftyp"  # an MP4 file starts with its 'ftyp' box (ISO/IEC 14496-12)
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="the stand-in ffmpeg is a POSIX shell script")
-def test_an_ffmpeg_on_the_path_is_used_before_the_bundled_one(tmp_path, monkeypatch):
-    folder = tmp_path / "bin"
-    folder.mkdir()
-    stand_in = folder / "ffmpeg"
-    stand_in.write_text("#!/bin/sh\necho 'the ffmpeg on the PATH ran' >&2\nexit 3\n", encoding="utf-8")
-    stand_in.chmod(0o755)
-    monkeypatch.setenv("PATH", str(folder))
-    with pytest.raises(BackendUnavailableError, match="the ffmpeg on the PATH ran"):
-        imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
-
-
-def test_without_ffmpeg_on_the_path_the_video_extras_ffmpeg_writes_the_clip(tmp_path, monkeypatch):
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    monkeypatch.delenv("IMAGEIO_FFMPEG_EXE", raising=False)
-    assert imageio.save_video(iter(_frames(6)), tmp_path / "a.mp4", fps=12) == 6
-    assert is_mp4(tmp_path / "a.mp4")
-    imageio.resize_video(tmp_path / "a.mp4", tmp_path / "small.mp4", 32)
-    assert is_mp4(tmp_path / "small.mp4")
-
-
-def test_a_video_whose_name_starts_with_a_dash_is_a_file_not_an_ffmpeg_option(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)  # relative names, as a user typing `-clip.mp4` in a shell gives them
-    assert imageio.save_video(iter(_frames(3)), "-clip.mp4", fps=10) == 3
-    assert is_mp4(tmp_path / "-clip.mp4")
-    imageio.resize_video("-clip.mp4", "-small.mp4", 16)
-    assert is_mp4(tmp_path / "-small.mp4")
-
-
-def test_with_no_ffmpeg_anywhere_video_names_the_extra_and_gif_still_works(tmp_path, monkeypatch):
-    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
-    monkeypatch.setenv("IMAGEIO_FFMPEG_EXE", str(tmp_path / "no-ffmpeg-here"))
-    with pytest.raises(BackendUnavailableError, match=re.escape('pip install "photo-fx[video]"')):
-        imageio.save_video(iter(_frames(2)), tmp_path / "a.mp4", fps=10)
-    with pytest.raises(BackendUnavailableError, match=re.escape("photo-fx[video]")):
-        imageio.resize_video(tmp_path / "a.mp4", tmp_path / "b.mp4", 32)
-    assert not (tmp_path / "a.mp4").exists()
-    assert imageio.save_video(iter(_frames(3)), tmp_path / "a.gif", fps=10) == 3
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf], ids=["nan", "infinity", "negative infinity"])
+def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp_path, bad):
+    rgb = np.full((2, 4, 3), 0.4, np.float32)
+    rgb[1, 2, 1] = bad
+    with pytest.raises(NonFiniteImageError, match="row 1, column 2"):
+        imageio.save(rgb, tmp_path / "odd.png")
+    assert not (tmp_path / "odd.png").exists()
 
 
 # --- bring your own matte: imageio.load_matte ----------------------------------------------------------------------

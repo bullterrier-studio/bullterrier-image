@@ -1,13 +1,7 @@
-# An animation: the dog, drawn as text, evaporates. The whole outline starts to hover; the right side lets go first
-# and a front sweeps right to left; every piece is blown right and up at 30 degrees through space already cleared.
+# The dog, drawn as text, just starting to evaporate. The whole outline hovers; the right side lets go first and a
+# front sweeps right to left; every piece is blown right and up at 30 degrees through space already cleared.
 name = "evaporate"
 size = 1024
-
-[animation]
-seconds = 5.0
-fps = 30
-hold_start = 0.5
-hold_end = 0.3
 
 [[step]]
 effect = "grade"
@@ -33,7 +27,7 @@ mask = "background"
 [[step]]
 effect = "disperse"
 cell = 6
-progress = { from = 0.0, to = 0.88, ease = [0.25, 0.1, 0.75, 0.9] }
+progress = 0.25
 ambient = 0.12
 sweep = -1.0                # the front starts at the right edge...
 top = 0

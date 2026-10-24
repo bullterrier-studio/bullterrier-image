@@ -30,7 +30,6 @@ CHECKOUT = Path(__file__).resolve().parents[2]  # src/photo_fx/gallery.py -> the
 _SIDE = 480  # px, longest side of a gallery picture
 _QUALITY = 82  # JPEG: small files, and these are thumbnails
 _INDEX = "README.md"  # the catalogue's index page: GitHub shows it when the folder is opened
-_ANIMATION_MOMENT = 0.5  # an animated example is shown mid-clip: its first frame is usually the untouched photo
 
 
 def render_effects_pages() -> dict[str, str]:
@@ -86,7 +85,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
         recipe = load_recipe(files.example)
         if recipe.needs_matte and matte is None:
             matte = subject_matte(photo)  # once for all the recipes that need it
-        picture = render(photo, recipe, matte, at=_ANIMATION_MOMENT)
+        picture = render(photo, recipe, matte)
         files.picture.parent.mkdir(parents=True, exist_ok=True)
         imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import GifImagePlugin, Image
+from PIL import Image
 
 import photo_fx
 from photo_fx import PhotoFxError, imageio
@@ -257,19 +257,6 @@ def test_photo_without_a_subject_is_reported_clearly(files, capsys):
     assert "no subject" in capsys.readouterr().err.lower()
 
 
-def test_animate_writes_the_clip_and_explains_a_still_recipe(files, capsys):
-    (files / "anim.toml").write_text(
-        'name="anim"\nsize=48\n[animation]\nseconds=0.5\nfps=8\n[[step]]\neffect="grade"\nexposure={from=0,to=1}\n',
-        encoding="utf-8",
-    )
-    assert cli("animate me.png anim.toml -o clip.gif") == 0
-    with Image.open(files / "clip.gif") as clip:
-        assert isinstance(clip, GifImagePlugin.GifImageFile)
-        assert clip.n_frames == 4
-    assert cli("animate me.png recipes/a.toml") == 1
-    assert "no [animation]" in capsys.readouterr().err
-
-
 # --- the subject: --matte (bring your own) and --segmenter (which model finds it) -----------------------------------
 
 
@@ -295,14 +282,7 @@ def test_a_matte_file_of_another_size_is_refused(cut, capsys, command):
     assert "matte" in capsys.readouterr().err
 
 
-def test_animate_and_steps_take_a_matte_file_too(cut):
-    (cut / "anim.toml").write_text(f'name="anim"\nsize=48\n[animation]\nseconds=0.25\nfps=8\n{CUT}', encoding="utf-8")
-    assert cli("animate me.png anim.toml -o clip.gif --matte matte.png") == 0
-    with Image.open(cut / "clip.gif") as clip:
-        frame = np.asarray(clip.convert("RGB"))
-    assert frame.shape == (36, 48, 3)  # scaled with the photo to the recipe's 48 px
-    assert frame[:, :22].max() <= 2  # the left half is still the background (black, within the GIF palette)
-    assert frame[:, 26:].mean() > 50  # and the right half is still the photo
+def test_steps_takes_a_matte_file_too(cut):
     assert cli("steps me.png cut.toml -o st --matte matte.png") == 0
     assert any((cut / "st").iterdir())
 
@@ -358,7 +338,6 @@ MISTAKES = {
     "a sweep beyond the parameter's range": ("sweep me.png recipes/a.toml grain.amount 0..5 -o s.png", "amount"),
     "a sweep of one tile": ("sweep me.png recipes/a.toml grain.amount 0..1 -o s.png --count 1", "count"),
     "a picture type nothing can write": ("sheet me.png recipes/a.toml -o sheet.xyz", ".xyz"),
-    "a video type nothing can write": ("animate me.png clip.toml -o c.avi", ".avi"),
     # (the suite's PHOTO_FX_MODEL names no file, so the portable model cannot run)
     "a segmenter that cannot run": ("render me.png cut.toml -o out --segmenter onnx", "no-such-model"),
 }
@@ -373,7 +352,6 @@ def mistakes(files):
     (files / "unknown.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
     (files / "empty").mkdir()
     (files / "cut.toml").write_text(f'name="cut"\nsize=64\n{CUT}', encoding="utf-8")  # needs the subject
-    (files / "clip.toml").write_text('name="clip"\nsize=32\n[animation]\nseconds=0.2\nfps=5\n' + CUT, encoding="utf-8")
     return files
 
 

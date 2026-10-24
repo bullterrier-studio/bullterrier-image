@@ -1,6 +1,6 @@
 """Build recipes in Python: `fx.<effect>(...)` makes a validated step.
 
-    from photo_fx import Recipe, fx, ramp, render
+    from photo_fx import Recipe, fx, render
 
     look = Recipe("neon-glitch", size=1024, steps=[
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
@@ -11,8 +11,7 @@
     image = render(photo, look)
 
 Every effect listed by `photo-fx effects` is here under its own name, with its own parameters and documentation
-(`help(fx.glitch)`). A misspelt parameter fails when the step is made, not when the photo is rendered. Parameters can
-change over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`.
+(`help(fx.glitch)`). A misspelt parameter fails when the step is made, not when the photo is rendered.
 
 `fx.pyi` lets editors complete effect names and parameters. It is written from `stub_text()` by
 `uv run poe regenerate`, once at integration rather than on every branch, so it can lag behind a branch's effects.

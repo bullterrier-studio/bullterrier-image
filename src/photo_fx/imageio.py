@@ -1,28 +1,23 @@
-"""Reading and writing pictures and videos.
+"""Reading and writing pictures.
 
 Every other module works on a single image representation: a float32 array of shape (height, width, 3),
 RGB, values 0..1, sRGB-encoded (display-referred, not linear). This module is the only place that knows
 about file formats, EXIF rotation, ICC profiles and 8-bit conversion, so none of that leaks into effects.
 """
 
-import contextlib
 import io
-import shutil
 import struct
-import subprocess
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
-from itertools import chain
 from pathlib import Path
-from typing import IO, cast
+from typing import cast
 
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.errors import BackendUnavailableError, ImageReadError, NoFramesError, NonFiniteImageError
-from photo_fx.ops import resample
+from photo_fx.errors import BackendUnavailableError, ImageReadError, NonFiniteImageError
 
-__all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
+__all__ = ["from_pil", "load", "load_matte", "save", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 # littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
@@ -35,12 +30,6 @@ _SRGB_ICC = _GENERATED_ICC[:24] + _FIXED_DATE + _GENERATED_ICC[36:]  # constant:
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _SIXTEEN_BIT = 65535.0  # the largest 16-bit value
 _ALPHA = 3  # the alpha channel of RGBA
-# ffmpeg filters ending every H.264 encode: convert RGB to YUV with the BT.709 (HD) matrix, not ffmpeg's BT.601
-# default, in limited (TV) range, and tag the stream so, so players neither shift colours nor guess
-_BT709 = (
-    "scale=out_color_matrix=bt709:out_range=tv,"
-    "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
-)
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -125,121 +114,6 @@ def _to_uint8(data: np.ndarray) -> np.ndarray:
             f"cannot write a picture with NaN or infinite values: the first is at row {row}, column {column}"
         )
     return (np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
-
-
-def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, max_side: int | None = None) -> int:
-    """Write `frames` (RGB images of one size) as a video or animation; the extension picks the format.
-
-    .mp4 / .mov: H.264 through ffmpeg (the one on the PATH, else the one the `[video]` extra installs:
-    `pip install "photo-fx[video]"`); frames are streamed, so a long clip never has to fit in memory. .gif: no extra
-    tools, but every frame is held in memory and colours are limited to 256, so use it for small, short clips.
-    Returns the number of frames written. NoFramesError when there are none; BackendUnavailableError when the
-    extension is none of those, or when ffmpeg is needed and found nowhere, or fails.
-
-    `max_side` shrinks frames larger than that (longest side, in px) while keeping the aspect ratio: 1600 px square
-    needs an unusually high H.264 level that some players struggle with, 1080 is playable almost everywhere.
-    """
-    path = Path(path)
-    suffix = path.suffix.lower()
-    if suffix == ".gif":
-        images = [
-            to_pil(frame if max_side is None or max(frame.shape[:2]) <= max_side else resample.resize(frame, max_side))
-            for frame in frames
-        ]
-        if not images:
-            raise NoFramesError("no frames to write")
-        images[0].save(path, save_all=True, append_images=images[1:], duration=round(1000 / fps), loop=0)
-        return len(images)
-    if suffix in {".mp4", ".mov"}:
-        return _save_with_ffmpeg(frames, path, fps, max_side)
-    raise BackendUnavailableError(f"cannot write {suffix!r} videos: use .mp4, .mov or .gif")
-
-
-def resize_video(source: str | Path, target: str | Path, max_side: int) -> None:
-    """Write a copy of the video `source` whose longest side is `max_side` px (same settings as `save_video`).
-
-    Cheaper than rendering an animation again at a second size.
-    """
-    ffmpeg = _ffmpeg("resizing a video")
-    shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
-    result = subprocess.run(  # noqa: S603  no shell: the resolved ffmpeg, our own options and two absolute paths
-        [ffmpeg, "-y", "-loglevel", "error", "-i", _as_file(source), "-an", "-vf", f"{shrink},{_BT709}",
-         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "16", "-preset", "medium", "-movflags", "+faststart",
-         "-g", "30", _as_file(target)],
-        capture_output=True, encoding="utf-8", errors="replace",
-        check=False,  # the return code is checked below, with the message
-    )  # fmt: skip
-    if result.returncode != 0:
-        raise BackendUnavailableError(f"ffmpeg failed: {result.stderr.strip()}")
-
-
-def _save_with_ffmpeg(frames: Iterable[np.ndarray], path: Path, fps: int, max_side: int | None) -> int:
-    ffmpeg = _ffmpeg(f"writing {path.suffix.lower()}")
-    frames = iter(frames)
-    first = next(frames, None)
-    if first is None:
-        raise NoFramesError("no frames to write")
-    height, width = first.shape[:2]
-    filters = "pad=ceil(iw/2)*2:ceil(ih/2)*2"  # H.264 in yuv420p needs even dimensions
-    if max_side is not None and max(height, width) > max_side:
-        shrink = f"scale=w='if(gt(iw,ih),{max_side},-2)':h='if(gt(iw,ih),-2,{max_side})':flags=lanczos"
-        filters = f"{shrink},{filters}"
-    filters = f"{filters},{_BT709}"
-    command = [
-        ffmpeg, "-y", "-loglevel", "error",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
-        "-an", "-vf", filters,
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "14", "-preset", "medium", "-movflags", "+faststart",
-        "-g", str(max(1, fps)),  # a keyframe every second: seekable, and one bad frame cannot spoil the rest
-        _as_file(path),
-    ]  # fmt: skip
-    # leaving the `with` closes both pipes and waits for ffmpeg, also when a frame cannot be written. No shell (S603):
-    # the resolved ffmpeg, our own options and numbers, and an absolute path
-    with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE) as process:  # noqa: S603  see above
-        # typed `IO[bytes] | None`, but always open: both were asked for with PIPE
-        stdin, stderr = cast(IO[bytes], process.stdin), cast(IO[bytes], process.stderr)
-        count = 0
-        try:
-            for frame in chain([first], frames):
-                stdin.write(_to_uint8(frame).tobytes())
-                count += 1
-        except BrokenPipeError:
-            pass  # ffmpeg stopped early; its error message below says why
-        finally:
-            # end of input: ffmpeg finishes the file and exits. Flushing the last buffered frame can find ffmpeg
-            # already gone; its error message below says why
-            with contextlib.suppress(BrokenPipeError):
-                stdin.close()
-        error = stderr.read().decode(errors="replace").strip()
-    if process.returncode != 0:
-        raise BackendUnavailableError(f"ffmpeg failed: {error}")
-    return count
-
-
-def _ffmpeg(task: str) -> str:
-    """The ffmpeg program to run: the one on the PATH, else the one the `[video]` extra (imageio-ffmpeg) bundles."""
-    found = shutil.which("ffmpeg")
-    if found is not None:
-        return found
-    try:
-        import imageio_ffmpeg
-
-        bundled: str | None = imageio_ffmpeg.get_ffmpeg_exe()
-    except (ImportError, RuntimeError):  # the extra is not installed, or has no binary for this platform
-        bundled = None
-    if bundled is not None and Path(bundled).is_file():
-        return bundled
-    raise BackendUnavailableError(
-        f'{task} needs ffmpeg: install the video extra (pip install "photo-fx[video]"), or install ffmpeg so it is on '
-        "the PATH (macOS: brew install ffmpeg; Debian or Ubuntu: sudo apt install ffmpeg; Windows: winget install "
-        "ffmpeg). Writing .gif needs neither."
-    )
-
-
-def _as_file(path: str | Path) -> str:
-    """`path` as an ffmpeg argument that can only mean that file: absolute, so a name starting with `-` is not read as
-    an option, nor one starting with `name:` as a protocol (pipe:, http:, concat:...)."""
-    return str(Path(path).absolute())
 
 
 def from_pil(img: Image.Image) -> np.ndarray:

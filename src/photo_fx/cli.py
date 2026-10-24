@@ -1,4 +1,4 @@
-"""Command line: `photo-fx render|sheet|sweep|cutout|animate|run|steps|init|effects`.
+"""Command line: `photo-fx render|sheet|sweep|cutout|run|steps|init|effects`.
 
 A thin layer over the library; no logic of its own.
 
@@ -11,7 +11,7 @@ import os
 import re
 import sys
 import textwrap
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="photo-fx",
-        description="Style photos with composable effects, optionally on a cut-out subject, and animate them.",
+        description="Style photos with composable effects, optionally on a cut-out subject.",
         epilog=_EXIT_CODES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -149,20 +149,6 @@ def _parser() -> argparse.ArgumentParser:
     _subject_options(p)
 
     p = command(
-        "animate",
-        _animate,
-        summary="render an animated recipe to a video (.mp4, .mov) or a .gif",
-        example="examples/photos/bullterrier.jpeg examples/recipes/evaporate.toml -o out/evaporate.mp4",
-    )
-    p.add_argument("photo", help="the photo to animate")
-    p.add_argument("recipe", help="a recipe .toml with an [animation] table")
-    p.add_argument("-o", "--out", help="output file (default: out/<photo>__<recipe>.mp4)")
-    p.add_argument(
-        "--max-side", type=int, help="shrink the video so its longest side is at most this many px (e.g. 1080)"
-    )
-    _subject_options(p)
-
-    p = command(
         "run",
         _run,
         summary="process every photo of a project with every recipe: cached, checked, with a report",
@@ -186,9 +172,6 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("photo", help="the photo to run the recipe on")
     p.add_argument("recipe", help="the recipe .toml to look into")
     p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
-    p.add_argument(
-        "--at", type=float, default=0.5, help="for an animated recipe: the moment of the clip, 0..1 (default 0.5)"
-    )
     _subject_options(p)
 
     p = command(
@@ -391,35 +374,6 @@ def _cutout(args: argparse.Namespace) -> int:
     return 0
 
 
-def _animate(args: argparse.Namespace) -> int:
-    from . import imageio
-    from .errors import RecipeError
-    from .recipe import load_recipe, render_frames
-
-    recipe = load_recipe(args.recipe)
-    if recipe.animation is None:
-        raise RecipeError(f"{Path(args.recipe).name} has no [animation] table, so there is nothing to animate")
-    target = Path(args.out) if args.out else Path("out") / f"{Path(args.photo).stem}__{recipe.name}.mp4"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    total = len(recipe.animation.positions())
-
-    def with_progress(frames: "Iterable[np.ndarray]") -> "Iterator[np.ndarray]":
-        for i, frame in enumerate(frames, start=1):
-            if i % 10 == 0 or i == total:
-                _progress(args, f"frame {i}/{total}")
-            yield frame
-
-    matte, find = _subject(args)
-    imageio.save_video(
-        with_progress(render_frames(imageio.load(args.photo), recipe, matte, find_subject=find)),
-        target,
-        fps=recipe.animation.fps,
-        max_side=args.max_side,
-    )
-    print(target)
-    return 0
-
-
 def _run(args: argparse.Namespace) -> int:
     from dataclasses import replace
 
@@ -455,7 +409,7 @@ def _steps(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
     matte, find = _subject(args)
-    stages = trace(imageio.load(args.photo), recipe, matte, at=args.at, find_subject=find)
+    stages = trace(imageio.load(args.photo), recipe, matte, find_subject=find)
     for stage in stages:
         _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))

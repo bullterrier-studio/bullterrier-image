@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from photo_fx import RecipeError
-from photo_fx.recipe import Animation, Recipe, Step, ramp, render
+from photo_fx.recipe import Recipe, Step, render
 from photo_fx.sheet import sweep
 
 GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
@@ -41,26 +41,17 @@ def test_a_sweep_renders_the_recipe_once_for_each_value_of_the_parameter(photo, 
         np.testing.assert_array_equal(render(photo, tile), render(photo, Recipe("by-hand", steps, size=48)))
 
 
-def test_the_value_replaces_an_animation_of_the_parameter(photo):
-    animated = Recipe("moving", [Step("grain", {"amount": ramp(0.5, 0.9)})], size=48, animation=Animation(1, 5))
-    _, tile = sweep(animated, "grain.amount", 0.2, 0.4, 2)[0]
-    by_hand = Recipe("by-hand", [Step("grain", {"amount": 0.2})], size=48)
-    np.testing.assert_array_equal(render(photo, tile), render(photo, by_hand))
-
-
 def test_a_sweep_keeps_the_other_steps_as_they_are():
     tiles = sweep(LOOK, "grain.amount", 0, 0.2, 3)
     assert all(tile.steps[0] == GLITCH and tile.size == LOOK.size and tile.name == LOOK.name for _, tile in tiles)
 
 
-def test_a_sweep_keeps_what_the_swept_step_and_the_recipe_have_around_the_parameter():
+def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():
     masked = Step("grain", GRAIN_PARAMS, mask="subject", opacity=0.5)
-    moving = Step("glitch", {"shift": ramp(0.1, 0.3)})
-    recipe = Recipe("moving", [moving, masked], size=48, animation=Animation(1, 5))
+    recipe = Recipe("masked", [GLITCH, masked], size=48)
     for _, tile in sweep(recipe, "grain.amount", 0, 0.2, 3):
         assert (tile.steps[1].mask, tile.steps[1].opacity) == ("subject", 0.5)
-        assert tile.steps[0] == moving
-        assert tile.animation == recipe.animation
+        assert tile.steps[0] == GLITCH
 
 
 def test_effect_number_picks_one_of_an_effect_the_recipe_has_twice():
