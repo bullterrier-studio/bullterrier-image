@@ -10,7 +10,7 @@ from bullterrier_image.ops.distance import signed_distance
 
 
 class OutlineParams(EffectParams):
-    """The settings of `outline`: the stroke (width, colour, side, opacity) and the halo beyond it."""
+    """The settings of `outline`: the stroke (width, colour, side) and the halo beyond it."""
 
     width: float = param(
         6.0,
@@ -35,13 +35,6 @@ class OutlineParams(EffectParams):
         max=200,
         doc="How far a soft halo of the same colour reaches beyond the stroke, in px; it fades smoothly from the "
         "stroke to nothing. Raising it spreads the halo (a large value makes an aura). 0 = no halo.",
-    )
-    opacity: float = param(
-        1.0,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How solid the stroke and halo are: 0 = invisible, 1 = fully covering the picture.",
     )
     matte_threshold: float = param(
         0.5,
@@ -81,6 +74,6 @@ def outline(rgb: np.ndarray, params: OutlineParams, *, matte: np.ndarray | None 
         halo = np.clip(1.0 - beyond / p.glow, 0.0, 1.0) ** 2  # constant: quadratic fade, no visible edge at `glow`
         covered = np.maximum(stroke_out, halo)
     # Outside the subject the stroke lies behind it, so a soft edge shows the stroke only where the subject is absent.
-    alpha = p.opacity * np.where(signed > 0, covered * (1.0 - matte), stroke_in)
+    alpha = np.where(signed > 0, covered * (1.0 - matte), stroke_in)
     tint = np.asarray(p.color, np.float32)
     return (rgb + (tint - rgb) * alpha[..., None]).astype(np.float32)

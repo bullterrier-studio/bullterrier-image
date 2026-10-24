@@ -32,11 +32,10 @@ def block() -> np.ndarray:
     "settings",
     [
         {"width": 0, "glow": 0},
-        {"width": 6, "glow": 8, "opacity": 0},
         {"width": 0, "glow": 0, "position": "inside"},
         {"width": 0, "glow": 0, "position": "center"},
     ],
-    ids=["no width, no glow", "opacity 0", "no width, inside", "no width, centre"],
+    ids=["no width, no glow", "no width, inside", "no width, centre"],
 )
 def test_nothing_is_drawn(settings, photo, matte):
     np.testing.assert_array_equal(registry.apply(NAME, photo, matte=matte, **settings), photo)
@@ -100,9 +99,9 @@ def test_matte_threshold_is_the_matte_value_from_which_a_pixel_belongs_to_the_su
     assert (out[20, 6, 0] == 1.0) != painted  # a 3 px stroke reaches column 6 only from a subject that starts at 9
 
 
-def test_colour_and_opacity_blend_the_stroke_with_the_picture():
-    out = registry.apply(NAME, grey(40), matte=block(), width=3, color=[1.0, 0.0, 0.2], opacity=0.5)
-    np.testing.assert_allclose(out[9, 20], [0.75, 0.25, 0.35], atol=1e-6)  # halfway from grey (0.5) to the colour
+def test_the_stroke_is_solid_colour():
+    out = registry.apply(NAME, grey(40), matte=block(), width=3, color=[1.0, 0.0, 0.2])
+    np.testing.assert_allclose(out[9, 20], [1.0, 0.0, 0.2], atol=1e-6)  # the row just above the square
 
 
 def test_the_glow_fades_quadratically_from_the_stroke_to_nothing_at_glow_px():
