@@ -55,7 +55,7 @@ def render(
     image, matte = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte, at, at)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
-    return _finish(_last(stages))
+    return _last(stages)
 
 
 def render_frames(
@@ -76,7 +76,7 @@ def render_frames(
     first_moving = next((i for i, step in enumerate(recipe.steps) if step.animated), len(recipe.steps))
     still = _run(rgb, recipe.steps[:first_moving], matte, 0.0, 0.0)
     for motion, clip in recipe.animation.frames():
-        yield _finish(_run(still, recipe.steps[first_moving:], matte, motion, clip))
+        yield _run(still, recipe.steps[first_moving:], matte, motion, clip)
 
 
 @dataclass(frozen=True)
@@ -110,7 +110,7 @@ def trace(
         subject = np.repeat(matte[..., None], 3, axis=2)  # type: ignore[index]  # `_prepare` gave the matte this recipe needs
         stages.append(Stage("subject matte (white = subject)", subject))
     for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, at, at), start=1):
-        stages.append(Stage(f"{number}. {step.describe()}", _finish(image)))
+        stages.append(Stage(f"{number}. {step.describe()}", image))
     return stages
 
 
@@ -198,7 +198,3 @@ def _blend(before: np.ndarray, after: np.ndarray, step: Step, matte: np.ndarray 
         # `_prepare` gave the matte every masked step needs
         alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]  # type: ignore[index,operator]
     return before + (after - before) * alpha
-
-
-def _finish(out: np.ndarray) -> np.ndarray:
-    return np.clip(out, 0.0, 1.0).astype(np.float32, copy=False)  # clip made a new array: no second copy needed
