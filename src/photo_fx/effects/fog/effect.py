@@ -12,12 +12,12 @@ class FogParams(EffectParams):
     """Fog: the picture mixed toward `color` by an opacity of at most `density`, cloudy, thickest at the bottom."""
 
     density: float = param(
-        0.6,
+        0.8,
         unit="fraction",
         min=0,
         max=1,
         doc="How thick the fog is where it is thickest (the bottom of the frame, in the densest cloud): the share of "
-        "the fog colour mixed into the picture there. 0 = no fog, 0.6 = a clear haze, 1 = the colour itself, "
+        "the fog colour mixed into the picture there. 0 = no fog, 0.8 = a heavy haze, 1 = the colour itself, "
         "hiding the picture. Fog also lowers contrast, since every pixel moves toward the same colour.",
     )
     color: Color = param(
@@ -26,7 +26,7 @@ class FogParams(EffectParams):
         "white a thick cloud, a warm grey smog.",
     )
     gradient: float = param(
-        0.6,
+        0.7,
         unit="fraction",
         min=0,
         max=1,
@@ -35,7 +35,7 @@ class FogParams(EffectParams):
         "the same all the way up, 1 = no fog at the very top, as for mist lying on the ground.",
     )
     patchiness: float = param(
-        0.7,
+        0.6,
         unit="fraction",
         min=0,
         max=1,

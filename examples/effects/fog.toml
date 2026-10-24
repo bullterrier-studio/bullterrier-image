@@ -5,4 +5,4 @@ size = 480
 
 [[step]]
 effect = "fog"
-seed = 3
+seed = 5
