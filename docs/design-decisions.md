@@ -93,6 +93,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   contract's "a constant picture stays constant under every interpolation" does not hold for them. *Reason:* the contract
   rule is about warping the photo; a second name keeps it simple instead of an exemption list. *Consequence:* a field
   named `interpolation` promises that rule; use `resampling` when the effect does not.
+- **The picture an effect takes is called `image`** (decided, not built yet). `blend` and `overlay` both take a
+  `Picture` and place it with the same `at`, `scale` and `margin`; their pictures were `texture` and `logo`. *Reason:*
+  the same kind of parameter has the same name, so a developer who has used one picture effect knows the next.
+  *Consequence:* a later effect with one picture names it `image`; one with several names each for its role.
 - **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
   nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
   channel), not a `matrix` or a `points` list. *Reason:* only scalars can be driven by a control signal from outside, become a slider
@@ -117,12 +121,32 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   preset; an effect with presets lists them in its documentation, the catalogue and the editor stub; only built-in
   effects have presets (a third-party effect's author ships data of their own); a look that needs several effects is
   a recipe, not a preset.
-- **Every step can be limited and blended: `mask` and `opacity` belong to the step, not to the effect.** `mask`
-  (`subject` or `background`) and `opacity` (0 to 1) are applied by the runner after any effect, so a gradient can sit
-  behind the subject, or an effect can be mixed in at 40%, with no effect knowing about it. An effect may still have its
-  own `opacity` when it means that effect's own element (the brightness of a particle, the share a soft focus replaces);
-  the two multiply. *Reason:* one place for the general blend, standard names for the specific one. *Consequence:*
-  never add an effect parameter that only mixes the effect's result with the picture.
+- **Every step can be limited and blended: `mask`, `opacity` and `blend_mode` belong to the step, not to the effect.**
+  `mask` (`subject` or `background`), `opacity` (0 to 1) and `blend_mode` (normal, multiply, screen, overlay,
+  soft_light, difference, color; decided, not built yet) are applied by the runner after any effect, so a gradient can
+  sit behind the subject, be screened over the photo, or an effect can be mixed in at 40%, with no effect knowing about
+  it: every step is a layer over the picture below it, as a filtered copy of a layer is in an image editor. *Reason:*
+  one place for the general blend. Eleven effects (`drop_shadow`, `dust_scratches`, `embers`, `floating_dust`,
+  `long_shadow`, `outline`, `rain`, `reflection`, `snow`, `soft_focus`, `sparkle`) had an `opacity` of their own that
+  rendered exactly what the step's `opacity` renders, and in a recipe file the key always reached the step, so the same
+  word meant two things depending on whether a look was written in TOML or Python; `crt`'s `mask` could not be set
+  from a recipe at all. *Consequence:* no effect parameter is named like a step key (`effect`, `mask`, `opacity`,
+  `blend_mode`, `preset`), and registering one fails, as a parameter named like an injected input does; the eleven
+  fields are removed (recipes that used them multiply the old default into the step's `opacity`, and each effect's
+  default is retuned so it stays subtle); a strength that is not a plain mix keeps a name of its own
+  (`layered_cutouts`' `layer_opacity`, whose overlapping copies compound); never add an effect parameter that only mixes
+  the effect's result with the picture. The blend-mode formulas live in one `ops` module that the runner and the
+  `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
+  knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a
+  `blend_mode`, not an effect.
+- **A step is written with the same keys in Python as in a recipe file** (decided, not built yet). `fx.<effect>(...)`
+  takes `mask`, `opacity`, `blend_mode` and `preset` as keywords beside the effect's own parameters:
+  `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`,
+  `opacity = 0.8`, `blend_mode = "screen"`. *Reason:* one name per concept across the recipe file, Python and the docs;
+  `.where("background")` and `.blend(0.8)` were a second vocabulary for `mask` and `opacity`, and "blend" would have
+  meant a method, an effect and a mode at once. The keys cannot clash with an effect's parameters because no
+  parameter may be named like a step key (above). *Consequence:* `Step.where` and `Step.blend` are removed, no alias
+  kept; `fx.pyi` shows the step keys in every signature, so an editor completes them.
 - **Size changes frame the photo before the steps; transparency is cut after them.** A recipe's framing (`Framing`,
   `bullterrier_image.core.framing`: `[frame]` in a recipe file, `Recipe(..., frame=Framing(...))` in Python) is applied
   by the runner to the photo and the subject matte together, before the first step, in one fixed order: `flip` (none, x,
@@ -167,6 +191,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the core depend on either. *Consequence:* the portable model (about 180 MB) is downloaded on first use into the user's
   cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
   copy for offline use.
+- **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
+  its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no
+  recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
+  input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
+  and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject** (decided, not built yet). An effect that needs distance (`depth_of_field`,
   `parallax`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth map or a
   function that finds one, and the public API binds the default: a monocular depth model on ONNX Runtime (Depth
