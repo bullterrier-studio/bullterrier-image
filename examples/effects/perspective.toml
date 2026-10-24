@@ -1,0 +1,11 @@
+# Shot from low down: the top narrows a little, the picture is turned a touch and zoomed to hide most of the margin.
+name = "perspective"
+size = 480
+
+[[step]]
+effect = "perspective"
+vertical = 0.2
+horizontal = 0.08
+rotate = -3
+scale = 0.3
+edge = "nearest"
