@@ -588,7 +588,7 @@ def test_the_color_tints_the_light(name, photo):
 
 # --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
 
-CPU_BUDGET = 1.0  # seconds of process CPU time per effect at 1 MP: about 10x the slowest measured (see test below)
+CPU_BUDGET = 3.0  # seconds of process CPU time per effect at 1 MP: about 10x the slowest measured (see test below)
 MEMORY_BUDGET = 12  # picture-sized buffers of working memory held at once; the most measured is 7.3 (gradient_map)
 
 
@@ -624,8 +624,9 @@ def _over_budget(name: str, rgb: np.ndarray) -> list[str]:
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_at_its_defaults_stays_within_the_time_and_memory_budget_on_a_1_mp_photo(name, megapixel_photo):
-    """Measured on an Apple M4 (load 4 to 18): the slowest effects take 0.1 s of CPU time, the hungriest holds 7.3
-    picture-sized buffers; the budgets leave room for a slower machine, never for a 10x regression."""
+    """Measured on an Apple M4: the slowest effect (`flow_warp`) takes 0.35 s of CPU time, the hungriest holds 7.3
+    picture-sized buffers; a shared GitHub runner is about 3.5x slower. The budgets leave room for a slower machine,
+    never for a 10x regression."""
     assert _over_budget(name, megapixel_photo) == []
 
 
