@@ -1,4 +1,4 @@
-# A sunset gradient with a grid behind a duotoned dog, split into colour ghosts.
+# A sunset gradient with a glowing grid screened over it behind a duotoned dog, split into colour ghosts.
 name = "vaporwave"
 size = 768
 
@@ -14,10 +14,11 @@ effect = "pattern"
 kind = "grid"
 cell = 48
 foreground = "#fffb96"
-background = "#7a3cff"
+background = "#000000"            # black: screen leaves the gradient as it is between the lines
 thickness = 0.1
 mask = "background"
-opacity = 0.4
+blend_mode = "screen"             # the lines lighten the gradient, as light does
+opacity = 0.7
 
 [[step]]
 effect = "gradient_map"
