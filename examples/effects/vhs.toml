@@ -1,0 +1,8 @@
+# A worn tape: tracking bands slide, the rows waver, colour bleeds to the right and the picture is grainy.
+name = "vhs"
+size = 480
+
+[[step]]
+effect = "vhs"
+tracking = 0.08
+seed = 4
