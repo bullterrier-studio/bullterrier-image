@@ -1,0 +1,8 @@
+# CRT scanlines: a dark line every 4 px, half a spacing thick.
+name = "scanlines"
+size = 480
+
+[[step]]
+effect = "scanlines"
+spacing = 4
+darkness = 0.45
