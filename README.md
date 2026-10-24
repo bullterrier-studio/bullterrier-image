@@ -419,7 +419,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
-  plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, effect)
+  plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
   core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
                            data in presets/), types.py,
                            vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`),

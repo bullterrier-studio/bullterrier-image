@@ -22,17 +22,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   (`tests/effects/<name>/`), its example and picture live outside the package. *Reason:* a pure function is trivially
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
   each other; shared numeric code goes to `ops/`, named by concept.
-- **A second picture is an asset: a parameter whose value is a picture** (decided, not built yet). An effect that uses a
+- **A second picture is an asset: a parameter whose value is a picture.** An effect that uses a
   file of its own (a texture to blend, a logo, the photo inside a double exposure, a colour reference, a displacement
-  map) declares a `Picture` field. A recipe file writes a path, relative to the recipe file, and the recipe reader reads
-  it with `imageio` once, when the recipe is loaded; Python passes a path or an array. The effect receives an RGBA
+  map) declares a `Picture` field (read-only RGBA pixels with a content digest, in `core/params.py`). A recipe file writes a path,
+  relative to the recipe file, and the recipe reader reads it with `imageio` once, when the recipe is loaded; `fx`
+  takes a path, an array, a `Picture` or a colour (a colour is a flat 1x1 picture, which is why every Picture field has
+  a default). The effect receives an RGBA
   float32 picture at its own size and places it itself (cover, tile, anchor and scale are its own parameters), because
   a logo, a texture and a colour reference are placed differently. *Reason:* the core and the effects never see a file
   or a folder, `imageio` stays the only reader of pictures, a missing file fails at load naming the step and the path,
   and video can pass a new array for every frame. Combining several photos as equals (`collage`, `transition`,
   `morph`, side by side) is not an asset: it needs several inputs or a canvas of its own, so it belongs to video or a
-  layout package, and before/after is the `compare` command. *Consequence:* the recipe reader moves from `core` to the
-  adapters layer, beside `imageio`; the pipeline's fingerprint covers each asset's content, not only the recipe text;
+  layout package, and before/after is the `compare` command. *Consequence:* the recipe reader moved from `core` to the
+  adapters layer, beside `imageio` (`bullterrier_image/loader.py`); the pipeline's fingerprint covers each asset's content, not only the recipe text;
   a loaded picture counts toward the memory budget; another kind of asset file (a `.cube` LUT, a folder of tiles) gets
   its own value type and reader in the adapters layer together with its first effect.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group

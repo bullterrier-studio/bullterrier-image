@@ -216,6 +216,8 @@ def test_pictures_are_equal_when_their_pixels_are_whatever_their_labels_and_hash
     assert a != other
     assert a != Picture(a.pixels[:2])  # the same first pixels, another size
     assert a != "a.png"
+    flat = np.linspace(0, 1, 24, dtype=np.float32)
+    assert Picture(flat.reshape(2, 3, 4)) != Picture(flat.reshape(3, 2, 4))  # the same values in another shape
 
 
 def test_a_pictures_repr_names_the_label_and_the_size_never_the_pixels():
