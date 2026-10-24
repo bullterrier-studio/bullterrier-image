@@ -63,6 +63,7 @@ class CurvesParams(EffectParams):
         doc="The red curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied after "
         "the master curve: raising it adds red to the shadows, lowering it takes red away. Its ends stay at "
         "black and white.",
+        advanced=True,
     )
     red_midtones: float = param(
         0.5,
@@ -72,6 +73,7 @@ class CurvesParams(EffectParams):
         doc="The red curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the "
         "master curve: raising it adds red to the midtones, lowering it takes red away. Its ends stay at "
         "black and white.",
+        advanced=True,
     )
     red_highlights: float = param(
         0.75,
@@ -81,6 +83,7 @@ class CurvesParams(EffectParams):
         doc="The red curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), applied "
         "after the master curve: raising it adds red to the highlights, lowering it takes red away. Its ends "
         "stay at black and white.",
+        advanced=True,
     )
     green_shadows: float = param(
         0.25,
@@ -90,6 +93,7 @@ class CurvesParams(EffectParams):
         doc="The green curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied "
         "after the master curve: raising it adds green to the shadows, lowering it takes green away. Its ends "
         "stay at black and white.",
+        advanced=True,
     )
     green_midtones: float = param(
         0.5,
@@ -99,6 +103,7 @@ class CurvesParams(EffectParams):
         doc="The green curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the "
         "master curve: raising it adds green to the midtones, lowering it takes green away. Its ends stay at "
         "black and white.",
+        advanced=True,
     )
     green_highlights: float = param(
         0.75,
@@ -108,6 +113,7 @@ class CurvesParams(EffectParams):
         doc="The green curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), "
         "applied after the master curve: raising it adds green to the highlights, lowering it takes green "
         "away. Its ends stay at black and white.",
+        advanced=True,
     )
     blue_shadows: float = param(
         0.25,
@@ -117,6 +123,7 @@ class CurvesParams(EffectParams):
         doc="The blue curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied "
         "after the master curve: raising it adds blue to the shadows, lowering it takes blue away. Its ends "
         "stay at black and white.",
+        advanced=True,
     )
     blue_midtones: float = param(
         0.5,
@@ -126,6 +133,7 @@ class CurvesParams(EffectParams):
         doc="The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the "
         "master curve: raising it adds blue to the midtones, lowering it takes blue away. Its ends stay at "
         "black and white.",
+        advanced=True,
     )
     blue_highlights: float = param(
         0.75,
@@ -135,6 +143,7 @@ class CurvesParams(EffectParams):
         doc="The blue curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), applied "
         "after the master curve: raising it adds blue to the highlights, lowering it takes blue away. Its "
         "ends stay at black and white.",
+        advanced=True,
     )
 
 
