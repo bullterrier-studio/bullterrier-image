@@ -11,7 +11,7 @@ from bullterrier_image.ops.shift import shift
 
 
 class LongShadowParams(EffectParams):
-    """The settings of `long_shadow`: the direction and length of the shadow, and its colour, opacity and fade."""
+    """The settings of `long_shadow`: the direction and length of the shadow, and its colour and fade."""
 
     angle: float = param(
         45.0,
@@ -36,14 +36,6 @@ class LongShadowParams(EffectParams):
         doc="The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the "
         "subject; another colour tints it.",
     )
-    opacity: float = param(
-        0.5,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How much of the picture behind the subject the shadow replaces with its colour where it is fullest, at "
-        "the subject: 0 = no shadow, 1 = the picture is fully covered there.",
-    )
     fade: float = param(
         1.0,
         unit="fraction",
@@ -66,7 +58,8 @@ def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray 
     """A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it.
 
     The shadow is every copy of the silhouette moved along the ray, one per pixel of travel, the farther ones fainter
-    by `fade`; it is laid behind the subject in `color` at `opacity`, so the subject itself is never changed.
+    by `fade`; it is laid behind the subject in `color`, replacing the picture where it is full (at the subject), so
+    the subject itself is never changed.
 
     `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no shadow: the picture comes back unchanged.
@@ -89,4 +82,4 @@ def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray 
         )
         cast = np.maximum(cast, fainter)
         held += moved
-    return put_behind(rgb, matte, params.opacity * cast, np.asarray(params.color, np.float32))
+    return put_behind(rgb, matte, cast, np.asarray(params.color, np.float32))

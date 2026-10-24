@@ -22,8 +22,8 @@ def one_pixel(row: int = CENTRE, col: int = CENTRE, size: int = SIZE) -> np.ndar
 
 
 def solid(**kwargs: object) -> dict[str, object]:
-    """A black shadow that does not fade and is fully opaque: every shadow pixel comes out black."""
-    return {"color": "#000000", "opacity": 1.0, "fade": 0.0} | kwargs
+    """A black shadow that does not fade: every shadow pixel comes out black."""
+    return {"color": "#000000", "fade": 0.0} | kwargs
 
 
 @pytest.mark.parametrize(
@@ -85,10 +85,6 @@ def test_a_slanted_shadow_runs_along_the_angle_and_stops_at_the_length() -> None
     assert rows.max() <= 9 + 15 + 1  # its last row, moved by 15 px down, and a pixel
 
 
-def test_no_opacity_leaves_the_picture_as_it_was(photo: np.ndarray, matte: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, matte=matte, opacity=0.0), photo)
-
-
 def test_length_zero_casts_nothing_beyond_the_subject_itself(photo: np.ndarray, matte: np.ndarray) -> None:
     """The silhouette is its own first copy, hidden behind the subject; only where the matte is soft does it leave a
     faint fringe, so the identity is exact for a cut-out with a hard edge."""
@@ -98,15 +94,13 @@ def test_length_zero_casts_nothing_beyond_the_subject_itself(photo: np.ndarray, 
 
 def test_the_subject_is_never_changed(photo: np.ndarray, matte: np.ndarray) -> None:
     for angle in (0, 45, 100, -170):
-        out = registry.apply(NAME, photo, matte=matte, angle=angle, length=40, opacity=1.0, color="#ff0000")
+        out = registry.apply(NAME, photo, matte=matte, angle=angle, length=40, color="#ff0000")
         np.testing.assert_array_equal(out[matte == 1], photo[matte == 1])
 
 
-def test_opacity_and_colour_mix_the_shadow_into_the_picture() -> None:
-    out = registry.apply(
-        NAME, grey(), matte=one_pixel(), angle=0, length=5, **solid(opacity=0.5, color="#ff0000", fade=0.0)
-    )
-    np.testing.assert_allclose(out[CENTRE, CENTRE + 3], [0.9, 0.4, 0.4], atol=1e-6)
+def test_the_shadow_replaces_the_picture_with_its_colour() -> None:
+    out = registry.apply(NAME, grey(), matte=one_pixel(), angle=0, length=5, **solid(color="#ff0000"))
+    np.testing.assert_allclose(out[CENTRE, CENTRE + 3], [1.0, 0.0, 0.0], atol=1e-6)
 
 
 def test_a_subject_cut_by_the_border_casts_the_shadow_of_the_part_beyond_it() -> None:

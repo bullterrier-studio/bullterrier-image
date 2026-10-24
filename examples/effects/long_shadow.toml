@@ -12,5 +12,5 @@ effect = "long_shadow"
 angle = 40
 length = 220
 color = "#e07a1f"
-opacity = 0.9
+opacity = 0.45                # the shadow covers 45% of the backdrop at the subject
 fade = 1.0
