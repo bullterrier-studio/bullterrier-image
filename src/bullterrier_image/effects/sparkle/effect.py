@@ -42,7 +42,7 @@ class SparkleParams(EffectParams):
         min=0,
         max=1,
         doc="How much the sparkles differ in size and brightness: each has a random scale from 1 - size_variation to "
-        "1 times `size` and `opacity`. 0 = every sparkle alike, 1 = from the biggest down to nothing.",
+        "1 times `size` and full brightness. 0 = every sparkle alike, 1 = from the biggest down to nothing.",
     )
     rays: float = param(
         2.0,
@@ -59,14 +59,6 @@ class SparkleParams(EffectParams):
         max=10,
         doc="The width in px of each ray (with a soft one-pixel edge). 1 = a hairline, larger = bolder rays.",
     )
-    opacity: float = param(
-        1.0,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How bright the biggest sparkles are: the share of white they screen over the picture at their middle; "
-        "smaller ones are fainter. 0 = invisible, 1 = solid white.",
-    )
     seed: int = param(
         0,
         unit="count",
@@ -82,7 +74,7 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
 
     A sparkle has a random scale s from 1 - `size_variation` to 1: its dot is `size` x s wide (soft: full brightness
     inside half its radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is
-    `opacity` x s bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only
+    s bright (solid white at 1), so the small ones are fainter too. Sparkles are screened over the picture, so they only
     lighten it; the same `seed` on the same picture always gives the same sparkles.
     """
     height, width = rgb.shape[:2]
@@ -91,9 +83,8 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     chosen = rng.choice(highlights, size=min(params.count, len(highlights)), replace=False)
     scale = 1 - params.size_variation * (1 - rng.random(len(chosen)))
     centre = np.stack([chosen % width, chosen // width], axis=1).astype(np.float64)
-    brightness = params.opacity * scale
     radius = params.size / 2 * scale
-    dots = draw_segments((height, width), centre, centre, radius, brightness, radius)
+    dots = draw_segments((height, width), centre, centre, radius, scale, radius)
     # the rays: from the middle left, right, up and down, each a hairline
     reach = params.rays * params.size * scale[:, None]
     arms = np.array(((1, 0), (-1, 0), (0, 1), (0, -1)))  # right, left, down, up
@@ -103,6 +94,6 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
         np.concatenate([centre] * len(tips)),
         np.concatenate(tips),
         params.thickness / 2,
-        np.tile(brightness, len(tips)),
+        np.tile(scale, len(tips)),
     )
     return screen(rgb, np.maximum(dots, rays)[..., None])

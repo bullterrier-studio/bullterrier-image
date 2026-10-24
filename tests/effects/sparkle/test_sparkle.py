@@ -82,11 +82,10 @@ def test_more_sparkles_than_highlights_make_one_on_each_highlight() -> None:
 
 
 def test_a_sparkle_is_a_soft_dot_with_the_brightness_of_its_size() -> None:
-    """The dot's diameter is `size` x s and its brightness `opacity` x s with s from 0.5 to 1 (random per sparkle): the
-    dot is `opacity` x s at its middle, half of that at its radius `size` x s / 2, and fades out to one and a half
-    radii."""
+    """The dot's diameter is `size` x s and its brightness s, with s from 0.5 to 1 (random per sparkle): the dot is s
+    at its middle, half of that at its radius `size` x s / 2, and fades out to one and a half radii."""
     for seed in range(8):
-        dot = glint(size=30.0, rays=0.0, opacity=1.0, seed=seed)
+        dot = glint(size=30.0, rays=0.0, seed=seed)
         brightness = dot[CENTRE]
         assert 0.5 <= brightness <= 1.0
         radius = 15.0 * brightness
@@ -96,17 +95,17 @@ def test_a_sparkle_is_a_soft_dot_with_the_brightness_of_its_size() -> None:
 
 
 def test_the_size_variation_spreads_the_sparkles_from_all_alike_to_the_smallest_nearly_gone() -> None:
-    alike = [glint(size=10.0, rays=0.0, opacity=1.0, size_variation=0.0, seed=seed)[CENTRE] for seed in range(8)]
+    alike = [glint(size=10.0, rays=0.0, size_variation=0.0, seed=seed)[CENTRE] for seed in range(8)]
     np.testing.assert_allclose(alike, 1.0, atol=1e-6)
-    spread = [glint(size=10.0, rays=0.0, opacity=1.0, size_variation=1.0, seed=seed)[CENTRE] for seed in range(30)]
-    assert min(spread) < 0.2  # brightness is opacity x the scale, which runs from 1 - size_variation to 1
+    spread = [glint(size=10.0, rays=0.0, size_variation=1.0, seed=seed)[CENTRE] for seed in range(30)]
+    assert min(spread) < 0.2  # brightness is the scale, which runs from 1 - size_variation to 1
     assert max(spread) > 0.9
 
 
 def test_the_thickness_is_the_width_of_the_rays() -> None:
     """A ray of width w covers a pixel fully up to w / 2 - 1 / 2 from its line and not at all from w / 2 + 1 / 2."""
-    wide = glint(size=10.0, rays=3.0, thickness=5.0, opacity=1.0, seed=1)
-    hairline = glint(size=10.0, rays=3.0, thickness=1.0, opacity=1.0, seed=1)
+    wide = glint(size=10.0, rays=3.0, thickness=5.0, seed=1)
+    hairline = glint(size=10.0, rays=3.0, thickness=1.0, seed=1)
     brightness, row, column = wide[CENTRE], CENTRE[0], CENTRE[1] + 12  # on the right arm, beyond the dot
     assert wide[row + 2, column] == pytest.approx(brightness)
     assert wide[row + 3, column] == 0.0
@@ -116,9 +115,9 @@ def test_the_thickness_is_the_width_of_the_rays() -> None:
 
 def test_rays_are_four_arms_along_the_axes_reaching_rays_times_the_dot_size() -> None:
     """The arms run left, right, up and down from the middle, `rays` x `size` x s long (s the sparkle's scale, which is
-    also its brightness as a share of `opacity`); no light falls on the diagonals beyond the dot."""
+    also its brightness); no light falls on the diagonals beyond the dot."""
     for seed in range(8):
-        star = glint(size=10.0, rays=3.0, opacity=1.0, seed=seed)
+        star = glint(size=10.0, rays=3.0, seed=seed)
         scale = star[CENTRE]
         reach = 3.0 * 10.0 * scale
         for arm in (
@@ -132,15 +131,10 @@ def test_rays_are_four_arms_along_the_axes_reaching_rays_times_the_dot_size() ->
 
 
 def test_no_rays_leave_only_the_dot() -> None:
-    dot = glint(size=10.0, rays=0.0, opacity=1.0, seed=1)
+    dot = glint(size=10.0, rays=0.0, seed=1)
     rows, columns = np.nonzero(dot)
     assert rows.max() - rows.min() <= 10
     assert columns.max() - columns.min() <= 10
-
-
-def test_the_opacity_scales_the_light() -> None:
-    full, half = glint(opacity=1.0, seed=1), glint(opacity=0.5, seed=1)
-    np.testing.assert_allclose(half, full / 2, atol=1e-6)
 
 
 def test_sparkles_only_add_light_and_never_darken(photo: np.ndarray) -> None:
