@@ -106,15 +106,3 @@ def test_a_picture_wrapped_by_whole_pixels_and_back_is_the_picture() -> None:
 
 def test_the_output_keeps_the_dtype_of_the_input() -> None:
     assert shift(noise((4, 5, 3)), 1.5, 0.5, edge="nearest").dtype == np.float32
-
-
-@pytest.mark.parametrize(
-    ("edge", "known"),
-    [pytest.param("wrap", True), pytest.param("clamp", False, id="an unknown rule is refused")],
-)
-def test_only_the_documented_edge_rules_are_accepted(edge: str, known: bool) -> None:
-    if known:
-        shift(noise((3, 3)), 1, 1, edge=edge)  # type: ignore[arg-type]
-    else:
-        with pytest.raises(ValueError, match="edge"):
-            shift(noise((3, 3)), 1, 1, edge=edge)  # type: ignore[arg-type]

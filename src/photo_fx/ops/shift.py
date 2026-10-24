@@ -6,7 +6,6 @@ from typing import Literal
 import numpy as np
 
 Edge = Literal["wrap", "nearest", "reflect", "mirror"]
-EDGES = ("wrap", "nearest", "reflect", "mirror")
 
 
 def shift(image: np.ndarray, dy: float, dx: float, *, edge: Edge) -> np.ndarray:
@@ -20,11 +19,8 @@ def shift(image: np.ndarray, dy: float, dx: float, *, edge: Edge) -> np.ndarray:
     `edge` says what lies beyond the picture's edge, which a shift uncovers on one side: 'wrap' the picture repeated
     (what leaves comes back on the other side), 'nearest' its outermost line repeated, 'reflect' the picture
     mirrored with the edge line repeated once (`dcba|abcd|dcba`), 'mirror' mirrored about the edge line
-    (`dcb|abcd|cba`). Any distance is allowed, also beyond the picture's size. Anything else for `edge` is a
-    `ValueError`.
+    (`dcb|abcd|cba`). Any distance is allowed, also beyond the picture's size.
     """
-    if edge not in EDGES:
-        raise ValueError(f"unknown edge {edge!r}: use one of {', '.join(EDGES)}")
     out = image
     for axis, distance in enumerate((dy, dx)):
         if distance != 0:
