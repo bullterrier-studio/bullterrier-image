@@ -60,6 +60,7 @@ class GradientMapParams(EffectParams):
         "'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and "
         "'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or "
         "flat pictures.",
+        advanced=True,
     )
 
 

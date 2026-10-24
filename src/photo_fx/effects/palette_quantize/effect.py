@@ -61,6 +61,7 @@ class PaletteQuantizeParams(EffectParams):
         max=100,
         doc="The most k-means rounds to run when `palette` is 'photo'. Each round moves every colour to the average of "
         "the pixels nearest to it; raising it lets the search settle further.",
+        advanced=True,
     )
     tolerance: float = param(
         0.001,
@@ -69,6 +70,7 @@ class PaletteQuantizeParams(EffectParams):
         max=1,
         doc="Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white "
         "is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result.",
+        advanced=True,
     )
     sample: int = param(
         10000,

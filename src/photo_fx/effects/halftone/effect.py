@@ -84,12 +84,14 @@ class HalftoneParams(EffectParams):
         max=10,
         doc="Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma cells. Larger is more "
         "exact and slower.",
+        advanced=True,
     )
     edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
         "'constant' (constant_value).",
+        advanced=True,
     )
     constant_value: float = param(
         0.0,
@@ -97,6 +99,7 @@ class HalftoneParams(EffectParams):
         min=0,
         max=1,
         doc="The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
+        advanced=True,
     )
 
 

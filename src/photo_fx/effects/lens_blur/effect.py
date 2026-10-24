@@ -34,6 +34,7 @@ class LensBlurParams(EffectParams):
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

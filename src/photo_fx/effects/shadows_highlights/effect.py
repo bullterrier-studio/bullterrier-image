@@ -48,6 +48,7 @@ class ShadowsHighlightsParams(EffectParams):
         "steps above it keep their own side of the base, which avoids halos around them; steps below it are "
         "averaged away. Raising it makes the base smoother and more like a plain blur; lowering it follows ever "
         "smaller edges.",
+        advanced=True,
     )
 
 

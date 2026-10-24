@@ -38,12 +38,14 @@ class ShearParams(EffectParams):
         "every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, "
         "slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, "
         "and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What fills the corners the skew uncovers, where it slides the picture away and shows what lies beyond its "
         "edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the "
         "edge pixel repeated: streaks), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

@@ -45,12 +45,14 @@ class ChromaticAberrationParams(EffectParams):
         doc="How a point between pixels is read from a colour channel: 'nearest' takes the closest pixel (fastest, "
         "but the fringes step), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a "
         "cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blue sees beyond the picture's edge (it reads from farther out than it shows): 'reflect' "
         "(mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel "
         "repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

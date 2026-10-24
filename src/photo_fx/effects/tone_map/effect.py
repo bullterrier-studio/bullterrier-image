@@ -52,6 +52,7 @@ class ToneMapParams(EffectParams):
         doc="The brightness step, in stops, that counts as an edge the base layer must not blur across: steps above it "
         "keep their own side of the base, which avoids halos around them; steps below it are averaged away and "
         "count as detail. Raising it makes the base smoother and more like a plain blur.",
+        advanced=True,
     )
 
 

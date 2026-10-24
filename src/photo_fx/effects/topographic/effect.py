@@ -62,11 +62,13 @@ class TopographicParams(EffectParams):
         max=10,
         doc="Where the smoothing blur is cut off, in sigmas: it reaches truncate x `smoothing` px. Larger is more "
         "exact and slower; below 3 the blur turns visibly boxy.",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the smoothing sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

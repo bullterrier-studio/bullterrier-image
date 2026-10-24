@@ -56,12 +56,14 @@ class PerspectiveParams(EffectParams):
         "every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, "
         "slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, "
         "and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What fills the margins the keystone, turn and zoom uncover around the picture: 'reflect' (mirrored, edge "
         "pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks), "
         "'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

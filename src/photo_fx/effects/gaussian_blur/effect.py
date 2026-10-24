@@ -27,12 +27,14 @@ class GaussianBlurParams(EffectParams):
         max=10,
         doc="Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more exact "
         "and slower; below 3 the blur turns visibly boxy.",
+        advanced=True,
     )
     edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
         "'constant' (constant_value, so the edge fades toward it).",
+        advanced=True,
     )
     constant_value: float = param(
         0.0,
@@ -41,6 +43,7 @@ class GaussianBlurParams(EffectParams):
         max=1,
         doc="The brightness (0..1, every channel) assumed beyond the edge when edge is 'constant': 0 darkens the "
         "edge, 1 lightens it; ignored otherwise.",
+        advanced=True,
     )
 
 

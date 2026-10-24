@@ -52,6 +52,7 @@ class DehazeParams(EffectParams):
         doc="The brightness step (0..1, Rec. 709 luma) that counts as an edge the refined haze estimate must not "
         "blur across: steps above it keep the haze of their own side, steps below it are smoothed. Raising it "
         "gives a smoother estimate and halos around edges; lowering it follows ever smaller edges.",
+        advanced=True,
     )
     transmission_floor: float = param(
         0.1,
@@ -61,6 +62,7 @@ class DehazeParams(EffectParams):
         doc="The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that reaches the camera: "
         "colours are stretched by at most 1 / transmission_floor, so a low floor clears thick haze but amplifies "
         "noise and clips; 1 allows no stretch at all.",
+        advanced=True,
     )
     airlight_fraction: float = param(
         0.001,
@@ -79,6 +81,7 @@ class DehazeParams(EffectParams):
         "pixels of the patch inside the picture and give the same result; 'mirror' (mirrored about the edge pixel) "
         "also looks at pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far side's "
         "darkest values set the haze at the border.",
+        advanced=True,
     )
 
 

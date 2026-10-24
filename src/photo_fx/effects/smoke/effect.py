@@ -103,12 +103,14 @@ class SmokeParams(EffectParams):
         "closest value (fastest, a little jagged), 'bilinear' blends the four around it (smooth), 'bicubic' fits a "
         "cubic spline through the neighbours (smoothest, a little slower). It matters only where something moves. "
         "Named `resampling`, not `interpolation`, because it reads a generated noise field, never the picture.",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the noise is beyond the picture's border when `turbulence` pushes a plume in from outside: "
         "'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge "
         "pixel repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
     seed: int = param(
         0,

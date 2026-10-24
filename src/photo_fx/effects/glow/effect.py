@@ -44,12 +44,14 @@ class GlowParams(EffectParams):
         max=10,
         doc="Where the halo's Gaussian is cut off, in sigmas: the halo reaches truncate x radius px. Larger is more "
         "exact and slower.",
+        advanced=True,
     )
     edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
         "'constant' (constant_value, so the glow fades toward the edge when it is 0).",
+        advanced=True,
     )
     constant_value: float = param(
         0.0,
@@ -57,6 +59,7 @@ class GlowParams(EffectParams):
         min=0,
         max=1,
         doc="The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
+        advanced=True,
     )
 
 

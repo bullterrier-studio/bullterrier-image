@@ -76,6 +76,7 @@ class LensDropsParams(EffectParams):
         min=1,
         max=10,
         doc="Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more exact and slower.",
+        advanced=True,
     )
     interpolation: Literal["nearest", "bilinear", "bicubic"] = param(
         "bilinear",
@@ -83,12 +84,14 @@ class LensDropsParams(EffectParams):
         "(fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels "
         "around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, "
         "a little slower, and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What a drop sees beyond the picture's edge (a drop near the border or a strong refraction reads from "
         "outside it), and the blur with it: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the "
         "edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

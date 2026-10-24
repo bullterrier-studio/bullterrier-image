@@ -57,12 +57,14 @@ class BumpLightParams(EffectParams):
         max=10,
         doc="Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact "
         "and slower.",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel "
         "repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the "
         "opposite edge, so a tileable picture lights without a seam).",
+        advanced=True,
     )
 
 

@@ -34,6 +34,7 @@ class RgbSplitParams(EffectParams):
         doc="What a moved channel shows where it has left the picture's edge: 'nearest' repeats the channel's edge "
         "pixels (a coloured smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors "
         "the channel (the edge line repeated once), 'mirror' mirrors it about the edge line.",
+        advanced=True,
     )
 
 

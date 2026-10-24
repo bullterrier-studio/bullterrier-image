@@ -41,6 +41,7 @@ class PolarParams(EffectParams):
         "every value exactly as it is but the middle of a planet turns blocky), 'bilinear' blends the four pixels "
         "around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, "
         "a little slower, and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
@@ -48,6 +49,7 @@ class PolarParams(EffectParams):
         "'from' (the angle itself never has an edge; it wraps round): 'nearest' (the edge pixel repeated: the sky "
         "stays one flat tone of the top row), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the "
         "edge pixel), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

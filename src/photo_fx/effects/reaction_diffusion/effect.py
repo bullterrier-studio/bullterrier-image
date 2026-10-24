@@ -74,12 +74,14 @@ class ReactionDiffusionParams(EffectParams):
         doc="How the picture is read at each cell and how the cells are read back over the picture: 'nearest' takes "
         "the closest cell (blocky), 'bilinear' blends the four around (smooth), 'bicubic' fits a cubic spline (the "
         "smoothest, may overshoot slightly).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What lies beyond the picture's border for the diffusion and for reading: 'reflect' (mirrored, edge "
         "pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the "
         "opposite edge, so the pattern tiles).",
+        advanced=True,
     )
 
 

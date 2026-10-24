@@ -45,6 +45,7 @@ class EmbossParams(EffectParams):
         doc="What the slope sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a "
         "tileable picture embosses without a seam).",
+        advanced=True,
     )
 
 

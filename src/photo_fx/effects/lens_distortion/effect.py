@@ -55,12 +55,14 @@ class LensDistortionParams(EffectParams):
         "every value exactly as it is but lines turn jagged), 'bilinear' blends the four pixels around it (smooth, "
         "slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, "
         "and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What shows where the bend reads from beyond the picture (with fit 'centre', or a pincushion): "
         "'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge "
         "pixel repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

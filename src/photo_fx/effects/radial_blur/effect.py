@@ -53,6 +53,7 @@ class RadialBlurParams(EffectParams):
         doc="How many points along each arc or ray are averaged, spread evenly over its length and read from the "
         "picture by the chosen interpolation: more is smoother and slower (the time grows with it), and a smear of "
         "more than a few pixels per sample shows as separate ghost copies. With 1 the picture is unchanged.",
+        advanced=True,
     )
     interpolation: Literal["nearest", "bilinear", "bicubic"] = param(
         "bilinear",
@@ -60,12 +61,14 @@ class RadialBlurParams(EffectParams):
         "every value exactly as it is but steps and ghosts show in smooth areas), 'bilinear' blends the four pixels "
         "around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest "
         "and most exact on smooth gradients, a little slower, and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the smear sees beyond the picture's edge (arcs and rays near the corners leave it): 'reflect' "
         "(mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel "
         "repeated), 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

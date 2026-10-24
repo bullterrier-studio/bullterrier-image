@@ -25,6 +25,7 @@ class EvaporateParams(EffectParams):
         None,
         doc="Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; "
         "use the same as the ascii step. A path that cannot be opened fails when the effect runs.",
+        advanced=True,
     )
     start: float = param(
         0.6,
@@ -153,6 +154,7 @@ class EvaporateParams(EffectParams):
         max=10,
         doc="Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it "
         "makes neighbouring pieces fly in more similar directions; 0 uses the raw outline.",
+        advanced=True,
     )
     normal_truncate: float = param(
         4.0,
@@ -162,6 +164,7 @@ class EvaporateParams(EffectParams):
         doc="Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` "
         "characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more "
         "exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0.",
+        advanced=True,
     )
     edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
@@ -169,6 +172,7 @@ class EvaporateParams(EffectParams):
         "repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row "
         "repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs "
         "the outline toward the border).",
+        advanced=True,
     )
     matte_threshold: float = param(
         0.5,
@@ -178,6 +182,7 @@ class EvaporateParams(EffectParams):
         doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
         "the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge "
         "(hair, fur), raising it less. Ignored without a matte.",
+        advanced=True,
     )
     background_threshold: float = param(
         0.02,
@@ -187,6 +192,7 @@ class EvaporateParams(EffectParams):
         doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
         "background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, "
         "noisy pieces behind; without a matte it also decides the figure's outline.",
+        advanced=True,
     )
 
 

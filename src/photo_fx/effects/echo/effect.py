@@ -51,6 +51,7 @@ class EchoParams(EffectParams):
         doc="What a copy shows where it has moved off the picture's edge: 'nearest' repeats the picture's edge pixels "
         "(a smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the picture "
         "(the edge line repeated once), 'mirror' mirrors it about the edge line.",
+        advanced=True,
     )
 
 

@@ -32,6 +32,7 @@ class ScanRollParams(EffectParams):
         doc="What fills the gap the roll opens: 'wrap' brings back what left on the other side, a true roll; "
         "'nearest' holds the picture's first or last line there (a smear); 'reflect' mirrors the picture (the edge "
         "line repeated once); 'mirror' mirrors it about the edge line.",
+        advanced=True,
     )
 
 

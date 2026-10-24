@@ -78,6 +78,7 @@ class AsciiParams(EffectParams):
     font: str | None = param(
         None,
         doc="Path to a monospaced .ttf/.ttc font; none (the default) uses the first system monospaced font found.",
+        advanced=True,
     )
 
 

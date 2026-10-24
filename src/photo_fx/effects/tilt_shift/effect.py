@@ -80,11 +80,13 @@ class TiltShiftParams(EffectParams):
         max=10,
         doc="Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its sigma px. Larger is "
         "more exact and slower.",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).",
+        advanced=True,
     )
 
 

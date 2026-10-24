@@ -42,12 +42,14 @@ class GrainParams(EffectParams):
         max=10,
         doc="Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1). Larger is more exact and "
         "slower.",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge "
         "pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the "
         "opposite edge, so the grain tiles seamlessly).",
+        advanced=True,
     )
 
 

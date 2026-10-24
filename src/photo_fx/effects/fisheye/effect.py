@@ -45,6 +45,7 @@ class FisheyeParams(EffectParams):
         "every value exactly as it is but the magnified middle turns blocky), 'bilinear' blends the four pixels "
         "around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, "
         "a little slower, and may ring beside hard edges).",
+        advanced=True,
     )
 
 

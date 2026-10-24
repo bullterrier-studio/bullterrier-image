@@ -65,6 +65,7 @@ class LightRaysParams(EffectParams):
         doc="How many readings of the picture along each ray are added up, spread evenly over its length: more is "
         "smoother and slower (the time grows with it); few show as separate ghost copies of a highlight. With 1 the "
         "highlights only brighten themselves.",
+        advanced=True,
     )
     decay: float = param(
         0.9,
@@ -80,6 +81,7 @@ class LightRaysParams(EffectParams):
         doc="How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, but "
         "steps and ghosts show), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits "
         "a cubic spline through the neighbouring pixels (sharpest, a little slower).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
@@ -87,6 +89,7 @@ class LightRaysParams(EffectParams):
         "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). The "
         "readings lie between a pixel and the light, so they leave the picture only when the light itself is "
         "outside it; this rule then matters at the border for 'bicubic' only, whose spline fit reads it.",
+        advanced=True,
     )
 
 

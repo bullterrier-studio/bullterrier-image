@@ -46,12 +46,14 @@ class MeltParams(EffectParams):
         "every value exactly as it is but edges turn jagged), 'bilinear' blends the pixels above and below it "
         "(smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbours (sharpest, a little slower, "
         "and may ring beside hard edges).",
+        advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
         doc="What the drips read above the picture's top edge (only the top `amount` rows are pulled from there): "
         "'nearest' (the top row repeated, so the top smears down), 'reflect' (mirrored, edge pixel repeated), "
         "'mirror' (mirrored about the edge pixel), 'wrap' (the bottom of the picture).",
+        advanced=True,
     )
 
 
