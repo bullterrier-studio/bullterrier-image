@@ -1,11 +1,12 @@
-"""Presets are an effect's named parameter sets, read from TOML: each is checked by the effect's own parameter model,
-and one without a description or with a bad parameter is a `RecipeError` naming it. Read from a throwaway folder here;
-the shipped presets are checked in `tests/effects/test_contract.py`."""
+"""Presets are the named parameter sets of an effect or a region kind, read from TOML: each is checked by its own
+parameter model, and one without a description or with a bad parameter is a `RecipeError` naming it. Read from a
+throwaway folder here; the shipped presets are checked in `tests/effects/test_contract.py`."""
 
 import pytest
 
 from bullterrier_image.core import registry
 from bullterrier_image.core.presets import read
+from bullterrier_image.core.regions import Shards
 from bullterrier_image.errors import RecipeError
 
 MODEL = registry.parameters("gradient_map")
@@ -44,6 +45,12 @@ BAD = {
 
 
 @pytest.mark.parametrize(("text", "complaint"), BAD.values(), ids=BAD.keys())
-def test_a_preset_that_is_not_complete_and_valid_is_refused_naming_it_and_its_effect(tmp_path, text, complaint):
-    with pytest.raises(RecipeError, match=rf"preset 'warm' of effect 'gradient_map'.*{complaint}"):
+def test_a_preset_that_is_not_complete_and_valid_is_refused_naming_it_and_its_owner(tmp_path, text, complaint):
+    with pytest.raises(RecipeError, match=rf"preset 'warm' of 'gradient_map'.*{complaint}"):
         read("gradient_map", MODEL, _folder(tmp_path, text))
+
+
+def test_a_bad_preset_of_a_region_kind_is_not_called_an_effects(tmp_path):
+    (tmp_path / "shards.toml").write_text('[warm]\ndescription = "x"\ncount = 0\n', encoding="utf-8")
+    with pytest.raises(RecipeError, match=r"preset 'warm' of 'shards'.*count"):
+        read("shards", Shards, tmp_path)
