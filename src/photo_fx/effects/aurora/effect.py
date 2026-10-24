@@ -49,6 +49,7 @@ class AuroraParams(EffectParams):
         doc="How fast the light fades going up: the brightness at a height h above the base, as a fraction of the "
         "curtain's height, is (1 - h) to this power. 1 = a straight fade, above 1 = a bright edge with the glow "
         "quickly falling away, below 1 = light that reaches high before dimming.",
+        advanced=True,
     )
     waviness: float = param(
         40.0,
@@ -66,6 +67,7 @@ class AuroraParams(EffectParams):
         max=2048,
         doc="Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of the first noise "
         "lattice of the base's wobble. Larger = long, slow folds; small = a quickly rippling hem.",
+        advanced=True,
     )
     rays: float = param(
         0.7,
@@ -82,6 +84,7 @@ class AuroraParams(EffectParams):
         max=256,
         doc="Width in pixels of the broadest rays, the spacing of the first noise lattice across the picture; tuned "
         "for a picture about 480 px high. Larger = a few wide shafts; small = a fine comb of streaks.",
+        advanced=True,
     )
     octaves: int = param(
         3,
@@ -99,6 +102,7 @@ class AuroraParams(EffectParams):
         max=1,
         doc="How much weaker each finer layer of the wobble and the rays is than the one before: each layer's weight "
         "is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong.",
+        advanced=True,
     )
     lacunarity: float = param(
         2.0,
@@ -107,6 +111,7 @@ class AuroraParams(EffectParams):
         max=4,
         doc="How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = "
         "every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size.",
+        advanced=True,
     )
     seed: int = param(
         0,
