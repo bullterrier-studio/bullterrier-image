@@ -42,6 +42,14 @@ def test_a_white_picture_on_black_paper_is_the_densest_glyph_on_every_cell():
         np.testing.assert_allclose(out[..., channel], densest, atol=1e-6)
 
 
+def test_a_cell_cut_off_by_the_picture_edge_is_measured_as_if_the_border_pixels_continued():
+    """The same as drawing the picture extended to whole cells with its border pixels repeated, then cropping."""
+    width, height = cell_size(8)
+    cut = np.random.default_rng(3).random((2 * height - 3, 3 * width - 5, 3), dtype=np.float32)
+    extended = np.pad(cut, ((0, 3), (0, 5), (0, 0)), mode="edge")
+    np.testing.assert_allclose(draw(cut, photo=0.5), draw(extended, photo=0.5)[: len(cut), : cut.shape[1]], atol=1e-6)
+
+
 def test_on_light_paper_the_ramp_flips_so_a_white_picture_is_blank_paper():
     width, height = cell_size(8)
     out = draw(np.ones((height, width, 3), np.float32), ink=BLACK, paper=WHITE)

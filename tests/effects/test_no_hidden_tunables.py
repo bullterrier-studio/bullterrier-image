@@ -352,7 +352,6 @@ KNOWN_LIBRARY_OPTIONS = {
     "ops/blur.py": 'mode="constant" of np.pad (the constant edge rule, beside the NUMPY_PAD table)',
     "ops/cluster.py": 'kind="stable" of argsort (pins the order of ties)',
     "ops/glyphs.py": 'anchor="mm" of ImageDraw.text (centres a glyph in its cell)',
-    "ops/textart.py": 'mode="edge" of np.pad (the partial edge cell repeats the border)',
 }
 
 
