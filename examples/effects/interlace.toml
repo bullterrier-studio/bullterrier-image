@@ -1,0 +1,7 @@
+# A frame whose two fields fell out of step: every second row slides a few pixels, combing the vertical edges.
+name = "interlace"
+size = 480
+
+[[step]]
+effect = "interlace"
+offset = 8
