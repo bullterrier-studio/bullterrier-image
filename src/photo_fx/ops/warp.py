@@ -58,7 +58,7 @@ def remap(
         ],
         axis=-1,
     )
-    return np.clip(out, 0, 1).astype(np.float32)
+    return np.clip(out, 0, 1)
 
 
 @dataclass(frozen=True)

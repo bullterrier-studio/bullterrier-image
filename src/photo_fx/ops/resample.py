@@ -8,7 +8,7 @@ def resize(array: np.ndarray, longest_side: int) -> np.ndarray:
     """Scale an RGB image, or a (height, width) alpha, so its longest side is `longest_side` px.
 
     Aspect ratio is kept. Works on float data without going through 8 bits, so a matte keeps its softness. Returns the
-    input itself when it already has that size, otherwise a new float32 array clipped to 0..1.
+    input itself when it already has that size, otherwise a new array clipped to 0..1 (float32 in, float32 out).
     """
     height, width = array.shape[:2]
     scale = longest_side / max(height, width)
@@ -20,4 +20,4 @@ def resize(array: np.ndarray, longest_side: int) -> np.ndarray:
     # a float32 (height, width) array is Pillow's 32-bit float mode "F" by its dtype
     scaled = [np.asarray(Image.fromarray(c.astype(np.float32, copy=False)).resize(size, resample)) for c in channels]
     out = scaled[0] if array.ndim == 2 else np.dstack(scaled)
-    return np.clip(out, 0.0, 1.0).astype(np.float32)
+    return np.clip(out, 0.0, 1.0)
