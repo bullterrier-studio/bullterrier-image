@@ -1,0 +1,6 @@
+# A CRT: bulged glass, a shadow mask, scanlines, a soft glow and a dim edge.
+name = "crt"
+size = 480
+
+[[step]]
+effect = "crt"
