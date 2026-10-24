@@ -24,9 +24,7 @@ class VoronoiCellsParams(EffectParams):
         unit="count",
         min=0,
         max=2**31 - 1,
-        doc="Seeds the random positions and colours: the same seed gives the same cells. The sites are "
-        "numpy.random.default_rng(seed).random((cells, 2)), columns x and y as fractions of the width and the "
-        "height; each cell's value on the colour list is drawn next.",
+        doc="Seeds the random positions and colours: the same seed gives the same cells.",
     )
     colors: tuple[Color, ...] = param(
         ("#12002b", "#6a1bff", "#ff2bd6", "#ffb347"),

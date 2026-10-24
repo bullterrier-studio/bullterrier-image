@@ -24,7 +24,8 @@ def coverage(out: np.ndarray) -> np.ndarray:
 def reference_coverage(
     shape: tuple[int, int], *, density: float, seed: int, flow: dict, **drawing: float
 ) -> np.ndarray:
-    """Brute force, one line and one point at a time. The lines start at default_rng(seed).random((lines, 2)) as
+    """Brute force, one line and one point at a time. The draw layout is not promised to users; it is pinned here so a
+    seed keeps its picture from release to release. The lines start at default_rng(seed).random((lines, 2)) as
     fractions of the width and height, lines = round(density x pixels). A line stamps a soft disc of diameter
     `thickness` at its start and at each of the next `length` - 1 points, `step` px apart along the flow: the
     direction at a point is radians(twist) x the fractal noise (`flow`: scale, octaves, persistence, lacunarity,

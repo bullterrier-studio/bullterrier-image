@@ -17,8 +17,9 @@ def render(shape: tuple[int, int] = (HEIGHT, WIDTH), **settings: object) -> np.n
 
 
 def sites(cells: int, seed: int, shape: tuple[int, int] = (HEIGHT, WIDTH)) -> np.ndarray:
-    """The cell sites in px (x, y), as the effect documents drawing them: default_rng(seed).random((cells, 2)) as
-    fractions of the width and the height."""
+    """The cell sites in px (x, y) as the effect draws them: default_rng(seed).random((cells, 2)) as fractions of the
+    width and the height. Not promised to users; pinned here so that a seed keeps its picture from release to release
+    and the test can know where the sites are."""
     return np.random.default_rng(seed).random((cells, 2)) * (shape[1], shape[0])
 
 
