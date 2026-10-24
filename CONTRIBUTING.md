@@ -61,3 +61,5 @@ in the same change as the code. Planned effects are in [docs/effects-roadmap.md]
 ## Security problems
 
 Do not open a public issue; see [SECURITY.md](SECURITY.md).
+
+<!-- throwaway change to prove a documentation-only pull request skips the code jobs; this PR is closed unmerged -->
