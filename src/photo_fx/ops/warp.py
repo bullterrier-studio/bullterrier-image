@@ -93,8 +93,9 @@ class Centre:
 
         Returns (rows, cols), float64, each of shape (height, width), for `remap`. A pixel's source is the centre plus
         the pixel's offset from it multiplied by `scale` (2 reads twice as far out, 0.5 half as far) and then turned
-        clockwise by `turn` radians (rows run down and columns right, so this is the way a clock's hands go on the
-        picture). `scale` and `turn` are each a number, or an array of shape (height, width) that differs from pixel to
+        counter-clockwise by `turn` radians as the picture is seen (rows run down and columns right: a pixel right of
+        the centre reads the point above it for a quarter turn), so the picture's content appears turned clockwise.
+        `scale` and `turn` are each a number, or an array of shape (height, width) that differs from pixel to
         pixel; None (the default) leaves that step out. The centre pixel always reads itself; with neither given
         every pixel reads itself.
         """
