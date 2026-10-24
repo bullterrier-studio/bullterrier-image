@@ -235,8 +235,7 @@ def run(
     dry_run: bool = False,
     only: str | None = None,
     log: Callable[[str], None] = lambda message: None,
-    find_subject: Callable[[np.ndarray], np.ndarray] | None = None,
-    segmenter: str | None = None,
+    subject: Callable[[np.ndarray], np.ndarray] | str | None = None,
 ) -> list[Item]:
     """Process every photo with every recipe and write the report; returns what happened to each pair.
 
@@ -244,19 +243,17 @@ def run(
     files still exist, are skipped unless `force`. `only` is a file-name pattern selecting some of the photos.
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
     (RecipeError); two recipes with one name, or an `only` that matches no photo, raise ProjectError.
-    The subject of a photo, for the recipes that need it, is found by `subject_matte` with `segmenter` (see
-    `photo_fx.matte`; None leaves the choice to the environment and the computer), or by `find_subject(rgb) -> matte`
-    instead (give one or the other). It is asked at most once per photo, and never again for a photo whose subject is
-    remembered in the project's cache from an earlier run by the same finder; if it raises, the recipes of that photo
+    `subject` says how the subject of a photo, for the recipes that need it, is found: the name of a segmenter for
+    `subject_matte` (see `photo_fx.matte`; None leaves the choice to the environment and the computer), or a function
+    `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never again for a photo whose subject
+    is remembered in the project's cache from an earlier run by the same finder; if it raises, the recipes of that photo
     that need the subject fail, and the rest run. The default finder is known by its `segmenter_identity` (the backend
     and its model), so switching segmenter or model finds the subjects again and redoes the recipes that use them
-    (BackendUnavailableError at once if it cannot run). A `find_subject` is known by its qualified name alone, a
+    (BackendUnavailableError at once if it cannot run). A function of your own is known by its qualified name alone, a
     callable object by its class: give one whose answers differ another name or delete `project.cache`. A damaged
     cache entry is found again, also with `force`.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
-    if find_subject is not None and segmenter is not None:
-        raise ValueError("give `find_subject` or `segmenter`, not both: your own finder has no segmenter to choose")
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
     names = [recipe.name for _, recipe in recipes]
     if len(set(names)) != len(names):
@@ -279,8 +276,8 @@ def run(
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
     # (only asked of the segmenter when a recipe needs the subject: a setting nobody uses cannot stop the project)
-    subject_key = _subject_key(find_subject, segmenter) if any(r.needs_matte for _, r in recipes) else ""
-    finder = find_subject or functools.partial(subject_matte, segmenter=segmenter)
+    subject_key = _subject_key(subject) if any(r.needs_matte for _, r in recipes) else ""
+    finder = subject if callable(subject) else functools.partial(subject_matte, segmenter=subject)
     items: list[Item] = []
     total = len(photos) * len(recipes)
     for photo in photos:
@@ -558,15 +555,15 @@ def _library_versions() -> str:
     return "; ".join(versions)
 
 
-def _subject_key(find_subject: Callable[[np.ndarray], np.ndarray] | None, segmenter: str | None) -> str:
+def _subject_key(subject: Callable[[np.ndarray], np.ndarray] | str | None) -> str:
     """What a remembered subject depends on besides the photo: who finds it (for the default finder the segmenter that
     would run, its backend and model; for a finder of the caller's its qualified name, a callable object being known by
     its class), the subject-finding code (the edge clean-up is part of what is remembered) and the libraries."""
-    if find_subject is None:
-        finder = f"segmenter {segmenter_identity(segmenter)}"
+    if callable(subject):
+        name = getattr(subject, "__qualname__", type(subject).__qualname__)
+        finder = f"finder {subject.__module__}.{name}"
     else:
-        name = getattr(find_subject, "__qualname__", type(find_subject).__qualname__)
-        finder = f"finder {find_subject.__module__}.{name}"
+        finder = f"segmenter {segmenter_identity(subject)}"
     return _fingerprint(finder, _source_digest(Path(finding.__file__).parent), _library_versions())
 
 

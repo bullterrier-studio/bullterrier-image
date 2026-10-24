@@ -165,11 +165,11 @@ def test_the_subject_is_found_once_per_photo_and_remembered_between_runs(folder)
     masked_recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "photo-fx.toml")
-    run(project, find_subject=finder)
+    run(project, subject=finder)
     assert len(finder.seen) == 2  # two photos; two of the four recipes need the subject, and ask once per photo
     photos = sorted(imageio.load(folder / "photos" / name).tobytes() for name in ("a.png", "b.png"))
     assert sorted(seen.tobytes() for seen in finder.seen) == photos  # each photo itself, at full size
-    run(project, force=True, find_subject=finder)
+    run(project, force=True, subject=finder)
     assert len(finder.seen) == 2  # redoing everything reads the remembered subject instead of looking again
 
 
@@ -177,12 +177,12 @@ def test_a_damaged_remembered_subject_is_found_again_even_when_forcing(folder):
     masked_recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "photo-fx.toml")
-    run(project, find_subject=finder)
+    run(project, subject=finder)
     for remembered in project.cache.iterdir():  # cut short, as by a full disk or a crash
         remembered.write_bytes(remembered.read_bytes()[:40])
-    assert {i.status for i in run(project, force=True, find_subject=finder)} == {"done"}
+    assert {i.status for i in run(project, force=True, subject=finder)} == {"done"}
     assert len(finder.seen) == 4  # both photos searched again
-    run(project, force=True, find_subject=finder)
+    run(project, force=True, subject=finder)
     assert len(finder.seen) == 4  # and what was found again is remembered
 
 
@@ -197,8 +197,8 @@ def finds_a_narrow_disc(rgb):
 def test_switching_the_subject_finder_finds_the_subjects_again(folder):
     masked_recipes(folder)
     project = load_project(folder / "photo-fx.toml")
-    run(project, find_subject=finds_a_wide_disc)
-    items = run(project, find_subject=finds_a_narrow_disc)
+    run(project, subject=finds_a_wide_disc)
+    items = run(project, subject=finds_a_narrow_disc)
     assert sorted((i.recipe, i.status) for i in items if i.photo == "a.png") == [
         ("cut1", "done"), ("cut2", "done"), ("grainy", "skipped"), ("warm", "skipped"),
     ]  # fmt: skip
@@ -213,10 +213,10 @@ def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(fold
     masked_recipes(folder)
     project = load_project(folder / "photo-fx.toml")
     monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
-    assert recipes_redone(run(project, segmenter="onnx")) == ["cut1", "cut2", "grainy", "warm"]
-    assert recipes_redone(run(project, segmenter="onnx")) == []  # same segmenter and model: everything is up to date
+    assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2", "grainy", "warm"]
+    assert recipes_redone(run(project, subject="onnx")) == []  # same segmenter and model: everything is up to date
     monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))  # another model finds other subjects
-    assert recipes_redone(run(project, segmenter="onnx")) == ["cut1", "cut2"]  # only what uses the subject is redone
+    assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2"]  # only what uses the subject is redone
 
 
 def test_the_segmenter_chosen_by_the_environment_is_part_of_what_is_remembered(folder, echo_model, monkeypatch):
@@ -236,11 +236,6 @@ def test_a_segmenter_setting_nobody_uses_does_not_stop_a_project_without_masked_
     assert {i.status for i in run(load_project(folder / "photo-fx.toml"))} == {"done"}
 
 
-def test_a_finder_and_a_segmenter_together_are_refused(folder):
-    with pytest.raises(ValueError, match="segmenter"):
-        run(load_project(folder / "photo-fx.toml"), find_subject=finds_a_wide_disc, segmenter="onnx")
-
-
 def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
     masked_recipes(folder)
     project = load_project(folder / "photo-fx.toml")
@@ -251,8 +246,8 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
             raise KeyboardInterrupt  # Ctrl-C
 
     with pytest.raises(KeyboardInterrupt):
-        run(project, find_subject=finder, log=interrupted_at_the_second_photo)
-    items = run(project, find_subject=finder)
+        run(project, subject=finder, log=interrupted_at_the_second_photo)
+    items = run(project, subject=finder)
     assert sorted((i.photo, i.recipe, i.status) for i in items) == [
         ("a.png", "cut1", "skipped"), ("a.png", "cut2", "skipped"), ("a.png", "grainy", "skipped"),
         ("a.png", "warm", "skipped"), ("b.png", "cut1", "skipped"), ("b.png", "cut2", "done"),
@@ -263,7 +258,7 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
 def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_searched_once(folder):
     masked_recipes(folder)
     finder = StandInFinder(error=RuntimeError("no subject found in the picture"))
-    by = by_pair(run(load_project(folder / "photo-fx.toml"), find_subject=finder))
+    by = by_pair(run(load_project(folder / "photo-fx.toml"), subject=finder))
     for recipe in ("cut1", "cut2"):
         assert by[("a.png", recipe)].status == "failed"
         assert "no subject" in str(by[("a.png", recipe)].error)
@@ -278,7 +273,7 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
     def finds_nothing(rgb):
         return None  # a broken finder, typed loosely on purpose: the point of the test
 
-    by = by_pair(run(load_project(folder / "photo-fx.toml"), find_subject=finds_nothing))
+    by = by_pair(run(load_project(folder / "photo-fx.toml"), subject=finds_nothing))
     assert by[("a.png", "cut1")].status == "failed"
     assert "`find_subject` returned None" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "grainy")].status == "done"
@@ -286,7 +281,7 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
 
 def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder):
     masked_recipes(folder)
-    items = run(load_project(folder / "photo-fx.toml"), find_subject=StandInFinder(radius=3))
+    items = run(load_project(folder / "photo-fx.toml"), subject=StandInFinder(radius=3))
     cut = [i for i in items if i.recipe == "cut1"]
     assert {i.status for i in cut} == {"done"}
     assert all("covers only" in i.warnings[0] for i in cut)
@@ -470,7 +465,7 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     assert (tmp_path / "new" / "photos").is_dir()
     imageio.save(photo, tmp_path / "new" / "photos" / "one.jpg")
     finder = StandInFinder()  # cutout-black needs the subject; the stand-in keeps the model out of the test
-    items = run(load_project(target), find_subject=finder)
+    items = run(load_project(target), subject=finder)
     assert sorted((i.recipe, i.status) for i in items) == [("cutout-black", "done"), ("glitch", "done")]
     assert len(finder.seen) == 1
     with pytest.raises(FileExistsError):
