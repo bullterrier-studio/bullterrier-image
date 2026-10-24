@@ -1,5 +1,5 @@
 """Colour ramps: a position from 0 to 1 looked up in a list of colours, the same way for every effect that colours by
-a scalar (`gradient_map`, `gradient`).
+a scalar.
 
 Promises: `ramp` returns a new float32 array and never modifies its input.
 """
