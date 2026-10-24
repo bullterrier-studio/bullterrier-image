@@ -7,6 +7,9 @@ from photo_fx.core.registry import effect
 from photo_fx.ops.convolve import convolve
 from photo_fx.ops.light import highlights, screen
 
+# constant: the highest `threshold` there is; `limit` raises a threshold no further, so near-white pixels still light
+MAX_THRESHOLD = 0.99
+
 
 class StarburstParams(EffectParams):
     """A starburst: the highlights are smeared into `rays` thin spikes of light that fade with distance, and screened
@@ -32,7 +35,7 @@ class StarburstParams(EffectParams):
         0.95,
         unit="fraction",
         min=0,
-        max=0.99,
+        max=MAX_THRESHOLD,
         doc="The brightness (0..1, per channel) where a spike starts: only values above it make light, rising to "
         "full at 1. Raising it limits the spikes to the brightest points. Every pixel above it sends out spikes, so "
         "at a low threshold a large bright area (a window, a sky, white fur) floods the picture with light: raise "
@@ -101,7 +104,7 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     if params.limit < 1:  # raise the threshold to the brightness that only `limit` of the pixels exceed
         allowed = int(params.limit * rgb.shape[0] * rgb.shape[1])
         brightest = np.partition(rgb.max(axis=-1).ravel(), -(allowed + 1))[-(allowed + 1)]
-        threshold = min(max(threshold, float(brightest)), 0.99)  # constant: 0.99, the highest threshold there is
+        threshold = min(max(threshold, float(brightest)), MAX_THRESHOLD)
     bright = highlights(rgb, threshold)
     # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own
     # border: no light comes in from beyond the edge.
