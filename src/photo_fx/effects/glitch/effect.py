@@ -8,6 +8,7 @@ from pydantic import AfterValidator, model_validator
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.glyphs import cell_size
 from photo_fx.ops.textart import check_palette, text_art
 
 # A text-art palette: at least two distinct characters, checked when the value is written.
@@ -90,7 +91,7 @@ class GlitchParams(EffectParams):
         min=1,
         max=100,
         doc="The fewest rows of characters a text strip holds, 1 to 100: a thinner strip is widened (each row counted "
-        "as twice `ascii_cell` tall) so its text stays legible, up to the whole picture.",
+        "as tall as the font's character cell, see `ascii_font`) so its text stays legible, up to the whole picture.",
     )
     ascii_gamma: float = param(
         0.55,
@@ -177,8 +178,7 @@ def glitch(rgb: np.ndarray, params: GlitchParams) -> np.ndarray:
         # constant: the id of a second random stream, independent of the band offsets drawn above
         text_rng = np.random.default_rng([params.seed, 1])
         chosen = text_rng.choice(len(strips), math.ceil(params.ascii_share * len(strips)), replace=False)
-        # sized before any font is measured, so the strip height is an estimate
-        row_height = 2 * params.ascii_cell  # constant: a monospaced character is about twice as tall as wide
+        _, row_height = cell_size(params.ascii_cell, params.ascii_font)
         text_height = min(height, params.ascii_rows * row_height)
         for i in chosen:
             top, band_height = strips[i]

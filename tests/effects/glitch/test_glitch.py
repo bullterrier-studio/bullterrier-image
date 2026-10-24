@@ -121,12 +121,12 @@ def test_any_share_above_zero_turns_at_least_one_strip_to_text(photo: np.ndarray
 
 @pytest.mark.parametrize(("cell", "rows"), [(4, 3), (4, 5), (3, 2)])
 def test_a_text_strip_is_widened_to_hold_its_rows_of_characters(photo: np.ndarray, cell: int, rows: int) -> None:
-    # a one-row band turned to text grows to `rows` rows of characters, each counted as twice the character width
+    # a one-row band turned to text grows to `rows` rows of characters, each as tall as the font's character cell
     text = registry.apply(
         NAME, photo, bands=1, band_min_height=0.0, band_max_height=0.0, ascii_share=1.0, ascii_cell=cell,
         ascii_rows=rows, **STILL,
     )  # fmt: skip
-    assert _changed_rows(text, photo).sum() == rows * 2 * cell
+    assert _changed_rows(text, photo).sum() == rows * cell_size(cell)[1]
 
 
 def _all_text(picture: np.ndarray, cell: int, **params: object) -> np.ndarray:
