@@ -1,0 +1,13 @@
+# Sunlight streams from the window at the top left, streaking across the room and the dog.
+name = "light_rays"
+size = 480
+
+[[step]]
+effect = "light_rays"
+x = 0.25
+y = 0.15
+length = 0.6
+threshold = 0.65
+amount = 2.5
+samples = 48
+decay = 0.97
