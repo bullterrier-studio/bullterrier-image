@@ -27,6 +27,7 @@ from bullterrier_image.core.regions import (
     needs,
     needs_subject,
     resolve,
+    used,
 )
 
 Shape = tuple[int, int]
@@ -566,6 +567,30 @@ def test_regions_need_the_subject_when_they_are_made_from_it_however_indirectly(
     }
     check(regions)
     assert needs_subject(regions, names) is expected
+
+
+USED = {
+    "nothing": ([], set()),
+    "a grid": (["grid"], {"grid"}),
+    "a pick brings the partition it picks from": (["pick"], {"pick", "grid"}),
+    "the built-in ones are named too": (["subject", "grid"], {"subject", "grid"}),
+    "a region laid over a pick laid over a grid laid over the subject": (
+        ["far"],
+        {"far", "pick_inner", "inner", "subject"},
+    ),
+    "two asking for the same": (["pick", "grid", "pick"], {"pick", "grid"}),
+}
+
+
+@pytest.mark.parametrize(("names", "expected"), USED.values(), ids=USED.keys())
+def test_the_regions_used_are_those_named_and_those_they_are_made_from(names, expected):
+    regions = {
+        **declared(),
+        "inner": Grid(fit="subject"),
+        "pick_inner": Pick(of="inner"),
+        "far": Shards(fit="pick_inner"),
+    }
+    assert used(regions, names) == expected
 
 
 def test_a_selection_asked_for_as_pieces_is_split_and_a_partition_is_kept():

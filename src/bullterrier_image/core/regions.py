@@ -53,6 +53,7 @@ __all__ = [
     "needs",
     "needs_subject",
     "resolve",
+    "used",
 ]
 
 BUILT_IN = ("subject", "background")
@@ -558,20 +559,24 @@ def check(declared: Mapping[str, Grid | Shards | Pick]) -> None:
             chain.append(ref)
 
 
-def needs_subject(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> bool:
-    """Whether making the regions `names` (checked ones, as `check` leaves them) needs the subject of the picture:
-    one of them is the built-in `subject` or `background`, or is laid over, or picked from, one that does."""
+def used(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> set[str]:
+    """The regions made when `names` (checked ones, as `check` leaves them) are asked for: those, and every region they
+    are laid over or picked from, down to the built-in ones."""
     seen: set[str] = set()
     todo = list(names)
     while todo:
         name = todo.pop()
-        if name in BUILT_IN:
-            return True
         if name not in seen:
             seen.add(name)
-            ref = _reference(declared[name])
+            ref = None if name in BUILT_IN else _reference(declared[name])
             todo += [] if ref is None else [ref]
-    return False
+    return seen
+
+
+def needs_subject(declared: Mapping[str, Grid | Shards | Pick], names: Iterable[str]) -> bool:
+    """Whether making the regions `names` needs the subject of the picture: one of the regions `used` is the built-in
+    `subject` or `background`."""
+    return not set(BUILT_IN).isdisjoint(used(declared, names))
 
 
 def resolve(

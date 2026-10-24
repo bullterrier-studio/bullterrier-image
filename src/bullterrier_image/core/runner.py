@@ -26,10 +26,11 @@ import numpy as np
 
 from bullterrier_image.errors import SubjectNotFoundError
 from bullterrier_image.ops.composite import composite
+from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import Regions, look_weights, resolve
+from .regions import Partition, Regions, Selection, look_weights, resolve, used
 from .steps import Each, Recipe, Step
 
 # Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).
@@ -86,8 +87,10 @@ def trace(
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
     The stages are the photo as the recipe receives it (framed and scaled), the subject matte if the recipe uses one
-    (white = subject), the image after each step, in order, and, when the recipe's framing cuts the picture out, that
-    cut (an RGBA picture, four channels). The last stage is exactly what `render` returns, because both run the
+    (white = subject), each region of the recipe that its steps use, in the order declared (a selection in white where
+    it chooses; a partition as the dimmed photo with its borders and the number of each piece, which is what `Pick`
+    and `Each` count by), the image after each step, in order, and, when the recipe's framing cuts the picture out,
+    that cut (an RGBA picture, four channels). The last stage is exactly what `render` returns, because both run the
     same code. Every stage stays in memory: one picture per step, plus the input and the matte.
 
     rgb, recipe, matte, find_subject: as for `render`.
@@ -97,12 +100,23 @@ def trace(
     if recipe.needs_matte:
         subject = np.repeat(matte[..., None], 3, axis=2)  # type: ignore[index]  # `_prepare` gave the matte this recipe needs
         stages.append(Stage("subject matte (white = subject)", subject))
+    wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in step.references()))
+    stages += [_region_stage(name, regions[name], rgb) for name in recipe.regions if name in wanted]
     for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, regions), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
         stages.append(Stage(label, recipe.frame.cut(stages[-1].image, matte)))
     return stages
+
+
+def _region_stage(name: str, region: Partition | Selection, rgb: np.ndarray) -> Stage:
+    """A region as a picture: a partition over the photo with its pieces numbered, a selection white where chosen."""
+    if isinstance(region, Partition):
+        return Stage(
+            f"region {name!r} ({region.count} pieces, numbered)", number_pieces(rgb, region.labels, region.count)
+        )
+    return Stage(f"region {name!r} (white = chosen)", np.repeat(region.alpha[..., None], 3, axis=2))
 
 
 def render_all(

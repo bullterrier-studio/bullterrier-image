@@ -1,6 +1,7 @@
 """Tests of `core/runner.py`: the runner is given the subject (a matte, or a function that finds it); it never looks
 for the subject itself."""
 
+import math
 import tracemalloc
 
 import numpy as np
@@ -530,3 +531,72 @@ def test_an_effect_that_takes_a_partition_gets_the_pieces_numbered_in_reading_or
 def test_a_selection_is_given_to_an_effect_as_a_partition_of_two_pieces(photo, matte, partition_probe):
     out = run(photo, [Step("partition_probe", partition="subject")], {}, matte=matte)
     np.testing.assert_allclose(out[..., 0] * 255, matte > 0.5)  # outside the subject first: it holds the first pixel
+
+
+# --- trace: the regions a recipe uses, with the pieces numbered ----------------------------------------------------
+
+TRACED: dict[str, Grid | Pick | Shards] = {
+    "panes": Grid(columns=10, rows=1),
+    "head": Pick(of="panes", pieces=[1]),
+    "unused": Grid(columns=2, rows=2),
+}
+
+
+def traced(photo, **keys):
+    recipe = Recipe("traced", [Step("grade", {"exposure": 0.2}, mask="head")], size=None, regions=TRACED)
+    return runner.trace(photo, recipe, **keys)
+
+
+def test_trace_shows_each_region_the_steps_use_between_the_input_and_the_steps_and_none_they_do_not(photo):
+    stages = traced(photo)
+    assert [stage.label.split("(")[0].strip() for stage in stages] == [
+        "input",
+        "region 'panes'",
+        "region 'head'",
+        "1. grade",
+    ]  # in the order declared, with the one `head` is picked from, and not the unused one
+    assert all(stage.image.shape == photo.shape for stage in stages)
+    np.testing.assert_array_equal(stages[0].image, photo)
+
+
+def piece_columns(piece: int, margin: int = 0) -> slice:
+    """The pixel columns of piece `piece` of 10 equal columns over 128 px (a pixel belongs to the piece holding its
+    centre), without `margin` px at each side."""
+    first, last = (math.ceil(k * 12.8 - 0.5) for k in (piece, piece + 1))
+    return slice(first + margin, last - margin)
+
+
+def test_the_stage_of_a_selection_is_white_where_it_chooses_and_black_elsewhere(photo):
+    head = traced(photo)[2].image
+    assert (head[:, piece_columns(1)] == 1).all()
+    assert (head[:, : piece_columns(1).start] == 0).all()
+    assert (head[:, piece_columns(1).stop :] == 0).all()
+
+
+def test_the_stage_of_a_partition_draws_the_borders_and_a_number_in_every_piece(photo):
+    panes = traced(photo)[1].image
+    white = panes.min(axis=2) > 0.5  # the photo is dimmed, so only lines and numbers are this bright
+    for piece in range(10):
+        assert white[:, piece_columns(piece, 2)].any(), piece  # a number, away from the borders
+    assert white[:, 12:14].any()  # a border between two pieces
+    assert not np.array_equal(panes, photo)
+
+
+def test_the_number_drawn_in_a_piece_is_its_own_a_one_has_less_ink_than_an_eight(photo):
+    panes = traced(photo)[1].image
+
+    def ink(piece: int) -> int:
+        return int((panes[:, piece_columns(piece, 2)].min(axis=2) > 0.5).sum())
+
+    assert ink(1) < ink(8)
+
+
+def test_trace_still_ends_in_what_render_returns_when_regions_are_drawn(photo):
+    recipe = Recipe("traced", [Step("grade", {"exposure": 0.2}, mask="head")], size=None, regions=TRACED)
+    np.testing.assert_array_equal(runner.trace(photo, recipe)[-1].image, runner.render(photo, recipe))
+
+
+def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
+    each = Each("panes", [fill(RED), "none"], mask="head")
+    labels = [stage.label for stage in runner.trace(photo, Recipe("t", [each], size=None, regions=TRACED))]
+    assert labels[-1].startswith("1. each panes [fill(color='#ff0000'), none]")
