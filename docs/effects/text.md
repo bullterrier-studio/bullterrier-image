@@ -6,7 +6,7 @@ Pictures redrawn as characters, such as ASCII art.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/ascii.jpg" width="160" alt="ascii"> | `ascii` | Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it. | `cell=10` `chars=' .:-=+*#%@'` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `gamma=1.0` `photo=0.0` `font=None` | [ascii.toml](../../examples/effects/ascii.toml) |
+| <img src="../gallery/ascii.jpg" width="160" alt="ascii"> | `ascii` | Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it. | `cell=10` `chars=' .:-=+*#%@'` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `gamma=1.0` `photo=0.0` +1 advanced | [ascii.toml](../../examples/effects/ascii.toml) |
 
 ### `ascii`
 
@@ -20,4 +20,11 @@ Pictures redrawn as characters, such as ASCII art.
 | `paper_threshold` | number | fraction | 0 to 1 | `0.5` | The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (dense characters on bright areas) rather than light (dense characters on dark areas); 0.5 = mid grey. Raising it lets lighter paper count as dark: 0 treats every paper as light, 1 every paper but white as dark. |
 | `gamma` | number | ratio | 0.1 to 10 | `1.0` | Exponent on the amount of ink each character puts down, 0.1 to 10: 1 = linear, above 1 lighter midtones (less ink), below 1 more ink. |
 | `photo` | number | fraction | 0 to 1 | `0.0` | How much of the original picture shows through the paper behind the characters, 0 to 1: 0 = text on flat `paper` (fine detail is lost to the grid), 1 = text laid over the untouched photo. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `font` | text or none |  |  | `None` | Path to a monospaced .ttf/.ttc font; none (the default) uses the first system monospaced font found. |
+
+</details>

@@ -6,13 +6,13 @@ Grain and other surface texture laid over the picture.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/bump_light.jpg" width="160" alt="bump_light"> | `bump_light` | Light the picture's brightness, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=8.0` `blur=1.0` `truncate=4.0` `edge='reflect'` | [bump_light.toml](../../examples/effects/bump_light.toml) |
-| <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`. | `density=0.6` `size=8.0` `hairs=0.15` `scratches=2` `angle=4.0` `width=1.0` `opacity=0.8` `light='#ffffff'` `dark='#000000'` `seed=0` | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
-| <img src="../gallery/emboss.jpg" width="160" alt="emboss"> | `emboss` | Read the brightness as a relief `depth` px tall and light it from `angle`. | `angle=315.0` `depth=6.0` `saturation=0.0` `edge='reflect'` | [emboss.toml](../../examples/effects/emboss.toml) |
-| <img src="../gallery/film_grain.jpg" width="160" alt="film_grain"> | `film_grain` | Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white. | `shadows=0.1` `highlights=0.03` `size=1.0` `seed=0` `truncate=4.0` `edge='reflect'` | [film_grain.toml](../../examples/effects/film_grain.toml) |
-| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px. | `amount=0.08` `size=1.0` `seed=0` `truncate=4.0` `edge='reflect'` | [grain.toml](../../examples/effects/grain.toml) |
+| <img src="../gallery/bump_light.jpg" width="160" alt="bump_light"> | `bump_light` | Light the picture's brightness, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=8.0` `blur=1.0` +2 advanced | [bump_light.toml](../../examples/effects/bump_light.toml) |
+| <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`. | `density=0.6` `size=8.0` `scratches=2` `opacity=0.8` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
+| <img src="../gallery/emboss.jpg" width="160" alt="emboss"> | `emboss` | Read the brightness as a relief `depth` px tall and light it from `angle`. | `angle=315.0` `depth=6.0` `saturation=0.0` +1 advanced | [emboss.toml](../../examples/effects/emboss.toml) |
+| <img src="../gallery/film_grain.jpg" width="160" alt="film_grain"> | `film_grain` | Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white. | `shadows=0.1` `highlights=0.03` `size=1.0` `seed=0` +2 advanced | [film_grain.toml](../../examples/effects/film_grain.toml) |
+| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px. | `amount=0.08` `size=1.0` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
 | <img src="../gallery/noise.jpg" width="160" alt="noise"> | `noise` | Add noise of standard deviation `amount` (0.06 visible, 0.2 heavy) to every pixel, grey or per channel. | `amount=0.06` `distribution='gaussian'` `color=True` `seed=0` | [noise.toml](../../examples/effects/noise.toml) |
-| <img src="../gallery/paper_texture.jpg" width="160" alt="paper_texture"> | `paper_texture` | Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture. | `kind='paper'` `amount=0.1` `scale=6.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `spacing=6.0` `fibre=0.3` `seed=0` | [paper_texture.toml](../../examples/effects/paper_texture.toml) |
+| <img src="../gallery/paper_texture.jpg" width="160" alt="paper_texture"> | `paper_texture` | Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture. | `kind='paper'` `amount=0.1` `scale=6.0` `octaves=3` `spacing=6.0` `seed=0` +3 advanced | [paper_texture.toml](../../examples/effects/paper_texture.toml) |
 | <img src="../gallery/pixel_grid.jpg" width="160" alt="pixel_grid"> | `pixel_grid` | The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between. | `cell=4` `gap=0.15` `amount=0.4` | [pixel_grid.toml](../../examples/effects/pixel_grid.toml) |
 | <img src="../gallery/scanlines.jpg" width="160" alt="scanlines"> | `scanlines` | Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`. | `spacing=3.0` `thickness=0.5` `darkness=0.35` `offset=0.0` | [scanlines.toml](../../examples/effects/scanlines.toml) |
 | <img src="../gallery/torn_edge.jpg" width="160" alt="torn_edge"> | `torn_edge` | Tear the border away: each side's pixels closer than a wandering distance of about `depth` px become `fill`. | `depth=24.0` `roughness=0.5` `scale=24.0` `octaves=3` `persistence=0.4` `lacunarity=2.0` `fill='#f5f0e6'` `seed=0` | [torn_edge.toml](../../examples/effects/torn_edge.toml) |
@@ -25,8 +25,15 @@ Grain and other surface texture laid over the picture.
 | `elevation` | number | degrees | 1 to 90 | `45.0` | How high the light stands above the picture's plane, in degrees: 90 = straight above (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 = grazing, so the relief is dramatic and the lit side is clipped to white. |
 | `height` | number | px | 0 to 100 | `8.0` | How tall the relief is: a white pixel stands this many px above a black one, so the slope between neighbours is their brightness difference times this. 0 = flat (the picture is unchanged), larger = steeper relief and stronger lighting. |
 | `blur` | number | px | 0 to 20 | `1.0` | Gaussian sigma in px with which the brightness is smoothed before it is read as height: 0 = every pixel is a bump (noise and grain shows), larger = broader, softer swells. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a seam). |
+
+</details>
 
 ### `dust_scratches`
 
@@ -34,14 +41,21 @@ Grain and other surface texture laid over the picture.
 | --- | --- | --- | --- | --- | --- |
 | `density` | number | count | 0 to 5 | `0.6` | How many specks and hairs there are: marks per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none, 0.6 is a light dusting, 3 is filthy. |
 | `size` | number | px | 1 to 50 | `8.0` | The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most marks are smaller (speck radii are random, with many tiny ones); larger = bigger blotches and longer hairs. |
-| `hairs` | number | fraction | 0 to 1 | `0.15` | The share of the dust marks drawn as hairs (short thin lines in any direction) instead of round specks: 0 = only specks, 1 = only hairs. |
 | `scratches` | whole number | count | 0 to 100 | `2` | How many scratches: thin, long, nearly vertical lines, each running over half to all of the picture's height. 0 = none. |
-| `angle` | number | degrees | 0 to 45 | `4.0` | The most a scratch may lean away from vertical, in degrees: each scratch gets a random lean up to this, to either side. 0 = all exactly vertical. |
-| `width` | number | px | 0.5 to 10 | `1.0` | How wide a scratch is in px. Larger = bolder scratches. |
 | `opacity` | number | fraction | 0 to 1 | `0.8` | How strongly the marks show: each mark's colour is mixed over the picture by this much (at its centre; edges are soft). 0 = invisible, 1 = solid. |
 | `light` | colour |  |  | `'#ffffff'` | The colour of the light marks (dust on a dark print, scratches into the emulsion): '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance. |
 | `dark` | colour |  |  | `'#000000'` | The colour of the dark marks (dust on the scanner glass): '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same marks in the same places, another seed others. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `hairs` | number | fraction | 0 to 1 | `0.15` | The share of the dust marks drawn as hairs (short thin lines in any direction) instead of round specks: 0 = only specks, 1 = only hairs. |
+| `angle` | number | degrees | 0 to 45 | `4.0` | The most a scratch may lean away from vertical, in degrees: each scratch gets a random lean up to this, to either side. 0 = all exactly vertical. |
+| `width` | number | px | 0.5 to 10 | `1.0` | How wide a scratch is in px. Larger = bolder scratches. |
+
+</details>
 
 ### `emboss`
 
@@ -50,7 +64,14 @@ Grain and other surface texture laid over the picture.
 | `angle` | number | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left (the usual choice: it reads as raised). Surfaces that rise away from the light are brighter than mid grey and those that rise towards it darker; turning the light by 180 inverts the picture around mid grey. |
 | `depth` | number | px | 0 to 50 | `6.0` | How tall the relief is: a white pixel stands this many px above a black one, so the slope between neighbours is their brightness difference times this. 0 = a flat surface (mid grey), larger = steeper relief and stronger shading, up to full black and white at sharp edges. |
 | `saturation` | number | fraction | 0 to 1 | `0.0` | How much of the picture's colour comes back: 0 = a grey emboss on mid grey, 1 = the picture itself shaded by the relief (flat areas keep their colour), in between a mix of the two. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the slope sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture embosses without a seam). |
+
+</details>
 
 ### `film_grain`
 
@@ -60,8 +81,15 @@ Grain and other surface texture laid over the picture.
 | `highlights` | number | fraction | 0 to 1 | `0.03` | Standard deviation of the grain at white, in 0..1 picture units. The grain between black and white runs linearly from `shadows` to this, by the pixel's brightness; set equal to `shadows` for an even grain, above it for grain that grows toward the highlights. |
 | `size` | number | px | 0 to 50 | `1.0` | Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its standard deviation. Larger = coarser, softer grain. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same grain (a different one in each channel), another seed a different pattern. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1). Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles seamlessly). |
+
+</details>
 
 ### `grain`
 
@@ -70,8 +98,15 @@ Grain and other surface texture laid over the picture.
 | `amount` | number | fraction | 0 to 1 | `0.08` | Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is heavy. |
 | `size` | number | px | 0 to 50 | `1.0` | Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its standard deviation. Larger = coarser, softer grain. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same grain, another seed a different pattern. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1). Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles seamlessly). |
+
+</details>
 
 ### `noise`
 
@@ -90,11 +125,18 @@ Grain and other surface texture laid over the picture.
 | `amount` | number | fraction | 0 to 1 | `0.1` | How strong the texture is: the standard deviation of the brightness change as a fraction of each pixel's own value (the texture multiplies the picture, so black stays black and the average brightness is kept). 0 = unchanged, 0.1 is visible, 0.3 is heavy; values lighten and darken alike, and the result is clipped to 0..1. |
 | `scale` | number | px | 1 to 256 | `6.0` | Size of the coarsest fibres in px, the spacing of the first noise lattice. Larger = broader, softer mottling; small values give a fine tooth. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed for the fibres, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth blotches, more = more fine detail. Layers finer than one pixel are dropped. |
+| `spacing` | number | px | 3 to 64 | `6.0` | The thread pitch of 'canvas' and 'linen' in px: the distance from one thread to the next. Ignored for 'paper'. Larger = coarser weave. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same texture (fibres and, for 'linen', thread strengths), another seed a different one. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of fibres is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer of fibres is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
-| `spacing` | number | px | 3 to 64 | `6.0` | The thread pitch of 'canvas' and 'linen' in px: the distance from one thread to the next. Ignored for 'paper'. Larger = coarser weave. |
 | `fibre` | number | fraction | 0 to 1 | `0.3` | For 'canvas' and 'linen', the share of the texture's variance that comes from the random fibres rather than the weave: 0 = a pure, regular weave, 1 = no weave (the same as 'paper'). Ignored for 'paper'. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same texture (fibres and, for 'linen', thread strengths), another seed a different one. |
+
+</details>
 
 ### `pixel_grid`
 

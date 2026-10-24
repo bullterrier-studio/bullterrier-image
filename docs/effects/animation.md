@@ -6,15 +6,14 @@ Effects that change over time, such as particles dispersing or evaporating.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `font=None` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `hover=0.0` `outward=0.0` `ambient=0.0` `clock=0.0` `seed=0` `outline_depth=0.15` `jitter=0.2` `anticipation=0.06` `pullback=0.15` `flight=0.2` `flight_variation=0.4` `finish=0.98` `hover_spread=0.45` `bob=0.004` `bob_cycles=3.0` `angle_spread=12.0` `distance_minimum=0.35` `outward_distance=0.12` `acceleration=0.5` `sway=0.012` `sway_cycles=1.5` `falloff=1.5` `flare=0.4` `flare_span=0.2` `ambient_period=3.0` `ambient_wavelength=0.2` `open_bottom=True` `normal_smoothing=1.0` `normal_truncate=4.0` `edge='reflect'` `matte_threshold=0.5` `background_threshold=0.02` | [disperse.toml](../../examples/effects/disperse.toml) |
-| <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `font=None` `start=0.6` `ramp=0.3` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` `rise_gamma=0.6` `rise_minimum=0.1` `rise_skew=1.5` `thinning=0.5` `falloff=1.5` `sway=0.12` `sway_minimum=0.3` `open_bottom=True` `normal_smoothing=1.0` `normal_truncate=4.0` `edge='reflect'` `matte_threshold=0.5` `background_threshold=0.02` | [evaporate.toml](../../examples/effects/evaporate.toml) |
+| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +32 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
+| <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `start=0.6` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` +15 advanced | [evaporate.toml](../../examples/effects/evaporate.toml) |
 
 ### `disperse`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from `font`). Use the same value as the ascii step before this one, so whole characters move. |
-| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
 | `progress` | number | fraction | 0 to 1 | `0.0` | The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone). Animate it. |
 | `top` | number | ratio | 0 to 10 | `1.0` | Weight of height in the order pieces leave: higher pieces go first. 0 = height does not matter. |
 | `outline` | number | ratio | 0 to 10 | `1.0` | Weight of closeness to the outline (and the left, right and top borders) in the order: pieces near the edge go before the middle. 0 = closeness does not matter. |
@@ -22,11 +21,17 @@ Effects that change over time, such as particles dispersing or evaporating.
 | `reach` | number | fraction | 0 to 1 | `1.0` | How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses and the rest stays, 1 = everything goes. |
 | `wind` | number | fraction | -1 to 1 | `0.2` | The farthest any piece is carried by the time it vanishes, as a fraction of the picture width: positive blows right, negative left. Keep it under a third, or pieces cross too much of the picture in one go. |
 | `angle` | number | degrees | -180 to 180 | `10.0` | Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward. |
+| `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: each piece's fate is fixed by it, so every frame of one seed fits together. |
+
+<details><summary>Advanced parameters (32)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
 | `hover` | number | fraction | 0 to 1 | `0.0` | Share of its journey a piece floats slowly along the wind before it goes (about 0..0.3 looks right). The outline starts at once, deeper pieces later (see `hover_spread`). 0 = off. |
 | `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece is also thrown away from the edge it came from (by up to `outward_distance`); pieces then fly in different directions, so leave it at 0 when everything should travel together on the wind. |
 | `ambient` | number | ratio | 0 to 1 | `0.0` | Depth of the slow shimmer of the pieces that stay, as a share of their brightness (about 0..0.1 looks right; brightening stops at white). 0 = off. |
 | `clock` | number | seconds | 0 to 3600 | `0.0` | The time the shimmer runs on: animate it over the whole clip (`over = "clip"`) so the picture is alive even while nothing detaches. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: each piece's fate is fixed by it, so every frame of one seed fits together. |
 | `outline_depth` | number | fraction | 0.01 to 1 | `0.15` | Distance from the outline (fraction of the picture width) beyond which a piece counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in. |
 | `jitter` | number | fraction | 0 to 1 | `0.2` | Random share of each piece's place in the leaving order: 0 = a clean front, raising it makes it ragged. |
 | `anticipation` | number | fraction | 0.01 to 0.2 | `0.06` | Wind-up time before a piece goes, as a share of the clip: it eases back by `pullback` over this time. The first piece goes only after it, so every piece has one. |
@@ -55,20 +60,27 @@ Effects that change over time, such as particles dispersing or evaporating.
 | `matte_threshold` | number | fraction | 0 to 1 | `0.5` | With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a matte. |
 | `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces; without a matte it also decides the figure's outline. |
 
+</details>
+
 ### `evaporate`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from `font`). Use the same value as the ascii step before this one, so whole characters fly away. |
-| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
 | `start` | number | fraction | 0 to 1 | `0.6` | Height (fraction of the picture, 0 = top) above which pieces begin to detach from the top down. 0 switches the top-down dissolve off. |
-| `ramp` | number | fraction | 0.01 to 1 | `0.3` | Height of the band (fraction of the picture) above `start` over which the chance of detaching rises smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out. |
 | `outline` | number | fraction | 0 to 1 | `0.0` | Width of the band (fraction of the picture width) along the figure's outline, and the left, right and top borders, where pieces detach; stronger nearer the edge. 0 switches it off. Raising it eats further in. |
 | `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece turns away from the edge it came from (the left of the head sheds to the left): 0 = straight up, 1 = as much sideways as up. |
 | `rise` | number | fraction | 0 to 1 | `0.3` | Farthest a piece climbs, as a fraction of the picture height (at least one character row). Raising it spreads the smoke higher. |
 | `wind` | number | ratio | -5 to 5 | `0.0` | Sideways drift in characters per row climbed: positive to the right, negative to the left. |
 | `vanish` | number | fraction | 0 to 1 | `0.3` | Share of detached pieces already gone before they climb (0..1); `thinning` removes more with height. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: the same seed always gives the same dissolve, another seed another one. |
+
+<details><summary>Advanced parameters (15)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
+| `ramp` | number | fraction | 0.01 to 1 | `0.3` | Height of the band (fraction of the picture) above `start` over which the chance of detaching rises smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out. |
 | `rise_gamma` | number | ratio | 0 to 5 | `0.6` | Gamma of the climb against how strongly a piece is pulled away (0..1): a piece climbs up to `rise` x pull^rise_gamma. Below 1 even weakly pulled pieces climb far, above 1 only the strongly pulled ones. |
 | `rise_minimum` | number | fraction | 0 to 1 | `0.1` | Shortest climb as a share of a piece's longest one; 1 makes every piece climb the full way. |
 | `rise_skew` | number | ratio | 0 to 5 | `1.5` | Exponent on each piece's random share of its climb: above 1 most pieces stay low and a few go high, 1 spreads them evenly, below 1 most go high. |
@@ -82,3 +94,5 @@ Effects that change over time, such as particles dispersing or evaporating.
 | `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs the outline toward the border). |
 | `matte_threshold` | number | fraction | 0 to 1 | `0.5` | With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a matte. |
 | `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also decides the figure's outline. |
+
+</details>

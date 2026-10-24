@@ -6,9 +6,9 @@ Generated or replaced backgrounds behind the subject.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/aurora.jpg" width="160" alt="aurora"> | `aurora` | Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky. | `colors=('#2bff9a', '#7a2cff')` `sky='#02050f'` `base=0.75` `height=0.7` `falloff=0.8` `waviness=40.0` `scale=200.0` `rays=0.7` `ray_width=10.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` | [aurora.toml](../../examples/effects/aurora.toml) |
-| <img src="../gallery/flow_lines.jpg" width="160" alt="flow_lines"> | `flow_lines` | Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow. | `density=0.002` `length=120` `step=1.0` `thickness=1.5` `scale=120.0` `octaves=2` `persistence=0.5` `lacunarity=2.0` `twist=180.0` `seed=0` `line='#ffd84a'` `background='#12002b'` | [flow_lines.toml](../../examples/effects/flow_lines.toml) |
-| <img src="../gallery/fractal.jpg" width="160" alt="fractal"> | `fractal` | Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes. | `kind='julia'` `zoom=1.0` `x=0.0` `y=0.0` `c_real=-0.8` `c_imag=0.156` `iterations=64` `period=24.0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` `interior='#000000'` | [fractal.toml](../../examples/effects/fractal.toml) |
+| <img src="../gallery/aurora.jpg" width="160" alt="aurora"> | `aurora` | Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky. | `colors=('#2bff9a', '#7a2cff')` `sky='#02050f'` `base=0.75` `height=0.7` `waviness=40.0` `rays=0.7` `octaves=3` `seed=0` +5 advanced | [aurora.toml](../../examples/effects/aurora.toml) |
+| <img src="../gallery/flow_lines.jpg" width="160" alt="flow_lines"> | `flow_lines` | Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow. | `density=0.002` `length=120` `thickness=1.5` `scale=120.0` `octaves=2` `twist=180.0` `seed=0` `line='#ffd84a'` `background='#12002b'` +3 advanced | [flow_lines.toml](../../examples/effects/flow_lines.toml) |
+| <img src="../gallery/fractal.jpg" width="160" alt="fractal"> | `fractal` | Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes. | `kind='julia'` `zoom=1.0` `x=0.0` `y=0.0` `c_real=-0.8` `c_imag=0.156` `iterations=64` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [fractal.toml](../../examples/effects/fractal.toml) |
 | <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep. | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
 | <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin or worley), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
@@ -24,15 +24,22 @@ Generated or replaced backgrounds behind the subject.
 | `sky` | colour |  |  | `'#02050f'` | The colour of the night sky, seen below the curtain's base, above its top and between its rays: '#rrggbb', '#rgb' or [r, g, b] 0..1. A very dark blue looks better than pure black. |
 | `base` | number | fraction | 0 to 1 | `0.75` | Where the curtain's bright lower edge lies, as a fraction of the picture's height from the top (0 = the top edge, 1 = the bottom edge). Below it the sky is dark. Waviness moves it up and down along the picture. |
 | `height` | number | fraction | 0.05 to 1 | `0.7` | How far up from its base the curtain reaches before it has faded out completely, as a fraction of the picture's height. Larger = a taller curtain. |
-| `falloff` | number | ratio | 0.2 to 8 | `0.8` | How fast the light fades going up: the brightness at a height h above the base, as a fraction of the curtain's height, is (1 - h) to this power. 1 = a straight fade, above 1 = a bright edge with the glow quickly falling away, below 1 = light that reaches high before dimming. |
 | `waviness` | number | px | 0 to 500 | `40.0` | How far the curtain's base wanders up and down across the picture, in pixels: the typical distance from the `base` line (the standard deviation of the ripple); tuned for a picture about 480 px high. 0 = a straight, level base. |
-| `scale` | number | px | 2 to 2048 | `200.0` | Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of the first noise lattice of the base's wobble. Larger = long, slow folds; small = a quickly rippling hem. |
 | `rays` | number | fraction | 0 to 1 | `0.7` | How strongly the curtain is broken into vertical rays: each ray has a brightness of its own and this is how far the dimmest drop below the brightest. 0 = a smooth, even curtain, 1 = rays separated by dark sky. |
-| `ray_width` | number | px | 1 to 256 | `10.0` | Width in pixels of the broadest rays, the spacing of the first noise lattice across the picture; tuned for a picture about 480 px high. Larger = a few wide shafts; small = a fine comb of streaks. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed for the base's wobble and for the rays, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more ragged detail. Layers finer than one pixel are dropped. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same curtain (its folds and its rays), another seed a different one. |
+
+<details><summary>Advanced parameters (5)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `falloff` | number | ratio | 0.2 to 8 | `0.8` | How fast the light fades going up: the brightness at a height h above the base, as a fraction of the curtain's height, is (1 - h) to this power. 1 = a straight fade, above 1 = a bright edge with the glow quickly falling away, below 1 = light that reaches high before dimming. |
+| `scale` | number | px | 2 to 2048 | `200.0` | Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of the first noise lattice of the base's wobble. Larger = long, slow folds; small = a quickly rippling hem. |
+| `ray_width` | number | px | 1 to 256 | `10.0` | Width in pixels of the broadest rays, the spacing of the first noise lattice across the picture; tuned for a picture about 480 px high. Larger = a few wide shafts; small = a fine comb of streaks. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of the wobble and the rays is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong. |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same curtain (its folds and its rays), another seed a different one. |
+
+</details>
 
 ### `flow_lines`
 
@@ -40,16 +47,23 @@ Generated or replaced backgrounds behind the subject.
 | --- | --- | --- | --- | --- | --- |
 | `density` | number | fraction | 0 to 0.05 | `0.002` | How many lines: the share of the picture's pixels that start one, so a 480 x 384 picture at 0.002 has about 370. 0 draws none. More = a denser weave; lines cross freely. |
 | `length` | whole number | count | 1 to 2000 | `120` | How many steps each line follows the flow; with `step` it sets the line's length in px. A line also ends where it reaches the edge of the picture. |
-| `step` | number | px | 0.5 to 16 | `1.0` | The distance in px a line moves each step. Keep it at or below the line's thickness for a solid line; larger steps leave dotted lines. |
 | `thickness` | number | px | 0.5 to 16 | `1.5` | The width of the lines in px (a soft disc of this diameter is stamped at every step). Tuned for a picture about 480 px high. |
 | `scale` | number | px | 4 to 1024 | `120.0` | The size of the flow's coarsest swirls in px, the spacing of the first noise lattice. Larger = broader, gentler bends. Tuned for a picture about 480 px high. |
 | `octaves` | whole number | count | 1 to 8 | `2` | How many layers of noise are summed for the flow, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth sweeping lines, more = wigglier ones. |
-| `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of the flow is than the one before. 0 = only the coarsest layer. |
-| `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer of the flow is than the one before: the lattice spacing is divided by this. |
 | `twist` | number | degrees | 0 to 720 | `180.0` | How far the flow turns for each standard deviation of the noise: a line's direction is the noise times this, measured clockwise on screen from the right. 0 = every line runs straight to the right; larger = tighter, more varied swirls. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the flow and the line starts: the same seed gives the same picture. The starts and the flow are independent random streams of it. |
 | `line` | colour |  |  | `'#ffd84a'` | The colour of the lines. |
 | `background` | colour |  |  | `'#12002b'` | The colour behind the lines. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `step` | number | px | 0.5 to 16 | `1.0` | The distance in px a line moves each step. Keep it at or below the line's thickness for a solid line; larger steps leave dotted lines. |
+| `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of the flow is than the one before. 0 = only the coarsest layer. |
+| `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer of the flow is than the one before: the lattice spacing is divided by this. |
+
+</details>
 
 ### `fractal`
 
@@ -62,9 +76,16 @@ Generated or replaced backgrounds behind the subject.
 | `c_real` | number | ratio | -2 to 2 | `-0.8` | Julia only: the real part of the constant c in z -> z^2 + c. It decides the shape: a point inside the Mandelbrot set gives a connected Julia set, one outside a dust. Ignored by 'mandelbrot'. |
 | `c_imag` | number | ratio | -2 to 2 | `0.156` | Julia only: the imaginary part of the constant c. Ignored by 'mandelbrot'. |
 | `iterations` | whole number | count | 1 to 2000 | `64` | How many times z -> z^2 + c is applied before a point is taken to stay for ever (the interior). More reveals finer detail at the set's edge and costs time in proportion; zooming in needs more. |
-| `period` | number | count | 1 to 1000 | `24.0` | How many iterations of escape time take the colours from the first to the last of `colors`; they then run back, so the bands cycle without a seam. Smaller = more, thinner bands. |
 | `colors` | list of colours |  |  | `('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` | The colours of the bands, evenly spaced; at least two. Points that escape early (far from the set) take the first colours. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `period` | number | count | 1 to 1000 | `24.0` | How many iterations of escape time take the colours from the first to the last of `colors`; they then run back, so the bands cycle without a seam. Smaller = more, thinner bands. |
 | `interior` | colour |  |  | `'#000000'` | The colour of the points that never escape: the inside of the set. |
+
+</details>
 
 ### `gradient`
 

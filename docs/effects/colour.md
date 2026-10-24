@@ -9,16 +9,16 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
 | <img src="../gallery/black_and_white.jpg" width="160" alt="black_and_white"> | `black_and_white` | Convert to black and white with `red`, `green` and `blue` filter weights, like a colour filter on B&W film. | `red=0.2126` `green=0.7152` `blue=0.0722` | [black_and_white.toml](../../examples/effects/black_and_white.toml) |
 | <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
-| <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` `preserve_luminosity=True` | [color_balance.toml](../../examples/effects/color_balance.toml) |
-| <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` `red_shadows=0.25` `red_midtones=0.5` `red_highlights=0.75` `green_shadows=0.25` `green_midtones=0.5` `green_highlights=0.75` `blue_shadows=0.25` `blue_midtones=0.5` `blue_highlights=0.75` | [curves.toml](../../examples/effects/curves.toml) |
+| <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
+| <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/fade.jpg" width="160" alt="fade"> | `fade` | Lift the blacks by `amount` for a matte, faded-film look; whites stay where they are. | `amount=0.12` | [fade.toml](../../examples/effects/fade.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` | [grade.toml](../../examples/effects/grade.toml) |
-| <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` `quantile_method='linear'` | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
+| <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/hue_shift.jpg" width="160" alt="hue_shift"> | `hue_shift` | Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme. | `hue=90.0` | [hue_shift.toml](../../examples/effects/hue_shift.toml) |
 | <img src="../gallery/invert.jpg" width="160" alt="invert"> | `invert` | Turn the picture into its negative: every red, green and blue value v becomes 1 - v. | none | [invert.toml](../../examples/effects/invert.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
-| <img src="../gallery/palette_quantize.jpg" width="160" alt="palette_quantize"> | `palette_quantize` | Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`. | `palette='photo'` `colors=8` `init='k-means++'` `iterations=20` `tolerance=0.001` `sample=10000` `seed=0` | [palette_quantize.toml](../../examples/effects/palette_quantize.toml) |
+| <img src="../gallery/palette_quantize.jpg" width="160" alt="palette_quantize"> | `palette_quantize` | Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`. | `palette='photo'` `colors=8` `init='k-means++'` `sample=10000` `seed=0` +2 advanced | [palette_quantize.toml](../../examples/effects/palette_quantize.toml) |
 | <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
 | <img src="../gallery/solarize.jpg" width="160" alt="solarize"> | `solarize` | Invert every red, green and blue value that is above `threshold` and leave the others as they are. | `threshold=0.5` | [solarize.toml](../../examples/effects/solarize.toml) |
@@ -69,7 +69,14 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `highlights_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the brightest tones, at full weight (pure white): positive adds red, negative removes it (towards cyan). 0 = off. |
 | `highlights_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the brightest tones, at full weight (pure white): positive adds green, negative removes it (towards magenta). 0 = off. |
 | `highlights_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the brightest tones, at full weight (pure white): positive adds blue, negative removes it (towards yellow). 0 = off. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `preserve_luminosity` | true or false |  |  | `True` | Keep each pixel's Rec. 709 luma while shifting colours: on, the brightness the shifts add or remove is taken off or put back on all three channels, so only the colour changes (Photoshop's 'Preserve Luminosity'); off, the shifts also lighten or darken. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping allows. |
+
+</details>
 
 ### `curves`
 
@@ -80,6 +87,11 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `midtones` | number | fraction | 0 to 1 | `0.5` | The master curve's output for the middle input, 0.5 (0..1; 0.5 = unchanged): lower darkens the midtones, higher brightens them. |
 | `highlights` | number | fraction | 0 to 1 | `0.75` | The master curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged): lower dims the highlights, higher makes them brighter. |
 | `white` | number | fraction | 0 to 1 | `1.0` | The master curve's output for pure white, at 1 on the input axis (0..1): lowering it dims the whites. |
+
+<details><summary>Advanced parameters (9)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `red_shadows` | number | fraction | 0 to 1 | `0.25` | The red curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied after the master curve: raising it adds red to the shadows, lowering it takes red away. Its ends stay at black and white. |
 | `red_midtones` | number | fraction | 0 to 1 | `0.5` | The red curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the master curve: raising it adds red to the midtones, lowering it takes red away. Its ends stay at black and white. |
 | `red_highlights` | number | fraction | 0 to 1 | `0.75` | The red curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), applied after the master curve: raising it adds red to the highlights, lowering it takes red away. Its ends stay at black and white. |
@@ -89,6 +101,8 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `blue_shadows` | number | fraction | 0 to 1 | `0.25` | The blue curve's output for the input a quarter of the way up (0..1; 0.25 = unchanged), applied after the master curve: raising it adds blue to the shadows, lowering it takes blue away. Its ends stay at black and white. |
 | `blue_midtones` | number | fraction | 0 to 1 | `0.5` | The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged), applied after the master curve: raising it adds blue to the midtones, lowering it takes blue away. Its ends stay at black and white. |
 | `blue_highlights` | number | fraction | 0 to 1 | `0.75` | The blue curve's output for the input three quarters of the way up (0..1; 0.75 = unchanged), applied after the master curve: raising it adds blue to the highlights, lowering it takes blue away. Its ends stay at black and white. |
+
+</details>
 
 ### `equalize`
 
@@ -120,7 +134,14 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `stops` | list of colours |  |  | `('#000000', '#ffffff')` | The gradient's colours from darkest to brightest, evenly spaced; at least two. Two make a duotone, three a tritone. |
 | `shadow_clip` | number | fraction | 0 to 0.5 | `0.01` | Share of the darkest pixels (0..0.5) that the contrast stretch pushes onto the first stop; 0 maps only the darkest pixel there. Larger gives deeper shadows. |
 | `highlight_clip` | number | fraction | 0 to 0.5 | `0.01` | Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the last stop. Larger gives brighter highlights. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `quantile_method` | one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased' |  |  | `'linear'` | How the stretch's clip points are read from the picture's brightness (numpy's quantile methods): 'linear' interpolates between the two nearest pixels; 'lower', 'higher', 'nearest' and 'midpoint' take the darker, the brighter, the nearer pixel or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and 'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or flat pictures. |
+
+</details>
 
 ### `hue_shift`
 
@@ -150,10 +171,17 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `palette` | one of 'photo', 'gameboy', 'cga', 'ega', 'pico8' |  |  | `'photo'` | Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); the others are fixed palettes: 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in Oklab, a space where equal distances look equally different. |
 | `colors` | whole number | count | 2 to 256 | `8` | How many colours to find when `palette` is 'photo' (ignored for a fixed palette). Raising it keeps more detail and gradation; fewer than this many are used if the picture has fewer distinct colours. |
 | `init` | one of 'k-means++', 'random' |  |  | `'k-means++'` | How the search for colours starts (palette 'photo'): 'k-means++' spreads the starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better set; 'random' starts from `colors` random pixels. |
-| `iterations` | whole number | count | 1 to 100 | `20` | The most k-means rounds to run when `palette` is 'photo'. Each round moves every colour to the average of the pixels nearest to it; raising it lets the search settle further. |
-| `tolerance` | number | fraction | 0 to 1 | `0.001` | Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result. |
 | `sample` | whole number | count | 1 to 1000000 | `10000` | How many randomly chosen pixels the colours are searched on when `palette` is 'photo'; every pixel is still repainted. A picture with fewer pixels is searched whole. Raising it costs time and can find rare colours; lowering it is faster but may miss small areas of colour. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the choice of sample pixels and starting colours: the same seed always gives the same picture, another seed may find slightly different colours. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `iterations` | whole number | count | 1 to 100 | `20` | The most k-means rounds to run when `palette` is 'photo'. Each round moves every colour to the average of the pixels nearest to it; raising it lets the search settle further. |
+| `tolerance` | number | fraction | 0 to 1 | `0.001` | Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result. |
+
+</details>
 
 ### `posterize`
 

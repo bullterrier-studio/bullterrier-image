@@ -8,10 +8,10 @@ Weather and air: fog, haze, rain and the like.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/embers.jpg" width="160" alt="embers"> | `embers` | Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it. | `count=120` `size=7.0` `softness=1.0` `length=8.0` `angle=15.0` `depth=0.5` `opacity=0.9` `color='#ff8a2b'` `seed=0` | [embers.toml](../../examples/effects/embers.toml) |
 | <img src="../gallery/floating_dust.jpg" width="160" alt="floating_dust"> | `floating_dust` | Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust. | `count=80` `size=24.0` `softness=0.8` `depth=0.5` `opacity=0.55` `color='#fff1d6'` `seed=0` | [floating_dust.toml](../../examples/effects/floating_dust.toml) |
-| <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom. | `density=0.8` `color='#cfd8e3'` `gradient=0.7` `patchiness=0.6` `scale=150.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `seed=0` | [fog.toml](../../examples/effects/fog.toml) |
-| <img src="../gallery/lens_drops.jpg" width="160" alt="lens_drops"> | `lens_drops` | Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`. | `count=14` `radius=24.0` `size_variation=0.5` `refraction=1.5` `blur=1.5` `highlight=0.0` `seed=0` `truncate=4.0` `interpolation='bilinear'` `edge='reflect'` | [lens_drops.toml](../../examples/effects/lens_drops.toml) |
+| <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom. | `density=0.8` `color='#cfd8e3'` `gradient=0.7` `patchiness=0.6` `scale=150.0` `octaves=4` `seed=0` +2 advanced | [fog.toml](../../examples/effects/fog.toml) |
+| <img src="../gallery/lens_drops.jpg" width="160" alt="lens_drops"> | `lens_drops` | Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`. | `count=14` `radius=24.0` `size_variation=0.5` `refraction=1.5` `blur=1.5` `highlight=0.0` `seed=0` +3 advanced | [lens_drops.toml](../../examples/effects/lens_drops.toml) |
 | <img src="../gallery/rain.jpg" width="160" alt="rain"> | `rain` | Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`. | `density=1.0` `angle=10.0` `length=32.0` `thickness=1.5` `depth=0.5` `opacity=0.7` `color='#dbe6f5'` `seed=0` | [rain.toml](../../examples/effects/rain.toml) |
-| <img src="../gallery/smoke.jpg" width="160" alt="smoke"> | `smoke` | Mix soft-edged plumes of `color` into the picture, up to `amount` thick. | `amount=0.5` `color='#e6e6e6'` `coverage=0.45` `feather=0.25` `scale=100.0` `rise=2.0` `turbulence=30.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `resampling='bilinear'` `edge='reflect'` `seed=0` | [smoke.toml](../../examples/effects/smoke.toml) |
+| <img src="../gallery/smoke.jpg" width="160" alt="smoke"> | `smoke` | Mix soft-edged plumes of `color` into the picture, up to `amount` thick. | `amount=0.5` `color='#e6e6e6'` `coverage=0.45` `scale=100.0` `rise=2.0` `turbulence=30.0` `octaves=4` `seed=0` +5 advanced | [smoke.toml](../../examples/effects/smoke.toml) |
 | <img src="../gallery/snow.jpg" width="160" alt="snow"> | `snow` | Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers. | `density=0.5` `size=14.0` `layers=4` `softness=0.5` `opacity=0.8` `depth=0.5` `seed=0` | [snow.toml](../../examples/effects/snow.toml) |
 | <img src="../gallery/sparkle.jpg" width="160" alt="sparkle"> | `sparkle` | Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each. | `count=60` `threshold=0.75` `size=10.0` `size_variation=0.5` `rays=2.0` `thickness=1.0` `opacity=1.0` `seed=0` | [sparkle.toml](../../examples/effects/sparkle.toml) |
 
@@ -51,9 +51,16 @@ Weather and air: fog, haze, rain and the like.
 | `patchiness` | number | fraction | 0 to 1 | `0.6` | How cloudy the fog is: 0 = an even veil, 1 = drifts with clear gaps, where the noise is lowest the fog thins to nothing. The cloud shapes come from fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`). |
 | `scale` | number | px | 1 to 1024 | `150.0` | Size of the biggest clouds in pixels, the spacing of the first noise lattice; tuned for a picture about 480 px high. Larger = broad banks of fog; small = fine, wispy mottling. |
 | `octaves` | whole number | count | 1 to 8 | `4` | How many layers of noise are summed to make the clouds, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy detail. Layers finer than one pixel are dropped. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same clouds, another seed a different bank of fog. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of cloud is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer of cloud is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same clouds, another seed a different bank of fog. |
+
+</details>
 
 ### `lens_drops`
 
@@ -66,9 +73,16 @@ Weather and air: fog, haze, rain and the like.
 | `blur` | number | px | 0 to 20 | `1.5` | How much the scene inside a drop is blurred, the sigma of a Gaussian in px, as a drop is never quite in focus. 0 = sharp. |
 | `highlight` | number | fraction | 0 to 1 | `0.0` | How bright the drops' shine is: white light screened along the rim of each drop, strongest at its top (light from above) and fading to nothing at its bottom and in its middle. 0 = none, so a flat picture stays flat; 0.5 is a soft glint. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same drops in the same places, another seed others. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more exact and slower. |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture inside a drop: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a drop sees beyond the picture's edge (a drop near the border or a strong refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
 
 ### `rain`
 
@@ -90,16 +104,23 @@ Weather and air: fog, haze, rain and the like.
 | `amount` | number | fraction | 0 to 1 | `0.5` | How opaque the smoke is at the heart of a plume: the share of the smoke colour mixed into the picture there. 0 = no smoke, 0.5 = see-through smoke, 1 = solid colour hiding the picture. |
 | `color` | colour |  |  | `'#e6e6e6'` | The colour of the smoke: '#rrggbb', '#rgb' or [r, g, b] 0..1. Pale grey is steam or light smoke, a dark grey or black a heavy, sooty plume. |
 | `coverage` | number | fraction | 0 to 1 | `0.45` | About the share of the picture that has any smoke in it: 0 = none, 0.45 = plumes with clear air between them, 1 = smoke everywhere, in thicker and thinner places. The plumes are the highest parts of a noise field, so raising it widens them and joins them up. |
-| `feather` | number | fraction | 0.01 to 1 | `0.25` | How soft the edge of a plume is, as the share of the picture over which the smoke fades from nothing to full `amount` just above the coverage cut. Small = crisp, billowing outlines; large = plumes that melt into the air with no clear outline. |
 | `scale` | number | px | 1 to 1024 | `100.0` | Size of the biggest plumes across, in pixels, the spacing of the first noise lattice before `rise` stretches it; tuned for a picture about 480 px high. Larger = a few big clouds; small = many small wisps. |
 | `rise` | number | ratio | 1 to 8 | `2.0` | How much the plumes are drawn out upward, anchored at the bottom edge: 1 = round puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney. |
 | `turbulence` | number | px | 0 to 500 | `30.0` | How far in pixels two more noise fields (with the same `scale`, `octaves`, `persistence` and `lacunarity`) push the plumes sideways and up and down: the typical displacement (their standard deviation). 0 = smooth, regular plumes; larger = twisting, curling smoke; much larger than `scale` tears the plumes into scattered wisps. |
 | `octaves` | whole number | count | 1 to 8 | `4` | How many layers of noise are summed to make the plumes, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy detail. Layers finer than one pixel are dropped. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same smoke, another seed different plumes. |
+
+<details><summary>Advanced parameters (5)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `feather` | number | fraction | 0.01 to 1 | `0.25` | How soft the edge of a plume is, as the share of the picture over which the smoke fades from nothing to full `amount` just above the coverage cut. Small = crisp, billowing outlines; large = plumes that melt into the air with no clear outline. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
 | `resampling` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How the noise is read where `rise` and `turbulence` have moved it between pixels: 'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the four around it (smooth), 'bicubic' fits a cubic spline through the neighbours (smoothest, a little slower). It matters only where something moves. Named `resampling`, not `interpolation`, because it reads a generated noise field, never the picture. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the noise is beyond the picture's border when `turbulence` pushes a plume in from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same smoke, another seed different plumes. |
+
+</details>
 
 ### `snow`
 
