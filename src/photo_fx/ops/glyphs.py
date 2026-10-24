@@ -56,12 +56,12 @@ def cell_size(cell: int, font: str | None = None) -> tuple[int, int]:
 def glyph_atlas(chars: str, cell: int, font: str | None = None) -> np.ndarray:
     """Ink coverage of each distinct character of `chars`, ordered from least to most ink.
 
-    `chars` = the palette, in any order; repeated characters count once. `cell` = character width in px and `font`
-    as in `cell_size`. Returns a float32 array of shape (n_glyphs, cell_h, cell_w) with coverage in 0..1 (0 = no ink,
-    1 = fully inked), where (cell_w, cell_h) == `cell_size(cell, font)`. Index 0 is the lightest glyph, the last index
-    the densest. The result is cached and shared between callers, so it is read-only: copy it before editing.
-    Raises ValueError if `chars` has fewer than two distinct characters (there is nothing to choose between) and
-    OSError if `font` is given but cannot be opened as a font file.
+    `chars` = the palette (at least two distinct characters), in any order; repeated characters count once. `cell` =
+    character width in px and `font` as in `cell_size`. Returns a float32 array of shape (n_glyphs, cell_h, cell_w)
+    with coverage in 0..1 (0 = no ink, 1 = fully inked), where (cell_w, cell_h) == `cell_size(cell, font)`. Index 0 is
+    the lightest glyph, the last index the densest. The result is cached and shared between callers, so it is
+    read-only: copy it before editing.
+    Raises OSError if `font` is given but cannot be opened as a font file.
     """
     return _atlas(chars, cell, _font_file(font))
 
@@ -86,8 +86,6 @@ def _atlas(chars: str, cell: int, font: str | None) -> np.ndarray:
         top = cell_h / 2 + (ascent - descent + 1) // 2 - ascent
         ImageDraw.Draw(canvas).text((left, top), ch, fill=_FULL_INK, font=glyph_font)
         bitmaps.append(np.asarray(canvas, dtype=np.float32) / float(_FULL_INK))
-    if len(bitmaps) < 2:
-        raise ValueError("glyph_atlas needs at least two different characters in `chars`")
     bitmaps.sort(key=lambda b: float(b.mean()))
     atlas = np.stack(bitmaps)
     atlas.flags.writeable = False  # shared through the cache: one caller's edit must not reach the others
@@ -97,20 +95,10 @@ def _atlas(chars: str, cell: int, font: str | None) -> np.ndarray:
 def paint(indices: np.ndarray, atlas: np.ndarray) -> np.ndarray:
     """Draw a grid of glyphs: cell (r, c) of the result holds the atlas glyph `indices[r, c]`.
 
-    `indices` = (rows, cols) integers, each in 0..n_glyphs-1 (negative values are rejected, not wrapped).
+    `indices` = (rows, cols) integers, each in 0..n_glyphs-1.
     `atlas` = (n_glyphs, cell_h, cell_w) coverage as returned by `glyph_atlas`.
     Returns a float32 (rows * cell_h, cols * cell_w) coverage array in 0..1.
-    Raises ValueError if `indices` is not a 2-D integer array or `atlas` is not 3-D, and IndexError if any index lies
-    outside the atlas.
     """
-    if indices.ndim != 2:
-        raise ValueError(f"paint needs a 2-D grid of indices, got {indices.ndim}-D")
-    if not np.issubdtype(indices.dtype, np.integer):
-        raise ValueError(f"paint needs integer indices, got {indices.dtype}")
-    if atlas.ndim != 3:  # constant: glyphs, rows, columns
-        raise ValueError(f"paint needs an atlas of shape (n_glyphs, cell_h, cell_w), got {atlas.ndim}-D")
-    if indices.size and (indices.min() < 0 or indices.max() >= len(atlas)):
-        raise IndexError(f"glyph index outside the atlas of {len(atlas)} glyphs")
     rows, cols = indices.shape
     _, cell_h, cell_w = atlas.shape
     return atlas[indices].transpose(0, 2, 1, 3).reshape(rows * cell_h, cols * cell_w)

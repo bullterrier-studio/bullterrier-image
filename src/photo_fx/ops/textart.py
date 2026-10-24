@@ -47,7 +47,6 @@ def text_art(
     photo: 0..1, how much of the picture shows through the paper behind the characters (0 = flat paper colour).
     font: path to a monospaced .ttf/.ttc, or None for the first system font found.
     A cell cut off by the picture's right or bottom edge is measured as if the border pixels continued.
-    Raises ValueError if `chars` has fewer than two distinct characters.
     """
     atlas = glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
     n, cell_h, cell_w = atlas.shape

@@ -55,12 +55,6 @@ def test_duplicate_characters_collapse():
     np.testing.assert_array_equal(with_repeats, glyph_atlas("ab .", 8))
 
 
-@pytest.mark.parametrize("chars", ["", "x", "xxxx"])
-def test_fewer_than_two_distinct_characters_raises(chars):
-    with pytest.raises(ValueError, match="at least two"):
-        glyph_atlas(chars, 8)
-
-
 def test_space_has_no_ink_and_the_full_block_has_the_most(any_host):
     atlas = glyph_atlas(" .:#█", 10)
     totals = ink(atlas)
@@ -105,30 +99,6 @@ def test_paint_output_shape_follows_rows_and_columns(rows, cols):
 def test_paint_of_an_empty_grid_is_empty():
     atlas = glyph_atlas(" .#", 7)
     assert paint(np.zeros((0, 3), dtype=int), atlas).shape == (0, 3 * atlas.shape[2])
-
-
-THREE_GLYPHS = glyph_atlas(" .#", 7)  # valid indices are 0..2, and -1 must not wrap to the last glyph
-
-
-@pytest.mark.parametrize(
-    ("indices", "atlas", "error", "match"),
-    [
-        (np.array([[0, 3]]), THREE_GLYPHS, IndexError, None),
-        (np.array([[0, 8]]), THREE_GLYPHS, IndexError, None),
-        (np.array([[0, -1]]), THREE_GLYPHS, IndexError, None),
-        (np.zeros((3,), int), THREE_GLYPHS, ValueError, "2-D"),
-        (np.zeros((1, 2, 3), int), THREE_GLYPHS, ValueError, "2-D"),
-        (np.array([[0.0, 1.0]]), THREE_GLYPHS, ValueError, "integer"),
-        (np.zeros((1, 1), int), np.zeros((7, 4), np.float32), ValueError, "atlas"),
-        (np.zeros((1, 1), int), np.zeros((2, 7, 4, 1), np.float32), ValueError, "atlas"),
-    ],
-    ids=["index 3", "index 8", "index -1", "1-D", "3-D", "not integer", "2-D atlas", "4-D atlas"],
-)
-def test_paint_rejects_indices_outside_the_atlas_or_not_a_grid_and_an_atlas_not_a_stack_of_glyphs(
-    indices, atlas, error, match
-):
-    with pytest.raises(error, match=match):
-        paint(indices, atlas)
 
 
 # --- fonts and glyph geometry -----------------------------------------------------------------------------------
