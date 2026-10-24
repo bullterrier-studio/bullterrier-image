@@ -343,24 +343,8 @@ def test_a_constant_marker_with_a_reason_covers_its_statement_and_a_param_declar
 
 # --- literal options of library calls ----------------------------------------------------------------------------
 
-# Options a library call takes that the rule above accepts today, kept here until the controller decides each:
-# every one is a string option that either implements a documented edge rule or fixes how an algorithm is defined.
-# `strict` makes the test fail the day one is fixed, so the entry is removed with it.
-KNOWN_LIBRARY_OPTIONS = {
-    "effects/anamorphic_streaks/effect.py": 'mode="same" of fftconvolve (keeps the picture size)',
-}
 
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        pytest.param(path, marks=pytest.mark.xfail(strict=True, reason=KNOWN_LIBRARY_OPTIONS[name]))
-        if (name := _module_name(path)) in KNOWN_LIBRARY_OPTIONS
-        else path
-        for path in SCANNED
-    ],
-    ids=[_module_name(path) for path in SCANNED],
-)
+@pytest.mark.parametrize("path", SCANNED, ids=[_module_name(path) for path in SCANNED])
 def test_no_literal_option_of_a_library_call_in_the_source(path):
     assert library_options(path.read_text(encoding="utf-8")) == []
 

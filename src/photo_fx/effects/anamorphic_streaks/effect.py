@@ -61,8 +61,7 @@ def anamorphic_streaks(rgb: np.ndarray, params: AnamorphicStreaksParams) -> np.n
     bright = highlights(rgb, params.threshold)
     streaks = np.empty_like(bright)
     for channel in range(rgb.shape[-1]):  # one channel at a time keeps the transforms' working memory to a third
-        streaks[..., channel] = signal.fftconvolve(
-            bright[..., channel], kernel.astype(np.float32)[None, :], mode="same", axes=1
-        )
+        spread = signal.fftconvolve(bright[..., channel], kernel.astype(np.float32)[None, :], axes=1)
+        streaks[..., channel] = spread[:, reach : reach + width]  # the middle `width` columns: as wide as the picture
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, params.amount * streaks * tint)
