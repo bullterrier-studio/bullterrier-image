@@ -1,0 +1,8 @@
+# A grain texture laid over the photo with the soft light blend mode: it adds grain and keeps the photo's brightness.
+name = "blend"
+size = 480
+
+[[step]]
+effect = "blend"
+texture = "../assets/grain-texture.png"
+mode = "soft_light"
