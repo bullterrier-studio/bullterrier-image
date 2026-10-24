@@ -1,0 +1,9 @@
+# Dust in the air: faint warm bokeh discs of several sizes, near ones large and soft.
+# It also makes the effect's picture in the catalogue.
+name = "floating_dust"
+size = 480
+
+[[step]]
+effect = "floating_dust"
+count = 80
+seed = 1
