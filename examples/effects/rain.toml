@@ -1,0 +1,9 @@
+# Falling rain: pale streaks, near ones long and bright, leaning a little with the wind.
+# It also makes the effect's picture in the catalogue.
+name = "rain"
+size = 480
+
+[[step]]
+effect = "rain"
+angle = 12
+seed = 1
