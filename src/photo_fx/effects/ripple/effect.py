@@ -36,7 +36,7 @@ class RippleParams(EffectParams):
         max=360,
         doc="Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the "
         "picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole "
-        "cycle and so the same as 0. Animating it makes the wave travel.",
+        "cycle and so the same as 0. Changing it slides the wave along.",
     )
     angle: float = param(
         0.0,

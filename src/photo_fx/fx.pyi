@@ -565,16 +565,16 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
-    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. Animate `progress`.
+def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
+    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
-has a fixed, random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches,
-drifts, wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
+has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
+fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
 
 When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
 figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
-makes the edges loosen all round first; `ambient` with `clock` keeps the pieces that stay alive.
+makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
 `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
 
@@ -586,7 +586,6 @@ cell : whole number, px, 1 to 64, default 5
     Animated, it moves in whole steps (rounded to the nearest whole number).
 progress : number, fraction, 0 to 1, default 0.0
     The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).
-    Animate it.
 top : number, ratio, 0 to 10, default 1.0
     Weight of height in the order pieces leave: higher pieces go first. 0 = height does
     not matter.
@@ -607,8 +606,9 @@ angle : number, degrees, -180 to 180, default 10.0
     Direction of the wind above the horizontal (on the side `wind` blows to); negative
     blows downward.
 seed : whole number, count, 0 to 2147483647, default 0
-    Random seed: each piece's fate is fixed by it, so every frame of one seed fits
-    together. Animated, it moves in whole steps (rounded to the nearest whole number).
+    Random seed: each piece's fate is fixed by it, so one seed always gives the same
+    pieces the same fates. Animated, it moves in whole steps (rounded to the nearest
+    whole number).
 
 Advanced parameters
 -------------------
@@ -627,9 +627,6 @@ outward : number, fraction, 0 to 1, default 0.0
 ambient : number, ratio, 0 to 1, default 0.0
     Depth of the slow shimmer of the pieces that stay, as a share of their brightness
     (about 0..0.1 looks right; brightening stops at white). 0 = off.
-clock : number, seconds, 0 to 3600, default 0.0
-    The time the shimmer runs on: animate it over the whole clip (`over = "clip"`) so
-    the picture is alive even while nothing detaches.
 outline_depth : number, fraction, 0.01 to 1, default 0.15
     Distance from the outline (fraction of the picture width) beyond which a piece
     counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness
@@ -638,25 +635,25 @@ jitter : number, fraction, 0 to 1, default 0.2
     Random share of each piece's place in the leaving order: 0 = a clean front, raising
     it makes it ragged.
 anticipation : number, fraction, 0.01 to 0.2, default 0.06
-    Wind-up time before a piece goes, as a share of the clip: it eases back by
+    Wind-up time before a piece goes, as a share of `progress`: it eases back by
     `pullback` over this time. The first piece goes only after it, so every piece has
     one.
 pullback : number, fraction, 0 to 1, default 0.15
     How far a piece eases back against its journey before it goes (anticipation), as a
     share of the journey. 0 = no wind-up.
 flight : number, fraction, 0.01 to 0.5, default 0.2
-    Average time from detaching to vanishing, as a share of the clip. Shorter flights
+    Average time from detaching to vanishing, as a share of `progress`. Shorter flights
     keep fewer pieces in the air at once (about 0.1 keeps it to a third on a side-to-
     side sweep).
 flight_variation : number, fraction, 0 to 0.9, default 0.4
     How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all
     the same.
 finish : number, fraction, 0.5 to 1, default 0.98
-    The progress by which the last piece has vanished (a little under 1 gives a clean
-    last frame). If `anticipation` and the longest flight do not fit before it, all
-    pieces go at once.
+    The progress by which the last piece has vanished (a little under 1 leaves nothing
+    behind at the end). If `anticipation` and the longest flight do not fit before it,
+    all pieces go at once.
 hover_spread : number, fraction, 0 to 1, default 0.45
-    With `hover`: how far into the clip a piece `outline_depth` inside starts to float
+    With `hover`: how far into `progress` a piece `outline_depth` inside starts to float
     (the outline starts at 0). 0 = everything floats at once.
 bob : number, fraction, 0 to 0.05, default 0.004
     Height of the gentle up-and-down of a hovering piece, as a fraction of the picture
@@ -688,11 +685,13 @@ flare : number, ratio, 0 to 2, default 0.4
     stops at white. 0 = no glow.
 flare_span : number, fraction, 0.01 to 1, default 0.2
     Share of a piece's flight that the glow lasts; it peaks halfway through that.
-ambient_period : number, seconds, 0.1 to 60, default 3.0
-    Seconds per shimmer cycle (breathing is 2-4 s).
+ambient_phase : number, cycles, 0 to 1, default 0.0
+    Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a
+    cycle on. Raising it moves the wave against the wind; with `ambient` at 0 it does
+    nothing.
 ambient_wavelength : number, fraction, 0.01 to 2, default 0.2
-    Length of one shimmer wave as a fraction of the picture width; with the period it
-    sets how fast the wave travels (against the wind).
+    Length of one shimmer wave as a fraction of the picture width; a shorter one packs
+    more waves across the picture.
 open_bottom : true or false, default True
     True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut
     off there). False: it counts like the other borders.
@@ -3144,8 +3143,8 @@ amplitude : number, px, 0 to 500, default 6.0
 phase : number, degrees, -360 to 360, default 0.0
     Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the
     line through the picture's centre and rising away from it in the wave's direction,
-    90 has a crest there, and 360 is a whole cycle and so the same as 0. Animating it
-    makes the wave travel.
+    90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it
+    slides the wave along.
 angle : number, degrees, -180 to 180, default 0.0
     The direction the wave travels in, in degrees clockwise from pointing right: 0 sends
     the wave along the picture's width, so each column is moved up or down and the

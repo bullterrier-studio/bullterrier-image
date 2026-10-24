@@ -1,10 +1,10 @@
-"""The `disperse` effect: over time, pieces of the picture detach one after another, drift on the wind, fade and go.
+"""The `disperse` effect: pieces of the picture detach one after another, drift on the wind, fade and go.
 
-Written to the motion-design skill's three layers. Primary: a wind front crosses the picture and pieces drift away on
-it. Secondary: the pieces near the outline float up slowly first, each piece pulls back slightly before it goes
-(anticipation) and glows briefly as it leaves. Ambient: the pieces that stay shimmer in a slow wave, all the time,
-travelling against the wind. Times are shares of the moving part of the clip (`progress` 0..1), so they scale with the
-clip's length.
+`progress` (0..1) is the moment shown, from untouched to finished. Written to the motion-design skill's three layers.
+Primary: a wind front crosses the picture and pieces drift away on it. Secondary: the pieces near the outline float up
+slowly first, each piece pulls back slightly before it goes (anticipation) and glows briefly as it leaves. Ambient: the
+pieces that stay shimmer in a wave travelling against the wind, set by `ambient_phase`. Every time-like parameter is a
+share of `progress`, so the look is the same however `progress` is driven.
 """
 
 from typing import Literal
@@ -39,7 +39,7 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone). Animate it.",
+        doc="The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).",
     )
     top: float = param(
         1.0,
@@ -114,21 +114,12 @@ class DisperseParams(EffectParams):
         "right; brightening stops at white). 0 = off.",
         advanced=True,
     )
-    clock: float = param(
-        0.0,
-        unit="seconds",
-        min=0,
-        max=3600,
-        doc='The time the shimmer runs on: animate it over the whole clip (`over = "clip"`) so the picture is alive '
-        "even while nothing detaches.",
-        advanced=True,
-    )
     seed: int = param(
         0,
         unit="count",
         min=0,
         max=2**31 - 1,
-        doc="Random seed: each piece's fate is fixed by it, so every frame of one seed fits together.",
+        doc="Random seed: each piece's fate is fixed by it, so one seed always gives the same pieces the same fates.",
     )
     outline_depth: float = param(
         0.15,
@@ -152,7 +143,7 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0.01,
         max=0.2,
-        doc="Wind-up time before a piece goes, as a share of the clip: it eases back by `pullback` over this time. "
+        doc="Wind-up time before a piece goes, as a share of `progress`: it eases back by `pullback` over this time. "
         "The first piece goes only after it, so every piece has one.",
         advanced=True,
     )
@@ -170,7 +161,7 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0.01,
         max=0.5,
-        doc="Average time from detaching to vanishing, as a share of the clip. Shorter flights keep fewer pieces in "
+        doc="Average time from detaching to vanishing, as a share of `progress`. Shorter flights keep fewer pieces in "
         "the air at once (about 0.1 keeps it to a third on a side-to-side sweep).",
         advanced=True,
     )
@@ -187,7 +178,7 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0.5,
         max=1,
-        doc="The progress by which the last piece has vanished (a little under 1 gives a clean last frame). If "
+        doc="The progress by which the last piece has vanished (a little under 1 leaves nothing behind at the end). If "
         "`anticipation` and the longest flight do not fit before it, all pieces go at once.",
         advanced=True,
     )
@@ -196,8 +187,8 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="With `hover`: how far into the clip a piece `outline_depth` inside starts to float (the outline starts at "
-        "0). 0 = everything floats at once.",
+        doc="With `hover`: how far into `progress` a piece `outline_depth` inside starts to float (the outline starts "
+        "at 0). 0 = everything floats at once.",
         advanced=True,
     )
     bob: float = param(
@@ -293,12 +284,13 @@ class DisperseParams(EffectParams):
         doc="Share of a piece's flight that the glow lasts; it peaks halfway through that.",
         advanced=True,
     )
-    ambient_period: float = param(
-        3.0,
-        unit="seconds",
-        min=0.1,
-        max=60,
-        doc="Seconds per shimmer cycle (breathing is 2-4 s).",
+    ambient_phase: float = param(
+        0.0,
+        unit="cycles",
+        min=0,
+        max=1,
+        doc="Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a cycle on. Raising it "
+        "moves the wave against the wind; with `ambient` at 0 it does nothing.",
         advanced=True,
     )
     ambient_wavelength: float = param(
@@ -306,8 +298,8 @@ class DisperseParams(EffectParams):
         unit="fraction",
         min=0.01,
         max=2,
-        doc="Length of one shimmer wave as a fraction of the picture width; with the period it sets how fast the "
-        "wave travels (against the wind).",
+        doc="Length of one shimmer wave as a fraction of the picture width; a shorter one packs more waves "
+        "across the picture.",
         advanced=True,
     )
     open_bottom: bool = param(
@@ -367,15 +359,15 @@ class DisperseParams(EffectParams):
 
 @effect(category="animation", params=DisperseParams)
 def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | None = None) -> np.ndarray:
-    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. Animate `progress`.
+    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
     The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
-    has a fixed, random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches,
-    drifts, wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
+    has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
+    fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
 
     When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
     figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
-    makes the edges loosen all round first; `ambient` with `clock` keeps the pieces that stay alive.
+    makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
     `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
     """
@@ -432,7 +424,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     shimmer = np.ones((rows, cols))
     if p.ambient > 0.0:
         against = 1.0 if p.wind >= 0 else -1.0  # constant: the sign of a direction
-        phase = p.clock / p.ambient_period + against * x / p.ambient_wavelength
+        phase = p.ambient_phase + against * x / p.ambient_wavelength
         shimmer = 1.0 + p.ambient * np.sin(2.0 * np.pi * phase)
     out = np.where(staying[..., None, None, None], pieces * shimmer[..., None, None, None], 0.0)
 

@@ -34,7 +34,6 @@ mask = "background"
 effect = "disperse"
 cell = 6
 progress = { from = 0.0, to = 0.88, ease = [0.25, 0.1, 0.75, 0.9] }
-clock = { from = 0.0, to = 5.0, over = "clip" }   # keeps the slow shimmer going through the holds
 ambient = 0.12
 sweep = -1.0                # the front starts at the right edge...
 top = 0

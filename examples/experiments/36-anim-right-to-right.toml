@@ -44,7 +44,6 @@ mask = "background"
 effect = "disperse"
 cell = 5
 progress = { from = 0.0, to = 0.88, ease = [0.25, 0.1, 0.75, 0.9] }   # a gentle S: soft ends, steady middle, so the motion never stalls
-clock = { from = 0.0, to = 4.8, over = "clip" }   # seconds; keep equal to `seconds` above
 ambient = 0.12
 sweep = -1.0                 # the front starts at the right edge and moves left...
 top = 0                      # ...and nothing else decides the order, so it is one clean wave

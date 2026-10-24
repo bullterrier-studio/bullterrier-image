@@ -199,7 +199,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `wavelength` | number | px | 2 to 4000 | `40.0` | The distance in pixels from one crest of the wave to the next, along the wave's direction. Raising it gives long, lazy swells; lowering it gives tight, fine ripples (below about 4 px the wave is too fine for the pixels to show it). |
 | `amplitude` | number | px | 0 to 500 | `6.0` | How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the picture unchanged. |
-| `phase` | number | degrees | -360 to 360 | `0.0` | Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole cycle and so the same as 0. Animating it makes the wave travel. |
+| `phase` | number | degrees | -360 to 360 | `0.0` | Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it slides the wave along. |
 | `angle` | number | degrees | -180 to 180 | `0.0` | The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to this direction. |
 
 <details><summary>Advanced parameters (2)</summary>

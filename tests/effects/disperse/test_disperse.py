@@ -50,10 +50,10 @@ def test_disperse_wind_carries_pieces_in_its_direction():
     )
 
 
-def test_disperse_neighbouring_frames_look_alike_so_the_motion_is_continuous():
-    frame = lambda p, seed: registry.apply("disperse", _lit(), progress=p, seed=seed, wind=0.2)  # noqa: E731  (a one-line helper)
-    continuous = np.abs(frame(0.50, 3) - frame(0.51, 3)).mean()  # one frame later, same pieces on the same paths
-    re_rolled = np.abs(frame(0.50, 3) - frame(0.51, 4)).mean()  # what picking new random paths per frame would give
+def test_disperse_neighbouring_progress_values_look_alike_so_a_seed_keeps_its_pieces():
+    shown = lambda p, seed: registry.apply("disperse", _lit(), progress=p, seed=seed, wind=0.2)  # noqa: E731  (a one-line helper)
+    continuous = np.abs(shown(0.50, 3) - shown(0.51, 3)).mean()  # a little later, same pieces on the same paths
+    re_rolled = np.abs(shown(0.50, 3) - shown(0.51, 4)).mean()  # what picking new random paths per value would give
     assert continuous < re_rolled / 2
 
 
@@ -144,17 +144,20 @@ def test_disperse_glows_briefly_as_pieces_leave_but_never_flashes():
     assert 0.5 + 0.05 < peak <= 0.5 * 1.4 + 1e-6  # brighter than before, but within the glow's cap (no white flash)
 
 
-def test_disperse_ambient_shimmer_is_small_runs_with_the_clock_and_travels_against_the_wind():
+def test_disperse_ambient_shimmer_is_small_follows_its_phase_and_travels_against_the_wind():
     grey = np.full((60, 200, 3), 0.5, np.float32)
-    shimmer = lambda clock, wind: registry.apply("disperse", grey, progress=0.0, ambient=0.08, clock=clock, wind=wind)  # noqa: E731  (a one-line helper)
+
+    def shimmer(phase, wind):
+        return registry.apply("disperse", grey, progress=0.0, ambient=0.08, ambient_phase=phase, wind=wind)
+
     assert np.abs(shimmer(0.7, 0.2) / 0.5 - 1).max() <= 0.08 + 1e-5  # never more than the amplitude
-    assert not np.array_equal(shimmer(0.0, 0.2), shimmer(1.0, 0.2))  # alive while nothing detaches
+    assert not np.array_equal(shimmer(0.0, 0.2), shimmer(0.1, 0.2))  # alive while nothing detaches
     np.testing.assert_array_equal(
-        registry.apply("disperse", grey, progress=0.0, ambient=0.0, clock=3.0), grey
+        registry.apply("disperse", grey, progress=0.0, ambient=0.0, ambient_phase=0.3), grey
     )  # off by default
 
-    def drift(wind):  # how many columns the wave pattern moved to the left between clock 0 and 1 s
-        before, after = shimmer(0.0, wind).mean(axis=(0, 2)), shimmer(1.0, wind).mean(axis=(0, 2))
+    def drift(wind):  # how many columns the wave pattern moved to the left when the phase went from 0 to 0.1
+        before, after = shimmer(0.0, wind).mean(axis=(0, 2)), shimmer(0.1, wind).mean(axis=(0, 2))
         shifts = range(-19, 20)  # less than half a wavelength (40 columns), so the answer is unambiguous
         return max(shifts, key=lambda s: np.corrcoef(after[40:-40], before[40 + s : len(before) - 40 + s])[0, 1])
 
@@ -245,10 +248,10 @@ def test_disperse_stays_within_0_to_1_whatever_the_settings(draw):
 
 
 @pytest.mark.parametrize("progress", [0.0, 0.1, 0.25, 0.3, 0.5, 0.7, 0.75, 0.9, 1.0])
-def test_disperse_every_frame_of_an_animated_progress_is_a_valid_value(progress):
-    """`progress` and `clock` are what recipes animate; every frame of that range is accepted and well-formed, and
-    glowing and shimmering pieces never go above white."""
-    out = registry.apply("disperse", _lit(), progress=progress, clock=3600.0 * progress, ambient=0.1)
+def test_disperse_every_progress_is_a_valid_value(progress):
+    """`progress` and `ambient_phase` are what a caller sets per picture; every value of that range is accepted and
+    well-formed, and glowing and shimmering pieces never go above white."""
+    out = registry.apply("disperse", _lit(), progress=progress, ambient_phase=progress, ambient=0.1)
     assert np.isfinite(out).all()
     assert out.min() >= 0.0
     assert out.max() <= 1.0
@@ -296,12 +299,12 @@ def test_disperse_finish_is_when_the_last_piece_has_vanished():
     assert registry.apply("disperse", _lit(), progress=0.6, seed=1).max() > 0.0  # by default (0.98) some remain
 
 
-def test_disperse_shimmer_repeats_after_one_period_and_one_wavelength():
+def test_disperse_shimmer_repeats_after_one_cycle_and_one_wavelength():
     grey = np.full((60, 200, 3), 0.5, np.float32)
-    kwargs = {"progress": 0.0, "ambient": 0.08, "wind": 0.2, "ambient_period": 2.0, "ambient_wavelength": 0.25}
-    at = lambda clock: registry.apply("disperse", grey, clock=clock, **kwargs)  # noqa: E731  (a one-line helper)
-    np.testing.assert_allclose(at(0.3), at(2.3), atol=1e-5)  # one period later
-    assert np.abs(at(0.3) - at(1.3)).max() > 0.01  # half a period later it differs
+    kwargs = {"progress": 0.0, "ambient": 0.08, "wind": 0.2, "ambient_wavelength": 0.25}
+    at = lambda phase: registry.apply("disperse", grey, ambient_phase=phase, **kwargs)  # noqa: E731  (a one-line helper)
+    np.testing.assert_allclose(at(0.0), at(1.0), atol=1e-5)  # one cycle later
+    assert np.abs(at(0.0) - at(0.5)).max() > 0.01  # half a cycle later it differs
     row = at(0.3)[30, :, 0]
     np.testing.assert_allclose(row[:150], row[50:], atol=1e-5)  # a wavelength is 0.25 x 200 = 50 px
 
