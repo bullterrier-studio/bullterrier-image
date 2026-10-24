@@ -48,8 +48,8 @@ def monotone_curve(inputs: Sequence[float], outputs: Sequence[float], values: np
     Fritsch and Carlson, 1980; the same as `scipy.interpolate.PchipInterpolator`): smooth, passing exactly through every
     point, and never overshooting. Between two points it stays between their outputs, so where the outputs rise the
     curve rises (a brighter value is never mapped darker) and a bump or dip is never invented. With two points it is a
-    straight line. Below the first input and above the last the curve is held at that point's output. `inputs` must
-    strictly increase (a ValueError says so otherwise) and all `inputs` and `outputs` are in 0..1.
+    straight line. Below the first input and above the last the curve is held at that point's output. `inputs` strictly
+    increase and all `inputs` and `outputs` are in 0..1.
     """
     curve = PchipInterpolator(np.asarray(inputs, np.float64), np.asarray(outputs, np.float64))
     low, high = inputs[0], inputs[-1]
