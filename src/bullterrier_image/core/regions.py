@@ -621,7 +621,6 @@ def _cut(
 ) -> np.ndarray:
     """A number for every pixel that is the same exactly for pixels on the same side of every cut of `kind`."""
     left, top, right, bottom = box
-    x, y = x.astype(np.float64), y.astype(np.float64)
     pieces = np.zeros(shape, np.int64)
     for bit, cut in enumerate(kind.lines):
         if isinstance(cut, Line):

@@ -156,6 +156,12 @@ def test_the_coverage_of_a_circle_adds_up_to_its_area_and_stays_between_0_and_1(
     assert ((out > 0) & (out < 1)).sum() < 4 * 2 * math.pi * radius  # only the border pixels are partial
 
 
+def test_one_sample_looks_at_the_middle_of_each_pixel_row():
+    """A rectangle whose top edge is at 2.3: the middle of row 2 (2.5) is inside, so with one sample row 2 is full."""
+    out = coverage([np.array([[0.0, 2.3], [4, 2.3], [4, 5], [0, 5]])], (6, 4), "nonzero", 1)
+    np.testing.assert_allclose(out[:, 0], [0, 0, 1, 1, 1, 0])
+
+
 def test_coverage_follows_the_fill_rule():
     both = SHAPES["two squares, the inner one the same way round"]
     nonzero = coverage(both, (16, 16), "nonzero", 4)

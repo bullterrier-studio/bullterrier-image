@@ -1205,6 +1205,28 @@ def test_a_path_laid_over_the_subject_takes_its_coordinates_from_the_subjects_bo
     np.testing.assert_allclose(alpha, want, atol=1e-6)
 
 
+@pytest.mark.parametrize(
+    "kind",
+    [Path(d=BLOB), Cuts(lines=[Curve(path=WAVE)]), Svg(file=MOSAIC)],
+    ids=["path", "curve", "svg"],
+)
+def test_a_torn_edge_of_no_amount_is_the_straight_drawing_exactly(kind):
+    torn = kind.model_copy(update={"edge": Edge(style="torn", amount=0)})
+    plain, bent = (resolve({"k": k}, (60, 80), subject=None)["k"] for k in (kind, torn))
+    if isinstance(plain, Selection):
+        np.testing.assert_allclose(bent.alpha, plain.alpha, atol=1e-6)
+    else:
+        np.testing.assert_array_equal(bent.labels, plain.labels)
+
+
+def test_a_torn_path_has_soft_values_inside_a_pixel_aligned_shape_because_it_reads_between_pixels():
+    square = "M 0.25 0.25 H 0.75 V 0.75 H 0.25 Z"
+    torn = alpha_of(Path(d=square, edge=Edge(style="torn", amount=0.02, scale=0.2)), (60, 60))
+    assert (
+        (torn > 0) & (torn < 1)
+    ).sum() > 100  # a straight one has about 4 * 30 soft pixels at most, all on its border
+
+
 def test_a_torn_path_keeps_its_area_roughly_and_moves_its_border():
     plain = alpha_of(Path(d=BLOB), (200, 300))
     torn = alpha_of(Path(d=BLOB, edge=Edge(style="torn", amount=0.02, scale=0.1, seed=3)), (200, 300))
@@ -1242,7 +1264,7 @@ def test_values_written_as_a_recipe_file_writes_the_cuts_are_the_same_as_the_mod
 
 RING_AND_DISC = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <path id="ring" fill-rule="evenodd"
-        d="M 10 50 a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0 Z M 30 50 a 20 20 0 1 1 40 0 a 20 20 0 1 1 -40 0 Z"/>
+        d="M 10 50 a 40 40 0 1 0 80 0 a 40 40 0 1 0 -80 0 Z M 30 50 a 20 20 0 1 0 40 0 a 20 20 0 1 0 -40 0 Z"/>
   <circle id="inner" cx="50" cy="50" r="10"/>
   <rect id="corner" x="0" y="0" width="12" height="12"/>
   <circle id="inner-copy" cx="50" cy="50" r="5"/>
@@ -1330,7 +1352,7 @@ def test_an_svg_that_cannot_be_read_is_refused_naming_the_region_and_file(tmp_pa
     regions = resolve({"s": Svg(file=str(tmp_path / "missing.svg"))}, (10, 10), subject=None)
     with pytest.raises(RecipeError, match=r"missing\.svg"):
         regions["s"]
-    with pytest.raises(RecipeError, match="file"):
+    with pytest.raises(RecipeError, match="not set"):
         resolve({"s": Svg()}, (10, 10), subject=None)["s"]
 
 

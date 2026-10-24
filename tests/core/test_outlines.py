@@ -105,12 +105,20 @@ def test_arc_flags_choose_between_the_four_arcs_through_two_points(large, sweep,
     assert outline[:, 1].max() - 50 == pytest.approx(down, abs=0.2)
 
 
-def test_a_cubic_curve_stays_within_a_tenth_of_a_pixel_of_the_curve():
-    (outline,) = path_outlines("M 0.05 0.9 C 0.1 -0.4 0.9 1.4 0.95 0.1", (0.0, 0.0, 400.0, 300.0))
-    p = np.array([[0.05, 0.9], [0.1, -0.4], [0.9, 1.4], [0.95, 0.1]]) * (400, 300)
+CURVES = {
+    "a cubic": ("M 0.05 0.9 C 0.1 -0.4 0.9 1.4 0.95 0.1", [[0.05, 0.9], [0.1, -0.4], [0.9, 1.4], [0.95, 0.1]]),
+    "a quadratic": ("M 0.05 0.9 Q 0.5 -0.6 0.95 0.1", [[0.05, 0.9], [0.5, -0.6], [0.95, 0.1]]),
+}
+
+
+@pytest.mark.parametrize(("d", "controls"), CURVES.values(), ids=CURVES.keys())
+def test_a_curve_stays_within_a_tenth_of_a_pixel_of_the_curve(d, controls):
+    """The curve's own Bernstein form, written here, against the chords that stand for it."""
+    (outline,) = path_outlines(d, (0.0, 0.0, 400.0, 300.0))
+    p = np.array(controls) * (400, 300)
     t = np.linspace(0, 1, 4001)[:, None]
-    curve = (1 - t) ** 3 * p[0] + 3 * (1 - t) ** 2 * t * p[1] + 3 * (1 - t) * t**2 * p[2] + t**3 * p[3]
-    # the distance of each point of the curve to the polyline that stands for it
+    n = len(p) - 1
+    curve = sum(math.comb(n, k) * (1 - t) ** (n - k) * t**k * p[k] for k in range(n + 1))
     a, b = outline[:-1], outline[1:]
     ab = b - a
     along = np.clip(np.einsum("ncd,cd->nc", curve[:, None, :] - a[None], ab) / np.einsum("cd,cd->c", ab, ab), 0, 1)
@@ -118,7 +126,12 @@ def test_a_cubic_curve_stays_within_a_tenth_of_a_pixel_of_the_curve():
     worst = np.hypot(*(curve[:, None, :] - nearest).transpose(2, 0, 1)).min(axis=1).max()
     assert worst < 0.1
     np.testing.assert_allclose(outline[0], p[0])
-    np.testing.assert_allclose(outline[-1], p[3])
+    np.testing.assert_allclose(outline[-1], p[-1])
+
+
+def test_drawing_after_a_close_goes_on_from_where_the_closed_subpath_began():
+    closed, second = path_outlines("M 0.1 0.1 L 0.5 0.1 L 0.5 0.5 Z L 0.9 0.9", BOX)
+    np.testing.assert_allclose(second, [closed[0], [100, 65]])
 
 
 def test_every_subpath_is_an_outline_of_its_own():
@@ -136,6 +149,8 @@ def test_every_subpath_is_an_outline_of_its_own():
         pytest.param("M 0 0 L 1", "L", id="missing coordinate"),
         pytest.param("M 0 0 L 1e999 0", "finite", id="infinite"),
         pytest.param("M 0 0 C 0 0 1e9 1e9 0 0", "too far", id="curve far beyond the frame"),
+        pytest.param("M 0 0 C 0 0 5000 5000 0 0", "too far", id="curve needing more chords than allowed"),
+        pytest.param("M 0 0 C 0 0 1e999 1e999 0 0", "finite", id="curve with infinite control points"),
     ],
 )
 def test_bad_path_data_is_refused_naming_the_problem(d, mentions):
@@ -231,6 +246,19 @@ def test_nested_groups_transforms_and_every_kind_of_shape_come_out_in_document_o
     # (inscribed chords within 0.05 px lose up to 2/3 of that along the border: 0.7 % of a circle 10 px across)
     assert area(shapes[1].outlines, (100, 100)) == pytest.approx(math.pi * 100, rel=1e-2)
     assert area(shapes[2].outlines, (100, 100)) == pytest.approx(math.pi * 20 * 5, rel=1e-2)
+
+
+def test_a_rotation_turns_the_shape_about_its_centre(tmp_path):
+    text = f"""<svg {SVG} viewBox="0 0 100 100"><g transform="rotate(90 50 50)">
+      <rect x="10" y="40" width="30" height="10"/></g></svg>"""
+    (shape,) = read(write(tmp_path, text), box=(0.0, 0.0, 100.0, 100.0))
+    assert extent(shape.outlines) == pytest.approx((50, 10, 60, 40))  # (x, y) goes to (100 - y, x)
+
+
+def test_shapes_in_defs_that_nothing_uses_are_not_counted(tmp_path):
+    defs = "<defs>" + '<rect width="1" height="1"/>' * 10 + "</defs>"
+    path = write(tmp_path, f'<svg {SVG} viewBox="0 0 10 10">{defs}<rect id="drawn" width="5" height="5"/></svg>')
+    assert [shape.id for shape in read(path, max_shapes=3)] == ["drawn"]
 
 
 def test_the_fill_rule_is_read_and_inherited_from_the_group(tmp_path):
@@ -340,6 +368,17 @@ def test_a_file_over_the_size_limit_is_refused_naming_the_limit_and_its_size(tmp
     assert len(read(path, max_kilobytes=4)) == 1
 
 
+@pytest.mark.parametrize(("size", "refused"), [(2000, False), (2048, False), (2049, True)], ids=lambda v: str(v))
+def test_the_size_limit_is_in_kilobytes_of_1024_bytes_and_the_limit_itself_is_allowed(tmp_path, size, refused):
+    text = f'<svg {SVG} viewBox="0 0 10 10"><rect width="5" height="5"/></svg>'
+    path = write(tmp_path, text + " " * (size - len(text)))
+    if refused:
+        with pytest.raises(RecipeError, match="max_kilobytes"):
+            read(path, max_kilobytes=2)
+    else:
+        assert len(read(path, max_kilobytes=2)) == 1
+
+
 def test_a_file_with_more_shapes_than_the_limit_is_refused_naming_the_limit_and_the_count(tmp_path):
     rects = '<rect width="1" height="1"/>' * 7
     path = write(tmp_path, f'<svg {SVG} viewBox="0 0 10 10">{rects}</svg>')
@@ -361,6 +400,14 @@ def test_a_use_that_contains_itself_is_refused(tmp_path):
     group = '<g id="a"><rect width="1" height="1"/><use href="#a"/></g>'
     text = f'<svg {SVG} viewBox="0 0 10 10">{group}<use href="#a"/></svg>'
     with pytest.raises(RecipeError, match="itself"):
+        read(write(tmp_path, text))
+
+
+def test_a_chain_of_uses_that_is_too_deep_is_refused(tmp_path):
+    links = "".join(f'<g id="g{k}"><use href="#g{k - 1}"/></g>' for k in range(1, 40))
+    defs = f'<defs><rect id="g0" width="1" height="1"/>{links}</defs>'
+    text = f'<svg {SVG} viewBox="0 0 10 10">{defs}<use href="#g39"/></svg>'
+    with pytest.raises(RecipeError, match="deep"):
         read(write(tmp_path, text))
 
 
