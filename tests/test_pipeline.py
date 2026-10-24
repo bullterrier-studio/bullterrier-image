@@ -10,6 +10,7 @@ from PIL import Image
 
 from bullterrier_image import Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.errors import BackendUnavailableError, ProjectError
 from bullterrier_image.pipeline import init_project, load_project, run
 
@@ -509,3 +510,43 @@ def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, 
     assert (tmp_path / "fresh" / "bt-image.toml").is_file()
     assert main(["run", str(tmp_path / "fresh" / "bt-image.toml")]) == 1  # no photos yet: explained, not a traceback
     assert "no photos match" in capsys.readouterr().err
+
+
+def circle_project(folder, **settings) -> Project:
+    recipe = Recipe("round", [fx.grade(exposure=0.3)], size=64, frame=Framing(transparent="circle"))
+    return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out", **settings)
+
+
+def test_a_recipe_with_transparency_is_refused_for_jpeg_before_anything_is_rendered(folder):
+    with pytest.raises(ProjectError, match=r"'round'.*jpg|jpg.*'round'"):
+        run(circle_project(folder, formats=("png", "jpg")))
+    assert not (folder / "out").exists()
+    run(circle_project(folder, formats=("png",)))  # known good: the same recipe to PNG
+    assert (folder / "out" / "a" / "round.png").exists()
+
+
+@pytest.mark.parametrize("fmt", ["png", "webp"])
+@pytest.mark.parametrize(
+    ("sizes", "name", "side"), [((), "round", 64), ((32,), "round_32", 32)], ids=["as rendered", "smaller"]
+)
+def test_a_recipe_with_transparency_is_exported_with_its_alpha_at_every_size(folder, fmt, sizes, name, side):
+    run(circle_project(folder, formats=(fmt,), sizes=sizes))
+    with Image.open(folder / "out" / "a" / f"{name}.{fmt}") as img:
+        assert img.mode == "RGBA"
+        alpha = np.asarray(img)[..., 3]
+    assert alpha.shape == (side * 3 // 4, side)  # the 128x96 photo at that longest side
+    assert alpha[0, 0] == 0
+    assert alpha[side * 3 // 8, side // 2] == 255
+
+
+def test_the_steps_of_a_recipe_with_transparency_are_saved_and_the_cut_is_a_png(folder):
+    run(circle_project(folder, formats=("png",), steps=True))
+    steps = folder / "out" / "a" / "steps" / "round"
+    assert sorted(path.name for path in steps.iterdir()) == [
+        "00-input.jpg",
+        "01-grade.jpg",
+        "02-transparent.png",
+        "_sheet.jpg",
+    ]
+    with Image.open(steps / "02-transparent.png") as img:
+        assert img.mode == "RGBA"

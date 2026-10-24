@@ -19,7 +19,9 @@ def matte_warnings(matte: np.ndarray, share_range: tuple[float, float] = (0.02, 
 
 
 def still_warnings(image: np.ndarray) -> list[str]:
-    """Warn about a result that is broken, empty, blown out or without any detail."""
+    """Warn about a result that is broken, empty, blown out or without any detail. Only the colour is judged: a picture
+    with transparency (four channels, alpha last) is judged by its three colour channels."""
+    image = image[..., :3]
     if not np.isfinite(image).all():
         return ["the result contains invalid pixel values"]
     if float(image.max()) < 0.02:

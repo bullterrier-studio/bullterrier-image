@@ -1,10 +1,11 @@
 import numpy as np
 import pytest
+from PIL import Image
 
 from bullterrier_image import RecipeError
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.recipe import Recipe, Step, render
-from bullterrier_image.sheet import sweep
+from bullterrier_image.recipe import Recipe, Stage, Step, render
+from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
 GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
 GRAIN_PARAMS = {"amount": 0.1, "size": 1.6, "seed": 2}
@@ -95,3 +96,39 @@ def test_a_sweep_that_cannot_be_made_is_refused_naming_the_offender(arguments, o
 @pytest.mark.parametrize("count", [2, 24])
 def test_the_smallest_and_the_largest_sheet_are_accepted(count):
     assert len(sweep(TWICE, "grain#1.amount", 0, 0.2, count)) == count
+
+
+def clear_red(size=8) -> np.ndarray:
+    """A picture that is red and entirely transparent."""
+    return np.dstack([np.tile(np.array([1, 0, 0], np.float32), (size, size, 1)), np.zeros((size, size), np.float32)])
+
+
+def test_a_picture_with_transparency_is_shown_over_a_checkerboard_so_the_colour_under_it_never_shows():
+    sheet = contact_sheet([("clear", clear_red())], tile=64)
+    tile = sheet[14:78, 14:78]  # the gap is 14 px
+    assert tile.shape == (64, 64, 3)
+    assert not (tile[..., 0] - tile[..., 1] > 0.1).any()  # no red: the colours are greys
+    assert len({tuple(np.round(pixel, 3)) for pixel in tile.reshape(-1, 3)}) == 2  # a light and a dark square
+
+
+def test_an_opaque_four_channel_picture_is_shown_as_its_colour_and_a_half_clear_one_as_a_mix():
+    photo = np.tile(np.array([0.2, 0.4, 0.6], np.float32), (8, 8, 1))
+    opaque = contact_sheet([("a", np.dstack([photo, np.ones((8, 8), np.float32)]))], tile=64)
+    np.testing.assert_allclose(opaque, contact_sheet([("a", photo)], tile=64), atol=1e-6)
+    half = contact_sheet([("a", np.dstack([photo, np.full((8, 8), 0.5, np.float32)]))], tile=64)[14:78, 14:78]
+    checker = contact_sheet([("a", clear_red())], tile=64)[14:78, 14:78]
+    np.testing.assert_allclose(
+        half, 0.5 * photo[0, 0] + 0.5 * checker, atol=1 / 255
+    )  # half the colour, half the board, to 8 bits
+
+
+def test_write_stages_saves_a_stage_with_transparency_as_png_and_the_others_as_jpg(photo, tmp_path):
+    stages = [
+        Stage("input", photo),
+        Stage("1. transparent('circle')", np.dstack([photo, np.ones((96, 128), np.float32)])),
+    ]
+    sheet = write_stages(stages, tmp_path)
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["00-input.jpg", "01-transparent.png", "_sheet.jpg"]
+    assert sheet == tmp_path / "_sheet.jpg"
+    with Image.open(tmp_path / "01-transparent.png") as saved:
+        assert saved.mode == "RGBA"

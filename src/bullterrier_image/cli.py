@@ -354,6 +354,8 @@ def _sweep(args: argparse.Namespace) -> int:
 
 
 def _cutout(args: argparse.Namespace) -> int:
+    import numpy as np
+
     from . import imageio
     from .errors import SubjectNotFoundError
     from .matte import refine_edge
@@ -370,7 +372,7 @@ def _cutout(args: argparse.Namespace) -> int:
         alpha = refine_edge(matte, args.shrink or 0.0, args.feather or 0.0)
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
-    imageio.save(photo, target, alpha=alpha)
+    imageio.save(np.dstack([photo, alpha]), target)
     print(target)
     return 0
 

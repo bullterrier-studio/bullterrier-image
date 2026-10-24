@@ -421,7 +421,7 @@ def test_fx_turns_a_path_or_an_array_into_a_picture_and_leaves_a_picture_or_a_co
     layer_probe, tmp_path, monkeypatch
 ):
     pixels = np.random.default_rng(2).random((5, 7, 4), dtype=np.float32)
-    imageio.save(pixels[..., :3], tmp_path / "tex.png", alpha=pixels[..., 3])
+    imageio.save(pixels, tmp_path / "tex.png")
     monkeypatch.chdir(tmp_path)  # a path is relative to the folder the program runs in
     from_path, from_pathlib = fx.layer_probe("tex.png"), fx.layer_probe(texture=Path("tex.png"))
     from_array, picture = fx.layer_probe(pixels), Picture(pixels)

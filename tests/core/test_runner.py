@@ -158,6 +158,62 @@ def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, m
     assert len(finder.seen) == 1
 
 
+# --- transparency: the picture is cut out after the last step -------------------------------------------------------
+
+
+def test_a_circle_cut_gives_four_channels_the_steps_result_and_the_inscribed_circle_as_alpha(photo):
+    recipe = Recipe("round", PLAIN.steps, size=None, frame=Framing(transparent="circle"))
+    out = runner.render(photo, recipe)
+    assert out.shape == (96, 128, 4)
+    np.testing.assert_array_equal(out[..., :3], runner.render(photo, PLAIN))
+    ys, xs = np.mgrid[0:96, 0:128]
+    distance = np.hypot(ys + 0.5 - 48, xs + 0.5 - 64)  # from the middle; the circle's radius is 48
+    assert (out[..., 3][distance < 47] == 1).all()
+    assert (out[..., 3][distance > 49] == 0).all()
+
+
+def test_the_alpha_of_a_background_cut_is_the_subject_matte_that_moved_with_the_photo(photo, matte):
+    recipe = Recipe("cut", PLAIN.steps, size=None, frame=Framing(transparent="background", flip="x", aspect=1.0))
+    out = runner.render(photo, recipe, matte)
+    np.testing.assert_array_equal(out[..., 3], matte[:, ::-1][:, 16:112])
+    np.testing.assert_array_equal(out[..., :3], runner.render(photo[:, ::-1][:, 16:112], PLAIN))
+
+
+def test_the_alpha_of_rounded_corners_is_clear_in_the_corners_and_opaque_in_the_middle_of_each_side(photo):
+    recipe = Recipe("rounded", PLAIN.steps, size=None, frame=Framing(transparent="rounded", corner_radius=0.25))
+    alpha = runner.render(photo, recipe)[..., 3]  # a corner radius of a quarter of the 96 px side: 24 px
+    assert [alpha[0, 0], alpha[0, -1], alpha[-1, 0], alpha[-1, -1]] == [0, 0, 0, 0]
+    assert [alpha[0, 64], alpha[-1, 64], alpha[48, 0], alpha[48, -1]] == [1, 1, 1, 1]
+
+
+def test_the_cut_is_made_at_the_recipes_size_after_the_steps(photo, matte):
+    recipe = Recipe("cut", PLAIN.steps, size=64, frame=Framing(transparent="background"))
+    out = runner.render(photo, recipe, matte)
+    assert out.shape == (48, 64, 4)
+    np.testing.assert_array_equal(out[..., 3], resize(matte, 64))
+
+
+def test_a_cut_around_the_subject_needs_the_subject_even_when_no_step_does(photo):
+    recipe = Recipe("cut", PLAIN.steps, size=None, frame=Framing(transparent="background"))
+    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
+        runner.render(photo, recipe)
+
+
+def test_trace_adds_the_cut_as_its_last_stage_and_it_is_what_render_returns(photo, matte):
+    recipe = Recipe("cut", MASKED.steps, size=None, frame=Framing(transparent="circle"))
+    stages = runner.trace(photo, recipe, matte)
+    assert [stage.image.shape[2] for stage in stages] == [3, 3, 3, 4]  # input, matte, the step, the cut
+    assert stages[-1].label == "2. transparent('circle')"
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, matte))
+    np.testing.assert_array_equal(stages[-1].image[..., :3], stages[-2].image)
+
+
+def test_render_all_cuts_only_the_recipes_that_ask_for_it(photo):
+    round_ = Recipe("round", PLAIN.steps, size=None, frame=Framing(transparent="circle"))
+    results = runner.render_all(photo, [PLAIN, round_])
+    assert [r.shape[2] for r in results] == [3, 4]
+
+
 # --- memory: the runner keeps only the image the next step needs ---------------------------------------------------
 
 

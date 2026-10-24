@@ -44,7 +44,9 @@ def render(
     The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; the subject
     matte is framed and scaled with it. Steps run in order, each on the previous step's output. A masked
     step is blended in through the subject matte, so only the subject or only the background changes.
-    Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically.
+    Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically. After the
+    last step a recipe whose framing is `transparent` is cut out: the result then has four channels, RGB and straight
+    alpha (h, w, 4), instead of three.
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
     height and width, 0..1 (white = subject), or None. find_subject: called with the photo as given (before it is
@@ -55,7 +57,8 @@ def render(
     image, matte = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
-    return _last(stages)
+    result = _last(stages)
+    return recipe.frame.cut(result, matte) if recipe.frame.has_alpha else result
 
 
 @dataclass(frozen=True)
@@ -75,8 +78,9 @@ def trace(
 ) -> list[Stage]:
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
-    The stages are the photo as the recipe receives it, the subject matte if the recipe uses one (white = subject),
-    and the image after each step, in order. The last stage is exactly what `render` returns, because both run the
+    The stages are the photo as the recipe receives it (framed and scaled), the subject matte if the recipe uses one
+    (white = subject), the image after each step, in order, and, when the recipe's framing cuts the picture out, that
+    cut (an RGBA picture, four channels). The last stage is exactly what `render` returns, because both run the
     same code. Every stage stays in memory: one picture per step, plus the input and the matte.
 
     rgb, recipe, matte, find_subject: as for `render`.
@@ -88,6 +92,9 @@ def trace(
         stages.append(Stage("subject matte (white = subject)", subject))
     for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
+    if recipe.frame.has_alpha:
+        label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
+        stages.append(Stage(label, recipe.frame.cut(stages[-1].image, matte)))
     return stages
 
 

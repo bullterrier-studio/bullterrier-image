@@ -235,7 +235,8 @@ def run(
     Pairs whose photo, recipe, export settings and the tool's own code are unchanged since the last run, and whose
     files still exist, are skipped unless `force`. `only` is a file-name pattern selecting some of the photos.
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
-    (RecipeError); two recipes with one name, or an `only` that matches no photo, raise ProjectError.
+    (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
+    (a framing with `transparent`) exported to jpg, raise ProjectError.
     `subject` says how the subject of a photo, for the recipes that need it, is found: the name of a segmenter for
     `subject_matte` (see `bullterrier_image.matte`; None leaves the choice to the environment and the computer), or a
     function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never again for a photo whose
@@ -251,6 +252,12 @@ def run(
     names = [recipe.name for _, recipe in recipes]
     if len(set(names)) != len(names):
         raise ProjectError(f"two recipes are called the same: {sorted({n for n in names if names.count(n) > 1})}")
+    for _, recipe in recipes:
+        if recipe.frame.has_alpha and "jpg" in project.formats:
+            raise ProjectError(
+                f"recipe {recipe.name!r} cuts the picture out (transparent = {recipe.frame.transparent!r}), which a "
+                "JPEG cannot hold, but the project exports 'jpg': use png or webp in `formats`"
+            )
     photos = [p for p in project.photos if only is None or fnmatch.fnmatch(p.name, only)]
     if not photos:
         raise ProjectError(f"no photos match --only {only!r}")

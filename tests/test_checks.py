@@ -42,3 +42,10 @@ def test_still_warnings(photo):
     assert "white" in still_warnings(np.ones((8, 8, 3), np.float32))[0]
     assert "flat" in still_warnings(np.full((8, 8, 3), 0.5, np.float32))[0]
     assert "invalid" in still_warnings(np.full((8, 8, 3), np.nan, np.float32))[0]
+
+
+def test_still_warnings_judge_the_colour_of_a_picture_with_transparency_not_its_alpha(photo):
+    clear = np.dstack([photo, np.zeros(photo.shape[:2], np.float32)])  # good colour, nothing opaque
+    assert still_warnings(clear) == []
+    black = np.dstack([np.zeros_like(photo), np.ones(photo.shape[:2], np.float32)])  # bad colour, fully opaque
+    assert "blank" in still_warnings(black)[0]

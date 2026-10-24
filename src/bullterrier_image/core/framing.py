@@ -127,6 +127,11 @@ class Framing(EffectParams):
         """True when the framing uses the subject: a crop around it or a cut that keeps only it."""
         return self.anchor == "subject" or self.transparent == "background"
 
+    @property
+    def has_alpha(self) -> bool:
+        """True when `cut` gives the picture an alpha channel."""
+        return self.transparent != "none"
+
     @overload
     def apply(self, rgb: np.ndarray, matte: np.ndarray) -> tuple[np.ndarray, np.ndarray]: ...
 

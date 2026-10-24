@@ -30,6 +30,7 @@ _SRGB_ICC = _GENERATED_ICC[:24] + _FIXED_DATE + _GENERATED_ICC[36:]  # constant:
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _SIXTEEN_BIT = 65535.0  # the largest 16-bit value
 _ALPHA = 3  # the alpha channel of RGBA
+_RGBA = 4  # the channels of RGBA
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -91,23 +92,27 @@ def _picture(path: str | Path) -> Iterator[Image.Image]:
         raise ImageReadError(f"cannot read {path} as an image: {error}") from error
 
 
-def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, quality: int = 95) -> None:
-    """Write `rgb` to `path`; the extension picks the format.
+def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
+    """Write `image` to `path`; the extension picks the format.
 
-    With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp. Values outside
-    0..1 are clipped; NaN or an infinity raises NonFiniteImageError, naming the first such pixel. `quality` (1..100,
-    default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no chroma subsampling) and
-    PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the
-    effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and no GPS position.
-    BackendUnavailableError, naming the extension, when no writer exists for it.
+    `image` is float (height, width, 3) RGB, or (height, width, 4) RGB with straight alpha as the last channel, which
+    gives the file a transparency channel, so use .png or .webp (a JPEG cannot hold one: BackendUnavailableError).
+    Values outside 0..1 are clipped; NaN or an infinity raises NonFiniteImageError, naming the first such pixel.
+    `quality` (1..100, default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no chroma
+    subsampling) and PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows the
+    colours the effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and no GPS
+    position. BackendUnavailableError, naming the extension, when no writer exists for it.
     """
     suffix = Path(path).suffix.lower()
     if Image.registered_extensions().get(suffix) not in Image.SAVE:
         raise BackendUnavailableError(
             f"cannot write {suffix or 'a file with no extension'!r} pictures: use .png, .jpg or .webp"
         )
-    img = to_pil(rgb, alpha)
-    if alpha is None and suffix in {".jpg", ".jpeg"}:
+    jpeg = suffix in {".jpg", ".jpeg"}
+    if jpeg and image.shape[2] == _RGBA:
+        raise BackendUnavailableError(f"cannot write {suffix!r} pictures with transparency: use .png or .webp")
+    img = to_pil(image)
+    if jpeg:
         img.save(path, quality=quality, subsampling=0, icc_profile=_SRGB_ICC)
     elif suffix == ".webp":
         img.save(path, quality=quality, icc_profile=_SRGB_ICC)
@@ -115,9 +120,9 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
         img.save(path, icc_profile=_SRGB_ICC)
 
 
-def to_pil(rgb: np.ndarray, alpha: np.ndarray | None = None) -> Image.Image:
-    """Convert to a Pillow image (RGB, or RGBA when `alpha` is given)."""
-    return Image.fromarray(_to_uint8(rgb if alpha is None else np.dstack([rgb, alpha])))
+def to_pil(image: np.ndarray) -> Image.Image:
+    """Convert to a Pillow image: RGB for (height, width, 3), RGBA (straight alpha last) for (height, width, 4)."""
+    return Image.fromarray(_to_uint8(image))
 
 
 def _to_uint8(data: np.ndarray) -> np.ndarray:

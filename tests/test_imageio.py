@@ -271,13 +271,23 @@ def test_a_decompression_bomb_is_refused_with_image_read_error(tmp_path, monkeyp
     assert imageio.load(tmp_path / "bomb.png").shape == (20, 30, 3)
 
 
-def test_save_with_alpha_writes_transparency(photo, matte, tmp_path):
-    imageio.save(photo, tmp_path / "cut.png", alpha=matte)
-    with Image.open(tmp_path / "cut.png") as img:
+@pytest.mark.parametrize("name", ["cut.png", "cut.webp"])
+def test_save_of_four_channels_writes_the_last_as_transparency(photo, matte, tmp_path, name):
+    imageio.save(np.dstack([photo, matte]), tmp_path / name, quality=100)
+    with Image.open(tmp_path / name) as img:
         assert img.mode == "RGBA"
         alpha = np.asarray(img)[..., 3]
         assert alpha[0, 0] == 0
         assert alpha[48, 64] == 255
+
+
+@pytest.mark.parametrize("name", ["cut.jpg", "cut.jpeg", "CUT.JPG"])
+def test_a_picture_with_transparency_cannot_be_saved_as_a_jpeg(photo, matte, tmp_path, name):
+    with pytest.raises(BackendUnavailableError, match="transparen"):
+        imageio.save(np.dstack([photo, matte]), tmp_path / name)
+    assert not (tmp_path / name).exists()
+    imageio.save(photo, tmp_path / name)  # known good: the same picture without its alpha
+    assert (tmp_path / name).exists()
 
 
 # --- what saved files carry: an sRGB profile, nothing from the input's metadata ------------------------------------
@@ -287,7 +297,7 @@ GPS_INFO = 0x8825  # the EXIF tag pointing to the GPS block (EXIF 2.32)
 
 @pytest.mark.parametrize("name", ["a.jpg", "a.png", "a.webp", "cut.png"])
 def test_a_saved_still_says_it_is_srgb_with_a_small_embedded_profile(photo, matte, tmp_path, name):
-    imageio.save(photo, tmp_path / name, alpha=matte if name.startswith("cut") else None)
+    imageio.save(np.dstack([photo, matte]) if name.startswith("cut") else photo, tmp_path / name)
     with Image.open(tmp_path / name) as img:
         profile = img.info["icc_profile"]
     assert "sRGB" in ImageCms.getProfileDescription(ImageCms.ImageCmsProfile(io.BytesIO(profile)))
