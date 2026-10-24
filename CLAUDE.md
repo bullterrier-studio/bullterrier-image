@@ -6,8 +6,8 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 
 ## Responsibility
 
-This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (design in `~/github/bullterrier-design`; the
-GitHub repository is `bullterrier-studio/bullterrier-image`).
+This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (the GitHub repository is
+`bullterrier-studio/bullterrier-image`).
 It changes and understands **single pictures** and has **no concept of time**. Its siblings are `audio` (finds beats and sections in sound),
 `control` (values that change over time: keyframes, envelopes, LFOs) and `video` (decides what happens when, maps control signals onto
 parameters, renders frames). Image, audio and control never depend on each other; only video knows the others.
@@ -31,7 +31,7 @@ a ramp or an LFO, and it keeps the parameter descriptions (unit, range, meaning)
 
 `bullterrier-image` (PyPI, repository), `bullterrier_image` (import; the documentation's alias is `bti`), `bt-image` (command, `bt-image.toml`,
 cache folder), `BT_IMAGE_*` (environment variables), `BullterrierImageError` (base exception), `bullterrier_image.effects` (plugin group). The rule
-is: the full name for identity, `bt-` for what a person types; the specification is `~/github/bullterrier-design/naming.md`. Names inside the
+is: the full name for identity, `bt-` for what a person types. Names inside the
 package (`Recipe`, `fx`, `RecipeError`, effect and parameter names) carry no prefix.
 
 ## Architecture in one paragraph
