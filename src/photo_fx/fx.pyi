@@ -82,6 +82,72 @@ font : text or none, default None
     monospaced font found."""
     ...
 
+def aurora(colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 0.7, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0) -> Step:
+    """Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.
+
+A generated background: the input is used only for its height and width, its content is ignored. In column x the
+curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit
+deviation along the picture (`scale`). A pixel d = (rows above the base) / (`height` x picture height) up the
+curtain has brightness (1 - d)**`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the
+column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture
+(`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
+
+Parameters
+----------
+colors : list of colours, default ('#2bff9a', '#7a2cff')
+    The curtain's colours from its base to its top, evenly spaced along the way up; at
+    least two. The classic aurora is green at the base turning violet or red higher up.
+sky : colour, default '#02050f'
+    The colour of the night sky, seen below the curtain's base, above its top and
+    between its rays: '#rrggbb', '#rgb' or [r, g, b] 0..1. A very dark blue looks better
+    than pure black.
+base : number, fraction, 0 to 1, default 0.75
+    Where the curtain's bright lower edge lies, as a fraction of the picture's height
+    from the top (0 = the top edge, 1 = the bottom edge). Below it the sky is dark.
+    Waviness moves it up and down along the picture.
+height : number, fraction, 0.05 to 1, default 0.7
+    How far up from its base the curtain reaches before it has faded out completely, as
+    a fraction of the picture's height. Larger = a taller curtain.
+falloff : number, ratio, 0.2 to 8, default 0.8
+    How fast the light fades going up: the brightness at a height h above the base, as a
+    fraction of the curtain's height, is (1 - h) to this power. 1 = a straight fade,
+    above 1 = a bright edge with the glow quickly falling away, below 1 = light that
+    reaches high before dimming.
+waviness : number, px, 0 to 500, default 40.0
+    How far the curtain's base wanders up and down across the picture, in pixels: the
+    typical distance from the `base` line (the standard deviation of the ripple); tuned
+    for a picture about 480 px high. 0 = a straight, level base.
+scale : number, px, 2 to 2048, default 200.0
+    Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of
+    the first noise lattice of the base's wobble. Larger = long, slow folds; small = a
+    quickly rippling hem.
+rays : number, fraction, 0 to 1, default 0.7
+    How strongly the curtain is broken into vertical rays: each ray has a brightness of
+    its own and this is how far the dimmest drop below the brightest. 0 = a smooth, even
+    curtain, 1 = rays separated by dark sky.
+ray_width : number, px, 1 to 256, default 10.0
+    Width in pixels of the broadest rays, the spacing of the first noise lattice across
+    the picture; tuned for a picture about 480 px high. Larger = a few wide shafts;
+    small = a fine comb of streaks.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of noise are summed for the base's wobble and for the rays, each
+    finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth,
+    more = more ragged detail. Layers finer than one pixel are dropped. Animated, it
+    moves in whole steps (rounded to the nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of the wobble and the rays is than the one before:
+    each layer's weight is this to the power of its number. 0 = only the coarsest layer,
+    1 = every layer equally strong.
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same curtain (its folds and its rays),
+    another seed a different one. Animated, it moves in whole steps (rounded to the
+    nearest whole number)."""
+    ...
+
 def auto_levels(clip: float = 0.005, mode: Literal['linked', 'per_channel'] = 'per_channel') -> Step:
     """Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end.
 
@@ -744,6 +810,48 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     mirrors it about the edge line."""
     ...
 
+def embers(count: int = 120, size: float = 7.0, softness: float = 1.0, length: float = 8.0, angle: float = 15.0, opacity: float = 0.9, color: str | list[float] | tuple[float, float, float] = '#ff8a2b', seed: int = 0) -> Step:
+    """Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it.
+
+Every ember has a random depth from 0 (far) to 1 (near): its width, streak length and brightness are `size`,
+`length` and `opacity` times 0.5 + 0.5 x depth. It rises at `angle` from vertical, so its streak runs from the
+spark down the other way, and its edge is `softness` of its radius soft. Where embers overlap the brighter one
+shows. Embers are screened over the picture, so they only lighten it; the same `seed` always gives the same
+sparks.
+
+Parameters
+----------
+count : whole number, count, 0 to 2000, default 120
+    How many embers there are, whatever the size of the picture (a number, not a
+    density). 0 = none (the picture unchanged), 120 is a lively shower of sparks.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+size : number, px, 1 to 30, default 7.0
+    The width in px of the nearest, largest embers; the farthest are half as wide. Tuned
+    for a picture about 480 px high. Larger = fatter sparks.
+softness : number, fraction, 0 to 1, default 1.0
+    How soft an ember's edge is: it falls from full brightness to none across this
+    fraction of the ember's radius (at least one pixel). 0 = crisp sparks, 1 = sparks
+    glowing out from their middle.
+length : number, px, 0 to 200, default 8.0
+    The length in px of the streak each nearest ember leaves behind it; the farthest are
+    half as long. Tuned for a picture about 480 px high. 0 = round dots, larger =
+    faster-looking sparks.
+angle : number, degrees, -45 to 45, default 15.0
+    How far the embers drift from straight up, in degrees: positive drifts to the right
+    as they rise (wind from the left), negative to the left. 0 = straight up. The
+    streaks trail the other way.
+opacity : number, fraction, 0 to 1, default 0.9
+    How bright the nearest embers are: the share of `color` they screen over the picture
+    along their middle; the farthest are fainter. 0 = invisible, 1 = solid colour.
+color : colour, default '#ff8a2b'
+    The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Embers are screened
+    over the picture, so they only lighten it.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same embers in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
+    ...
+
 def emboss(angle: float = 315.0, depth: float = 6.0, saturation: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Read the brightness as a relief `depth` px tall and light it from `angle`.
 
@@ -1004,6 +1112,94 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     slower, and may ring beside hard edges)."""
     ...
 
+def floating_dust(count: int = 80, size: float = 24.0, softness: float = 0.8, opacity: float = 0.55, color: str | list[float] | tuple[float, float, float] = '#fff1d6', seed: int = 0) -> Step:
+    """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
+
+Every speck has a random depth from 0 (far) to 1 (near): its width and brightness are `size` and `opacity` times
+0.5 + 0.5 x depth. A speck is full brightness inside, half of it at its radius, with an edge `softness` of its
+radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
+lighten it; the same `seed` always gives the same dust.
+
+Parameters
+----------
+count : whole number, count, 0 to 1000, default 80
+    How many specks there are, whatever the size of the picture (a number, not a
+    density). 0 = none (the picture unchanged), 80 is a scattering, 400 a dusty air.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
+size : number, px, 1 to 200, default 24.0
+    The diameter in px of the nearest, largest specks; the farthest are half as wide.
+    Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if the dust
+    were closer to the lens.
+softness : number, fraction, 0 to 1, default 0.8
+    How soft a speck's edge is: the edge falls from full brightness to none across this
+    fraction of the speck's radius (at least one pixel). 0 = crisp discs, 1 = specks
+    fading out from their middle.
+opacity : number, fraction, 0 to 1, default 0.55
+    How bright the nearest specks are: the share of `color` they screen over the picture
+    at their middle; the farthest are fainter. 0 = invisible, 1 = solid colour.
+color : colour, default '#fff1d6'
+    The colour of the light the specks catch: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Specks are screened over the picture, so they only lighten it.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same specks in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
+    ...
+
+def flow_lines(density: float = 0.002, length: int = 120, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b') -> Step:
+    """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
+
+A generated background: the input is used only for its height and width, its content is ignored. The flow's
+direction at each pixel is `twist` times a fractal noise field. Each of the `density` x pixels lines starts at a
+random point and takes `length` steps of `step` px along the flow (the direction read at the pixel the line is
+in), ending early where it would leave the picture. A soft disc `thickness` px across is stamped at every
+point; where discs overlap the strongest counts, so lines stay as bold as one.
+
+Parameters
+----------
+density : number, fraction, 0 to 0.05, default 0.002
+    How many lines: the share of the picture's pixels that start one, so a 480 x 384
+    picture at 0.002 has about 370. 0 draws none. More = a denser weave; lines cross
+    freely.
+length : whole number, count, 1 to 2000, default 120
+    How many steps each line follows the flow; with `step` it sets the line's length in
+    px. A line also ends where it reaches the edge of the picture. Animated, it moves in
+    whole steps (rounded to the nearest whole number).
+step : number, px, 0.5 to 16, default 1.0
+    The distance in px a line moves each step. Keep it at or below the line's thickness
+    for a solid line; larger steps leave dotted lines.
+thickness : number, px, 0.5 to 16, default 1.5
+    The width of the lines in px (a soft disc of this diameter is stamped at every
+    step). Tuned for a picture about 480 px high.
+scale : number, px, 4 to 1024, default 120.0
+    The size of the flow's coarsest swirls in px, the spacing of the first noise
+    lattice. Larger = broader, gentler bends. Tuned for a picture about 480 px high.
+octaves : whole number, count, 1 to 8, default 2
+    How many layers of noise are summed for the flow, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth sweeping lines, more =
+    wigglier ones. Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of the flow is than the one before. 0 = only the
+    coarsest layer.
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer of the flow is than the one before: the lattice spacing is
+    divided by this.
+twist : number, degrees, 0 to 720, default 180.0
+    How far the flow turns for each standard deviation of the noise: a line's direction
+    is the noise times this, measured clockwise on screen from the right. 0 = every line
+    runs straight to the right; larger = tighter, more varied swirls.
+seed : whole number, count, 0 to 2147483647, default 0
+    Seeds the flow and the line starts: the same seed gives the same picture. The starts
+    are numpy.random.default_rng(seed).random((lines, 2)), columns x and y as fractions
+    of the width and the height. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+line : colour, default '#ffd84a'
+    The colour of the lines.
+background : colour, default '#12002b'
+    The colour behind the lines."""
+    ...
+
 def flow_warp(amount: float = 20.0, steps: int = 6, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, angle: float = 0.0, variation: float = 60.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.
 
@@ -1063,6 +1259,104 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when the flow carries it in from beyond the
     picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def fog(density: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, patchiness: float = 0.6, scale: float = 150.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0) -> Step:
+    """Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom.
+
+The opacity at a pixel is `density` x (1 - `gradient` x (1 - t)) x (1 - `patchiness` x (1 - c)), where t is how
+far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge) and c in 0..1 is the
+cloud: fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`) passed through the normal
+cumulative distribution, so c is spread evenly over 0..1 whatever the noise settings. Each pixel becomes
+picture + opacity x (color - picture), so the fog lowers contrast as well as tinting.
+
+Parameters
+----------
+density : number, fraction, 0 to 1, default 0.8
+    How thick the fog is where it is thickest (the bottom of the frame, in the densest
+    cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.8 =
+    a heavy haze, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
+    since every pixel moves toward the same colour.
+color : colour, default '#cfd8e3'
+    The colour of the fog: '#rrggbb', '#rgb' or [r, g, b] 0..1. A pale blue-grey is a
+    cool morning mist, white a thick cloud, a warm grey smog.
+gradient : number, fraction, 0 to 1, default 0.7
+    How much thicker the fog is at the bottom of the frame than at the top, as a share
+    of its density: the opacity falls in a straight line from the bottom row up, to 1 -
+    gradient of its value at the top row. 0 = the same all the way up, 1 = no fog at the
+    very top, as for mist lying on the ground.
+patchiness : number, fraction, 0 to 1, default 0.6
+    How cloudy the fog is: 0 = an even veil, 1 = drifts with clear gaps, where the noise
+    is lowest the fog thins to nothing. The cloud shapes come from fractal noise
+    (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`).
+scale : number, px, 1 to 1024, default 150.0
+    Size of the biggest clouds in pixels, the spacing of the first noise lattice; tuned
+    for a picture about 480 px high. Larger = broad banks of fog; small = fine, wispy
+    mottling.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed to make the clouds, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
+    detail. Layers finer than one pixel are dropped. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of cloud is than the one before: each layer's
+    weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
+    layer equally strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer of cloud is than the one before: the lattice spacing is
+    divided by this per layer. 1 = every layer the same size, 2 = each half as coarse,
+    larger = detail drops off faster in size.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same clouds, another seed a different
+    bank of fog. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
+    ...
+
+def fractal(kind: Literal['mandelbrot', 'julia'] = 'julia', zoom: float = 1.0, x: float = 0.0, y: float = 0.0, c_real: float = -0.8, c_imag: float = 0.156, iterations: int = 64, period: float = 24.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), interior: str | list[float] | tuple[float, float, float] = '#000000') -> Step:
+    """Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes.
+
+A generated background: the input is used only for its height and width, its content is ignored. A point
+escapes when |z| exceeds 256 after n steps of z -> z^2 + c; its colour is then `colors` at the smooth escape count
+n + 1 - log2(log|z| / log 256) over `period` (a continuous count, so no steps between bands), and a point that has
+not escaped after `iterations` steps takes `interior`. Only the unescaped points are iterated, in single
+precision.
+
+Parameters
+----------
+kind : one of 'mandelbrot', 'julia', default 'julia'
+    Which set: 'mandelbrot' (every point is the constant c, z starts at 0; centre it
+    with x = -0.5 to see the whole set) or 'julia' (every point is the start z, with the
+    one constant `c_real` + i `c_imag`).
+zoom : number, ratio, 0.1 to 100000, default 1.0
+    Magnification. At 1 the picture's shorter side shows 4 units of the complex plane,
+    enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units. Very deep
+    zooms run out of single precision around 10000.
+x : number, ratio, -2 to 2, default 0.0
+    The real part of the point at the centre of the picture, in units of the complex
+    plane. 0 centres a Julia set; -0.5 centres the Mandelbrot set.
+y : number, ratio, -2 to 2, default 0.0
+    The imaginary part of the point at the centre of the picture, in units of the
+    complex plane; positive moves the view up.
+c_real : number, ratio, -2 to 2, default -0.8
+    Julia only: the real part of the constant c in z -> z^2 + c. It decides the shape: a
+    point inside the Mandelbrot set gives a connected Julia set, one outside a dust.
+    Ignored by 'mandelbrot'.
+c_imag : number, ratio, -2 to 2, default 0.156
+    Julia only: the imaginary part of the constant c. Ignored by 'mandelbrot'.
+iterations : whole number, count, 1 to 2000, default 64
+    How many times z -> z^2 + c is applied before a point is taken to stay for ever (the
+    interior). More reveals finer detail at the set's edge and costs time in proportion;
+    zooming in needs more. Animated, it moves in whole steps (rounded to the nearest
+    whole number).
+period : number, count, 1 to 1000, default 24.0
+    How many iterations of escape time take the colours from the first to the last of
+    `colors`; they then run back, so the bands cycle without a seam. Smaller = more,
+    thinner bands.
+colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
+    The colours of the bands, evenly spaced; at least two. Points that escape early (far
+    from the set) take the first colours.
+interior : colour, default '#000000'
+    The colour of the points that never escape: the inside of the set."""
     ...
 
 def gaussian_blur(radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0) -> Step:
@@ -1506,6 +1800,55 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
+def lens_drops(count: int = 14, radius: float = 24.0, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
+
+A drop at a random place has a random radius from half of `radius` to all of it. The pixel at offset d from its
+middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by `interpolation` and
+`edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over the drop,
+`highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle. Later drops
+cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the same drops.
+
+Parameters
+----------
+count : whole number, count, 0 to 200, default 14
+    How many drops there are, whatever the size of the picture (a number, not a
+    density). 0 = none (the picture unchanged). Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+radius : number, px, 1 to 200, default 24.0
+    The radius in px of the biggest drops; the smallest are half as big. Tuned for a
+    picture about 480 px high. Larger = bigger drops.
+refraction : number, ratio, 0.25 to 4, default 1.5
+    How strongly a drop bends the scene: it shows the picture turned upside down about
+    the drop's middle and this many times as wide. 1 = the same scale, turned round;
+    above 1 a wider view in miniature, as in a real drop; below 1 a magnified view.
+blur : number, px, 0 to 20, default 1.5
+    How much the scene inside a drop is blurred, the sigma of a Gaussian in px, as a
+    drop is never quite in focus. 0 = sharp.
+highlight : number, fraction, 0 to 1, default 0.0
+    How bright the drops' shine is: white light screened along the rim of each drop,
+    strongest at its top (light from above) and fading to nothing at its bottom and in
+    its middle. 0 = none, so a flat picture stays flat; 0.5 is a soft glint.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same drops in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more
+    exact and slower.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture inside a drop: 'nearest' takes
+    the closest pixel (fastest, keeps every value exactly as it is but edges turn
+    jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
+    slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a drop sees beyond the picture's edge (a drop near the border or a strong
+    refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge
+    pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
+    ...
+
 def lens_flare(x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 0.05, halo: float = 0.2, ring: float = 0.12, ring_width: float = 0.02, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8') -> Step:
     """A lens flare: a halo and a ring round the light at (`x`, `y`) and `ghosts` discs along the line through the
 picture's centre, tinted `color` and screened over the picture by `amount`.
@@ -1819,6 +2162,50 @@ seed : whole number, count, 0 to 4294967295, default 0
     pattern. Animated, it moves in whole steps (rounded to the nearest whole number)."""
     ...
 
+def noise_field(kind: Literal['value', 'perlin', 'worley'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0) -> Step:
+    """Replace the picture with a noise field of `kind` (value, perlin or worley), coloured through `colors`.
+
+A generated background: the input is used only for its height and width, its content is ignored. The noise is
+standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
+distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
+noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
+Perlin's fade curve); 'worley' is the distance to the nearest feature point (F1).
+
+Parameters
+----------
+kind : one of 'value', 'perlin', 'worley', default 'perlin'
+    The noise: 'value' (random values on a lattice, smoothly interpolated: soft
+    blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more
+    even, zero at the lattice points) or 'worley' (cellular noise: the distance to the
+    nearest of a scatter of random points, one per cell of `scale` px, dark at each
+    point and brightening away from it; a single layer, so it ignores `octaves`,
+    `persistence` and `lacunarity`).
+scale : number, px, 2 to 1024, default 120.0
+    Size of the coarsest features in pixels: the spacing of the first lattice (value,
+    perlin) or the size of a cell (worley); tuned for a picture about 480 px high.
+    Larger = broad, slow variation; small = fine grain.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed (value, perlin), each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail.
+    Layers finer than one pixel are dropped. Animated, it moves in whole steps (rounded
+    to the nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before (value, perlin): each
+    layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 =
+    every layer equally strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before (value, perlin): the lattice
+    spacing is divided by this per layer. 1 = every layer the same size, 2 = each half
+    as coarse, larger = detail drops off faster.
+colors : list of colours, default ('#0b1d3a', '#2a7f9e', '#f4e9c8')
+    The colours the noise is shown in, from its lowest values to its highest, evenly
+    spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
+    the noise, so every colour is used about equally.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same picture, another seed a different
+    one. Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
 def palette_quantize(palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'] = 'photo', colors: int = 8, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0) -> Step:
     """Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`.
 
@@ -1911,6 +2298,44 @@ seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same texture (fibres and, for 'linen',
     thread strengths), another seed a different one. Animated, it moves in whole steps
     (rounded to the nearest whole number)."""
+    ...
+
+def pattern(kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0) -> Step:
+    """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.
+
+A generated background: the input is used only for its height and width, its content is ignored. The pattern is
+anchored at the top-left corner, so it does not shift when the picture is resized. Every shape is drawn from
+its signed distance in px to its border, so edges have the same softness at every angle.
+
+Parameters
+----------
+kind : one of 'stripes', 'checks', 'dots', 'grid', default 'grid'
+    The pattern: 'stripes' (parallel bands, `thickness` wide), 'checks' (a chessboard of
+    `cell` px squares, the top-left one in the foreground colour), 'dots' (a disc of
+    `radius` in every cell) or 'grid' (lines `thickness` wide along the cell borders).
+cell : number, px, 2 to 512, default 32.0
+    The size of one repeat in px: the distance from one stripe to the next, the side of
+    a check, a dot or a grid square. Tuned for a picture about 480 px high; larger = a
+    coarser pattern.
+angle : number, degrees, 0 to 360, default 0.0
+    Turns the pattern clockwise on screen about the picture's top-left corner. At 0 the
+    stripes are vertical and the checks, dots and grid lines are aligned with the
+    picture's edges; at 90 the stripes are horizontal.
+foreground : colour, default '#ffffff'
+    The colour of the stripes, the dark checks, the dots and the grid lines.
+background : colour, default '#101018'
+    The colour between them.
+thickness : number, fraction, 0 to 1, default 0.2
+    Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of
+    `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and
+    'dots'.
+radius : number, fraction, 0 to 0.75, default 0.3
+    Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the
+    neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes',
+    'checks' and 'grid'.
+feather : number, px, 0 to 32, default 1.0
+    The width of the soft edge in px, centred on the shape's border and blended
+    linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
     ...
 
 def perspective(vertical: float = 0.25, horizontal: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -2023,6 +2448,51 @@ amount : number, fraction, 0 to 1, default 0.4
     of the picture's brightness or less), in between a mix of the two."""
     ...
 
+def plasma(scale: float = 160.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 25.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080'), seed: int = 0) -> Step:
+    """Replace the picture with a plasma: warped, crossed sine waves coloured through `colors`.
+
+A generated background: the input is used only for its height and width, its content is ignored. Layer i has two
+plane waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random directions a
+and phases p, and weight `persistence`**i; it is evaluated at positions pushed along x and y by `warp` px times
+the two waves of layer i - 1 (so layer 0 is not warped). The sum is standardised and passed through the normal
+cumulative distribution, so a pixel's place on the colour ramp is about its rank among all pixels.
+
+Parameters
+----------
+scale : number, px, 4 to 1024, default 160.0
+    Wavelength in pixels of the coarsest layer's waves, the distance from crest to
+    crest; tuned for a picture about 480 px high. Larger = broad, slow swirls; small =
+    fine, busy ripples.
+octaves : whole number, count, 1 to 8, default 2
+    How many layers of waves are summed, each finer than the last (by `lacunarity`) and
+    weaker (by `persistence`). Each layer is two sine waves crossing at random angles. 1
+    = a plain weave of two waves, more = richer, busier patterns. Layers with fewer than
+    2 px a wavelength are dropped. Animated, it moves in whole steps (rounded to the
+    nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very busy).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: its wavelength is divided by this
+    per layer. 1 = every layer the same size, 2 = each half as long, larger = detail
+    drops off faster in size.
+warp : number, px, 0 to 500, default 25.0
+    How far in pixels each layer's waves are pushed along by the two waves of the layer
+    before it (a layer's position is shifted by up to this much). 0 = plain straight
+    waves; larger = the swirling, folded look of a plasma. The first layer has nothing
+    before it, so it is not warped.
+colors : list of colours, default ('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080')
+    The colours the plasma is shown in, from its lowest values to its highest, evenly
+    spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
+    the pattern, so every colour is used about equally. The default's last colour is its
+    first, so the palette comes round without a seam.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same plasma (the angles and phases of
+    the waves), another seed a different one. Animated, it moves in whole steps (rounded
+    to the nearest whole number)."""
+    ...
+
 def polar(mode: Literal['to', 'from'] = 'to', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
     """Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from').
 
@@ -2118,6 +2588,90 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the smear sees beyond the picture's edge (arcs and rays near the corners leave
     it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def rain(density: float = 1.0, angle: float = 10.0, length: float = 32.0, thickness: float = 1.5, opacity: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dbe6f5', seed: int = 0) -> Step:
+    """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
+
+Every streak has a random depth from 0 (far) to 1 (near): its length, width and brightness are `length`,
+`thickness` and `opacity` times 0.5 + 0.5 x depth, so the rain has depth. A streak is drawn with antialiased
+edges and is cut off by the picture's edge. Streaks are screened over the picture, so they only lighten it. A
+higher `density` keeps every streak of a lower one and adds more; the same `seed` always gives the same rain.
+
+Parameters
+----------
+density : number, count, 0 to 5, default 1.0
+    How many streaks fall: streaks per 1000 square px of picture (a 32 x 32 px area), so
+    the same density looks alike on any picture size. 0 = none (the picture unchanged),
+    1 is a steady shower, 3 a downpour.
+angle : number, degrees, -45 to 45, default 10.0
+    How far the streaks lean from straight down, in degrees: positive leans toward the
+    right as they fall (wind from the left), negative toward the left. 0 = vertical.
+length : number, px, 1 to 200, default 32.0
+    The length of the nearest streaks in px; the farthest are half as long. Tuned for a
+    picture about 480 px high. Larger = longer streaks, as with a slower shutter.
+thickness : number, px, 1 to 20, default 1.5
+    The width of the nearest streaks in px; the farthest are half as wide. Tuned for a
+    picture about 480 px high. Larger = fatter drops.
+opacity : number, fraction, 0 to 1, default 0.7
+    How bright the nearest streaks are: the share of `color` they screen over the
+    picture at their centre; the farthest are half as bright. 0 = invisible, 1 = solid
+    colour.
+color : colour, default '#dbe6f5'
+    The colour of the rain: '#rrggbb', '#rgb' or [r, g, b] 0..1. Streaks are screened
+    over the picture, so they only lighten it.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same streaks in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
+    ...
+
+def reaction_diffusion(feed: float = 0.037, kill: float = 0.06, steps: int = 300, cell: float = 8.0, threshold: float = 0.6, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts.
+
+The model has two chemicals, u (starting at 1 everywhere) and v (starting at 0). Where the picture's brightness
+is above `threshold` they start at u = 1/2, v = 1/4. Each step both diffuse (v half as fast as u, by the
+five-point Laplacian) and react: u += Du lap u - u v^2 + feed (1 - u), v += Dv lap v + u v^2 - (feed + kill) v,
+with Du = 0.2097 and Dv = 0.105 (Pearson 1993) and a time step of 1. The result is drawn through `colors` at
+1 - u, so untouched areas take the first colour. The simulation runs on cells of `cell` px: the picture is read
+at each cell's centre, and the cells are read back over the picture, both by `resampling`.
+
+Parameters
+----------
+feed : number, ratio, 0.01 to 0.08, default 0.037
+    The feed rate F of the Gray-Scott model: how fast chemical u is replenished.
+    Together with `kill` it decides the kind of pattern: about 0.03 to 0.04 with a kill
+    of 0.06 gives spots and worms, higher feeds give mazes and fingerprints, the
+    extremes leave nothing but the seed.
+kill : number, ratio, 0.04 to 0.07, default 0.06
+    The kill rate k of the Gray-Scott model: how fast chemical v is removed. Raising it
+    makes the pattern sparser (isolated spots); lowering it fills the picture.
+steps : whole number, count, 0 to 5000, default 300
+    How many simulation steps run. 0 shows only the seed; more lets the pattern grow
+    outward from it and costs time in proportion (and more cells, so smaller `cell`,
+    cost more per step). Animated, it moves in whole steps (rounded to the nearest whole
+    number).
+cell : number, px, 1 to 64, default 8.0
+    The size of one simulation cell in px: the model runs on a coarse grid and is read
+    back over the picture by `resampling`. 1 simulates every pixel (slow on large
+    pictures); larger = a coarser, larger-scale pattern that runs faster. Tuned for a
+    picture about 480 px high.
+threshold : number, fraction, 0 to 1, default 0.6
+    Brightness (0..1) above which the picture seeds the pattern: only the brighter parts
+    start it. Lower seeds more of the picture; at 1 nothing seeds and the result is a
+    flat first colour.
+colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
+    The colour ramp, evenly spaced; at least two. Untouched areas take the first colour
+    and the strongest pattern the last.
+resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How the picture is read at each cell and how the cells are read back over the
+    picture: 'nearest' takes the closest cell (blocky), 'bilinear' blends the four
+    around (smooth), 'bicubic' fits a cubic spline (the smoothest, may overshoot
+    slightly).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What lies beyond the picture's border for the diffusion and for reading: 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
+    (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles)."""
     ...
 
 def rgb_split(angle: float = 30.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest') -> Step:
@@ -2396,6 +2950,114 @@ seed : whole number, count, 0 to 4294967295, default 0
     in whole steps (rounded to the nearest whole number)."""
     ...
 
+def smoke(amount: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#e6e6e6', coverage: float = 0.45, feather: float = 0.25, scale: float = 100.0, rise: float = 2.0, turbulence: float = 30.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0) -> Step:
+    """Mix soft-edged plumes of `color` into the picture, up to `amount` thick.
+
+The plumes are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
+when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`
+(so the plumes are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more
+noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u
+spread evenly over 0..1; the opacity is `amount` x smoothstep((u - (1 - `coverage`)) / `feather`), so about
+`coverage` of the picture has smoke and the opacity climbs from 0 to `amount` across the `feather` share of
+pixels above the cut. Each pixel becomes picture + opacity x (color - picture).
+
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.5
+    How opaque the smoke is at the heart of a plume: the share of the smoke colour mixed
+    into the picture there. 0 = no smoke, 0.5 = see-through smoke, 1 = solid colour
+    hiding the picture.
+color : colour, default '#e6e6e6'
+    The colour of the smoke: '#rrggbb', '#rgb' or [r, g, b] 0..1. Pale grey is steam or
+    light smoke, a dark grey or black a heavy, sooty plume.
+coverage : number, fraction, 0 to 1, default 0.45
+    About the share of the picture that has any smoke in it: 0 = none, 0.45 = plumes
+    with clear air between them, 1 = smoke everywhere, in thicker and thinner places.
+    The plumes are the highest parts of a noise field, so raising it widens them and
+    joins them up.
+feather : number, fraction, 0.01 to 1, default 0.25
+    How soft the edge of a plume is, as the share of the picture over which the smoke
+    fades from nothing to full `amount` just above the coverage cut. Small = crisp,
+    billowing outlines; large = plumes that melt into the air with no clear outline.
+scale : number, px, 1 to 1024, default 100.0
+    Size of the biggest plumes across, in pixels, the spacing of the first noise lattice
+    before `rise` stretches it; tuned for a picture about 480 px high. Larger = a few
+    big clouds; small = many small wisps.
+rise : number, ratio, 1 to 8, default 2.0
+    How much the plumes are drawn out upward, anchored at the bottom edge: 1 = round
+    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
+turbulence : number, px, 0 to 500, default 30.0
+    How far in pixels two more noise fields (with the same `scale`, `octaves`,
+    `persistence` and `lacunarity`) push the plumes sideways and up and down: the
+    typical displacement (their standard deviation). 0 = smooth, regular plumes; larger
+    = twisting, curling smoke; much larger than `scale` tears the plumes into scattered
+    wisps.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed to make the plumes, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
+    detail. Layers finer than one pixel are dropped. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How the noise is read where `rise` and `turbulence` have moved it between pixels:
+    'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the
+    four around it (smooth), 'bicubic' fits a cubic spline through the neighbours
+    (smoothest, a little slower). It matters only where something moves. Named
+    `resampling`, not `interpolation`, because it reads a generated noise field, never
+    the picture.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the noise is beyond the picture's border when `turbulence` pushes a plume in
+    from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same smoke, another seed different
+    plumes. Animated, it moves in whole steps (rounded to the nearest whole number)."""
+    ...
+
+def snow(density: float = 0.5, size: float = 14.0, layers: int = 4, softness: float = 0.5, opacity: float = 0.8, seed: int = 0) -> Step:
+    """Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers.
+
+Each flake falls in a random layer; at depth d = k / `layers` (the nearest layer is 1) it is a disc `size` x d
+wide, `opacity` x (0.5 + 0.5 d) bright, with an edge `softness` of its radius soft. Where flakes overlap the
+brighter one shows, and flakes are screened over the picture, so they only lighten it. A higher `density` keeps
+every flake of a lower one and adds more; the same `seed` always gives the same snow.
+
+Parameters
+----------
+density : number, count, 0 to 5, default 0.5
+    How many flakes fall: flakes per 1000 square px of picture (a 32 x 32 px area), so
+    the same density looks alike on any picture size. 0 = none (the picture unchanged),
+    0.5 is a light flurry, 3 a blizzard.
+size : number, px, 1 to 100, default 14.0
+    The diameter of the nearest, largest flakes in px; flakes in farther layers are
+    smaller. Tuned for a picture about 480 px high. Larger = bigger flakes, as if they
+    fell closer to the lens.
+layers : whole number, count, 1 to 10, default 4
+    How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide
+    as `size` and (0.5 + 0.5 k / n) as bright as `opacity`, so more layers = a smoother
+    range from fine far flakes to large near ones. 1 = every flake alike. Animated, it
+    moves in whole steps (rounded to the nearest whole number).
+softness : number, fraction, 0 to 1, default 0.5
+    How soft a flake's edge is: the edge falls from full brightness to none across this
+    fraction of the flake's radius (at least one pixel), so large flakes are blurrier
+    than small ones, like flakes out of focus. 0 = crisp one-pixel edges, 1 = a flake
+    fading out from its middle.
+opacity : number, fraction, 0 to 1, default 0.8
+    How bright the nearest flakes are: the share of white they screen over the picture
+    at their centre; farther flakes are fainter. 0 = invisible, 1 = solid white.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same flakes in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
+    ...
+
 def soft_focus(radius: float = 12.0, opacity: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
 
@@ -2433,6 +3095,40 @@ threshold : number, fraction, 0 to 1, default 0.5
     Channel value (0..1) above which red, green and blue are inverted; values at or
     below it stay. Lowering it reverses more of the tones (0 inverts everything but pure
     black); 1 changes nothing."""
+    ...
+
+def sparkle(count: int = 60, threshold: float = 0.75, size: float = 10.0, rays: float = 2.0, opacity: float = 1.0, seed: int = 0) -> Step:
+    """Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each.
+
+A sparkle has a random scale s from 0.5 to 1: its dot is `size` x s wide (soft: full brightness inside half its
+radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is `opacity` x s
+bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only lighten it; the
+same `seed` on the same picture always gives the same sparkles.
+
+Parameters
+----------
+count : whole number, count, 0 to 2000, default 60
+    How many sparkles: at most this many, each on a different pixel brighter than
+    `threshold` (fewer when the picture has fewer such pixels). 0 = none (the picture
+    unchanged). Animated, it moves in whole steps (rounded to the nearest whole number).
+threshold : number, fraction, 0 to 1, default 0.75
+    How bright a pixel must be to get a sparkle: its brightness (Rec. 709 luminance,
+    0..1) must be above this. Raising it keeps the sparkles to the brightest highlights;
+    1 = none, nothing is brighter than white.
+size : number, px, 1 to 100, default 10.0
+    The diameter in px of the biggest sparkles' soft dot; the smallest are half as wide.
+    Tuned for a picture about 480 px high. Larger = bigger glints.
+rays : number, ratio, 0 to 10, default 2.0
+    How long the four rays of the cross are, as a multiple of the sparkle's dot
+    diameter: each ray runs this far from the middle, straight left, right, up and down,
+    one pixel thin. 0 = a soft dot only, no rays.
+opacity : number, fraction, 0 to 1, default 1.0
+    How bright the biggest sparkles are: the share of white they screen over the picture
+    at their middle; smaller ones are fainter. 0 = invisible, 1 = solid white.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same sparkles on the same picture,
+    another seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
     ...
 
 def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1) -> Step:
@@ -2504,6 +3200,39 @@ angle : number, degrees, 0 to 360, default 0.0
 color : colour, default '#ffffff'
     The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
     of the light that makes them."""
+    ...
+
+def starfield(count: int = 600, size: float = 3.0, depth: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dfe8ff', sky: str | list[float] | tuple[float, float, float] = '#04060f', seed: int = 0) -> Step:
+    """A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input.
+
+The input is used only for its height and width; its content does not show. Every star has a random depth u from 0
+to 1 and a scale s = 1 - `depth` x u, so near stars (u = 0) are full size and brightness: it is a dot `size` x s
+wide, s bright, with antialiased edges. Where stars overlap the brighter one shows. Stars are screened over the
+sky, so they only lighten it; the same `seed` always gives the same sky.
+
+Parameters
+----------
+count : whole number, count, 0 to 20000, default 600
+    How many stars there are, whatever the size of the picture (a number, not a
+    density). 0 = an empty sky, 600 a clear night. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
+size : number, px, 1 to 50, default 3.0
+    The diameter in px of the nearest, biggest stars (the others are smaller by their
+    depth). Tuned for a picture about 480 px high. Larger = bigger stars.
+depth : number, fraction, 0 to 1, default 0.7
+    How far apart the stars are in depth, which spreads their size and brightness: a
+    star is between 1 - depth and 1 times the full size and brightness. 0 = every star
+    alike, 1 = from the nearest down to specks too small to see.
+color : colour, default '#dfe8ff'
+    The colour of the stars' light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is
+    a cold white. Stars are screened over the sky, so they only lighten it.
+sky : colour, default '#04060f'
+    The colour of the sky between the stars: '#rrggbb', '#rgb' or [r, g, b] 0..1. The
+    default is a blue-black night.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same stars in the same places, another
+    seed others. Animated, it moves in whole steps (rounded to the nearest whole
+    number)."""
     ...
 
 def swirl(angle: float = 90.0, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -2671,6 +3400,51 @@ edge_threshold : number, stops, 0.01 to 8, default 0.5
     base smoother and more like a plain blur."""
     ...
 
+def topographic(levels: int = 8, thickness: float = 1.5, line: str | list[float] | tuple[float, float, float] = '#ffffff', fill: Literal['none', 'bands'] = 'none', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea'), smoothing: float = 5.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+    """Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights.
+
+Brightness is the Rec. 709 luminance, blurred by `smoothing` px, scaled to h = luminance x `levels`; the contours
+are h = 1, 2, ..., `levels` - 1. A pixel's distance to the nearest contour in px is |h - k| divided by the slope
+of h there (central differences, halved on the outermost rows and columns, which have one neighbour: lines come
+out thinner there), so a line is `thickness` px wide however steep or shallow the brightness runs; a pixel at
+distance d is covered by clip(`thickness` / 2 + 1/2 - d, 0, 1) of the `line` colour. Where the brightness does
+not vary there is no contour. With fill 'bands' the photo is first replaced by the colour of its band
+floor(h) (the last band for white) taken from `colors`.
+
+Parameters
+----------
+levels : whole number, count, 2 to 64, default 8
+    How many bands the brightness range 0..1 is cut into; there is a contour line at
+    each of the levels - 1 heights between them. 2 = a single line at middle grey, 8 = a
+    clear contour map, 14 = a busy one, 64 = a dense engraving. Animated, it moves in
+    whole steps (rounded to the nearest whole number).
+thickness : number, px, 0.5 to 20, default 1.5
+    How wide the lines are, in pixels across the line however steep the slope of
+    brightness there; tuned for a picture about 480 px high. Edges are anti-aliased, so
+    fractions of a pixel show as partial strength.
+line : colour, default '#ffffff'
+    The colour of the contour lines: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+fill : one of 'none', 'bands', default 'none'
+    What lies between the lines: 'none' (the photo itself, with the lines drawn over it)
+    or 'bands' (the photo is replaced by flat colour, each band coloured from `colors`
+    by its height, like a hypsometric map).
+colors : list of colours, default ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')
+    The colours of the bands for fill 'bands', from the lowest band (darkest brightness)
+    to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'.
+smoothing : number, px, 0 to 50, default 5.0
+    Sigma in pixels of the Gaussian blur the brightness gets before the contours are
+    found, so that grain and fine texture do not break the lines into specks; tuned for
+    a picture about 480 px high. 0 = the brightness as it is, raising it gives smoother,
+    simpler contours.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing blur is cut off, in sigmas: it reaches truncate x `smoothing`
+    px. Larger is more exact and slower; below 3 the blur turns visibly boxy.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
+    ...
+
 def torn_edge(depth: float = 24.0, roughness: float = 0.5, scale: float = 24.0, octaves: int = 3, persistence: float = 0.4, lacunarity: float = 2.0, fill: str | list[float] | tuple[float, float, float] = '#f5f0e6', seed: int = 0) -> Step:
     """Tear the border away: each side's pixels closer than a wandering distance of about `depth` px become `fill`.
 
@@ -2757,6 +3531,39 @@ roundness : number, fraction, 0 to 1, default 1.0
 color : colour, default '#000000'
     The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
     white lightens."""
+    ...
+
+def voronoi_cells(cells: int = 80, seed: int = 0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347'), shade: float = 0.35, edge_width: float = 1.5, edge_color: str | list[float] | tuple[float, float, float] = '#0a0014') -> Step:
+    """Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders.
+
+A generated background: the input is used only for its height and width, its content is ignored. Every pixel
+belongs to the cell of its nearest site; a cell's colour is a random point on `colors`, darkened toward its
+border by `shade`, and the border lines are drawn in `edge_color`.
+
+Parameters
+----------
+cells : whole number, count, 4 to 2000, default 80
+    How many cells (random points, the sites) the picture is divided into. More =
+    smaller cells; the average cell is the picture's area divided by this. Animated, it
+    moves in whole steps (rounded to the nearest whole number).
+seed : whole number, count, 0 to 2147483647, default 0
+    Seeds the random positions and colours: the same seed gives the same cells. The
+    sites are numpy.random.default_rng(seed).random((cells, 2)), columns x and y as
+    fractions of the width and the height; each cell's value on the colour list is drawn
+    next. Animated, it moves in whole steps (rounded to the nearest whole number).
+colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')
+    The colour ramp, evenly spaced; at least two. Each cell takes the colour at its own
+    random position along it, so a longer list gives more variety.
+shade : number, fraction, 0 to 1, default 0.35
+    How much each cell darkens away from its site: 0 = flat colour, 1 = black on the
+    cell's border. The darkening is the distance to the site over the distance to the
+    site plus the distance to the border, so it grows steadily from the site to the
+    border and gives every cell a dome look.
+edge_width : number, px, 0 to 32, default 1.5
+    The width of the border lines between cells in px, with anti-aliased edges; 0 = no
+    borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high.
+edge_color : colour, default '#0a0014'
+    The colour of the border lines."""
     ...
 
 def white_balance(temperature: float = 0.0, tint: float = 0.0) -> Step:

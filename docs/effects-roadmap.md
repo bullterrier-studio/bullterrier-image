@@ -140,7 +140,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | --- | --- | --- |
 | `liquid_metal` ✓ | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=35, tint="#c9d6ff")` |
 | `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
-| `reaction_diffusion` | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=200, seed=1)` |
+| `reaction_diffusion` ✓ | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=300)` |
 | `cellular_automata` | Life-like rules run on the thresholded picture. | `fx.cellular_automata(rule="life", steps=12, threshold=0.5)` |
 | `lenticular` | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strips=40, shift=6)` |
 
@@ -220,14 +220,14 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `fog` | Layered haze, gradient or noise-based. | `fx.fog(density=0.4, color="#cfd8e3")` |
-| `rain` | Falling streaks (and optional splashes). | `fx.rain(density=0.5, angle=12, seed=1)` |
-| `snow` | Flakes in depth layers. | `fx.snow(density=0.4, seed=1)` |
-| `smoke` | Noise-driven smoke or steam. | `fx.smoke(amount=0.4, seed=1)` |
-| `sparkle` | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
-| `floating_dust` | Slow bokeh particles. | `fx.floating_dust(count=80, seed=1)` |
-| `lens_drops` | Water drops on the lens. | `fx.lens_drops(count=14, seed=1)` |
-| `embers` | Rising sparks. | `fx.embers(count=120, seed=1)` |
+| `fog` ✓ | Layered haze, gradient or noise-based. | `fx.fog(density=0.4, color="#cfd8e3")` |
+| `rain` ✓ | Falling streaks (and optional splashes). | `fx.rain(density=0.5, angle=12, seed=1)` |
+| `snow` ✓ | Flakes in depth layers. | `fx.snow(density=0.4, seed=1)` |
+| `smoke` ✓ | Noise-driven smoke or steam. | `fx.smoke(amount=0.4, seed=1)` |
+| `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
+| `floating_dust` ✓ | Slow bokeh particles. | `fx.floating_dust(count=80, seed=1)` |
+| `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
+| `embers` ✓ | Rising sparks. | `fx.embers(count=120, seed=1)` |
 
 ## Subject-aware effects
 
@@ -273,16 +273,16 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `gradient` | Linear, radial, conic or mesh gradient. | `fx.gradient(["#12002b","#ff2bd6"], kind="radial")` |
-| `noise_field` | Perlin, simplex or Worley noise as colour. | `fx.noise_field(kind="simplex", scale=200, seed=1)` |
-| `pattern` | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
-| `plasma` | Classic plasma colours. | `fx.plasma(scale=120, seed=1)` |
-| `starfield` | Stars with depth. | `fx.starfield(count=600, seed=1)` |
-| `voronoi_cells` | Cell pattern. | `fx.voronoi_cells(cells=200, seed=1)` |
-| `topographic` | Contour lines of luminance or noise. | `fx.topographic(levels=14)` |
-| `flow_lines` | Streamlines through a noise flow field. | `fx.flow_lines(density=0.6, seed=1)` |
-| `aurora` | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |
-| `fractal` | Mandelbrot or Julia sets with smooth colouring. | `fx.fractal(kind="julia", zoom=1.5, iterations=64)` |
+| `gradient` ✓ | Linear, radial, conic or mesh gradient. | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
+| `noise_field` ✓ | Perlin, simplex or Worley noise as colour. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
+| `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
+| `plasma` ✓ | Classic plasma colours. | `fx.plasma(scale=120, seed=1)` |
+| `starfield` ✓ | Stars with depth. | `fx.starfield(count=600, seed=1)` |
+| `voronoi_cells` ✓ | Cell pattern. | `fx.voronoi_cells(cells=200, seed=1)` |
+| `topographic` ✓ | Contour lines of luminance or noise. | `fx.topographic(levels=14)` |
+| `flow_lines` ✓ | Streamlines through a noise flow field. | `fx.flow_lines(density=0.004, seed=1)` |
+| `aurora` ✓ | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |
+| `fractal` ✓ | Mandelbrot or Julia sets with smooth colouring. | `fx.fractal(kind="julia", zoom=1.5, iterations=64)` |
 
 ## Utilities
 
