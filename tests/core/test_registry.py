@@ -232,15 +232,15 @@ def test_an_effect_without_a_model_is_refused(throwaway_effects):
 
 def test_parameters_and_schema_describe_the_model(gain):
     assert registry.parameters("gain_probe") is GainParams
-    properties = registry.schema("gain_probe")["properties"]
+    properties = registry.parameters("gain_probe").model_json_schema()["properties"]
     assert properties["gain"]["unit"] == "ratio"
     assert properties["offset"]["description"] == "Added after the gain."
 
 
 def test_validate_returns_the_model_or_explains_what_is_wrong(gain):
-    assert registry.validate("gain_probe", {"gain": 2}) == GainParams(gain=2.0)
+    assert registry.get("gain_probe").validate({"gain": 2}) == GainParams(gain=2.0)
     with pytest.raises(ValueError, match=r"gain_probe.*`offset`.*>= -1"):
-        registry.validate("gain_probe", {"offset": -2})
+        registry.get("gain_probe").validate({"offset": -2})
 
 
 def _summary_of(docstring: str) -> str:
@@ -280,7 +280,7 @@ def test_describe_gives_the_documentation_and_every_parameter(gain):
 
 
 def test_queries_about_an_unknown_effect_list_the_known_ones(gain):
-    for query in (registry.parameters, registry.schema, registry.inputs):
+    for query in (registry.parameters, registry.inputs):
         with pytest.raises(KeyError, match="gain_probe"):
             query("no_such_effect")
 

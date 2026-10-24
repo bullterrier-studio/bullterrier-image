@@ -160,17 +160,7 @@ class ValidatedModel(BaseModel):
         try:
             return cls.model_validate(dict(values))
         except ValidationError as error:
-            raise _invalid(error, owner, cls.field_names()) from None
-
-    @classmethod
-    def field_names(cls) -> tuple[str, ...]:
-        """The names of the fields, in declaration order."""
-        return tuple(cls.model_fields)
-
-    @classmethod
-    def json_schema(cls) -> dict[str, Any]:
-        """The JSON schema of the model, with every field's description (and, for effect parameters, its unit)."""
-        return cls.model_json_schema()
+            raise _invalid(error, owner, cls.model_fields) from None
 
     def _init_checked(self, owner: str, **values: Any) -> None:
         """For a subclass's own (positional) constructor: validate `values` into this instance; RecipeError like
@@ -178,7 +168,7 @@ class ValidatedModel(BaseModel):
         try:
             BaseModel.__init__(self, **values)
         except ValidationError as error:
-            raise _invalid(error, owner, type(self).field_names()) from None
+            raise _invalid(error, owner, type(self).model_fields) from None
 
 
 class FieldDoc(NamedTuple):

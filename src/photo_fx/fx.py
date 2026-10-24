@@ -53,7 +53,7 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     so a misspelt or out-of-range value fails here exactly as it would in a recipe file.
     """
     model = registry.parameters(name)
-    fields = model.field_names()
+    fields = tuple(model.model_fields)
 
     def build(*args: Any, **values: Any) -> Step:
         if len(args) > len(fields):

@@ -138,7 +138,7 @@ def _edge_naming_problems(name: str) -> list[str]:
     decides what lies beyond the picture's edge) under a name other than `edge`."""
     return [
         f"effect {name!r}: field `{field}` chooses an edge rule and should be called `edge`"
-        for field, spec in registry.schema(name)["properties"].items()
+        for field, spec in registry.parameters(name).model_json_schema()["properties"].items()
         if field != "edge" and {"reflect", "mirror"} & set(spec.get("enum", ()))
     ]
 
@@ -266,7 +266,7 @@ def _choices() -> list[tuple[str, str, str]]:
     return [
         (name, field, choice)
         for name in ALL
-        for field, prop in registry.schema(name)["properties"].items()
+        for field, prop in registry.parameters(name).model_json_schema()["properties"].items()
         for choice in prop.get("enum", ())
     ]
 
@@ -299,7 +299,7 @@ def _setting(name: str, field: str, value: float) -> dict[str, float]:
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_parameter_is_described_and_has_a_unit_entry(name):
-    schema = registry.schema(name)
+    schema = registry.parameters(name).model_json_schema()
     for field, prop in schema["properties"].items():
         assert prop.get("description", "").strip(), f"{name}.{field} has no description"
         assert "unit" in prop, f"{name}.{field} has no unit entry"
@@ -400,7 +400,7 @@ def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
     effects that read the picture between its pixels (those with an `interpolation` field)."""
     found = []
     for name in ALL:
-        properties = registry.schema(name)["properties"]
+        properties = registry.parameters(name).model_json_schema()["properties"]
         if "interpolation" in properties:
             choices = {field: prop["enum"] for field, prop in properties.items() if "enum" in prop}
             found += [
@@ -420,7 +420,7 @@ def test_a_constant_picture_stays_constant_under_every_way_of_reading_between_pi
 @pytest.mark.parametrize("name", sorted({name for name, _ in _sampling_cases()}))
 def test_each_interpolation_reads_the_picture_its_own_way(name):
     noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    choices = registry.schema(name)["properties"]["interpolation"]["enum"]
+    choices = registry.parameters(name).model_json_schema()["properties"]["interpolation"]["enum"]
     outs = {choice: registry.apply(name, noise, interpolation=choice) for choice in choices}
     for first, second in itertools.combinations(choices, 2):
         assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"

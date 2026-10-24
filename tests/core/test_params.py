@@ -280,14 +280,14 @@ def test_whole_number_fields_are_the_int_fields():
 
 
 def test_the_published_colour_pattern_matches_a_whole_value_only():
-    pattern = Probe.json_schema()["properties"]["tint"]["anyOf"][0]["pattern"]
+    pattern = Probe.model_json_schema()["properties"]["tint"]["anyOf"][0]["pattern"]
     assert re.search(pattern, "#fff")
     assert re.search(pattern, "#a1B2c3")
     assert not re.search(pattern, "xx#fff00")  # JSON Schema patterns search, so they must be anchored
     assert not re.search(pattern, "#fff0")
 
 
-# --- parse and field_names: the one way callers validate ------------------------------------------------------------
+# --- parse: the one way callers validate ------------------------------------------------------------
 
 
 def test_parse_builds_the_model_from_a_mapping():
@@ -298,10 +298,6 @@ def test_parse_reports_every_problem_as_one_value_error_naming_the_owner():
     with pytest.raises(ValueError, match=r"probe.*`radius`.*\b0\b.*-1.*`raduis`") as raised:
         Probe.parse({"radius": -1, "raduis": 2}, "effect 'probe'")
     assert not isinstance(raised.value, ValidationError)  # callers see a plain ValueError, never pydantic's type
-
-
-def test_field_names_are_the_fields_in_declaration_order():
-    assert Probe.field_names() == ("radius", "count", "mode", "tint", "label")
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf")], ids=["nan", "infinity"])

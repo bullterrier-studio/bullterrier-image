@@ -71,12 +71,11 @@ class Step(ValidatedModel):
         for name in registry.INPUTS:
             if name in self.params:
                 raise RecipeError(f"`{name}` is supplied by the recipe itself and cannot be set")
-        registry.inputs(self.effect)  # an unknown effect: UnknownEffectError listing the known ones
-        registry.validate(self.effect, self.params_at(0.0))
+        registry.get(self.effect).validate(self.params_at(0.0))  # an unknown effect: UnknownEffectError listing them
         if self.animated:
             for moment in _CHECKED_MOMENTS:
                 try:
-                    registry.validate(self.effect, self.params_at(moment, moment))
+                    registry.get(self.effect).validate(self.params_at(moment, moment))
                 except RecipeError as error:
                     raise RecipeError(f"{error} (animated: at {moment:.0%} of its movement)") from None
         return self
@@ -225,7 +224,7 @@ class Recipe(ValidatedModel):
                 continue
             for index, (motion, clip) in enumerate(frames):
                 try:
-                    registry.validate(step.effect, step.params_at(motion, clip))
+                    registry.get(step.effect).validate(step.params_at(motion, clip))
                 except RecipeError as error:
                     where = f"frame {index} at {index / animation.fps:.2f} s"
                     raise RecipeError(f"step {number}: {error} (animated: {where})") from None

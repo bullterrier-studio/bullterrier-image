@@ -117,15 +117,7 @@ class ModelledEffect[P: EffectParams]:
         return self.params_model.parse(values, f"effect {self.__name__!r}")
 
 
-@dataclass(frozen=True)
-class _Entry:
-    function: ModelledEffect  # what callers run
-    category: str
-    model: type[EffectParams]
-    inputs: tuple[str, ...]
-
-
-_EFFECTS: dict[str, _Entry] = {}
+_EFFECTS: dict[str, ModelledEffect] = {}
 
 # The effect packages: entry points of this group, each naming a module whose import registers effects.
 _GROUP = "photo_fx.effects"
@@ -165,51 +157,44 @@ def effect[P: EffectParams](
 def unregister(name: str) -> None:
     """Remove the effect called `name` (UnknownEffectError if there is none). For tests that register throwaway
     effects."""
-    _entry(name)
+    get(name)
     del _EFFECTS[name]
 
 
 def get(name: str) -> ModelledEffect:
     """The effect called `name`; UnknownEffectError (a KeyError) listing the available ones if there is none."""
-    return _entry(name).function
+    _load_effect_packages()
+    try:
+        return _EFFECTS[name]
+    except KeyError:
+        raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
 
 
 def all_effects() -> dict[str, ModelledEffect]:
     """Every registered effect by name, sorted by name (a copy)."""
     _load_effect_packages()
-    return {name: _EFFECTS[name].function for name in sorted(_EFFECTS)}
+    return {name: _EFFECTS[name] for name in sorted(_EFFECTS)}
 
 
 def category(name: str) -> str:
     """The category of the effect called `name` (KeyError like `get`)."""
-    return _entry(name).category
+    return get(name).category
 
 
 def categories() -> dict[str, list[str]]:
     """Every category, in the order of `CATEGORIES`, with the sorted names of its effects (empty if it has none)."""
     _load_effect_packages()
-    return {c: sorted(name for name, entry in _EFFECTS.items() if entry.category == c) for c in CATEGORIES}
+    return {c: sorted(name for name, fn in _EFFECTS.items() if fn.category == c) for c in CATEGORIES}
 
 
 def parameters(name: str) -> type[EffectParams]:
     """The parameter model of the effect called `name` (KeyError like `get`)."""
-    return _entry(name).model
-
-
-def schema(name: str) -> dict[str, Any]:
-    """The JSON schema of the effect's parameter model, with a `unit` on every property (KeyError like `get`)."""
-    return parameters(name).json_schema()
+    return get(name).params_model
 
 
 def inputs(name: str) -> tuple[str, ...]:
     """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("matte",) (KeyError like `get`)."""
-    return _entry(name).inputs
-
-
-def validate(name: str, values: Mapping[str, object]) -> EffectParams:
-    """Check `values` (parameter name -> value) for the effect called `name`: its model, or RecipeError naming the
-    effect, each field, the constraint and the value."""
-    return _entry(name).function.validate(values)
+    return get(name).inputs
 
 
 def apply(name: str, rgb: np.ndarray, **params: Any) -> np.ndarray:
@@ -227,8 +212,8 @@ def describe() -> dict[str, str]:
 def documentation(name: str) -> str:
     """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every field's
     type, unit, range, default and description. KeyError like `get`."""
-    entry = _entry(name)
-    return f"{inspect.cleandoc(entry.function.__doc__ or '')}\n\n{entry.model.documentation()}"
+    fn = get(name)
+    return f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation()}"
 
 
 def summary(name: str) -> str:
@@ -236,14 +221,6 @@ def summary(name: str) -> str:
     text = " ".join((get(name).__doc__ or "").split())
     end = _SENTENCE_END.search(text)
     return text[: end.end()] if end else text
-
-
-def _entry(name: str) -> _Entry:
-    _load_effect_packages()
-    try:
-        return _EFFECTS[name]
-    except KeyError:
-        raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
 
 
 def _load_effect_packages() -> None:
@@ -310,18 +287,17 @@ def _register(fn: Any, category: str, params: Any) -> ModelledEffect:
                 f"effect {name!r} has the model {fn.params_model.__name__}, not {getattr(params, '__name__', params)}"
             )
         fn.category = category
-        entry = _Entry(fn, category, fn.params_model, fn.inputs)
+        registered = fn
     else:
-        found = _check_shape(name, fn, params)
-        entry = _Entry(ModelledEffect(fn, params, category, found), category, params, found)
+        registered = ModelledEffect(fn, params, category, _check_shape(name, fn, params))
     existing = _EFFECTS.get(name)
-    if existing is not None and _origin(existing.function) != _origin(entry.function):
+    if existing is not None and _origin(existing) != _origin(registered):
         raise ValueError(
-            f"two effects are called {name!r}: one in {existing.function.__module__}, another in "
-            f"{entry.function.__module__}; rename one"
+            f"two effects are called {name!r}: one in {existing.__module__}, another in {registered.__module__}; "
+            "rename one"
         )
-    _EFFECTS[name] = entry
-    return entry.function
+    _EFFECTS[name] = registered
+    return registered
 
 
 def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
@@ -344,7 +320,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
                 f"effect {name!r}: the input `{parameter.name}` needs a default (None), so that {name}(rgb) works"
             )
         declared.append(parameter.name)
-    clash = sorted(set(params.field_names()) & set(INPUTS))
+    clash = sorted(set(params.model_fields) & set(INPUTS))
     if clash:
         raise ValueError(f"effect {name!r}: `{clash[0]}` is supplied by the recipe, so it cannot be a parameter")
     return tuple(declared)
