@@ -110,10 +110,10 @@ An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imagei
 def glow(rgb: np.ndarray, params: GlowParams, *, matte: np.ndarray | None = None) -> np.ndarray: ...
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
-and maximum. `matte` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed. Contract tests check all
-of this for every effect.
+and maximum. `matte` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so is `partition` (piece labels
+of a region, `(h, w)` int32). Contract tests check all of this for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
-(`effect`, `mask`, `opacity`, `blend_mode`, `preset`) or an injected input; registering one fails. An effect whose natural
+(`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.
 
 ## Parameters
