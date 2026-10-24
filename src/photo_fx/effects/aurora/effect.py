@@ -1,6 +1,6 @@
 """The `aurora` effect: soft vertical light curtains, brightest at a wavy base, over a dark sky."""
 
-from typing import Any
+from functools import partial
 
 import numpy as np
 from scipy.special import ndtr
@@ -130,15 +130,13 @@ def aurora(rgb: np.ndarray, params: AuroraParams) -> np.ndarray:
     (`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
     """
     rows, width = rgb.shape[:2]
-    noise: dict[str, Any] = {
-        "octaves": params.octaves,
-        "persistence": params.persistence,
-        "lacunarity": params.lacunarity,
-    }
     # constant: a one-row field, so the noise runs along the picture only
-    ripple = fractal((1, width), scale=params.scale, seed=params.seed, **noise)[0]
+    noise = partial(
+        fractal, (1, width), octaves=params.octaves, persistence=params.persistence, lacunarity=params.lacunarity
+    )
+    ripple = noise(scale=params.scale, seed=params.seed)[0]
     # constant: stream 1 of the seed, independent of the ripple's stream 0 (the seed itself)
-    rank = ndtr(fractal((1, width), scale=params.ray_width, seed=[params.seed, 1], **noise))[0]
+    rank = ndtr(noise(scale=params.ray_width, seed=[params.seed, 1]))[0]
     above = (params.base * rows + params.waviness * ripple)[None, :] - np.arange(rows)[:, None]  # px above the base
     up = above / (params.height * rows)  # 0 at the base, 1 at the curtain's top
     brightness = np.clip(above + 0.5, 0.0, 1.0) * np.clip(1 - up, 0.0, 1.0) ** params.falloff

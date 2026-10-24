@@ -1,6 +1,7 @@
 """The `smoke` effect: soft-edged plumes of noise, stretched upward and swirled, mixed into the picture as a colour."""
 
-from typing import Any, Literal
+from functools import partial
+from typing import Literal
 
 import numpy as np
 from scipy.special import ndtr
@@ -131,16 +132,16 @@ def smoke(rgb: np.ndarray, params: SmokeParams) -> np.ndarray:
     pixels above the cut. Each pixel becomes picture + opacity x (color - picture).
     """
     height, width = rgb.shape[:2]
-    noise: dict[str, Any] = {
-        "scale": params.scale,
-        "octaves": params.octaves,
-        "persistence": params.persistence,
-        "lacunarity": params.lacunarity,
-    }
-    # constant: one stream per field, numbered from 0 (the seed itself)
-    field, sway_down, sway_across = (
-        fractal((height, width), seed=[params.seed, stream], **noise) for stream in range(3)
+    noise = partial(
+        fractal,
+        (height, width),
+        scale=params.scale,
+        octaves=params.octaves,
+        persistence=params.persistence,
+        lacunarity=params.lacunarity,
     )
+    # constant: one stream per field, numbered from 0 (the seed itself)
+    field, sway_down, sway_across = (noise(seed=[params.seed, stream]) for stream in range(3))
     rows = (height - 1) * (1 - 1 / params.rise) + np.arange(height)[:, None] / params.rise
     cols = np.arange(width)[None, :]
     warped = remap(
