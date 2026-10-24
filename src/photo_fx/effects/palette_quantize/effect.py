@@ -3,11 +3,11 @@
 from typing import Literal
 
 import numpy as np
+from pydantic import TypeAdapter
 
-from photo_fx.core.params import EffectParams, param
+from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.cluster import kmeans, nearest
-from photo_fx.ops.color import parse_color
 from photo_fx.ops.colorspace import srgb_to_linear
 
 # The named palettes are data, as their authors publish them (sRGB hex):
@@ -28,6 +28,7 @@ _PALETTES: dict[str, tuple[str, ...]] = {
         "#ff004d", "#ffa300", "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa",
     ),
 }  # fmt: skip
+_COLOUR = TypeAdapter(Color)  # reads the hex codes above like a recipe's `Color` field does
 
 
 class PaletteQuantizeParams(EffectParams):
@@ -123,7 +124,7 @@ def palette_quantize(rgb: np.ndarray, params: PaletteQuantizeParams) -> np.ndarr
     flat = rgb.reshape(rgb.shape[0] * rgb.shape[1], rgb.shape[2])
     lab = _oklab(flat)
     if params.palette != "photo":
-        colours = np.array([parse_color(c) for c in _PALETTES[params.palette]], dtype=np.float32)
+        colours = np.array([_COLOUR.validate_python(c) for c in _PALETTES[params.palette]], dtype=np.float32)
         return colours[nearest(lab, _oklab(colours))].reshape(rgb.shape)
     search = lab
     if params.sample < len(flat):

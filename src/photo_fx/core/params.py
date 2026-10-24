@@ -35,10 +35,10 @@ from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_orig
 
 import annotated_types
 import numpy as np
+from PIL import ImageColor
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, WithJsonSchema
 
 from photo_fx.errors import RecipeError
-from photo_fx.ops.color import parse_color
 
 from .types import Color as ColorForms
 
@@ -53,10 +53,9 @@ def _is_number(value: object) -> bool:
 
 
 def _to_color(value: object) -> tuple[float, float, float]:
-    """A colour as written ('#rrggbb', '#rgb', three numbers 0..1, a numpy array of three) -> the three floats
-    `parse_color` gives."""
+    """A colour as written ('#rrggbb', '#rgb', three numbers 0..1, a numpy array of three) -> its three floats 0..1."""
     if isinstance(value, str) and _HEX.fullmatch(value.strip()):
-        red, green, blue = (float(c) for c in parse_color(value.strip()))
+        red, green, blue = (channel / 255.0 for channel in ImageColor.getrgb(value.strip()))  # constant: 8-bit levels
         return red, green, blue
     parts: list[Any] = []
     if isinstance(value, np.ndarray) and value.ndim == 1:
@@ -64,8 +63,7 @@ def _to_color(value: object) -> tuple[float, float, float]:
     elif isinstance(value, list | tuple):
         parts = list(value)
     if len(parts) == 3 and all(_is_number(c) and math.isfinite(c) and 0 <= c <= 1 for c in parts):
-        red, green, blue = (float(c) for c in parse_color(parts))
-        return red, green, blue
+        return float(parts[0]), float(parts[1]), float(parts[2])
     raise ValueError(f"a colour is '#rrggbb', '#rgb' or three numbers from 0 to 1, got {value!r}")
 
 
@@ -87,7 +85,7 @@ Color = Annotated[
     ),
 ]
 """A colour parameter: written '#rrggbb', '#rgb' or as three numbers 0..1; held as three floats 0..1 (red, green,
-blue), exactly the float32 values `photo_fx.ops.color.parse_color` gives, so `np.asarray(color, np.float32)` is it."""
+blue): `np.asarray(color, np.float32)` is the colour as an array."""
 
 
 def _as_tuple(value: object) -> object:

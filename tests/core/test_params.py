@@ -247,7 +247,7 @@ class Kinds(EffectParams):
         ({"radius": np.float32(2.5)}, "radius", 2.5),
         ({"mode": "hard"}, "mode", "hard"),
         ({"tint": "#fff"}, "tint", (1.0, 1.0, 1.0)),
-        ({"tint": np.array([0.25, 0.5, 1.0])}, "tint", (0.25, 0.5, 1.0)),  # as parse_color accepted
+        ({"tint": np.array([0.25, 0.5, 1.0])}, "tint", (0.25, 0.5, 1.0)),
         ({"tint": (np.float32(0.5), 0, 1)}, "tint", (0.5, 0.0, 1.0)),
         ({"names": ["x", "y"]}, "names", ("x", "y")),
     ],

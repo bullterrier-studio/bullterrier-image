@@ -4,7 +4,7 @@ import numpy as np
 
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
-from photo_fx.ops.color import luminance, parse_color
+from photo_fx.ops.color import luminance
 
 
 class ThresholdParams(EffectParams):
@@ -36,4 +36,4 @@ def threshold(rgb: np.ndarray, params: ThresholdParams) -> np.ndarray:
     Brightness is Rec. 709 luminance, so a pure green is far brighter than a pure blue, as the eye sees them.
     """
     is_light = (luminance(rgb) >= np.float32(params.level))[..., None]
-    return np.where(is_light, parse_color(params.light), parse_color(params.dark)).astype(np.float32)
+    return np.where(is_light, np.asarray(params.light, np.float32), np.asarray(params.dark, np.float32))
