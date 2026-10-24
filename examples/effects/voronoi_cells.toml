@@ -1,0 +1,8 @@
+# Stained-glass cells in a neon ramp, with thin dark borders. The picture only gives the size.
+name = "voronoi_cells"
+size = 480
+
+[[step]]
+effect = "voronoi_cells"
+cells = 200
+seed = 1
