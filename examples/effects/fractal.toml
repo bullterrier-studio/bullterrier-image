@@ -1,0 +1,11 @@
+# A Julia set (c = -0.4 + 0.6i) in a neon ramp. The picture only gives the size.
+name = "fractal"
+size = 480
+
+[[step]]
+effect = "fractal"
+kind = "julia"
+c_real = -0.4
+c_imag = 0.6
+zoom = 1.5
+iterations = 64
