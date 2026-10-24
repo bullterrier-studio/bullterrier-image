@@ -1,11 +1,8 @@
-"""Behaviour of the `blend` effect.
+"""Behaviour of the `blend` effect: a picture fitted to the photo and combined with it by its blend mode and alpha.
 
-The oracle for the blend modes is the W3C Compositing and Blending Level 1 specification, written out here as plain
-Python on single pixels (separable modes per channel, the non-separable `color` mode with the spec's helper functions),
-so the effect's array code is compared with the spec and not with itself.
+The blend modes themselves are tested against the W3C specification in `tests/ops/test_composite.py`; here the
+expectations are worked out by hand: a neutral picture per mode, a multiply, a half-transparent picture.
 """
-
-import math
 
 import numpy as np
 import pytest
@@ -16,97 +13,16 @@ from bullterrier_image.core import registry
 NAME = "blend"
 
 
-# --- the specification, one pixel at a time ---------------------------------------------------------------------
+def test_multiply_by_a_flat_colour_multiplies_every_channel_by_it(photo):
+    out = registry.apply(NAME, photo, texture=Picture.of_color((0.5, 1.0, 0.25)), mode="multiply")
+    np.testing.assert_allclose(out, photo * np.array([0.5, 1.0, 0.25], np.float32), atol=1e-6)
 
 
-def multiply(cb: float, cs: float) -> float:
-    return cb * cs
-
-
-def screen(cb: float, cs: float) -> float:
-    return cb + cs - cb * cs
-
-
-def hard_light(cb: float, cs: float) -> float:
-    return multiply(cb, 2 * cs) if cs <= 0.5 else screen(cb, 2 * cs - 1)
-
-
-def soft_light(cb: float, cs: float) -> float:
-    if cs <= 0.5:
-        return cb - (1 - 2 * cs) * cb * (1 - cb)
-    d = ((16 * cb - 12) * cb + 4) * cb if cb <= 0.25 else math.sqrt(cb)
-    return cb + (2 * cs - 1) * (d - cb)
-
-
-SEPARABLE = {
-    "normal": lambda cb, cs: cs,
-    "multiply": multiply,
-    "screen": screen,
-    "overlay": lambda cb, cs: hard_light(cs, cb),  # overlay is hard light with the two swapped
-    "soft_light": soft_light,
-    "difference": lambda cb, cs: abs(cb - cs),
-}
-
-
-def lum(c):
-    return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
-
-
-def clip_color(c):
-    luminosity, low, high = lum(c), min(c), max(c)
-    if low < 0:
-        c = [luminosity + (ci - luminosity) * luminosity / (luminosity - low) for ci in c]
-    if high > 1:
-        c = [luminosity + (ci - luminosity) * (1 - luminosity) / (high - luminosity) for ci in c]
-    return c
-
-
-def set_lum(c, luminosity):
-    d = luminosity - lum(c)
-    return clip_color([ci + d for ci in c])
-
-
-def blend_pixel(mode, backdrop, source):
-    if mode == "color":
-        return set_lum(list(source), lum(backdrop))
-    return [SEPARABLE[mode](cb, cs) for cb, cs in zip(backdrop, source, strict=True)]
-
-
-def expected_blend(mode: str, rgb: np.ndarray, colour: tuple[float, float, float], alpha: float = 1.0) -> np.ndarray:
-    """The photo blended with one colour (opaque backdrop): Co = (1 - as) Cb + as B(Cb, Cs)."""
-    out = np.zeros_like(rgb, dtype=np.float64)
-    for index in np.ndindex(rgb.shape[:2]):
-        backdrop = [float(v) for v in rgb[index]]
-        mixed = blend_pixel(mode, backdrop, colour)
-        out[index] = [(1 - alpha) * cb + alpha * bm for cb, bm in zip(backdrop, mixed, strict=True)]
-    return out
-
-
-MODES = [*SEPARABLE, "color"]
-COLOURS = {
-    "orange": (1.0, 0.5, 0.0),
-    "dark teal": (0.0, 0.25, 0.3),
-    "light grey": (0.8, 0.8, 0.8),
-    "saturated blue": (0.1, 0.2, 0.95),
-}
-
-
-@pytest.mark.parametrize("colour", COLOURS.values(), ids=COLOURS.keys())
-@pytest.mark.parametrize("mode", MODES)
-def test_a_one_colour_picture_blends_like_that_colour_by_the_w3c_formulas(mode, colour, photo):
-    rgb = np.ascontiguousarray(photo[::6, ::8])  # 16 x 16, every kind of backdrop tone
-    picture = Picture(np.array([[colour]], np.float32))
-    out = registry.apply(NAME, rgb, texture=picture, mode=mode)
-    np.testing.assert_allclose(out, expected_blend(mode, rgb, colour), atol=2e-5)
-
-
-@pytest.mark.parametrize("mode", MODES)
-def test_the_pictures_own_alpha_mixes_the_blend_in_partway(mode, photo):
-    rgb = np.ascontiguousarray(photo[::6, ::8])
+def test_the_pictures_own_alpha_mixes_the_blend_in_partway(photo):
     colour = (0.9, 0.3, 0.1)
     picture = Picture(np.array([[(*colour, 0.4)]], np.float32))
-    out = registry.apply(NAME, rgb, texture=picture, mode=mode)
-    np.testing.assert_allclose(out, expected_blend(mode, rgb, colour, alpha=0.4), atol=2e-5)
+    out = registry.apply(NAME, photo, texture=picture, mode="normal")
+    np.testing.assert_allclose(out, 0.6 * photo + 0.4 * np.array(colour, np.float32), atol=1e-6)
 
 
 IDENTITIES = {
