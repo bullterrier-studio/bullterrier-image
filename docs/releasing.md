@@ -63,9 +63,8 @@ stored anywhere) with signed attestations; last, the GitHub Release gets the cha
 files and a build-provenance attestation.
 
 **One-time setup, by the owner:**
-- pypi.org, *Publishing*: add a pending publisher for the project `bullterrier-image`: owner and repository as on GitHub
-  (`jcakstins` and `photo-fx` until the repository is transferred and renamed; then `bullterrier-studio` and
-  `bullterrier-image`), workflow `release.yml`, environment `pypi`. The same on test.pypi.org with the environment `testpypi`.
+- pypi.org, *Publishing*: add a pending publisher for the project `bullterrier-image`: owner `bullterrier-studio`, repository
+  `bullterrier-image`, workflow `release.yml`, environment `pypi`. The same on test.pypi.org with the environment `testpypi`.
   The first upload creates the project.
 - GitHub, *Settings > Environments*: `pypi` and `testpypi`, each with the owner as required reviewer and deployments
   limited to tags `v*`.

@@ -7,7 +7,7 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 ## Responsibility
 
 This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (design in `~/github/bullterrier-design`; the
-GitHub repository is still `jcakstins/photo-fx` until it is transferred and renamed).
+GitHub repository is `bullterrier-studio/bullterrier-image`).
 It changes and understands **single pictures** and has **no concept of time**. Its siblings are `audio` (finds beats and sections in sound),
 `control` (values that change over time: keyframes, envelopes, LFOs) and `video` (decides what happens when, maps control signals onto
 parameters, renders frames). Image, audio and control never depend on each other; only video knows the others.

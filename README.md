@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jcakstins/photo-fx/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/jcakstins/photo-fx/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/bullterrier-studio/bullterrier-image/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/bullterrier-studio/bullterrier-image/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white">
   <img alt="uv" src="https://img.shields.io/badge/built%20with-uv-de5fe9">
   <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-2ea44f">
@@ -102,8 +102,8 @@ bt-image effects                   # lists every effect and its main parameters 
 From a checkout, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone https://github.com/jcakstins/photo-fx.git
-cd photo-fx
+git clone https://github.com/bullterrier-studio/bullterrier-image.git
+cd bullterrier-image
 uv sync
 uv run bt-image effects
 ```

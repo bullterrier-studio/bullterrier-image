@@ -46,8 +46,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/jcakstins/photo-fx"
-Issues = "https://github.com/jcakstins/photo-fx/issues"
+Repository = "https://github.com/bullterrier-studio/bullterrier-image"
+Issues = "https://github.com/bullterrier-studio/bullterrier-image/issues"
 
 [project.scripts]
 bt-image = "bullterrier_image.cli:main"

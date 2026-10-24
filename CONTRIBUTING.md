@@ -9,8 +9,8 @@ way it is.
 You need [uv](https://docs.astral.sh/uv/) and git.
 
 ```bash
-git clone https://github.com/jcakstins/photo-fx.git
-cd photo-fx
+git clone https://github.com/bullterrier-studio/bullterrier-image.git
+cd bullterrier-image
 uv sync                # the project and its development tools, in .venv
 uv run poe setup       # once per clone: the git hooks and the commit-message template
 ```

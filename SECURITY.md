@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems privately, not in a public issue: use GitHub's private vulnerability reporting at
-<https://github.com/jcakstins/photo-fx/security/advisories/new> ("Report a vulnerability" on the repository's Security
+<https://github.com/bullterrier-studio/bullterrier-image/security/advisories/new> ("Report a vulnerability" on the repository's Security
 tab). Say what is affected, how to reproduce it (a small file or recipe helps), and what an attacker could do with it.
 
 You can expect an acknowledgement within a week. Once a fix is released, the advisory is published with credit to you,
