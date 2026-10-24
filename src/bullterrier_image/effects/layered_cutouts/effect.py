@@ -45,13 +45,15 @@ class LayeredCutoutsParams(EffectParams):
         doc="The colour of the farthest layer; the layers between step evenly from `color` to it. With one layer "
         "only `color` is used.",
     )
-    opacity: float = param(
+    layer_opacity: float = param(
         1.0,
         unit="fraction",
         min=0,
         max=1,
         doc="How much of what lies behind each layer it covers: 1 = fully (paper), below 1 the layers show through "
-        "each other and the picture; 0 = no layers.",
+        "each other and the picture; 0 = no layers. Not the step's `opacity`: each layer is laid at this over the "
+        "ones beyond it, so where layers overlap they compound (two layers at 0.5 cover 0.75), while the step's "
+        "`opacity` mixes the finished stack in once.",
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
@@ -83,6 +85,6 @@ def layered_cutouts(rgb: np.ndarray, params: LayeredCutoutsParams, *, matte: np.
     colors = near + (far - near) * along[:, None]
     behind = rgb  # what lies behind the subject: the picture with the layers laid over it, the farthest first
     for number in range(params.layers, 0, -1):
-        cover = params.opacity * shift(matte, *(step * number), edge=params.edge)
+        cover = params.layer_opacity * shift(matte, *(step * number), edge=params.edge)
         behind = behind + cover[..., None] * (colors[number - 1] - behind)
     return put_behind(rgb, matte, 1, behind)  # constant: the layers' own opacity is already in `behind`
