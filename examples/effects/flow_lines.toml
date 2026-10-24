@@ -1,4 +1,4 @@
-# Golden flow lines on deep violet, twice as dense as the default. The picture only gives the size.
+# Golden flow lines on deep violet, twice as dense as the default, behind the dog.
 name = "flow_lines"
 size = 480
 
@@ -6,3 +6,4 @@ size = 480
 effect = "flow_lines"
 density = 0.004
 seed = 1
+mask = "background"

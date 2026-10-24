@@ -1,4 +1,4 @@
-# A fine pink grid, turned 15 degrees, on deep violet. The picture only gives the size.
+# A fine pink grid, turned 15 degrees, on deep violet, behind the dog.
 name = "pattern"
 size = 480
 
@@ -10,3 +10,4 @@ foreground = "#ff2bd6"
 background = "#12002b"
 thickness = 0.06
 angle = 15
+mask = "background"

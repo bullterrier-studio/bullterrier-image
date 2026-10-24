@@ -1,4 +1,4 @@
-# A Julia set (c = -0.4 + 0.6i) in a neon ramp. The picture only gives the size.
+# A Julia set (c = -0.4 + 0.6i) in a neon ramp, behind the dog.
 name = "fractal"
 size = 480
 
@@ -7,5 +7,6 @@ effect = "fractal"
 kind = "julia"
 c_real = -0.4
 c_imag = 0.6
-zoom = 1.5
+zoom = 2.4
 iterations = 64
+mask = "background"

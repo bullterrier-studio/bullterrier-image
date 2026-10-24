@@ -1,4 +1,4 @@
-# Stained-glass cells in a neon ramp, with thin dark borders. The picture only gives the size.
+# Stained-glass cells in a neon ramp, with thin dark borders, behind the dog.
 name = "voronoi_cells"
 size = 480
 
@@ -6,3 +6,4 @@ size = 480
 effect = "voronoi_cells"
 cells = 200
 seed = 1
+mask = "background"
