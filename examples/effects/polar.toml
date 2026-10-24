@@ -1,0 +1,9 @@
+# A tiny planet: the photo wrapped round its middle, the room's ceiling turned into sky around it.
+name = "polar"
+size = 480
+
+[[step]]
+effect = "polar"
+mode = "to"
+x = 0.5
+y = 0.5

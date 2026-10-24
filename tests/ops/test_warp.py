@@ -172,6 +172,14 @@ def test_the_distance_of_every_pixel_from_the_centre() -> None:
     assert distance[0, 30] == pytest.approx(15.0)
 
 
+def test_the_offsets_of_the_pixels_from_the_centre_are_positive_below_and_right_of_it() -> None:
+    dr, dc = Centre(31, 61, x=0.5, y=0.5).offsets()
+    assert dr.shape == (31, 1)
+    assert dc.shape == (1, 61)
+    assert (dr[0, 0], dr[15, 0], dr[30, 0]) == (-15.0, 0.0, 15.0)
+    assert (dc[0, 0], dc[0, 30], dc[0, 60]) == (-30.0, 0.0, 30.0)
+
+
 @pytest.mark.parametrize(
     ("x", "y", "pixel"),
     [(0.0, 0.0, (0, 0)), (1.0, 1.0, (30, 60)), (0.25, 0.8, (24, 15))],

@@ -76,7 +76,7 @@ class Centre:
     @property
     def distance(self) -> np.ndarray:
         """The distance in px of every pixel from the centre, float64, shape (height, width)."""
-        return np.hypot(*self._offsets())
+        return np.hypot(*self.offsets())
 
     def sources(
         self, scale: float | np.ndarray | None = None, turn: float | np.ndarray | None = None
@@ -90,7 +90,7 @@ class Centre:
         pixel; None (the default) leaves that step out. The centre pixel always reads itself; with neither given
         every pixel reads itself.
         """
-        dr, dc = self._offsets()
+        dr, dc = self.offsets()
         if scale is not None:
             dr, dc = dr * scale, dc * scale
         if turn is not None:
@@ -103,8 +103,10 @@ class Centre:
         """The shape of the picture, (height, width)."""
         return self.height, self.width
 
-    def _offsets(self) -> tuple[np.ndarray, np.ndarray]:
-        """The row offset (height, 1) and column offset (1, width) of the pixels from the centre, in px."""
+    def offsets(self) -> tuple[np.ndarray, np.ndarray]:
+        """Where each pixel is from the centre, in px: the row offset, shape (height, 1), and the column offset, shape
+        (1, width), both float64, positive below and right of the centre. They broadcast against each other, and against
+        `distance`, to (height, width)."""
         dr = np.arange(self.height, dtype=np.float64)[:, None] - self.y * (self.height - 1)
         dc = np.arange(self.width, dtype=np.float64)[None, :] - self.x * (self.width - 1)
         return dr, dc
