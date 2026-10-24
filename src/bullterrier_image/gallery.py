@@ -315,7 +315,8 @@ def _row(name: str) -> str:
 
 def _parameter_table(name: str) -> list[str]:
     """The lines of an effect's parameter table (name, type, unit, range, default, description), under a heading of its
-    own; the advanced parameters follow in a collapsed block of the same form, then the effect's presets."""
+    own; the advanced parameters follow in a collapsed block of the same form, then the opacity of its steps if it is
+    not 1, then the effect's presets."""
     docs = registry.parameters(name).fields_doc()
     head = ["| Parameter | Type | Unit | Range | Default | Description |", "| --- | --- | --- | --- | --- | --- |"]
 
@@ -338,6 +339,8 @@ def _parameter_table(name: str) -> list[str]:
             "",
             "</details>",
         ]
+    if (opacity := registry.opacity(name)) != 1:
+        lines += ["", f"A step of `{name}` has `opacity = {opacity:g}` unless it sets its own."]
     if found := registry.presets(name):
         lines += [
             "",

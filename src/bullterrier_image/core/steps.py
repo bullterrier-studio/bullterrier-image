@@ -48,7 +48,12 @@ class Step(ValidatedModel):
         None, description='Apply only to the "subject" or only to the "background" of the photo; None: everywhere.'
     )
     opacity: float = Field(
-        1.0, ge=0, le=1, strict=True, allow_inf_nan=False, description="How much of the step shows: 0 none, 1 fully."
+        ge=0,
+        le=1,
+        strict=True,
+        allow_inf_nan=False,
+        description="How much of the step shows: 0 none, 1 fully; when none is given, the effect's own default "
+        "(`registry.opacity`, 1 for most effects).",
     )
     blend_mode: BlendMode = Field(
         "normal",
@@ -62,7 +67,7 @@ class Step(ValidatedModel):
         effect: str,
         params: Mapping[str, Any] | None = None,
         mask: str | None = None,
-        opacity: float = 1.0,
+        opacity: float | None = None,
         blend_mode: str = "normal",
         preset: str | None = None,
         **unknown: Any,
@@ -72,7 +77,8 @@ class Step(ValidatedModel):
 
         preset: the name of one of the effect's presets (see `registry.presets`). The step holds the preset's
         parameters with `params` laid over them, so a parameter you give wins; an effect without that preset is a
-        RecipeError listing the ones it has."""
+        RecipeError listing the ones it has. opacity: None takes the effect's default (`registry.opacity`, declared with
+        `@effect(opacity=...)`, usually 1); a number replaces it."""
         values = dict(params or {})
         if preset is not None:
             found = registry.presets(effect)  # an unknown effect: UnknownEffectError listing them
@@ -80,6 +86,8 @@ class Step(ValidatedModel):
                 has = f"its presets: {', '.join(found)}" if found else "it has no presets"
                 raise RecipeError(f"effect {effect!r} has no preset {preset!r}; {has}")
             values = {**found[preset].params, **values}
+        if opacity is None:
+            opacity = registry.opacity(effect)  # an unknown effect: UnknownEffectError listing them
         self._init_checked(
             "", effect=effect, params=values, mask=mask, opacity=opacity, blend_mode=blend_mode, **unknown
         )

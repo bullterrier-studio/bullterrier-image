@@ -1,12 +1,14 @@
 """A step's values are validated by its effect's parameter model, at once; the recipe objects (Step, Recipe) are
 validated, frozen models wherever they are made."""
 
+import inspect
 import tomllib
 from importlib.resources import files
 
 import numpy as np
 import pytest
 
+from bullterrier_image import fx
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, Picture, param
@@ -61,6 +63,45 @@ def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_val
     path.write_text("[[step]]\neffect = 'gain_probe'\ngain = 7.5\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"hot\.toml.*step 1.*gain_probe.*`gain`.*\b4\b.*7\.5"):
         load_recipe(path)
+
+
+# --- the effect's own default opacity --------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def faint(throwaway_effects):
+    def faint_probe(rgb: np.ndarray, params: GainParams) -> np.ndarray:
+        """Brightens by a gain, mixed in at 0.4 unless a step says otherwise."""
+        return rgb
+
+    return effect(category="light", params=GainParams, opacity=0.4)(faint_probe)
+
+
+def recipe_step(folder, keys: str) -> Step:
+    path = folder / "faint.toml"
+    path.write_text(f"[[step]]\neffect = 'faint_probe'\n{keys}", encoding="utf-8")
+    return load_recipe(path).steps[0]
+
+
+@pytest.mark.parametrize(
+    ("make", "opacity"),
+    [
+        pytest.param(lambda folder: Step("faint_probe"), 0.4, id="Step takes the effect's default"),
+        pytest.param(lambda folder: fx.faint_probe(), 0.4, id="fx takes it"),
+        pytest.param(lambda folder: recipe_step(folder, ""), 0.4, id="a recipe file takes it"),
+        pytest.param(lambda folder: Step("faint_probe", opacity=1.0), 1.0, id="Step: a given opacity replaces it"),
+        pytest.param(lambda folder: fx.faint_probe(opacity=0.5), 0.5, id="fx: replaces it, does not multiply"),
+        pytest.param(lambda folder: recipe_step(folder, "opacity = 0.5\n"), 0.5, id="a recipe file: replaces it"),
+    ],
+)
+def test_a_step_has_its_effects_default_opacity_unless_it_gives_one(faint, tmp_path, make, opacity):
+    assert make(tmp_path).opacity == opacity
+
+
+def test_the_fx_signature_shows_the_effects_default_opacity(faint):
+    assert inspect.signature(fx.faint_probe).parameters["opacity"].default == 0.4
+    (stub,) = [line for line in fx.stub_text().splitlines() if line.startswith("def faint_probe(")]
+    assert ", opacity: float = 0.4, blend_mode: " in stub
 
 
 # --- the recipe objects are validated, frozen models -----------------------------------------------------------------

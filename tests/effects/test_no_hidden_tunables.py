@@ -3,6 +3,7 @@
 An architecture test: its subject is the source of the effect packages (`effects/<name>/effect.py`) and of the helpers
 they share (`ops/*.py`), so it reads them with `ast`. A numeric literal fails unless it is
 - part of a parameter's declaration (inside `param(...)`: default, min, max), or
+- the default opacity of the effect's steps (`@effect(..., opacity=0.6)`), declared and documented like a parameter, or
 - a trivial value (0, 1, 2, 0.5, 255; a minus sign does not matter) used as an arithmetic operand (exponents included:
   squares and square roots are mathematics), a comparison operand, an index or slice bound, or a positional bound, fill
   or matrix entry of a `BOUND_CALLS` function (`np.clip(x, 0, 1)`), or
@@ -74,6 +75,12 @@ def hidden_tunables(source: str) -> list[tuple[int, float]]:
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and _called_name(node.func) == "param"
         for inner in ast.walk(node)
+    } | {
+        id(keyword.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _called_name(node.func) == "effect"
+        for keyword in node.keywords
+        if keyword.arg == "opacity"
     }
     covered = _covered_lines(source, tree)
     return sorted(
@@ -344,6 +351,14 @@ MARKED = {  # module source -> the literals still found
         [0.35],
     ),
     "an unmarked decorator": ("@lru_cache(maxsize=16)\ndef probe():\n    return 0.35\n", [16, 0.35]),
+    "the step opacity an effect declares is never a finding": (
+        '@effect(category="light", params=P, opacity=0.6)\ndef probe(rgb, params):\n    return rgb\n',
+        [],
+    ),
+    "another number in the registration is": (
+        '@effect(category="light", params=P, sigma=0.6)\ndef probe():\n    pass\n',
+        [0.6],
+    ),
     "a literal in a param declaration is never a finding": (
         'radius: float = param(0.35, unit="px", min=0.1, max=7, doc="Radius.")\n',
         [],

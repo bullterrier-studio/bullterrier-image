@@ -5,6 +5,7 @@ Every effect here is the test's own (`throwaway_effects` removes it again), so n
 
 import importlib
 import json
+import re
 import subprocess
 import sys
 import textwrap
@@ -152,6 +153,24 @@ def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwawa
     assert "clash_probe" not in registry.describe()
 
 
+@pytest.mark.parametrize("opacity", [1.5, -0.1, float("nan"), True, "0.5"])
+def test_a_step_opacity_outside_0_to_1_is_refused_at_registration(opacity, throwaway_effects):
+    with pytest.raises(ValueError, match=rf"gain_probe.*opacity.*{re.escape(repr(opacity))}"):
+        effect(category="light", params=GainParams, opacity=opacity)(gain_probe)
+    assert "gain_probe" not in registry.describe()
+
+
+def test_an_effect_may_declare_the_opacity_of_its_steps_and_its_documentation_says_so(gain, throwaway_effects):
+    @effect(category="light", params=GainParams, opacity=0.4)
+    def faint_probe(rgb, params):
+        """Brightens faintly."""
+        return rgb
+
+    assert (registry.opacity("faint_probe"), registry.opacity("gain_probe")) == (0.4, 1.0)
+    assert "\nStep opacity\n------------\n0.4" in registry.documentation("faint_probe")
+    assert "Step opacity" not in registry.documentation("gain_probe")  # 1, the rule: nothing to say
+
+
 @pytest.mark.parametrize("category", ["lights", "Light", ""], ids=["misspelt", "capitalised", "empty"])
 def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(category, throwaway_effects):
     with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, utilities"):
@@ -159,9 +178,10 @@ def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(cat
     assert "gain_probe" not in registry.describe()
 
 
-def test_registering_an_effect_again_keeps_the_very_same_effect(gain):
-    assert effect(category="light", params=GainParams)(gain) is gain
+def test_registering_an_effect_again_keeps_the_very_same_effect_with_what_it_now_declares(gain):
+    assert effect(category="colour", params=GainParams, opacity=0.3)(gain) is gain
     assert registry.get("gain_probe") is gain
+    assert (registry.category("gain_probe"), registry.opacity("gain_probe")) == ("colour", 0.3)
 
 
 def test_registering_the_same_function_twice_is_allowed(throwaway_effects):

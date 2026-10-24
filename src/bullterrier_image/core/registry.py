@@ -88,14 +88,20 @@ class ModelledEffect[P: EffectParams]:
     params_model: type[P]  # the effect's parameter model
     category: str  # its section of the catalogue, one of `CATEGORIES`
     inputs: tuple[str, ...]  # the injected inputs it declares, from `INPUTS`
+    opacity: float  # the opacity of a step of this effect that sets none, 0..1 (see `effect`)
 
     def __init__(
-        self, function: Callable[..., np.ndarray], params_model: type[P], category: str, inputs: tuple[str, ...]
+        self,
+        function: Callable[..., np.ndarray],
+        params_model: type[P],
+        category: str,
+        inputs: tuple[str, ...],
+        opacity: float,
     ) -> None:
         """Wrap `function(rgb, params, *, inputs...)`; the registry does this, after checking every rule."""
         functools.update_wrapper(self, function)
         self._function = function
-        self.params_model, self.category, self.inputs = params_model, category, inputs
+        self.params_model, self.category, self.inputs, self.opacity = params_model, category, inputs, opacity
         fields = [p.replace(kind=inspect.Parameter.KEYWORD_ONLY) for p in params_model.signature().parameters.values()]
         given = [p for p in inspect.signature(function).parameters.values() if p.name in inputs]
         self.__signature__ = inspect.Signature(
@@ -146,19 +152,23 @@ _LOADING = _Loading()
 
 
 def effect[P: EffectParams](
-    *, category: str, params: type[P]
+    *, category: str, params: type[P], opacity: float = 1.0
 ) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
     """Decorator: `@effect(category="light", params=GlowParams)` makes `glow(rgb, params, *, matte=None) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
     as its second argument. Keyword-only parameters after it are injected inputs, each named in `INPUTS` and defaulted.
+    `opacity` (0..1, default 1) is the opacity a step of this effect has when it sets none, in a recipe file, `Step`
+    and `fx` alike: an effect that is meant to be mixed in partway (a shadow, rain) says so here, and a step's own
+    `opacity` replaces it. `fx` signatures, `documentation` and the catalogue show it.
     Raises `ValueError`, and registers nothing, when the category is unknown, `params` is not an `EffectParams`
     subclass, the function has another shape, an input is unknown, a field is named like an input or a step key
-    (`STEP_KEYS`), or a different function already has the same name. Registering the same function again, as
-    reloading its module does, replaces the old one; registering a `ModelledEffect` again keeps that very object.
+    (`STEP_KEYS`), `opacity` is not a number from 0 to 1, or a different function already has the same name.
+    Registering the same function again, as reloading its module does, replaces the old one (category and opacity
+    included); registering a `ModelledEffect` again keeps that very object.
     """
-    return lambda fn: _register(fn, category, params)
+    return lambda fn: _register(fn, category, params, opacity)
 
 
 def unregister(name: str) -> None:
@@ -204,6 +214,12 @@ def presets(name: str) -> dict[str, Preset]:
     return preset_files.read(name, parameters(name))
 
 
+def opacity(name: str) -> float:
+    """The opacity a step of the effect called `name` has when it sets none (declared with `@effect(opacity=...)`;
+    usually 1). KeyError like `get`."""
+    return get(name).opacity
+
+
 def inputs(name: str) -> tuple[str, ...]:
     """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("matte",) (KeyError like `get`)."""
     return get(name).inputs
@@ -224,9 +240,15 @@ def describe() -> dict[str, str]:
 def documentation(name: str, *, advanced: bool = True) -> str:
     """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every basic
     field's type, unit, range, default and description, then an "Advanced parameters" section (or, with
-    `advanced=False`, one line counting them), then a "Presets" section if it has any. KeyError like `get`."""
+    `advanced=False`, one line counting them), then a "Step opacity" section if a step of it has an opacity other than
+    1 by default, then a "Presets" section if it has any. KeyError like `get`."""
     fn = get(name)
     text = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
+    if fn.opacity != 1:
+        text += (
+            f"\n\nStep opacity\n------------\n{fn.opacity:g}: a step of this effect is mixed in at {fn.opacity:g} "
+            "unless it sets its own `opacity`, which replaces this."
+        )
     if not (found := presets(name)):
         return text
     lines = [f"{preset} : {found[preset].description}" for preset in found]
@@ -291,22 +313,26 @@ def _failure(entry_point: metadata.EntryPoint, error: Exception) -> str:
     return f"{message}; fix or uninstall it, or set {_PLUGINS_VARIABLE}=builtin to load only our own effects"
 
 
-def _register(fn: Any, category: str, params: Any) -> ModelledEffect:
+def _register(fn: Any, category: str, params: Any, opacity: Any) -> ModelledEffect:
     name = fn.__name__
     if category not in CATEGORIES:
         raise ValueError(
             f"effect {name!r} has the unknown category {category!r}: write @effect(category=...) with one of: "
             f"{', '.join(CATEGORIES)}"
         )
+    if type(opacity) not in {int, float} or not 0 <= opacity <= 1:  # not a bool; NaN fails the comparison
+        raise ValueError(
+            f"effect {name!r}: opacity, the default opacity of its steps, must be a number from 0 to 1, got {opacity!r}"
+        )
     if isinstance(fn, ModelledEffect):  # registered again (a module reloaded, a test restoring the registry)
         if params is not fn.params_model:
             raise ValueError(
                 f"effect {name!r} has the model {fn.params_model.__name__}, not {getattr(params, '__name__', params)}"
             )
-        fn.category = category
+        fn.category, fn.opacity = category, opacity
         registered = fn
     else:
-        registered = ModelledEffect(fn, params, category, _check_shape(name, fn, params))
+        registered = ModelledEffect(fn, params, category, _check_shape(name, fn, params), opacity)
     existing = _EFFECTS.get(name)
     if existing is not None and _origin(existing) != _origin(registered):
         raise ValueError(

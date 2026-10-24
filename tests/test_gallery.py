@@ -215,6 +215,17 @@ def test_an_effect_with_presets_lists_them_under_its_parameter_table():
     assert "Presets" not in page[page.index("### `grade`") :].split("\n### ")[0]
 
 
+def test_an_effect_that_sets_its_steps_opacity_says_so_under_its_parameter_table(throwaway_effects):
+    @effect(category="light", params=AmountParams, opacity=0.4)
+    def faint_probe(rgb, params):
+        """Lightens faintly."""
+        return rgb
+
+    page = gallery.render_effects_pages()["light.md"]
+    assert "A step of `faint_probe` has `opacity = 0.4` unless it sets its own." in page
+    assert "unless it sets its own" not in page[page.index("### `glow`") :].split("\n### ")[0]
+
+
 class TunedParams(EffectParams):
     """The tuned probe's settings: a technique option between two look controls."""
 

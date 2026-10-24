@@ -54,16 +54,16 @@ def empty_registry() -> Iterator[None]:
     """Inside the block the effect registry is empty; afterwards, even if the block raised, whatever was registered in
     it is removed and the real effects are back, in their original order. Uses only the registry's public interface:
     `unregister`, and registering the same function again, which the registry allows."""
-    real = [(name, fn, registry.category(name)) for name, fn in registry.all_effects().items()]
-    for name, _, _ in real:
+    real = [(name, fn, registry.category(name), registry.opacity(name)) for name, fn in registry.all_effects().items()]
+    for name, *_ in real:
         unregister(name)
     try:
         yield
     finally:
         for name in registry.all_effects():
             unregister(name)
-        for _, fn, category in real:
-            effect(category=category, params=fn.params_model)(fn)
+        for _, fn, category, opacity in real:
+            effect(category=category, params=fn.params_model, opacity=opacity)(fn)
 
 
 @pytest.fixture

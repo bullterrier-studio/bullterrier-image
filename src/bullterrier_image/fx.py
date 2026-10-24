@@ -83,13 +83,13 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
 
 def _signature(name: str) -> inspect.Signature:
     """The effect's parameters as a call signature, then the step keys as keywords, typed and defaulted as `Step`
-    declares them (`effect` is the builder's own name), and `preset` (one of the names) if the effect has presets."""
+    declares them (`effect` is the builder's own name; `opacity` defaults to the effect's own, `registry.opacity`), and
+    `preset` (one of the names) if the effect has presets."""
     signature = registry.parameters(name).signature()
     step = Step.model_fields
+    defaults = {key: step[key].default for key in step} | {"opacity": registry.opacity(name)}
     keys = [
-        inspect.Parameter(
-            key, inspect.Parameter.KEYWORD_ONLY, default=step[key].default, annotation=step[key].annotation
-        )
+        inspect.Parameter(key, inspect.Parameter.KEYWORD_ONLY, default=defaults[key], annotation=step[key].annotation)
         for key in registry.STEP_KEYS
         if key in step and key != "effect"
     ]
