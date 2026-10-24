@@ -7,6 +7,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` `truncate=4.0` `edge='reflect'` `constant_value=0.0` | [halftone.toml](../../examples/effects/halftone.toml) |
+| <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` `truncate=4.0` `edge='reflect'` | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 
 ### `halftone`
 
@@ -23,3 +24,14 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma cells. Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), 'constant' (constant_value). |
 | `constant_value` | number | fraction | 0 to 1 | `0.0` | The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise. |
+
+### `liquid_metal`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `smoothing` | number | px | 0 to 20 | `3.0` | Gaussian sigma in px with which the brightness is smoothed before it is read as height: 0 = every pixel is a bump and the metal is rough with the picture's texture and noise, larger = broad, flowing swells. |
+| `relief` | number | px | 0 to 200 | `35.0` | How tall the relief is: a white pixel stands this many px above a black one, so the slope between neighbours is their brightness difference times this. 0 = a flat mirror (one tint-coloured picture when the horizon is at 0.5), larger = steeper relief and a more contrasty, more broken-up reflection. Sizes are in px, so the defaults suit a picture about 480 px high: scale `smoothing` and `relief` with the picture's size. |
+| `horizon` | number | fraction | 0.05 to 0.95 | `0.65` | Where the environment's horizon is, as a fraction of the way from the ground (0, looking straight down) to the sky (1, looking straight up), kept off the extremes so there is always some of both; a flat surface looks at 0.5. The metal is exactly `tint` at the horizon, darker towards the ground and lighter towards the sky: raising it turns more of the reflections dark, lowering it more of them light. |
+| `tint` | colour |  |  | `'#c9d6ff'` | The metal's colour as it looks at the horizon ('#rrggbb', '#rgb' or [r, g, b] 0..1): the metal runs from black on the ground through this to white in the sky. A light bluish silver by default; gold is '#e6b84d'. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `smoothing` > 0). Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a seam). |

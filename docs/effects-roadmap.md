@@ -78,21 +78,21 @@ separate code.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `grain` ✓ | Film grain. | `fx.grain(amount=0.07)` |
-| `film_grain` | Grain that depends on brightness, per channel. | `fx.film_grain(shadows=0.1, highlights=0.03)` |
-| `noise` | Gaussian/uniform, colour or mono noise. | `fx.noise(amount=0.1, color=False)` |
-| `scanlines` | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
-| `pixel_grid` | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
-| `emboss` | Relief from luminance. | `fx.emboss(angle=135, depth=1)` |
-| `bump_light` | Light a height map from a direction. | `fx.bump_light(angle=45, height=0.6)` |
-| `dust_scratches` | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
-| `paper_texture` | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
+| `film_grain` ✓ | Grain that depends on brightness, per channel. | `fx.film_grain(shadows=0.1, highlights=0.03)` |
+| `noise` ✓ | Gaussian/uniform, colour or mono noise. | `fx.noise(amount=0.1, color=False)` |
+| `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
+| `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
+| `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, depth=6)` |
+| `bump_light` ✓ | Light a height map from a direction. | `fx.bump_light(angle=45, height=8)` |
+| `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
+| `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
 | `border` | Solid or rounded border. | `fx.border(width=24, color="#fff", radius=12)` |
 | `crt` | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.1, mask=0.4)` |
 | `vhs` | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.4, bleed=3)` |
 | `ntsc` | Chroma smear and dot crawl. | `fx.ntsc(bleed=4)` |
 | `polaroid_frame` | Instant-film frame with caption space. | `fx.polaroid_frame(caption="2026")` |
 | `film_strip_frame` | 35 mm frame with sprocket holes. | `fx.film_strip_frame()` |
-| `torn_edge` | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
+| `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
 
 ## Stylised looks
 
@@ -138,7 +138,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `liquid_metal` | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=0.6, tint="#c9d6ff")` |
+| `liquid_metal` ✓ | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=35, tint="#c9d6ff")` |
 | `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
 | `reaction_diffusion` | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=200, seed=1)` |
 | `cellular_automata` | Life-like rules run on the thresholded picture. | `fx.cellular_automata(rule="life", steps=12, threshold=0.5)` |
@@ -167,19 +167,19 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | --- | --- | --- |
 | `swirl` ✓ | Twist around a point. | `fx.swirl(angle=120, radius=0.5)` |
 | `pinch_bulge` ✓ | Push in or out. | `fx.pinch_bulge(amount=0.5)` |
-| `ripple` | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
-| `displace` | Move pixels by noise or a map. | `fx.displace(map="noise", amount=12)` |
+| `ripple` ✓ | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
+| `displace` ✓ | Move pixels by noise or a map. | `fx.displace(amount=12, scale=80, seed=1)` |
 | `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
 | `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
 | `mirror` ✓ | Symmetry on an axis, or four-way. | `fx.mirror(direction="left_to_right")` |
-| `kaleidoscope` | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
+| `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
 | `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
-| `shear` | Skew with edge fill. | `fx.shear(x=0.2)` |
-| `perspective` | Corner-pin to a quad. | `fx.perspective(corners=[...])` |
+| `shear` ✓ | Skew with edge fill. | `fx.shear(x=0.2)` |
+| `perspective` ✓ | Corner-pin to a quad. | `fx.perspective(vertical=0.3, rotate=-3, scale=0.2)` |
 | `pixel_sort` | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", angle=90, low=0.2, high=0.8)` |
-| `melt` | Brightness-driven drips running down. | `fx.melt(amount=0.4, seed=1)` |
-| `flow_warp` | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
+| `melt` ✓ | Brightness-driven drips running down. | `fx.melt(amount=40, seed=1)` |
+| `flow_warp` ✓ | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
 | `stretch` | Smear one pixel row or column outward. | `fx.stretch(axis="x", at=0.5)` |
 | `scatter` | Random pixel displacement. | `fx.scatter(radius=6, seed=1)` |
 | `shatter` | Cracked-glass pieces, slightly offset and rotated. | `fx.shatter(pieces=60, gap=2, seed=1)` |
