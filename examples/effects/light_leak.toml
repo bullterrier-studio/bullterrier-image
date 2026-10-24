@@ -1,0 +1,12 @@
+# A warm orange leak creeps in from the right edge, as from a worn film back.
+name = "light_leak"
+size = 480
+
+[[step]]
+effect = "light_leak"
+color = "#ff7a2e"
+angle = 20
+size = 0.3
+blobs = 4
+seed = 3
+amount = 0.9
