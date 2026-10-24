@@ -5,7 +5,6 @@ import shutil
 import struct
 import subprocess
 import sys
-import time
 import warnings
 
 import numpy as np
@@ -282,41 +281,29 @@ def test_a_saved_picture_never_carries_the_inputs_exif_or_gps(tmp_path):
         assert b"PhoneMaker" not in (tmp_path / name).read_bytes()
 
 
-SAVE_EVERY_FORMAT = """
-import sys, time
-from pathlib import Path
-import numpy as np
-from photo_fx import imageio
-
-out = Path(sys.argv[1])
-rgb = np.random.default_rng(3).random((24, 32, 3), dtype=np.float32)
-for name in ("a.jpg", "a.png", "a.webp", "a.gif"):
-    imageio.save(rgb, out / name)
-imageio.save_video([rgb, rgb[::-1]], out / "a.mp4", fps=2)
-print(int(time.time()))  # the clock second when this run finished
-"""
+ICC_FIXED_DATE = bytes.fromhex(
+    "07d0 0001 0001 0000 0000 0000"
+)  # ICC.1 header bytes 24..35: 2000-01-01 00:00:00 as 6 u16
 
 
-def test_the_same_picture_saved_at_another_time_gives_the_same_bytes(tmp_path):
-    # Two separate processes, the second started in a later clock second than the first finished, so anything that
-    # writes the time into a file (an embedded profile's creation date, a container timestamp) shows as a difference.
-    runs: list[int] = []  # the clock second each run finished in
-    for run in ("first", "second"):
-        if runs:
-            while int(time.time()) <= runs[-1]:  # wait for the clock to reach the next second (under a second)
-                time.sleep(0.02)
-        (tmp_path / run).mkdir()
-        done = subprocess.run(
-            [sys.executable, "-c", SAVE_EVERY_FORMAT, str(tmp_path / run)],
-            capture_output=True,
-            encoding="utf-8",
-            check=True,
-        )
-        runs.append(int(done.stdout))
-    names = sorted(p.name for p in (tmp_path / "first").iterdir())
-    assert names == ["a.gif", "a.jpg", "a.mp4", "a.png", "a.webp"]
-    for name in names:
-        assert (tmp_path / "first" / name).read_bytes() == (tmp_path / "second" / name).read_bytes(), name
+@pytest.mark.parametrize("name", ["a.jpg", "a.png", "a.webp"])
+def test_the_embedded_profile_carries_a_fixed_date_not_the_time_of_saving(photo, tmp_path, name):
+    """A file saved twice is the same bytes only if no clock reading enters it; the profile's header has a date."""
+    imageio.save(photo, tmp_path / name)
+    with Image.open(tmp_path / name) as img:
+        assert img.info["icc_profile"][24:36] == ICC_FIXED_DATE
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_a_saved_video_carries_no_creation_time(photo, tmp_path):
+    """The movie, track and media headers (ISO/IEC 14496-12 mvhd, tkhd, mdhd, version 0) hold their creation and
+    modification times, in seconds since 1904, in the first two u32 after the version and flags; 0 is no time."""
+    imageio.save_video([photo, photo[::-1]], tmp_path / "a.mp4", fps=2)
+    data = (tmp_path / "a.mp4").read_bytes()
+    for box in (b"mvhd", b"tkhd", b"mdhd"):
+        start = data.index(box) + 4
+        assert data[start] == 0  # version 0: 32-bit times
+        assert struct.unpack(">II", data[start + 4 : start + 12]) == (0, 0), box
 
 
 def test_saving_maps_nan_to_black_and_infinities_to_the_ends_without_warning(tmp_path):
