@@ -1,0 +1,21 @@
+# Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.
+name = "portrait-pop"
+size = 768
+
+[[step]]
+effect = "black_and_white"
+mask = "background"
+
+[[step]]
+effect = "gaussian_blur"
+radius = 10
+mask = "background"
+
+[[step]]
+effect = "vibrance"
+amount = 0.4
+mask = "subject"
+
+[[step]]
+effect = "vignette"
+amount = 0.35

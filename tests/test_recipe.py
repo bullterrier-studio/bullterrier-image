@@ -241,7 +241,8 @@ def test_matte_of_the_wrong_size_is_rejected(photo):
 
 
 def test_shipped_recipes_all_load():
-    files = sorted((Path(__file__).parent.parent / "recipes").glob("*.toml"))
+    examples = Path(__file__).parent.parent / "examples"
+    files = sorted([*(examples / "recipes").glob("*.toml"), *(examples / "experiments").glob("*.toml")])
     assert files
     assert all(load_recipe(f).steps for f in files)
 

@@ -1,0 +1,22 @@
+# A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.
+name = "sticker"
+size = 768
+
+[[step]]
+effect = "gradient"
+kind = "linear"
+colors = ["#ffd166", "#ef476f"]
+angle = 60
+mask = "background"
+
+[[step]]
+effect = "outline"
+width = 14
+color = "#ffffff"
+
+[[step]]
+effect = "drop_shadow"
+dx = 10
+dy = 16
+blur = 18
+opacity = 0.5

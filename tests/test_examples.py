@@ -33,37 +33,30 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     files = [r for r in project.recipes if isinstance(r, Path)]
     assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects
     recipes = [load_recipe(f) for f in files]
-    assert len(recipes) <= 6  # a demo, not a catalogue
     assert len({r.name for r in recipes}) == len(recipes)
     assert any(r.animation for r in recipes)
     assert any(r.needs_matte for r in recipes)
 
 
 def _is_a_combination(recipe: Recipe) -> bool:
-    """A signature look combines effects: three different ones at least."""
+    """A demo recipe combines effects: three different ones at least."""
     return len({step.effect for step in recipe.steps}) >= 3
 
 
-@pytest.mark.parametrize("path", sorted((EXAMPLES / "looks").glob("*.toml")), ids=lambda path: path.stem)
-def test_every_look_combines_effects_and_renders(path, photo, matte):
+@pytest.mark.parametrize("path", sorted((EXAMPLES / "recipes").glob("*.toml")), ids=lambda path: path.stem)
+def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     recipe = load_recipe(path)
     assert _is_a_combination(recipe), f"{path.name} uses fewer than three different effects"
     assert max(render(photo, recipe, matte).shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
-def test_a_recipe_of_two_effects_is_not_a_look(tmp_path):
+def test_a_recipe_of_two_effects_is_not_a_combination(tmp_path):
     path = tmp_path / "two.toml"
     path.write_text(
         'name = "two"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "glow"\n',
         encoding="utf-8",
     )
     assert not _is_a_combination(load_recipe(path))
-
-
-def test_the_looks_project_names_the_looks_folder_and_every_look_in_it_is_found():
-    project = load_project(EXAMPLES / "looks.toml")
-    found = {r.name for r in project.recipes if isinstance(r, Path)}
-    assert found == {p.name for p in (EXAMPLES / "looks").glob("*.toml")}
 
 
 def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the_text_they_move():

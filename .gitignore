@@ -22,9 +22,6 @@ examples/output/manifest.json
 examples/output/index.html
 examples/output/steps/*/[0-9]*.jpg
 examples/output/python-api/
-examples/output/looks/.cache/
-examples/output/looks/manifest.json
-examples/output/looks/index.html
 
 # scratch for agent-driven development: plans, briefs, reports (shared by absolute path, never committed)
 .superpowers/

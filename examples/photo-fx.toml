@@ -1,7 +1,7 @@
-# The demo pipeline: one photo x six looks -> output/
+# The demo project: one photo x every recipe in recipes/ -> output/
 #
 #   uv run photo-fx run examples/photo-fx.toml            # render everything (finished work is skipped next time)
-#   uv run photo-fx run examples/photo-fx.toml --steps    # also keep the picture after every step of every look
+#   uv run photo-fx run examples/photo-fx.toml --steps    # also keep the picture after every step of every recipe
 #
 # Open output/index.html afterwards to look through the results and any warnings from the automatic checks.
 photos  = ["photos/*.jpeg", "photos/*.jpg", "photos/*.png"]

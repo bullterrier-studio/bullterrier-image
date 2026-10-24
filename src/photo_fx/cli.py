@@ -117,7 +117,7 @@ def _parser() -> argparse.ArgumentParser:
         "sweep",
         _sweep,
         summary="render one parameter of a recipe across a range of values, side by side in one image",
-        example="examples/photos/bullterrier.jpeg examples/recipes/02-glitch.toml glitch.split 0..20",
+        example="examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20",
     )
     p.add_argument("photo", help="the photo to style")
     p.add_argument("recipe", help="the recipe .toml whose parameter is swept")
@@ -152,7 +152,7 @@ def _parser() -> argparse.ArgumentParser:
         "animate",
         _animate,
         summary="render an animated recipe to a video (.mp4, .mov) or a .gif",
-        example="examples/photos/bullterrier.jpeg examples/recipes/06-evaporate.toml -o out/evaporate.mp4",
+        example="examples/photos/bullterrier.jpeg examples/recipes/evaporate.toml -o out/evaporate.mp4",
     )
     p.add_argument("photo", help="the photo to animate")
     p.add_argument("recipe", help="a recipe .toml with an [animation] table")
@@ -181,7 +181,7 @@ def _parser() -> argparse.ArgumentParser:
         "steps",
         _steps,
         summary="show what every step of a recipe does to a photo: one picture per step",
-        example="examples/photos/bullterrier.jpeg examples/recipes/05-ember-glitch.toml",
+        example="examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml",
     )
     p.add_argument("photo", help="the photo to run the recipe on")
     p.add_argument("recipe", help="the recipe .toml to look into")

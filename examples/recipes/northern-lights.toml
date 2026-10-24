@@ -1,4 +1,4 @@
-# The dog under a night sky: aurora curtains and stars behind, a cold tint on the fur, a soft glow. Would gain a rim light (batch 11).
+# The dog under a night sky: aurora curtains and stars behind, a cold tint on the fur, a rim of aurora light on the edge, a soft glow.
 name = "northern-lights"
 size = 768
 
@@ -19,6 +19,13 @@ shadow = "#0b1d5e"
 highlight = "#7fffd4"
 amount = 0.3
 mask = "subject"
+
+[[step]]
+effect = "rim_light"
+angle = 60
+color = "#7fffd4"
+width = 16
+amount = 1.5
 
 [[step]]
 effect = "bloom"

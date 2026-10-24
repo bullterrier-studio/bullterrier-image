@@ -38,7 +38,7 @@ background separately.
 
 ## Gallery
 
-Every picture here is made from one photo by the recipe linked next to it. Reproduce them with `photo-fx run examples/photo-fx.toml`.
+Every picture here is made from one photo by the recipe linked under it (`examples/recipes/`). Reproduce them with `photo-fx run examples/photo-fx.toml`.
 
 <table>
   <tr>
@@ -49,36 +49,37 @@ Every picture here is made from one photo by the recipe linked next to it. Repro
     <td align="center" width="20%"><img src="examples/output/bullterrier/ember-glitch.jpg" alt="ember-glitch"></td>
   </tr>
   <tr>
-    <td valign="top"><a href="examples/recipes/01-neon-pulse.toml"><b>neon-pulse</b></a><br><sub>Magenta-to-cyan grade, chromatic fringe, glow spilling onto black.<br><code>clarity</code> <code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code></sub></td>
-    <td valign="top"><a href="examples/recipes/02-glitch.toml"><b>glitch</b></a><br><sub>The subject on black, digitally damaged, with film grain.<br><code>fill</code> <code>glitch</code> <code>grain</code></sub></td>
-    <td valign="top"><a href="examples/recipes/03-ascii-colour.toml"><b>ascii-colour</b></a><br><sub>Redrawn as text, every character in the photo's own colour.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code></sub></td>
-    <td valign="top"><a href="examples/recipes/04-halftone-print.toml"><b>halftone-print</b></a><br><sub>Newsprint dot screen in warm white ink.<br><code>clarity</code> <code>halftone</code> <code>fill</code></sub></td>
-    <td valign="top"><a href="examples/recipes/05-ember-glitch.toml"><b>ember-glitch</b></a><br><sub>Fire palette, torn glitch strips, glow and grain.<br><code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code> <code>grain</code></sub></td>
+    <td valign="top"><a href="examples/recipes/neon-pulse.toml"><b>neon-pulse</b></a><br><sub>Hot magenta and cyan on black, split into a faint chromatic fringe, with a glow that spills onto the dark.<br><code>clarity</code> <code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code></sub></td>
+    <td valign="top"><a href="examples/recipes/glitch.toml"><b>glitch</b></a><br><sub>The classic: the subject on black, digitally damaged, with film grain.<br><code>fill</code> <code>glitch</code> <code>grain</code></sub></td>
+    <td valign="top"><a href="examples/recipes/ascii-colour.toml"><b>ascii-colour</b></a><br><sub>The photo redrawn as text, every character in the colour of the photo underneath, over a faint ghost of the photo.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code></sub></td>
+    <td valign="top"><a href="examples/recipes/halftone-print.toml"><b>halftone-print</b></a><br><sub>A newsprint dot screen: tone becomes dot size, in warm white ink on black.<br><code>clarity</code> <code>halftone</code> <code>fill</code></sub></td>
+    <td valign="top"><a href="examples/recipes/ember-glitch.toml"><b>ember-glitch</b></a><br><sub>A fire palette, then torn glitch strips with a red and blue split.<br><code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code> <code>grain</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/cyberpunk.jpg" alt="cyberpunk"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/vaporwave.jpg" alt="vaporwave"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/terminal.jpg" alt="terminal"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/newsprint.jpg" alt="newsprint"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>A neon night street: magenta and violet grade, colour fringes, scanlines, a glow and rain. Would gain a CRT curve (batch 6) and neon edges (batch 8).<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient with a grid behind a duotoned dog, split into colour ghosts. Would gain blend modes (decision D2) for the grid.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
+    <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters, scanlines and glow. Would gain a CRT curve and flicker (batch 6).<br><code>clarity</code> <code>ascii</code> <code>scanlines</code> <code>bloom</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (decision D1).<br><code>black_and_white</code> <code>clarity</code> <code>levels</code> <code>halftone</code> <code>paper_texture</code> <code>torn_edge</code></sub></td>
+    <td valign="top"><a href="examples/recipes/northern-lights.toml"><b>northern-lights</b></a><br><sub>The dog under a night sky: aurora curtains and stars behind, a cold tint on the fur, a rim of aurora light on the edge, a soft glow.<br><code>aurora</code> <code>starfield</code> <code>split_tone</code> <code>rim_light</code> <code>bloom</code> <code>grain</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/sticker.jpg" alt="sticker"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/portrait-pop.jpg" alt="portrait-pop"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.<br><code>gradient</code> <code>outline</code> <code>drop_shadow</code></sub></td>
+    <td valign="top"><a href="examples/recipes/portrait-pop.toml"><b>portrait-pop</b></a><br><sub>Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.<br><code>black_and_white</code> <code>gaussian_blur</code> <code>vibrance</code> <code>vignette</code></sub></td>
   </tr>
 </table>
 
-The sixth demo recipe is an [animation](#animation).
-
-### Signature looks
-
-Effects are meant to be combined: each recipe below chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`). Reproduce them with `photo-fx run examples/looks.toml`.
-
-<table>
-  <tr>
-    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/cyberpunk.jpg" alt="cyberpunk"></td>
-    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/vaporwave.jpg" alt="vaporwave"></td>
-    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/terminal.jpg" alt="terminal"></td>
-    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/newsprint.jpg" alt="newsprint"></td>
-    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
-  </tr>
-  <tr>
-    <td valign="top"><a href="examples/looks/01-cyberpunk.toml"><b>cyberpunk</b></a><br><sub>Magenta and violet grade, colour fringes, scanlines, glow and rain.<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code></sub></td>
-    <td valign="top"><a href="examples/looks/02-vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient and a grid behind a duotoned dog, split into colour ghosts.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
-    <td valign="top"><a href="examples/looks/03-terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters, scanlines, glow.<br><code>clarity</code> <code>ascii</code> <code>scanlines</code> <code>bloom</code> <code>vignette</code></sub></td>
-    <td valign="top"><a href="examples/looks/04-newsprint.toml"><b>newsprint</b></a><br><sub>Black and white dots on off-white paper with a torn edge.<br><code>black_and_white</code> <code>clarity</code> <code>levels</code> <code>halftone</code> <code>paper_texture</code> <code>torn_edge</code></sub></td>
-    <td valign="top"><a href="examples/looks/05-northern-lights.toml"><b>northern-lights</b></a><br><sub>Aurora curtains and stars behind a cold-tinted dog.<br><code>aurora</code> <code>starfield</code> <code>split_tone</code> <code>bloom</code> <code>grain</code></sub></td>
-  </tr>
-</table>
+The last recipe, `evaporate`, is an [animation](#animation). Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`).
 
 ## Contents
 
@@ -142,7 +143,7 @@ container, still works with Pillow's built-in font, which is not monospaced.
 
 ## Quick start
 
-The repository ships a demo: one photo and six looks (five stills and an animation).
+The repository ships a demo project: one photo and a dozen recipes (stills and an animation) in the layout `photo-fx init` makes.
 
 ```bash
 uv run photo-fx run examples/photo-fx.toml
@@ -176,7 +177,7 @@ target is `effect.parameter` (`effect#2.parameter` for an effect the recipe uses
 goes after `--`, as in `... -o out/sweep.png -- -2..2`.
 
 ```
-uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/02-glitch.toml glitch.split 0..20
+uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
 ```
 
 ## The pipeline
@@ -357,7 +358,7 @@ load only photo-fx's own effects. Effect names must be unique across every insta
 When a look is not right, the cause is rarely the last step. Print the picture after every step:
 
 ```bash
-uv run photo-fx steps examples/photos/bullterrier.jpeg examples/recipes/05-ember-glitch.toml
+uv run photo-fx steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml
 ```
 
 <p align="center">
@@ -376,7 +377,7 @@ it to `.mp4` and also saves a filmstrip PNG, so the animation can be shown where
 <p align="center">
   <img src="examples/output/bullterrier/evaporate.frames.png" alt="Evaporation, six frames over five seconds">
 </p>
-<p align="center"><sub><code>06-evaporate.toml</code>: the dog, drawn as text, evaporates. Frames at 0, 1, 2, 3, 4 and 5 seconds.</sub></p>
+<p align="center"><sub><code>evaporate.toml</code>: the dog, drawn as text, evaporates. Frames at 0, 1, 2, 3, 4 and 5 seconds.</sub></p>
 
 ```toml
 [animation]
@@ -460,10 +461,9 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
                            glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
   errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
-examples/        the demo project: one photo, six recipes, the committed results, a Python example
+examples/        the demo project (photo-fx.toml, photos/, recipes/, output/), one snippet per effect (effects/), older experiments (experiments/), a Python example; see examples/README.md
   effects/       one short example recipe per effect, <effect>.toml
 docs/            the effect catalogue (effects/, generated: an index and a page per category) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
-recipes/         a larger set of experiments
 tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
 ```
 
