@@ -1,4 +1,4 @@
-# A radial glow: magenta in the middle fading to deep violet at the edges. The picture only gives the size.
+# A radial glow behind the dog: magenta in the middle fading to deep violet at the edges, on the background only.
 name = "gradient"
 size = 480
 
@@ -7,3 +7,4 @@ effect = "gradient"
 kind = "radial"
 colors = ["#ff2bd6", "#6a1bff", "#12002b"]
 radius = 0.8
+mask = "background"
