@@ -242,8 +242,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Regions
 
 - **A recipe declares named regions; a region is a partition or a selection.** `[region.<name>]` with a `kind`. A
-  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in reading order: top to bottom, then
-  left to right); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
+  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in reading order: piece k comes before
+  piece k+1 when its first pixel comes earlier in the raster scan, left to right along each row, rows from the top; for a
+  grid that is row after row); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
   SVG shapes and the subject are all "which pixels", so one idea serves them all and effects never learn about regions.
 - **Steps use regions by name, with one word per idea.** `mask` is where a step applies (on every step, any selection;
   `subject` and `background` are built in); `each` + `looks` gives each piece of a partition its own look; `partition`
@@ -261,6 +262,31 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   picture. *Reason:* generated paper fringes read as 2000s camera presets.
 - **The portable model is the default subject finder on every platform.** Apple Vision is used only when asked.
   *Reason:* `fit = "subject"` must cut the same on a Mac and on Linux.
+- **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
+  every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
+  give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
+  selects nothing, so a recipe also works on a thumbnail.
+- **`Shards.focus` is an exponent offset.** A seed at a share r of the way to the farthest corner moves to r^(1+focus)
+  of it; 0 spreads the seeds evenly. *Reason:* the prototype's `(r/R)**(1 + 3*focus)` had a hidden 3 (rule 5); the
+  `glass` preset is `focus = 2.5`.
+- **`Edge.octaves` and `Edge.persistence` are advanced fields.** They shape a torn edge (the layers of noise and how
+  strong each finer one is), so they are named, documented parameters, not constants; lacunarity 2 is the standard
+  octave doubling, cited. A torn edge keeps its size and character at any resolution, not its exact ripples: the noise
+  lattice has a number of points that depends on the picture's size.
+- **The step keys as built.** `mask` takes any selection name, checked when the recipe is made (a step knows no
+  regions; the recipe that holds it does, and `fx` declares none, so by itself it knows the built-in two). `partition`
+  names the region an effect with the injected input `partition` draws (int32 piece numbers; a selection is split into
+  what it chooses and what it does not). `each` and `looks` make an `Each` step, a step type of its own: it has no
+  effect or parameters, only `each`, `looks`, `assign`, `seed` and `feather` (px; how softly the looks blend across a
+  border, default 1 to smooth the pixels' stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
+  apply to the blended looks. `partition`, `each` and `looks` are reserved like the other step keys, so no effect
+  parameter takes them; `seed` and `feather` are not, as an `Each` has no effect parameters to clash with. A look is a
+  step with its own `opacity` (its effect's default unless given) and `blend_mode`.
+- **Regions are made for the working picture, once per render, and only as steps ask.** After framing and scaling, so a
+  piece number means the same on the picture that is rendered. A recipe needs the subject only if a region *in use*
+  (named by a step, or what such a region is laid over or picked from) is made from it, so declaring a region that
+  nothing uses costs nothing. Recipe format 2 adds regions and the new keys; a file of format 1 may not use them, so its
+  meaning never changes.
 - Grids, cuts, shards, Bezier paths, SVG shapes and grid-first subjects are built in slices; the plan and the
   deferred list (each item with the need that would justify it) are in `.superpowers/plans/regions.md`.
 

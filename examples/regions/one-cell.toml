@@ -1,0 +1,26 @@
+# One cell of an uneven 3 x 3 grid gets a look; the rest of the picture stays as it is, and a thin line outlines the
+# grid. Needs recipe format 2.
+format = 2
+name = "one-cell"
+size = 1024
+
+[region.panes]                 # column and row sizes as relative shares: [0.2, 0.17, 0.63] and [0.38, 0.3, 0.32]
+kind = "grid"
+columns = [0.2, 0.17, 0.63]
+rows = [0.38, 0.3, 0.32]
+
+[region.cell]                  # the piece in the middle, by its number: pieces count row after row from 0
+kind = "pick"
+of = "panes"
+pieces = [4]
+
+[[step]]
+effect = "gradient_map"
+stops = ["#12002b", "#ff2bd6", "#00f0ff"]
+mask = "cell"
+
+[[step]]
+effect = "seams"
+partition = "panes"
+width = 0.0015
+color = "#ffffff"

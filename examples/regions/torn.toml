@@ -1,0 +1,29 @@
+# The dog torn into a few big scraps with ragged edges, each a different look, and a solid cream band along every tear.
+# Needs recipe format 2.
+format = 2
+name = "torn"
+size = 1024
+
+[region.scraps]
+kind = "shards"
+preset = "torn"                # a few large pieces with wide, ragged tears
+fit = "subject"
+
+[[step]]
+each = "scraps"
+mask = "subject"
+looks = [
+    { effect = "gradient_map", preset = "sepia" },
+    "none",
+    { effect = "gradient_map", preset = "cyanotype" },
+    "none",
+    { effect = "halftone", cell = 9 },
+    "none",
+]
+
+[[step]]
+effect = "seams"
+partition = "scraps"
+mask = "subject"
+width = 0.007                  # a solid band: no generated paper fibres
+color = "#f6f1e6"

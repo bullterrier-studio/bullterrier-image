@@ -261,7 +261,7 @@ stops = ["#0a0000", "#e0261b", "#ffb347", "#fff3d6"]
 [[step]]
 effect = "fill"
 color = "#000000"
-mask = "background"               # "subject" or "background": apply only there
+mask = "background"               # "subject", "background" or a region: apply only there
 
 [[step]]
 effect = "glitch"
@@ -285,7 +285,7 @@ combined with that picture by the blend mode, then mixed in by the opacity, only
 
 | Key | Values | What it does |
 |---|---|---|
-| `mask` | `"subject"` or `"background"` | Apply the step only there (the subject is found first). |
+| `mask` | `"subject"`, `"background"` or the name of a selection region | Apply the step only there (the subject is found first). |
 | `opacity` | 0 to 1, default 1 (or the effect's own) | How much of the step shows: 0 none, 1 fully. An effect meant to be mixed in partway (a shadow, rain) may set the default of its steps' opacity; its documentation (`help(fx.rain)`, `bt-image effects rain`, the catalogue) and its `fx` signature show it, and a step's own `opacity` replaces it. |
 | `blend_mode` | `normal` (default), `multiply`, `screen`, `overlay`, `soft_light`, `difference`, `color` | How the result combines with the picture below it: `normal` shows the result, `multiply` darkens, `screen` lightens, `overlay` and `soft_light` deepen contrast, `difference` subtracts, `color` takes the result's hue and saturation and keeps the brightness below. These are the W3C blend modes, the same as the `blend` effect's `mode`. |
 | `preset` | a preset's name | Start from one of the effect's named parameter sets (see Presets, below). |
@@ -294,6 +294,60 @@ No effect has a parameter with one of these names, so a key means the same in ev
 `fx.glow(opacity=0.6, blend_mode="screen")`. A gradient screened over the photo, or a texture multiplied into it, is
 an ordinary step with a `blend_mode`; the `blend` effect is for a second picture of your own (`image = "grain.png"`),
 which it fits to the photo and blends by its own transparency.
+
+**Regions.** A recipe says *where* a step goes by naming regions. With `format = 2`, `[region.NAME]` declares one by its
+`kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
+stone, with presets `glass`, `torn`, `stone` and `mosaic`) or a `pick` of some pieces of one of those. Grids and shards
+are *partitions*: every pixel is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps`
+draws them numbered). A `pick`, `subject` and `background` are *selections*. `fit = "subject"` lays a grid or shards over
+the subject instead of the whole picture, and `edge = { style = "torn" }` tears their borders. A step uses regions by
+name: `mask` limits it to a selection, `each` + `looks` gives every piece of a partition its own look (each look is
+rendered once over the whole picture, so the cost is the number of looks, not pieces), and `partition` names the
+partition the `seams` effect draws lines along:
+
+```toml
+format = 2
+
+[region.glass]
+kind = "shards"
+preset = "glass"
+fit = "subject"
+
+[[step]]
+each = "glass"
+looks = [{ effect = "halftone", cell = 8 }, "none", { effect = "gradient_map", preset = "cyanotype" }]  # "none": as it was
+assign = "random"                 # or "cycle" (the default): how the pieces get looks; seed = 4 makes it repeatable
+mask = "subject"
+
+[[step]]
+effect = "seams"
+partition = "glass"
+width = 0.0016
+```
+
+In Python the regions are declared with the kinds' own models and the `each` step is `Each`:
+
+```python
+from bullterrier_image import Each, Recipe, Shards, fx
+
+glass = Recipe(
+    "glass",
+    regions={"glass": Shards(preset="glass", fit="subject")},
+    steps=[
+        Each(
+            "glass",
+            [fx.halftone(cell=8), "none", fx.gradient_map(preset="cyanotype")],
+            assign="random",
+            seed=4,
+            mask="subject",
+        ),
+        fx.seams(partition="glass", width=0.0016),
+    ],
+)
+```
+
+Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
+examples are in [`examples/regions/`](examples/regions/).
 
 **Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
 before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the

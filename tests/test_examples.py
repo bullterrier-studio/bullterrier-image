@@ -2,9 +2,10 @@ import importlib.util
 import re
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from bullterrier_image import Recipe, gallery, load_project, load_recipe, render
+from bullterrier_image import Recipe, Step, gallery, load_project, load_recipe, render
 from bullterrier_image.core import registry
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
@@ -46,6 +47,16 @@ def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     recipe = load_recipe(path)
     assert _is_a_combination(recipe), f"{path.name} uses fewer than three different effects"
     assert max(render(photo, recipe, matte).shape[:2]) == recipe.size  # rendered at the recipe's size
+
+
+@pytest.mark.parametrize("path", sorted((EXAMPLES / "regions").glob("*.toml")), ids=lambda path: path.stem)
+def test_every_regions_example_declares_regions_and_renders_to_something_other_than_the_photo(path, photo, matte):
+    recipe = load_recipe(path)
+    assert recipe.name == path.stem
+    assert recipe.regions
+    out = render(photo, recipe, matte)
+    assert max(out.shape[:2]) == recipe.size
+    assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
 
 
 def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, matte):

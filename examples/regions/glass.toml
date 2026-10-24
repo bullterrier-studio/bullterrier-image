@@ -1,0 +1,32 @@
+# Shattered glass over the dog: the shards crowd round an impact point, each piece gets one of a few looks (some are
+# left as they were, so the dog stays recognisable) and a thin white line marks every crack. Needs recipe format 2.
+format = 2
+name = "glass"
+size = 1024
+
+[region.glass]
+kind = "shards"
+preset = "glass"               # many small splinters near the impact point, big pieces far from it, straight cracks
+fit = "subject"                # laid over the dog's box, not the whole picture
+impact = [0.5, 0.2]            # as shares of that box: near the top, between the ears
+
+[[step]]
+each = "glass"
+mask = "subject"
+assign = "random"
+seed = 4
+looks = [
+    { effect = "gradient_map", preset = "cyanotype" },
+    "none",
+    { effect = "gradient_map", preset = "thermal", opacity = 0.8 },
+    "none",
+    { effect = "halftone", cell = 8 },
+    "none",
+]
+
+[[step]]
+effect = "seams"
+partition = "glass"
+mask = "subject"
+width = 0.0016
+color = "#ffffff"
