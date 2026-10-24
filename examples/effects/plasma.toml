@@ -1,8 +1,8 @@
-# A vivid cyclic plasma, replacing the photo (only its size is used).
-# It also makes the effect's picture in the catalogue.
+# A vivid cyclic plasma behind the dog, on the background only.
 name = "plasma"
 size = 480
 
 [[step]]
 effect = "plasma"
 seed = 3
+mask = "background"

@@ -1,8 +1,8 @@
-# Perlin noise in a deep-blue to cream ramp, replacing the photo (only its size is used).
-# It also makes the effect's picture in the catalogue.
+# Perlin noise in a deep-blue to cream ramp behind the dog, on the background only.
 name = "noise_field"
 size = 480
 
 [[step]]
 effect = "noise_field"
 seed = 2
+mask = "background"
