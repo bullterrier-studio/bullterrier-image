@@ -49,7 +49,8 @@ and `looks` gives every piece its own look:
     [[step]]
     each = "panes"                 # a partition
     looks = [{ effect = "halftone", cell = 9 }, "none"]   # each look is a step table, or "none": the piece stays
-    assign = "cycle"               # or "random" (with `seed`): how the pieces get looks; `feather`: soft borders, px
+    assign = "cycle"               # or "random" (with `seed`): how the pieces get looks
+    feather = 0.001                # soft borders between pieces, a share of the long side
     mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
 
 Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them.

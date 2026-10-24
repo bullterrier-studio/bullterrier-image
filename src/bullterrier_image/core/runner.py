@@ -215,7 +215,7 @@ def _each(before: np.ndarray, step: Each, matte: np.ndarray | None, regions: Reg
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
     partition = regions.partition(step.each)
     assignment = step.assignment(partition.count)
-    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather)
+    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather * max(before.shape[:2]))
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered

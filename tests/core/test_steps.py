@@ -348,7 +348,7 @@ BAD_EACH = {
         r"`assign`.*cycle.*random",
     ),
     "a negative seed": (lambda: Each("panes", ["none"], seed=-1), r"`seed`.*0"),
-    "a feather below 0": (lambda: Each("panes", ["none"], feather=-0.5), r"`feather`.*0"),
+    "a feather below 0": (lambda: Each("panes", ["none"], feather=-0.005), r"`feather`.*0"),
     "an infinite feather": (lambda: Each("panes", ["none"], feather=float("inf")), r"`feather`"),
     "an unknown key": (lambda: Each("panes", ["none"], effect="grade"), r"`effect`"),
     "a mask that is not a name": (lambda: Each("panes", ["none"], mask=3), r"`mask`"),  # type: ignore[arg-type]

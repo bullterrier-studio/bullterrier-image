@@ -277,8 +277,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   regions; the recipe that holds it does, and `fx` declares none, so by itself it knows the built-in two). `partition`
   names the region an effect with the injected input `partition` draws (int32 piece numbers; a selection is split into
   what it chooses and what it does not). `each` and `looks` make an `Each` step, a step type of its own: it has no
-  effect or parameters, only `each`, `looks`, `assign`, `seed` and `feather` (px; how softly the looks blend across a
-  border, default 1 to smooth the pixels' stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
+  effect or parameters, only `each`, `looks`, `assign`, `seed` and `feather` (a share of the long side, so the same look
+  comes out at any resolution; how softly the looks blend across a border, default 0.001 to smooth the pixels'
+  stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
   apply to the blended looks. `partition`, `each` and `looks` are reserved like the other step keys, so no effect
   parameter takes them; `seed` and `feather` are not, as an `Each` has no effect parameters to clash with. A look is a
   step with its own `opacity` (its effect's default unless given) and `blend_mode`.

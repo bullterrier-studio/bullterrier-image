@@ -320,7 +320,7 @@ def test_each_piece_shows_its_look_and_the_looks_take_turns(photo, count):
 
 
 @pytest.mark.parametrize("size", [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)])
-@pytest.mark.parametrize("feather", [0, 0.5, 3])
+@pytest.mark.parametrize("feather", [0, 0.5 / 128, 3 / 128])  # shares of the 128 px long side
 @pytest.mark.parametrize("assign", ["cycle", "random"])
 def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_feather(size, feather, assign):
     photo = np.random.default_rng(2).random((*size, 3), dtype=np.float32)
@@ -344,8 +344,8 @@ def test_a_none_look_leaves_its_pieces_exactly_as_they_were(photo):
 
 
 def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
-    out = run(photo, [Each("cols", [fill(RED), "none"], feather=2)], columns(4))
-    reach = 4 * 2 + 1  # a feather is cut off at 4 sigmas
+    out = run(photo, [Each("cols", [fill(RED), "none"], feather=2 / 128)], columns(4))
+    reach = 4 * 2 + 1  # a feather of 2 px, cut off at 4 sigmas
     np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
     assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
     border = out[:, 31, 1]  # the green of the last column of the red piece: red has none, the photo some
@@ -353,7 +353,7 @@ def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
     assert (border < photo[:, 31, 1]).all()  # a mix of the two looks, not either one
 
 
-@pytest.mark.parametrize("feather", [0, 3])
+@pytest.mark.parametrize("feather", [0, 3 / 128])
 @pytest.mark.parametrize("assign", ["cycle", "random"])
 def test_looks_that_change_nothing_give_back_the_photo_exactly(photo, feather, assign):
     nothing: list[Step | str] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), "none"]
@@ -602,3 +602,16 @@ def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
     each = Each("panes", [fill(RED), "none"], mask="head")
     labels = [stage.label for stage in runner.trace(photo, Recipe("t", [each], size=None, regions=TRACED))]
     assert labels[-1].startswith("1. each panes [fill(color='#ff0000'), none]")
+
+
+def test_a_feather_is_a_share_of_the_long_side_so_the_blend_is_the_same_at_two_resolutions():
+    grey = np.full((96, 128, 3), 0.5, np.float32)
+    recipe = [Each("cols", [fill(RED), "none"], feather=0.02)]
+
+    def rendered(size: int) -> np.ndarray:
+        return runner.render(grey, Recipe("scaled", recipe, size=size, regions=columns(2)))
+
+    small, large = rendered(128), rendered(256)
+    halved = large.reshape(96, 2, 128, 2, 3).mean(axis=(1, 3))  # the large one at the small one's resolution
+    np.testing.assert_allclose(halved, small, atol=0.03)
+    assert 0.1 < small[0, 63, 1] < 0.4  # and it is a real blend at the border, not a hard edge

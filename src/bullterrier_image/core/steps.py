@@ -208,14 +208,14 @@ class Each(_Layer):
         description="Random seed of assign='random': the same seed always gives the same looks to the same pieces.",
     )
     feather: float = Field(
-        1.0,
+        0.001,
         ge=0,
-        le=100,
+        le=0.05,
         strict=True,
         allow_inf_nan=False,
-        description="How softly a piece's look fades into its neighbours' across a border, in px (0 to 100): the "
-        "standard deviation of a Gaussian. 0 gives hard borders; about 1 only smooths the stair-steps of the "
-        "pixels; raising it blends the looks over a wider band.",
+        description="How softly a piece's look fades into its neighbours' across a border, as a share of the "
+        "picture's long side (0 to 0.05): the standard deviation of a Gaussian. 0 gives hard borders; about 0.001 "
+        "only smooths the stair-steps of the pixels; raising it blends the looks over a wider band.",
     )
 
     def __init__(
@@ -227,7 +227,7 @@ class Each(_Layer):
         blend_mode: str = "normal",
         assign: str = "cycle",
         seed: int = 0,
-        feather: float = 1.0,
+        feather: float = 0.001,
         **unknown: Any,
     ) -> None:
         """Validate and make the step; RecipeError saying what is wrong and what is valid. opacity: None shows the

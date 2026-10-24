@@ -259,7 +259,7 @@ looks = [
 ]
 assign = "random"
 seed = 4
-feather = 2
+feather = 0.01
 mask = "subject"
 opacity = 0.9
 """
@@ -285,7 +285,7 @@ REGIONS_RECIPE = Recipe(
             opacity=0.9,
             assign="random",
             seed=4,
-            feather=2,
+            feather=0.01,
         ),
     ],
 )
