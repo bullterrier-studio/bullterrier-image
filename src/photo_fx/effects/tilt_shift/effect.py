@@ -116,7 +116,7 @@ def tilt_shift(rgb: np.ndarray, params: TiltShiftParams) -> np.ndarray:
             share = np.clip(1.0 - np.abs(position - level), 0.0, 1.0)
             if share.max() > 0:
                 sigma = params.radius * level / params.levels
-                out += share[..., None] * gaussian_blur(rgb, sigma, truncate=params.truncate, mode=params.edge)
+                out += share[..., None] * gaussian_blur(rgb, sigma, truncate=params.truncate, edge=params.edge)
     if params.saturation > 0:
         grey = luminance(rgb)[..., None]
         colourful = grey + (out - grey) * (1.0 + params.saturation * weight)[..., None]

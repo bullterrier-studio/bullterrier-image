@@ -7,17 +7,17 @@ from scipy import fft
 
 from photo_fx.ops.blur import NUMPY_PAD
 
-EdgeMode = Literal["reflect", "nearest", "mirror", "wrap"]
+Edge = Literal["reflect", "nearest", "mirror", "wrap"]
 
 
-def convolve(image: np.ndarray, kernel: np.ndarray, *, mode: EdgeMode) -> np.ndarray:
+def convolve(image: np.ndarray, kernel: np.ndarray, *, edge: Edge) -> np.ndarray:
     """`image` (height, width) or (height, width, channels), floats, averaged with the weights of `kernel`, each
     channel on its own: output[y, x] is the sum over (i, j) of kernel[i + r, j + s] * image[y - i, x - j] for a
     kernel of (2r + 1) x (2s + 1) weights, so the kernel's middle element weighs the pixel itself and an asymmetric
     kernel is applied as a true convolution (flipped), not a correlation.
 
     `kernel` must have an odd number of rows and columns, non-negative weights and a sum of 1 (a ValueError says
-    otherwise). `mode` is what lies beyond the picture's edge, as in `photo_fx.ops.blur`: 'reflect' (mirrored, edge
+    otherwise). `edge` is what lies beyond the picture's edge, as in `photo_fx.ops.blur`: 'reflect' (mirrored, edge
     pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the
     opposite edge).
 
@@ -33,7 +33,7 @@ def convolve(image: np.ndarray, kernel: np.ndarray, *, mode: EdgeMode) -> np.nda
     height, width = image.shape[:2]
     reach_y, reach_x = kernel.shape[0] // 2, kernel.shape[1] // 2
     widths = [(reach_y, reach_y), (reach_x, reach_x)] + [(0, 0)] * (image.ndim - 2)
-    padded = np.pad(image, widths, mode=NUMPY_PAD[mode])
+    padded = np.pad(image, widths, mode=NUMPY_PAD[edge])
     shape = (
         fft.next_fast_len(height + 2 * reach_y, real=True),
         fft.next_fast_len(width + 2 * reach_x, real=True),

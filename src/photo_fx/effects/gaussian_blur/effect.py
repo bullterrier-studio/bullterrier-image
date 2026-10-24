@@ -50,4 +50,4 @@ def gaussian_blur(rgb: np.ndarray, params: GaussianBlurParams) -> np.ndarray:
 
     Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
     """
-    return blur(rgb, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value)
+    return blur(rgb, params.radius, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value)

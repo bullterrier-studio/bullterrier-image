@@ -5,14 +5,14 @@ from typing import Literal
 import numpy as np
 from scipy import fft, ndimage
 
-Mode = Literal["reflect", "constant", "nearest", "mirror", "wrap"]
+Edge = Literal["reflect", "constant", "nearest", "mirror", "wrap"]
 
 # constant: kernel radius in px from which FFT beats direct convolution (measured: equal at 12 MP, FFT ahead at 1 MP)
 _FFT_FROM_RADIUS = 32
-# The one table of the edge modes: scipy's names under numpy's for the same extension (scipy 'reflect' repeats the edge
+# The one table of the edge rules: scipy's names under numpy's for the same extension (scipy 'reflect' repeats the edge
 # pixel, as numpy's 'symmetric' does; scipy 'mirror' does not, as numpy's 'reflect' does not). `photo_fx.ops.convolve`
-# reads it too, so the two modules cannot disagree about what an edge mode means.
-NUMPY_PAD: dict[Mode, Literal["symmetric", "reflect", "edge", "wrap", "constant"]] = {
+# reads it too, so the two modules cannot disagree about what an edge rule means.
+NUMPY_PAD: dict[Edge, Literal["symmetric", "reflect", "edge", "wrap", "constant"]] = {
     "reflect": "symmetric",
     "mirror": "reflect",
     "nearest": "edge",
@@ -22,45 +22,45 @@ NUMPY_PAD: dict[Mode, Literal["symmetric", "reflect", "edge", "wrap", "constant"
 
 
 def gaussian_blur(
-    image: np.ndarray, sigma: float, *, truncate: float, mode: Mode, constant_value: float | None = None
+    image: np.ndarray, sigma: float, *, truncate: float, edge: Edge, constant_value: float | None = None
 ) -> np.ndarray:
     """`scipy.ndimage.gaussian_filter` over the two picture axes of a (height, width) or (height, width, channels)
     array, each channel on its own, at a cost that hardly grows with `sigma`.
 
     `sigma` is the Gaussian's standard deviation in px (0 = a copy), `truncate` where its kernel is cut off, in sigmas
-    (the kernel reaches `int(truncate * sigma + 0.5)` px), `mode` what lies beyond the picture's edge, as in scipy:
+    (the kernel reaches `int(truncate * sigma + 0.5)` px), `edge` what lies beyond the picture's edge, as in scipy:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge) or 'constant' (`constant_value`, which only that mode needs).
+    repeated), 'wrap' (the opposite edge) or 'constant' (`constant_value`, which only that rule needs).
 
     A kernel reaching less than 32 px gives exactly scipy's result. A longer one gives scipy's result within 1e-5 of
     the largest magnitude in the picture and `constant_value` (float32 rounding; about 4e-7 measured on 0..1
     pictures), never outside the range they span, in time that grows with the picture, not with the kernel. Returns a
     new array of the input's shape and dtype; the input is left alone.
     """
-    if mode == "constant" and constant_value is None:
-        raise ValueError("gaussian_blur: mode 'constant' needs a constant_value")
+    if edge == "constant" and constant_value is None:
+        raise ValueError("gaussian_blur: edge 'constant' needs a constant_value")
     beyond = {} if constant_value is None else {"cval": constant_value}
     radius = int(truncate * float(sigma) + 0.5)  # how scipy sizes its kernel
     if radius < _FFT_FROM_RADIUS:
         sigmas = (sigma, sigma) + (0.0,) * (image.ndim - 2)  # a zero sigma leaves the channel axis alone
-        return ndimage.gaussian_filter(image, sigmas, mode=mode, truncate=truncate, **beyond)
+        return ndimage.gaussian_filter(image, sigmas, mode=edge, truncate=truncate, **beyond)
     offsets = np.arange(-radius, radius + 1, dtype=np.float64)
     kernel = np.exp(-0.5 * (offsets / sigma) ** 2)
     kernel /= kernel.sum()
-    blurred = _convolve_axis(image, kernel, mode, constant_value, axis=0)
-    blurred = _convolve_axis(blurred, kernel, mode, constant_value, axis=1)
+    blurred = _convolve_axis(image, kernel, edge, constant_value, axis=0)
+    blurred = _convolve_axis(blurred, kernel, edge, constant_value, axis=1)
     # The weights are positive and sum to 1, so the true result lies within the range of what it averages: clipping
     # to that range only moves rounding error towards the truth.
     low, high = float(image.min()), float(image.max())
-    if constant_value is not None and mode == "constant":
+    if constant_value is not None and edge == "constant":
         low, high = min(low, constant_value), max(high, constant_value)
     return np.clip(blurred, low, high).astype(image.dtype, copy=False)
 
 
 def _convolve_axis(
-    array: np.ndarray, kernel: np.ndarray, mode: Mode, constant_value: float | None, *, axis: int
+    array: np.ndarray, kernel: np.ndarray, edge: Edge, constant_value: float | None, *, axis: int
 ) -> np.ndarray:
-    """`array` convolved along `axis` with the odd-length, symmetric `kernel`, by FFT over the edge extension `mode`.
+    """`array` convolved along `axis` with the odd-length, symmetric `kernel`, by FFT over the edge extension `edge`.
 
     The extension is one kernel radius on each side, so the picture's own samples never wrap around; the result is a
     view of a larger array, so the caller copies it once it is done.
@@ -69,10 +69,10 @@ def _convolve_axis(
     length = array.shape[axis]
     widths = [(0, 0)] * array.ndim
     widths[axis] = (radius, radius)
-    if mode == "constant" and constant_value is not None:
+    if edge == "constant" and constant_value is not None:
         padded = np.pad(array, widths, mode="constant", constant_values=constant_value)
     else:
-        padded = np.pad(array, widths, mode=NUMPY_PAD[mode])
+        padded = np.pad(array, widths, mode=NUMPY_PAD[edge])
     size = fft.next_fast_len(length + 2 * radius, real=True)
     # The kernel centred on sample 0 of a circular buffer, so output sample i lines up with padded input sample i.
     centred = np.zeros(size)

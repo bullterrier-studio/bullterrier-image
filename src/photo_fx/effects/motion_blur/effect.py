@@ -65,4 +65,4 @@ def motion_blur(rgb: np.ndarray, params: MotionBlurParams) -> np.ndarray:
     """
     if params.length == 0:
         return rgb.copy()
-    return convolve(rgb, _line_kernel(params.angle, params.length), mode=params.edge)
+    return convolve(rgb, _line_kernel(params.angle, params.length), edge=params.edge)

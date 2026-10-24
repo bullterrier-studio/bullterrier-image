@@ -52,5 +52,5 @@ def soft_focus(rgb: np.ndarray, params: SoftFocusParams) -> np.ndarray:
     and a blurred exposure of the same scene stacked). The picture only ever gets
     brighter, detail stays under the glow, and black stays black.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge)
     return (rgb * (1.0 - params.opacity) + screen(rgb, blurred) * params.opacity).astype(np.float32)

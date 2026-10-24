@@ -112,7 +112,7 @@ def halftone(rgb: np.ndarray, params: HalftoneParams) -> np.ndarray:
     cell = params.cell
     paper = np.asarray(params.paper, dtype=np.float32)
     smooth = gaussian_blur(
-        rgb, cell * params.sigma, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
+        rgb, cell * params.sigma, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
     )
     cos, sin = np.cos(np.radians(params.angle)), np.sin(np.radians(params.angle))
     x = np.arange(width, dtype=np.float32)

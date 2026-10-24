@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
-from photo_fx.ops.blur import NUMPY_PAD, Mode
+from photo_fx.ops.blur import NUMPY_PAD, Edge
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ def edge_distance(
     open_bottom: bool = True,
     smoothing: float = 1.0,  # constant: light smoothing, one element; effects expose it as a parameter
     truncate: float = 4.0,  # constant: scipy's own cutoff, which keeps all but 0.006% of the kernel's weight
-    mode: Mode = "reflect",  # constant: the shape carries on past the open bottom as the rows above it do
+    mode: Edge = "reflect",  # constant: the shape carries on past the open bottom as the rows above it do
 ) -> EdgeField:
     """Distance to the nearest edge, and the outward direction, for every element of a 2-D bool mask.
 

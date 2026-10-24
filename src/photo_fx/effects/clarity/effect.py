@@ -57,6 +57,6 @@ def clarity(rgb: np.ndarray, params: ClarityParams) -> np.ndarray:
     Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
     """
     blurred = gaussian_blur(
-        rgb, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
+        rgb, params.radius, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
     )
     return np.clip(rgb + params.amount * (rgb - blurred), 0.0, 1.0).astype(np.float32)

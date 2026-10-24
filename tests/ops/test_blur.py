@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.ops.blur import Mode, gaussian_blur
+from photo_fx.ops.blur import Edge, gaussian_blur
 
-MODES: list[Mode] = ["reflect", "mirror", "nearest", "wrap", "constant"]
+EDGES: list[Edge] = ["reflect", "mirror", "nearest", "wrap", "constant"]
 TOLERANCE = 1e-5  # the bound `gaussian_blur` documents for pictures in 0..1
-CONSTANT = 0.3  # beyond-the-edge value for mode 'constant': not 0, so a dropped value shows
+CONSTANT = 0.3  # beyond-the-edge value for edge 'constant': not 0, so a dropped value shows
 # A single pixel, a single row or column, odd rectangles, and one larger than the biggest kernel radius below but one.
 SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37), (150, 220)]
 # Kernel radii (truncate 4) of 6, 28, 32, 80 and 360 px: small and large kernels, longer than most of the pictures.
@@ -18,40 +18,40 @@ SIGMAS = [1.5, 7.0, 8.0, 20.0, 90.0]
 
 
 def picture(shape: tuple[int, ...], seed: int = 0) -> np.ndarray:
-    """Gradients plus noise in 0..1, float32: edges that differ from each other, so every edge mode matters."""
+    """Gradients plus noise in 0..1, float32: edges that differ from each other, so every edge rule matters."""
     rng = np.random.default_rng(seed)
     rows, cols = np.mgrid[0 : shape[0], 0 : shape[1]].astype(np.float32)
     ramp = (rows / max(shape[0], 1) * 0.5 + cols / max(shape[1], 1) * 0.3).reshape(shape[:2] + (1,) * (len(shape) - 2))
     return (ramp + rng.random(shape, dtype=np.float32) * 0.2).astype(np.float32)
 
 
-def scipy_blur(image: np.ndarray, sigma: float, mode: Mode, truncate: float = 4.0) -> np.ndarray:
+def scipy_blur(image: np.ndarray, sigma: float, edge: Edge, truncate: float = 4.0) -> np.ndarray:
     """The oracle: scipy's direct convolution over the two picture axes only, never across channels."""
     sigmas = (sigma, sigma) + (0.0,) * (image.ndim - 2)
-    return ndimage.gaussian_filter(image, sigmas, mode=mode, cval=CONSTANT, truncate=truncate)
+    return ndimage.gaussian_filter(image, sigmas, mode=edge, cval=CONSTANT, truncate=truncate)
 
 
-def blur(image: np.ndarray, sigma: float, mode: Mode, truncate: float = 4.0) -> np.ndarray:
-    return gaussian_blur(image, sigma, truncate=truncate, mode=mode, constant_value=CONSTANT)
+def blur(image: np.ndarray, sigma: float, edge: Edge, truncate: float = 4.0) -> np.ndarray:
+    return gaussian_blur(image, sigma, truncate=truncate, edge=edge, constant_value=CONSTANT)
 
 
 @pytest.mark.parametrize("sigma", SIGMAS)
-@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("edge", EDGES)
 @pytest.mark.parametrize("size", SIZES, ids=[f"{h}x{w}" for h, w in SIZES])
-def test_the_blur_matches_a_direct_convolution_within_the_documented_bound(size, mode, sigma):
+def test_the_blur_matches_a_direct_convolution_within_the_documented_bound(size, edge, sigma):
     image = picture(size)
-    got = blur(image, sigma, mode)
+    got = blur(image, sigma, edge)
     assert got.shape == image.shape
-    assert np.abs(got.astype(np.float64) - scipy_blur(image, sigma, mode)).max() <= TOLERANCE
+    assert np.abs(got.astype(np.float64) - scipy_blur(image, sigma, edge)).max() <= TOLERANCE
 
 
-@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("edge", EDGES)
 @pytest.mark.parametrize("sigma", [3.0, 40.0])
-def test_each_channel_of_a_colour_picture_is_blurred_on_its_own(mode, sigma):
+def test_each_channel_of_a_colour_picture_is_blurred_on_its_own(edge, sigma):
     image = picture((45, 70, 3), seed=1)
     image[..., 1] = 1.0 - image[..., 1]  # channels unlike each other: blurring across them would show
-    got = blur(image, sigma, mode)
-    assert np.abs(got.astype(np.float64) - scipy_blur(image, sigma, mode)).max() <= TOLERANCE
+    got = blur(image, sigma, edge)
+    assert np.abs(got.astype(np.float64) - scipy_blur(image, sigma, edge)).max() <= TOLERANCE
 
 
 @pytest.mark.parametrize("truncate", [1.3, 2.5, 10.0])
@@ -63,43 +63,43 @@ def test_truncate_cuts_the_kernel_where_scipy_does(truncate):
 
 
 @pytest.mark.parametrize(("sigma", "truncate"), [(0.0, 4.0), (1.5, 4.0), (7.0, 4.0), (2.0, 10.0), (30.0, 1.0)])
-@pytest.mark.parametrize("mode", MODES)
-def test_a_kernel_radius_below_32_px_gives_exactly_scipys_result(sigma, truncate, mode):
+@pytest.mark.parametrize("edge", EDGES)
+def test_a_kernel_radius_below_32_px_gives_exactly_scipys_result(sigma, truncate, edge):
     image = picture((61, 83, 3), seed=3)
-    np.testing.assert_array_equal(blur(image, sigma, mode, truncate), scipy_blur(image, sigma, mode, truncate))
+    np.testing.assert_array_equal(blur(image, sigma, edge, truncate), scipy_blur(image, sigma, edge, truncate))
 
 
 @pytest.mark.parametrize("sigma", [2.0, 25.0, 120.0])
-@pytest.mark.parametrize("mode", MODES)
-def test_the_blur_never_leaves_the_range_of_the_picture_and_what_lies_beyond_it(mode, sigma):
+@pytest.mark.parametrize("edge", EDGES)
+def test_the_blur_never_leaves_the_range_of_the_picture_and_what_lies_beyond_it(edge, sigma):
     image = picture((70, 90), seed=4) * 0.5 + 0.4  # 0.4..0.9: the constant 0.3 lies below it
-    got = blur(image, sigma, mode)
-    low = min(float(image.min()), CONSTANT) if mode == "constant" else float(image.min())
+    got = blur(image, sigma, edge)
+    low = min(float(image.min()), CONSTANT) if edge == "constant" else float(image.min())
     assert got.min() >= low
     assert got.max() <= image.max()
 
 
 @pytest.mark.parametrize("sigma", [2.0, 25.0, 120.0])
-@pytest.mark.parametrize("mode", MODES)
-def test_an_even_picture_stays_exactly_as_it_is(mode, sigma):
+@pytest.mark.parametrize("edge", EDGES)
+def test_an_even_picture_stays_exactly_as_it_is(edge, sigma):
     """Whatever the blur averages is the same value (beyond the edge too: the constant is that value), so the result
     is that value exactly, not merely close to it."""
     even = np.full((50, 70, 3), CONSTANT, dtype=np.float32)
-    np.testing.assert_array_equal(blur(even, sigma, mode), even)
+    np.testing.assert_array_equal(blur(even, sigma, edge), even)
 
 
 @pytest.mark.parametrize("sigma", [2.0, 50.0])
 def test_the_blur_keeps_float32_and_leaves_its_input_alone(sigma):
     image = picture((40, 60, 3), seed=5)
     before = image.copy()
-    got = gaussian_blur(image, sigma, truncate=4.0, mode="reflect")
+    got = gaussian_blur(image, sigma, truncate=4.0, edge="reflect")
     assert got.dtype == np.float32
     np.testing.assert_array_equal(image, before)
 
 
-def test_mode_constant_needs_the_value_beyond_the_edge():
+def test_edge_constant_needs_the_value_beyond_the_edge():
     with pytest.raises(ValueError, match="constant_value"):
-        gaussian_blur(picture((8, 8)), 40.0, truncate=4.0, mode="constant")
+        gaussian_blur(picture((8, 8)), 40.0, truncate=4.0, edge="constant")
 
 
 def cpu_seconds(image: np.ndarray, sigma: float) -> float:
@@ -111,7 +111,7 @@ def cpu_seconds(image: np.ndarray, sigma: float) -> float:
     for _ in range(3):
         blurs, start = 0, time.process_time()
         while (spent := time.process_time() - start) < 0.05:
-            gaussian_blur(image, sigma, truncate=4.0, mode="reflect")
+            gaussian_blur(image, sigma, truncate=4.0, edge="reflect")
             blurs += 1
         per_blur.append(spent / blurs)
     return min(per_blur)

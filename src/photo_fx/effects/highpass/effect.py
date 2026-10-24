@@ -45,5 +45,5 @@ def highpass(rgb: np.ndarray, params: HighpassParams) -> np.ndarray:
     A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each
     colour channel is filtered on its own and the result is kept within 0..1.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge)
     return np.clip(rgb - blurred + MID_GREY, 0.0, 1.0).astype(np.float32)

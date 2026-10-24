@@ -55,8 +55,8 @@ def lens_blur(rgb: np.ndarray, params: LensBlurParams) -> np.ndarray:
     disc = np.clip(params.radius + 0.5 - distance, 0.0, 1.0)
     disc /= disc.sum()
     if params.highlights == 0:
-        return convolve(rgb, disc, mode=params.edge)
+        return convolve(rgb, disc, edge=params.edge)
     weight = 1.0 + params.highlights * luminance(rgb)
-    weighted = convolve(rgb * weight[..., np.newaxis], disc, mode=params.edge)
-    total = convolve(weight, disc, mode=params.edge)[..., np.newaxis]
+    weighted = convolve(rgb * weight[..., np.newaxis], disc, edge=params.edge)
+    total = convolve(weight, disc, edge=params.edge)[..., np.newaxis]
     return np.clip(weighted / total, rgb.min(), rgb.max()).astype(np.float32)

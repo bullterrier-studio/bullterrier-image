@@ -58,7 +58,7 @@ def sharpen(rgb: np.ndarray, params: SharpenParams) -> np.ndarray:
     Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
     kept within 0..1.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, mode=params.edge)
+    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge)
     detail = rgb - blurred
     detail *= np.abs(detail) >= params.threshold  # smaller differences count for nothing
     return np.clip(rgb + params.amount * detail, 0.0, 1.0).astype(np.float32)

@@ -69,6 +69,6 @@ def glow(rgb: np.ndarray, params: GlowParams) -> np.ndarray:
     """
     bright = highlights(rgb, params.threshold)
     halo = gaussian_blur(
-        bright, params.radius, truncate=params.truncate, mode=params.edge, constant_value=params.constant_value
+        bright, params.radius, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
     )
     return screen(rgb, params.amount * halo)

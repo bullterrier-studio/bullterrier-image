@@ -92,6 +92,6 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     framed = np.pad(bright, ((1, 1), (1, 1), (0, 0)))
     spikes = np.empty_like(bright)
     for channel in range(rgb.shape[-1]):  # one channel at a time keeps the transforms' working memory to a third
-        spikes[..., channel] = total * convolve(framed[..., channel], kernel, mode="nearest")[1:-1, 1:-1]
+        spikes[..., channel] = total * convolve(framed[..., channel], kernel, edge="nearest")[1:-1, 1:-1]
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, params.amount * spikes * tint)

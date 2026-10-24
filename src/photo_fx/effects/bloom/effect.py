@@ -84,5 +84,5 @@ def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
     halo = np.zeros_like(bright)
     for octave, weight in enumerate(weights):
         sigma = params.radius / 2.0**octave
-        halo += float(weight) * gaussian_blur(bright, sigma, truncate=params.truncate, mode=params.edge)
+        halo += float(weight) * gaussian_blur(bright, sigma, truncate=params.truncate, edge=params.edge)
     return screen(rgb, params.amount * halo)

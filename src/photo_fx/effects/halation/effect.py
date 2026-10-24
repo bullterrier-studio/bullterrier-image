@@ -67,6 +67,6 @@ def halation(rgb: np.ndarray, params: HalationParams) -> np.ndarray:
     brightens and leaves black black.
     """
     brightest = highlights(rgb.max(axis=-1), params.threshold)
-    halo = gaussian_blur(brightest, params.radius, truncate=params.truncate, mode=params.edge)
+    halo = gaussian_blur(brightest, params.radius, truncate=params.truncate, edge=params.edge)
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, (params.amount * halo)[..., None] * tint)
