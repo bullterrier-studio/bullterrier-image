@@ -1,7 +1,9 @@
-# Worms and spots grown from the dog's bright parts, laid over the photo.
+# Fine worms and mazes grown from the dog's bright parts (small cells, many steps), laid over the photo.
 name = "reaction_diffusion"
 size = 480
 
 [[step]]
 effect = "reaction_diffusion"
+cell = 4
+steps = 1000
 opacity = 0.6

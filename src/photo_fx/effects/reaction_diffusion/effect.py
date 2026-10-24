@@ -39,7 +39,7 @@ class ReactionDiffusionParams(EffectParams):
         "sparser (isolated spots); lowering it fills the picture.",
     )
     steps: int = param(
-        1000,
+        300,
         unit="count",
         min=0,
         max=5000,
@@ -47,7 +47,7 @@ class ReactionDiffusionParams(EffectParams):
         "costs time in proportion (and more cells, so smaller `cell`, cost more per step).",
     )
     cell: float = param(
-        4.0,
+        8.0,
         unit="px",
         min=1,
         max=64,
