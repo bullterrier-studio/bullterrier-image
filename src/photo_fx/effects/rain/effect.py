@@ -32,16 +32,25 @@ class RainParams(EffectParams):
         unit="px",
         min=1,
         max=200,
-        doc="The length of the nearest streaks in px; the farthest are half as long. Tuned for a picture about 480 px "
-        "high. Larger = longer streaks, as with a slower shutter.",
+        doc="The length of the nearest streaks in px; the farthest are shorter by `depth`. Tuned for a picture about "
+        "480 px high. Larger = longer streaks, as with a slower shutter.",
     )
     thickness: float = param(
         1.5,
         unit="px",
         min=1,
         max=20,
-        doc="The width of the nearest streaks in px; the farthest are half as wide. Tuned for a picture about 480 px "
-        "high. Larger = fatter drops.",
+        doc="The width of the nearest streaks in px; the farthest are narrower by `depth`. Tuned for a picture about "
+        "480 px high. Larger = fatter drops.",
+    )
+    depth: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How far apart the streaks are in depth, which spreads their length, width and brightness: the farthest "
+        "have 1 - depth times those of the nearest. 0 = every streak alike, 1 = from the nearest down to nothing at "
+        "the farthest.",
     )
     opacity: float = param(
         0.7,
@@ -49,7 +58,7 @@ class RainParams(EffectParams):
         min=0,
         max=1,
         doc="How bright the nearest streaks are: the share of `color` they screen over the picture at their centre; "
-        "the farthest are half as bright. 0 = invisible, 1 = solid colour.",
+        "the farthest are fainter by `depth`. 0 = invisible, 1 = solid colour.",
     )
     color: Color = param(
         "#dbe6f5",
@@ -69,16 +78,16 @@ class RainParams(EffectParams):
 def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
 
-    Every streak has a random depth from 0 (far) to 1 (near): its length, width and brightness are `length`,
-    `thickness` and `opacity` times 0.5 + 0.5 x depth, so the rain has depth. A streak is drawn with antialiased
+    Every streak lies at a random distance d from 0 (far) to 1 (near): its length, width and brightness are `length`,
+    `thickness` and `opacity` times 1 - `depth` x (1 - d), so the rain has depth. A streak is drawn with antialiased
     edges and is cut off by the picture's edge. Streaks are screened over the picture, so they only lighten it. A
     higher `density` keeps every streak of a lower one and adds more; the same `seed` always gives the same rain.
     """
     height, width = rgb.shape[:2]
     # constant: density is counted per 1000 square px
     streaks = np.random.default_rng(params.seed).random((round(params.density * height * width / 1000), 3))
-    x, y, depth = streaks.T
-    near = 0.5 + 0.5 * depth
+    x, y, distance = streaks.T
+    near = 1 - params.depth * (1 - distance)
     start = np.stack([x * width, y * height], axis=1)
     lean = np.radians(params.angle)
     end = start + params.length * near[:, None] * np.array([np.sin(lean), np.cos(lean)])

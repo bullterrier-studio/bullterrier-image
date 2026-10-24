@@ -101,6 +101,21 @@ def test_a_drop_changes_only_the_pixels_inside_its_radius() -> None:
     assert max(areas) > 1.5 * min(areas)  # the drops differ in size
 
 
+def test_the_size_variation_spreads_the_drops_from_all_alike_to_the_smallest_nearly_gone() -> None:
+    """A drop of radius r touches about pi r^2 pixels: radius `radius` x a share that runs from 1 - size_variation."""
+
+    def areas(size_variation: float) -> np.ndarray:
+        return np.array(
+            [
+                drop_of(RAMPS, seed, refraction=1.0, radius=25.0, size_variation=size_variation, **BARE)[1].sum()
+                for seed in range(0, 120, 6)
+            ]
+        )
+
+    np.testing.assert_allclose(areas(0.0), np.pi * 25.0**2, rtol=0.05)
+    assert areas(1.0).min() < 0.1 * np.pi * 25.0**2
+
+
 @pytest.mark.parametrize("count", [3, 8])
 def test_count_drops_are_made_whatever_the_size_of_the_picture(count: int) -> None:
     """Small drops far apart on a noise picture are `count` separate discs."""

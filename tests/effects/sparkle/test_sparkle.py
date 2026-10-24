@@ -95,6 +95,25 @@ def test_a_sparkle_is_a_soft_dot_with_the_brightness_of_its_size() -> None:
         assert dot[CENTRE[0], CENTRE[1] + round(0.5 * radius) - 1] == pytest.approx(brightness, abs=0.001)
 
 
+def test_the_size_variation_spreads_the_sparkles_from_all_alike_to_the_smallest_nearly_gone() -> None:
+    alike = [glint(size=10.0, rays=0.0, opacity=1.0, size_variation=0.0, seed=seed)[CENTRE] for seed in range(8)]
+    np.testing.assert_allclose(alike, 1.0, atol=1e-6)
+    spread = [glint(size=10.0, rays=0.0, opacity=1.0, size_variation=1.0, seed=seed)[CENTRE] for seed in range(30)]
+    assert min(spread) < 0.2  # brightness is opacity x the scale, which runs from 1 - size_variation to 1
+    assert max(spread) > 0.9
+
+
+def test_the_thickness_is_the_width_of_the_rays() -> None:
+    """A ray of width w covers a pixel fully up to w / 2 - 1 / 2 from its line and not at all from w / 2 + 1 / 2."""
+    wide = glint(size=10.0, rays=3.0, thickness=5.0, opacity=1.0, seed=1)
+    hairline = glint(size=10.0, rays=3.0, thickness=1.0, opacity=1.0, seed=1)
+    brightness, row, column = wide[CENTRE], CENTRE[0], CENTRE[1] + 12  # on the right arm, beyond the dot
+    assert wide[row + 2, column] == pytest.approx(brightness)
+    assert wide[row + 3, column] == 0.0
+    assert hairline[row, column] == pytest.approx(brightness)
+    assert hairline[row + 1, column] == 0.0
+
+
 def test_rays_are_four_arms_along_the_axes_reaching_rays_times_the_dot_size() -> None:
     """The arms run left, right, up and down from the middle, `rays` x `size` x s long (s the sparkle's scale, which is
     also its brightness as a share of `opacity`); no light falls on the diagonals beyond the dot."""

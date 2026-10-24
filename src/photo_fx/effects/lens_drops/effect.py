@@ -26,8 +26,16 @@ class LensDropsParams(EffectParams):
         unit="px",
         min=1,
         max=200,
-        doc="The radius in px of the biggest drops; the smallest are half as big. Tuned for a picture about 480 px "
-        "high. Larger = bigger drops.",
+        doc="The radius in px of the biggest drops; the smallest are smaller by `size_variation`. Tuned for a "
+        "picture about 480 px high. Larger = bigger drops.",
+    )
+    size_variation: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How much the drops differ in size: each has a random share of `radius` from 1 - size_variation to 1. "
+        "0 = every drop alike, 1 = from the full radius down to specks.",
     )
     refraction: float = param(
         1.5,
@@ -88,11 +96,12 @@ class LensDropsParams(EffectParams):
 def lens_drops(rgb: np.ndarray, params: LensDropsParams) -> np.ndarray:
     """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
 
-    A drop at a random place has a random radius from half of `radius` to all of it. The pixel at offset d from its
-    middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by `interpolation` and
-    `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over the drop,
-    `highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle. Later drops
-    cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the same drops.
+    A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at
+    offset d from its middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by
+    `interpolation` and `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over
+    the drop, `highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle.
+    Later drops cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the
+    same drops.
     """
     if params.count == 0:
         return rgb.copy()
@@ -102,7 +111,9 @@ def lens_drops(rgb: np.ndarray, params: LensDropsParams) -> np.ndarray:
     scene = gaussian_blur(rgb, params.blur, truncate=params.truncate, edge=params.edge)
     # every drop's pixels, one after the other: where they are, how much the drop covers each, how it shines
     places, covers, shines, sources = [], [], [], []
-    for middle_x, middle_y, reach in zip(x * width, y * height, params.radius * (0.5 + 0.5 * size), strict=True):
+    for middle_x, middle_y, reach in zip(
+        x * width, y * height, params.radius * (1 - params.size_variation * (1 - size)), strict=True
+    ):
         top, bottom = max(int(middle_y - reach) - 1, 0), min(int(middle_y + reach) + 2, height)
         left, right = max(int(middle_x - reach) - 1, 0), min(int(middle_x + reach) + 2, width)
         rows, cols = np.mgrid[top:bottom, left:right]

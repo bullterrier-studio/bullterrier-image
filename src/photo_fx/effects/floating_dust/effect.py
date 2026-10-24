@@ -24,8 +24,8 @@ class FloatingDustParams(EffectParams):
         unit="px",
         min=1,
         max=200,
-        doc="The diameter in px of the nearest, largest specks; the farthest are half as wide. Tuned for a picture "
-        "about 480 px high. Larger = bigger bokeh discs, as if the dust were closer to the lens.",
+        doc="The diameter in px of the nearest, largest specks; the farthest are narrower by `depth`. Tuned for a "
+        "picture about 480 px high. Larger = bigger bokeh discs, as if the dust were closer to the lens.",
     )
     softness: float = param(
         0.8,
@@ -34,6 +34,15 @@ class FloatingDustParams(EffectParams):
         max=1,
         doc="How soft a speck's edge is: the edge falls from full brightness to none across this fraction of the "
         "speck's radius (at least one pixel). 0 = crisp discs, 1 = specks fading out from their middle.",
+    )
+    depth: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How far apart the specks are in depth, which spreads their size and brightness: the farthest have 1 - "
+        "depth times those of the nearest. 0 = every speck alike, 1 = from the nearest down to nothing at the "
+        "farthest.",
     )
     opacity: float = param(
         0.55,
@@ -61,15 +70,15 @@ class FloatingDustParams(EffectParams):
 def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
 
-    Every speck has a random depth from 0 (far) to 1 (near): its width and brightness are `size` and `opacity` times
-    0.5 + 0.5 x depth. A speck is full brightness inside, half of it at its radius, with an edge `softness` of its
-    radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
+    Every speck lies at a random distance d from 0 (far) to 1 (near): its width and brightness are `size` and `opacity`
+    times 1 - `depth` x (1 - d). A speck is full brightness inside, half of it at its radius, with an edge `softness` of
+    its radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
     lighten it; the same `seed` always gives the same dust.
     """
     height, width = rgb.shape[:2]
-    # constant: three random numbers per particle, its x, y and depth
-    x, y, depth = np.random.default_rng(params.seed).random((params.count, 3)).T
-    near = 0.5 + 0.5 * depth
+    # constant: three random numbers per particle, its x, y and distance
+    x, y, distance = np.random.default_rng(params.seed).random((params.count, 3)).T
+    near = 1 - params.depth * (1 - distance)
     centre = np.stack([x * width, y * height], axis=1)
     radius = params.size / 2 * near
     light = draw_segments((height, width), centre, centre, radius, params.opacity * near, params.softness * radius)

@@ -33,8 +33,16 @@ class SparkleParams(EffectParams):
         unit="px",
         min=1,
         max=100,
-        doc="The diameter in px of the biggest sparkles' soft dot; the smallest are half as wide. Tuned for a picture "
-        "about 480 px high. Larger = bigger glints.",
+        doc="The diameter in px of the biggest sparkles' soft dot; the smallest are narrower by `size_variation`. "
+        "Tuned for a picture about 480 px high. Larger = bigger glints.",
+    )
+    size_variation: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How much the sparkles differ in size and brightness: each has a random scale from 1 - size_variation to "
+        "1 times `size` and `opacity`. 0 = every sparkle alike, 1 = from the biggest down to nothing.",
     )
     rays: float = param(
         2.0,
@@ -42,7 +50,14 @@ class SparkleParams(EffectParams):
         min=0,
         max=10,
         doc="How long the four rays of the cross are, as a multiple of the sparkle's dot diameter: each ray runs "
-        "this far from the middle, straight left, right, up and down, one pixel thin. 0 = a soft dot only, no rays.",
+        "this far from the middle, straight left, right, up and down, `thickness` wide. 0 = a soft dot only, no rays.",
+    )
+    thickness: float = param(
+        1.0,
+        unit="px",
+        min=0,
+        max=10,
+        doc="The width in px of each ray (with a soft one-pixel edge). 1 = a hairline, larger = bolder rays.",
     )
     opacity: float = param(
         1.0,
@@ -65,16 +80,16 @@ class SparkleParams(EffectParams):
 def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     """Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each.
 
-    A sparkle has a random scale s from 0.5 to 1: its dot is `size` x s wide (soft: full brightness inside half its
-    radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is `opacity` x s
-    bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only lighten it; the
-    same `seed` on the same picture always gives the same sparkles.
+    A sparkle has a random scale s from 1 - `size_variation` to 1: its dot is `size` x s wide (soft: full brightness
+    inside half its radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is
+    `opacity` x s bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only
+    lighten it; the same `seed` on the same picture always gives the same sparkles.
     """
     height, width = rgb.shape[:2]
     rng = np.random.default_rng(params.seed)
     highlights = np.flatnonzero(luminance(rgb) > params.threshold)
     chosen = rng.choice(highlights, size=min(params.count, len(highlights)), replace=False)
-    scale = 0.5 + 0.5 * rng.random(len(chosen))
+    scale = 1 - params.size_variation * (1 - rng.random(len(chosen)))
     centre = np.stack([chosen % width, chosen // width], axis=1).astype(np.float64)
     brightness = params.opacity * scale
     radius = params.size / 2 * scale
@@ -83,8 +98,13 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     reach = params.rays * params.size * scale[:, None]
     # constant: the unit vectors of the four ray directions
     tips = [centre + reach * np.array(direction) for direction in ((1, 0), (-1, 0), (0, 1), (0, -1))]
-    # constant: a hairline is half a pixel to each side of its line, with a one-pixel antialiased edge
+    # constant: a one-pixel antialiased edge
     rays = draw_segments(
-        (height, width), np.tile(centre, (len(tips), 1)), np.concatenate(tips), 0.5, np.tile(brightness, len(tips)), 1.0
+        (height, width),
+        np.tile(centre, (len(tips), 1)),
+        np.concatenate(tips),
+        params.thickness / 2,
+        np.tile(brightness, len(tips)),
+        1.0,
     )
     return screen(rgb, np.maximum(dots, rays)[..., None])

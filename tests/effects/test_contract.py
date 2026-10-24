@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from photo_fx.core import registry
 from photo_fx.core.params import UNITS, EffectParams, param
@@ -537,6 +538,29 @@ def test_the_opacity_scales_the_light_of_every_particle(name, photo):
     half = registry.apply(name, black, **{**PARTICLES[name], "opacity": 0.5}, seed=1)
     assert full.max() > 0.4
     np.testing.assert_allclose(half, full / 2, atol=1e-6)
+
+
+# well separated particles, each big and sharp enough to reach full brightness at its middle (snow: its layers 1/4..1)
+SEPARATE = {
+    "embers": {"count": 40, "size": 8.0, "length": 0.0, "softness": 0.0},
+    "floating_dust": {"count": 40, "size": 8.0, "softness": 0.0},
+    "rain": {"density": 0.3, "length": 8.0, "thickness": 8.0},
+    "snow": {"density": 0.1, "size": 40.0, "layers": 4, "softness": 0.0},
+}
+
+
+@pytest.mark.parametrize("name", SEPARATE)
+def test_depth_spreads_the_brightness_of_the_particles_from_all_alike_to_the_farthest_nearly_gone(name):
+    def peaks(depth):
+        settings = {**PARTICLES[name], **SEPARATE[name], "depth": depth, "seed": 1}
+        light = registry.apply(name, np.zeros((400, 400, 3), np.float32), **settings)[..., 0]
+        patches, found = ndimage.label(light > 0, structure=np.ones((3, 3)))
+        return np.array(ndimage.maximum(light, patches, range(1, found + 1)))
+
+    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # opacity 1, no depth: every one at full brightness
+    spread = peaks(1.0)  # brightness is opacity x the particle's nearness, which runs from 0 (or 1/4 for snow) to 1
+    assert spread.min() < 0.3
+    assert spread.max() > 0.9
 
 
 @pytest.mark.parametrize("name", TINTED)
