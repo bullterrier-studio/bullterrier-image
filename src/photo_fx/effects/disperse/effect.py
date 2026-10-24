@@ -94,6 +94,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="Share of its journey a piece floats slowly along the wind before it goes (about 0..0.3 looks right). "
         "The outline starts at once, deeper pieces later (see `hover_spread`). 0 = off.",
+        advanced=True,
     )
     outward: float = param(
         0.0,
@@ -102,6 +103,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="How much a piece is also thrown away from the edge it came from (by up to `outward_distance`); pieces "
         "then fly in different directions, so leave it at 0 when everything should travel together on the wind.",
+        advanced=True,
     )
     ambient: float = param(
         0.0,
@@ -110,6 +112,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="Depth of the slow shimmer of the pieces that stay, as a share of their brightness (about 0..0.1 looks "
         "right; brightening stops at white). 0 = off.",
+        advanced=True,
     )
     clock: float = param(
         0.0,
@@ -118,6 +121,7 @@ class DisperseParams(EffectParams):
         max=3600,
         doc='The time the shimmer runs on: animate it over the whole clip (`over = "clip"`) so the picture is alive '
         "even while nothing detaches.",
+        advanced=True,
     )
     seed: int = param(
         0,
@@ -133,6 +137,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="Distance from the outline (fraction of the picture width) beyond which a piece counts as fully inside, "
         "for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in.",
+        advanced=True,
     )
     jitter: float = param(
         0.2,
@@ -140,6 +145,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=1,
         doc="Random share of each piece's place in the leaving order: 0 = a clean front, raising it makes it ragged.",
+        advanced=True,
     )
     anticipation: float = param(
         0.06,
@@ -148,6 +154,7 @@ class DisperseParams(EffectParams):
         max=0.2,
         doc="Wind-up time before a piece goes, as a share of the clip: it eases back by `pullback` over this time. "
         "The first piece goes only after it, so every piece has one.",
+        advanced=True,
     )
     pullback: float = param(
         0.15,
@@ -156,6 +163,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="How far a piece eases back against its journey before it goes (anticipation), as a share of the "
         "journey. 0 = no wind-up.",
+        advanced=True,
     )
     flight: float = param(
         0.2,
@@ -164,6 +172,7 @@ class DisperseParams(EffectParams):
         max=0.5,
         doc="Average time from detaching to vanishing, as a share of the clip. Shorter flights keep fewer pieces in "
         "the air at once (about 0.1 keeps it to a third on a side-to-side sweep).",
+        advanced=True,
     )
     flight_variation: float = param(
         0.4,
@@ -171,6 +180,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=0.9,
         doc="How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all the same.",
+        advanced=True,
     )
     finish: float = param(
         0.98,
@@ -179,6 +189,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="The progress by which the last piece has vanished (a little under 1 gives a clean last frame). If "
         "`anticipation` and the longest flight do not fit before it, all pieces go at once.",
+        advanced=True,
     )
     hover_spread: float = param(
         0.45,
@@ -187,6 +198,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="With `hover`: how far into the clip a piece `outline_depth` inside starts to float (the outline starts at "
         "0). 0 = everything floats at once.",
+        advanced=True,
     )
     bob: float = param(
         0.004,
@@ -194,6 +206,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=0.05,
         doc="Height of the gentle up-and-down of a hovering piece, as a fraction of the picture height.",
+        advanced=True,
     )
     bob_cycles: float = param(
         3.0,
@@ -201,6 +214,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=20,
         doc="Number of ups and downs while a piece hovers.",
+        advanced=True,
     )
     angle_spread: float = param(
         12.0,
@@ -208,6 +222,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=180,
         doc="Range of each piece's own direction around the wind's `angle` (it differs by up to half of this).",
+        advanced=True,
     )
     distance_minimum: float = param(
         0.35,
@@ -215,6 +230,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=1,
         doc="The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all travel equally far.",
+        advanced=True,
     )
     outward_distance: float = param(
         0.12,
@@ -223,6 +239,7 @@ class DisperseParams(EffectParams):
         max=1,
         doc="How far `outward` 1 throws a piece away from its edge, as a fraction of the picture's width "
         "(sideways) and height (up and down).",
+        advanced=True,
     )
     acceleration: float = param(
         0.5,
@@ -231,6 +248,7 @@ class DisperseParams(EffectParams):
         max=10,
         doc="How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration times as fast as "
         "it starts. 0 = steady speed.",
+        advanced=True,
     )
     sway: float = param(
         0.012,
@@ -239,6 +257,7 @@ class DisperseParams(EffectParams):
         max=0.2,
         doc="Largest sideways wobble of a flying piece, as a fraction of the picture width; it grows during the "
         "flight. 0 = none.",
+        advanced=True,
     )
     sway_cycles: float = param(
         1.5,
@@ -246,6 +265,7 @@ class DisperseParams(EffectParams):
         min=0,
         max=20,
         doc="Number of wobbles during a piece's flight.",
+        advanced=True,
     )
     falloff: float = param(
         1.5,
@@ -254,6 +274,7 @@ class DisperseParams(EffectParams):
         max=10,
         doc="How a flying piece fades: brightness is (1 - share of flight)^falloff. 0 = no fade (it just vanishes "
         "at the end), 1 = even, above 1 fades quickly at first.",
+        advanced=True,
     )
     flare: float = param(
         0.4,
@@ -262,6 +283,7 @@ class DisperseParams(EffectParams):
         max=2,
         doc="Extra brightness at the peak of the glow as a piece leaves (0.4 = 1.4x); brightening stops at white. "
         "0 = no glow.",
+        advanced=True,
     )
     flare_span: float = param(
         0.2,
@@ -269,6 +291,7 @@ class DisperseParams(EffectParams):
         min=0.01,
         max=1,
         doc="Share of a piece's flight that the glow lasts; it peaks halfway through that.",
+        advanced=True,
     )
     ambient_period: float = param(
         3.0,
@@ -276,6 +299,7 @@ class DisperseParams(EffectParams):
         min=0.1,
         max=60,
         doc="Seconds per shimmer cycle (breathing is 2-4 s).",
+        advanced=True,
     )
     ambient_wavelength: float = param(
         0.2,
@@ -284,11 +308,13 @@ class DisperseParams(EffectParams):
         max=2,
         doc="Length of one shimmer wave as a fraction of the picture width; with the period it sets how fast the "
         "wave travels (against the wind).",
+        advanced=True,
     )
     open_bottom: bool = param(
         True,
         doc="True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut off there). False: it "
         "counts like the other borders.",
+        advanced=True,
     )
     normal_smoothing: float = param(
         1.0,
