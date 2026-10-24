@@ -1,12 +1,19 @@
-"""Tests of `ops/colorspace.py`: the sRGB transfer function and HSV, checked against published values and the standard
-library's `colorsys`."""
+"""Tests of `ops/colorspace.py`: the sRGB transfer function, HSV and JFIF YCbCr, checked against published values and
+the standard library's `colorsys`."""
 
 import colorsys
 
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.colorspace import hsv_to_rgb, linear_to_srgb, rgb_to_hsv, srgb_to_linear
+from bullterrier_image.ops.colorspace import (
+    hsv_to_rgb,
+    linear_to_srgb,
+    rgb_to_hsv,
+    rgb_to_ycbcr,
+    srgb_to_linear,
+    ycbcr_to_rgb,
+)
 
 # (encoded, linear) pairs from the IEC 61966-2-1 transfer function, worked out by hand:
 #   linear segment: v / 12.92 up to 0.04045; above it ((v + 0.055) / 1.055) ** 2.4.
@@ -88,3 +95,33 @@ def test_hue_is_always_below_one_even_for_a_red_with_a_trace_of_blue() -> None:
 def test_hue_wraps_around_the_colour_circle() -> None:
     np.testing.assert_allclose(hsv_to_rgb(np.array([1.25, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
     np.testing.assert_allclose(hsv_to_rgb(np.array([-0.75, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
+
+
+# 8-bit (Y, Cb, Cr) of the primaries and grey, as every JPEG tool tabulates them (JFIF, ITU-T T.871): the chroma of a
+# grey is 128, red's Cr and blue's Cb are the top of the range (255.5, written 255 in 8 bits).
+YCBCR_8BIT = [
+    pytest.param((0, 0, 0), (0, 128, 128), id="black"),
+    pytest.param((255, 255, 255), (255, 128, 128), id="white"),
+    pytest.param((128, 128, 128), (128, 128, 128), id="grey"),
+    pytest.param((255, 0, 0), (76.245, 84.972, 255.5), id="red"),
+    pytest.param((0, 255, 0), (149.685, 43.528, 21.235), id="green"),
+    pytest.param((0, 0, 255), (29.07, 255.5, 107.266), id="blue"),
+]
+
+
+@pytest.mark.parametrize(("rgb", "ycbcr"), YCBCR_8BIT)
+def test_rgb_to_ycbcr_matches_the_jfif_values(rgb: tuple[int, ...], ycbcr: tuple[float, ...]) -> None:
+    out = rgb_to_ycbcr(np.array(rgb, np.float32) / 255)
+    np.testing.assert_allclose(out * 255, ycbcr, atol=0.01)
+
+
+@pytest.mark.parametrize(("rgb", "ycbcr"), YCBCR_8BIT)
+def test_ycbcr_to_rgb_matches_the_jfif_values(rgb: tuple[int, ...], ycbcr: tuple[float, ...]) -> None:
+    np.testing.assert_allclose(ycbcr_to_rgb(np.array(ycbcr, np.float32) / 255) * 255, rgb, atol=0.01)
+
+
+def test_ycbcr_to_rgb_undoes_rgb_to_ycbcr_and_keeps_the_shape() -> None:
+    image = np.random.default_rng(5).random((4, 5, 3), dtype=np.float32)
+    back = ycbcr_to_rgb(rgb_to_ycbcr(image))
+    assert back.shape == image.shape
+    np.testing.assert_allclose(back, image, atol=1e-5)

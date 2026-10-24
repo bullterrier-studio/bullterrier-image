@@ -1,0 +1,7 @@
+# A photo crushed by JPEG: 8 px blocks, ringing round the edges and colour that bleeds past its outlines.
+name = "jpeg_crush"
+size = 480
+
+[[step]]
+effect = "jpeg_crush"
+quality = 5

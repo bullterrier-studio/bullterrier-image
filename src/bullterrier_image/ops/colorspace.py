@@ -102,3 +102,38 @@ def hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
     k = (np.array([5, 3, 1], dtype=np.float32) + hue * 6) % 6  # constant: channel offsets and six sectors, standard HSV
     ramp = np.clip(np.minimum(k, 4 - k), 0, 1)  # constant: the trapezoid's plateau starts 4 sectors on, standard HSV
     return (value - value * saturation * ramp).astype(np.float32)
+
+
+# JFIF full-range YCbCr (ITU-T T.871): Y is the luma of the Rec. 601 weights, Cb and Cr are the blue and red differences
+# scaled to span the full range, centred on 128 of 255.
+_RGB_TO_YCBCR = np.array(
+    [[0.299, 0.587, 0.114], [-0.168736, -0.331264, 0.5], [0.5, -0.418688, -0.081312]], dtype=np.float32
+)  # constant: the JFIF matrix, ITU-T T.871
+_YCBCR_TO_RGB = np.linalg.inv(_RGB_TO_YCBCR).astype(np.float32)
+_CHROMA_CENTRE = np.array([0, 128 / 255, 128 / 255], dtype=np.float32)  # constant: JFIF centres Cb and Cr on 128 of 255
+
+
+def rgb_to_ycbcr(rgb: np.ndarray) -> np.ndarray:
+    """Convert sRGB to the JFIF YCbCr of JPEG files (ITU-T T.871), as fractions of the 8-bit range.
+
+    Args:
+        rgb: sRGB values, last axis length 3, 0..1.
+
+    Returns:
+        float32 array of the same shape holding (Y, Cb, Cr), each 0..1 for in-range input: Y is the luma (the
+        Rec. 601 weights 0.299, 0.587, 0.114), and Cb and Cr, the blue and red differences, are centred on 128/255
+        (a grey has both there). Red's Cr and blue's Cb reach 255.5/255, just above 1; nothing is clipped.
+    """
+    return (np.asarray(rgb, dtype=np.float32) @ _RGB_TO_YCBCR.T + _CHROMA_CENTRE).astype(np.float32)
+
+
+def ycbcr_to_rgb(ycbcr: np.ndarray) -> np.ndarray:
+    """Convert JFIF YCbCr, as fractions of the 8-bit range, back to sRGB; the inverse of `rgb_to_ycbcr`.
+
+    Args:
+        ycbcr: (Y, Cb, Cr) on the last axis, as `rgb_to_ycbcr` returns them.
+
+    Returns:
+        float32 array of the same shape holding sRGB (r, g, b), 0..1 for the YCbCr of in-range colours; not clipped.
+    """
+    return ((np.asarray(ycbcr, dtype=np.float32) - _CHROMA_CENTRE) @ _YCBCR_TO_RGB.T).astype(np.float32)
