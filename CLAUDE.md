@@ -108,6 +108,19 @@ What a new effect looks like is defined once, by the template in `src/photo_fx/e
 3. **Gate:** `uv run poe check`; nothing but files named for the new effect should appear in `git status`. `uv run poe regenerate` is run by the
    integrator, not by you: do not commit `fx.pyi` or `docs/effects/`.
 
+## Fixing defects: structurally, not defensively
+
+Models and loops patch the symptom where it shows (a fallback, a default, a swallowed exception, one more check) and call it robust; each patch makes the code harder to understand and leaves the cause alive
+(Armin Ronacher, "The Coming Loop"). Here a fix removes the cause. The reasoning is in `docs/design-decisions.md`.
+1. **Reproduce first, at the public interface** (a failing test, red evidence), then **find where the invalid state is created**, not where it is noticed. Fix it there.
+2. **A fix makes the bad state impossible**: a stricter parameter model (type, range, `Literal`), one source of truth for the value, a function whose result cannot be wrong, or the removal of the code path. Not a branch that copes with it afterwards.
+3. **Check the class, not the instance:** search for the same shape elsewhere (`grep`) and fix them by the same structural change, or say why not.
+4. **Trust the contracts inside the library; validate at the boundary.** Inputs from outside (a recipe, a parameter, a photo, a file, a model, the network) are validated once, where they enter, with a `PhotoFxError` that names the value. Internal code does not re-check what the layer above guarantees; if a guarantee is broken, it fails loudly and the cause is fixed.
+5. **No defensive code:** no fallback or default that hides a missing or invalid value; no `try/except` that continues (`except Exception`, a bare `except`, `contextlib.suppress`); no `isinstance`, `None` or range re-checks of internal arguments; no clamping, `np.nan_to_num` or retry added "just in case"; no `getattr`/`.get()` with a default for something that must exist; no widening a type to make an error go away; no skipped, xfailed or loosened tests. The one clamp that belongs is the one the effect contract defines (output in 0..1), written once.
+6. **A fix that needs a design change says so:** propose the change (in the report, under "Needs from others") instead of patching around the design. Never cover unclear design with more machinery.
+7. **One decision, one place.** A table, constant, name or rule that exists twice is a defect (two copies drift): keep one definition in the module that owns the concept and make the other use it. This holds for tests too: before adding a test, look for the same behaviour already tested; add a row to the existing table; a rule that holds for every effect lives once in `tests/effects/test_contract.py`; setup two test files need is a fixture in the nearest `conftest.py`. A reviewer who finds a duplicate asks for the merge, not a comment.
+8. Where a skill (`systematic-debugging`'s defence-in-depth, a generic "add validation at every layer") pulls against this section, this section wins.
+
 ## Lint, types and the other gates
 
 `uv run poe check` runs every gate, cheapest first, and stops at the first failure: `ruff format --check`; `ruff check` (rules below, plus explicit encodings `PLW1514`, no blind `except` `BLE`, pathlib `PTH`); `vulture` (dead code in `src`; framework-called names are exempt in `[tool.vulture]`); `deptry` (every import declared, development tools not used by the library); `poe build-check` (sdist and wheel checked by twine and check-wheel-contents); `mypy`; the tests, in random order, which include the import contracts, the effect contract (odd sizes, every number across its range) and the hidden-tunable scan of effect packages and `ops` (a number is a `param`, a trivial operand or index, or carries `# constant: <reason>`; never a library option, which a marker does not excuse). Each gate has a test proving it fails on a known-bad input. Process rule: **a defect a review finds twice becomes a gate**, so reviews stay light.
@@ -153,7 +166,7 @@ How a test file is written (`src/photo_fx/effects/_template/test_effect.py.tmpl`
 
 Use them; they are installed globally. `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion` for process; `testing-best-practices`
 for tests; `software-design-philosophy` for design (deep modules, no pass-throughs, no information leakage; interface docstrings state promises); `motion-design` for anything animated.
-Where they pull against this file: tests follow this file (no goldens); design follows the skill (do not add shallow wrappers; per-effect boilerplate is the price of uniformity, so keep `apply` bodies substantial).
+Where they pull against this file: tests follow this file (no goldens); fixes follow "Fixing defects" (structural, never defensive); design follows the skill (do not add shallow wrappers; per-effect boilerplate is the price of uniformity, so keep `apply` bodies substantial).
 
 ## Working style
 

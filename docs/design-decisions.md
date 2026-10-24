@@ -114,6 +114,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   raised in its own reviewed commit. The FFT is single-threaded, so CPU time stays predictable when photos are
   rendered in parallel.
 
+## Fixing defects
+
+- **A fix removes the cause; it does not add a defence.** The bug is reproduced at the public interface, fixed where the invalid state is created (a stricter parameter model, one source of truth, a removed path),
+  and the same class is searched for elsewhere. Inside the library code trusts its contracts and fails loudly; inputs are validated once at the boundary with a `PhotoFxError`. *Reason:* agents and automated loops
+  patch where a failure shows (fallbacks, defaults, swallowed exceptions, extra checks), which "makes the system less understandable while appearing more robust" and keeps the cause (Armin Ronacher,
+  "The Coming Loop", 2026); the repo's own instances were library options hidden behind `# constant:` and two copies of the same edge table. *Consequence:* the rules live in `CLAUDE.md` ("Fixing defects"),
+  duplicated knowledge (code or tests) is merged, and what a tool can see becomes a gate (blind `except`, literal library options, the marker rule).
+
 ## Testing and gates
 
 - **Properties, not golden images.** Tests assert the property that defines a behaviour (a blur stays in range, a sort
