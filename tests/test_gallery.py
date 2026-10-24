@@ -504,11 +504,12 @@ def test_the_gallery_command_keeps_what_is_not_a_generated_page(docs):
     assert note.read_text(encoding="utf-8") == "mine"
 
 
-def test_the_gallery_command_renders_an_existing_picture_again_only_with_force(docs):
+def test_the_gallery_command_renders_a_named_picture_again_even_when_it_exists(docs):
+    """Naming an effect with --only means "render it": after its recipe or defaults changed, the old picture is not
+    kept by surprise."""
     picture = gallery.effect_files("grain", checkout=docs).picture  # grain's recipe needs no cut-out: renders anywhere
-    assert dev_command(docs, "gallery", "--only", "grain").returncode == 0
-    assert picture.read_bytes() == b"existing"  # kept
-    done = dev_command(docs, "gallery", "--only", "grain", "--force")
+    assert picture.read_bytes() == b"existing"
+    done = dev_command(docs, "gallery", "--only", "grain")
     assert done.returncode == 0, done.stderr
     with Image.open(picture) as rendered:
         # rendered again
@@ -532,17 +533,16 @@ def _catalogue_pages() -> set[str]:
 
 GALLERY_RUNS = {  # command arguments -> the files it must add or change in the checkout (none else)
     "--only renders a missing picture and nothing else": (["--only", "grain"], {"docs/gallery/grain.jpg"}, True),
-    "--only --force renders one picture again and nothing else": (
-        ["--only", "grain", "--force"],
+    "--only renders an existing picture again and nothing else": (
+        ["--only", "grain"],
         {"docs/gallery/grain.jpg"},
         False,
     ),
     "--only names several effects": (
-        ["--only", "grain", "invert", "--force"],
+        ["--only", "grain", "invert"],
         {"docs/gallery/grain.jpg", "docs/gallery/invert.jpg"},
         False,
     ),
-    "--only leaves an existing picture alone and writes nothing": (["--only", "grain"], set(), False),
     "without --only the catalogue pages are written too": ([], _catalogue_pages(), False),
 }
 

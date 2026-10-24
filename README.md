@@ -509,7 +509,7 @@ and how to report a security problem privately in [SECURITY.md](SECURITY.md).
 
 Generated shared files (`src/bullterrier_image/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches that
 add effects never conflict over them; each effect's picture is a file of its own. After merging, `uv run poe regenerate` brings them up to date in one
-commit. Pictures that exist are kept (`uv run poe gallery --force` renders them again).
+commit. Pictures that exist are kept (`uv run poe gallery --force` renders them all again; an effect named with `--only` is always rendered).
 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook, unless it changes only documentation (pages and `docs/images/`); pushes to other branches are checked by CI when the pull request opens.

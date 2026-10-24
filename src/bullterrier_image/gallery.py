@@ -101,12 +101,14 @@ def write_docs(only: Sequence[str] = (), force: bool = False, *, checkout: Path 
     pages there that the catalogue no longer has (a category that lost its effects) are removed and other files are
     left alone; then the missing pictures (all of them with `force`) are rendered. Returns the pages, then the pictures.
 
-    With `only`, nothing but those effects' pictures is written: no page, no `fx.pyi`, no other file, so an agent
-    adding one effect leaves the shared generated files to the integrator (`regenerate`). Returns the pictures.
+    With `only`, those effects' pictures are rendered, whether they exist or not (naming an effect means "render it",
+    so a picture is never kept by surprise after its recipe changed), and nothing else is written: no page, no
+    `fx.pyi`, no other file, so an agent adding one effect leaves the shared generated files to the integrator
+    (`regenerate`). Returns the pictures.
     """
     _chosen(only, checkout)  # a bad name fails before anything is written
     written = [] if only else _write_pages(checkout)
-    rendered = render_gallery(only, force, checkout=checkout)
+    rendered = render_gallery(only, force or bool(only), checkout=checkout)
     return [*written, *(effect_files(name, checkout=checkout).picture for name in rendered)]
 
 
