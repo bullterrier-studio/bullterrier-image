@@ -106,8 +106,9 @@ def trace(
     """
     rgb, matte = _prepare(rgb, recipe, matte, find_subject)
     stages = [Stage("input", rgb)]
-    if recipe.needs_matte and matte is not None:  # `_prepare` gives a matte whenever the recipe needs one
-        stages.append(Stage("subject matte (white = subject)", np.repeat(matte[..., None], 3, axis=2)))
+    if recipe.needs_matte:
+        subject = np.repeat(matte[..., None], 3, axis=2)  # type: ignore[index]  # `_prepare` gave the matte this recipe needs
+        stages.append(Stage("subject matte (white = subject)", subject))
     for number, (step, image) in enumerate(_stages(rgb, recipe.steps, matte, at, at), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", _finish(image)))
     return stages
@@ -194,9 +195,8 @@ def _blend(before: np.ndarray, after: np.ndarray, step: Step, matte: np.ndarray 
     of a picture, are freed before the next step runs rather than kept by the generator."""
     alpha: np.floating | np.ndarray = np.float32(step.opacity)
     if step.mask:
-        if matte is None:  # not reachable through the public functions: `_prepare` finds it for masked steps
-            raise ValueError(f"step {step.effect!r} is masked to the {step.mask}, but there is no subject matte")
-        alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]
+        # `_prepare` gave the matte every masked step needs
+        alpha = alpha * (matte if step.mask == "subject" else 1.0 - matte)[..., None]  # type: ignore[index,operator]
     return before + (after - before) * alpha
 
 

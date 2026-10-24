@@ -182,7 +182,7 @@ class Animation(BaseModel):
         Pingpong looping plays the frames forward and then backward, without repeating the turning frames.
         """
         count = max(2, round(self.seconds * self.fps))
-        moving = max(self.seconds - self.hold_start - self.hold_end, 1e-6)
+        moving = self.seconds - self.hold_start - self.hold_end
         motion = [min(max((i / self.fps - self.hold_start) / moving, 0.0), 1.0) for i in range(count)]
         if self.loop == "pingpong":
             motion = motion + motion[-2:0:-1]
