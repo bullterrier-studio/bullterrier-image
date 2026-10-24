@@ -1,0 +1,8 @@
+# A green-to-violet aurora curtain over a dark sky, replacing the photo (only its size is used).
+# It also makes the effect's picture in the catalogue.
+name = "aurora"
+size = 480
+
+[[step]]
+effect = "aurora"
+seed = 2
