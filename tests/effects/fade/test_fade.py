@@ -13,10 +13,6 @@ def grey(*values: float) -> np.ndarray:
     return np.repeat(np.array(values, np.float32)[None, :, None], 3, axis=2)
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_allclose(registry.apply(NAME, photo, amount=0.0), photo, atol=1e-6)
-
-
 @pytest.mark.parametrize(
     ("amount", "values", "expected"),
     [

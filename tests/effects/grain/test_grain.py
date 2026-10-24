@@ -27,10 +27,6 @@ def test_the_same_seed_gives_the_same_grain_and_another_seed_other_grain(photo: 
     assert np.abs(registry.apply(NAME, photo, seed=1) - registry.apply(NAME, photo, seed=2)).mean() > 0.01
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0), photo)
-
-
 @pytest.mark.parametrize("size", [1.0, 4.0])
 def test_amount_is_the_standard_deviation_of_the_added_brightness(size: float) -> None:
     noise = added_noise({"amount": 0.03, "size": size, "seed": 5})

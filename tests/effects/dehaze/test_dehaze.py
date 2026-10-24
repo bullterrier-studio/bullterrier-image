@@ -50,11 +50,6 @@ def test_a_haze_free_picture_is_left_alone() -> None:
     np.testing.assert_allclose(registry.apply(NAME, clear, amount=1.0), clear, atol=1e-5)
 
 
-def test_amount_zero_leaves_a_hazy_picture_unchanged() -> None:
-    hazy = haze(scene(2), sloped_transmission())
-    np.testing.assert_allclose(registry.apply(NAME, hazy, amount=0.0), hazy, atol=1e-5)
-
-
 def test_raising_amount_brings_the_picture_closer_to_the_clear_scene() -> None:
     clear = scene(3)
     hazy = haze(clear, sloped_transmission())

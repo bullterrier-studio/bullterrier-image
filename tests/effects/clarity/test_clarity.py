@@ -5,10 +5,6 @@ import numpy as np
 from photo_fx.core import registry
 
 
-def test_clarity_zero_amount_is_identity(photo: np.ndarray) -> None:
-    np.testing.assert_allclose(registry.apply("clarity", photo, amount=0.0), photo, atol=1e-6)
-
-
 def _dot_on_grey(size: int = 21) -> np.ndarray:
     image = np.full((size, size, 3), 0.5, np.float32)
     image[size // 2, size // 2] = 1.0

@@ -18,13 +18,6 @@ def grey(values: np.ndarray) -> np.ndarray:
 
 
 @pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_amount_zero_leaves_the_picture_unchanged(interpolation: str, photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, amount=0.0, interpolation=interpolation)
-    np.testing.assert_array_equal(out, photo)
-    assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
-
-
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
 @pytest.mark.parametrize(
     ("x", "y", "pixel"),
     [(0.5, 0.5, (30, 40)), (0.0, 0.0, (0, 0)), (0.25, 0.75, (45, 20)), (1.0, 0.5, (30, 80))],

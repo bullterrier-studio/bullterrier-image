@@ -107,10 +107,6 @@ def test_color_tints_the_light() -> None:
     np.testing.assert_allclose(out[LIGHT], [1.0, 0.5, 0.0], atol=1e-5)
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0), photo)
-
-
 @pytest.mark.parametrize(
     "settings",
     [{}, {"ghosts": 12, "spacing": 3.0, "x": 1.0, "y": 1.0, "amount": 10.0}, {"halo": 1.0, "ring": 1.0, "size": 0.3}],

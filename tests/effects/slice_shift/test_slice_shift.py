@@ -48,10 +48,6 @@ def test_slides_go_both_ways(photo) -> None:
     assert min(shifts) < 0 < max(shifts)
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, slices=30, amount=0.0), photo)
-
-
 def test_the_seed_decides_the_strips_and_the_slides(photo) -> None:
     first = registry.apply(NAME, photo, slices=30, amount=0.2, seed=5)
     np.testing.assert_array_equal(first, registry.apply(NAME, photo, slices=30, amount=0.2, seed=5))

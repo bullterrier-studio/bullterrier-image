@@ -120,10 +120,9 @@ def test_only_what_is_brighter_than_threshold_makes_rays(value: float, threshold
     assert bool(streak.max() > 1e-3) is rays
 
 
-def test_black_stays_black_and_amount_zero_changes_nothing(photo: np.ndarray) -> None:
+def test_black_stays_black(photo: np.ndarray) -> None:
     black = np.zeros_like(photo)
     np.testing.assert_array_equal(shine(black), black)
-    np.testing.assert_array_equal(shine(photo, amount=0.0, threshold=0.3), photo)
 
 
 @pytest.mark.parametrize(

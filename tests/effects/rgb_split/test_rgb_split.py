@@ -59,10 +59,6 @@ def test_the_green_channel_is_never_touched(angle: float, photo) -> None:
     np.testing.assert_array_equal(out[..., 1], photo[..., 1])
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, angle=123, amount=0), photo)
-
-
 def test_on_a_picture_red_and_blue_are_the_picture_shifted_with_the_edge_pixel_held(photo) -> None:
     """Angle 0, amount 5 px: red column j shows the picture's column j - 5 (the first column held where j < 5), blue
     column j shows column j + 5 (the last held), read here with explicit index arrays."""

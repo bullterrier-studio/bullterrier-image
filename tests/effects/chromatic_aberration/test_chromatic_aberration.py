@@ -18,13 +18,6 @@ def grey(values: np.ndarray) -> np.ndarray:
 
 
 @pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_amount_zero_leaves_the_picture_unchanged(interpolation: str, photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, amount=0.0, interpolation=interpolation)
-    np.testing.assert_array_equal(out, photo)
-    assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
-
-
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
 @pytest.mark.parametrize("edge", EDGES)
 @pytest.mark.parametrize(("x", "y"), [(0.5, 0.5), (0.1, 0.8)], ids=["centred", "off centre"])
 def test_green_is_never_touched(interpolation: str, edge: str, x: float, y: float, photo: np.ndarray) -> None:

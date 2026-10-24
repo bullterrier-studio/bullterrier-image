@@ -37,10 +37,6 @@ def brute_force(rgb: np.ndarray, amount: float, radius: float, feather: float, r
     return out
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0), photo)
-
-
 def test_the_centre_is_untouched_and_the_corners_are_the_darkest() -> None:
     out = registry.apply(NAME, grey(41, 61), amount=1.0, radius=0.3, feather=0.4)
     assert out[20, 30, 0] == pytest.approx(0.5)

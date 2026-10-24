@@ -30,10 +30,6 @@ def edge(low: float = 0.3, high: float = 0.7) -> np.ndarray:
     return step
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0), photo)
-
-
 @pytest.mark.parametrize("value", [0.0, 0.35, 1.0])
 def test_a_flat_picture_is_untouched_by_any_amount(value: float) -> None:
     flat = np.full((20, 30, 3), value, np.float32)

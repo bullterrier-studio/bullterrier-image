@@ -123,10 +123,6 @@ def test_black_and_a_picture_without_highlights_stay_as_they_are() -> None:
     np.testing.assert_allclose(registry.apply(NAME, dim, threshold=0.5), dim, atol=1e-6)  # float32 rounding of screen
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0, threshold=0.3), photo)
-
-
 @pytest.mark.parametrize("rays", [1, 4, 7])
 def test_the_picture_only_ever_gets_brighter(rays: int, photo: np.ndarray) -> None:
     out = registry.apply(NAME, photo, rays=rays, threshold=0.5, length=0.3, amount=2.0)

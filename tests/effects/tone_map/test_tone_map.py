@@ -28,10 +28,6 @@ def checkerboard(mean: float = 0.25, swing: float = 0.1, shape: tuple[int, int] 
     return flat(mean, shape) * np.where(parity, 1 + swing, 1 - swing).astype(np.float32)
 
 
-def test_contrast_one_and_amount_zero_leave_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_allclose(registry.apply(NAME, photo, contrast=1.0, amount=0.0), photo, atol=1e-5)
-
-
 # On an even picture base and detail are the colour's own log luminance and zero, so every channel is multiplied by
 # Y^(contrast - 1), Y the Rec. 709 luma: a grey v becomes v^contrast. Worked out by hand (calculator) per row.
 FLAT_ROWS = {

@@ -345,6 +345,41 @@ def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)
 
 
+# --- what holds for every effect that has the setting ----------------------------------------------------------------
+
+
+def _choices() -> list[tuple[str, str, str]]:
+    """(effect, choice field, choice) for every choice of every `Literal` field of every effect."""
+    return [
+        (name, field, choice)
+        for name in ALL
+        for field, prop in registry.schema(name)["properties"].items()
+        for choice in prop.get("enum", ())
+    ]
+
+
+# Effects whose `amount` of 0 is the identity only together with another setting.
+AMOUNT_ZERO_NEEDS = {"tone_map": {"contrast": 1.0}}  # its `amount` is the detail on top of the contrast curve
+
+
+def _amount_zero_cases() -> list[tuple[str, dict[str, object]]]:
+    """(effect, settings) for every effect whose `amount` can be 0: its defaults, then each choice of each `Literal`
+    field (a sampling or edge rule must not change a picture nothing moves in)."""
+    found: list[tuple[str, dict[str, object]]] = []
+    for name in ALL:
+        if not any(doc.name == "amount" and doc.minimum == 0 for doc in registry.parameters(name).fields_doc()):
+            continue
+        found += [(name, {})] + [(name, {field: choice}) for n, field, choice in _choices() if n == name]
+    return found
+
+
+@pytest.mark.parametrize(("name", "setting"), _amount_zero_cases(), ids=lambda case: str(case) if case else "defaults")
+def test_an_amount_of_zero_returns_the_picture_as_it_is_in_a_new_array(name, setting, photo):
+    out = registry.apply(name, photo, amount=0.0, **AMOUNT_ZERO_NEEDS.get(name, {}), **setting, **_inputs(name, photo))
+    np.testing.assert_allclose(out, photo, atol=1e-6)
+    assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
+
+
 # --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
 
 CPU_BUDGET = 1.0  # seconds of process CPU time per effect at 1 MP: about 10x the slowest measured (see test below)

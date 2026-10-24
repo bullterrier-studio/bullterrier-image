@@ -25,10 +25,6 @@ def test_black_stays_black() -> None:
     np.testing.assert_array_equal(registry.apply(NAME, flat(0.0)), flat(0.0))
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_allclose(registry.apply(NAME, photo, amount=0.0), photo, atol=1e-6)
-
-
 def test_a_threshold_above_every_value_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
     dim = photo * 0.5
     np.testing.assert_allclose(registry.apply(NAME, dim, threshold=0.5, amount=10.0), dim, atol=1e-6)

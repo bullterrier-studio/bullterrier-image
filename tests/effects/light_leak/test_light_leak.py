@@ -42,10 +42,6 @@ def test_it_lights_a_black_picture_and_stays_smooth() -> None:
     assert np.abs(np.diff(light, axis=0)).max() < 0.1
 
 
-def test_amount_zero_leaves_the_picture_unchanged(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0), photo)
-
-
 def test_amount_scales_the_light_where_nothing_saturates() -> None:
     weak, strong = leak(amount=0.1, size=0.2), leak(amount=0.3, size=0.2)
     assert weak.max() > 0.01

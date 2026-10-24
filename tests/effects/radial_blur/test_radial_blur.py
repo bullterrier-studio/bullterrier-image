@@ -23,11 +23,6 @@ def grey(values: np.ndarray) -> np.ndarray:
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_amount_zero_leaves_the_picture_unchanged(mode: str, photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo, mode=mode, amount=0.0), photo)
-
-
-@pytest.mark.parametrize("mode", MODES)
 def test_a_single_sample_is_the_picture_itself(mode: str, photo: np.ndarray) -> None:
     np.testing.assert_allclose(registry.apply(NAME, photo, mode=mode, amount=0.5, samples=1), photo, atol=2e-6)
 
