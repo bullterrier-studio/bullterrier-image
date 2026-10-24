@@ -70,7 +70,6 @@ class FractalParams(EffectParams):
         max=2000,
         doc="How many times z -> z^2 + c is applied before a point is taken to stay for ever (the interior). More "
         "reveals finer detail at the set's edge and costs time in proportion; zooming in needs more.",
-        advanced=True,
     )
     period: float = param(
         24.0,
