@@ -1,0 +1,10 @@
+# Water drops on the lens: each shows the scene upside down in miniature, with a glint along its top.
+# It also makes the effect's picture in the catalogue.
+name = "lens_drops"
+size = 480
+
+[[step]]
+effect = "lens_drops"
+count = 14
+highlight = 0.5
+seed = 1
