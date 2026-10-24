@@ -243,7 +243,7 @@ Use the subject cut-out, so they target the subject or the background.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000").where("background")` |
+| `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000", mask="background")` |
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
 | `drop_shadow` ✓ | Soft shadow behind the subject. | `fx.drop_shadow(dx=12, dy=18, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. | `fx.long_shadow(angle=45, length=300)` |
@@ -268,9 +268,9 @@ modes.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(texture="tex.png", mode="soft_light")` |
-| `overlay` ✓ | Place an image, logo or watermark. | `fx.overlay(logo="logo.png", at="bottom_right", scale=0.2)` |
-| `gradient_overlay` (a recipe step, once steps have `blend_mode`) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear")` with `blend_mode = "screen"` |
+| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(image="tex.png", mode="soft_light")` |
+| `overlay` ✓ | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom_right", scale=0.2)` |
+| `gradient_overlay` ✓ (a recipe step) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear", blend_mode="screen")` |
 | `text` | Render text with font, outline and shadow. | `fx.text("BULLTERRIER", size=0.08, at="bottom")` |
 
 Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a
