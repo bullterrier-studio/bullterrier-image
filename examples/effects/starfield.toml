@@ -1,0 +1,9 @@
+# A clear night sky: 600 stars of different depths over a blue-black sky. A generated background: the demo photo
+# only gives its size. It also makes the effect's picture in the catalogue.
+name = "starfield"
+size = 480
+
+[[step]]
+effect = "starfield"
+count = 600
+seed = 1
