@@ -32,6 +32,7 @@ class DustScratchesParams(EffectParams):
         max=1,
         doc="The share of the dust marks drawn as hairs (short thin lines in any direction) instead of round specks: "
         "0 = only specks, 1 = only hairs.",
+        advanced=True,
     )
     scratches: int = param(
         2,
@@ -48,6 +49,7 @@ class DustScratchesParams(EffectParams):
         max=45,
         doc="The most a scratch may lean away from vertical, in degrees: each scratch gets a random lean up to this, "
         "to either side. 0 = all exactly vertical.",
+        advanced=True,
     )
     width: float = param(
         1.0,
@@ -55,6 +57,7 @@ class DustScratchesParams(EffectParams):
         min=0.5,
         max=10,
         doc="How wide a scratch is in px. Larger = bolder scratches.",
+        advanced=True,
     )
     opacity: float = param(
         0.8,
