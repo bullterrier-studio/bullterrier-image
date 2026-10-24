@@ -7,18 +7,24 @@ Warps that bend, ripple or displace the picture's geometry.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), the longest move being `amount` px. | `amount=12.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
+| <img src="../gallery/droste.jpg" width="160" alt="droste"> | `droste` | Show the picture again, `scale` times as large and turned by `turn`, in its own middle, up to `repeats` times. | `scale=0.5` `turn=20.0` `repeats=4` +2 advanced | [droste.toml](../../examples/effects/droste.toml) |
 | <img src="../gallery/fisheye.jpg" width="160" alt="fisheye"> | `fisheye` | Bend the picture as a fisheye lens with its axis at `x`, `y` would, magnifying the middle. | `amount=0.6` `x=0.5` `y=0.5` +1 advanced | [fisheye.toml](../../examples/effects/fisheye.toml) |
 | <img src="../gallery/flow_warp.jpg" width="160" alt="flow_warp"> | `flow_warp` | Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise. | `amount=20.0` `scale=80.0` `octaves=3` `seed=0` `angle=0.0` `variation=60.0` +5 advanced | [flow_warp.toml](../../examples/effects/flow_warp.toml) |
 | <img src="../gallery/kaleidoscope.jpg" width="160" alt="kaleidoscope"> | `kaleidoscope` | Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror. | `segments=6` `angle=0.0` `x=0.5` `y=0.5` +2 advanced | [kaleidoscope.toml](../../examples/effects/kaleidoscope.toml) |
 | <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does. | `distortion=0.2` `fit='frame'` `x=0.5` `y=0.5` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
+| <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
 | <img src="../gallery/mirror.jpg" width="160" alt="mirror"> | `mirror` | Make the picture symmetric: keep one half (or quarter) and replace the rest by its reflection. | `direction='left_to_right'` | [mirror.toml](../../examples/effects/mirror.toml) |
 | <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, turn it, zoom it. | `vertical=0.25` `horizontal=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
 | <img src="../gallery/pinch_bulge.jpg" width="160" alt="pinch_bulge"> | `pinch_bulge` | Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`. | `amount=0.5` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [pinch_bulge.toml](../../examples/effects/pinch_bulge.toml) |
+| <img src="../gallery/pixel_sort.jpg" width="160" alt="pixel_sort"> | `pixel_sort` | Sort every run of pixels whose key lies between `low` and `high` along the rows (or columns) by that key. | `by='brightness'` `low=0.25` `high=0.75` `axis='horizontal'` `order='ascending'` | [pixel_sort.toml](../../examples/effects/pixel_sort.toml) |
 | <img src="../gallery/polar.jpg" width="160" alt="polar"> | `polar` | Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from'). | `mode='to'` `x=0.5` `y=0.5` +2 advanced | [polar.toml](../../examples/effects/polar.toml) |
 | <img src="../gallery/ripple.jpg" width="160" alt="ripple"> | `ripple` | Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`. | `wavelength=40.0` `amplitude=6.0` `phase=0.0` `angle=0.0` +2 advanced | [ripple.toml](../../examples/effects/ripple.toml) |
+| <img src="../gallery/scatter.jpg" width="160" alt="scatter"> | `scatter` | Replace every pixel by one picked at random from within `radius` px of it. | `radius=4` `seed=0` +1 advanced | [scatter.toml](../../examples/effects/scatter.toml) |
+| <img src="../gallery/shatter.jpg" width="160" alt="shatter"> | `shatter` | Break the picture into `pieces` random Voronoi pieces, move and turn each, and draw `gap` px lines between them. | `pieces=24` `offset=10.0` `angle=5.0` `gap=0.0` `color='#000000'` `seed=0` +2 advanced | [shatter.toml](../../examples/effects/shatter.toml) |
 | <img src="../gallery/shear.jpg" width="160" alt="shear"> | `shear` | Skew the picture about its centre: slide rows sideways by `x` px per row, then columns down by `y` px per column. | `x=0.2` `y=0.0` +2 advanced | [shear.toml](../../examples/effects/shear.toml) |
 | <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance. | `slices=30` `amount=0.05` `seed=0` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
+| <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
 | <img src="../gallery/swirl.jpg" width="160" alt="swirl"> | `swirl` | Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`. | `angle=90.0` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [swirl.toml](../../examples/effects/swirl.toml) |
 | <img src="../gallery/tile.jpg" width="160" alt="tile"> | `tile` | Repeat the whole picture, scaled down, in a grid of `columns` by `rows`. | `columns=3` `rows=3` | [tile.toml](../../examples/effects/tile.toml) |
 
@@ -39,6 +45,23 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when its move reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
+
+### `droste`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `scale` | number | ratio | 0.1 to 0.9 | `0.5` | How much smaller each copy is than the one around it, strictly between 0 and 1: 0.5 = each copy is half the size of the last, 0.9 = a slow shrink with many copies close together, 0.1 = one small copy. The copy has the picture's own shape and sits in its middle. |
+| `turn` | number | degrees | -180 to 180 | `20.0` | How far each copy is turned from the one around it, in degrees: positive turns the copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them upright (nested frames); other values make the copies spiral into the middle. |
+| `repeats` | whole number | count | 1 to 12 | `4` | How many copies are drawn inside one another at most, 1 to 12: the copy this deep shows the picture's middle instead of a further copy. Raising it adds ever smaller copies towards the middle. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but the small copies turn blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a turned copy shows where it reads from beyond the picture (a turned copy's corners reach past the edge): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
 
@@ -117,6 +140,21 @@ Warps that bend, ripple or displace the picture's geometry.
 
 </details>
 
+### `lenticular`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `strip` | whole number | px | 1 to 500 | `6` | The width of each vertical strip in pixels, counted from the left edge; a last strip at the right edge may be narrower. Narrow strips make a fine comb, wide ones a coarse stagger; a strip wider than the picture leaves it whole. Tuned for a picture about 480 px high. |
+| `shift` | number | px | -500 to 500 | `5.0` | How far every second strip (the 2nd, 4th, ... from the left) is slid sideways, in pixels: positive moves its picture right, negative left, 0 leaves the picture unchanged. A distance that is not a whole number blends the two pixels it lies between. Raising it separates the two interleaved views further. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `edge` | one of 'wrap', 'nearest', 'reflect', 'mirror' |  |  | `'nearest'` | What a slid strip shows where its picture has moved off the picture's side: 'nearest' (the outermost column repeated), 'wrap' (the opposite side comes round), 'reflect' (mirrored, edge column repeated), 'mirror' (mirrored about the edge column). |
+
+</details>
+
 ### `melt`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -176,6 +214,16 @@ Warps that bend, ripple or displace the picture's geometry.
 
 </details>
 
+### `pixel_sort`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `by` | one of 'brightness', 'hue' |  |  | `'brightness'` | What the pixels are measured and put in order by: 'brightness' (perceived brightness, Rec. 709 weights; 0 = black, 1 = white) or 'hue' (the position on the colour circle, 0 = red, 1/3 = green, 2/3 = blue; a grey has hue 0). Brightness gives smooth light-to-dark smears, hue rainbow streaks. |
+| `low` | number | fraction | 0 to 1 | `0.25` | The lowest key, 0 to 1, a pixel may have and still be sorted: pixels below it stay where they are and break a run in two. Raising it leaves more of the dark (or low-hue) pixels alone. If it is above `high`, nothing is sorted. |
+| `high` | number | fraction | 0 to 1 | `0.75` | The highest key, 0 to 1, a pixel may have and still be sorted: pixels above it stay where they are and break a run in two. Lowering it leaves more of the bright (or high-hue) pixels alone, which protects the highlights. If it is below `low`, nothing is sorted. |
+| `axis` | one of 'horizontal', 'vertical' |  |  | `'horizontal'` | The direction the pixels are sorted along: 'horizontal' sorts along every row (the streaks run across the picture), 'vertical' along every column (the streaks run down it). |
+| `order` | one of 'ascending', 'descending' |  |  | `'ascending'` | Which way a run is ordered: 'ascending' puts the lowest key first (the left or top end of the run), 'descending' the highest key first. |
+
 ### `polar`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -211,6 +259,41 @@ Warps that bend, ripple or displace the picture's geometry.
 
 </details>
 
+### `scatter`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `radius` | whole number | px | 0 to 500 | `4` | How far a pixel may be moved, in whole pixels, up or down and left or right: each pixel shows the one up to this many pixels away along each direction, picked at random. 0 leaves the picture unchanged; a few pixels give frosted glass, tens of pixels dissolve the picture into confetti. Tuned for a picture about 480 px high. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same scatter, another seed a different one. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when its move reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
+
+### `shatter`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `pieces` | whole number | count | 4 to 500 | `24` | How many pieces (Voronoi cells round random points) the picture breaks into, 4 to 500. More = smaller pieces; the average piece is the picture's area divided by this. |
+| `offset` | number | px | 0 to 200 | `10.0` | The farthest a piece's picture is moved, in pixels, up or down and left or right: each piece draws its own random move up to this far in each direction. 0 = no piece moves. Raising it tears the picture further apart. Tuned for a picture about 480 px high. |
+| `angle` | number | degrees | 0 to 45 | `5.0` | The most a piece's picture is turned, in degrees, about the piece's own centre: each piece draws its own random turn up to this far clockwise or anticlockwise. 0 = no piece turns. |
+| `gap` | number | px | 0 to 32 | `0.0` | The width of the lines between the pieces, in pixels, with anti-aliased edges; 0 = no lines, the pieces simply meet (below 1 px the lines get fainter). Raising it draws the cracks in `color`. Tuned for a picture about 480 px high. |
+| `color` | colour |  |  | `'#000000'` | The colour of the lines between the pieces. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the pieces lie and how each moves and turns: the same seed always gives the same break, another seed a different one. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but turned pieces turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a moved piece shows where it reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
+
 ### `shear`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -234,6 +317,15 @@ Warps that bend, ripple or displace the picture's geometry.
 | `slices` | whole number | count | 1 to 500 | `30` | How many horizontal strips the picture is cut into, 1 to 500 (never more than it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides the whole picture as one. More strips make a finer, busier tear. |
 | `amount` | number | fraction | 0 to 1 | `0.05` | The furthest a strip slides, as a fraction 0 to 1 of the picture's width: each strip slides by a random whole number of pixels between that far left and that far right, so a strip may also stay put. 0 leaves the picture unchanged; 1 can slide a strip by a whole picture width. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the cuts fall and how far each strip slides: the same seed always gives the same tear, any other seed gives a different one. |
+
+### `stretch`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `axis` | one of 'vertical', 'horizontal' |  |  | `'vertical'` | Which way the line is smeared: 'vertical' repeats one pixel row up and down over the rows beside it (streaks run down the picture), 'horizontal' repeats one pixel column left and right (streaks run across). |
+| `at` | number | fraction | 0 to 1 | `0.5` | Where the line that is smeared lies, as a fraction 0 to 1 of the way across the picture (down it for 'vertical', right for 'horizontal'): 0 = the first row or column, 0.5 = the middle, 1 = the last. Moving it chooses which colours the smear carries. |
+| `span` | number | fraction | 0 to 1 | `0.15` | How far the line is smeared, as a fraction 0 to 1 of the picture's height (width for 'horizontal') on each side that `side` names, rounded to whole pixels. 0 = nothing is smeared; 1 = the line covers the whole picture. Raising it hides more of the picture behind the smear. |
+| `side` | one of 'both', 'after', 'before' |  |  | `'both'` | Which sides of the line are smeared: 'both' (outward each way), 'after' (down, or right) or 'before' (up, or left). The other side keeps the picture as it is. |
 
 ### `swirl`
 

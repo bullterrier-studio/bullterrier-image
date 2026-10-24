@@ -7,6 +7,7 @@ Grain and other surface texture laid over the picture.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/bump_light.jpg" width="160" alt="bump_light"> | `bump_light` | Light the picture's brightness, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=8.0` `blur=1.0` +2 advanced | [bump_light.toml](../../examples/effects/bump_light.toml) |
+| <img src="../gallery/crt.jpg" width="160" alt="crt"> | `crt` | Show the picture on a CRT: bulged glass, a glow, scanlines, a shadow mask, a dim edge and the bezel `border`. | `curve=0.15` `shadow_mask=0.35` `scanlines=0.3` `bloom=0.3` `vignette=0.35` +8 advanced | [crt.toml](../../examples/effects/crt.toml) |
 | <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places, over the picture at `opacity`. | `density=0.6` `size=8.0` `scratches=2` `opacity=0.8` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
 | <img src="../gallery/emboss.jpg" width="160" alt="emboss"> | `emboss` | Read the brightness as a relief `depth` px tall and light it from `angle`. | `angle=315.0` `depth=6.0` `saturation=0.0` +1 advanced | [emboss.toml](../../examples/effects/emboss.toml) |
 | <img src="../gallery/film_grain.jpg" width="160" alt="film_grain"> | `film_grain` | Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white. | `shadows=0.1` `highlights=0.03` `size=1.0` `seed=0` +2 advanced | [film_grain.toml](../../examples/effects/film_grain.toml) |
@@ -32,6 +33,31 @@ Grain and other surface texture laid over the picture.
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a seam). |
+
+</details>
+
+### `crt`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `curve` | number | ratio | 0 to 1 | `0.15` | How far the glass bulges: each pixel shows the picture at 1 + curve x (d / R)^2 times its distance from the middle, d its own distance from it and R the distance of a corner (the radial term of the Brown-Conrady lens model), so straight lines bow outward, more toward the corners, and the corners and edges reach beyond the picture and show `border` instead. 0 = a flat screen; 1 = a strongly bulged one. |
+| `shadow_mask` | number | fraction | 0 to 1 | `0.35` | How strongly the shadow mask shows: the screen is covered with red, green and blue vertical stripes, and a stripe lets through only its own colour. 0 = no mask; at 1 each channel is lit in a third of the columns only. The mask keeps the picture's average brightness (the lit stripes are brightened by as much as the others are darkened), so raising it shows the stripes without dimming the picture. |
+| `scanlines` | number | fraction | 0 to 1 | `0.3` | How dark the gaps between the lines of the raster are: the picture is darkened between the lines by up to this share, smoothly, so a line is brightest in its middle. 0 = no scanlines, 1 = black between them. |
+| `bloom` | number | ratio | 0 to 2 | `0.3` | How strongly the bright parts glow into their surroundings, as light spreading in the glass: the blurred highlights are screened over the picture by this much. 0 = no glow, 1 = the halo at full brightness, above 1 it reaches white sooner. |
+| `vignette` | number | fraction | 0 to 1 | `0.35` | How much dimmer the screen is at its corners than in the middle: the picture is darkened in proportion to the square of the distance from the middle, up to this share at a corner. 0 = an evenly lit screen. |
+
+<details><summary>Advanced parameters (8)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `border` | colour |  |  | `'#000000'` | The colour beyond the curved screen, where the glass ends and the bezel begins: '#rrggbb', '#rgb' or [r, g, b] 0..1. It covers everything else there, and is only seen where `curve` is above 0. |
+| `shadow_mask_pitch` | whole number | px | 3 to 24 | `3` | The width in px of one triad of red, green and blue stripes, a third of it for each, tuned for a picture about 480 px high: 3 gives stripes one pixel wide, larger gives coarser ones. |
+| `scanline_spacing` | number | px | 2 to 32 | `4.0` | The distance in px from one line of the raster to the next, tuned for a picture about 480 px high: lines are centred on rows 0, spacing, 2 x spacing... and the gaps between them lie half a spacing away. A larger spacing is fewer, wider-set lines. |
+| `bloom_radius` | number | px | 0 to 100 | `10.0` | Gaussian sigma in px of the glow, tuned for a picture about 480 px high: larger spreads the light further; 0 keeps it on the highlights themselves. |
+| `bloom_threshold` | number | fraction | 0 to 0.99 | `0.5` | The brightness (0..1, per channel) where the glow starts: only values above it give light, rising to full at 1. Raising it limits the glow to the brightest parts. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x `bloom_radius` px. Larger is more exact and slower. |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read when the glass bends the picture: 'nearest' takes the closest pixel (fastest, but lines turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the bend and the glow's blur see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). The bend's own beyond is covered by `border`. |
 
 </details>
 
