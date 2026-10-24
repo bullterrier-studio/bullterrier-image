@@ -222,6 +222,17 @@ convention = "google"
 "src/photo_fx/effects/**" = ["A001"]  # the `ascii` effect function shadows a builtin by design
 "**/__init__.py" = ["F401"]
 
+# Pyright is the language server behind editor and Claude Code navigation (pyright-lsp); mypy stays the type gate. It only
+# needs to find the project's virtualenv and the source layout so that every import resolves. Config lives here, not in a
+# pyrightconfig.json (tests/tools/test_one_config_home.py forbids that file).
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+include = ["src", "tests"]
+exclude = ["**/__pycache__", "src/photo_fx/fx.pyi"]  # fx.pyi is generated at integration, like mypy and ruff skip it
+extraPaths = ["src"]
+
 # `uv run mypy` checks src and tests; the gate (`poe check`) and the pre-push hook run it.
 [tool.mypy]
 python_version = "3.12"
