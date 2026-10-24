@@ -1,0 +1,15 @@
+# The subject standing on a dark floor, mirrored in it and fading away.
+name = "reflection"
+size = 480
+
+[[step]]
+effect = "fill"
+color = "#1c2530"
+mask = "background"           # a dark floor and wall, so the mirror image shows
+
+[[step]]
+effect = "reflection"
+height = 0.6
+fade = 0.5
+blur = 2
+opacity = 0.9
