@@ -53,6 +53,8 @@ def slice_shift(rgb: np.ndarray, params: SliceShiftParams) -> np.ndarray:
         np.sort(rng.choice(height - 1, strips - 1, replace=False)) + 1
     )  # the first row of every strip but the first
     slides = rng.integers(-furthest, furthest + 1, size=strips)
-    slide = slides[np.searchsorted(starts, np.arange(height), side="right")]  # each row takes its strip's slide
+    first_row = np.zeros(height, dtype=bool)
+    first_row[starts] = True
+    slide = slides[np.cumsum(first_row)]  # a row's strip is the number of strips begun at or above it
     columns = (np.arange(width)[None, :] - slide[:, None]) % width
     return rgb[np.arange(height)[:, None], columns]

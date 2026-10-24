@@ -348,7 +348,6 @@ def test_a_constant_marker_with_a_reason_covers_its_statement_and_a_param_declar
 # `strict` makes the test fail the day one is fixed, so the entry is removed with it.
 KNOWN_LIBRARY_OPTIONS = {
     "effects/anamorphic_streaks/effect.py": 'mode="same" of fftconvolve (keeps the picture size)',
-    "effects/slice_shift/effect.py": 'side="right" of searchsorted',
     "ops/glyphs.py": 'anchor="mm" of ImageDraw.text (centres a glyph in its cell)',
 }
 
