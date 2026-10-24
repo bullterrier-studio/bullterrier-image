@@ -85,6 +85,15 @@ def test_different_seeds_start_from_different_points() -> None:
     assert any(not np.array_equal(runs[0], other) for other in runs[1:])
 
 
+def test_a_centre_left_empty_jumps_to_the_last_listed_of_the_equally_far_points() -> None:
+    """Two points at A and two at B, one centre on each point: whatever order they start in, the first centre on A
+    and the first on B take all the points, and the two left empty find every point 0 away from its centre. Of those
+    four equals the last two listed (both B) are taken, so the centres end as A, B, B, B."""
+    points = np.array([[0, 0], [0, 0], [1, 1], [1, 1]], np.float32)
+    centres = kmeans(points, 4, init="random", iterations=10, tolerance=0.0, seed=0)
+    assert sorted(map(tuple, centres.tolist())) == [(0.0, 0.0), (1.0, 1.0), (1.0, 1.0), (1.0, 1.0)]
+
+
 def test_more_iterations_never_raise_the_total_squared_distance() -> None:
     rng = np.random.default_rng(11)
     points = rng.random((400, 3)).astype(np.float32)  # no clusters at all: Lloyd needs many rounds

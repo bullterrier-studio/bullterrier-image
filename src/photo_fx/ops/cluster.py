@@ -45,7 +45,8 @@ def kmeans(
     """Centres of `k` clusters of `points` by Lloyd's algorithm: a float32 array `(k, d)`.
 
     Each round assigns every point to its nearest centre, then moves each centre to the mean of its points. A centre
-    left with no points jumps to the point farthest from its own centre, so no centre is wasted. There are fewer than
+    left with no points jumps to the point farthest from its own centre (of equally far points, the one listed last),
+    so no centre is wasted. There are fewer than
     `k` centres only when there are fewer than `k` points (one per point).
 
     init: how the first centres are chosen. "random" takes `k` distinct points; "k-means++" (Arthur and Vassilvitskii,
@@ -70,7 +71,8 @@ def kmeans(
         moved[filled] = sums[filled] / members[filled, None]
         empty = np.flatnonzero(~filled)
         if empty.size:
-            outliers = np.argsort(((pts - moved[labels]) ** 2).sum(axis=1), kind="stable")[::-1]
+            farness = ((pts - moved[labels]) ** 2).sum(axis=1)
+            outliers = np.lexsort((np.arange(len(pts)), farness))[::-1]  # farthest first; of equals, the last index
             moved[empty] = pts[outliers[: empty.size]]
         shift = float(np.sqrt(((moved - centres) ** 2).sum(axis=1)).max())
         centres = moved
