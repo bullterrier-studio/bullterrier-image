@@ -1,0 +1,16 @@
+# The sun at the top right of the window throws a halo, a ring and a string of ghosts across a dimmed room.
+name = "lens_flare"
+size = 480
+
+[[step]]
+effect = "levels"
+gamma = 0.7
+
+[[step]]
+effect = "lens_flare"
+x = 0.72
+y = 0.12
+ghosts = 5
+spacing = 0.5
+size = 0.06
+amount = 1.0
