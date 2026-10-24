@@ -253,8 +253,8 @@ def _segmenter_option(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--segmenter",
         type=_segmenter,
-        help="what finds the subject: vision (Apple Vision, macOS) or onnx (a portable model, downloaded on first "
-        "use); default: $BT_IMAGE_SEGMENTER, else vision where available",
+        help="what finds the subject: onnx (a portable model, downloaded on first use) or vision (Apple Vision, "
+        "macOS only, never chosen unless asked); default: $BT_IMAGE_SEGMENTER, else onnx",
     )
 
 

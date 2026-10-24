@@ -186,10 +186,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Finding the subject and depth
 
-- **Two backends behind one function**, `subject_matte(rgb)`: Apple Vision on macOS (built in, no download) and IS-Net on
-  ONNX Runtime everywhere else; `--matte` (or `matte=`) skips both. *Reason:* the best cut-out per platform without making
-  the core depend on either. *Consequence:* the portable model (about 180 MB) is downloaded on first use into the user's
-  cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
+- **Two backends behind one function**, `subject_matte(rgb)`: IS-Net on ONNX Runtime, the default on every platform, and
+  Apple Vision on macOS, used only when asked (`segmenter="vision"`, `BT_IMAGE_SEGMENTER=vision`); `--matte` (or `matte=`)
+  skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
+  asks for the platform's own; neither makes the core depend on it. *Consequence:* `segmenter_identity()` of the default
+  is the portable model's (the cache keys of subjects remembered under Vision change once, so they are found again). The portable model (about 180 MB) is downloaded on first use into the
+  user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
   copy for offline use.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no

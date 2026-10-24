@@ -94,7 +94,7 @@ def test_an_explicit_segmenter_wins_over_the_environment(echo_red, monkeypatch):
 
 @pytest.mark.parametrize("value", ["onnx", " ONNX "])
 def test_the_environment_variable_chooses_when_no_segmenter_is_given(echo_red, monkeypatch, value):
-    monkeypatch.setenv("BT_IMAGE_SEGMENTER", value)  # on macOS the automatic choice would be Vision
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", value)
     photo = ramp()
     np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
 
@@ -176,14 +176,6 @@ def test_off_macos_the_identity_of_apple_vision_is_refused_like_its_use():
         segmenter_identity("vision")
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="the automatic choice is Apple Vision only where Vision exists")
-def test_on_macos_the_automatic_choice_is_apple_vision(echo_red, monkeypatch):
-    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "")  # empty means unset
-    photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
-    np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="vision"))
-    assert not np.allclose(subject_matte(photo), subject_matte(photo, segmenter="onnx"), atol=0.05)
-
-
 @pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
 def test_apple_vision_is_refused_off_macos_saying_what_to_use_instead():
     with pytest.raises(BackendUnavailableError, match="macOS") as caught:
@@ -191,10 +183,23 @@ def test_apple_vision_is_refused_off_macos_saying_what_to_use_instead():
     assert "onnx" in str(caught.value)
 
 
-@pytest.mark.skipif(sys.platform == "darwin", reason="on macOS the automatic choice is Apple Vision")
-def test_off_macos_the_automatic_choice_is_the_portable_model(echo_red):
+def test_the_default_is_the_portable_model_on_every_platform(echo_red):
+    """A recipe must cut the same on a Mac and on Linux, so Apple Vision is never chosen unless it is asked for."""
     photo = ramp()
+    np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="onnx"))
     np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
+
+
+def test_the_default_identity_is_the_portable_models_where_vision_exists_too(monkeypatch):
+    monkeypatch.delenv("BT_IMAGE_MODEL")  # the standard model: the identity is pinned, nothing is downloaded
+    assert segmenter_identity().startswith("onnx:")
+    assert segmenter_identity() == segmenter_identity("onnx")
+
+
+def test_a_default_that_cannot_run_names_the_model_it_needs(monkeypatch):
+    with pytest.raises(BackendUnavailableError, match="no-such-model") as caught:  # the suite's BT_IMAGE_MODEL
+        subject_matte(ramp())
+    assert "default" in str(caught.value)
 
 
 def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it(tmp_path, monkeypatch):

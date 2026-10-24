@@ -250,8 +250,9 @@ def test_bad_recipe_is_reported_before_any_work(files, capsys):
     assert not (files / "o").exists()
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="the subject matte needs Apple Vision")
-def test_photo_without_a_subject_is_reported_clearly(files, capsys):
+def test_photo_without_a_subject_is_reported_clearly(files, echo_model, monkeypatch, capsys):
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # answers with the red channel; the photo is black
+    imageio.save(np.zeros((96, 128, 3), np.float32), files / "me.png")
     (files / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n', encoding="utf-8")
     assert cli("render me.png m.toml") == 1
     assert "no subject" in capsys.readouterr().err.lower()

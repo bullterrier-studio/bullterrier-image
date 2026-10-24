@@ -58,7 +58,7 @@ class NonFiniteImageError(BullterrierImageError, ValueError):
 
 
 class BackendUnavailableError(BullterrierImageError, NotImplementedError):
-    """A capability needs a backend this machine does not have, e.g. subject finding without Apple Vision."""
+    """A capability needs a backend this machine does not have, e.g. subject finding without ONNX Runtime."""
 
 
 class ImageReadError(BullterrierImageError, OSError):

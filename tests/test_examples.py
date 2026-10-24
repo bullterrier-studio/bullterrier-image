@@ -1,6 +1,5 @@
 import importlib.util
 import re
-import sys
 from pathlib import Path
 
 import pytest
@@ -78,8 +77,8 @@ def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the
     assert checked, "no demo recipe moves ascii text, so nothing was checked"
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="finding the subject needs Apple Vision")
-def test_the_python_example_runs(tmp_path, capsys):
+def test_the_python_example_runs(tmp_path, capsys, echo_model, monkeypatch):
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # a stand-in subject finder: no download, same on every OS
     spec = importlib.util.spec_from_file_location("python_api_example", EXAMPLES / "python_api.py")
     assert spec is not None
     assert spec.loader is not None

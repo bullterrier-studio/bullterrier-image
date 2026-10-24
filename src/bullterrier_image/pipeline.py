@@ -238,14 +238,14 @@ def run(
     (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
     (a framing with `transparent`) exported to jpg, raise ProjectError.
     `subject` says how the subject of a photo, for the recipes that need it, is found: the name of a segmenter for
-    `subject_matte` (see `bullterrier_image.matte`; None leaves the choice to the environment and the computer), or a
-    function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never again for a photo whose
-    subject is remembered in the project's cache from an earlier run by the same finder; if it raises, the recipes of
-    that photo that need the subject fail, and the rest run. The default finder is known by its `segmenter_identity`
-    (the backend and its model), so switching segmenter or model finds the subjects again and redoes the recipes that
-    use them (BackendUnavailableError at once if it cannot run). A function of your own is known by its qualified name
-    alone, a callable object by its class: give one whose answers differ another name or delete `project.cache`. A
-    damaged cache entry is found again, also with `force`.
+    `subject_matte` (see `bullterrier_image.matte`; None leaves the choice to the environment, then to the portable
+    model), or a function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never again for
+    a photo whose subject is remembered in the project's cache from an earlier run by the same finder; if it raises,
+    the recipes of that photo that need the subject fail, and the rest run. The default finder is known by its
+    `segmenter_identity` (the backend and its model), so switching segmenter or model finds the subjects again and
+    redoes the recipes that use them (BackendUnavailableError at once if it cannot run). A function of your own is
+    known by its qualified name alone, a callable object by its class: give one whose answers differ another name or
+    delete `project.cache`. A damaged cache entry is found again, also with `force`.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -625,7 +625,7 @@ effect = "grain"
 amount = 0.07
 size = 1.6
 """,
-    "cutout-black.toml": """# Just the subject, on pure black (macOS: uses Apple Vision to find the subject).
+    "cutout-black.toml": """# Just the subject, on pure black (the portable model finds it; downloaded on first use).
 name = "cutout-black"
 size = 1600
 

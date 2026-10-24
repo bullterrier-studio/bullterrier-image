@@ -123,8 +123,8 @@ depend on the machine.
 
 | Backend | Where | Notes |
 |---|---|---|
-| `vision`: Apple Vision subject segmentation | macOS | Built in: no download, runs on the Neural Engine. The default on macOS. |
-| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default elsewhere. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
+| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default everywhere, so a recipe cuts the same on every machine. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
+| `vision`: Apple Vision subject segmentation | macOS | Only when asked (`--segmenter vision`, `BT_IMAGE_SEGMENTER=vision`). Built in: no download, runs on the Neural Engine. Its cut differs from the portable model's. |
 
 The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
 folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else `~/.cache/bt-image` on Linux,
@@ -132,13 +132,13 @@ folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else
 is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_MODEL` at a
 copy (`BT_IMAGE_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
-Choose the backend with `--segmenter vision|onnx` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
-with `BT_IMAGE_SEGMENTER=onnx`; the option wins over the variable. No model is needed at all if you have the subject's
+Choose the backend with `--segmenter onnx|vision` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
+with `BT_IMAGE_SEGMENTER=vision`; the option wins over the variable. No model is needed at all if you have the subject's
 matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
 the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
 in [`matte/`](src/bullterrier_image/matte), so a further backend is added there without touching the rest. On Python versions
 newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
-it is missing, and Apple Vision and `--matte` still work.
+it is missing, and `--matte` (or, on macOS, `--segmenter vision`) still works.
 
 **Text effects** (`ascii`, `disperse`, `evaporate` and the text strips of `glitch`) draw with a monospaced font: the first that exists of the
 files listed in `BT_IMAGE_FONTS` (paths separated like `PATH`), or else of the usual system fonts (Menlo, Monaco or
@@ -155,7 +155,7 @@ open examples/output/index.html            # macOS; xdg-open on Linux, start on 
 ```
 
 That processes `examples/photos/bullterrier.jpeg` with every recipe in `examples/recipes/` (about ten seconds on a
-recent Mac; the first run elsewhere also downloads the subject model). Run it
+recent Mac, once the subject model is downloaded: the first run does that). Run it
 again and finished work is skipped; edit one recipe and only that one is redone. Add photos to `examples/photos/` and
 they join the batch.
 
@@ -435,8 +435,8 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
   imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
   loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
-  matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (Apple Vision, or IS-Net on
-                           ONNX Runtime, downloaded on first use) is hidden here
+  matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (IS-Net on ONNX Runtime,
+                           downloaded on first use; or Apple Vision, when asked) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
@@ -484,7 +484,7 @@ commit. Pictures that exist are kept (`uv run poe gallery --force` renders them 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook, unless it changes only documentation (pages and `docs/images/`); pushes to other branches are checked by CI when the pull request opens.
 
-Tests that need Apple Vision are skipped off macOS. The portable backend is tested with tiny stand-in models built in the tests: the suite never
+The test of Apple Vision is skipped off macOS. The portable backend is tested with tiny stand-in models built in the tests: the suite never
 downloads the real model, and its one test of the real model runs only when the model is already in the cache.
 
 ## License
