@@ -213,6 +213,32 @@ def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lante
     assert "pydantic" not in fx.stub_text()
 
 
+def _stub_functions() -> dict[str, ast.FunctionDef]:
+    return {node.name: node for node in ast.parse(fx.stub_text()).body if isinstance(node, ast.FunctionDef)}
+
+
+def test_the_stub_and_the_builder_take_a_preset_exactly_where_an_effect_has_presets():
+    for name, function in _stub_functions().items():
+        names = list(registry.presets(name))
+        keyword_only = [a.arg for a in function.args.kwonlyargs]
+        assert keyword_only == (["preset"] if names else [])
+        if names:
+            assert ast.unparse(function.args.kwonlyargs[0].annotation) == f"Literal{names!r} | None"  # type: ignore[arg-type]
+            assert function.args.kw_defaults[0].value is None  # type: ignore[union-attr]
+            assert "preset" in inspect.signature(getattr(fx, name)).parameters
+        else:
+            assert "preset" not in inspect.signature(getattr(fx, name)).parameters
+
+
+def test_a_preset_is_chosen_with_the_keyword_preset_and_the_other_values_win_over_it():
+    assert fx.gradient_map(preset="sepia") == Step("gradient_map", preset="sepia")
+    assert fx.gradient_map(preset="sepia", shadow_clip=0.2).params["shadow_clip"] == 0.2
+    with pytest.raises(ValueError, match=r"gradient_map.*'nope'.*sepia"):
+        fx.gradient_map(preset="nope")
+    with pytest.raises(ValueError, match=r"grade.*'sepia'.*no presets"):
+        fx.grade(preset="sepia")
+
+
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
     """fx.pyi itself is regenerated at integration (`poe regenerate`), so only its generator is checked here."""
     tree = ast.parse(fx.stub_text())

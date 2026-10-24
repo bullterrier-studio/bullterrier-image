@@ -310,7 +310,7 @@ def _row(name: str) -> str:
 
 def _parameter_table(name: str) -> list[str]:
     """The lines of an effect's parameter table (name, type, unit, range, default, description), under a heading of its
-    own; the advanced parameters follow in a collapsed block of the same form."""
+    own; the advanced parameters follow in a collapsed block of the same form, then the effect's presets."""
     docs = registry.parameters(name).fields_doc()
     head = ["| Parameter | Type | Unit | Range | Default | Description |", "| --- | --- | --- | --- | --- | --- |"]
 
@@ -333,6 +333,15 @@ def _parameter_table(name: str) -> list[str]:
             "",
             "</details>",
         ]
+    if found := registry.presets(name):
+        lines += [
+            "",
+            'Presets (`preset="name"` in a recipe step or `fx`):',
+            "",
+            "| Preset | Description |",
+            "| --- | --- |",
+        ]
+        lines += [f"| {_cell(f'`{preset}`')} | {_cell(found[preset].description)} |" for preset in found]
     return lines
 
 

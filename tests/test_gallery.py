@@ -207,6 +207,14 @@ def test_a_modelled_effect_gets_a_table_of_its_parameters(fresh_registry):
     )
 
 
+def test_an_effect_with_presets_lists_them_under_its_parameter_table():
+    page = gallery.render_effects_pages()["colour.md"]
+    table = page[page.index("### `gradient_map`") :].split("\n### ")[0]
+    for name, preset in registry.presets("gradient_map").items():
+        assert f"| `{name}` | {preset.description} |" in table
+    assert "Presets" not in page[page.index("### `grade`") :].split("\n### ")[0]
+
+
 class TunedParams(EffectParams):
     """The tuned probe's settings: a technique option between two look controls."""
 

@@ -18,9 +18,11 @@ change over an animation: `fx.disperse(progress=ramp(0, 0.9, "gentle"))`.
 `uv run poe regenerate`, once at integration rather than on every branch, so it can lag behind a branch's effects.
 """
 
+import inspect
+import re
 from collections.abc import Callable
 from functools import cache
-from typing import Any
+from typing import Any, Literal
 
 from .core import registry
 from .core.steps import Step
@@ -50,24 +52,39 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     """The function behind `fx.<name>`: takes the effect's parameters (not the image) and returns a Step.
 
     Values may be given by position, in the model's field order, or by keyword; the Step checks them with the model,
-    so a misspelt or out-of-range value fails here exactly as it would in a recipe file.
+    so a misspelt or out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the
+    effect's presets (see `registry.presets`); the values given win over the preset's.
     """
-    model = registry.parameters(name)
-    fields = tuple(model.model_fields)
+    fields = tuple(registry.parameters(name).model_fields)
 
-    def build(*args: Any, **values: Any) -> Step:
+    def build(*args: Any, preset: str | None = None, **values: Any) -> Step:
         if len(args) > len(fields):
             raise TypeError(f"fx.{name}() takes at most {len(fields)} positional values ({len(args)} given)")
         positional = dict(zip(fields, args, strict=False))
         for twice in positional.keys() & values.keys():
             raise TypeError(f"fx.{name}() got `{twice}` both by position and by keyword")
-        return Step(name, {**positional, **values})
+        return Step(name, {**positional, **values}, preset=preset)
 
     build.__name__, build.__qualname__ = name, f"fx.{name}"
     build.__doc__ = registry.documentation(name)
     # `inspect.signature` reads this documented hook, which mypy does not model on functions
-    build.__signature__ = model.signature().replace(return_annotation="Step")  # type: ignore[attr-defined]
+    build.__signature__ = _signature(name).replace(return_annotation="Step")  # type: ignore[attr-defined]
     return build
+
+
+def _signature(name: str) -> inspect.Signature:
+    """The effect's parameters as a call signature, then `preset` (a keyword, one of the names) if it has presets."""
+    signature = registry.parameters(name).signature()
+    names = tuple(registry.presets(name))
+    if not names:
+        return signature
+    chosen = inspect.Parameter(
+        "preset",
+        inspect.Parameter.KEYWORD_ONLY,
+        default=None,
+        annotation=Literal[names] | None,
+    )
+    return signature.replace(parameters=[*signature.parameters.values(), chosen])
 
 
 def stub_text() -> str:
@@ -82,7 +99,9 @@ def stub_text() -> str:
         "",
     ]
     for name in sorted(registry.describe()):
-        lines.append(f"def {name}{registry.parameters(name).signature()} -> Step:")
+        # Python before 3.14 writes `X | None` of a Literal as Optional[X]; a stub is written the short way
+        signature = re.sub(r"Optional\[(Literal\[[^\]]*\])\]", r"\1 | None", str(_signature(name)))
+        lines.append(f"def {name}{signature} -> Step:")
         doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")
         lines += [f'    """{doc}"""', "    ...", ""]
     return "\n".join(lines)
