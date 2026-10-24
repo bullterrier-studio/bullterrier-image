@@ -1,0 +1,8 @@
+# A pale morning mist over the photo, thickening toward the bottom.
+# It also makes the effect's picture in the catalogue.
+name = "fog"
+size = 480
+
+[[step]]
+effect = "fog"
+seed = 3
