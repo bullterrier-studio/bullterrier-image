@@ -84,6 +84,7 @@ A Pydantic model per effect: a subclass of `EffectParams` (`photo_fx.core.params
   `ratio`, `cycles`) and an inclusive `min` and `max` that hold the default.
 - **Other fields** take no unit, min or max: `bool` switches, `Literal[...]` choices (the doc must mention every choice), `str`, `Color` (`'#rrggbb'` or `'#rgb'`
   with the leading `#`, or three numbers 0..1), and lists of those. A list may be written as a list or an array.
+- **Basic and advanced:** `advanced=True` marks a field the user would change to tune the technique rather than to choose the look; it is listed apart (after the basic ones, collapsed in the catalogue, counted in `photo-fx effects`) and stays settable, validated and in the schema; aim at six or fewer basic fields per effect.
 - **Animation:** any numeric parameter may be animated; an `int` field moves in whole steps (rounded to the nearest), and every rendered frame is checked
   against the range when the recipe loads.
 

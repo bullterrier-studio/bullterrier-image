@@ -50,6 +50,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   documented field with a unit and an honest range; only mathematical and standard constants are exempt, each cited.
   *Reason:* a look must be reproducible and tunable from the recipe alone. *Consequence:* a test scans effect packages
   and `ops` for unexplained numbers; exposing a tunable never changes default output (proved byte-identical).
+- **Basic and advanced parameters.** A field is advanced (`param(..., advanced=True)`) when the user would change it to
+  tune the technique rather than to choose the look (`edge`, `truncate`, `interpolation`, a secondary shaping control);
+  aim at six or fewer basic fields per effect. *Reason:* "nothing hidden" exposes every tunable, and one flat list of
+  dozens of them buries the few controls that define the look. *Consequence:* the flag changes listing only: basic
+  fields first, then an "Advanced parameters" section (`help`, `fx.pyi`), a count in `photo-fx effects` (`--advanced` or
+  naming the effect shows all) and a collapsed block in the catalogue. Every field stays settable, validated, in
+  declaration order in the signature and in the JSON schema (`"advanced"`). No tiers, no classification by name.
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
   `intensity` or `factor`. *Reason:* users bring vocabulary from Photoshop, Lightroom and shader literature.
   *Consequence:* a shared vocabulary table and a contract test flag discouraged names.
