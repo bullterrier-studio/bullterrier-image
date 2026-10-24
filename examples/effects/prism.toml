@@ -1,0 +1,6 @@
+# A prism: a rainbow fringe on every edge, growing toward the corners.
+name = "prism"
+size = 480
+
+[[step]]
+effect = "prism"
