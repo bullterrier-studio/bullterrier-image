@@ -69,7 +69,6 @@ def starfield(rgb: np.ndarray, params: StarfieldParams) -> np.ndarray:
     x, y, far = np.random.default_rng(params.seed).random((params.count, 3)).T
     scale = 1 - params.depth * far
     centre = np.stack([x * width, y * height], axis=1)
-    # constant: a one-pixel antialiased edge
-    light = draw_segments((height, width), centre, centre, params.size / 2 * scale, scale, 1.0)
+    light = draw_segments((height, width), centre, centre, params.size / 2 * scale, scale)
     sky = np.zeros((height, width, 3), np.float32) + np.asarray(params.sky, np.float32)
     return screen(sky, light[..., None] * np.asarray(params.color, np.float32))

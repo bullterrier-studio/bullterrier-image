@@ -9,7 +9,7 @@ def draw_segments(
     end: np.ndarray,
     radius: float | np.ndarray,
     weight: float | np.ndarray,
-    feather: float | np.ndarray,
+    feather: float | np.ndarray = 1.0,  # constant: one pixel, the finest edge a pixel grid can draw
 ) -> np.ndarray:
     """The (height, width) float32 layer of light that segments from `start` to `end` leave, brightest where they cross.
 
@@ -17,7 +17,7 @@ def draw_segments(
     lies inside the picture, an `end` may lie beyond it. A segment whose ends are equal is a disc. `radius` (the
     half-width of the segment, px), `weight` (its brightness along its centre line, 0..1) and `feather` (the width of
     its soft edge, px) are each one number for every segment or an array of n. A feather under 1 is taken as 1: a
-    narrower edge is aliasing, the pixel grid's own limit.
+    narrower edge is aliasing, the pixel grid's own limit; without one it is 1, a pixel of antialiasing.
 
     A pixel's value is `weight` times how far the segment covers it: 1 within `radius` - `feather` / 2 of the segment
     (its centre line, or the point of a disc), 0 beyond `radius` + `feather` / 2, and falling linearly between, so

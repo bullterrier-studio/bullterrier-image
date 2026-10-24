@@ -96,15 +96,13 @@ def sparkle(rgb: np.ndarray, params: SparkleParams) -> np.ndarray:
     dots = draw_segments((height, width), centre, centre, radius, brightness, radius)
     # the rays: from the middle left, right, up and down, each a hairline
     reach = params.rays * params.size * scale[:, None]
-    # constant: the unit vectors of the four ray directions
-    tips = [centre + reach * np.array(direction) for direction in ((1, 0), (-1, 0), (0, 1), (0, -1))]
-    # constant: a one-pixel antialiased edge
+    arms = np.array(((1, 0), (-1, 0), (0, 1), (0, -1)))  # right, left, down, up
+    tips = [centre + reach * arm for arm in arms]
     rays = draw_segments(
         (height, width),
-        np.tile(centre, (len(tips), 1)),
+        np.concatenate([centre] * len(tips)),
         np.concatenate(tips),
         params.thickness / 2,
         np.tile(brightness, len(tips)),
-        1.0,
     )
     return screen(rgb, np.maximum(dots, rays)[..., None])

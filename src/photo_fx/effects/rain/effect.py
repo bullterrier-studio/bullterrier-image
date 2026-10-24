@@ -91,8 +91,6 @@ def rain(rgb: np.ndarray, params: RainParams) -> np.ndarray:
     start = np.stack([x * width, y * height], axis=1)
     lean = np.radians(params.angle)
     end = start + params.length * near[:, None] * np.array([np.sin(lean), np.cos(lean)])
-    layer = draw_segments(
-        (height, width), start, end, params.thickness * near / 2, params.opacity * near, feather=1.0
-    )  # constant: a one-pixel antialiased edge
+    layer = draw_segments((height, width), start, end, params.thickness * near / 2, params.opacity * near)
     light = layer[..., None] * np.asarray(params.color, np.float32)
     return screen(rgb, light)
