@@ -1,0 +1,11 @@
+# Broken glass: 24 pieces, each moved up to 10 px and turned up to 5 degrees, with thin dark cracks between them.
+name = "shatter"
+size = 480
+
+[[step]]
+effect = "shatter"
+pieces = 24
+offset = 10
+angle = 5
+gap = 1.5
+seed = 1
