@@ -6,11 +6,7 @@ from typing import Literal
 import numpy as np
 from scipy import ndimage
 
-# scipy's names for what lies beyond the picture's edge, as `photo_fx.ops.blur` uses them, in `map_coordinates`'s own
-# spelling: for interpolation its 'wrap' does not repeat the picture but 'grid-wrap' does
-_BEYOND_THE_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
-# constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
-_SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
+from photo_fx.ops.warp import SCIPY_EDGE, SPLINE_ORDER
 
 
 def accumulate(
@@ -58,7 +54,7 @@ def accumulate(
                 plane,
                 matrix,
                 offset=shift,
-                order=_SPLINE_ORDER[interpolation],
-                mode=_BEYOND_THE_EDGE[edge],
+                order=SPLINE_ORDER[interpolation],
+                mode=SCIPY_EDGE[edge],
             )
     return np.stack(totals, axis=-1)
