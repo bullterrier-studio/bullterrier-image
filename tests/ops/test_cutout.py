@@ -37,3 +37,10 @@ def test_where_the_subject_is_whole_or_the_layer_empty_the_picture_is_returned_t
     np.testing.assert_array_equal(out[:, :64], photo[:, :64])
     np.testing.assert_array_equal(out[:, 100:], photo[:, 100:])
     assert not np.array_equal(out[:, 64:100], photo[:, 64:100])
+
+
+def test_the_layer_may_be_a_picture_and_its_opacity_one_number() -> None:
+    picture = np.array([[[0.8, 0.4, 0.2], [0.8, 0.4, 0.2]]], np.float32)
+    layer = np.array([[[1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]], np.float32)  # red behind the left pixel, blue the right
+    out = put_behind(picture, np.zeros((1, 2), np.float32), 0.5, layer)
+    np.testing.assert_allclose(out, [[[0.9, 0.2, 0.1], [0.4, 0.2, 0.6]]], atol=1e-6)
