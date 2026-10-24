@@ -276,16 +276,21 @@ def _load_recipes(paths: list[str]) -> "list[Recipe]":
 
 
 def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarray]]":
+    recipes = _load_recipes(args.recipes)  # validated before any slow work starts
+    _progress(args, f"rendering {len(recipes)} recipe(s)...")
+    return recipes, _render_recipes(args, recipes)
+
+
+def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[np.ndarray]":
+    """The photo of `args` through each recipe, the subject (the --matte file, else found once) shared by them all."""
     from . import imageio
     from .recipe import render_all
 
-    recipes = _load_recipes(args.recipes)  # validated before any slow work starts
-    _progress(args, f"rendering {len(recipes)} recipe(s)...")
     matte, find = _subject(args)
     if matte is not None:
         given = matte
         find = lambda photo: given  # noqa: E731  (render_all asks with the photo as given, which the matte fits)
-    return recipes, render_all(imageio.load(args.photo), recipes, find_subject=find)
+    return render_all(imageio.load(args.photo), recipes, find_subject=find)
 
 
 def _render(args: argparse.Namespace) -> int:
