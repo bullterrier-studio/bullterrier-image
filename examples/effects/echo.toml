@@ -1,0 +1,10 @@
+# A ghost trail: five soft copies of the dog streak off to the right, each half as strong as the one before.
+name = "echo"
+size = 480
+
+[[step]]
+effect = "echo"
+copies = 5
+dx = 14
+dy = 0
+fade = 0.5
