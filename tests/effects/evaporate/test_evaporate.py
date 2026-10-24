@@ -9,7 +9,7 @@ from photo_fx.ops.glyphs import cell_size
 
 def test_evaporate_leaves_everything_below_start_untouched():
     lit = np.ones((96, 128, 3), np.float32)
-    out = registry.apply("evaporate", lit, cell=5, start=0.5, end=0.2)
+    out = registry.apply("evaporate", lit, cell=5, start=0.5, ramp=0.3)
     assert not np.array_equal(out, lit)
     first_safe_row = 48 + cell_size(5)[1]  # pieces are whole character rows, so the row straddling `start` may change
     np.testing.assert_array_equal(out[first_safe_row:], lit[first_safe_row:])
@@ -17,7 +17,7 @@ def test_evaporate_leaves_everything_below_start_untouched():
 
 def test_evaporate_thins_out_the_top_more_than_the_bottom():
     lit = np.ones((96, 128, 3), np.float32)
-    out = registry.apply("evaporate", lit, cell=5, start=0.8, end=0.3)
+    out = registry.apply("evaporate", lit, cell=5, start=0.8, ramp=0.5)
     assert out[:32].mean() < out[64:].mean()
     assert out[64:].mean() > 0.95
     assert out[:20].mean() < 0.5
@@ -26,14 +26,14 @@ def test_evaporate_thins_out_the_top_more_than_the_bottom():
 def test_evaporate_only_moves_pieces_up_and_never_adds_light():
     upper_half = np.zeros((96, 128, 3), np.float32)
     upper_half[:48] = 0.8
-    out = registry.apply("evaporate", upper_half, cell=5, start=0.9, end=0.4, rise=0.3)
+    out = registry.apply("evaporate", upper_half, cell=5, start=0.9, ramp=0.5, rise=0.3)
     assert out[48 + cell_size(5)[1] :].max() == 0.0  # nothing sank into the dark lower half
     assert out.max() <= upper_half.max() + 1e-6
 
 
 def test_evaporate_vanish_controls_how_many_pieces_survive_the_trip():
     lit = np.ones((120, 128, 3), np.float32)
-    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2}
+    kwargs = {"cell": 5, "start": 0.9, "ramp": 0.4, "rise": 0.4, "seed": 2}
     keep_all = registry.apply("evaporate", lit, vanish=0.0, **kwargs)
     some = registry.apply("evaporate", lit, vanish=0.5, **kwargs)
     none = registry.apply("evaporate", lit, vanish=1.0, **kwargs)
@@ -85,7 +85,7 @@ def test_evaporate_treats_the_left_right_and_top_borders_as_edges_but_not_the_bo
 def test_evaporate_without_edge_or_outward_ignores_the_outline():
     lit = np.zeros((100, 120, 3), np.float32)
     lit[50:, 30:90] = 1.0  # lit only below `start`
-    out = registry.apply("evaporate", lit, cell=5, start=0.4, end=0.1)
+    out = registry.apply("evaporate", lit, cell=5, start=0.4, ramp=0.3)
     first_safe_row = 40 + cell_size(5)[1]
     np.testing.assert_array_equal(out[first_safe_row:], lit[first_safe_row:])
 
@@ -122,7 +122,7 @@ def test_evaporate_takes_its_edge_from_the_matte_when_given():
 def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift():
     dim = np.zeros((120, 160, 3), np.float32)
     dim[60:100, 60:100] = 0.1  # a dim block on black; everything above it is empty
-    everything_detaches = {"start": 1.0, "end": 0.99, "vanish": 0.0, "thinning": 0.0, "seed": 1}
+    everything_detaches = {"start": 1.0, "ramp": 0.01, "vanish": 0.0, "thinning": 0.0, "seed": 1}
     assert registry.apply("evaporate", dim, **everything_detaches)[:60].max() > 0.0  # by default (0.02) it drifts up
     above = registry.apply("evaporate", dim, background_threshold=0.2, **everything_detaches)[:60]
     assert above.max() == 0.0  # no brighter than the threshold: background, nothing drifts
@@ -147,7 +147,7 @@ def test_evaporate_seed_controls_the_dissolve(photo):
 def test_evaporate_wind_pushes_the_pieces_sideways():
     lit = np.zeros((200, 200, 3), np.float32)
     lit[120:140, 90:110] = 1.0  # a lit block near the middle
-    kwargs = {"cell": 5, "start": 1.0, "end": 0.5, "rise": 0.5, "seed": 3}
+    kwargs = {"cell": 5, "start": 1.0, "ramp": 0.5, "rise": 0.5, "seed": 3}
     right = registry.apply("evaporate", lit, wind=0.8, **kwargs)
     left = registry.apply("evaporate", lit, wind=-0.8, **kwargs)
     columns = np.arange(200)
@@ -164,7 +164,7 @@ def test_evaporate_bottom_border_is_an_edge_only_when_open_bottom_is_off():
 
 def test_evaporate_without_falloff_keeps_risen_pieces_at_full_brightness():
     lit = np.ones((120, 128, 3), np.float32)
-    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2}
+    kwargs = {"cell": 5, "start": 0.9, "ramp": 0.4, "rise": 0.4, "seed": 2}
     dimmed = registry.apply("evaporate", lit, **kwargs)
     undimmed = registry.apply("evaporate", lit, falloff=0.0, **kwargs)
     assert set(np.unique(undimmed)) == {0.0, 1.0}  # every piece is either gone or as bright as it was
@@ -180,7 +180,7 @@ def _one_column_of_pieces() -> np.ndarray:
 
 def test_evaporate_without_sway_pieces_rise_straight_up():
     img = _one_column_of_pieces()
-    kwargs = {"cell": 5, "start": 1.0, "end": 0.6, "rise": 0.5, "vanish": 0.0, "seed": 1}
+    kwargs = {"cell": 5, "start": 1.0, "ramp": 0.4, "rise": 0.5, "vanish": 0.0, "seed": 1}
     straight = registry.apply("evaporate", img, sway=0.0, sway_minimum=0.0, **kwargs)
     swaying = registry.apply("evaporate", img, **kwargs)
     column = slice(20 * 5, 21 * 5)
@@ -191,7 +191,7 @@ def test_evaporate_without_sway_pieces_rise_straight_up():
 
 def test_evaporate_thinning_and_vanish_decide_how_many_risen_pieces_survive():
     lit = np.ones((120, 128, 3), np.float32)
-    kwargs = {"cell": 5, "start": 0.9, "end": 0.5, "rise": 0.4, "seed": 2, "vanish": 0.0}
+    kwargs = {"cell": 5, "start": 0.9, "ramp": 0.4, "rise": 0.4, "seed": 2, "vanish": 0.0}
     upper = slice(0, 40)
     every = registry.apply("evaporate", lit, thinning=0.0, **kwargs)[upper].sum()
     thinned = registry.apply("evaporate", lit, thinning=1.0, **kwargs)[upper].sum()
@@ -217,21 +217,21 @@ _LANDING = {"cell": 5, "vanish": 0.0, "thinning": 0.0, "falloff": 0.0, "sway": 0
 
 def test_evaporate_rise_minimum_one_makes_every_fully_pulled_piece_climb_the_whole_rise():
     img = _one_row_of_pieces(30)
-    pulled = {"start": 1.0, "end": 0.99, "rise": 0.25, **_LANDING}  # row 30 is far above `end`: every piece detaches
+    pulled = {"start": 1.0, "ramp": 0.01, "rise": 0.25, **_LANDING}  # row 30 is above the ramp: every piece detaches
     assert _rows_with_content(registry.apply("evaporate", img, rise_minimum=1.0, **pulled)) == {20}  # 0.25 x 40 rows
     assert len(_rows_with_content(registry.apply("evaporate", img, **pulled))) > 3  # by default climbs differ
 
 
 def test_evaporate_rise_gamma_zero_lets_weakly_pulled_pieces_climb_as_far_as_strongly_pulled_ones():
     img = _one_row_of_pieces(30)
-    weak = {"start": 1.0, "end": 0.0, "rise": 0.25, "rise_minimum": 1.0, **_LANDING}  # row 30: pulled at about 0.14
+    weak = {"start": 1.0, "ramp": 1.0, "rise": 0.25, "rise_minimum": 1.0, **_LANDING}  # row 30: pulled at about 0.14
     assert _rows_with_content(registry.apply("evaporate", img, rise_gamma=0.0, **weak)) == {20, 30}
     assert 20 not in _rows_with_content(registry.apply("evaporate", img, **weak))  # default gamma: they climb less
 
 
 def test_evaporate_rise_skew_above_one_keeps_most_pieces_low():
     img = _one_row_of_pieces(30)
-    pulled = {"start": 1.0, "end": 0.99, "rise": 0.5, "rise_minimum": 0.0, **_LANDING}
+    pulled = {"start": 1.0, "ramp": 0.01, "rise": 0.5, "rise_minimum": 0.0, **_LANDING}
 
     def mean_climb(skew: float) -> float:
         """Average height climbed by the lit pixels, in px."""

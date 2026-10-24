@@ -34,13 +34,13 @@ class EvaporateParams(EffectParams):
         doc="Height (fraction of the picture, 0 = top) above which pieces begin to detach from the top down. "
         "0 switches the top-down dissolve off.",
     )
-    end: float = param(
+    ramp: float = param(
         0.3,
         unit="fraction",
-        min=0,
+        min=0.01,
         max=1,
-        doc="Height (fraction of the picture, 0 = top) above which every piece has detached. Between `end` and "
-        "`start` the chance rises smoothly.",
+        doc="Height of the band (fraction of the picture) above `start` over which the chance of detaching rises "
+        "smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out.",
     )
     outline: float = param(
         0.0,
@@ -196,8 +196,8 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
 
     The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
     make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
-    the top down, between `start` and `end`; and from the outline, within `outline` of the edge of the figure and of the
-    left, right and top borders of the picture (and the bottom unless `open_bottom`).
+    the top down, over the `ramp` above `start`; and from the outline, within `outline` of the edge of the figure and
+    of the left, right and top borders of the picture (and the bottom unless `open_bottom`).
 
     A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
     sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
@@ -220,7 +220,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
 
     # How strongly each piece wants to detach, 0..1 (smoothstep: 3t^2 - 2t^3).
     centre = (np.arange(rows) + 0.5) * cell_h / height  # each row's height in the picture, 0 = top
-    t = np.clip((p.start - centre) / max(p.start - p.end, 1e-6), 0.0, 1.0)  # constant: guards start == end
+    t = np.clip((p.start - centre) / p.ramp, 0.0, 1.0)
     strength = np.broadcast_to(
         (t * t * (3.0 - 2.0 * t))[:, None], (rows, cols)
     )  # constant: smoothstep polynomial 3t^2 - 2t^3
