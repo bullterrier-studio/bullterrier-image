@@ -85,9 +85,6 @@ def _signature(name: str) -> inspect.Signature:
     """The effect's parameters as a call signature, then the step keys as keywords, typed and defaulted as `Step`
     declares them (`effect` is the builder's own name), and `preset` (one of the names) if the effect has presets."""
     signature = registry.parameters(name).signature()
-    # TODO(step keys): a field named like a step key is shadowed by the key, as in a recipe file, until the registry
-    # refuses such fields; then this filter goes.
-    fields = [p for p in signature.parameters.values() if p.name not in registry.STEP_KEYS]
     step = Step.model_fields
     keys = [
         inspect.Parameter(
@@ -101,7 +98,7 @@ def _signature(name: str) -> inspect.Signature:
         keys.append(
             inspect.Parameter("preset", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=Literal[names] | None)
         )
-    return signature.replace(parameters=[*fields, *keys])
+    return signature.replace(parameters=[*signature.parameters.values(), *keys])
 
 
 def stub_text() -> str:

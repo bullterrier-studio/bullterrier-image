@@ -137,17 +137,18 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
     assert "gain_probe" not in registry.describe()
 
 
-def test_a_parameter_may_not_be_named_like_an_input(throwaway_effects):
-    class MatteParams(EffectParams):
-        """Claims the matte as a parameter."""
-
-        matte: float = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies the matte.")
+@pytest.mark.parametrize("name", ["matte", "effect", "mask", "opacity", "blend_mode", "preset"])
+def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
+    field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")
+    clashing = type(
+        "ClashParams", (EffectParams,), {"__doc__": "Claims a name.", "__annotations__": {name: float}, name: field}
+    )
 
     def clash_probe(rgb, params, *, matte=None):
         return rgb
 
-    with pytest.raises(ValueError, match=r"clash_probe.*`matte`"):
-        effect(category="light", params=MatteParams)(clash_probe)
+    with pytest.raises(ValueError, match=rf"clash_probe.*`{name}`"):
+        effect(category="light", params=clashing)(clash_probe)
     assert "clash_probe" not in registry.describe()
 
 

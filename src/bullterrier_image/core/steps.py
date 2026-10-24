@@ -90,6 +90,11 @@ class Step(ValidatedModel):
         for name in registry.INPUTS:
             if name in self.params:
                 raise RecipeError(f"`{name}` is supplied by the recipe itself and cannot be set")
+        for name in registry.STEP_KEYS:
+            if name in self.params:
+                raise RecipeError(
+                    f"`{name}` is a key of the step, not a parameter of {self.effect!r}: give it as {name}="
+                )
         registry.get(self.effect).validate(self.params)  # an unknown effect: UnknownEffectError listing them
         return self
 

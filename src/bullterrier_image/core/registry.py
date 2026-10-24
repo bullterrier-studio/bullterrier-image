@@ -65,6 +65,7 @@ INPUTS = ("matte",)
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, and one of its presets.
+# No effect parameter may take one of these names (nor an input's), so a key means the same in every step.
 STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset")
 
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
@@ -153,9 +154,9 @@ def effect[P: EffectParams](
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
     as its second argument. Keyword-only parameters after it are injected inputs, each named in `INPUTS` and defaulted.
     Raises `ValueError`, and registers nothing, when the category is unknown, `params` is not an `EffectParams`
-    subclass, the function has another shape, an input is unknown, a field is named like an input, or a different
-    function already has the same name. Registering the same function again, as reloading its module does, replaces
-    the old one; registering a `ModelledEffect` again keeps that very object.
+    subclass, the function has another shape, an input is unknown, a field is named like an input or a step key
+    (`STEP_KEYS`), or a different function already has the same name. Registering the same function again, as
+    reloading its module does, replaces the old one; registering a `ModelledEffect` again keeps that very object.
     """
     return lambda fn: _register(fn, category, params)
 
@@ -336,9 +337,12 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
                 f"effect {name!r}: the input `{parameter.name}` needs a default (None), so that {name}(rgb) works"
             )
         declared.append(parameter.name)
-    clash = sorted(set(params.model_fields) & set(INPUTS))
+    clash = sorted(set(params.model_fields) & {*INPUTS, *STEP_KEYS})
     if clash:
-        raise ValueError(f"effect {name!r}: `{clash[0]}` is supplied by the recipe, so it cannot be a parameter")
+        raise ValueError(
+            f"effect {name!r}: `{clash[0]}` is supplied by the recipe (an input or a key of the step), so it cannot be "
+            "a parameter"
+        )
     return tuple(declared)
 
 

@@ -108,6 +108,7 @@ def test_effect_queries_live_only_in_the_registry(name):
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
         (lambda: Step("evaporate", {"matte": 1}), "matte"),
+        (lambda: Step("grain", {"opacity": 0.5}), "`opacity` is a key of the step"),
     ],
 )
 def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
