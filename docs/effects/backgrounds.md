@@ -14,7 +14,7 @@ Generated or replaced backgrounds behind the subject.
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
 | <img src="../gallery/plasma.jpg" width="160" alt="plasma"> | `plasma` | Replace the picture with a plasma: warped, crossed sine waves coloured through `colors`. | `scale=160.0` `octaves=2` `persistence=0.5` `lacunarity=2.0` `warp=25.0` `colors=('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080')` `seed=0` | [plasma.toml](../../examples/effects/plasma.toml) |
 | <img src="../gallery/starfield.jpg" width="160" alt="starfield"> | `starfield` | A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input. | `count=600` `size=3.0` `depth=0.7` `color='#dfe8ff'` `sky='#04060f'` `seed=0` | [starfield.toml](../../examples/effects/starfield.toml) |
-| <img src="../gallery/voronoi_cells.jpg" width="160" alt="voronoi_cells"> | `voronoi_cells` | Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders. | `cells=80` `seed=0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` `shade=0.35` `edge_width=1.5` `edge_color='#0a0014'` | [voronoi_cells.toml](../../examples/effects/voronoi_cells.toml) |
+| <img src="../gallery/voronoi_cells.jpg" width="160" alt="voronoi_cells"> | `voronoi_cells` | Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders. | `cells=80` `seed=0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` `shade=0.35` `line_width=1.5` `line_color='#0a0014'` | [voronoi_cells.toml](../../examples/effects/voronoi_cells.toml) |
 
 ### `aurora`
 
@@ -47,7 +47,7 @@ Generated or replaced backgrounds behind the subject.
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer of the flow is than the one before. 0 = only the coarsest layer. |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer of the flow is than the one before: the lattice spacing is divided by this. |
 | `twist` | number | degrees | 0 to 720 | `180.0` | How far the flow turns for each standard deviation of the noise: a line's direction is the noise times this, measured clockwise on screen from the right. 0 = every line runs straight to the right; larger = tighter, more varied swirls. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the flow and the line starts: the same seed gives the same picture. The starts are numpy.random.default_rng(seed).random((lines, 2)), columns x and y as fractions of the width and the height. |
+| `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the flow and the line starts: the same seed gives the same picture. The starts and the flow are independent random streams of it. |
 | `line` | colour |  |  | `'#ffd84a'` | The colour of the lines. |
 | `background` | colour |  |  | `'#12002b'` | The colour behind the lines. |
 
@@ -56,7 +56,7 @@ Generated or replaced backgrounds behind the subject.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `kind` | one of 'mandelbrot', 'julia' |  |  | `'julia'` | Which set: 'mandelbrot' (every point is the constant c, z starts at 0; centre it with x = -0.5 to see the whole set) or 'julia' (every point is the start z, with the one constant `c_real` + i `c_imag`). |
-| `zoom` | number | ratio | 0.1 to 100000 | `1.0` | Magnification. At 1 the picture's shorter side shows 4 units of the complex plane, enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units. Very deep zooms run out of single precision around 10000. |
+| `zoom` | number | ratio | 0.1 to 10000 | `1.0` | Magnification. At 1 the picture's shorter side shows 4 units of the complex plane, enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units. |
 | `x` | number | ratio | -2 to 2 | `0.0` | The real part of the point at the centre of the picture, in units of the complex plane. 0 centres a Julia set; -0.5 centres the Mandelbrot set. |
 | `y` | number | ratio | -2 to 2 | `0.0` | The imaginary part of the point at the centre of the picture, in units of the complex plane; positive moves the view up. |
 | `c_real` | number | ratio | -2 to 2 | `-0.8` | Julia only: the real part of the constant c in z -> z^2 + c. It decides the shape: a point inside the Mandelbrot set gives a connected Julia set, one outside a dust. Ignored by 'mandelbrot'. |
@@ -132,8 +132,8 @@ Generated or replaced backgrounds behind the subject.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `cells` | whole number | count | 4 to 2000 | `80` | How many cells (random points, the sites) the picture is divided into. More = smaller cells; the average cell is the picture's area divided by this. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the random positions and colours: the same seed gives the same cells. The sites are numpy.random.default_rng(seed).random((cells, 2)), columns x and y as fractions of the width and the height; each cell's value on the colour list is drawn next. |
+| `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the random positions and colours: the same seed gives the same cells. |
 | `colors` | list of colours |  |  | `('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` | The colour ramp, evenly spaced; at least two. Each cell takes the colour at its own random position along it, so a longer list gives more variety. |
 | `shade` | number | fraction | 0 to 1 | `0.35` | How much each cell darkens away from its site: 0 = flat colour, 1 = black on the cell's border. The darkening is the distance to the site over the distance to the site plus the distance to the border, so it grows steadily from the site to the border and gives every cell a dome look. |
-| `edge_width` | number | px | 0 to 32 | `1.5` | The width of the border lines between cells in px, with anti-aliased edges; 0 = no borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high. |
-| `edge_color` | colour |  |  | `'#0a0014'` | The colour of the border lines. |
+| `line_width` | number | px | 0 to 32 | `1.5` | The width of the border lines between cells in px, with anti-aliased edges; 0 = no borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high. |
+| `line_color` | colour |  |  | `'#0a0014'` | The colour of the border lines. |

@@ -810,13 +810,13 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     mirrors it about the edge line."""
     ...
 
-def embers(count: int = 120, size: float = 7.0, softness: float = 1.0, length: float = 8.0, angle: float = 15.0, opacity: float = 0.9, color: str | list[float] | tuple[float, float, float] = '#ff8a2b', seed: int = 0) -> Step:
+def embers(count: int = 120, size: float = 7.0, softness: float = 1.0, length: float = 8.0, angle: float = 15.0, depth: float = 0.5, opacity: float = 0.9, color: str | list[float] | tuple[float, float, float] = '#ff8a2b', seed: int = 0) -> Step:
     """Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it.
 
-Every ember has a random depth from 0 (far) to 1 (near): its width, streak length and brightness are `size`,
-`length` and `opacity` times 0.5 + 0.5 x depth. It rises at `angle` from vertical, so its streak runs from the
-spark down the other way, and its edge is `softness` of its radius soft. Where embers overlap the brighter one
-shows. Embers are screened over the picture, so they only lighten it; the same `seed` always gives the same
+Every ember lies at a random distance d from 0 (far) to 1 (near): its width, streak length and brightness are
+`size`, `length` and `opacity` times 1 - `depth` x (1 - d). It rises at `angle` from vertical, so its streak runs
+from the spark down the other way, and its edge is `softness` of its radius soft. Where embers overlap the brighter
+one shows. Embers are screened over the picture, so they only lighten it; the same `seed` always gives the same
 sparks.
 
 Parameters
@@ -826,20 +826,24 @@ count : whole number, count, 0 to 2000, default 120
     density). 0 = none (the picture unchanged), 120 is a lively shower of sparks.
     Animated, it moves in whole steps (rounded to the nearest whole number).
 size : number, px, 1 to 30, default 7.0
-    The width in px of the nearest, largest embers; the farthest are half as wide. Tuned
-    for a picture about 480 px high. Larger = fatter sparks.
+    The width in px of the nearest, largest embers; the farthest are narrower by
+    `depth`. Tuned for a picture about 480 px high. Larger = fatter sparks.
 softness : number, fraction, 0 to 1, default 1.0
     How soft an ember's edge is: it falls from full brightness to none across this
     fraction of the ember's radius (at least one pixel). 0 = crisp sparks, 1 = sparks
     glowing out from their middle.
 length : number, px, 0 to 200, default 8.0
     The length in px of the streak each nearest ember leaves behind it; the farthest are
-    half as long. Tuned for a picture about 480 px high. 0 = round dots, larger =
+    shorter by `depth`. Tuned for a picture about 480 px high. 0 = round dots, larger =
     faster-looking sparks.
 angle : number, degrees, -45 to 45, default 15.0
     How far the embers drift from straight up, in degrees: positive drifts to the right
     as they rise (wind from the left), negative to the left. 0 = straight up. The
     streaks trail the other way.
+depth : number, fraction, 0 to 1, default 0.5
+    How far apart the embers are in depth, which spreads their width, streak length and
+    brightness: the farthest have 1 - depth times those of the nearest. 0 = every ember
+    alike, 1 = from the nearest down to nothing at the farthest.
 opacity : number, fraction, 0 to 1, default 0.9
     How bright the nearest embers are: the share of `color` they screen over the picture
     along their middle; the farthest are fainter. 0 = invisible, 1 = solid colour.
@@ -1113,12 +1117,12 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     slower, and may ring beside hard edges)."""
     ...
 
-def floating_dust(count: int = 80, size: float = 24.0, softness: float = 0.8, opacity: float = 0.55, color: str | list[float] | tuple[float, float, float] = '#fff1d6', seed: int = 0) -> Step:
+def floating_dust(count: int = 80, size: float = 24.0, softness: float = 0.8, depth: float = 0.5, opacity: float = 0.55, color: str | list[float] | tuple[float, float, float] = '#fff1d6', seed: int = 0) -> Step:
     """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
 
-Every speck has a random depth from 0 (far) to 1 (near): its width and brightness are `size` and `opacity` times
-0.5 + 0.5 x depth. A speck is full brightness inside, half of it at its radius, with an edge `softness` of its
-radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
+Every speck lies at a random distance d from 0 (far) to 1 (near): its width and brightness are `size` and `opacity`
+times 1 - `depth` x (1 - d). A speck is full brightness inside, half of it at its radius, with an edge `softness` of
+its radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
 lighten it; the same `seed` always gives the same dust.
 
 Parameters
@@ -1128,13 +1132,17 @@ count : whole number, count, 0 to 1000, default 80
     density). 0 = none (the picture unchanged), 80 is a scattering, 400 a dusty air.
     Animated, it moves in whole steps (rounded to the nearest whole number).
 size : number, px, 1 to 200, default 24.0
-    The diameter in px of the nearest, largest specks; the farthest are half as wide.
-    Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if the dust
-    were closer to the lens.
+    The diameter in px of the nearest, largest specks; the farthest are narrower by
+    `depth`. Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if
+    the dust were closer to the lens.
 softness : number, fraction, 0 to 1, default 0.8
     How soft a speck's edge is: the edge falls from full brightness to none across this
     fraction of the speck's radius (at least one pixel). 0 = crisp discs, 1 = specks
     fading out from their middle.
+depth : number, fraction, 0 to 1, default 0.5
+    How far apart the specks are in depth, which spreads their size and brightness: the
+    farthest have 1 - depth times those of the nearest. 0 = every speck alike, 1 = from
+    the nearest down to nothing at the farthest.
 opacity : number, fraction, 0 to 1, default 0.55
     How bright the nearest specks are: the share of `color` they screen over the picture
     at their middle; the farthest are fainter. 0 = invisible, 1 = solid colour.
@@ -1192,9 +1200,8 @@ twist : number, degrees, 0 to 720, default 180.0
     runs straight to the right; larger = tighter, more varied swirls.
 seed : whole number, count, 0 to 2147483647, default 0
     Seeds the flow and the line starts: the same seed gives the same picture. The starts
-    are numpy.random.default_rng(seed).random((lines, 2)), columns x and y as fractions
-    of the width and the height. Animated, it moves in whole steps (rounded to the
-    nearest whole number).
+    and the flow are independent random streams of it. Animated, it moves in whole steps
+    (rounded to the nearest whole number).
 line : colour, default '#ffd84a'
     The colour of the lines.
 background : colour, default '#12002b'
@@ -1328,10 +1335,9 @@ kind : one of 'mandelbrot', 'julia', default 'julia'
     Which set: 'mandelbrot' (every point is the constant c, z starts at 0; centre it
     with x = -0.5 to see the whole set) or 'julia' (every point is the start z, with the
     one constant `c_real` + i `c_imag`).
-zoom : number, ratio, 0.1 to 100000, default 1.0
+zoom : number, ratio, 0.1 to 10000, default 1.0
     Magnification. At 1 the picture's shorter side shows 4 units of the complex plane,
-    enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units. Very deep
-    zooms run out of single precision around 10000.
+    enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units.
 x : number, ratio, -2 to 2, default 0.0
     The real part of the point at the centre of the picture, in units of the complex
     plane. 0 centres a Julia set; -0.5 centres the Mandelbrot set.
@@ -1801,14 +1807,15 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def lens_drops(count: int = 14, radius: float = 24.0, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def lens_drops(count: int = 14, radius: float = 24.0, size_variation: float = 0.5, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
 
-A drop at a random place has a random radius from half of `radius` to all of it. The pixel at offset d from its
-middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by `interpolation` and
-`edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over the drop,
-`highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle. Later drops
-cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the same drops.
+A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at
+offset d from its middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by
+`interpolation` and `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over
+the drop, `highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle.
+Later drops cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the
+same drops.
 
 Parameters
 ----------
@@ -1817,8 +1824,11 @@ count : whole number, count, 0 to 200, default 14
     density). 0 = none (the picture unchanged). Animated, it moves in whole steps
     (rounded to the nearest whole number).
 radius : number, px, 1 to 200, default 24.0
-    The radius in px of the biggest drops; the smallest are half as big. Tuned for a
-    picture about 480 px high. Larger = bigger drops.
+    The radius in px of the biggest drops; the smallest are smaller by `size_variation`.
+    Tuned for a picture about 480 px high. Larger = bigger drops.
+size_variation : number, fraction, 0 to 1, default 0.5
+    How much the drops differ in size: each has a random share of `radius` from 1 -
+    size_variation to 1. 0 = every drop alike, 1 = from the full radius down to specks.
 refraction : number, ratio, 0.25 to 4, default 1.5
     How strongly a drop bends the scene: it shows the picture turned upside down about
     the drop's middle and this many times as wide. 1 = the same scale, turned round;
@@ -2591,11 +2601,11 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def rain(density: float = 1.0, angle: float = 10.0, length: float = 32.0, thickness: float = 1.5, opacity: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dbe6f5', seed: int = 0) -> Step:
+def rain(density: float = 1.0, angle: float = 10.0, length: float = 32.0, thickness: float = 1.5, depth: float = 0.5, opacity: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dbe6f5', seed: int = 0) -> Step:
     """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
 
-Every streak has a random depth from 0 (far) to 1 (near): its length, width and brightness are `length`,
-`thickness` and `opacity` times 0.5 + 0.5 x depth, so the rain has depth. A streak is drawn with antialiased
+Every streak lies at a random distance d from 0 (far) to 1 (near): its length, width and brightness are `length`,
+`thickness` and `opacity` times 1 - `depth` x (1 - d), so the rain has depth. A streak is drawn with antialiased
 edges and is cut off by the picture's edge. Streaks are screened over the picture, so they only lighten it. A
 higher `density` keeps every streak of a lower one and adds more; the same `seed` always gives the same rain.
 
@@ -2609,15 +2619,19 @@ angle : number, degrees, -45 to 45, default 10.0
     How far the streaks lean from straight down, in degrees: positive leans toward the
     right as they fall (wind from the left), negative toward the left. 0 = vertical.
 length : number, px, 1 to 200, default 32.0
-    The length of the nearest streaks in px; the farthest are half as long. Tuned for a
-    picture about 480 px high. Larger = longer streaks, as with a slower shutter.
+    The length of the nearest streaks in px; the farthest are shorter by `depth`. Tuned
+    for a picture about 480 px high. Larger = longer streaks, as with a slower shutter.
 thickness : number, px, 1 to 20, default 1.5
-    The width of the nearest streaks in px; the farthest are half as wide. Tuned for a
-    picture about 480 px high. Larger = fatter drops.
+    The width of the nearest streaks in px; the farthest are narrower by `depth`. Tuned
+    for a picture about 480 px high. Larger = fatter drops.
+depth : number, fraction, 0 to 1, default 0.5
+    How far apart the streaks are in depth, which spreads their length, width and
+    brightness: the farthest have 1 - depth times those of the nearest. 0 = every streak
+    alike, 1 = from the nearest down to nothing at the farthest.
 opacity : number, fraction, 0 to 1, default 0.7
     How bright the nearest streaks are: the share of `color` they screen over the
-    picture at their centre; the farthest are half as bright. 0 = invisible, 1 = solid
-    colour.
+    picture at their centre; the farthest are fainter by `depth`. 0 = invisible, 1 =
+    solid colour.
 color : colour, default '#dbe6f5'
     The colour of the rain: '#rrggbb', '#rgb' or [r, g, b] 0..1. Streaks are screened
     over the picture, so they only lighten it.
@@ -3022,12 +3036,12 @@ seed : whole number, count, 0 to 4294967295, default 0
     plumes. Animated, it moves in whole steps (rounded to the nearest whole number)."""
     ...
 
-def snow(density: float = 0.5, size: float = 14.0, layers: int = 4, softness: float = 0.5, opacity: float = 0.8, seed: int = 0) -> Step:
+def snow(density: float = 0.5, size: float = 14.0, layers: int = 4, softness: float = 0.5, opacity: float = 0.8, depth: float = 0.5, seed: int = 0) -> Step:
     """Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers.
 
-Each flake falls in a random layer; at depth d = k / `layers` (the nearest layer is 1) it is a disc `size` x d
-wide, `opacity` x (0.5 + 0.5 d) bright, with an edge `softness` of its radius soft. Where flakes overlap the
-brighter one shows, and flakes are screened over the picture, so they only lighten it. A higher `density` keeps
+Each flake falls in a random layer; at nearness d = k / `layers` (the nearest layer is 1) it is a disc `size` x d
+wide, `opacity` x (1 - `depth` x (1 - d)) bright, with an edge `softness` of its radius soft. Where flakes overlap
+the brighter one shows, and flakes are screened over the picture, so they only lighten it. A higher `density` keeps
 every flake of a lower one and adds more; the same `seed` always gives the same snow.
 
 Parameters
@@ -3042,9 +3056,9 @@ size : number, px, 1 to 100, default 14.0
     fell closer to the lens.
 layers : whole number, count, 1 to 10, default 4
     How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide
-    as `size` and (0.5 + 0.5 k / n) as bright as `opacity`, so more layers = a smoother
-    range from fine far flakes to large near ones. 1 = every flake alike. Animated, it
-    moves in whole steps (rounded to the nearest whole number).
+    as `size` and (1 - `depth` x (1 - k / n)) as bright as `opacity`, so more layers = a
+    smoother range from fine far flakes to large near ones. 1 = every flake alike.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
 softness : number, fraction, 0 to 1, default 0.5
     How soft a flake's edge is: the edge falls from full brightness to none across this
     fraction of the flake's radius (at least one pixel), so large flakes are blurrier
@@ -3053,6 +3067,10 @@ softness : number, fraction, 0 to 1, default 0.5
 opacity : number, fraction, 0 to 1, default 0.8
     How bright the nearest flakes are: the share of white they screen over the picture
     at their centre; farther flakes are fainter. 0 = invisible, 1 = solid white.
+depth : number, fraction, 0 to 1, default 0.5
+    How much fainter the farthest flakes are: a flake in layer k of n has 1 - depth x (1
+    - k / n) of the brightness of the nearest. 0 = every layer equally bright, 1 = the
+    far layers fade to nothing.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always puts the same flakes in the same places, another
     seed others. Animated, it moves in whole steps (rounded to the nearest whole
@@ -3098,13 +3116,13 @@ threshold : number, fraction, 0 to 1, default 0.5
     black); 1 changes nothing."""
     ...
 
-def sparkle(count: int = 60, threshold: float = 0.75, size: float = 10.0, rays: float = 2.0, opacity: float = 1.0, seed: int = 0) -> Step:
+def sparkle(count: int = 60, threshold: float = 0.75, size: float = 10.0, size_variation: float = 0.5, rays: float = 2.0, thickness: float = 1.0, opacity: float = 1.0, seed: int = 0) -> Step:
     """Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each.
 
-A sparkle has a random scale s from 0.5 to 1: its dot is `size` x s wide (soft: full brightness inside half its
-radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is `opacity` x s
-bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only lighten it; the
-same `seed` on the same picture always gives the same sparkles.
+A sparkle has a random scale s from 1 - `size_variation` to 1: its dot is `size` x s wide (soft: full brightness
+inside half its radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is
+`opacity` x s bright, so the small ones are fainter too. Sparkles are screened over the picture, so they only
+lighten it; the same `seed` on the same picture always gives the same sparkles.
 
 Parameters
 ----------
@@ -3117,12 +3135,19 @@ threshold : number, fraction, 0 to 1, default 0.75
     0..1) must be above this. Raising it keeps the sparkles to the brightest highlights;
     1 = none, nothing is brighter than white.
 size : number, px, 1 to 100, default 10.0
-    The diameter in px of the biggest sparkles' soft dot; the smallest are half as wide.
-    Tuned for a picture about 480 px high. Larger = bigger glints.
+    The diameter in px of the biggest sparkles' soft dot; the smallest are narrower by
+    `size_variation`. Tuned for a picture about 480 px high. Larger = bigger glints.
+size_variation : number, fraction, 0 to 1, default 0.5
+    How much the sparkles differ in size and brightness: each has a random scale from 1
+    - size_variation to 1 times `size` and `opacity`. 0 = every sparkle alike, 1 = from
+    the biggest down to nothing.
 rays : number, ratio, 0 to 10, default 2.0
     How long the four rays of the cross are, as a multiple of the sparkle's dot
     diameter: each ray runs this far from the middle, straight left, right, up and down,
-    one pixel thin. 0 = a soft dot only, no rays.
+    `thickness` wide. 0 = a soft dot only, no rays.
+thickness : number, px, 0 to 10, default 1.0
+    The width in px of each ray (with a soft one-pixel edge). 1 = a hairline, larger =
+    bolder rays.
 opacity : number, fraction, 0 to 1, default 1.0
     How bright the biggest sparkles are: the share of white they screen over the picture
     at their middle; smaller ones are fainter. 0 = invisible, 1 = solid white.
@@ -3534,12 +3559,12 @@ color : colour, default '#000000'
     white lightens."""
     ...
 
-def voronoi_cells(cells: int = 80, seed: int = 0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347'), shade: float = 0.35, edge_width: float = 1.5, edge_color: str | list[float] | tuple[float, float, float] = '#0a0014') -> Step:
+def voronoi_cells(cells: int = 80, seed: int = 0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347'), shade: float = 0.35, line_width: float = 1.5, line_color: str | list[float] | tuple[float, float, float] = '#0a0014') -> Step:
     """Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders.
 
 A generated background: the input is used only for its height and width, its content is ignored. Every pixel
 belongs to the cell of its nearest site; a cell's colour is a random point on `colors`, darkened toward its
-border by `shade`, and the border lines are drawn in `edge_color`.
+border by `shade`, and the border lines are drawn in `line_color`.
 
 Parameters
 ----------
@@ -3548,10 +3573,8 @@ cells : whole number, count, 4 to 2000, default 80
     smaller cells; the average cell is the picture's area divided by this. Animated, it
     moves in whole steps (rounded to the nearest whole number).
 seed : whole number, count, 0 to 2147483647, default 0
-    Seeds the random positions and colours: the same seed gives the same cells. The
-    sites are numpy.random.default_rng(seed).random((cells, 2)), columns x and y as
-    fractions of the width and the height; each cell's value on the colour list is drawn
-    next. Animated, it moves in whole steps (rounded to the nearest whole number).
+    Seeds the random positions and colours: the same seed gives the same cells.
+    Animated, it moves in whole steps (rounded to the nearest whole number).
 colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')
     The colour ramp, evenly spaced; at least two. Each cell takes the colour at its own
     random position along it, so a longer list gives more variety.
@@ -3560,10 +3583,10 @@ shade : number, fraction, 0 to 1, default 0.35
     cell's border. The darkening is the distance to the site over the distance to the
     site plus the distance to the border, so it grows steadily from the site to the
     border and gives every cell a dome look.
-edge_width : number, px, 0 to 32, default 1.5
+line_width : number, px, 0 to 32, default 1.5
     The width of the border lines between cells in px, with anti-aliased edges; 0 = no
     borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high.
-edge_color : colour, default '#0a0014'
+line_color : colour, default '#0a0014'
     The colour of the border lines."""
     ...
 
