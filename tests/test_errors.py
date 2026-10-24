@@ -9,6 +9,7 @@ from photo_fx import (
     BackendUnavailableError,
     ImageReadError,
     NoFramesError,
+    NonFiniteImageError,
     PhotoFxError,
     ProjectError,
     RecipeError,
@@ -68,6 +69,7 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
         (BackendUnavailableError, NotImplementedError),
         (ImageReadError, OSError),
         (NoFramesError, ValueError),
+        (NonFiniteImageError, ValueError),
     ],
 )
 def test_every_public_error_is_caught_as_a_photo_fx_error_and_as_its_builtin(error, builtin):

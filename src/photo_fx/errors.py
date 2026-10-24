@@ -8,8 +8,8 @@ Dependency direction: the bottom layer, below `ops`: it imports nothing from pho
 """
 
 __all__ = [
-    "BackendUnavailableError", "ImageReadError", "NoFramesError", "PhotoFxError", "ProjectError", "RecipeError",
-    "SubjectNotFoundError", "UnknownEffectError",
+    "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError", "PhotoFxError", "ProjectError",
+    "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
 ]  # fmt: skip
 
 
@@ -47,6 +47,10 @@ class SubjectNotFoundError(PhotoFxError, RuntimeError):
 
 class NoFramesError(PhotoFxError, ValueError):
     """A video or animation was asked for with no frames to write."""
+
+
+class NonFiniteImageError(PhotoFxError, ValueError):
+    """A picture to write holds NaN or an infinity, which is no colour: the message names the first such pixel."""
 
 
 class BackendUnavailableError(PhotoFxError, NotImplementedError):

@@ -35,6 +35,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         BackendUnavailableError,
         ImageReadError,
         NoFramesError,
+        NonFiniteImageError,
         PhotoFxError,
         ProjectError,
         RecipeError,
@@ -52,8 +53,8 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "ImageReadError", "NoFramesError", "PhotoFxError", "ProjectError",
-        "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
+        "BackendUnavailableError", "ImageReadError", "NoFramesError", "NonFiniteImageError",
+        "PhotoFxError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".matte": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),

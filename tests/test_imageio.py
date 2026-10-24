@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from PIL import GifImagePlugin, Image, ImageCms
 
-from photo_fx import BackendUnavailableError, ImageReadError, NoFramesError, imageio
+from photo_fx import BackendUnavailableError, ImageReadError, NoFramesError, NonFiniteImageError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -306,14 +306,13 @@ def test_a_saved_video_carries_no_creation_time(photo, tmp_path):
         assert struct.unpack(">II", data[start + 4 : start + 12]) == (0, 0), box
 
 
-def test_saving_maps_nan_to_black_and_infinities_to_the_ends_without_warning(tmp_path):
-    rgb = np.full((1, 4, 3), 0.4, np.float32)
-    rgb[0, 0], rgb[0, 1], rgb[0, 2] = np.nan, np.inf, -np.inf
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf], ids=["nan", "infinity", "negative infinity"])
+def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp_path, bad):
+    rgb = np.full((2, 4, 3), 0.4, np.float32)
+    rgb[1, 2, 1] = bad
+    with pytest.raises(NonFiniteImageError, match="row 1, column 2"):
         imageio.save(rgb, tmp_path / "odd.png")
-    with Image.open(tmp_path / "odd.png") as img:
-        assert np.asarray(img)[0, :, 0].tolist() == [0, 255, 0, 102]  # 0.4 * 255 = 102: finite pixels untouched
+    assert not (tmp_path / "odd.png").exists()
 
 
 def _frames(count=4, height=47, width=63):

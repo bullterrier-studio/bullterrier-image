@@ -19,7 +19,7 @@ from typing import IO, cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from photo_fx.errors import BackendUnavailableError, ImageReadError, NoFramesError
+from photo_fx.errors import BackendUnavailableError, ImageReadError, NoFramesError, NonFiniteImageError
 from photo_fx.ops import resample
 
 __all__ = ["from_pil", "load", "load_matte", "resize_video", "save", "save_video", "to_pil"]
@@ -91,11 +91,11 @@ def save(rgb: np.ndarray, path: str | Path, alpha: np.ndarray | None = None, qua
     """Write `rgb` to `path`; the extension picks the format.
 
     With `alpha` (height, width, 0..1) the file gets a transparency channel, so use .png or .webp. Values outside
-    0..1 are clipped and NaN is written as 0 (black), silently. `quality` (1..100, default 95) sets JPEG and WebP
-    compression; JPEGs keep full-resolution colour (4:4:4, no chroma subsampling) and PNG is lossless. The file
-    embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the effects made, and carries no
-    other metadata: nothing from the photo it came from, so no EXIF and no GPS position. BackendUnavailableError,
-    naming the extension, when no writer exists for it.
+    0..1 are clipped; NaN or an infinity raises NonFiniteImageError, naming the first such pixel. `quality` (1..100,
+    default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no chroma subsampling) and
+    PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the
+    effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and no GPS position.
+    BackendUnavailableError, naming the extension, when no writer exists for it.
     """
     suffix = Path(path).suffix.lower()
     if Image.registered_extensions().get(suffix) not in Image.SAVE:
@@ -117,9 +117,14 @@ def to_pil(rgb: np.ndarray, alpha: np.ndarray | None = None) -> Image.Image:
 
 
 def _to_uint8(data: np.ndarray) -> np.ndarray:
-    """0..1 floats to 8-bit levels, rounded; out-of-range values clip, NaN (no colour at all) becomes 0, black."""
-    finite = np.nan_to_num(data, nan=0.0, posinf=1.0, neginf=0.0)
-    return (np.clip(finite, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+    """0..1 floats to 8-bit levels, rounded; out-of-range values clip. NonFiniteImageError for NaN or infinity."""
+    finite = np.isfinite(data)
+    if not finite.all():
+        row, column = np.argwhere(~finite)[0][:2]
+        raise NonFiniteImageError(
+            f"cannot write a picture with NaN or infinite values: the first is at row {row}, column {column}"
+        )
+    return (np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
 
 
 def save_video(frames: Iterable[np.ndarray], path: str | Path, fps: int = 30, max_side: int | None = None) -> int:
