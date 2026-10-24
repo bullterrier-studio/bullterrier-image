@@ -9,3 +9,4 @@ angle = 45
 length = 0.1
 threshold = 0.96
 amount = 0.8
+limit = 0.002

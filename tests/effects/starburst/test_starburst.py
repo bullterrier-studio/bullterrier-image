@@ -184,3 +184,36 @@ def test_color_tints_the_spikes(color: str | tuple[float, ...], expected: tuple[
     # 10 px right of the point a spike of a white point has light 1 - 10 / reach in every channel
     reach = 0.2 * DIAGONAL
     np.testing.assert_allclose(out[MIDDLE, MIDDLE + 10], np.array(expected) * (1 - 10 / reach), atol=2e-5)
+
+
+def test_limit_keeps_a_large_bright_area_from_flooding_while_the_brightest_point_still_shines() -> None:
+    """A block of 0.9 (16% of the pixels) and one white point. At threshold 0.5 every block pixel radiates and
+    the area is wrapped in light; with `limit` of 1% only the white point radiates."""
+    picture = np.zeros((SIZE, SIZE, 3), np.float32)
+    picture[60:140, 60:140] = 0.9
+    picture[30, 170] = 1.0
+    beside_the_block = (100, slice(145, 155), 0)  # right of the block, where its pixels' spikes run to the right
+    beside_the_point = (30, slice(175, 185), 0)
+    settings = {"rays": 4, "length": 0.1, "amount": 1.0, "threshold": 0.5}
+    flooded = registry.apply(NAME, picture, **settings)
+    capped = registry.apply(NAME, picture, limit=0.01, **settings)
+    assert flooded[beside_the_block].min() > 0.05
+    np.testing.assert_array_equal(capped[beside_the_block], 0.0)
+    assert capped[beside_the_point].min() > 0.05
+
+
+@pytest.mark.parametrize(
+    ("limit", "shining"),
+    [(0.0, []), (0.00003, [0]), (0.00006, [0, 1]), (1.0, [0, 1, 2])],
+    ids=["none", "one pixel of three", "two pixels of three", "no cap"],
+)
+def test_limit_lets_only_that_share_of_the_pixels_radiate_the_brightest_first(limit: float, shining: list[int]) -> None:
+    """Three points of different brightness in a picture of 40401 pixels: a limit of 0.00003 allows one pixel."""
+    rows = [30, 100, 170]  # brightest first
+    picture = np.zeros((SIZE, SIZE, 3), np.float32)
+    for row, value in zip(rows, (1.0, 0.9, 0.8), strict=True):
+        picture[row, 30] = value
+    out = registry.apply(NAME, picture, rays=4, length=0.1, amount=1.0, threshold=0.0, limit=limit)
+    for index, row in enumerate(rows):
+        spike = out[row, 35:45, 0]  # to the right of the point
+        assert bool(spike.min() > 0.02) is (index in shining)

@@ -34,8 +34,19 @@ class StarburstParams(EffectParams):
         min=0,
         max=0.99,
         doc="The brightness (0..1, per channel) where a spike starts: only values above it make light, rising to "
-        "full at 1. Raising it limits the spikes to the brightest points; lowered, large bright areas flood the "
-        "picture with light.",
+        "full at 1. Raising it limits the spikes to the brightest points. Every pixel above it sends out spikes, so "
+        "at a low threshold a large bright area (a window, a sky, white fur) floods the picture with light: raise "
+        "the threshold, or cap the number of points with `limit`.",
+    )
+    limit: float = param(
+        1.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the "
+        "threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share "
+        "of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. "
+        "Lower it to keep a low `threshold` from flooding large bright areas.",
     )
     amount: float = param(
         0.8,
@@ -63,14 +74,14 @@ class StarburstParams(EffectParams):
 @effect(category="light", params=StarburstParams)
 def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-    screened over the picture by `amount`.
+    screened over the picture by `amount`. `limit` caps how many pixels count as bright.
 
     Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
     picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
     inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays
     black.
     """
-    if params.amount == 0:
+    if params.amount == 0 or params.limit == 0:
         return rgb.copy()
     reach = params.length * float(np.hypot(*rgb.shape[:2]))  # the spike fades to nothing at this distance, in px
     half = int(np.ceil(reach))
@@ -86,7 +97,12 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         kernel = np.maximum(kernel, thin * fade)
     total = kernel.sum()
     kernel /= total  # `convolve` takes weights adding up to 1; the sum comes back below
-    bright = highlights(rgb, params.threshold)
+    threshold = params.threshold
+    if params.limit < 1:  # raise the threshold to the brightness that only `limit` of the pixels exceed
+        allowed = int(params.limit * rgb.shape[0] * rgb.shape[1])
+        brightest = np.partition(rgb.max(axis=-1).ravel(), -(allowed + 1))[-(allowed + 1)]
+        threshold = min(max(threshold, float(brightest)), 0.99)  # constant: 0.99, the highest threshold there is
+    bright = highlights(rgb, threshold)
     # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own
     # border: no light comes in from beyond the edge.
     framed = np.pad(bright, ((1, 1), (1, 1), (0, 0)))
