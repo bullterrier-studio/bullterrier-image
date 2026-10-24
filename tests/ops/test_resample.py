@@ -1,6 +1,6 @@
 """Tests of `ops/resample.py`."""
 
-from photo_fx.ops.resample import resize
+from bullterrier_image.ops.resample import resize
 
 
 def test_resize_keeps_aspect_ratio_and_range(photo, matte):

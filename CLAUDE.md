@@ -1,4 +1,4 @@
-# CLAUDE.md: photo-fx
+# CLAUDE.md: bullterrier-image
 
 Python library and CLI that styles photos with composable effects (ASCII, glitch, halftone, colour grades, particle dispersal). A look is a **recipe**
 (TOML or Python): an ordered list of effects. Read `README.md` for usage, `docs/design-decisions.md` for why it is built this way and
@@ -6,7 +6,8 @@ Python library and CLI that styles photos with composable effects (ASCII, glitch
 
 ## Responsibility
 
-This repository is the **image package** of the Bullterrier ecosystem (`~/github/bullterrier-design`; it will be renamed `bullterrier-image`).
+This repository is `bullterrier-image`, the **image package** of the Bullterrier ecosystem (design in `~/github/bullterrier-design`; the
+GitHub repository is still `jcakstins/photo-fx` until it is transferred and renamed).
 It changes and understands **single pictures** and has **no concept of time**. Its siblings are `audio` (finds beats and sections in sound),
 `control` (values that change over time: keyframes, envelopes, LFOs) and `video` (decides what happens when, maps control signals onto
 parameters, renders frames). Image, audio and control never depend on each other; only video knows the others.
@@ -26,12 +27,19 @@ parameters, renders frames). Image, audio and control never depend on each other
 a ramp or an LFO, and it keeps the parameter descriptions (unit, range, meaning) the only thing video must read. Filter-shaped compositing
 (text block, overlay, blend, sticker) stays here; anything that needs a canvas of its own or several inputs does not.
 
+## Names
+
+`bullterrier-image` (PyPI, repository), `bullterrier_image` (import; the documentation's alias is `bti`), `bt-image` (command, `bt-image.toml`,
+cache folder), `BT_IMAGE_*` (environment variables), `BullterrierImageError` (base exception), `bullterrier_image.effects` (plugin group). The rule
+is: the full name for identity, `bt-` for what a person types; the specification is `~/github/bullterrier-design/naming.md`. Names inside the
+package (`Recipe`, `fx`, `RecipeError`, effect and parameter names) carry no prefix.
+
 ## Architecture in one paragraph
 
 A **microkernel**: a small stable `core` (contracts, registry, recipe engine) and many **plugins** (effects) that register themselves and are found by
 **auto-discovery**. The engine is a **pipes-and-filters pipeline**: a recipe is an ordered list of steps, each step is a pure filter `image -> image`.
 Code is organised as **vertical slices**, one per effect, held together by its name and a `tests/` tree that mirrors `src/`: its code is the package
-`src/photo_fx/effects/<name>/` (`effect.py`, `__init__.py`; code only), its tests `tests/effects/<name>/test_<name>.py`, its example recipe
+`src/bullterrier_image/effects/<name>/` (`effect.py`, `__init__.py`; code only), its tests `tests/effects/<name>/test_<name>.py`, its example recipe
 `examples/effects/<name>.toml` and its gallery picture `docs/gallery/<name>.jpg` (artifacts stay out of `src/`); `gallery.effect_files(name)` is the one
 place that knows these paths. Shared numeric code lives in `ops/`, named by concept.
 
@@ -42,31 +50,31 @@ effects    one package per effect                                      (may impo
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
 ops        pure numeric primitives                                    (may import errors)
-errors     PhotoFxError and its subclasses                            (imports nothing from photo_fx)
+errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 ```
 Imports flow **downward only**. `import-linter` enforces this in the test suite (contracts in `pyproject.toml`, run by `tests/test_layering.py`; `uv run lint-imports`).
 If you want an import the rules forbid, the code is in the wrong layer: move it.
-Nothing imports `effects`: the registry loads every entry point of the group `photo_fx.effects` (ours is in `pyproject.toml`; third parties add theirs) on its first query, so `import photo_fx` stays fast. In a checkout, `uv sync` installs that entry point; without it no effect is found.
-The runner is given the subject (a `matte`, or a `find_subject` function); the public `photo_fx.recipe` binds `matte.subject_matte` as the default.
+Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` (ours is in `pyproject.toml`; third parties add theirs) on its first query, so `import bullterrier_image` stays fast. In a checkout, `uv sync` installs that entry point; without it no effect is found.
+The runner is given the subject (a `matte`, or a `find_subject` function); the public `bullterrier_image.recipe` binds `matte.subject_matte` as the default.
 
 ## The rules
 
-1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before. An `ops` module is added together with its first consumer, never ahead of it (`vulture` fails the gate on code nothing uses; earlier modules wait in git history). `photo_fx.ops` is internal, not API.
-2. **Presets are data, not code**: a preset is a named parameter set of one effect (TOML, `src/photo_fx/presets/<effect>.toml`), so it never needs to import effects.
-3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `photo-fx effects`, `docs/effects/`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
+1. **Effects never import other effects.** Shared logic moves to `ops/`, in a module named for its concept (`warp`, `noise`, `edges`, `colorspace`...). Never `utils.py`, `common.py`, `helpers.py`. Extract to `ops/` when a second effect needs it, not before. An `ops` module is added together with its first consumer, never ahead of it (`vulture` fails the gate on code nothing uses; earlier modules wait in git history). `bullterrier_image.ops` is internal, not API.
+2. **Presets are data, not code**: a preset is a named parameter set of one effect (TOML, `src/bullterrier_image/presets/<effect>.toml`), so it never needs to import effects.
+3. **Params are declared once** as a Pydantic model; it drives validation (in `fx`, recipes and direct calls), defaults, the generated documentation (`help(fx.<effect>)`, `bt-image effects`, `docs/effects/`, `fx.pyi`), the `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates new files named for it (its package, its tests, its example recipe, later its picture) and modifies no existing file (`tests/test_scaffold.py` proves it on a copy of the tree). If you find yourself editing the registry, `__init__`, README, `fx.pyi` or `docs/effects/`, stop: something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including options of libraries an effect calls, is a named, documented parameter in the field's own terminology. Exempt only mathematical and standard constants, each cited in a comment.
 6. **Determinism:** same inputs and `seed` give the same output on any machine. Use `numpy.random.default_rng(seed)`; never global random state.
 7. **Layering and the contract are tests, not conventions:** they run over every effect automatically.
-8. **Errors:** callers catch `PhotoFxError` (`photo_fx.errors`, the bottom layer, exported from `photo_fx`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
+8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`, the bottom layer, exported from `bullterrier_image`). Library code raises one of its subclasses (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each subclass also inherits the matching builtin, so `except ValueError` keeps working. A broken effect definition (caught at import) is a programming error and stays a plain `ValueError`/`TypeError`.
 
 ## Standards
 
-- `src/` holds only code and the data the package runs on (its presets, `src/photo_fx/presets/<effect>.toml`). Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
-- The public API is explicit: `photo_fx`, `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio`, `photo_fx.plugin`, each with `__all__`. Everything else is internal;
-  `photo_fx.core` and `photo_fx.ops` are not API.
+- `src/` holds only code and the data the package runs on (its presets, `src/bullterrier_image/presets/<effect>.toml`). Tests, examples and gallery pictures live outside it; `tests/` mirrors `src/`.
+- The public API is explicit: `bullterrier_image`, `bullterrier_image.recipe`, `bullterrier_image.fx`, `bullterrier_image.imageio`, `bullterrier_image.plugin`, each with `__all__`. Everything else is internal;
+  `bullterrier_image.core` and `bullterrier_image.ops` are not API.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.
-- The library raises `PhotoFxError` subclasses; the CLI catches them and never prints a traceback for a user's mistake.
+- The library raises `BullterrierImageError` subclasses; the CLI catches them and never prints a traceback for a user's mistake.
 - The library never prints and never configures logging; only the CLI writes to the terminal.
 - Output files carry no EXIF or GPS data from the input.
 - Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
@@ -89,7 +97,7 @@ The runner is given the subject (a `matte`, or a `find_subject` function); the p
 
 ## The effect contract
 
-An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`photo_fx/imageio.py` is the only place that knows about file formats):
+An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`bullterrier_image/imageio.py` is the only place that knows about file formats):
 
 ```python
 @effect(category="light", params=GlowParams)  # category is one of CATEGORIES; params is the effect's Pydantic model
@@ -100,13 +108,13 @@ It returns an array of the same shape, is deterministic, never modifies its inpu
 
 ## Parameters
 
-A Pydantic model per effect: a subclass of `EffectParams` (`photo_fx.core.params`; frozen, `extra="forbid"`, every field strict), each field declared with
+A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, every field strict), each field declared with
 `param(default, doc=...)`. Every field needs a default and a description (what it does, its unit and range in words, what raising it does).
 - **Numeric fields** (`int`, `float`) also need a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`,
   `ratio`, `cycles`) and an inclusive `min` and `max` that hold the default.
 - **Other fields** take no unit, min or max: `bool` switches, `Literal[...]` choices (the doc must mention every choice), `str`, `Color` (`'#rrggbb'` or `'#rgb'`
   with the leading `#`, or three numbers 0..1), and lists of those. A list may be written as a list or an array.
-- **Basic and advanced:** `advanced=True` marks a field the user would change to tune the technique rather than to choose the look; it is listed apart (after the basic ones, collapsed in the catalogue, counted in `photo-fx effects`) and stays settable, validated and in the schema; aim at six or fewer basic fields per effect.
+- **Basic and advanced:** `advanced=True` marks a field the user would change to tune the technique rather than to choose the look; it is listed apart (after the basic ones, collapsed in the catalogue, counted in `bt-image effects`) and stays settable, validated and in the schema; aim at six or fewer basic fields per effect.
 - **State, not time:** a parameter that changes with a process is a state (`progress` or a share in `fraction`, a position in a cycle in `cycles`), never a
   duration; whoever animates the effect sets it per frame (see "Responsibility").
 
@@ -117,11 +125,11 @@ to declare parameters.
 
 ## Adding an effect (the recipe)
 
-The three commands below are developer tasks (`tools/dev.py`, run through `poe`), not part of the installed `photo-fx` program.
+The three commands below are developer tasks (`tools/dev.py`, run through `poe`), not part of the installed `bt-image` program.
 
-What a new effect looks like is defined once, by the template in `src/photo_fx/effects/_template/` (the colour effects, `effects/grade/`,
+What a new effect looks like is defined once, by the template in `src/bullterrier_image/effects/_template/` (the colour effects, `effects/grade/`,
 `effects/clarity/`... are worked examples of it). Three steps:
-1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes `src/photo_fx/effects/<name>/__init__.py` and `effect.py` (the
+1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes `src/bullterrier_image/effects/<name>/__init__.py` and `effect.py` (the
    `EffectParams` model with one documented example field and the registered function), `tests/effects/<name>/test_<name>.py` and
    `examples/effects/<name>.toml`. It works and passes the gate as written.
 2. **Fill in:** in `effect.py` replace the example field with the effect's own (every value that shapes the result is a `param` field, library options
@@ -138,7 +146,7 @@ Models and loops patch the symptom where it shows (a fallback, a default, a swal
 1. **Reproduce first, at the public interface** (a failing test, red evidence), then **find where the invalid state is created**, not where it is noticed. Fix it there.
 2. **A fix makes the bad state impossible**: a stricter parameter model (type, range, `Literal`), one source of truth for the value, a function whose result cannot be wrong, or the removal of the code path. Not a branch that copes with it afterwards.
 3. **Check the class, not the instance:** search for the same shape elsewhere (`grep`) and fix them by the same structural change, or say why not.
-4. **Trust the contracts inside the library; validate at the boundary.** Inputs from outside (a recipe, a parameter, a photo, a file, a model, the network) are validated once, where they enter, with a `PhotoFxError` that names the value. Internal code does not re-check what the layer above guarantees; if a guarantee is broken, it fails loudly and the cause is fixed.
+4. **Trust the contracts inside the library; validate at the boundary.** Inputs from outside (a recipe, a parameter, a photo, a file, a model, the network) are validated once, where they enter, with a `BullterrierImageError` that names the value. Internal code does not re-check what the layer above guarantees; if a guarantee is broken, it fails loudly and the cause is fixed.
 5. **No defensive code:** no fallback or default that hides a missing or invalid value; no `try/except` that continues (`except Exception`, a bare `except`, `contextlib.suppress`); no `isinstance`, `None` or range re-checks of internal arguments; no clamping, `np.nan_to_num` or retry added "just in case"; no `getattr`/`.get()` with a default for something that must exist; no widening a type to make an error go away; no skipped, xfailed or loosened tests. The one clamp that belongs is the one the effect contract defines (output in 0..1), written once.
 6. **A fix that needs a design change says so:** propose the change (in the report, under "Needs from others") instead of patching around the design. Never cover unclear design with more machinery.
 7. **One decision, one place.** A table, constant, name or rule that exists twice is a defect (two copies drift): keep one definition in the module that owns the concept and make the other use it. This holds for tests too: before adding a test, look for the same behaviour already tested; add a row to the existing table; a rule that holds for every effect lives once in `tests/effects/test_contract.py`; setup two test files need is a fixture in the nearest `conftest.py`. A reviewer who finds a duplicate asks for the merge, not a comment.
@@ -171,13 +179,13 @@ Tests must follow the testing-best-practices skill, no exceptions. A test that i
 - Hard to test through the public interface is a design signal: change the interface (inject a dependency, expose a parameter), do not reach inside.
 - Two internal strategies (say a sparse and a dense path) are tested through the public API on inputs that naturally exercise each, against an independent reference written in the test (a naive implementation), not by forcing a private switch.
 
-Rewrite patterns, when a test reaches inside (`tests/test_suite_rules.py` fails on private imports and on patching `photo_fx`):
+Rewrite patterns, when a test reaches inside (`tests/test_suite_rules.py` fails on private imports and on patching `bullterrier_image`):
 - To observe or control our own code, inject through a public parameter (`pipeline.run(find_subject=...)`, `gallery.write_docs(checkout=...)`) and count the calls of the stand-in you passed.
 - A private name worth testing is promoted deliberately (public name, docstring), as `matte.refine_edge` was; otherwise test the behaviour it serves and delete the direct test.
 - Effects of a test's own: `throwaway_effects`, or `fresh_registry` for an empty registry; both use only the registry's public interface.
 - "Work was skipped" is seen in the files (a sentinel left untouched), not by spying on a function. Errors: the type plus a short substring naming the argument or value.
 
-How a test file is written (`src/photo_fx/effects/_template/test_effect.py.tmpl` is the model):
+How a test file is written (`src/bullterrier_image/effects/_template/test_effect.py.tmpl` is the model):
 - **Parametrise by default:** cases that differ by literals are one test over a table (`pytest.param(..., id=...)`, or a dict of id to case) with known-good and known-bad rows side by side; the id states the rule.
 - **A new test file only for a new module**, at the mirror of its path (`tests/ops/test_blur.py` for `ops/blur.py`); anything else goes into the existing file.
 - **Shared helpers live in the nearest `conftest.py`**, as fixtures: `tests/conftest.py` (`photo`, `matte`, the registry helpers, `echo_model`, `tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). A helper one file uses stays in that file.

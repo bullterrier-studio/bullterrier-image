@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 
 def test_hue_shift_full_turn_is_identity(photo: np.ndarray) -> None:

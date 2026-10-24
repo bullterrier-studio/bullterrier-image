@@ -6,7 +6,7 @@ import colorsys
 import numpy as np
 import pytest
 
-from photo_fx.ops.colorspace import hsv_to_rgb, linear_to_srgb, rgb_to_hsv, srgb_to_linear
+from bullterrier_image.ops.colorspace import hsv_to_rgb, linear_to_srgb, rgb_to_hsv, srgb_to_linear
 
 # (encoded, linear) pairs from the IEC 61966-2-1 transfer function, worked out by hand:
 #   linear segment: v / 12.92 up to 0.04045; above it ((v + 0.055) / 1.055) ** 2.4.

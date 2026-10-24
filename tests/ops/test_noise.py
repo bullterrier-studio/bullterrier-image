@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from photo_fx.ops.noise import clumped_noise, fractal, standardise
+from bullterrier_image.ops.noise import clumped_noise, fractal, standardise
 
 SETTINGS: dict[str, Any] = {"scale": 16.0, "octaves": 3, "persistence": 0.5, "lacunarity": 2.0, "seed": 4}
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "equalize"
 NO_CLIP = 256  # `limit` at its maximum: no bin of at most 256 can reach 256 times the flat height, so nothing clips

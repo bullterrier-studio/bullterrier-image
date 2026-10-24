@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "fractal"
 BAILOUT = 256.0  # the escape radius the effect documents for its smooth colouring

@@ -4,7 +4,7 @@ brute-force count of the saturated pixels."""
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "auto_levels"
 CHANNELS = (0, 1, 2)

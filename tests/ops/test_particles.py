@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.particles import draw_segments
+from bullterrier_image.ops.particles import draw_segments
 
 SHAPE = (40, 60)
 

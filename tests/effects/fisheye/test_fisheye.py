@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "fisheye"
 INTERPOLATIONS = ["nearest", "bilinear", "bicubic"]

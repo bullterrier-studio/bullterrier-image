@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 
 def _dot_on_grey(size: int = 21) -> np.ndarray:

@@ -1,4 +1,4 @@
-# Contributing to photo-fx
+# Contributing to bullterrier-image
 
 Thank you for helping. This page is the short version; [CLAUDE.md](CLAUDE.md) holds every rule in full (it is written for
 AI agents and people alike), and [docs/design-decisions.md](docs/design-decisions.md) says why the project is built the
@@ -34,11 +34,11 @@ means in practice.
 uv run poe new-effect my_effect --category light
 ```
 
-This writes the effect's package (`src/photo_fx/effects/my_effect/`), its tests, and its example recipe from the
+This writes the effect's package (`src/bullterrier_image/effects/my_effect/`), its tests, and its example recipe from the
 template, working as written. Replace the example parameter and the body with your effect, describe its properties in
 the tests, then `uv run poe gallery --only my_effect` renders its picture. Adding an effect edits no existing file; if
 `git status` shows anything else, something is wrong. Every value that shapes the result is a documented parameter
-(see "Parameters" in CLAUDE.md), and effects never import each other: shared code goes to `src/photo_fx/ops/`.
+(see "Parameters" in CLAUDE.md), and effects never import each other: shared code goes to `src/bullterrier_image/ops/`.
 
 ## Commits and branches
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 
 def test_grade_exposure_one_stop_doubles_brightness() -> None:

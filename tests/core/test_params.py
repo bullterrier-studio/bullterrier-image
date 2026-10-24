@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from photo_fx.core.params import Color, EffectParams, describe_error, param
+from bullterrier_image.core.params import Color, EffectParams, describe_error, param
 
 
 class Probe(EffectParams):

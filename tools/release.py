@@ -262,7 +262,7 @@ def release(version: str, *, dry_run: bool, assume_yes: bool) -> int:
     pushed = subprocess.run(  # noqa: S603  argv built here
         ["git", "push", "--atomic", "origin", "main", f"v{version}"],  # noqa: S607  git from PATH, as every tool
         # this command has just run the whole gate: tell the pre-push hook not to run it a second time
-        env={**os.environ, "PHOTO_FX_GATE_PASSED": "1"},
+        env={**os.environ, "BT_IMAGE_GATE_PASSED": "1"},
         capture_output=True,
         encoding="utf-8",
         check=False,

@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "chromatic_aberration"
 INTERPOLATIONS = ["nearest", "bilinear", "bicubic"]

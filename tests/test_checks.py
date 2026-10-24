@@ -1,6 +1,6 @@
 import numpy as np
 
-from photo_fx.checks import matte_warnings, still_warnings
+from bullterrier_image.checks import matte_warnings, still_warnings
 
 
 def disc(share, size=100):

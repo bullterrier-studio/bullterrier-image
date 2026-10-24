@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.ops.blur import Edge, gaussian_blur
+from bullterrier_image.ops.blur import Edge, gaussian_blur
 
 EDGES: list[Edge] = ["reflect", "mirror", "nearest", "wrap", "constant"]
 TOLERANCE = 1e-5  # the bound `gaussian_blur` documents for pictures in 0..1

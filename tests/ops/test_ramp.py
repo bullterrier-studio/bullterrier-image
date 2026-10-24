@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.ramp import ramp
+from bullterrier_image.ops.ramp import ramp
 
 RED, GREEN, BLUE = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)
 

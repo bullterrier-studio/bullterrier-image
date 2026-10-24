@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "color_balance"
 BLACK, MID, WHITE = (0.0, 0.0, 0.0), (0.5, 0.5, 0.5), (1.0, 1.0, 1.0)

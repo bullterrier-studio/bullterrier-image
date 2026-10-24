@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
-from photo_fx.ops.noise import fractal
+from bullterrier_image.core import registry
+from bullterrier_image.ops.noise import fractal
 
 NAME = "flow_lines"
 LINE, BACKGROUND = np.array([1.0, 128 / 255, 0.0]), np.array([0.0, 0.0, 64 / 255])

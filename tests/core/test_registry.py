@@ -14,9 +14,9 @@ import numpy as np
 import pytest
 from pydantic import BaseModel
 
-from photo_fx.core import registry
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect
 
 
 class GainParams(EffectParams):
@@ -175,13 +175,13 @@ def test_a_second_function_under_an_existing_name_is_an_error_naming_both_module
         return rgb
 
     first = twin
-    first.__module__ = "photo_fx.effects.first_module"
+    first.__module__ = "bullterrier_image.effects.first_module"
 
     def twin(rgb, params):  # type: ignore[no-redef]  # the point of the test: a second function, same name
         """Second."""
         return 1 - rgb
 
-    twin.__module__ = "photo_fx.effects.second_module"
+    twin.__module__ = "bullterrier_image.effects.second_module"
     registered = effect(category="utilities", params=GainParams)(first)
     with pytest.raises(ValueError, match=r"twin.*first_module.*second_module"):
         effect(category="utilities", params=GainParams)(twin)
@@ -191,8 +191,8 @@ def test_a_second_function_under_an_existing_name_is_an_error_naming_both_module
 
 def test_reloading_an_effects_module_is_not_a_duplicate(tmp_path, monkeypatch, throwaway_effects):
     (tmp_path / "reload_probe_module.py").write_text(
-        "from photo_fx.core.params import EffectParams\n"
-        "from photo_fx.core.registry import effect\n\n"
+        "from bullterrier_image.core.params import EffectParams\n"
+        "from bullterrier_image.core.registry import effect\n\n"
         "class ReloadParams(EffectParams):\n"
         '    """None."""\n\n'
         '@effect(category="utilities", params=ReloadParams)\n'
@@ -338,7 +338,7 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
     interpreter, where nothing has been loaded yet; loading takes long enough for an unlocked race to show."""
     code = textwrap.dedent("""
         import json, sys, threading
-        from photo_fx.core import registry
+        from bullterrier_image.core import registry
 
         start = threading.Barrier(16)
         seen = []

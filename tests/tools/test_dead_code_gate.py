@@ -35,7 +35,7 @@ def test_the_package_as_it_is_has_no_dead_code(project_copy):
 
 def test_an_unused_function_and_an_unused_class_fail_the_gate_by_name(project_copy):
     checkout = project_copy("pyproject.toml")
-    (checkout / "src" / "photo_fx" / "ops" / "leftover.py").write_text(DEAD_CODE, encoding="utf-8")
+    (checkout / "src" / "bullterrier_image" / "ops" / "leftover.py").write_text(DEAD_CODE, encoding="utf-8")
     result = vulture(checkout)
     assert result.returncode != 0
     assert "leftover.py" in result.stdout

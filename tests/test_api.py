@@ -10,22 +10,29 @@ from typing import Literal
 import numpy as np
 import pytest
 
-import photo_fx
-import photo_fx.core.runner
-import photo_fx.effects
-import photo_fx.plugin
-from photo_fx import Project, Recipe, Step, fx, imageio, load_recipe, render, run, trace
-from photo_fx.cli import main
-from photo_fx.core import registry
-from photo_fx.core.params import Color, EffectParams, param
-from photo_fx.core.registry import effect
+import bullterrier_image
+import bullterrier_image.core.runner
+import bullterrier_image.effects
+import bullterrier_image.plugin
+from bullterrier_image import Project, Recipe, Step, fx, imageio, load_recipe, render, run, trace
+from bullterrier_image.cli import main
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.registry import effect
 
 # --- the public surface: explicit, one home per name ------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     "module",
-    [photo_fx, photo_fx.fx, photo_fx.imageio, photo_fx.recipe, photo_fx.plugin, photo_fx.core],
+    [
+        bullterrier_image,
+        bullterrier_image.fx,
+        bullterrier_image.imageio,
+        bullterrier_image.recipe,
+        bullterrier_image.plugin,
+        bullterrier_image.core,
+    ],
     ids=lambda m: m.__name__,
 )
 def test_every_public_module_lists_what_it_exports_and_has_it(module):
@@ -36,13 +43,14 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
 
 
 def test_the_version_is_looked_up_when_asked_for_not_on_import():
-    """Finding the installed version loads the packaging machinery (importlib.metadata), so `import photo_fx` waits
+    """Finding the installed version loads the packaging machinery (importlib.metadata), so `import bullterrier_image`
+    waits
     until `__version__` is read; it is then there like any other public name."""
     code = (
         "import json, sys\n"
-        "import photo_fx\n"
+        "import bullterrier_image\n"
         "on_import = 'importlib.metadata' in sys.modules\n"
-        "json.dump([on_import, photo_fx.__version__, '__version__' in dir(photo_fx)], sys.stdout)\n"
+        "json.dump([on_import, bullterrier_image.__version__, '__version__' in dir(bullterrier_image)], sys.stdout)\n"
     )
     done = subprocess.run([sys.executable, "-P", "-c", code], capture_output=True, encoding="utf-8", check=False)
     assert done.returncode == 0, done.stderr
@@ -54,17 +62,18 @@ def test_the_version_is_looked_up_when_asked_for_not_on_import():
 
 @pytest.mark.parametrize("name", ["render", "trace", "render_all"])
 def test_the_render_family_has_one_public_home_and_core_does_not_offer_its_own(name):
-    """`photo_fx.render` is `photo_fx.recipe.render` (with the default subject finder); the core's version, which
+    """`bullterrier_image.render` is `bullterrier_image.recipe.render` (with the default subject finder); the core's
+    version, which
     finds no subject by itself, is reachable only by its module path."""
-    assert getattr(photo_fx, name) is getattr(photo_fx.recipe, name)
-    assert getattr(photo_fx, name) is not getattr(photo_fx.core.runner, name)
-    assert not hasattr(photo_fx.core, name)
+    assert getattr(bullterrier_image, name) is getattr(bullterrier_image.recipe, name)
+    assert getattr(bullterrier_image, name) is not getattr(bullterrier_image.core.runner, name)
+    assert not hasattr(bullterrier_image.core, name)
 
 
 @pytest.mark.parametrize("name", ["get", "apply", "describe", "categories", "summary", "CATEGORIES"])
 def test_effect_queries_live_only_in_the_registry(name):
     assert hasattr(registry, name)
-    assert not hasattr(photo_fx.effects, name)
+    assert not hasattr(bullterrier_image.effects, name)
 
 
 # --- steps are checked when they are made, wherever they come from ------------------------------------------------
@@ -257,7 +266,7 @@ class NewParams(EffectParams):
 
 
 def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
-    from photo_fx.core.registry import effect, unregister
+    from bullterrier_image.core.registry import effect, unregister
 
     @effect(category="utilities", params=OldParams)
     def renamed_probe(rgb, params):

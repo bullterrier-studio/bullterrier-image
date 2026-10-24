@@ -7,9 +7,9 @@ test passes the palette it relies on.
 import numpy as np
 import pytest
 
-from photo_fx import fx
-from photo_fx.core import registry
-from photo_fx.ops.glyphs import cell_size, glyph_atlas
+from bullterrier_image import fx
+from bullterrier_image.core import registry
+from bullterrier_image.ops.glyphs import cell_size, glyph_atlas
 
 NAME = "ascii"
 CHARS = " .:-=+*#%@"  # ten glyphs, index 0 (the space) = no ink

@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
-from photo_fx.ops.glyphs import cell_size
+from bullterrier_image.core import registry
+from bullterrier_image.ops.glyphs import cell_size
 
 
 def _lit(height=120, width=160):

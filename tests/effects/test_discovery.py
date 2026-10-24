@@ -1,6 +1,7 @@
-"""Discovery of effect folders: `src/photo_fx/effects/<name>/` holds one effect's code, and the registry's first query
-finds it with no other edit. Every rule is tried on a copy of the package, from a fresh interpreter, so the real
-package is never touched; each known-bad tree must stop that first query with a message naming the folder and the rule.
+"""Discovery of effect folders: `src/bullterrier_image/effects/<name>/` holds one effect's code, and the registry's
+first query finds it with no other edit. Every rule is tried on a copy of the package, from a fresh interpreter, so the
+real package is never touched; each known-bad tree must stop that first query with a message naming the folder and the
+rule.
 """
 
 import json
@@ -13,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-import photo_fx
-from photo_fx.core import registry
+import bullterrier_image
+from bullterrier_image.core import registry
 
 
 def _effect_module(name: str, category: str = "utilities") -> str:
@@ -22,8 +23,8 @@ def _effect_module(name: str, category: str = "utilities") -> str:
     return textwrap.dedent(f'''
         import numpy as np
 
-        from photo_fx.core.params import EffectParams, param
-        from photo_fx.core.registry import effect
+        from bullterrier_image.core.params import EffectParams, param
+        from bullterrier_image.core.registry import effect
 
         class {name.title().replace("_", "")}Params(EffectParams):
             """Settings."""
@@ -42,10 +43,10 @@ TRIGGER = "from . import effect  # registers the effect\n"
 
 _REPORT = """
     import contextlib, io, json, sys
-    from photo_fx import effects, fx
-    from photo_fx.core import registry
-    from photo_fx.cli import main
-    from photo_fx.recipe import Step
+    from bullterrier_image import effects, fx
+    from bullterrier_image.core import registry
+    from bullterrier_image.cli import main
+    from bullterrier_image.recipe import Step
 
     listing = io.StringIO()
     with contextlib.redirect_stdout(listing):
@@ -62,14 +63,14 @@ _REPORT = """
 """
 
 
-FIRST_QUERY = "from photo_fx.core import registry\nregistry.describe()\n"  # loads the effects
+FIRST_QUERY = "from bullterrier_image.core import registry\nregistry.describe()\n"  # loads the effects
 
 
 def _import_a_copy_with(tmp_path: Path, files: dict[str, str], code: str = FIRST_QUERY) -> subprocess.CompletedProcess:
     """Copy the package, add `files` (paths relative to its effects/ folder; a path ending in / makes an empty folder),
     then run `code` in a fresh interpreter that imports the copy."""
-    package = tmp_path / "photo_fx"
-    shutil.copytree(Path(photo_fx.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
+    package = tmp_path / "bullterrier_image"
+    shutil.copytree(Path(bullterrier_image.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
     for relative, source in files.items():
         target = package / "effects" / relative
         if relative.endswith("/"):
@@ -102,14 +103,14 @@ def test_a_new_folder_in_the_effects_package_is_found_with_no_other_edit(tmp_pat
     report = json.loads(done.stdout)
     assert Path(report["package"]).is_relative_to(tmp_path)  # it really looked at the copy
     assert set(report["registered"]) == set(registry.describe()) | {"zz_folder"}
-    assert report["module"] == "photo_fx.effects.zz_folder.effect"
+    assert report["module"] == "bullterrier_image.effects.zz_folder.effect"
     assert report["category"] == "texture"
     assert report["fx"] == report["recipe_step"] == "zz_folder"
     assert report["cli_lists_it"]
 
 
 def test_folders_are_imported_in_sorted_order_and_private_ones_not_at_all(tmp_path):
-    log = "from photo_fx.effects import _order_log\n_order_log.seen.append(__name__)\n"
+    log = "from bullterrier_image.effects import _order_log\n_order_log.seen.append(__name__)\n"
     done = _import_a_copy_with(
         tmp_path,
         {
@@ -123,14 +124,17 @@ def test_folders_are_imported_in_sorted_order_and_private_ones_not_at_all(tmp_pa
         },
         """
         import json, sys
-        from photo_fx.core import registry
-        from photo_fx.effects import _order_log
+        from bullterrier_image.core import registry
+        from bullterrier_image.effects import _order_log
         json.dump({"seen": _order_log.seen, "registered": sorted(registry.describe())}, sys.stdout)
         """,
     )
     assert done.returncode == 0, done.stderr
     report = json.loads(done.stdout)
-    assert report["seen"] == ["photo_fx.effects.zz_a.effect", "photo_fx.effects.zz_b.effect"]  # sorted, not as found
+    assert report["seen"] == [
+        "bullterrier_image.effects.zz_a.effect",
+        "bullterrier_image.effects.zz_b.effect",
+    ]  # sorted, not as found
     assert {"zz_a", "zz_b"} <= set(report["registered"])
     assert "zz_hidden" not in report["registered"]
 
@@ -179,6 +183,6 @@ KNOWN_BAD = {
 def test_a_broken_effect_folder_stops_the_first_query_naming_the_folder_and_the_rule(tmp_path, files, named):
     done = _import_a_copy_with(tmp_path, files)
     assert done.returncode != 0
-    assert "PhotoFxError" in done.stderr
+    assert "BullterrierImageError" in done.stderr
     for text in named:
         assert text in done.stderr, done.stderr

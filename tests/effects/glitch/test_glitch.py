@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from photo_fx import RecipeError, fx
-from photo_fx.core import registry
+from bullterrier_image import RecipeError, fx
+from bullterrier_image.core import registry
 
 NAME = "glitch"
 STILL = {"split": 0, "shift": 0.0}  # no sliding and no split

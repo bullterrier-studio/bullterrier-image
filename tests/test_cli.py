@@ -10,15 +10,15 @@ import numpy as np
 import pytest
 from PIL import Image
 
-import photo_fx
-from photo_fx import PhotoFxError, imageio
-from photo_fx.cli import main
-from photo_fx.core import registry
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.matte import subject_matte
-from photo_fx.recipe import Recipe, Step, load_recipe, render
-from photo_fx.sheet import contact_sheet
+import bullterrier_image
+from bullterrier_image import BullterrierImageError, imageio
+from bullterrier_image.cli import main
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.matte import subject_matte
+from bullterrier_image.recipe import Recipe, Step, load_recipe, render
+from bullterrier_image.sheet import contact_sheet
 
 ROOT = Path(__file__).resolve().parents[1]
 CUT = '[[step]]\neffect="fill"\ncolor="#000000"\nmask="background"\n'  # black wherever the matte is 0
@@ -137,7 +137,7 @@ def test_effects_naming_an_effect_and_a_category_exclude_each_other(capsys):
 
 
 def _headings(out: str) -> list[str]:
-    """The effect names `photo-fx effects` printed: the unindented lines."""
+    """The effect names `bt-image effects` printed: the unindented lines."""
     return [line for line in out.splitlines() if line and not line.startswith(" ")]
 
 
@@ -288,14 +288,14 @@ def test_steps_takes_a_matte_file_too(cut):
 
 
 def test_the_segmenter_option_wins_over_the_environment(cut, echo_model, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "nonsense")  # refused if it were asked
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))  # the portable backend answers with the red channel
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "nonsense")  # refused if it were asked
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # the portable backend answers with the red channel
     assert cli("render me.png cut.toml -o out --segmenter onnx") == 0
     photo = imageio.load(cut / "me.png")
     expected = render(photo, load_recipe(cut / "cut.toml"), subject_matte(photo, segmenter="onnx"))
     np.testing.assert_allclose(imageio.load(cut / "out" / "me__cut.png"), expected, atol=0.5 / 255)
-    (cut / "photo-fx.toml").write_text(PROJECT, encoding="utf-8")
-    assert cli("run photo-fx.toml --segmenter onnx") == 0  # and in a project run
+    (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
+    assert cli("run bt-image.toml --segmenter onnx") == 0  # and in a project run
     assert (cut / "done" / "me" / "cut.jpg").exists()
 
 
@@ -307,12 +307,12 @@ def test_an_unknown_segmenter_is_a_usage_error(cut, capsys):
 
 
 def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo_model, monkeypatch):
-    (cut / "photo-fx.toml").write_text(PROJECT, encoding="utf-8")
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))  # the subject is where the photo is red
-    assert cli("run photo-fx.toml --segmenter onnx -q") == 0
+    (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # the subject is where the photo is red
+    assert cli("run bt-image.toml --segmenter onnx -q") == 0
     first = (cut / "done" / "me" / "cut.jpg").read_bytes()
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))  # and now where it is green: another cut-out
-    assert cli("run photo-fx.toml --segmenter onnx -q") == 0
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(1)))  # and now where it is green: another cut-out
+    assert cli("run bt-image.toml --segmenter onnx -q") == 0
     assert (cut / "done" / "me" / "cut.jpg").read_bytes() != first
 
 
@@ -338,7 +338,7 @@ MISTAKES = {
     "a sweep beyond the parameter's range": ("sweep me.png recipes/a.toml grain.amount 0..5 -o s.png", "amount"),
     "a sweep of one tile": ("sweep me.png recipes/a.toml grain.amount 0..1 -o s.png --count 1", "count"),
     "a picture type nothing can write": ("sheet me.png recipes/a.toml -o sheet.xyz", ".xyz"),
-    # (the suite's PHOTO_FX_MODEL names no file, so the portable model cannot run)
+    # (the suite's BT_IMAGE_MODEL names no file, so the portable model cannot run)
     "a segmenter that cannot run": ("render me.png cut.toml -o out --segmenter onnx", "no-such-model"),
 }
 
@@ -372,18 +372,19 @@ def test_the_same_commands_with_valid_input_succeed(files):
 
 
 def test_an_unknown_segmenter_in_the_environment_ends_in_one_error_line(cut, capsys, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
-    (cut / "photo-fx.toml").write_text(PROJECT, encoding="utf-8")
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "coreml")
+    (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
     # a render, and a project that needs the subject, say so at once
-    for command in ("render me.png cut.toml -o out", "run photo-fx.toml"):
+    for command in ("render me.png cut.toml -o out", "run bt-image.toml"):
         assert cli(command) == 1
         last_line = capsys.readouterr().err.strip().splitlines()[-1]
         assert last_line.startswith("error: ")
-        assert "PHOTO_FX_SEGMENTER" in last_line
+        assert "BT_IMAGE_SEGMENTER" in last_line
 
 
 def test_a_bug_in_an_effect_is_not_dressed_up_as_a_mistake_of_the_user(files, throwaway_effects):
-    """The command line catches `PhotoFxError` and `OSError`, nothing wider: a plain ValueError out of an effect is a
+    """The command line catches `BullterrierImageError` and `OSError`, nothing wider: a plain ValueError out of an
+    effect is a
     bug, and the developer needs its traceback."""
 
     @effect(category="utilities", params=ProbeParams)
@@ -406,7 +407,7 @@ def test_sheet_columns_must_be_a_positive_whole_number(files, capsys, columns):
 
 
 @pytest.mark.parametrize(
-    ("mistake", "error"), [("a photo that does not exist", OSError), ("an unknown effect", PhotoFxError)]
+    ("mistake", "error"), [("a photo that does not exist", OSError), ("an unknown effect", BullterrierImageError)]
 )
 def test_debug_lets_the_original_exception_through(mistakes, mistake, error):
     command, offender = MISTAKES[mistake]
@@ -414,12 +415,12 @@ def test_debug_lets_the_original_exception_through(mistakes, mistake, error):
         cli(f"{command} --debug")
 
 
-def test_photo_fx_debug_in_the_environment_does_the_same(mistakes, monkeypatch):
+def test_bullterrier_image_debug_in_the_environment_does_the_same(mistakes, monkeypatch):
     command, offender = MISTAKES["an unknown effect"]
-    monkeypatch.setenv("PHOTO_FX_DEBUG", "1")
-    with pytest.raises(PhotoFxError, match=offender):
+    monkeypatch.setenv("BT_IMAGE_DEBUG", "1")
+    with pytest.raises(BullterrierImageError, match=offender):
         cli(command)
-    monkeypatch.setenv("PHOTO_FX_DEBUG", "0")  # anything but 1 leaves the friendly error on
+    monkeypatch.setenv("BT_IMAGE_DEBUG", "0")  # anything but 1 leaves the friendly error on
     assert cli(command) == 1
 
 
@@ -450,7 +451,8 @@ def test_quiet_hides_the_progress_lines_but_not_the_results(files, capsys):
     assert quiet.out == loud.out
 
 
-# --- the program itself: --version, python -m photo_fx, the exit codes in --help --------------------------------------
+# --- the program itself: --version, python -m bullterrier_image, the exit codes in --help
+# --------------------------------------
 
 
 def test_version_is_the_one_in_pyproject(capsys):
@@ -458,19 +460,26 @@ def test_version_is_the_one_in_pyproject(capsys):
     with pytest.raises(SystemExit) as caught:
         cli("--version")
     assert caught.value.code == 0
-    assert capsys.readouterr().out.strip() == f"photo-fx {declared}"
-    assert photo_fx.__version__ == declared
+    assert capsys.readouterr().out.strip() == f"bt-image {declared}"
+    assert bullterrier_image.__version__ == declared
 
 
 @pytest.mark.parametrize("option", ["--help", "--version"])
 def test_help_and_version_load_no_image_library(option):
-    """`photo-fx --help` and `--version` answer at once: the libraries that render pictures (numpy, scipy, Pillow,
+    """`bt-image --help` and `--version` answer at once: the libraries that render pictures (numpy, scipy, Pillow,
     pydantic, the effects, the subject finder, the pipeline) load only when a command needs them."""
-    heavy = ["numpy", "scipy", "PIL", "pydantic", "photo_fx.core", "photo_fx.effects", "photo_fx.matte",
-             "photo_fx.pipeline"]  # fmt: skip
+    heavy = [
+        *("numpy", "scipy", "PIL", "pydantic"),
+        *(
+            "bullterrier_image.core",
+            "bullterrier_image.effects",
+            "bullterrier_image.matte",
+            "bullterrier_image.pipeline",
+        ),
+    ]
     code = (
         "import json, sys\n"
-        "from photo_fx.cli import main\n"
+        "from bullterrier_image.cli import main\n"
         f"try:\n    main([{option!r}])\nexcept SystemExit:\n    pass\n"
         f"json.dump([m for m in {heavy!r} if m in sys.modules], sys.stderr)\n"
     )
@@ -478,20 +487,20 @@ def test_help_and_version_load_no_image_library(option):
         [sys.executable, "-P", "-c", code], capture_output=True, encoding="utf-8", check=False, cwd=ROOT
     )
     assert done.returncode == 0, done.stderr
-    assert done.stdout.startswith(("usage: photo-fx", "photo-fx "))  # it really answered
+    assert done.stdout.startswith(("usage: bt-image", "bt-image "))  # it really answered
     assert done.stderr == "[]"
 
 
 @pytest.mark.parametrize(
     ("command", "code", "output"),
-    [("--version", 0, "photo-fx "), ("render gone.png r.toml", 1, "error: ")],
+    [("--version", 0, "bt-image "), ("render gone.png r.toml", 1, "error: ")],
     ids=["answers", "reports an error with no traceback"],
 )
-def test_python_dash_m_photo_fx_runs_the_command_line(tmp_path, command, code, output):
-    """`python -m photo_fx ARGS` in a fresh interpreter, the way a user starts it."""
-    environment = {key: value for key, value in os.environ.items() if key != "PHOTO_FX_DEBUG"}
+def test_python_dash_m_bullterrier_image_runs_the_command_line(tmp_path, command, code, output):
+    """`python -m bullterrier_image ARGS` in a fresh interpreter, the way a user starts it."""
+    environment = {key: value for key, value in os.environ.items() if key != "BT_IMAGE_DEBUG"}
     done = subprocess.run(
-        [sys.executable, "-m", "photo_fx", *command.split()],
+        [sys.executable, "-m", "bullterrier_image", *command.split()],
         cwd=tmp_path, env=environment, capture_output=True, encoding="utf-8", check=False, timeout=60,
     )  # fmt: skip
     assert done.returncode == code, done.stderr
@@ -523,7 +532,7 @@ def test_every_command_has_a_help_with_an_example(capsys):
             cli(f"{command} --help")
         assert caught.value.code == 0
         text = capsys.readouterr().out
-        assert re.search(rf"^example: photo-fx {command}\b", text, re.MULTILINE), f"{command}: no example in\n{text}"
+        assert re.search(rf"^example: bt-image {command}\b", text, re.MULTILINE), f"{command}: no example in\n{text}"
 
 
 @pytest.mark.parametrize("command", ["gallery", "regenerate", "new-effect"])

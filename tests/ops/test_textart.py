@@ -6,8 +6,8 @@ Expected pictures come from `ops.glyphs` (the glyph shapes) and from the colours
 import numpy as np
 import pytest
 
-from photo_fx.ops.glyphs import cell_size, glyph_atlas
-from photo_fx.ops.textart import check_palette, text_art
+from bullterrier_image.ops.glyphs import cell_size, glyph_atlas
+from bullterrier_image.ops.textart import check_palette, text_art
 
 CHARS = " .:-=+*#%@"
 BLACK, WHITE = np.zeros(3, np.float32), np.ones(3, np.float32)

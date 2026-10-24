@@ -4,7 +4,7 @@ the largest move being `amount` px."""
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "displace"
 HEIGHT, WIDTH = 200, 300

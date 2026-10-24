@@ -4,9 +4,9 @@ the shipped presets are checked in `tests/effects/test_contract.py`."""
 
 import pytest
 
-from photo_fx.core import registry
-from photo_fx.core.presets import read
-from photo_fx.errors import RecipeError
+from bullterrier_image.core import registry
+from bullterrier_image.core.presets import read
+from bullterrier_image.errors import RecipeError
 
 MODEL = registry.parameters("gradient_map")
 

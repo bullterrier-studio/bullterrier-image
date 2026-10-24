@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 
 def test_split_tone_tints_without_changing_brightness(photo: np.ndarray) -> None:

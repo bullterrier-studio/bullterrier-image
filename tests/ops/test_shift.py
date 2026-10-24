@@ -9,7 +9,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from photo_fx.ops.shift import Edge, shift
+from bullterrier_image.ops.shift import Edge, shift
 
 EDGES: list[Edge] = ["wrap", "nearest", "reflect", "mirror"]
 # numpy's names for the same rules: its 'symmetric' repeats the edge pixel (our 'reflect'), its 'reflect' does not

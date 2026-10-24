@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "mirror"
 SIZES = [(96, 128), (13, 29), (61, 37)]  # even by even, and two odd ones: the middle row or column is its own mirror

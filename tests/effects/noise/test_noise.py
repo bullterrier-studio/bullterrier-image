@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "noise"
 AMOUNT = 0.03  # small enough that no value of a 0.5 grey is clipped, even for a Gaussian's tail

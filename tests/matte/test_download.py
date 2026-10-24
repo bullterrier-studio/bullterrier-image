@@ -1,4 +1,4 @@
-"""Tests of `photo_fx.matte.download`: the verified, atomic first-use download of a model file.
+"""Tests of `bullterrier_image.matte.download`: the verified, atomic first-use download of a model file.
 
 The network is a real boundary served on the loopback interface: a test-owned HTTP server on an ephemeral port, whose
 handler counts the requests it answers. Expected digests are computed here with hashlib from the served bytes."""
@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from photo_fx import PhotoFxError
-from photo_fx.matte.download import DownloadError, fetch, user_cache_dir
+from bullterrier_image import BullterrierImageError
+from bullterrier_image.matte.download import DownloadError, fetch, user_cache_dir
 
 PAYLOAD = b"not really a model, but bytes all the same\n" * 1000
 
@@ -79,8 +79,8 @@ def files_in(folder: Path) -> list[str]:
     return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
 
 
-def test_a_failed_download_is_one_of_photo_fxs_own_errors(tmp_path):
-    with pytest.raises(PhotoFxError, match="only https"):
+def test_a_failed_download_is_one_of_bullterrier_images_own_errors(tmp_path):
+    with pytest.raises(BullterrierImageError, match="only https"):
         fetch("ftp://models.example.invalid/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
 
 
@@ -161,10 +161,10 @@ def test_leftovers_of_a_download_killed_long_ago_are_cleared_by_the_next_downloa
 def test_a_cache_folder_that_cannot_be_written_gives_the_same_advice_before_any_download(server, tmp_path):
     blocker = tmp_path / "not-a-folder"
     blocker.write_text("a file where the cache folder should be", encoding="utf-8")
-    target = blocker / "photo-fx" / "model.onnx"
+    target = blocker / "bullterrier-image" / "model.onnx"
     with pytest.raises(DownloadError, match="by hand") as caught:
         fetch(server.url, sha256(PAYLOAD), target, size=len(PAYLOAD))
-    assert str(blocker / "photo-fx") in str(caught.value)
+    assert str(blocker / "bullterrier-image") in str(caught.value)
     assert server.requests == []
 
 
@@ -239,12 +239,12 @@ def test_a_file_url_is_fetched_like_any_other(tmp_path):
 @pytest.mark.parametrize(
     ("platform", "environ", "expected"),
     [
-        ("darwin", {}, Path("/home/ada/Library/Caches/photo-fx")),
-        ("linux", {}, Path("/home/ada/.cache/photo-fx")),
-        ("linux", {"XDG_CACHE_HOME": "/var/cache/ada"}, Path("/var/cache/ada/photo-fx")),
-        ("linux", {"XDG_CACHE_HOME": ""}, Path("/home/ada/.cache/photo-fx")),  # empty means unset (XDG spec)
-        ("win32", {"LOCALAPPDATA": "/Users/ada/AppData/Local"}, Path("/Users/ada/AppData/Local/photo-fx/Cache")),
-        ("win32", {}, Path("/home/ada/AppData/Local/photo-fx/Cache")),
+        ("darwin", {}, Path("/home/ada/Library/Caches/bt-image")),
+        ("linux", {}, Path("/home/ada/.cache/bt-image")),
+        ("linux", {"XDG_CACHE_HOME": "/var/cache/ada"}, Path("/var/cache/ada/bt-image")),
+        ("linux", {"XDG_CACHE_HOME": ""}, Path("/home/ada/.cache/bt-image")),  # empty means unset (XDG spec)
+        ("win32", {"LOCALAPPDATA": "/Users/ada/AppData/Local"}, Path("/Users/ada/AppData/Local/bt-image/Cache")),
+        ("win32", {}, Path("/home/ada/AppData/Local/bt-image/Cache")),
     ],
 )
 def test_user_cache_dir_follows_each_platforms_convention(platform, environ, expected):

@@ -5,7 +5,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "reaction_diffusion"
 DU, DV = 0.2097, 0.105  # the diffusion rates of the model, as the effect documents them (Pearson 1993)

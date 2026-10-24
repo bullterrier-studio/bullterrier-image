@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/photo-fx/
+      url: https://test.pypi.org/project/bullterrier-image/
     permissions:
       id-token: write # Trusted Publishing: PyPI accepts this run's OIDC token for the pending/registered publisher
     steps:
@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: pypi
-      url: https://pypi.org/project/photo-fx/
+      url: https://pypi.org/project/bullterrier-image/
     permissions:
       id-token: write # Trusted Publishing, and the signed PEP 740 attestations uploaded with the files
     steps:

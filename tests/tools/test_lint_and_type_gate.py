@@ -18,7 +18,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 # one xdist worker runs this module, so its fixture (a copy of the project and a cold mypy cache) is built once
 pytestmark = pytest.mark.xdist_group("lint-and-type-gate")
-LIBRARY_MODULE = "src/photo_fx/ops/probe.py"  # a module of the package, under no per-file exemption
+LIBRARY_MODULE = "src/bullterrier_image/ops/probe.py"  # a module of the package, under no per-file exemption
 TEST_MODULE = "tests/test_probe.py"
 
 
@@ -124,19 +124,19 @@ OFFENCES = {
     "os.path instead of pathlib": (
         LIBRARY_MODULE,
         '"""Probe."""\n\nimport os\n\n\ndef config(folder: str) -> str:\n    """Its config file."""\n'
-        '    return os.path.join(folder, "photo-fx.toml")\n',
+        '    return os.path.join(folder, "bt-image.toml")\n',
         ruff,
         "PTH118",
     ),
     "a test importing a private name": (
         TEST_MODULE,
-        "from photo_fx.ops.glyphs import _load_font\n\n\ndef test_probe():\n    assert callable(_load_font)\n",
+        "from bullterrier_image.ops.glyphs import _load_font\n\n\ndef test_probe():\n    assert callable(_load_font)\n",
         ruff,
         "PLC2701",
     ),
     "a test reading a private attribute": (
         TEST_MODULE,
-        "from photo_fx import imageio\n\n\ndef test_probe():\n    assert imageio._SRGB is not None\n",
+        "from bullterrier_image import imageio\n\n\ndef test_probe():\n    assert imageio._SRGB is not None\n",
         ruff,
         "SLF001",
     ),
@@ -152,7 +152,10 @@ def test_the_copy_with_a_known_good_module_passes_both_tools(checkout, with_file
 
 def test_an_effect_added_before_fx_pyi_is_regenerated_type_checks(checkout, with_file):
     # fx.pyi is regenerated only at integration, so a branch's new effect is not in it yet; mypy must not mind
-    with_file(TEST_MODULE, "from photo_fx import fx\n\n\ndef test_probe():\n    assert fx.not_in_the_stub(radius=1)\n")
+    with_file(
+        TEST_MODULE,
+        "from bullterrier_image import fx\n\n\ndef test_probe():\n    assert fx.not_in_the_stub(radius=1)\n",
+    )
     verdict = mypy(checkout)
     assert verdict.returncode == 0, verdict.report
 

@@ -6,7 +6,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from photo_fx.ops.radial import accumulate
+from bullterrier_image.ops.radial import accumulate
 
 CENTRE = (4.0, 6.0)  # (row, column) of the middle pixel of a 9 x 13 picture
 

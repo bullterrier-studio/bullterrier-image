@@ -4,7 +4,7 @@ it is from the centre (`x`) and a column sliding up or down likewise (`y`)."""
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "shear"
 

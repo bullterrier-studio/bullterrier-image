@@ -6,7 +6,7 @@ import sees. Each layer may import only the layers below it:
     effects    one folder per effect; never import each other
     core       loader | runner > steps > registry > presets > params | vocabulary > types; may import ops
     ops        may import errors
-    errors     the exceptions; import nothing from photo_fx, so every layer may raise them
+    errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
 
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
 unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
@@ -23,9 +23,9 @@ from pathlib import Path
 
 import pytest
 
-import photo_fx
+import bullterrier_image
 
-PACKAGE = Path(photo_fx.__file__).parent
+PACKAGE = Path(bullterrier_image.__file__).parent
 ROOT = PACKAGE.parent.parent  # the repository: pyproject.toml holds the contracts
 LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-imports` from the repository root
 
@@ -54,9 +54,9 @@ def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProce
 
 def lint_a_copy_with(tmp_path: Path, module: str, line: str) -> subprocess.CompletedProcess:
     """Lint a copy of the package (and its contracts) in which `module` also has the import `line`."""
-    shutil.copytree(PACKAGE, tmp_path / "photo_fx", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(PACKAGE, tmp_path / "bullterrier_image", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy(ROOT / "pyproject.toml", tmp_path)
-    target = tmp_path / "photo_fx" / module
+    target = tmp_path / "bullterrier_image" / module
     target.write_text(target.read_text(encoding="utf-8") + f"\n{line}  # injected by the test\n", encoding="utf-8")
     return lint(tmp_path, pythonpath=tmp_path)
 
@@ -72,37 +72,72 @@ def test_the_package_keeps_every_import_contract():
 FORBIDDEN = {
     "effect to effect": (
         "effects/glitch/effect.py",
-        "import photo_fx.effects.ascii",
-        "photo_fx.effects.glitch.effect",
+        "import bullterrier_image.effects.ascii",
+        "bullterrier_image.effects.glitch.effect",
         EFFECTS_APART,
     ),
-    "ops to core": ("ops/cells.py", "import photo_fx.core.params", "photo_fx.ops.cells", LAYERS),
-    "errors to ops": ("errors.py", "import photo_fx.ops.cells", "photo_fx.errors", LAYERS),
-    "errors to core": ("errors.py", "import photo_fx.core.params", "photo_fx.errors", LAYERS),
-    "core to effects": ("core/steps.py", "import photo_fx.effects", "photo_fx.core.steps", LAYERS),
-    "core to imageio": ("core/runner.py", "import photo_fx.imageio", "photo_fx.core.runner", LAYERS),
+    "ops to core": ("ops/cells.py", "import bullterrier_image.core.params", "bullterrier_image.ops.cells", LAYERS),
+    "errors to ops": ("errors.py", "import bullterrier_image.ops.cells", "bullterrier_image.errors", LAYERS),
+    "errors to core": ("errors.py", "import bullterrier_image.core.params", "bullterrier_image.errors", LAYERS),
+    "core to effects": ("core/steps.py", "import bullterrier_image.effects", "bullterrier_image.core.steps", LAYERS),
+    "core to imageio": ("core/runner.py", "import bullterrier_image.imageio", "bullterrier_image.core.runner", LAYERS),
     "effects to imageio": (
         "effects/grade/effect.py",
-        "import photo_fx.imageio",
-        "photo_fx.effects.grade.effect",
+        "import bullterrier_image.imageio",
+        "bullterrier_image.effects.grade.effect",
         LAYERS,
     ),
     "effect folder to effect folder": (
         "effects/grade/effect.py",
-        "import photo_fx.effects.clarity.effect",
-        "photo_fx.effects.grade.effect",
+        "import bullterrier_image.effects.clarity.effect",
+        "bullterrier_image.effects.grade.effect",
         EFFECTS_APART,
     ),
-    "recipe to pipeline": ("recipe.py", "import photo_fx.pipeline", "photo_fx.recipe", LAYERS),
-    "fx to gallery": ("fx.py", "import photo_fx.gallery", "photo_fx.fx", LAYERS),
-    "pipeline to cli": ("pipeline.py", "import photo_fx.cli", "photo_fx.pipeline", LAYERS),
-    "loader to runner": ("core/loader.py", "import photo_fx.core.runner", "photo_fx.core.loader", CORE_ORDER),
-    "steps to loader": ("core/steps.py", "import photo_fx.core.loader", "photo_fx.core.steps", CORE_ORDER),
-    "registry to steps": ("core/registry.py", "import photo_fx.core.steps", "photo_fx.core.registry", CORE_ORDER),
-    "loader to registry": ("core/loader.py", "import photo_fx.core.registry", "photo_fx.core.loader", LOADER_DIRECT),
-    "presets to registry": ("core/presets.py", "import photo_fx.core.registry", "photo_fx.core.presets", CORE_ORDER),
-    "params to presets": ("core/params.py", "import photo_fx.core.presets", "photo_fx.core.params", CORE_ORDER),
-    "params to registry": ("core/params.py", "import photo_fx.core.registry", "photo_fx.core.params", CORE_ORDER),
+    "recipe to pipeline": ("recipe.py", "import bullterrier_image.pipeline", "bullterrier_image.recipe", LAYERS),
+    "fx to gallery": ("fx.py", "import bullterrier_image.gallery", "bullterrier_image.fx", LAYERS),
+    "pipeline to cli": ("pipeline.py", "import bullterrier_image.cli", "bullterrier_image.pipeline", LAYERS),
+    "loader to runner": (
+        "core/loader.py",
+        "import bullterrier_image.core.runner",
+        "bullterrier_image.core.loader",
+        CORE_ORDER,
+    ),
+    "steps to loader": (
+        "core/steps.py",
+        "import bullterrier_image.core.loader",
+        "bullterrier_image.core.steps",
+        CORE_ORDER,
+    ),
+    "registry to steps": (
+        "core/registry.py",
+        "import bullterrier_image.core.steps",
+        "bullterrier_image.core.registry",
+        CORE_ORDER,
+    ),
+    "loader to registry": (
+        "core/loader.py",
+        "import bullterrier_image.core.registry",
+        "bullterrier_image.core.loader",
+        LOADER_DIRECT,
+    ),
+    "presets to registry": (
+        "core/presets.py",
+        "import bullterrier_image.core.registry",
+        "bullterrier_image.core.presets",
+        CORE_ORDER,
+    ),
+    "params to presets": (
+        "core/params.py",
+        "import bullterrier_image.core.presets",
+        "bullterrier_image.core.params",
+        CORE_ORDER,
+    ),
+    "params to registry": (
+        "core/params.py",
+        "import bullterrier_image.core.registry",
+        "bullterrier_image.core.params",
+        CORE_ORDER,
+    ),
 }
 
 
@@ -115,9 +150,9 @@ def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract
 
 
 ALLOWED = {
-    "core to ops": ("core/steps.py", "import photo_fx.ops.cells"),
-    "core to errors": ("core/vocabulary.py", "import photo_fx.errors"),
-    "ops to errors": ("ops/cells.py", "import photo_fx.errors"),
+    "core to ops": ("core/steps.py", "import bullterrier_image.ops.cells"),
+    "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
+    "ops to errors": ("ops/cells.py", "import bullterrier_image.errors"),
 }
 
 
@@ -149,9 +184,12 @@ def _effects_declared_in_the_source() -> set[str]:
 
 
 def test_importing_the_package_loads_no_effect_and_no_heavy_library():
-    """`import photo_fx` stays fast: the effects, and the libraries they and the recipe engine need, load when used."""
-    heavy = ["photo_fx.effects", "scipy", "pydantic", "numpy", "PIL", "onnxruntime"]
-    code = f"import json, sys\nimport photo_fx\njson.dump([m for m in {heavy!r} if m in sys.modules], sys.stdout)\n"
+    """`import bullterrier_image` stays fast: the effects, and the libraries they need, load when used."""
+    heavy = ["bullterrier_image.effects", "scipy", "pydantic", "numpy", "PIL", "onnxruntime"]
+    code = (
+        "import json, sys\nimport bullterrier_image\n"
+        f"json.dump([m for m in {heavy!r} if m in sys.modules], sys.stdout)\n"
+    )
     result = fresh_python(code)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == []
@@ -161,8 +199,8 @@ def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query()
     """`core` never imports `effects`: the registry loads them through their entry point the first time it is asked."""
     code = (
         "import json, sys\n"
-        "import photo_fx.core.runner\n"
-        "from photo_fx.core import registry\n"
+        "import bullterrier_image.core.runner\n"
+        "from bullterrier_image.core import registry\n"
         "json.dump(sorted(registry.all_effects()), sys.stdout)\n"
     )
     result = fresh_python(code)
@@ -173,14 +211,15 @@ def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query()
 
 
 def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
-    """`import photo_fx; photo_fx.recipe` worked before the split, with every public name of the old module."""
+    """`import bullterrier_image; bullterrier_image.recipe` works, with every public name of the old module."""
     names = ["Recipe", "Stage", "Step", "load_recipe", "render", "render_all", "trace"]
     code = (
-        "import photo_fx\n"
+        "import bullterrier_image\n"
         f"names = {names!r}\n"
-        "missing = [n for n in names if not hasattr(photo_fx.recipe, n)]\n"
+        "missing = [n for n in names if not hasattr(bullterrier_image.recipe, n)]\n"
         "assert not missing, missing\n"
-        "assert photo_fx.recipe.render is photo_fx.render and photo_fx.recipe.load_recipe is photo_fx.load_recipe\n"
+        "recipe = bullterrier_image.recipe\n"
+        "assert recipe.render is bullterrier_image.render and recipe.load_recipe is bullterrier_image.load_recipe\n"
     )
     result = fresh_python(code)
     assert result.returncode == 0, result.stderr

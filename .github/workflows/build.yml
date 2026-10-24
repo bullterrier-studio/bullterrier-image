@@ -58,9 +58,9 @@ jobs:
           uv venv --quiet smoke
           uv pip install --quiet --python smoke "$wheel"
           if [ "$RUNNER_OS" = Windows ]; then bin=smoke/Scripts; else bin=smoke/bin; fi
-          "$bin/photo-fx" --version
-          "$bin/photo-fx" --help
+          "$bin/bt-image" --version
+          "$bin/bt-image" --help
           "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
           printf 'name = "smoke"\n\n[[step]]\neffect = "grade"\n\n[[step]]\neffect = "halftone"\n' > smoke.toml
-          "$bin/photo-fx" render photo.png smoke.toml -o out
+          "$bin/bt-image" render photo.png smoke.toml -o out
           test -s out/photo__smoke.png

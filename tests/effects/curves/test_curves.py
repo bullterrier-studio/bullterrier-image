@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "curves"
 ANCHORS = (0.0, 0.25, 0.5, 0.75, 1.0)  # where the five master points sit on the input axis, as documented

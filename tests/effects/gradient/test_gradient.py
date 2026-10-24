@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from photo_fx import RecipeError
-from photo_fx.core import registry
+from bullterrier_image import RecipeError
+from bullterrier_image.core import registry
 
 NAME = "gradient"
 RED, GREEN, BLUE = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)

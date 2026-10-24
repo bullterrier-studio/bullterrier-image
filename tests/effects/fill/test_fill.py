@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 
 def test_fill_ignores_the_picture(photo: np.ndarray) -> None:

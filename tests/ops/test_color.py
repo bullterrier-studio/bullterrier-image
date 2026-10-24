@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from photo_fx.ops.color import ink_amount, luminance
+from bullterrier_image.ops.color import ink_amount, luminance
 
 
 def test_luminance_uses_the_rec709_weights():

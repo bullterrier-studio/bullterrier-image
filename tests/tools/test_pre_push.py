@@ -38,5 +38,5 @@ def test_a_feature_branch_push_skips_the_gate_and_succeeds(monkeypatch):
 
 def test_a_push_right_after_a_passed_gate_does_not_run_it_again(monkeypatch):
     monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
-    monkeypatch.setenv("PHOTO_FX_GATE_PASSED", "1")
+    monkeypatch.setenv("BT_IMAGE_GATE_PASSED", "1")
     assert pre_push.main() == 0

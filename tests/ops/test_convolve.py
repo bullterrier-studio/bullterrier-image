@@ -5,7 +5,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from photo_fx.ops.convolve import Edge, convolve
+from bullterrier_image.ops.convolve import Edge, convolve
 
 EDGES: list[Edge] = ["reflect", "mirror", "nearest", "wrap"]
 NUMPY_PAD: dict[Edge, Literal["symmetric", "reflect", "edge", "wrap"]] = {

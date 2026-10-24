@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from photo_fx import BackendUnavailableError
-from photo_fx.ops.glyphs import cell_size, glyph_atlas, paint
+from bullterrier_image import BackendUnavailableError
+from bullterrier_image.ops.glyphs import cell_size, glyph_atlas, paint
 
 CELLS = [5, 8, 13, 20]
 
@@ -20,7 +20,7 @@ def any_host(request, monkeypatch):
     """Runs a test twice: with the host's fonts, and as on a host without any monospaced font (a slim Linux container),
     where the list of font files to look for is empty and Pillow's own font draws."""
     if request.param == "no system font":
-        monkeypatch.setenv("PHOTO_FX_FONTS", "")
+        monkeypatch.setenv("BT_IMAGE_FONTS", "")
 
 
 def test_cell_width_is_the_requested_width_and_height_grows_with_it(any_host):
@@ -247,7 +247,7 @@ def test_cell_height_is_between_one_and_a_fifth_and_two_and_a_half_widths(cell):
 @pytest.fixture
 def no_system_font(monkeypatch):
     """The list of font files to look for is empty, as on a host that has none of them."""
-    monkeypatch.setenv("PHOTO_FX_FONTS", "")
+    monkeypatch.setenv("BT_IMAGE_FONTS", "")
 
 
 @pytest.mark.parametrize("cell", CELLS)
@@ -271,13 +271,13 @@ def test_without_a_font_file_or_freetype_the_error_says_how_to_give_a_font(no_sy
     sized to a cell: drawing needs a font file, so the error names the setting that lists one."""
     monkeypatch.setattr(ImageFont, "load_default", lambda size=None: ImageFont.load_default_imagefont())
     cell = 997  # a cell width no other test draws at, so nothing drawn earlier can answer for it
-    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_FONTS"):
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_FONTS"):
         glyph_atlas(" #", cell)
 
 
 @host_fonts
 def test_the_listed_fonts_are_tried_in_order_and_missing_ones_skipped(font, tmp_path, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_FONTS", os.pathsep.join([str(tmp_path / "missing.ttf"), font]))
+    monkeypatch.setenv("BT_IMAGE_FONTS", os.pathsep.join([str(tmp_path / "missing.ttf"), font]))
     np.testing.assert_array_equal(glyph_atlas(" .#M", 10), glyph_atlas(" .#M", 10, font))
     assert cell_size(10) == cell_size(10, font)
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.cutout import put_behind
+from bullterrier_image.ops.cutout import put_behind
 
 PICTURE = np.array([[[0.8, 0.4, 0.2]]], np.float32)  # one pixel
 RED = np.array([1.0, 0.0, 0.0], np.float32)

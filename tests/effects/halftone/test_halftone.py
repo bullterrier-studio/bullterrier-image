@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "halftone"
 WHITE_ON_BLACK = {"ink": "#ffffff", "paper": "#000000"}

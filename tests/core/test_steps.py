@@ -7,12 +7,12 @@ from importlib.resources import files
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
-from photo_fx.core.loader import load_recipe
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.core.steps import Recipe, Step
-from photo_fx.errors import RecipeError, UnknownEffectError
+from bullterrier_image.core import registry
+from bullterrier_image.core.loader import load_recipe
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.errors import RecipeError, UnknownEffectError
 
 
 class GainParams(EffectParams):
@@ -126,8 +126,10 @@ def test_the_recipe_objects_refuse_unknown_fields():
 
 
 def _shipped(effect: str, preset: str) -> dict:
-    """What the shipped file says about a preset, read here with tomllib (not through photo-fx), without its text."""
-    table = tomllib.loads((files("photo_fx") / "presets" / f"{effect}.toml").read_text(encoding="utf-8"))[preset]
+    """What the shipped file says about a preset, read with tomllib, not through the library, without its text."""
+    table = tomllib.loads((files("bullterrier_image") / "presets" / f"{effect}.toml").read_text(encoding="utf-8"))[
+        preset
+    ]
     return {key: value for key, value in table.items() if key != "description"}
 
 

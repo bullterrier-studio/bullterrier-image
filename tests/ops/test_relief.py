@@ -1,10 +1,10 @@
-"""Behaviour of `photo_fx.ops.relief`: the slopes of a height field and the light a surface catches."""
+"""Behaviour of `bullterrier_image.ops.relief`: the slopes of a height field and the light a surface catches."""
 
 import numpy as np
 import pytest
 
-from photo_fx.ops.convolve import Edge
-from photo_fx.ops.relief import lambert, slopes
+from bullterrier_image.ops.convolve import Edge
+from bullterrier_image.ops.relief import lambert, slopes
 
 HEIGHT = np.array([[0.0, 1.0, 4.0, 9.0], [2.0, 2.0, 2.0, 2.0], [5.0, 3.0, 1.0, 0.0]])
 

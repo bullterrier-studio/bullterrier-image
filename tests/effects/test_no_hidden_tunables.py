@@ -43,9 +43,9 @@ from pathlib import Path
 
 import pytest
 
-import photo_fx
+import bullterrier_image
 
-PACKAGE = Path(photo_fx.__file__).parent
+PACKAGE = Path(bullterrier_image.__file__).parent
 SCANNED = sorted([*(PACKAGE / "effects").glob("*/effect.py"), *(PACKAGE / "ops").glob("*.py")])
 TRIVIAL = {0, 1, 2, 0.5, 255}
 CHANNELS = 3

@@ -6,7 +6,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from photo_fx.ops.cluster import kmeans, nearest
+from bullterrier_image.ops.cluster import kmeans, nearest
 
 Init = Literal["k-means++", "random"]
 # Three tight blobs, far apart in a 3-d space; their centres are known by construction.

@@ -30,8 +30,8 @@ def test_the_project_as_it_is_builds_clean_distributions(project, uv_run_env):
     built = sorted(path.name for path in (project / "dist" / "check").iterdir())
     version = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     assert built == [
-        f"photo_fx-{version}-py3-none-any.whl",
-        f"photo_fx-{version}.tar.gz",
+        f"bullterrier_image-{version}-py3-none-any.whl",
+        f"bullterrier_image-{version}.tar.gz",
     ]  # sdist and wheel, nothing else
 
 
@@ -48,7 +48,9 @@ def test_a_long_description_pypi_cannot_render_fails_the_gate(project, uv_run_en
 
 
 def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project, uv_run_env):
-    (project / "src" / "photo_fx" / "not-importable.py").write_text('"""A module with a dash."""\n', encoding="utf-8")
+    (project / "src" / "bullterrier_image" / "not-importable.py").write_text(
+        '"""A module with a dash."""\n', encoding="utf-8"
+    )
     result = build_check(project, uv_run_env)
     assert result.returncode != 0
     report = result.stdout + result.stderr
@@ -59,16 +61,16 @@ def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project, uv_run_env
 def _without_the_template_exclusion(project: Path) -> None:
     pyproject = project / "pyproject.toml"
     text = pyproject.read_text(encoding="utf-8")
-    assert 'wheel-exclude = ["photo_fx/effects/_template"]' in text
-    pyproject.write_text(text.replace('wheel-exclude = ["photo_fx/effects/_template"]', ""), encoding="utf-8")
+    assert 'wheel-exclude = ["bullterrier_image/effects/_template"]' in text
+    pyproject.write_text(text.replace('wheel-exclude = ["bullterrier_image/effects/_template"]', ""), encoding="utf-8")
 
 
 def _picture_in_the_package(project: Path) -> None:
-    (project / "src" / "photo_fx" / "effects" / "grade" / "grade.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+    (project / "src" / "bullterrier_image" / "effects" / "grade" / "grade.jpg").write_bytes(b"\xff\xd8\xff\xd9")
 
 
 def _test_in_the_package(project: Path) -> None:
-    (project / "src" / "photo_fx" / "effects" / "grade" / "test_grade.py").write_text(
+    (project / "src" / "bullterrier_image" / "effects" / "grade" / "test_grade.py").write_text(
         "def test_x(): ...\n", encoding="utf-8"
     )
 
@@ -81,5 +83,9 @@ def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_eac
     report = result.stdout + result.stderr
     assert result.returncode != 0
     assert "W102" in report  # check-wheel-contents: wheel library contains files not in the package tree
-    for shipped in ("photo_fx/effects/_template/effect.py.tmpl", "photo_fx/effects/grade/grade.jpg", "test_grade.py"):
+    for shipped in (
+        "bullterrier_image/effects/_template/effect.py.tmpl",
+        "bullterrier_image/effects/grade/grade.jpg",
+        "test_grade.py",
+    ):
         assert shipped in report

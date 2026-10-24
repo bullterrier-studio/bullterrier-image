@@ -46,7 +46,7 @@ and its release candidates take its text.
 **Approving.** The command prints the link to the release workflow's runs. The run checks the tag, runs the whole CI,
 then waits at the `testpypi` job (a pre-release) or the `pypi` job (a release): open the run, choose *Review
 deployments*, tick the environment and *Approve and deploy*. Try a release candidate with
-`pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ photo-fx==0.1.0rc1`.
+`pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ bullterrier-image==0.1.0rc1`.
 
 **Recovering.** A refused or cancelled release changed nothing: fix what it names and run it again. If the push fails,
 the release commit and tag stay local, nothing reached origin, and the command prints both ways out: push again
@@ -63,8 +63,9 @@ stored anywhere) with signed attestations; last, the GitHub Release gets the cha
 files and a build-provenance attestation.
 
 **One-time setup, by the owner:**
-- pypi.org, *Publishing*: add a pending publisher for the project `photo-fx`: owner `jcakstins`, repository
-  `photo-fx`, workflow `release.yml`, environment `pypi`. The same on test.pypi.org with the environment `testpypi`.
+- pypi.org, *Publishing*: add a pending publisher for the project `bullterrier-image`: owner and repository as on GitHub
+  (`jcakstins` and `photo-fx` until the repository is transferred and renamed; then `bullterrier-studio` and
+  `bullterrier-image`), workflow `release.yml`, environment `pypi`. The same on test.pypi.org with the environment `testpypi`.
   The first upload creates the project.
 - GitHub, *Settings > Environments*: `pypi` and `testpypi`, each with the owner as required reviewer and deployments
   limited to tags `v*`.

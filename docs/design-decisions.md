@@ -1,12 +1,12 @@
 # Design decisions
 
-The decisions that shape photo-fx and still hold, each with its reason and what it costs or commits us to. Rules for
+The decisions that shape bullterrier-image and still hold, each with its reason and what it costs or commits us to. Rules for
 contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effects roadmap](effects-roadmap.md).
 
 ## Architecture
 
 - **Linear layers: app > adapters > effects > core > ops > errors.** Each layer imports only the layers below it; the
-  exception hierarchy (`photo_fx.errors`) imports nothing, so it is the bottom layer and every layer may raise it.
+  exception hierarchy (`bullterrier_image.errors`) imports nothing, so it is the bottom layer and every layer may raise it.
   *Reason:* one direction of dependency is the simplest rule that stays true as the project grows; a forbidden import
   means the code is in the wrong layer, so the fix is always a move, never an exception. *Consequence:* the rules are
   import-linter contracts in `pyproject.toml`, run by the test suite (`uv run lint-imports`); `core` never imports
@@ -23,24 +23,24 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
   each other; shared numeric code goes to `ops/`, named by concept.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
-  `photo_fx.effects` the first time it is queried, once, under a lock; photo-fx's own effect library is one such entry
-  point and a third-party package declares its own, written against the public `photo_fx.plugin`. *Reason:* importing
-  every effect (and scipy, pydantic) made `import photo_fx` cost a quarter of a second before anything was used, and
+  `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
+  point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing
+  every effect (and scipy, pydantic) made `import bullterrier_image` cost a quarter of a second before anything was used, and
   left outside packages no way into recipes or the command line; entry points are PyPA's standard plugin mechanism
   (pytest, Sphinx, flake8 use it). *Consequence:* a checkout needs `uv sync` to install the entry point; a plugin that
-  fails to import is a `PhotoFxError` naming it, `PHOTO_FX_PLUGINS=builtin` skips third-party packages, effect names
+  fails to import is a `BullterrierImageError` naming it, `BT_IMAGE_PLUGINS=builtin` skips third-party packages, effect names
   are unique across every installed package, and registering is for import time (queries are thread-safe once loaded).
 - **`ops` modules arrive with their first consumer.** *Reason:* code nothing uses is a cost with no benefit, and a
   primitive designed before its user is designed for the wrong user. *Consequence:* the dead-code gate fails on unused
   code; the removed primitives (`colorspace`, `noise`, `edges`, `warp`, `voronoi`, `sprites`) are restored from commit
-  3b9b2ed (`git show 3b9b2ed:src/photo_fx/ops/<module>.py`) together with the effect that needs them.
-- **One public path per name.** The public API is `photo_fx` (with `render` & co. binding the default subject finder),
-  `photo_fx.recipe`, `photo_fx.fx`, `photo_fx.imageio` and `photo_fx.plugin`, each with `__all__`. *Reason:* two paths to one name with
-  different behaviour (a `render` that finds the subject and one that does not) is a trap. *Consequence:* `photo_fx.core`
-  and `photo_fx.ops` are internal and re-export nothing; no compatibility shims before 1.0.
+  3b9b2ed (`git show 3b9b2ed:src/bullterrier_image/ops/<module>.py`) together with the effect that needs them.
+- **One public path per name.** The public API is `bullterrier_image` (with `render` & co. binding the default subject finder),
+  `bullterrier_image.recipe`, `bullterrier_image.fx`, `bullterrier_image.imageio` and `bullterrier_image.plugin`, each with `__all__`. *Reason:* two paths to one name with
+  different behaviour (a `render` that finds the subject and one that does not) is a trap. *Consequence:* `bullterrier_image.core`
+  and `bullterrier_image.ops` are internal and re-export nothing; no compatibility shims before 1.0.
 - **No time in the library.** Effects are pure functions of one picture and a set of values; a parameter describes a state
   (`progress`, `phase`, `seed`), never a duration. Easing, ramps, animated values, the animation timeline, frame
-  rendering and GIF/MP4 output were removed. *Reason:* photo-fx is the image package of a wider ecosystem
+  rendering and GIF/MP4 output were removed. *Reason:* bullterrier-image is the image package of a wider ecosystem
   (`bullterrier-design`) in which one package owns each concept: `control` shapes values over time, `video` maps them
   onto parameters and renders frames, `audio` supplies the beats. Animation done here would exist twice, and a parameter
   measured in seconds would tie an effect to one clip and one clock. *Consequence:* a parameter that moved with time
@@ -50,7 +50,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Parameters
 
 - **Every effect declares its parameters once, as a frozen Pydantic model** (`EffectParams`, `extra="forbid"`, strict
-  fields). *Reason:* one declaration drives validation, defaults, `help(fx.<effect>)`, `photo-fx effects`,
+  fields). *Reason:* one declaration drives validation, defaults, `help(fx.<effect>)`, `bt-image effects`,
   `docs/effects/`, `fx.pyi`, the `fx` signatures and the JSON schema, so they cannot disagree. *Consequence:*
   `@effect(category=..., params=...)` requires the model; a misspelt or out-of-range value fails at construction or
   load, naming the effect, the field, the constraint and the value, never deep inside a render.
@@ -62,7 +62,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   tune the technique rather than to choose the look (`edge`, `truncate`, `interpolation`, a secondary shaping control);
   aim at six or fewer basic fields per effect. *Reason:* "nothing hidden" exposes every tunable, and one flat list of
   dozens of them buries the few controls that define the look. *Consequence:* the flag changes listing only: basic
-  fields first, then an "Advanced parameters" section (`help`, `fx.pyi`), a count in `photo-fx effects` (`--advanced` or
+  fields first, then an "Advanced parameters" section (`help`, `fx.pyi`), a count in `bt-image effects` (`--advanced` or
   naming the effect shows all) and a collapsed block in the catalogue. Every field stays settable, validated, in
   declaration order in the signature and in the JSON schema (`"advanced"`). No tiers, no classification by name.
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
@@ -92,7 +92,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   made. *Reason:* data can be diffed, cached by fingerprint, edited by non-programmers and generated by tools.
   *Consequence:* a recipe file may carry `format = <n>`, and a release that
   changes the format adds a number and keeps reading the old ones.
-- **Presets are per-effect parameter sets, shipped as data in `src/photo_fx/presets/<effect>.toml`.** A look that is
+- **Presets are per-effect parameter sets, shipped as data in `src/bullterrier_image/presets/<effect>.toml`.** A look that is
   one effect with a set of values (sepia is a gradient map, teal-and-orange a split tone) is a preset of that effect,
   not a new effect: `fx.gradient_map(preset="sepia")`, or `preset = "sepia"` in a recipe step. *Reason:* a new effect
   is code, tests and a picture for what is a few numbers, and a preset is checked by the effect's own parameter model,
@@ -107,13 +107,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   own `opacity` when it means that effect's own element (the brightness of a particle, the share a soft focus replaces);
   the two multiply. *Reason:* one place for the general blend, standard names for the specific one. *Consequence:*
   never add an effect parameter that only mixes the effect's result with the picture.
-- **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `photo_fx.recipe` binds the
+- **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
 
 ## Errors and I/O
 
-- **One error hierarchy.** Library code raises `PhotoFxError` subclasses (`RecipeError`, `UnknownEffectError`,
+- **One error hierarchy.** Library code raises `BullterrierImageError` subclasses (`RecipeError`, `UnknownEffectError`,
   `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
   *Reason:* callers catch one type; `except ValueError` keeps working. *Consequence:* the CLI catches them and prints a
   message, never a traceback, for a user's mistake; a broken effect definition is a programming error (plain
@@ -126,7 +126,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Two backends behind one function**, `subject_matte(rgb)`: Apple Vision on macOS (built in, no download) and IS-Net on
   ONNX Runtime everywhere else; `--matte` (or `matte=`) skips both. *Reason:* the best cut-out per platform without making
   the core depend on either. *Consequence:* the portable model (about 180 MB) is downloaded on first use into the user's
-  cache, verified against a pinned SHA-256, never at import, never left half-written; `PHOTO_FX_MODEL` points at a local
+  cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
   copy for offline use.
 
 ## Determinism
@@ -152,7 +152,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Fixing defects
 
 - **A fix removes the cause; it does not add a defence.** The bug is reproduced at the public interface, fixed where the invalid state is created (a stricter parameter model, one source of truth, a removed path),
-  and the same class is searched for elsewhere. Inside the library code trusts its contracts and fails loudly; inputs are validated once at the boundary with a `PhotoFxError`. *Reason:* agents and automated loops
+  and the same class is searched for elsewhere. Inside the library code trusts its contracts and fails loudly; inputs are validated once at the boundary with a `BullterrierImageError`. *Reason:* agents and automated loops
   patch where a failure shows (fallbacks, defaults, swallowed exceptions, extra checks), which "makes the system less understandable while appearing more robust" and keeps the cause (Armin Ronacher,
   "The Coming Loop", 2026); the repo's own instances were library options hidden behind `# constant:` and two copies of the same edge table. *Consequence:* the rules live in `CLAUDE.md` ("Fixing defects"),
   duplicated knowledge (code or tests) is merged, and what a tool can see becomes a gate (blind `except`, literal library options, the marker rule).

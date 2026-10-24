@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.cells import cut, figure, join, lit
+from bullterrier_image.ops.cells import cut, figure, join, lit
 
 # (height, width, cell_w, cell_h): multiples, non-multiples, and a cell larger than the picture.
 SIZES = [(96, 128, 8, 16), (97, 131, 5, 11), (10, 7, 3, 4), (5, 9, 16, 12), (1, 1, 1, 1), (33, 20, 7, 1)]

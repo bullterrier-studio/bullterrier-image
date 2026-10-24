@@ -3,13 +3,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from photo_fx import Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
-from photo_fx import recipe as facade
-from photo_fx.core import runner
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.matte import subject_matte
-from photo_fx.ops.resample import resize
+from bullterrier_image import Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
+from bullterrier_image import recipe as facade
+from bullterrier_image.core import runner
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.matte import subject_matte
+from bullterrier_image.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -141,11 +141,11 @@ def test_shipped_recipes_all_load():
 
 
 def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_model, monkeypatch):
-    """Without a matte or `find_subject`, `photo_fx.recipe`'s functions find the subject with `subject_matte`: the
-    results must equal the core's given `subject_matte`'s answer. The portable backend with a stand-in model (the
+    """Without a matte or `find_subject`, `bullterrier_image.recipe`'s functions find the subject with `subject_matte`:
+    the results must equal the core's given `subject_matte`'s answer. The portable backend with a stand-in model (the
     external boundary, see `echo_model`) is chosen through the environment, so the test is the same on every OS."""
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     alpha = subject_matte(photo)

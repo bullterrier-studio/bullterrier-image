@@ -1,4 +1,4 @@
-"""Tests of `photo_fx.matte`: choosing a backend, the portable ONNX backend, and `refine_edge`.
+"""Tests of `bullterrier_image.matte`: choosing a backend, the portable ONNX backend, and `refine_edge`.
 
 The models are external boundaries: the portable backend is given tiny ONNX models built in the test (`echo_model` in
 conftest), whose answer follows from the documented model contract, so the expected mattes are worked out by hand.
@@ -13,9 +13,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from photo_fx import BackendUnavailableError, SubjectNotFoundError, imageio
-from photo_fx.matte import onnx_model_path, refine_edge, segmenter_identity, subject_matte
-from photo_fx.ops.resample import resize
+from bullterrier_image import BackendUnavailableError, SubjectNotFoundError, imageio
+from bullterrier_image.matte import onnx_model_path, refine_edge, segmenter_identity, subject_matte
+from bullterrier_image.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -38,10 +38,10 @@ def ramp(height: int = 60, width: int = 90) -> np.ndarray:
 @pytest.fixture
 def echo_red(echo_model, monkeypatch):
     """The portable backend answers with the red channel (see `echo_model`)."""
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))
 
 
-# --- choosing the backend: explicit > PHOTO_FX_SEGMENTER > auto ----------------------------------------------------
+# --- choosing the backend: explicit > BT_IMAGE_SEGMENTER > auto ----------------------------------------------------
 
 
 def test_the_onnx_backend_reads_the_picture_as_the_model_contract_says(echo_red):
@@ -59,7 +59,7 @@ def test_the_onnx_backend_reads_the_picture_as_the_model_contract_says(echo_red)
 @pytest.mark.parametrize(("channel", "expected"), [(1, 230 / 255), (2, 153 / 255)])
 def test_each_channel_reaches_the_model_in_rgb_order_as_its_8_bit_value(echo_model, monkeypatch, channel, expected):
     """Flat channels are exact 8-bit values, so no resampling blurs them: the model sees exactly v/255 - 0.5."""
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(channel)))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(channel)))
     alpha = found(picture(np.zeros((20, 30), np.float32), green=230 / 255, blue=153 / 255), "onnx")
     np.testing.assert_allclose(alpha, expected, atol=1e-6)
 
@@ -87,14 +87,14 @@ def test_a_picture_where_nothing_stands_out_is_an_error(echo_red):
 
 
 def test_an_explicit_segmenter_wins_over_the_environment(echo_red, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "vision")  # would fail off macOS, and differ from the echo on macOS
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "vision")  # would fail off macOS, and differ from the echo on macOS
     photo = ramp()
     np.testing.assert_allclose(found(photo, "onnx")[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
 
 
 @pytest.mark.parametrize("value", ["onnx", " ONNX "])
 def test_the_environment_variable_chooses_when_no_segmenter_is_given(echo_red, monkeypatch, value):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", value)  # on macOS the automatic choice would be Vision
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", value)  # on macOS the automatic choice would be Vision
     photo = ramp()
     np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
 
@@ -107,8 +107,8 @@ def test_an_unknown_segmenter_is_refused_naming_the_known_ones():
 
 
 def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
-    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_SEGMENTER") as caught:
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "coreml")
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_SEGMENTER") as caught:
         subject_matte(ramp())
     assert "coreml" in str(caught.value)
     assert "onnx" in str(caught.value)
@@ -119,14 +119,14 @@ def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(
 
 def test_the_identity_follows_the_content_of_the_model_not_its_place(echo_model, monkeypatch, tmp_path):
     red = echo_model(0)
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(red))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(red))
     identity = segmenter_identity("onnx")
     assert segmenter_identity("onnx") == identity  # same inputs, same identity
     copy = tmp_path / "elsewhere.onnx"
     copy.write_bytes(red.read_bytes())
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(copy))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(copy))
     assert segmenter_identity("onnx") == identity  # the same model at another path is the same segmenter
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(1)))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(1)))
     assert segmenter_identity("onnx") != identity  # another model, another identity
 
 
@@ -136,37 +136,37 @@ def test_the_standard_model_has_an_identity_of_its_own_without_being_downloaded(
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("XDG_CACHE_HOME", str(home / "cache"))
     monkeypatch.setenv("LOCALAPPDATA", str(home / "local"))
-    monkeypatch.delenv("PHOTO_FX_MODEL")
+    monkeypatch.delenv("BT_IMAGE_MODEL")
     standard = segmenter_identity("onnx")
     assert standard == segmenter_identity("onnx")
     assert not any(home.rglob("*"))  # nothing was fetched to find out
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))
     assert segmenter_identity("onnx") != standard
 
 
 def test_the_identity_is_chosen_like_the_backend_is(echo_red, monkeypatch):
     explicit = segmenter_identity("onnx")
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     assert segmenter_identity() == explicit  # the environment variable chooses when nothing is given
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "coreml")
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "coreml")
     assert segmenter_identity("onnx") == explicit  # and an explicit choice wins over it
-    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_SEGMENTER"):
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_SEGMENTER"):
         segmenter_identity()
 
 
 def test_the_identity_of_a_segmenter_that_cannot_run_says_why_as_subject_matte_does():
     with pytest.raises(BackendUnavailableError, match="coreml"):
         segmenter_identity("coreml")
-    with pytest.raises(BackendUnavailableError, match="no-such-model"):  # the suite's PHOTO_FX_MODEL names no file
+    with pytest.raises(BackendUnavailableError, match="no-such-model"):  # the suite's BT_IMAGE_MODEL names no file
         segmenter_identity("onnx")
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="Apple Vision exists only on macOS")
 def test_on_macos_vision_and_the_portable_model_have_different_identities(echo_red, monkeypatch):
     assert segmenter_identity("vision") != segmenter_identity("onnx")
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "vision")
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "vision")
     assert segmenter_identity() == segmenter_identity("vision")
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "onnx")
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     assert segmenter_identity() == segmenter_identity("onnx")
 
 
@@ -178,7 +178,7 @@ def test_off_macos_the_identity_of_apple_vision_is_refused_like_its_use():
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="the automatic choice is Apple Vision only where Vision exists")
 def test_on_macos_the_automatic_choice_is_apple_vision(echo_red, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_SEGMENTER", "")  # empty means unset
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "")  # empty means unset
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
     np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="vision"))
     assert not np.allclose(subject_matte(photo), subject_matte(photo, segmenter="onnx"), atol=0.05)
@@ -199,8 +199,8 @@ def test_off_macos_the_automatic_choice_is_the_portable_model(echo_red):
 
 def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it(tmp_path, monkeypatch):
     missing = tmp_path / "isnet.onnx"
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(missing))
-    with pytest.raises(BackendUnavailableError, match="PHOTO_FX_MODEL") as caught:
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(missing))
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_MODEL") as caught:
         subject_matte(ramp(), segmenter="onnx")
     assert str(missing) in str(caught.value)
     assert not missing.exists()  # pointing at a local file never downloads
@@ -212,15 +212,15 @@ def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, 
     blocker.write_text("a file where the home folder should be", encoding="utf-8")
     for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
         monkeypatch.setenv(variable, str(blocker))
-    monkeypatch.delenv("PHOTO_FX_MODEL")
+    monkeypatch.delenv("BT_IMAGE_MODEL")
     with pytest.raises(BackendUnavailableError, match="by hand") as caught:
         subject_matte(ramp(), segmenter="onnx")
-    assert "PHOTO_FX_MODEL" in str(caught.value)
+    assert "BT_IMAGE_MODEL" in str(caught.value)
     assert "--matte" in str(caught.value)
 
 
 def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(tmp_path / "mine.onnx"))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(tmp_path / "mine.onnx"))
     assert onnx_model_path() == tmp_path / "mine.onnx"
 
 
@@ -238,14 +238,14 @@ ISNET_SHA256 = "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a
 
 def test_the_real_model_finds_the_dog(monkeypatch):
     """The pinned model itself, when it has been downloaded before. The test never downloads: it uses the cached file
-    only if it is the right one, and through `PHOTO_FX_MODEL`, which is never fetched."""
-    monkeypatch.delenv("PHOTO_FX_MODEL")
+    only if it is the right one, and through `BT_IMAGE_MODEL`, which is never fetched."""
+    monkeypatch.delenv("BT_IMAGE_MODEL")
     cached = onnx_model_path()
     if not cached.is_file():
-        pytest.skip(f"the portable model is not in the cache ({cached}); `photo-fx cutout` downloads it")
+        pytest.skip(f"the portable model is not in the cache ({cached}); `bt-image cutout` downloads it")
     if sha256_of(cached) != ISNET_SHA256:
         pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(cached))
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(cached))
     photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
     alpha = subject_matte(photo, segmenter="onnx")
     height, width = alpha.shape

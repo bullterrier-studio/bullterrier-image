@@ -38,7 +38,7 @@ def test_ruff_pytest_poe_and_commit_message_are_configured_in_pyproject():
 
 
 @pytest.mark.parametrize("name", STRAY_NAMES)
-@pytest.mark.parametrize("folder", ["", "src", "tests", "src/photo_fx/deep", "tests/effects"])
+@pytest.mark.parametrize("folder", ["", "src", "tests", "src/bullterrier_image/deep", "tests/effects"])
 def test_a_stray_config_is_reported_by_name(tmp_path, name, folder):
     (tmp_path / folder).mkdir(parents=True, exist_ok=True)
     (tmp_path / folder / name).write_text("", encoding="utf-8")

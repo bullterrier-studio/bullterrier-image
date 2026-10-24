@@ -1,8 +1,8 @@
 """`poe new-effect` (tools/dev.py): a new effect is a set of new files named for it, written from the template, that
-works as written: its package (`src/photo_fx/effects/<name>/`), its tests (`tests/effects/<name>/`) and its
+works as written: its package (`src/bullterrier_image/effects/<name>/`), its tests (`tests/effects/<name>/`) and its
 example recipe (`examples/effects/<name>.toml`), where `gallery.effect_files` says they belong.
 
-The scaffold always writes into the checkout photo-fx runs from, so these tests run it on a copy: in-process through
+The scaffold always writes into the checkout it runs from, so these tests run it on a copy: in-process through
 `gallery.new_effect(checkout=...)`, or as the command, in a fresh interpreter importing the copy. The last two prove
 rule 4 of CLAUDE.md on a copy of the whole tree: adding an effect creates files and changes none, and the gate passes.
 """
@@ -18,18 +18,18 @@ from pathlib import Path
 
 import pytest
 
-import photo_fx
-from photo_fx import ProjectError, gallery
-from photo_fx.core import registry
+import bullterrier_image
+from bullterrier_image import ProjectError, gallery
+from bullterrier_image.core import registry
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
 def checkout(tmp_path):
-    """A scratch source checkout holding a copy of this photo-fx package (with its effect template)."""
-    package = tmp_path / "checkout" / "src" / "photo_fx"
-    shutil.copytree(Path(photo_fx.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
+    """A scratch source checkout holding a copy of this bullterrier-image package (with its effect template)."""
+    package = tmp_path / "checkout" / "src" / "bullterrier_image"
+    shutil.copytree(Path(bullterrier_image.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
     return tmp_path / "checkout"
 
 
@@ -43,7 +43,7 @@ def _tree(root: Path) -> dict[str, str]:
 
 
 def run_dev_script(checkout: Path, *args: str) -> subprocess.CompletedProcess:
-    """`tools/dev.py ARGS` from the copy of the package in `checkout` (so photo-fx takes the copy for its checkout)."""
+    """`tools/dev.py ARGS` from the copy of the package in `checkout` (so it takes the copy for its checkout)."""
     # no bytecode caches: the files in the checkout are exactly what the command wrote
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src"), "PYTHONDONTWRITEBYTECODE": "1"}
     return subprocess.run(
@@ -78,7 +78,7 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
     code = (
         "import json, sys\n"
         "import numpy as np\n"
-        "from photo_fx.core import registry\n"
+        "from bullterrier_image.core import registry\n"
         "out = registry.apply('lamp_probe', np.full((4, 4, 3), 0.25, np.float32), amount=1.0)\n"
         "json.dump([registry.category('lamp_probe'), float(out.max())], sys.stdout)\n"
     )
@@ -93,7 +93,7 @@ def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout)
 @pytest.mark.parametrize(
     "existing",
     [
-        "src/photo_fx/effects/lamp_probe/notes.txt",
+        "src/bullterrier_image/effects/lamp_probe/notes.txt",
         "tests/effects/lamp_probe/test_lamp_probe.py",
         "examples/effects/lamp_probe.toml",
         "docs/gallery/lamp_probe.jpg",
@@ -199,7 +199,7 @@ def _scaffold_into(copy: Path) -> list[str]:
 def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_existing_file(tmp_path, tracked_files):
     created = _scaffold_into(_copy_of_the_tree(tmp_path / "tree", tracked_files))
     assert created  # something was added ...
-    places = (f"src/photo_fx/effects/{PROBE}/", f"tests/effects/{PROBE}/", f"examples/effects/{PROBE}.")
+    places = (f"src/bullterrier_image/effects/{PROBE}/", f"tests/effects/{PROBE}/", f"examples/effects/{PROBE}.")
     assert all(path.startswith(places) for path in created), created  # ... and only files named for the effect
 
 
@@ -208,7 +208,7 @@ def test_a_scaffolded_effect_passes_the_contract_tests_its_own_tests_and_ruff_as
     run over every effect) and the new effect's own tests; not the whole gate."""
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     created = _scaffold_into(copy)
-    environment = {**os.environ, "PYTHONPATH": str(copy / "src")}  # the copy's photo_fx, not the installed one
+    environment = {**os.environ, "PYTHONPATH": str(copy / "src")}  # the copy's bullterrier_image, not the installed one
     contract_and_own = ["tests/effects/test_contract.py", f"tests/effects/{PROBE}"]
     checks = [
         [sys.executable, "-m", "ruff", "format", "--check", "--no-cache", *created],

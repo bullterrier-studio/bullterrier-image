@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "film_grain"
 # A weak grain, so that no value of a mid or dark patch is clipped (std 0.02 at black, 0.006 at white)

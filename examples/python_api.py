@@ -2,14 +2,14 @@
 
     uv run python examples/python_api.py
 
-Everything here is also available from the command line (`photo-fx run`, `photo-fx steps`); this is the same
+Everything here is also available from the command line (`bt-image run`, `bt-image steps`); this is the same
 machinery for when a look is easier to write as code than as a recipe file.
 """
 
 from pathlib import Path
 
-from photo_fx import Project, Recipe, fx, imageio, run, trace
-from photo_fx.sheet import write_stages
+from bullterrier_image import Project, Recipe, fx, imageio, run, trace
+from bullterrier_image.sheet import write_stages
 
 HERE = Path(__file__).parent
 PHOTO = HERE / "photos" / "bullterrier.jpeg"

@@ -1,4 +1,4 @@
-<h1 align="center">photo-fx</h1>
+<h1 align="center">bullterrier-image</h1>
 
 <p align="center">
   <b>A photo-effects pipeline you can script.</b><br>
@@ -30,7 +30,7 @@ background separately.
     <td width="33%" valign="top"><b>Developer friendly</b><br>Small pure-function effects, each with its category, example and gallery picture. Typos fail when a recipe is loaded, not halfway through a batch, and editors autocomplete every parameter.</td>
   </tr>
   <tr>
-    <td width="33%" valign="top"><b>Transparent</b><br>See the picture after every step with <code>photo-fx steps</code>, so a look that is not right can be debugged, not guessed at.</td>
+    <td width="33%" valign="top"><b>Transparent</b><br>See the picture after every step with <code>bt-image steps</code>, so a look that is not right can be debugged, not guessed at.</td>
     <td width="33%" valign="top"><b>Checked automatically</b><br>A missed cut-out or a blank result is flagged without anyone having to look.</td>
     <td width="33%" valign="top"><b>One picture, any moment</b><br>Effects like <code>disperse</code> show one moment of a process, set by a plain parameter (<code>progress</code>), so a video tool can drive it from anything, a beat included.</td>
   </tr>
@@ -38,7 +38,7 @@ background separately.
 
 ## Gallery
 
-Every picture here is made from one photo by the recipe linked under it (`examples/recipes/`). Reproduce them with `photo-fx run examples/photo-fx.toml`.
+Every picture here is made from one photo by the recipe linked under it (`examples/recipes/`). Reproduce them with `bt-image run examples/bt-image.toml`.
 
 <table>
   <tr>
@@ -94,8 +94,8 @@ Effects are meant to be combined: every recipe chains three or more of them over
 Requires Python 3.12+. As a package:
 
 ```bash
-pip install photo-fx
-photo-fx effects                   # lists every effect and its main parameters (--advanced: all of them; --category NAME: one category;
+pip install bullterrier-image
+bt-image effects                   # lists every effect and its main parameters (--advanced: all of them; --category NAME: one category;
                                    # --list-categories: the categories with their number of effects; NAME: one effect in full)
 ```
 
@@ -105,12 +105,12 @@ From a checkout, with [uv](https://docs.astral.sh/uv/):
 git clone https://github.com/jcakstins/photo-fx.git
 cd photo-fx
 uv sync
-uv run photo-fx effects
+uv run bt-image effects
 ```
 
 ## Platforms
 
-photo-fx runs on macOS, Linux and Windows, on Python 3.12, 3.13 and 3.14. Every effect works everywhere; three things
+bullterrier-image runs on macOS, Linux and Windows, on Python 3.12, 3.13 and 3.14. Every effect works everywhere; three things
 depend on the machine.
 
 **Finding the subject** (cut-outs, `mask = "background"`, anything that needs a silhouette) has two backends:
@@ -121,30 +121,30 @@ depend on the machine.
 | `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default elsewhere. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
 
 The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
-folder (`~/Library/Caches/photo-fx` on macOS, `$XDG_CACHE_HOME/photo-fx` or else `~/.cache/photo-fx` on Linux,
-`%LOCALAPPDATA%\photo-fx\Cache` on Windows), checks its SHA-256 against the one pinned in the code and keeps it; nothing is downloaded when photo-fx is imported. Offline, or where the download
-is blocked, download the file the error message names by hand and save it where it says, or point `PHOTO_FX_MODEL` at a
-copy (`PHOTO_FX_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
+folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else `~/.cache/bt-image` on Linux,
+`%LOCALAPPDATA%\bt-image\Cache` on Windows), checks its SHA-256 against the one pinned in the code and keeps it; nothing is downloaded when bullterrier-image is imported. Offline, or where the download
+is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_MODEL` at a
+copy (`BT_IMAGE_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
 Choose the backend with `--segmenter vision|onnx` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
-with `PHOTO_FX_SEGMENTER=onnx`; the option wins over the variable. No model is needed at all if you have the subject's
+with `BT_IMAGE_SEGMENTER=onnx`; the option wins over the variable. No model is needed at all if you have the subject's
 matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
 the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
-in [`matte/`](src/photo_fx/matte), so a further backend is added there without touching the rest. On Python versions
-newer than 3.14 ONNX Runtime has no release yet, so photo-fx installs without it there: the `onnx` backend then says
+in [`matte/`](src/bullterrier_image/matte), so a further backend is added there without touching the rest. On Python versions
+newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
 it is missing, and Apple Vision and `--matte` still work.
 
 **Text effects** (`ascii`, `disperse`, `evaporate` and the text strips of `glitch`) draw with a monospaced font: the first that exists of the
-files listed in `PHOTO_FX_FONTS` (paths separated like `PATH`), or else of the usual system fonts (Menlo, Monaco or
+files listed in `BT_IMAGE_FONTS` (paths separated like `PATH`), or else of the usual system fonts (Menlo, Monaco or
 Courier on macOS, DejaVu Sans Mono on Linux, Consolas on Windows). A machine with none of them, such as a slim Linux
 container, still works with Pillow's built-in font, which is not monospaced.
 
 ## Quick start
 
-The repository ships a demo project: one photo and a dozen recipes in the layout `photo-fx init` makes.
+The repository ships a demo project: one photo and a dozen recipes in the layout `bt-image init` makes.
 
 ```bash
-uv run photo-fx run examples/photo-fx.toml
+uv run bt-image run examples/bt-image.toml
 open examples/output/index.html            # macOS; xdg-open on Linux, start on Windows
 ```
 
@@ -156,26 +156,26 @@ they join the batch.
 To start your own project:
 
 ```bash
-uv run photo-fx init my-project            # photo-fx.toml, a photos/ folder, two starter recipes
+uv run bt-image init my-project            # bt-image.toml, a photos/ folder, two starter recipes
 cp ~/Pictures/me.jpg my-project/photos/
-uv run photo-fx run my-project/photo-fx.toml
+uv run bt-image run my-project/bt-image.toml
 ```
 
 ### The command line
 
-`photo-fx --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `run`, `steps`, `init`, `effects`) and
-`photo-fx COMMAND --help` shows one command's options and an example. `photo-fx --version` prints the version, and
-`python -m photo_fx` is the same program for when the `photo-fx` script is not on your `PATH`. Results are printed to
+`bt-image --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `run`, `steps`, `init`, `effects`) and
+`bt-image COMMAND --help` shows one command's options and an example. `bt-image --version` prints the version, and
+`python -m bullterrier_image` is the same program for when the `bt-image` script is not on your `PATH`. Results are printed to
 stdout and progress and errors to stderr. A mistake (a file that is not an image, an unknown effect in a recipe, an
 output folder that cannot be written) prints one line, `error: ...`, and exits with 1; usage mistakes exit with 2, Ctrl-C
-with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `PHOTO_FX_DEBUG=1`.
+with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `BT_IMAGE_DEBUG=1`.
 
 `sweep` shows what one parameter does: the recipe at five values of it (`--count`, 2 to 24), side by side, each labelled. The
 target is `effect.parameter` (`effect#2.parameter` for an effect the recipe uses twice); a range that starts below zero
 goes after `--`, as in `... -o out/sweep.png -- -2..2`.
 
 ```
-uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
+uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
 ```
 
 ## The pipeline
@@ -201,7 +201,7 @@ uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.t
 | **export** | Writes every format and size you asked for. |
 | **report** | `manifest.json` (machine-readable) and `index.html` (browse everything, warnings included). |
 
-**Image files in and out** (`photo_fx.imageio`):
+**Image files in and out** (`bullterrier_image.imageio`):
 
 - **Reading.** Anything Pillow opens: JPEG, PNG, WebP, TIFF, GIF, BMP... in any mode: 8-bit RGB, greyscale, 1-bit,
   palette and CMYK; 16-bit greyscale at full precision. Transparency is composited over white, so a colour hidden under
@@ -214,7 +214,7 @@ uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.t
   refused; raise that limit yourself for bigger files you trust.
 - **Writing.** Stills embed a small sRGB profile and nothing else: no EXIF and no GPS position from your photo, and no
   timestamp, so the same picture always gives the same file. JPEG and WebP quality is the project's `quality` export
-  setting (92 unless set; also used by `photo-fx steps`), or 95 for `imageio.save`, `photo-fx render`, `sheet` and
+  setting (92 unless set; also used by `bt-image steps`), or 95 for `imageio.save`, `bt-image render`, `sheet` and
   `cutout`; JPEGs keep full-resolution colour.
 
 Good batch behaviour is built in, and tested:
@@ -223,7 +223,7 @@ Good batch behaviour is built in, and tested:
 - **Resilient.** One photo or recipe failing is recorded and the rest carry on. The exit code is non-zero if anything failed (`--strict` also fails on warnings, for CI).
 - **Safe to preview.** `--dry-run` shows what would run and writes nothing. `--only 'dog*.jpg'` limits a run to some photos. `--force` redoes everything.
 
-The project file is `photo-fx.toml`:
+The project file is `bt-image.toml`:
 
 ```toml
 photos  = ["photos/*.jpg", "photos/*.png"]   # globs, relative to this file
@@ -274,8 +274,8 @@ effects, misspelt parameters and bad values fail when the recipe loads, naming t
 
 **Presets.** Some built-in effects ship named parameter sets for common looks: `preset = "sepia"` on a `gradient_map` step,
 or `fx.gradient_map(preset="sepia")` in Python. Parameters you write next to it win over the preset's
-(`fx.gradient_map(preset="sepia", shadow_clip=0.05)`), and `photo-fx effects gradient_map` lists the presets of an effect.
-They are data (`src/photo_fx/presets/<effect>.toml`), checked like any step; third-party effects have none.
+(`fx.gradient_map(preset="sepia", shadow_clip=0.05)`), and `bt-image effects gradient_map` lists the presets of an effect.
+They are data (`src/bullterrier_image/presets/<effect>.toml`), checked like any step; third-party effects have none.
 
 ## Python API
 
@@ -283,7 +283,7 @@ The same recipes can be written in Python with `fx`. Every effect is a function 
 editors complete names and parameters (`fx.pyi` is generated by `poe regenerate`).
 
 ```python
-from photo_fx import Recipe, fx, imageio, render
+from bullterrier_image import Recipe, fx, imageio, render
 
 photo = imageio.load("dog.jpg")
 
@@ -306,23 +306,23 @@ recipes can be handed straight to the pipeline: `run(Project(photos=(...), recip
 [`examples/python_api.py`](examples/python_api.py) for a complete, runnable example.
 
 Every effect declares its parameters once, as a frozen Pydantic model in which each field has a description, a unit, a
-range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `photo-fx effects` and
+range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `bt-image effects` and
 [docs/effects/](docs/effects/README.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
 field, the limit and the value. Writing an effect follows the same pattern: `uv run poe new-effect <name>
---category <category>` starts one from the template, and [`effects/grade/effect.py`](src/photo_fx/effects/grade/effect.py)
+--category <category>` starts one from the template, and [`effects/grade/effect.py`](src/bullterrier_image/effects/grade/effect.py)
 is a worked example.
 
-Importing `photo_fx` is quick: the effects load the first time one is asked for, once, under a lock, so threads can
+Importing `bullterrier_image` is quick: the effects load the first time one is asked for, once, under a lock, so threads can
 render at the same time; register effects at import time only.
 
 ### Writing a plugin
 
-Effects can live in your own package. Write them against `photo_fx.plugin`, which holds everything an effect author
+Effects can live in your own package. Write them against `bullterrier_image.plugin`, which holds everything an effect author
 needs (`EffectParams`, `param`, `Color`, `effect`, `CATEGORIES`):
 
 ```python
 import numpy as np
-from photo_fx.plugin import Color, EffectParams, effect, param
+from bullterrier_image.plugin import Color, EffectParams, effect, param
 
 
 class TintParams(EffectParams):
@@ -339,22 +339,22 @@ def tint(rgb: np.ndarray, params: TintParams) -> np.ndarray:
 ```
 
 Declare the module as an entry point in your package's `pyproject.toml` and install the package; `tint` is then
-available by name in TOML recipes, as `fx.tint(...)` and in `photo-fx effects`:
+available by name in TOML recipes, as `fx.tint(...)` and in `bt-image effects`:
 
 ```toml
-[project.entry-points."photo_fx.effects"]
+[project.entry-points."bullterrier_image.effects"]
 my_effects = "my_package.effects"
 ```
 
-A plugin that fails to load stops the first effect lookup with an error naming it; set `PHOTO_FX_PLUGINS=builtin` to
-load only photo-fx's own effects. Effect names must be unique across every installed package.
+A plugin that fails to load stops the first effect lookup with an error naming it; set `BT_IMAGE_PLUGINS=builtin` to
+load only bullterrier-image's own effects. Effect names must be unique across every installed package.
 
 ## Seeing what each step does
 
 When a look is not right, the cause is rarely the last step. Print the picture after every step:
 
 ```bash
-uv run photo-fx steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml
+uv run bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml
 ```
 
 <p align="center">
@@ -362,7 +362,7 @@ uv run photo-fx steps examples/photos/bullterrier.jpeg examples/recipes/ember-gl
 </p>
 
 The sheet (written to `out/steps/<photo>__<recipe>/`, with one picture per step) shows the photo, the subject cut-out
-(white = subject), and the result of each step, with the exact parameters. In Python it is `trace(photo, recipe)`, and `photo-fx run --steps` does it for a whole batch (linked from the report).
+(white = subject), and the result of each step, with the exact parameters. In Python it is `trace(photo, recipe)`, and `bt-image run --steps` does it for a whole batch (linked from the report).
 The last picture is exactly what `render` returns, because both run the same code.
 
 ## Effects
@@ -370,15 +370,15 @@ The last picture is exactly what `render` returns, because both run the same cod
 Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and dispersing
 particles, grouped by category. **[The effect catalogue](docs/effects/README.md)** (an index and a page per category) shows every effect with a picture of it, a
 one-line description, its parameters and defaults, and the example recipe that made the picture.
-`uv run photo-fx effects` prints the main parameters of every effect (`--advanced` adds the technique options, `photo-fx effects NAME` shows one effect in full).
+`uv run bt-image effects` prints the main parameters of every effect (`--advanced` adds the technique options, `bt-image effects NAME` shows one effect in full).
 
 Adding an effect adds files named for it and edits none. `uv run poe new-effect my_effect --category light` writes
 them from the template, working as written:
 
-- `src/photo_fx/effects/my_effect/effect.py` (and `__init__.py`): its parameter model and a pure function
+- `src/bullterrier_image/effects/my_effect/effect.py` (and `__init__.py`): its parameter model and a pure function
   `def my_effect(rgb, params) -> rgb` with the decorator `@effect(category="...", params=...)`. Its docstring becomes its
-  documentation. Every package in [`src/photo_fx/effects/`](src/photo_fx/effects) is found automatically. Effects never
-  import each other: what two of them share goes to `src/photo_fx/ops/`.
+  documentation. Every package in [`src/bullterrier_image/effects/`](src/bullterrier_image/effects) is found automatically. Effects never
+  import each other: what two of them share goes to `src/bullterrier_image/ops/`.
 - `tests/effects/my_effect/test_my_effect.py`: tests of the property that defines it.
 - `examples/effects/my_effect.toml`: a short example recipe (size 480), which makes its picture in the catalogue,
   `docs/gallery/my_effect.jpg` (`uv run poe gallery --only my_effect`).
@@ -400,8 +400,8 @@ never block an export, and `--strict` turns them into a failing exit code:
 ## Project layout
 
 ```
-src/photo_fx/                  layers, top to bottom; each imports only from the layers below it
-  cli.py         app       the `photo-fx` command (no logic of its own); `python -m photo_fx` runs it too
+src/bullterrier_image/                  layers, top to bottom; each imports only from the layers below it
+  cli.py         app       the `bt-image` command (no logic of its own); `python -m bullterrier_image` runs it too
   pipeline.py              many photos x many recipes: cache, checks, export, report
   gallery.py               what is generated from the effects (catalogue page, pictures, fx.pyi); new-effect, driven by tools/dev.py
   sheet.py                 contact sheets, step sheets and parameter sweeps
@@ -421,8 +421,8 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
                            loader.py (TOML), runner.py (render, render_all, trace; given the photo and the subject)
   ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
                            glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
-  errors.py      errors    PhotoFxError and its subclasses: the bottom layer, importable from every other one
-examples/        the demo project (photo-fx.toml, photos/, recipes/, output/), one snippet per effect (effects/), older experiments (experiments/), a Python example; see examples/README.md
+  errors.py      errors    BullterrierImageError and its subclasses: the bottom layer, importable from every other one
+examples/        the demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/), older experiments (experiments/), a Python example; see examples/README.md
   effects/       one short example recipe per effect, <effect>.toml
 docs/            the effect catalogue (effects/, generated: an index and a page per category) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
 tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
@@ -442,7 +442,7 @@ uv run poe check       # before every push or merge: format, lint, dead code, de
 uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
 uv run poe fix         # applies the automatic lint and format fixes
 uv run poe new-effect my_effect --category light   # a new effect's files, from the template
-uv run photo-fx render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
+uv run bt-image render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
 uv run poe regenerate   # at integration: fx.pyi, docs/effects/, missing pictures
 ```
 
@@ -451,7 +451,7 @@ most 72 characters, body explaining why); a `commit-msg` hook checks it. The det
 How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md), what changed in each release in [CHANGELOG.md](CHANGELOG.md),
 and how to report a security problem privately in [SECURITY.md](SECURITY.md).
 
-Generated shared files (`src/photo_fx/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches that
+Generated shared files (`src/bullterrier_image/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches that
 add effects never conflict over them; each effect's picture is a file of its own. After merging, `uv run poe regenerate` brings them up to date in one
 commit. Pictures that exist are kept (`uv run poe gallery --force` renders them again).
 

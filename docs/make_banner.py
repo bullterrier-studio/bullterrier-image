@@ -1,13 +1,13 @@
 """Rebuild docs/images/banner.jpg, the README's header: the original photo, then what each recipe made of it.
 
-uv run photo-fx run examples/photo-fx.toml && uv run python docs/make_banner.py
+uv run bt-image run examples/bt-image.toml && uv run python docs/make_banner.py
 """
 
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from photo_fx import imageio
+from bullterrier_image import imageio
 
 ROOT = Path(__file__).parent.parent
 RESULTS = ROOT / "examples" / "output" / "bullterrier"

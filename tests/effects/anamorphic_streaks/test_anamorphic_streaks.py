@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "anamorphic_streaks"
 

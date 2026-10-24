@@ -20,7 +20,7 @@ repos:
   - repo: local
     hooks:
       # Hooks only check; they never rewrite staged files. The hook name is what pre-commit prints on a failure,
-      # so it carries the fix. `types: [python]` leaves out the generated src/photo_fx/fx.pyi.
+      # so it carries the fix. `types: [python]` leaves out the generated src/bullterrier_image/fx.pyi.
       - id: ruff-format
         name: ruff-format (fix with `uv run poe fix`)
         entry: uv run ruff format --check

@@ -12,9 +12,9 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
-from photo_fx.core import registry
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect, unregister
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect, unregister
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -131,10 +131,10 @@ def matte() -> np.ndarray:
 @pytest.fixture(autouse=True)
 def no_model_download(monkeypatch):
     """No test may download the subject-finding model, or depend on the settings of the person running the tests:
-    `PHOTO_FX_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it, instead of
-    downloading) and `PHOTO_FX_SEGMENTER` is unset. A test that needs a model sets `PHOTO_FX_MODEL` itself."""
-    monkeypatch.setenv("PHOTO_FX_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
-    monkeypatch.delenv("PHOTO_FX_SEGMENTER", raising=False)
+    `BT_IMAGE_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it, instead of
+    downloading) and `BT_IMAGE_SEGMENTER` is unset. A test that needs a model sets `BT_IMAGE_MODEL` itself."""
+    monkeypatch.setenv("BT_IMAGE_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
+    monkeypatch.delenv("BT_IMAGE_SEGMENTER", raising=False)
 
 
 @pytest.fixture

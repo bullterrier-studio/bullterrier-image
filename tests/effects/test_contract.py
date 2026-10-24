@@ -10,10 +10,10 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.core import registry
-from photo_fx.core.params import UNITS, EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.core.steps import Step
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import UNITS, EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.core.steps import Step
 
 ALL = sorted(registry.describe())
 
@@ -104,7 +104,7 @@ def test_an_emptied_registry_holds_only_what_the_test_registers_and_gets_the_rea
 
 def _naming_problems(name: str) -> list[str]:
     """Every parameter of the effect `name` that uses a discouraged name, with the name to use instead."""
-    from photo_fx.core.vocabulary import DISCOURAGED
+    from bullterrier_image.core.vocabulary import DISCOURAGED
 
     return [
         f"effect {name!r}: parameter `{parameter}` should be called `{DISCOURAGED[parameter]}`"

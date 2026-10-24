@@ -1,0 +1,13 @@
+# The demo project: one photo x every recipe in recipes/ -> output/
+#
+#   uv run bt-image run examples/bt-image.toml            # render everything (finished work is skipped next time)
+#   uv run bt-image run examples/bt-image.toml --steps    # also keep the picture after every step of every recipe
+#
+# Open output/index.html afterwards to look through the results and any warnings from the automatic checks.
+photos  = ["photos/*.jpeg", "photos/*.jpg", "photos/*.png"]
+recipes = ["recipes"]
+output  = "output"
+
+[export]
+formats = ["jpg"]
+quality = 90

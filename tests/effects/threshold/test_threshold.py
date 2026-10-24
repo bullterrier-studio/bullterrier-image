@@ -5,7 +5,7 @@ from itertools import pairwise
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "threshold"
 BLACK, WHITE = np.zeros(3, np.float32), np.ones(3, np.float32)

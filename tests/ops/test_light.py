@@ -4,7 +4,7 @@ hand from their definitions."""
 import numpy as np
 import pytest
 
-from photo_fx.ops.light import highlights, screen
+from bullterrier_image.ops.light import highlights, screen
 
 
 @pytest.mark.parametrize(

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.ops.warp import Centre, remap
+from bullterrier_image.ops.warp import Centre, remap
 
 Interpolation = Literal["nearest", "bilinear", "bicubic"]
 Edge = Literal["reflect", "mirror", "nearest", "wrap"]

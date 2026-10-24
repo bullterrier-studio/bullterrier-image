@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.tone import monotone_curve, remap_levels
+from bullterrier_image.ops.tone import monotone_curve, remap_levels
 
 ONE_PIXEL = np.array([[[0.3, 0.4, 0.6]]], np.float32)
 IDENTITY = {"black": 0.0, "white": 1.0, "gamma": 1.0, "output_black": 0.0, "output_white": 1.0}

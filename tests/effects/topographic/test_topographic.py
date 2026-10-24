@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "topographic"
 BLACK_LINES = {"line": "#000000", "smoothing": 0.0, "fill": "none"}

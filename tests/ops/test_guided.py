@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.ops.guided import guided_filter
+from bullterrier_image.ops.guided import guided_filter
 
 
 def window_mean(values: np.ndarray, radius: int) -> np.ndarray:

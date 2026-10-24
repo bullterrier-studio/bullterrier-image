@@ -3,8 +3,8 @@ import dataclasses
 import numpy as np
 import pytest
 
-from photo_fx.ops.blur import Edge
-from photo_fx.ops.distance import EdgeField, edge_distance, signed_distance
+from bullterrier_image.ops.blur import Edge
+from bullterrier_image.ops.distance import EdgeField, edge_distance, signed_distance
 
 HEIGHT, WIDTH = 40, 60
 TOP, BOTTOM, LEFT, RIGHT = 10, 29, 15, 44  # inclusive bounds of the rectangle in the middle of the array

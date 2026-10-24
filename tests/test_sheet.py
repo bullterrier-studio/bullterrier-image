@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from photo_fx import RecipeError
-from photo_fx.recipe import Recipe, Step, render
-from photo_fx.sheet import sweep
+from bullterrier_image import RecipeError
+from bullterrier_image.recipe import Recipe, Step, render
+from bullterrier_image.sheet import sweep
 
 GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
 GRAIN_PARAMS = {"amount": 0.1, "size": 1.6, "seed": 2}

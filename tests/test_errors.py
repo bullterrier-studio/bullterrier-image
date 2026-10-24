@@ -1,24 +1,25 @@
-"""photo-fx raises its own exceptions: one base, `PhotoFxError`, and subclasses that also inherit the builtin a caller
-would already catch, so a mistake raises the same type whichever way it was made (a recipe file, `fx`, a direct
+"""bullterrier-image raises its own exceptions: one base, `BullterrierImageError`, and subclasses that also inherit the
+builtin a caller would already catch, so a mistake raises the same type whichever way it was made (a recipe file, `fx`,
+a direct
 call)."""
 
 import numpy as np
 import pytest
 
-from photo_fx import (
+from bullterrier_image import (
     BackendUnavailableError,
+    BullterrierImageError,
     ImageReadError,
     NonFiniteImageError,
-    PhotoFxError,
     ProjectError,
     RecipeError,
     SubjectNotFoundError,
     UnknownEffectError,
     fx,
 )
-from photo_fx.core import registry
-from photo_fx.core.loader import load_recipe
-from photo_fx.core.steps import Step
+from bullterrier_image.core import registry
+from bullterrier_image.core.loader import load_recipe
+from bullterrier_image.core.steps import Step
 
 GREY = np.full((4, 4, 3), 0.25, dtype=np.float32)
 
@@ -51,7 +52,7 @@ def test_an_unknown_effect_is_an_unknown_effect_error_with_a_clean_message_where
 def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_have():
     with pytest.raises(ValueError, match="opacity"):
         Step("grade", opacity=1.5)
-    with pytest.raises(PhotoFxError, match="opacity"):
+    with pytest.raises(BullterrierImageError, match="opacity"):
         Step("grade", opacity=1.5)
     with pytest.raises(KeyError):
         Step("no_such_effect")
@@ -70,8 +71,8 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
         (NonFiniteImageError, ValueError),
     ],
 )
-def test_every_public_error_is_caught_as_a_photo_fx_error_and_as_its_builtin(error, builtin):
-    with pytest.raises(PhotoFxError, match="what went wrong"):
+def test_every_public_error_is_caught_as_a_bullterrier_image_error_and_as_its_builtin(error, builtin):
+    with pytest.raises(BullterrierImageError, match="what went wrong"):
         raise error("what went wrong")
     with pytest.raises(builtin, match="what went wrong"):
         raise error("what went wrong")

@@ -5,9 +5,9 @@ import re
 
 import pytest
 
-from photo_fx.core.loader import load_recipe
-from photo_fx.core.steps import Step
-from photo_fx.errors import RecipeError
+from bullterrier_image.core.loader import load_recipe
+from bullterrier_image.core.steps import Step
+from bullterrier_image.errors import RecipeError
 
 STEP = "[[step]]\neffect = 'grade'\n"
 

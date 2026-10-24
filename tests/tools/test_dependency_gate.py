@@ -31,7 +31,9 @@ def test_the_package_as_it_is_declares_what_it_imports(project_copy):
 )
 def test_library_code_importing_an_undeclared_package_fails_naming_it(project_copy, module, rule):
     checkout = project_copy("pyproject.toml")
-    (checkout / "src" / "photo_fx" / "ops" / "probe.py").write_text(f'"""Probe."""\n\nimport {module}\n', "utf-8")
+    (checkout / "src" / "bullterrier_image" / "ops" / "probe.py").write_text(
+        f'"""Probe."""\n\nimport {module}\n', "utf-8"
+    )
     result = deptry(checkout)
     report = result.stdout + result.stderr
     assert result.returncode != 0, report

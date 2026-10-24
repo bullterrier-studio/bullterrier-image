@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "rgb_split"
 ROW, COLUMN = 5, 10  # where the white pixel sits on the black 12 x 24 picture of the tests below

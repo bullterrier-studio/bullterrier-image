@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "lens_blur"
 REC_709_RED = 0.2126  # the perceived brightness of pure red, from the Rec. 709 standard

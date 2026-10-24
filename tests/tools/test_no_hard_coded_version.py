@@ -1,6 +1,6 @@
 """No test hard-codes the project's version: the version changes with every release, so a test that writes it (a built
-file name such as `photo_fx-<version>-py3-none-any.whl`) breaks the build on the next release. Tests read the version
-from pyproject.toml instead.
+file name such as `bullterrier_image-<version>-py3-none-any.whl`) breaks the build on the next release. Tests read the
+version from pyproject.toml instead.
 
 The scan is `tools/release.py`'s `literal_versions`, the same one the release command uses to refuse a version that a
 test already holds; it matches every PEP 440 spelling of the version, not just the canonical one.
@@ -37,7 +37,7 @@ def test_no_test_file_holds_the_project_version(release_tool):
 def test_the_version_is_found_in_any_spelling_and_only_that_version(release_tool, tmp_path):
     (tmp_path / "tools").mkdir()
     (tmp_path / "tools" / "test_build.py").write_text(
-        'WHEEL = "photo_fx-7.3.0rc1-py3-none-any.whl"\n'
+        'WHEEL = "bullterrier_image-7.3.0rc1-py3-none-any.whl"\n'
         'OTHER = "7.3.0rc2 and 7.3.0 and 17.3.0rc1"\n'  # neighbours of the version are not it
         'SPELT = "v7.3.0-RC.1"\n',
         encoding="utf-8",

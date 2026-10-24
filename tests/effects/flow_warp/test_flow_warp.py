@@ -4,7 +4,7 @@ steps, so it smears into streaks where the flow converges."""
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "flow_warp"
 HEIGHT, WIDTH = 200, 300

@@ -18,12 +18,12 @@ import numpy as np
 import pytest
 from PIL import Image, JpegImagePlugin
 
-import photo_fx
-from photo_fx import ProjectError, UnknownEffectError, fx, gallery, imageio
-from photo_fx.core import registry
-from photo_fx.core.params import Color, EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.ops.resample import resize
+import bullterrier_image
+from bullterrier_image import ProjectError, UnknownEffectError, fx, gallery, imageio
+from bullterrier_image.core import registry
+from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.ops.resample import resize
 
 
 class AmountParams(EffectParams):
@@ -290,12 +290,13 @@ REAL_EXAMPLES = Path(__file__).parent.parent / "examples" / "effects"
 
 @pytest.fixture
 def checkout(tmp_path, photo):
-    """A scratch source checkout to generate into: a copy of this photo-fx package (without fx.pyi, so writing one
-    shows), a copy of the example recipes, a demo photo, and the empty folder the pictures go to. Nothing in the real
+    """A scratch source checkout to generate into: a copy of this bullterrier-image package (without fx.pyi, so writing
+    one shows), a copy of the example recipes, a demo photo, and the empty folder the pictures go to. Nothing in the
+    real
     checkout is written."""
     root = tmp_path / "checkout"
-    package = root / "src" / "photo_fx"
-    shutil.copytree(Path(photo_fx.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
+    package = root / "src" / "bullterrier_image"
+    shutil.copytree(Path(bullterrier_image.__file__).parent, package, ignore=shutil.ignore_patterns("__pycache__"))
     (package / "fx.pyi").unlink()
     shutil.copytree(REAL_EXAMPLES, root / "examples" / "effects")
     (root / "examples" / "photos").mkdir()
@@ -338,7 +339,7 @@ def _jpeg_tables(quality: int) -> dict:
 
 def test_an_effects_files_are_found_by_its_name_in_the_layout_that_mirrors_the_package(checkout):
     files = gallery.effect_files("lamp", checkout=checkout)
-    assert files.package == checkout / "src" / "photo_fx" / "effects" / "lamp"
+    assert files.package == checkout / "src" / "bullterrier_image" / "effects" / "lamp"
     assert files.tests == checkout / "tests" / "effects" / "lamp" / "test_lamp.py"
     assert files.example == checkout / "examples" / "effects" / "lamp.toml"
     assert files.picture == checkout / "docs" / "gallery" / "lamp.jpg"
@@ -411,7 +412,7 @@ def test_regenerate_checks_the_checkout_before_writing_anything(checkout):
     gallery.effect_files("grain", checkout=checkout).example.unlink()  # one effect without its example recipe
     with pytest.raises(ProjectError, match="grain"):
         gallery.regenerate(checkout=checkout)
-    assert not (checkout / "src" / "photo_fx" / "fx.pyi").exists()
+    assert not (checkout / "src" / "bullterrier_image" / "fx.pyi").exists()
     assert not (checkout / "docs" / "effects").exists()
 
 
@@ -424,9 +425,9 @@ def test_gallery_outside_a_source_checkout_says_it_needs_one(tmp_path):
 # --- writing everything: `poe gallery` and `poe regenerate` (tools/dev.py) --------------------------------------------
 
 
-# The commands always work on the checkout photo-fx runs from. To run them without touching the real one, each test
+# The commands always work on the checkout it runs from. To run them without touching the real one, each test
 # runs the script in a fresh interpreter from a copy of the package placed in the scratch checkout's src/: imported
-# from there, photo-fx takes the scratch checkout for its own.
+# from there, bullterrier-image takes the scratch checkout for its own.
 
 DEV_SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "dev.py"
 
@@ -455,7 +456,7 @@ def _page_files(root: Path) -> dict[str, Path]:
 def test_regenerate_writes_the_stub_and_the_pages_and_keeps_existing_pictures(docs):
     done = dev_command(docs, "regenerate")
     assert done.returncode == 0, done.stderr
-    stub, pages = docs / "src" / "photo_fx" / "fx.pyi", _page_files(docs)
+    stub, pages = docs / "src" / "bullterrier_image" / "fx.pyi", _page_files(docs)
     assert done.stdout.split() == [str(stub), *map(str, pages.values())]  # into the scratch checkout, nowhere else
     assert stub.read_text(encoding="utf-8") == fx.stub_text()
     for filename, text in gallery.render_effects_pages().items():
@@ -471,7 +472,7 @@ def test_the_gallery_command_writes_the_pages_too(docs):
     assert done.stdout.split() == [str(path) for path in pages.values()]
     for filename, text in gallery.render_effects_pages().items():
         assert pages[filename].read_text(encoding="utf-8") == text
-    assert not (docs / "src" / "photo_fx" / "fx.pyi").exists()
+    assert not (docs / "src" / "bullterrier_image" / "fx.pyi").exists()
 
 
 def test_regenerating_again_changes_no_file_and_removes_the_page_of_a_category_that_lost_its_effects(docs):
@@ -540,7 +541,7 @@ def test_the_gallery_command_writes_exactly_the_files_its_arguments_name(docs, a
     sentinels = {  # stand-ins for the generated and the hand-written files a picture run must leave alone
         "docs/effects/README.md": "old index",
         "docs/effects/light.md": "old page",
-        "src/photo_fx/fx.pyi": "old stub",
+        "src/bullterrier_image/fx.pyi": "old stub",
         "README.md": "the project readme",
     }
     for relative, text in sentinels.items():

@@ -1,5 +1,5 @@
-"""Third-party effect packages: written against `photo_fx.plugin`, declared as an entry point of the group
-`photo_fx.effects`, found by the registry like photo-fx's own effects.
+"""Third-party effect packages: written against `bullterrier_image.plugin`, declared as an entry point of the group
+`bullterrier_image.effects`, found by the registry like bullterrier-image's own effects.
 
 Each test installs a throwaway package the way an installer would (the package plus a `.dist-info` folder holding its
 `entry_points.txt`) in a folder put on `PYTHONPATH`, and runs a fresh interpreter, so the registry loads the effect
@@ -20,7 +20,7 @@ TINT_PACKAGE = '''
 
 import numpy as np
 
-from photo_fx.plugin import Color, EffectParams, effect, param
+from bullterrier_image.plugin import Color, EffectParams, effect, param
 
 
 class TintParams(EffectParams):
@@ -36,11 +36,11 @@ def zz_tint(rgb: np.ndarray, params: TintParams) -> np.ndarray:
     return (rgb * (1 - params.amount) + np.asarray(params.colour, np.float32) * params.amount).astype(np.float32)
 '''
 
-# Registers an effect under the name of one of photo-fx's own, which the registry refuses.
+# Registers an effect under the name of one of bullterrier-image's own, which the registry refuses.
 CLASHING_PACKAGE = '''
 """A broken third-party effect package."""
 
-from photo_fx.plugin import EffectParams, effect
+from bullterrier_image.plugin import EffectParams, effect
 
 
 class GlowParams(EffectParams):
@@ -56,19 +56,19 @@ def glow(rgb, params):
 
 def install(site: Path, distribution: str, entry_point: str, source: str) -> None:
     """Install, in `site`, a distribution whose module `<entry_point>_pkg` holds `source`, declared as the entry point
-    `entry_point` of the group `photo_fx.effects`."""
+    `entry_point` of the group `bullterrier_image.effects`."""
     module = f"{entry_point}_pkg"
     (site / f"{module}.py").write_text(source, encoding="utf-8")
     info = site / f"{distribution.replace('-', '_')}-1.0.dist-info"
     info.mkdir()
     (info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {distribution}\nVersion: 1.0\n", encoding="utf-8")
-    (info / "entry_points.txt").write_text(f"[photo_fx.effects]\n{entry_point} = {module}\n", encoding="utf-8")
+    (info / "entry_points.txt").write_text(f"[bullterrier_image.effects]\n{entry_point} = {module}\n", encoding="utf-8")
 
 
 def fresh_python(site: Path, code: str, *args: str) -> dict:
     """Run `code` in a fresh interpreter that sees the packages installed in `site`; what it printed, as JSON."""
     environment = {**os.environ, "PYTHONPATH": str(site)}
-    environment.pop("PHOTO_FX_PLUGINS", None)
+    environment.pop("BT_IMAGE_PLUGINS", None)
     done = subprocess.run(
         [sys.executable, "-c", textwrap.dedent(code), *args],
         env=environment,
@@ -91,8 +91,8 @@ def test_an_installed_plugin_effect_is_listed_and_runs_from_toml_and_from_fx(tmp
         """
         import json, sys
         import numpy as np
-        from photo_fx import Recipe, fx, load_recipe, render
-        from photo_fx.core import registry
+        from bullterrier_image import Recipe, fx, load_recipe, render
+        from bullterrier_image.core import registry
 
         grey = np.full((6, 8, 3), 0.5, np.float32)
         from_toml = render(grey, load_recipe(sys.argv[1]))
@@ -115,30 +115,32 @@ def test_an_installed_plugin_effect_is_listed_and_runs_from_toml_and_from_fx(tmp
     assert report["fx"] == pytest.approx(expected, abs=1e-6)
 
 
-def test_a_broken_plugin_is_a_photo_fx_error_naming_it_and_photo_fx_plugins_builtin_skips_it(tmp_path):
+def test_a_broken_plugin_is_a_bullterrier_image_error_naming_it_and_bullterrier_image_plugins_builtin_skips_it(
+    tmp_path,
+):
     """One interpreter, three settings in turn: a failed load is not remembered, so each query tries again."""
     install(tmp_path, "zz-clash", "zz_clash", CLASHING_PACKAGE)
     report = fresh_python(
         tmp_path,
         """
         import json, os, sys
-        from photo_fx import PhotoFxError
-        from photo_fx.core import registry
+        from bullterrier_image import BullterrierImageError
+        from bullterrier_image.core import registry
 
         report = {}
         for setting in ("everything", "", "builtin"):
-            os.environ["PHOTO_FX_PLUGINS"] = setting
+            os.environ["BT_IMAGE_PLUGINS"] = setting
             try:
                 report[setting] = {"effects": sorted(registry.describe())}
-            except PhotoFxError as error:
+            except BullterrierImageError as error:
                 report[setting] = {"error": str(error)}
         json.dump(report, sys.stdout)
         """,
     )
-    assert "PHOTO_FX_PLUGINS" in report["everything"]["error"]
+    assert "BT_IMAGE_PLUGINS" in report["everything"]["error"]
     assert "'everything'" in report["everything"]["error"]
     broken = report[""]["error"]
-    for named in ("zz_clash", "zz-clash", "glow", "PHOTO_FX_PLUGINS=builtin"):
+    for named in ("zz_clash", "zz-clash", "glow", "BT_IMAGE_PLUGINS=builtin"):
         assert named in broken
     assert "glow" in report["builtin"]["effects"]
     assert "zz_clash" not in " ".join(report["builtin"]["effects"])

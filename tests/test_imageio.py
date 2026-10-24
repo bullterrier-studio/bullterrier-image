@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from PIL import Image, ImageCms
 
-from photo_fx import BackendUnavailableError, ImageReadError, NonFiniteImageError, imageio
+from bullterrier_image import BackendUnavailableError, ImageReadError, NonFiniteImageError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):

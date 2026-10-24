@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from photo_fx.core import registry
+from bullterrier_image.core import registry
 
 NAME = "channel_mixer"
 # The nine weights in row order: a row is one output channel, a column one input channel.

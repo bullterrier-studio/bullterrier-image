@@ -1,15 +1,15 @@
-"""Developer commands that need a source checkout of photo-fx: `uv run poe gallery|regenerate|new-effect`.
+"""Developer commands that need a source checkout of bullterrier-image: `uv run poe gallery|regenerate|new-effect`.
 
-They write into the checkout photo-fx runs from (the effect packages, tests, example recipes, gallery pictures,
-`fx.pyi` and the catalogue in `docs/effects/`), so they are not part of the installed `photo-fx` program. Each prints
+They write into the checkout bullterrier-image runs from (the effect packages, tests, example recipes, gallery pictures,
+`fx.pyi` and the catalogue in `docs/effects/`), so they are not part of the installed `bt-image` program. Each prints
 the files it wrote, one per line, to stdout; an error is `error: <reason>` on stderr and exit code 1.
 """
 
 import argparse
 import sys
 
-from photo_fx import PhotoFxError, gallery
-from photo_fx.core import registry
+from bullterrier_image import BullterrierImageError, gallery
+from bullterrier_image.core import registry
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,7 +49,11 @@ def main(argv: list[str] | None = None) -> int:
             written = gallery.regenerate()
         else:
             written = gallery.new_effect(args.name, args.category)
-    except (PhotoFxError, ValueError, OSError) as error:  # ValueError: gallery's own refusals (unknown or taken name)
+    except (
+        BullterrierImageError,
+        ValueError,
+        OSError,
+    ) as error:  # ValueError: gallery's own refusals (unknown or taken name)
         print(f"error: {error}", file=sys.stderr)
         return 1
     for path in written:

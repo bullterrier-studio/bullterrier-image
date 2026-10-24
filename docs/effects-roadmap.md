@@ -1,11 +1,11 @@
 # Effects roadmap
 
-What photo-fx can do today and what could come next. **✓ marks what exists now** (`photo-fx effects` lists it with every
+What bullterrier-image can do today and what could come next. **✓ marks what exists now** (`bt-image effects` lists it with every
 parameter); everything else is a proposal. Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
 is `effect = "<effect>"` plus the same parameters.
 
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
-`src/photo_fx/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
+`src/bullterrier_image/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
 recipes.
 
 ## Colour and tone
@@ -263,7 +263,7 @@ Combine the photo with other images, text and blend modes.
 | `blend` | Combine with another layer in any blend mode. | `fx.blend(image="tex.png", mode="overlay", opacity=0.4)` |
 | `overlay` | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom-right", scale=0.15)` |
 | `gradient_overlay` | Linear, radial or conic colour wash. | `fx.gradient_overlay(["#f0f","#0ff"], kind="linear", mode="screen")` |
-| `text` | Render text with font, outline and shadow. | `fx.text("PHOTO-FX", size=0.08, at="bottom")` |
+| `text` | Render text with font, outline and shadow. | `fx.text("BULLTERRIER", size=0.08, at="bottom")` |
 | `split_screen` | Before/after or side by side. | `fx.split_screen(vertical=True)` |
 | `collage` | Several recipes' results in one layout. | `fx.collage(columns=3)` |
 | `transition` | Between two images: dissolve, wipe, glitch, pixel. | `fx.transition(to="b.jpg", kind="pixel", progress=0.5)` |
@@ -293,8 +293,8 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `avatar` | Square crop on the subject, optional circle. | `fx.avatar(size=512, shape="circle")` |
 | `upscale` | Lanczos, or an optional AI model. | `fx.upscale(factor=2)` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
-| `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `photo-fx sweep photo.jpg r.toml glitch.split 0..20` |
-| `compare` (CLI) | Before/after slider page. | `photo-fx compare a.jpg b.jpg` |
+| `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml glitch.split 0..20` |
+| `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
 | `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
 
 ## One moment of a process

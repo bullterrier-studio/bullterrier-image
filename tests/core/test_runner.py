@@ -6,11 +6,11 @@ import tracemalloc
 import numpy as np
 import pytest
 
-from photo_fx import SubjectNotFoundError
-from photo_fx.core import runner
-from photo_fx.core.params import EffectParams, param
-from photo_fx.core.registry import effect
-from photo_fx.core.steps import Recipe, Step
+from bullterrier_image import SubjectNotFoundError
+from bullterrier_image.core import runner
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.registry import effect
+from bullterrier_image.core.steps import Recipe, Step
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)

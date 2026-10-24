@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from photo_fx import Recipe, gallery, load_project, load_recipe, render
-from photo_fx.core import registry
+from bullterrier_image import Recipe, gallery, load_project, load_recipe, render
+from bullterrier_image.core import registry
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
@@ -28,7 +28,7 @@ def test_every_example_recipe_belongs_to_an_effect():
 
 
 def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
-    project = load_project(EXAMPLES / "photo-fx.toml")
+    project = load_project(EXAMPLES / "bt-image.toml")
     assert [p.name for p in project.photos] == ["bullterrier.jpeg"]
     files = [r for r in project.recipes if isinstance(r, Path)]
     assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects

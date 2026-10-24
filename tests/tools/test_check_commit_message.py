@@ -58,7 +58,7 @@ VALID = {
     "body line of exactly 100 characters": f"fix: x\n\n{BODY_100}\n",
     "body line longer than the header limit but within the body limit": f"fix: x\n\n{'c' * 90}\n",
     "single long URL line": f"docs: link the spec\n\nhttps://example.com/{'a' * 150}\n",
-    "indented code block": f"docs: show usage\n\nExample:\n\n    uv run photo-fx run {'x' * 120}\n",
+    "indented code block": f"docs: show usage\n\nExample:\n\n    uv run bt-image run {'x' * 120}\n",
     "tab indented code line": f"docs: show usage\n\n\t{'x' * 120}\n",
     "acronym subject": "fix: ASCII glyphs are cut off\n",
     "code identifier subject": "feat: GlowParams gets a falloff\n",
