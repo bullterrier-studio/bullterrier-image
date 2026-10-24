@@ -100,7 +100,8 @@ class SmokeParams(EffectParams):
         "bilinear",
         doc="How the noise is read where `rise` and `turbulence` have moved it between pixels: 'nearest' takes the "
         "closest value (fastest, a little jagged), 'bilinear' blends the four around it (smooth), 'bicubic' fits a "
-        "cubic spline through the neighbours (smoothest, a little slower). It matters only where something moves.",
+        "cubic spline through the neighbours (smoothest, a little slower). It matters only where something moves. "
+        "Named `resampling`, not `interpolation`, because it reads a generated noise field, never the picture.",
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
