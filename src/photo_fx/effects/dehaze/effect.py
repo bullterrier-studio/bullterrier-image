@@ -1,5 +1,7 @@
 """The `dehaze` effect: remove haze and fog with the dark channel prior (He, Sun and Tang 2009)."""
 
+from typing import Literal
+
 import numpy as np
 from scipy import ndimage
 
@@ -70,6 +72,14 @@ class DehazeParams(EffectParams):
         "pixel is always used). Raising it makes the estimate less sensitive to a single odd pixel but can pick "
         "a bright object instead of the sky.",
     )
+    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+        "nearest",
+        doc="What the darkest-value search sees beyond the picture's edge, which sets the haze estimate along the "
+        "border: 'nearest' (the edge pixel repeated) and 'reflect' (mirrored, edge pixel repeated) look only at "
+        "pixels of the patch inside the picture and give the same result; 'mirror' (mirrored about the edge pixel) "
+        "also looks at pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far side's "
+        "darkest values set the haze at the border.",
+    )
 
 
 @effect(category="light", params=DehazeParams)
@@ -85,13 +95,12 @@ def dehaze(rgb: np.ndarray, params: DehazeParams) -> np.ndarray:
       `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between
       `transmission_floor` and 1;
     - the scene J = (I - A) / t + A, held to 0..1.
-    A picture without haze (a dark channel of 0) comes out as it went in. Colours are those of the sRGB-encoded picture.
+    A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond
+    the picture's border. Colours are those of the sRGB-encoded picture.
     """
     channel_min = rgb.min(axis=-1)
     patch = params.patch
-    # The dark channel's minimum over a patch reaches only pixels of the picture ('nearest' repeats the edge pixel,
-    # which is inside the patch anyway), so no edge value is invented.
-    dark = ndimage.minimum_filter(channel_min, size=patch, mode="nearest")
+    dark = ndimage.minimum_filter(channel_min, size=patch, mode=params.edge)
 
     # Airlight: the brightest pixel among the haziest ones.
     count = max(1, int(params.airlight_fraction * dark.size))
@@ -100,7 +109,7 @@ def dehaze(rgb: np.ndarray, params: DehazeParams) -> np.ndarray:
     airlight = np.maximum(pixels[np.argmax(pixels.sum(axis=-1))], _MIN_AIRLIGHT)
 
     # Transmission: from the dark channel of the picture divided by the airlight, refined along the picture's edges.
-    dark_normalised = ndimage.minimum_filter((rgb / airlight).min(axis=-1), size=patch, mode="nearest")
+    dark_normalised = ndimage.minimum_filter((rgb / airlight).min(axis=-1), size=patch, mode=params.edge)
     rough = 1.0 - params.amount * dark_normalised
     refined = guided_filter(luminance(rgb), rough, radius=round(params.radius), epsilon=params.edge_threshold**2)
     transmission = np.clip(refined, params.transmission_floor, 1.0)

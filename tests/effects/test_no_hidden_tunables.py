@@ -348,7 +348,6 @@ def test_a_constant_marker_with_a_reason_covers_its_statement_and_a_param_declar
 # `strict` makes the test fail the day one is fixed, so the entry is removed with it.
 KNOWN_LIBRARY_OPTIONS = {
     "effects/anamorphic_streaks/effect.py": 'mode="same" of fftconvolve (keeps the picture size)',
-    "effects/dehaze/effect.py": 'mode="nearest" of minimum_filter, twice (an edge rule no parameter names)',
     "effects/slice_shift/effect.py": 'side="right" of searchsorted',
     "ops/blur.py": 'mode="constant" of np.pad (the constant edge rule, beside the NUMPY_PAD table)',
     "ops/cluster.py": 'kind="stable" of argsort (pins the order of ties)',

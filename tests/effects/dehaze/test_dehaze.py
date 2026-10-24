@@ -114,6 +114,75 @@ def test_the_hand_worked_pixels_of_a_small_picture(settings, where, expected) ->
     np.testing.assert_allclose(out[where], expected, atol=1e-5)
 
 
+# What `edge` changes is the haze at the border. A 12 x 12 picture of P with a 4 x 4 sky block (rows and columns
+# 5..8) and one pixel Z with a zero channel (transmission 1 wherever its patch reaches). With `patch` 4 the patch of
+# a pixel spans two rows before it and one after, and the sky pixel (7, 7) sees only sky whatever lies beyond the
+# border, so the airlight is the sky under every choice. The patch of the corner pixel (0, 0) holds Z at (2, 2) only
+# if the picture is mirrored about its edge pixel; the patch of (11, 11) holds Z at (0, 0) only if the picture wraps
+# round. Where the patch holds Z, t = 1 and P stays; elsewhere t = 5/6 and P is cleared as in the rows above.
+def border_picture(zero_at: tuple[int, int] | None = None) -> np.ndarray:
+    picture = np.tile(np.array(P, np.float32), (12, 12, 1))
+    picture[5:9, 5:9] = SKY
+    if zero_at is not None:
+        picture[zero_at] = Q
+    return picture
+
+
+EDGE_ROWS = {
+    "nearest: the patch is cut at the border, so Z two rows away is not seen": ("nearest", (2, 2), (0, 0), CLEARED_P),
+    "reflect repeats the border pixel, so it sees what nearest sees": ("reflect", (2, 2), (0, 0), CLEARED_P),
+    "mirror reaches the pixel two rows in: Z is seen, t = 1": ("mirror", (2, 2), (0, 0), P),
+    "wrap looks at the far side, not at Z two rows in": ("wrap", (2, 2), (0, 0), CLEARED_P),
+    "nearest does not see the opposite corner": ("nearest", (0, 0), (11, 11), CLEARED_P),
+    "reflect does not see the opposite corner": ("reflect", (0, 0), (11, 11), CLEARED_P),
+    "mirror does not see the opposite corner": ("mirror", (0, 0), (11, 11), CLEARED_P),
+    "wrap sees Z at the opposite corner, t = 1": ("wrap", (0, 0), (11, 11), P),
+}
+
+
+@pytest.mark.parametrize(("edge", "zero_at", "where", "expected"), EDGE_ROWS.values(), ids=list(EDGE_ROWS))
+def test_edge_sets_what_the_patch_sees_beyond_the_border_of_the_picture(edge, zero_at, where, expected) -> None:
+    out = registry.apply(NAME, border_picture(zero_at), patch=4, radius=0, amount=1.0, edge=edge)
+    np.testing.assert_allclose(out[where], expected, atol=1e-5)
+
+
+# The same picture with a corner of haze W = (0.95, 0.85, 0.7) in rows and columns 0..2, hazier than the sky (a
+# darkest channel of 0.7 against 0.6). Where the patch is cut or mirrored at the border the corner pixels see only W
+# and rank first, so W is the airlight: t = 1 - (0.1 / 0.7) = 6/7 and J = W - (W - P) x 7/6. If the picture wraps
+# round, the patch of every corner pixel also holds P from the far side, W ranks below the sky and the airlight is the
+# sky, as in the rows above.
+CORNER_HAZE = (0.95, 0.85, 0.7)
+CLEARED_BY_CORNER_HAZE = (0.95 - 0.65 * 7 / 6, 0.85 - 0.65 * 7 / 6, 0.0)  # (0.1917, 0.0917, 0)
+AIRLIGHT_EDGE_ROWS = {
+    "nearest: the corner's patch is cut, so W ranks first": ("nearest", CLEARED_BY_CORNER_HAZE),
+    "reflect: the corner's patch is cut, so W ranks first": ("reflect", CLEARED_BY_CORNER_HAZE),
+    "mirror: the corner's patch holds only W, so W ranks first": ("mirror", CLEARED_BY_CORNER_HAZE),
+    "wrap: the corner's patch holds P from the far side, so the sky is the airlight": ("wrap", CLEARED_P),
+}
+
+
+@pytest.mark.parametrize(("edge", "expected"), AIRLIGHT_EDGE_ROWS.values(), ids=list(AIRLIGHT_EDGE_ROWS))
+def test_edge_sets_which_pixels_the_airlight_search_ranks_haziest_at_the_border(edge, expected) -> None:
+    picture = border_picture()
+    picture[:3, :3] = CORNER_HAZE
+    out = registry.apply(NAME, picture, patch=4, radius=0, amount=1.0, edge=edge)
+    np.testing.assert_allclose(out[6, 2], expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("edge", ["nearest", "reflect", "mirror", "wrap"])
+def test_every_edge_choice_gives_a_picture_of_the_same_shape_within_0_to_1(edge, photo) -> None:
+    odd = photo[:51, :67] * 0.5 + 0.3
+    out = registry.apply(NAME, odd, patch=9, edge=edge)
+    assert out.shape == odd.shape
+    assert out.min() >= 0.0
+    assert out.max() <= 1.0
+
+
+def test_an_edge_the_patch_search_cannot_use_is_refused() -> None:
+    with pytest.raises(ValueError, match="edge"):
+        registry.apply(NAME, scene(), edge="constant")
+
+
 def candidate_picture(*candidates: tuple[float, float, float]) -> np.ndarray:
     """10 x 10 of P with two pixels in each of the given colours, so that the airlight search sees them first when it
     looks at the 4 or 8 haziest pixels of 100 (their darkest channel, 0.5 or more, is above P's 0.1)."""
