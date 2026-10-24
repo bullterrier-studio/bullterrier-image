@@ -59,6 +59,27 @@ Every picture here is made from one photo by the recipe linked next to it. Repro
 
 The sixth demo recipe is an [animation](#animation).
 
+### Signature looks
+
+Effects are meant to be combined: each recipe below chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`) or blended in partway (`opacity`). Reproduce them with `photo-fx run examples/looks.toml`.
+
+<table>
+  <tr>
+    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/cyberpunk.jpg" alt="cyberpunk"></td>
+    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/vaporwave.jpg" alt="vaporwave"></td>
+    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/terminal.jpg" alt="terminal"></td>
+    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/newsprint.jpg" alt="newsprint"></td>
+    <td align="center" width="20%"><img src="examples/output/looks/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/looks/01-cyberpunk.toml"><b>cyberpunk</b></a><br><sub>Magenta and violet grade, colour fringes, scanlines, glow and rain.<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/looks/02-vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient and a grid behind a duotoned dog, split into colour ghosts.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
+    <td valign="top"><a href="examples/looks/03-terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters, scanlines, glow.<br><code>clarity</code> <code>ascii</code> <code>scanlines</code> <code>bloom</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/looks/04-newsprint.toml"><b>newsprint</b></a><br><sub>Black and white dots on off-white paper with a torn edge.<br><code>black_and_white</code> <code>clarity</code> <code>levels</code> <code>halftone</code> <code>paper_texture</code> <code>torn_edge</code></sub></td>
+    <td valign="top"><a href="examples/looks/05-northern-lights.toml"><b>northern-lights</b></a><br><sub>Aurora curtains and stars behind a cold-tinted dog.<br><code>aurora</code> <code>starfield</code> <code>split_tone</code> <code>bloom</code> <code>grain</code></sub></td>
+  </tr>
+</table>
+
 ## Contents
 
 [Gallery](#gallery) | [Install](#install) | [Platforms](#platforms) | [Quick start](#quick-start) | [The pipeline](#the-pipeline) | [Recipes](#recipes) |

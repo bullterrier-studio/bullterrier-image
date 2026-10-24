@@ -326,11 +326,14 @@ Time-based effects, plus every effect above that has a numeric parameter can be 
 
 What combining effects can give, once the pieces exist:
 
-- **Cyberpunk**: split tone, chromatic aberration, scanlines, bloom, rain
+- **Cyberpunk** ✓ ([recipe](../examples/looks/01-cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain
 - **Risograph poster**: levels, risograph inks, paper texture, border
-- **Terminal**: green ASCII, CRT, scanlines, vignette
-- **Vaporwave**: gradient background, grid pattern, gradient map, glitch
-- **Newspaper**: CMYK halftone, paper texture, faded sepia, torn edge
+- **Terminal** ✓ ([recipe](../examples/looks/03-terminal.toml); gains `crt` with batch 6): green ASCII, CRT, scanlines, vignette
+- **Vaporwave** ✓ ([recipe](../examples/looks/02-vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
+- **Newspaper** ✓ ([recipe](../examples/looks/04-newsprint.toml), black and white until `cmyk_halftone` and `sepia` exist): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure**: black and white, a second photo inside the silhouette, vignette
 - **Sticker**: cut-out with a white border and drop shadow
 - **Turn to dust** (animation): ASCII, disperse, embers, camera shake
+- **Northern lights** ✓ ([recipe](../examples/looks/05-northern-lights.toml)): aurora and stars behind a cold-tinted subject; gains a rim light with batch 11
+
+A look is added to `examples/looks/` by the batch that builds its last missing effect (Risograph poster with batch 9, Sticker with batch 11, Double exposure with decision D2, Turn to dust with batch 12).
