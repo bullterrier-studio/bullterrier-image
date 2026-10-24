@@ -1,0 +1,8 @@
+# Golden flow lines on deep violet, twice as dense as the default. The picture only gives the size.
+name = "flow_lines"
+size = 480
+
+[[step]]
+effect = "flow_lines"
+density = 0.004
+seed = 1
