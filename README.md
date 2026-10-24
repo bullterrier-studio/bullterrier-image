@@ -297,13 +297,15 @@ which it fits to the photo and blends by its own transparency.
 
 **Regions.** A recipe says *where* a step goes by naming regions. With `format = 2`, `[region.NAME]` declares one by its
 `kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
-stone, with presets `glass`, `torn`, `stone` and `mosaic`), a `pick` of some pieces of one of those, or a `subject`.
-Grids and shards are *partitions*: every pixel is in one piece, and the pieces are numbered from 0 in reading order
-(`bt-image steps` draws them numbered). A `pick`, a `subject` and the built-in `background` are *selections*.
-`fit = "subject"` lays a grid or shards over the subject instead of the whole picture, and `edge = { style = "torn" }` tears their borders. A step uses regions by
-name: `mask` limits it to a selection, `each` + `looks` gives every piece of a partition its own look (each look is
-rendered once over the whole picture, so the cost is the number of looks, not pieces), and `partition` names the
-partition the `seams` effect draws lines along:
+stone, with presets `glass`, `torn`, `stone` and `mosaic`), `cuts` (straight and curved lines across the picture), `svg`
+(the shapes of an SVG file), a `path` (everything inside a closed SVG path), a `pick` of some pieces of a partition, or a
+`subject`. Grids, shards, cuts and svg are *partitions*: every pixel is in one piece, and the pieces are numbered from 0
+in reading order (`bt-image steps` draws them numbered). A `path`, a `pick`, a `subject` and the built-in `background`
+are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole picture, and
+`edge = { style = "torn" }` tears its borders. A step uses regions by name: `mask` limits it to a selection, `each` +
+`looks` gives every piece of a partition its own look (each look is rendered once over the whole picture, so the cost is
+the number of looks, not pieces), and `partition` names the partition the `seams` effect draws lines along:
+
 
 ```toml
 format = 2
@@ -345,6 +347,45 @@ glass = Recipe(
     ],
 )
 ```
+
+Cuts, paths and SVG files, in the units every region uses (positions are shares of the frame: the picture, or the box
+of the `fit` selection):
+
+```toml
+format = 2
+
+[region.diagonal]                  # a straight cut: through (x, y) at an angle in degrees, counter-clockwise from horizontal
+kind = "cuts"
+lines = [{ x = 0.5, y = 0.5, angle = 62 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]  # and a curve
+
+[region.blob]                      # a selection: inside a closed path (M L H V C S Q T A Z, absolute or relative)
+kind = "path"
+d = "M 0.08 0.42 C 0.1 0.25, 0.32 0.22, 0.38 0.38 C 0.44 0.52, 0.36 0.74, 0.22 0.72 Z"
+
+[region.shapes]                    # every shape of the file is a piece
+kind = "svg"
+file = "shapes.svg"                # relative to the recipe file
+
+[region.leaf]
+kind = "pick"
+of = "shapes"
+pieces = ["leaf", 0]               # a shape by its id, or a piece by its number
+```
+
+- **Units.** A `path`'s or curve's coordinates run 0 to 1 across and down, and that unit square is stretched to the
+  frame: an arc `A 0.25 0.25` is a circle only in a square frame. A line's `angle` is measured on the picture's pixels.
+  The nonzero fill rule decides what is inside a `path` (an inner outline drawn the other way round is a hole); its
+  border is soft by the share of each pixel it covers (`samples` sets how many scanlines measure that). A curve cut
+  should run from border to border; an end that does not is carried straight on to the nearest border.
+- **SVG files** are placed by their `viewBox` and `preserveAspectRatio` (default: fitted inside, centred; without a
+  `viewBox` the `width` and `height` are the view box). Each `rect`, `circle`, `ellipse`, `polygon`, `polyline` and
+  `path` is a piece; colours and strokes are ignored, the `fill-rule` is kept (holes are holes), later shapes lie on top,
+  a `use` is drawn where it is used. The area outside every shape is one more piece, numbered like any piece by its
+  first pixel (0 when the top left pixel is outside every shape). `pick` takes a shape by its `id`: `pieces = ["leaf"]`.
+- **An SVG file is untrusted input.** Nothing in it is run or fetched (scripts, links and external images are ignored).
+  A file that declares XML entities, is larger than `max_kilobytes` (default 1024), has more than `max_shapes` shapes
+  (default 1000, counting what each `use` repeats) or nests deeper than 64 levels is refused with an error naming the
+  limit and its value.
 
 **Grid first.** `kind = "subject"` with `per` finds the subject inside each piece of a partition on its own and unites the
 finds, so small things a search of the whole picture misses show up (a calf behind its mother). Without `per` it is the

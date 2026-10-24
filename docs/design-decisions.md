@@ -310,8 +310,35 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   crop's pixels (and its size), so whatever recipe, framing or size made the crop, a repeat run asks the model nothing;
   "nothing found" is remembered too. The existing whole-photo entries and their keys are unchanged. The answer is kept in
   16 bits and the first run uses the kept value, so the first and later runs give the same pixels.
-- Grids, cuts, shards, Bezier paths and SVG shapes are built in slices; the plan and the
-  deferred list (each item with the need that would justify it) are in `.superpowers/plans/regions.md`.
+- **Cuts, paths and SVG shapes are drawn in the frame's units and filled by one scanline fill.** A path's coordinates
+  (`Cuts` curves, `Path.d`) are shares of the frame, and the unit square is stretched to it, so an arc is a circle only
+  in a square frame; a straight cut's `angle` is measured on the picture's pixels, counter-clockwise from horizontal.
+  `ops/raster` fills outlines by the nonzero or even-odd rule a few rows at a time (no supersampled picture, so 4K costs
+  about 1 s torn and 0.1 s straight): exactly across a pixel, `Path.samples` scanlines down it (advanced, default 4).
+  A cut curve is closed along the frame's border and its inside read as one side; an end not on the border is carried
+  straight on to the nearest. Every kind reads its drawing at the noise-shifted coordinates, so `edge = torn` works on
+  all of them. *Reason:* one rule for position and one for borders; a library rasteriser would add a dependency for a
+  fill that is a page of numpy.
+- **SVG files are read by `svgelements` (MIT), behind a guard in `core/outlines`.** We never write an SVG reader;
+  the library handles shapes, transforms, `use`, arcs and `viewBox`. A shape is a piece: colours and strokes are
+  ignored, `display="none"` shapes are skipped, the `fill-rule` is kept, later shapes lie on top, and the area outside
+  every shape is one more piece, numbered like any by its first pixel (0 unless the top left pixel is inside a shape). `Pick` takes a number
+  or an `id` (every piece of every shape with it; an id the file lacks is an error, a shape too small or too covered to
+  have a pixel selects nothing, as a number does). The file is placed by its `viewBox` and `preserveAspectRatio`
+  (library rule, default fitted inside and centred), and without a `viewBox` its `width` and `height`; a `transform` on
+  the root element is refused. *Reason:* the owner's files are unknown, so the common SVG subset is read whole and the
+  rest draws nothing.
+- **An SVG file is untrusted input; each limit is a named field or a cited constant, never silent.** XML entity
+  declarations are refused (a DOCTYPE with an internal subset, found by expat before the library sees the file:
+  billion laughs and external entities cannot start, whatever the encoding; a DOCTYPE that only names a public DTD is
+  harmless and never fetched). Nothing is run or fetched: scripts, links, `href` and external images are ignored.
+  `Svg.max_kilobytes` (default 1024) and `Svg.max_shapes` (default 1000) are advanced fields; shapes are counted before
+  any `use` is expanded (a use of a use of a use would otherwise multiply, as entities do), a `use` that contains
+  itself is refused, and nesting deeper than 64 levels (the reader recurses once per level) is refused, each with a
+  `RecipeError` naming the limit and its value. A curve that would need more than 1024 chords or a point farther than
+  10^7 px is refused (hostile coordinates, never a drawing). *Revisit when* an owner's real file needs more.
+- The plan and the deferred list of regions (each item with the need that would justify it) are in
+  `.superpowers/plans/regions.md`.
 
 ## Testing and gates
 
