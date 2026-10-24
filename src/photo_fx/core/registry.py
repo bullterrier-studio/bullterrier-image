@@ -209,11 +209,12 @@ def describe() -> dict[str, str]:
     return {name: documentation(name) for name in sorted(_EFFECTS)}
 
 
-def documentation(name: str) -> str:
-    """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every field's
-    type, unit, range, default and description. KeyError like `get`."""
+def documentation(name: str, *, advanced: bool = True) -> str:
+    """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every basic
+    field's type, unit, range, default and description, then an "Advanced parameters" section (or, with
+    `advanced=False`, one line counting them). KeyError like `get`."""
     fn = get(name)
-    return f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation()}"
+    return f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
 
 
 def summary(name: str) -> str:

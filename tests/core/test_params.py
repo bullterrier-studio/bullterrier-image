@@ -224,6 +224,73 @@ def test_the_documentation_says_an_animated_whole_number_moves_in_whole_steps():
     assert "whole steps" not in _entry(Probe.documentation(), "radius")
 
 
+class Tiered(EffectParams):
+    """A model whose advanced fields sit between its basic ones."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of the look is applied.")
+    edge: Literal["reflect", "wrap"] = param("reflect", advanced=True, doc="Past the border: 'reflect' or 'wrap'.")
+    angle: float = param(30.0, unit="degrees", min=0, max=180, doc="Direction of the look.")
+    softness: float = param(2.0, unit="px", min=0, max=10, advanced=True, doc="Blur of the technique's mask.")
+
+
+def test_the_documentation_lists_basic_fields_then_an_advanced_section_in_declaration_order():
+    text = Tiered.documentation()
+    basic, advanced = text.split("Advanced parameters\n-------------------\n")
+    assert basic.startswith("Parameters\n----------\n")
+    assert [name for name in ("amount", "angle") if f"{name} : " in basic] == ["amount", "angle"]
+    assert basic.index("amount : ") < basic.index("angle : ")
+    assert advanced.index("edge : ") < advanced.index("softness : ")
+    assert "edge : " not in basic
+    assert "softness : " not in basic
+    assert "amount : " not in advanced
+    assert "advanced parameters)" not in text  # the full text has no pointer to itself
+
+
+def test_the_short_documentation_hides_the_advanced_fields_and_counts_them():
+    text = Tiered.documentation(advanced=False)
+    assert "amount : " in text
+    assert "angle : " in text
+    assert "edge" not in text
+    assert "softness" not in text
+    assert text.rstrip().endswith("(+2 advanced parameters)")
+
+
+def test_a_model_without_advanced_fields_has_no_advanced_section_and_no_count():
+    for text in (Probe.documentation(), Probe.documentation(advanced=False)):
+        assert "dvanced" not in text
+
+
+def test_the_json_schema_says_which_fields_are_advanced():
+    properties = Tiered.model_json_schema()["properties"]
+    assert {name: p["advanced"] for name, p in properties.items()} == {
+        "amount": False,
+        "edge": True,
+        "angle": False,
+        "softness": True,
+    }
+
+
+def test_the_flag_does_not_reorder_the_signature_or_the_fields():
+    assert list(Tiered.signature().parameters) == ["amount", "edge", "angle", "softness"]
+    assert list(Tiered.model_fields) == ["amount", "edge", "angle", "softness"]
+
+
+@pytest.mark.parametrize(
+    ("values", "refused"),
+    [
+        pytest.param({"edge": "wrap", "softness": 10}, None, id="advanced-fields-accept-valid-values"),
+        pytest.param({"softness": 10.5}, "softness", id="advanced-number-out-of-range-is-refused"),
+        pytest.param({"edge": "clamp"}, "edge", id="advanced-choice-not-offered-is-refused"),
+    ],
+)
+def test_an_advanced_field_is_validated_like_any_other(values, refused):
+    if refused is None:
+        assert Tiered(**values).edge == "wrap"
+    else:
+        with pytest.raises(ValidationError, match=refused):
+            Tiered(**values)
+
+
 # --- strictness for every kind of field (known-good and known-bad per kind) -----------------------------------------
 
 

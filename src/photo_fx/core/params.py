@@ -20,6 +20,8 @@ Promises:
   specific `RecipeError` raised by a validator (an `UnknownEffectError`) keeps its class when it is the only problem.
 - `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
   command line, in a caller's types (a `Color` is shown as the forms one may write).
+- `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
+  defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
 
 import functools
@@ -104,6 +106,7 @@ class _Spec:
     unit: str | None
     min: float | None
     max: float | None
+    advanced: bool
     field_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -114,6 +117,7 @@ def param(
     unit: str | None = None,
     min: float | None = None,  # noqa: A002  (the documented name of the range's lower bound)
     max: float | None = None,  # noqa: A002  (the documented name of the range's upper bound)
+    advanced: bool = False,
     **field_kwargs: Any,
 ) -> Any:
     """Declare one field of an `EffectParams` model.
@@ -121,13 +125,15 @@ def param(
     default: the value an effect uses when none is given; it must lie in the range. doc: what the field does, its unit
     and range in words, and what raising it does (shown in `help()`, the catalogue and the command line). unit: one of
     `UNITS`, required for a number, not allowed otherwise. min, max: the documented range, both required and inclusive
-    for a number; not allowed for anything else.
+    for a number; not allowed for anything else. advanced: the user would change it to tune the technique rather
+    than to choose the look; it is listed after the basic fields (and left out of short listings) but is settable,
+    validated and in the schema like any other.
     field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
     A whole-number (`int`) field may be animated: its value then moves in whole steps, rounded to the nearest.
     The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
     """
-    return _Spec(default, doc, unit, min, max, field_kwargs)
+    return _Spec(default, doc, unit, min, max, advanced, field_kwargs)
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
@@ -181,6 +187,7 @@ class FieldDoc(NamedTuple):
     maximum: float | None
     default: Any
     doc: str
+    advanced: bool
 
     @property
     def range(self) -> str:
@@ -257,15 +264,18 @@ class EffectParams(ValidatedModel):
                     maximum,
                     info.default,
                     info.description or "",
+                    bool(extra["advanced"]),
                 )
             )
         return tuple(docs)
 
     @classmethod
-    def documentation(cls) -> str:
-        """A "Parameters" section (numpydoc style) with each field's type, unit, range, default and description."""
+    def documentation(cls, advanced: bool = True) -> str:
+        """A "Parameters" section (numpydoc style) with each basic field's type, unit, range, default and description,
+        then an "Advanced parameters" section of the same form if there are advanced fields. With `advanced=False` those
+        are left out and one line says how many."""
         whole = cls.whole_number_fields()
-        entries = []
+        sections: dict[bool, list[str]] = {False: [], True: []}
         for doc in cls.fields_doc():
             parts = [doc.type]
             if doc.unit:
@@ -277,8 +287,13 @@ class EffectParams(ValidatedModel):
             if doc.name in whole:
                 words += " Animated, it moves in whole steps (rounded to the nearest whole number)."
             description = textwrap.fill(words, 88, initial_indent="    ", subsequent_indent="    ")
-            entries.append(f"{doc.name} : {', '.join(parts)}\n{description}")
-        return "Parameters\n----------\n" + "\n".join(entries)
+            sections[doc.advanced].append(f"{doc.name} : {', '.join(parts)}\n{description}")
+        text = "Parameters\n----------\n" + "\n".join(sections[False])
+        if not sections[True]:
+            return text
+        if advanced:
+            return text + "\n\nAdvanced parameters\n-------------------\n" + "\n".join(sections[True])
+        return text + f"\n\n(+{len(sections[True])} advanced parameters)"
 
 
 _MISSING = object()
@@ -328,7 +343,11 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
     elif get_origin(annotation) is tuple:
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
     made = Field(
-        spec.default, description=spec.doc, json_schema_extra={"unit": spec.unit}, **constraints, **spec.field_kwargs
+        spec.default,
+        description=spec.doc,
+        json_schema_extra={"unit": spec.unit, "advanced": spec.advanced},
+        **constraints,
+        **spec.field_kwargs,
     )
     return typed, made
 

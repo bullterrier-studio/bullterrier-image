@@ -279,6 +279,27 @@ def test_describe_gives_the_documentation_and_every_parameter(gain):
     assert registry.summary("gain_probe") == "Brightens by a gain, then shifts by an offset."
 
 
+class TunedParams(EffectParams):
+    """A gain with a technique option."""
+
+    gain: float = param(1.0, unit="ratio", min=0, max=4, doc="Multiplies every value.")
+    softness: float = param(2.0, unit="px", min=0, max=10, advanced=True, doc="Blur of the technique's mask.")
+
+
+def test_documentation_lists_the_advanced_parameters_unless_told_not_to(throwaway_effects):
+    @effect(category="light", params=TunedParams)
+    def tuned_probe(rgb, params):
+        """Gains, tuned."""
+        return rgb
+
+    full, short = registry.documentation("tuned_probe"), registry.documentation("tuned_probe", advanced=False)
+    assert full.startswith("Gains, tuned.")
+    assert "softness : " in full
+    assert short.startswith("Gains, tuned.")
+    assert "softness" not in short
+    assert "(+1 advanced parameters)" in short
+
+
 def test_queries_about_an_unknown_effect_list_the_known_ones(gain):
     for query in (registry.parameters, registry.inputs):
         with pytest.raises(KeyError, match="gain_probe"):
