@@ -348,7 +348,9 @@ def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
     reach = 4 * 2 + 1  # a feather is cut off at 4 sigmas
     np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
     assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
-    assert not np.array_equal(out[:, 30:34], photo[:, 30:34])  # and the border is blended
+    border = out[:, 31, 1]  # the green of the last column of the red piece: red has none, the photo some
+    assert (border > 0).all()
+    assert (border < photo[:, 31, 1]).all()  # a mix of the two looks, not either one
 
 
 @pytest.mark.parametrize("feather", [0, 3])

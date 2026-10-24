@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from bullterrier_image import Picture, Project, Recipe, fx, imageio
+from bullterrier_image import Each, Grid, Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.errors import BackendUnavailableError, ProjectError
@@ -121,9 +121,16 @@ def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_e
     assert {recipe for _, recipe in remade(folder)} == {"layered.jpg", "layered.png"}
 
 
-def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe):
+@pytest.mark.parametrize(
+    "layer",
+    [
+        pytest.param(lambda image: fx.layer_probe(image), id="a step"),
+        pytest.param(lambda image: Each("panes", [fx.layer_probe(image), "none"]), id="a look of an each step"),
+    ],
+)
+def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe, layer):
     def project_with(image: Picture) -> Project:
-        recipe = Recipe("layered", [fx.layer_probe(image)], size=64)
+        recipe = Recipe("layered", [layer(image)], size=64, regions={"panes": Grid(columns=2)})
         return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out")
 
     dark = Picture(np.full((4, 4, 3), 0.25, np.float32), "tex")

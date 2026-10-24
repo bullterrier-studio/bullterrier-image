@@ -4,7 +4,7 @@ from PIL import Image
 
 from bullterrier_image import RecipeError
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.recipe import Recipe, Stage, Step, render
+from bullterrier_image.recipe import Each, Grid, Recipe, Stage, Step, render
 from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
 GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
@@ -132,3 +132,11 @@ def test_write_stages_saves_a_stage_with_transparency_as_png_and_the_others_as_j
     assert sheet == tmp_path / "_sheet.jpg"
     with Image.open(tmp_path / "01-transparent.png") as saved:
         assert saved.mode == "RGBA"
+
+
+def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps_of_the_recipe():
+    seams = Step("seams", {"width": 0.01}, partition="panes")
+    look = Recipe("panes", [Each("panes", ["none"]), seams], size=48, regions={"panes": Grid(columns=2)})
+    tiles = sweep(look, "seams.width", 0.002, 0.02, 3)
+    assert [tile.steps[1].partition for _, tile in tiles] == ["panes"] * 3  # type: ignore[union-attr]
+    assert all(tile.steps[0] == look.steps[0] and tile.regions == look.regions for _, tile in tiles)
