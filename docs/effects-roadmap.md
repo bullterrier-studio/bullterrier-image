@@ -292,7 +292,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `avatar` | Square crop on the subject, optional circle. | `fx.avatar(size=512, shape="circle")` |
 | `upscale` | Lanczos, or an optional AI model. | `fx.upscale(factor=2)` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
-| `sweep` (CLI) | Render one parameter across a range, side by side. | `photo-fx sweep r.toml glitch.split 0..20` |
+| `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `photo-fx sweep photo.jpg r.toml glitch.split 0..20` |
 | `compare` (CLI) | Before/after slider page. | `photo-fx compare a.jpg b.jpg` |
 | `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
 

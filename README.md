@@ -164,12 +164,20 @@ uv run photo-fx run my-project/photo-fx.toml
 
 ### The command line
 
-`photo-fx --help` lists the commands (`render`, `sheet`, `cutout`, `animate`, `run`, `steps`, `init`, `effects`) and
+`photo-fx --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `animate`, `run`, `steps`, `init`, `effects`) and
 `photo-fx COMMAND --help` shows one command's options and an example. `photo-fx --version` prints the version, and
 `python -m photo_fx` is the same program for when the `photo-fx` script is not on your `PATH`. Results are printed to
 stdout and progress and errors to stderr. A mistake (a file that is not an image, an unknown effect in a recipe, an
 output folder that cannot be written) prints one line, `error: ...`, and exits with 1; usage mistakes exit with 2, Ctrl-C
 with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `PHOTO_FX_DEBUG=1`.
+
+`sweep` shows what one parameter does: the recipe at five values of it (`--count`, 2 to 24), side by side, each labelled. The
+target is `effect.parameter` (`effect#2.parameter` for an effect the recipe uses twice); a range that starts below zero
+goes after `--`, as in `... -o out/sweep.png -- -2..2`.
+
+```
+uv run photo-fx sweep examples/photos/bullterrier.jpeg examples/recipes/02-glitch.toml glitch.split 0..20
+```
 
 ## The pipeline
 
@@ -428,7 +436,7 @@ src/photo_fx/                  layers, top to bottom; each imports only from the
   cli.py         app       the `photo-fx` command (no logic of its own); `python -m photo_fx` runs it too
   pipeline.py              many photos x many recipes: cache, checks, export, report
   gallery.py               what is generated from the effects (catalogue page, pictures, fx.pyi); new-effect, driven by tools/dev.py
-  sheet.py                 contact sheets and step sheets
+  sheet.py                 contact sheets, step sheets and parameter sweeps
   checks.py                automatic quality checks
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
