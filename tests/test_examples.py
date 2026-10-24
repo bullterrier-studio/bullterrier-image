@@ -49,6 +49,14 @@ def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     assert max(render(photo, recipe, matte).shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
+def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, matte):
+    recipe = load_recipe(EXAMPLES / "transparent" / "avatar.toml")
+    out = render(photo, recipe, matte)
+    assert out.shape == (recipe.size, recipe.size, 4)
+    middle = out.shape[0] // 2
+    assert (out[0, 0, 3], out[middle, middle, 3]) == (0, 1)  # clear in the corner, opaque in the middle
+
+
 def test_a_recipe_of_two_effects_is_not_a_combination(tmp_path):
     path = tmp_path / "two.toml"
     path.write_text(

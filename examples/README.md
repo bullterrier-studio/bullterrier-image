@@ -7,6 +7,7 @@ Everything here uses one photo, `photos/bullterrier.jpeg`.
 | `bt-image.toml` | the demo project: every photo in `photos/` through every recipe in `recipes/` into `output/` (the layout `bt-image init` makes) |
 | `recipes/` | finished looks, each a recipe that combines three or more effects |
 | `output/bullterrier/` | the rendered pictures the main README shows (re-made by the command below) |
+| `transparent/` | recipes whose picture is cut out (a circle, rounded corners, the subject): their render has an alpha channel, so it is a PNG, and a project that exports `jpg` refuses them; the picture is made with the command below, not by the demo project |
 | `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence; the commands are below |
 | `effects/` | one short recipe per effect, the source of its catalogue picture in `docs/gallery/` |
 | `experiments/` | older recipes, mostly variants of glitch, ASCII and evaporate; not part of the demo |
@@ -17,6 +18,17 @@ uv run bt-image run examples/bt-image.toml           # render every recipe (fini
 open examples/output/index.html                      # the results and any quality warnings (xdg-open on Linux)
 uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
 uv run python examples/python_api.py
+```
+
+## Transparent looks
+
+A recipe with `transparent` in its `[frame]` table renders to a picture with an alpha channel. `transparent/avatar.toml` crops
+a square around the subject and cuts a circle; run this from the repository root to make `output/bullterrier/avatar.png`
+again:
+
+```bash
+uv run bt-image render examples/photos/bullterrier.jpeg examples/transparent/avatar.toml -o out
+mv out/bullterrier__avatar.png examples/output/bullterrier/avatar.png
 ```
 
 ## Assets

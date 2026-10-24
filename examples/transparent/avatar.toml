@@ -1,0 +1,17 @@
+# A round avatar: a square crop around the subject, a little more colour and bite, and everything outside the circle clear.
+# The render has an alpha channel, so it is a PNG (a project that exports jpg refuses this recipe).
+name = "avatar"
+size = 512
+
+[frame]
+aspect = 1                  # a square...
+anchor = "subject"          # ...around the subject
+margin = 0.15               # with a sixth of the subject's size around it
+transparent = "circle"      # the circle inscribed in the square; the rest is transparent
+
+[[step]]
+effect = "vibrance"
+amount = 0.3
+
+[[step]]
+effect = "clarity"
