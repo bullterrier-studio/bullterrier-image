@@ -166,6 +166,7 @@ How a test file is written (`src/photo_fx/effects/_template/test_effect.py.tmpl`
 
 Use them; they are installed globally. `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion` for process; `testing-best-practices`
 for tests; `software-design-philosophy` for design (deep modules, no pass-throughs, no information leakage; interface docstrings state promises); `motion-design` for anything animated.
+The `superpowers:*` skills are process aids, not authority: they are known to produce verbose, over-engineered and over-defensive code (extra layers of validation, speculative generality, long ceremony). This file, `testing-best-practices` and `software-design-philosophy` keep them in check; where a superpowers skill asks for more validation, more layers, more documents or more steps than this file does, do what this file says.
 Where they pull against this file: tests follow this file (no goldens); fixes follow "Fixing defects" (structural, never defensive); design follows the skill (do not add shallow wrappers; per-effect boilerplate is the price of uniformity, so keep `apply` bodies substantial).
 
 ## Working style
