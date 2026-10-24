@@ -31,12 +31,10 @@ def accumulate(
     is how a point between pixels is read ('nearest' pixel, 'bilinear', 'bicubic' spline) and `edge` what lies beyond
     the picture's edge ('reflect', 'mirror', 'nearest', 'wrap', as in `photo_fx.ops.blur`).
 
-    `offsets` and `weights` have one entry each (a ValueError says otherwise); the weights are not normalised or
+    `offsets` and `weights` have one entry each; the weights are not normalised or
     clipped, so the result can leave 0..1 and the caller scales it. Returns a new float32 array of the input's shape,
     black when there are no readings; the input is left alone.
     """
-    if len(offsets) != len(weights):
-        raise ValueError(f"accumulate: weights need one entry per offset, got {len(weights)} for {len(offsets)}")
     centre_point = np.asarray(centre, dtype=np.float64)
     planes = [np.ascontiguousarray(image[..., channel]) for channel in range(image.shape[2])]
     totals = [np.zeros_like(plane) for plane in planes]

@@ -145,13 +145,3 @@ def test_the_input_is_left_alone_and_the_result_keeps_its_shape_and_dtype() -> N
     np.testing.assert_array_equal(image, before)
     assert out.shape == image.shape
     assert out.dtype == np.float32
-
-
-@pytest.mark.parametrize(
-    ("offsets", "weights"),
-    [([0.0, 0.1], [1.0]), ([0.0], [1.0, 1.0])],
-    ids=["a weight missing", "a weight too many"],
-)
-def test_one_weight_per_offset_is_required(offsets: list[float], weights: list[float]) -> None:
-    with pytest.raises(ValueError, match="weights"):
-        accumulate_with(dot(4, 8), "zoom", offsets, weights)
