@@ -5,4 +5,4 @@ size = 480
 [[step]]
 effect = "soft_focus"
 radius = 14
-opacity = 0.6
+opacity = 0.3                 # the step mixes the full soft focus in at 30%

@@ -11,7 +11,7 @@ from bullterrier_image.ops.light import screen
 
 
 class SoftFocusParams(EffectParams):
-    """An Orton-style soft focus: a blurred copy of the picture screened over it, at an opacity."""
+    """An Orton-style soft focus: a blurred copy of the picture screened over it."""
 
     radius: float = param(
         12.0,
@@ -20,14 +20,6 @@ class SoftFocusParams(EffectParams):
         max=500,
         doc="Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier and softer; 0 blurs "
         "nothing, so the picture is only brightened by screening it with itself.",
-    )
-    opacity: float = param(
-        0.5,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How much of the screened result replaces the sharp picture: 0 = off (the picture unchanged), 1 = the "
-        "full soft focus. Raising it brightens and softens more.",
     )
     truncate: float = param(
         4.0,
@@ -50,9 +42,8 @@ class SoftFocusParams(EffectParams):
 def soft_focus(rgb: np.ndarray, params: SoftFocusParams) -> np.ndarray:
     """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
 
-    `opacity` sets how much of that replaces the sharp picture. This is the Orton effect of film photography (a sharp
-    and a blurred exposure of the same scene stacked). The picture only ever gets
-    brighter, detail stays under the glow, and black stays black.
+    This is the Orton effect of film photography (a sharp and a blurred exposure of the same scene stacked). The
+    picture only ever gets brighter, detail stays under the glow, and black stays black; the step's `opacity` mixes
+    in less of it.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge)
-    return (rgb * (1.0 - params.opacity) + screen(rgb, blurred) * params.opacity).astype(np.float32)
+    return screen(rgb, gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge))
