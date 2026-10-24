@@ -1,0 +1,7 @@
+# A screen with a few faulty pixels.
+# It also makes the effect's picture in the catalogue.
+name = "dead_pixels"
+size = 480
+
+[[step]]
+effect = "dead_pixels"
