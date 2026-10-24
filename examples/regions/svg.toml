@@ -1,0 +1,37 @@
+# Shapes from an SVG file cut the picture: each shape is a piece, the area outside every shape is piece 0 and stays as it
+# was, the other pieces take the looks in turn. `file` is relative to this recipe. Needs recipe format 2.
+format = 2
+name = "svg"
+size = 1024
+
+[region.mosaic]
+kind = "svg"
+file = "../assets/mosaic.svg"   # the viewBox is fitted inside the picture and centred
+
+[region.leaf]
+kind = "pick"
+of = "mosaic"
+pieces = ["leaf", "vein-left", "vein-right"]   # shapes picked by their `id`
+
+[[step]]
+each = "mosaic"                # pieces: 0 outside every shape, then the shapes in the order they first appear in the picture
+looks = [
+    "none",                                                        # 0 outside every shape: as it was
+    { effect = "gradient_map", preset = "cyanotype" },             # 1 wave
+    { effect = "gradient_map", preset = "thermal" },               # 2 sun
+    { effect = "halftone", cell = 7 },                             # 3 drop
+    "none",                                                        # 4 leaf (outlined below)
+    "none",                                                        # 5 right vein
+    "none",                                                        # 6 left vein
+    { effect = "gradient_map", preset = "thermal", opacity = 0.8 },  # 7 ring
+    { effect = "gradient_map", preset = "cyanotype" },             # 8 tile
+    { effect = "gradient_map", preset = "cyanotype", opacity = 0.6 },  # 9 hill
+    { effect = "halftone", cell = 7 },                             # 10 star
+    { effect = "gradient_map", preset = "thermal" },               # 11 pebble
+]
+
+[[step]]
+effect = "seams"
+partition = "leaf"
+width = 0.004
+color = "#ffffff"

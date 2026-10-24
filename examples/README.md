@@ -6,10 +6,10 @@ Everything here uses one photo, `photos/bullterrier.jpeg`.
 | --- | --- |
 | `bt-image.toml` | the demo project: every photo in `photos/` through every recipe in `recipes/` into `output/` (the layout `bt-image init` makes) |
 | `recipes/` | finished looks, each a recipe that combines three or more effects |
-| `regions/` | recipes that use regions (recipe format 2): `glass` (shattered glass), `torn` (torn scraps), `one-cell` (one cell of an uneven grid) and `grid-first` (the subject found cell by cell); the subject is found for them, and they are not part of the demo project |
+| `regions/` | recipes that use regions (recipe format 2): `glass` (shattered glass), `torn` (torn scraps), `one-cell` (one cell of an uneven grid), `grid-first` (the subject found cell by cell), `diagonal` (one straight cut), `tear` (a torn cut with a solid band), `bezier-cut` (a curved cut), `bezier-shape` (a closed path as a mask) and `svg` (shapes of `assets/mosaic.svg` as pieces); the subject is found where a recipe uses it, and they are not part of the demo project |
 | `output/bullterrier/` | the rendered pictures the main README shows (re-made by the command below) |
 | `transparent/` | recipes whose picture is cut out (a circle, rounded corners, the subject): their render has an alpha channel, so it is a PNG, and a project that exports `jpg` refuses them; the picture is made with the command below, not by the demo project |
-| `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence; the commands are below |
+| `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence (the commands are below), and `mosaic.svg`, a drawing of closed shapes made for the examples, also free of licence |
 | `effects/` | one short recipe per effect, the source of its catalogue picture in `docs/gallery/` |
 | `experiments/` | older recipes, mostly variants of glitch, ASCII and evaporate; not part of the demo |
 | `python_api.py` | the same pipeline driven from Python |

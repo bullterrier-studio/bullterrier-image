@@ -1,0 +1,22 @@
+# A closed shape drawn with Bezier curves (SVG path syntax, coordinates as shares of the dog's box) halftones the dog's
+# chest and legs inside it, with a yellow outline. A selection is also a two-piece partition, so `seams` can outline it.
+# Needs recipe format 2.
+format = 2
+name = "bezier-shape"
+size = 1024
+
+[region.blob]
+kind = "path"
+fit = "subject"                # laid over the dog's box, not the whole picture
+d = "M 0.04 0.58 C 0.12 0.46, 0.45 0.5, 0.65 0.56 C 0.9 0.62, 1.02 0.74, 0.95 0.88 C 0.8 1.04, 0.3 1.04, 0.1 0.92 C -0.02 0.82, -0.02 0.68, 0.04 0.58 Z"
+
+[[step]]
+effect = "halftone"
+cell = 7
+mask = "blob"
+
+[[step]]
+effect = "seams"
+partition = "blob"
+width = 0.005
+color = "#ffd600"

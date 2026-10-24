@@ -1,0 +1,19 @@
+# One straight cut through the dog at 62 degrees: one side keeps its colours, the other becomes a thermal map, and a thin
+# white line marks the cut. Needs recipe format 2.
+format = 2
+name = "diagonal"
+size = 1024
+
+[region.halves]
+kind = "cuts"
+lines = [{ x = 0.5, y = 0.5, angle = 62 }]   # through the middle of the picture, counter-clockwise from horizontal
+
+[[step]]
+each = "halves"
+looks = ["none", { effect = "gradient_map", preset = "thermal" }]
+
+[[step]]
+effect = "seams"
+partition = "halves"
+width = 0.003
+color = "#ffffff"

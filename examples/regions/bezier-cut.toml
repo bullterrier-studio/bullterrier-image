@@ -1,0 +1,19 @@
+# A curved cut from the top edge to the bottom edge, drawn as a cubic Bezier in SVG path syntax, coordinates as shares of
+# the picture. One side gets a heat map. Needs recipe format 2.
+format = 2
+name = "bezier-cut"
+size = 1024
+
+[region.wave]
+kind = "cuts"
+lines = [{ path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]
+
+[[step]]
+each = "wave"
+looks = ["none", { effect = "gradient_map", preset = "thermal" }]
+
+[[step]]
+effect = "seams"
+partition = "wave"
+width = 0.006
+color = "#ffffff"
