@@ -4,6 +4,7 @@ from itertools import pairwise
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from bullterrier_image.core import registry
 
@@ -55,6 +56,24 @@ def test_raising_amount_brings_the_picture_closer_to_the_clear_scene() -> None:
     hazy = haze(clear, sloped_transmission())
     errors = [mean_error(registry.apply(NAME, hazy, amount=a), clear, slice(60, None)) for a in (0.0, 0.4, 0.8, 1.0)]
     assert all(later < earlier - 0.01 for earlier, later in pairwise(errors))
+
+
+def test_pixels_tied_for_the_haziest_are_taken_in_reading_order_on_any_machine() -> None:
+    """The patch minimum makes plateaus, so more pixels tie for the last places among the haziest than there are places:
+    which are taken sets the airlight. The rule is the first in reading order, worked out here by sorting; an
+    unspecified order (what a partial sort gives) differs between machines and moved the result by 5 %."""
+    hazy = haze(scene(), sloped_transmission())
+    amount, patch, floor = 0.9, 15, 0.1
+    dark = ndimage.minimum_filter(hazy.min(axis=-1), size=patch, mode="nearest").ravel()
+    haziest_first = sorted(range(dark.size), key=lambda i: (-dark[i], i))
+    chosen = hazy.reshape(-1, 3)[haziest_first[: int(0.001 * dark.size)]]
+    airlight = chosen[np.argmax(chosen.sum(axis=-1))]
+    transmission = 1 - amount * ndimage.minimum_filter((hazy / airlight).min(axis=-1), size=patch, mode="nearest")
+    expected = np.clip((hazy - airlight) / np.maximum(transmission, floor)[..., None] + airlight, 0, 1)
+    out = registry.apply(
+        NAME, hazy, amount=amount, patch=patch, transmission_floor=floor, radius=0
+    )  # radius 0: no smoothing
+    np.testing.assert_allclose(out, expected, atol=1e-5)
 
 
 def test_transmission_floor_limits_how_far_dense_haze_is_stretched() -> None:
