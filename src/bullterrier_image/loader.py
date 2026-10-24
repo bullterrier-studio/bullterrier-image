@@ -40,7 +40,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
 (`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `pick` (`of`, `pieces`) or `subject` (`per`, `context`,
-`threshold`, `max_coverage`), the fields of `Grid`, `Shards`, `Pick` and `Subject`; `fit` lays a grid or shards over a
+`threshold`), the fields of `Grid`, `Shards`, `Pick` and `Subject`; `fit` lays a grid or shards over a
 selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid or
 shards) cuts the picture into numbered pieces, a *selection* (a `pick`, a `subject` or the built-in `subject` and
 `background`) chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition. Steps name

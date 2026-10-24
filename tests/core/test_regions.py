@@ -684,7 +684,6 @@ BAD_VALUES = {
     "negative context": (Subject, {"context": -0.1}, "context"),
     "threshold past 1": (Subject, {"threshold": 1.1}, "threshold"),
     "negative threshold": (Subject, {"threshold": -0.1}, "threshold"),
-    "coverage past 1": (Subject, {"max_coverage": 2}, "max_coverage"),
     "a per that is no text": (Subject, {"per": 3}, "per"),
 }
 
@@ -856,13 +855,13 @@ def test_a_finder_that_knows_the_true_boundary_is_united_into_that_boundary_what
 ):
     shape = (40, 60)
     assert_equal = np.testing.assert_array_equal
-    assert_equal(found(true_boundary(shape), shape, per, context=context, max_coverage=1), disc(shape))
+    assert_equal(found(true_boundary(shape), shape, per, context=context), disc(shape))
 
 
 def test_without_per_the_subject_is_the_built_in_subject_and_the_finder_of_pieces_is_not_asked():
     shape = (20, 30)
     asked = Recorder(true_boundary(shape))
-    regions = resolve({"it": Subject(threshold=1, max_coverage=0, context=1)}, shape, subject=finder(shape), find=asked)
+    regions = resolve({"it": Subject(threshold=1, context=1)}, shape, subject=finder(shape), find=asked)
     np.testing.assert_array_equal(regions.selection("it").alpha, regions.selection("subject").alpha)
     assert asked.boxes == []
 
@@ -889,7 +888,7 @@ def test_a_pixel_takes_its_value_from_the_view_of_its_own_piece_only():
     values = iter(
         [0.91, 0.93, 0.95, 0.97]
     )  # in the order of the pieces: top left, top right, bottom left, bottom right
-    alpha = found(lambda box: np.full(size_of(box), next(values), np.float32), context=0.5, max_coverage=1)
+    alpha = found(lambda box: np.full(size_of(box), next(values), np.float32), context=0.5)
     assert alpha[:10, :15] == pytest.approx(0.91)
     assert alpha[:10, 15:] == pytest.approx(0.93)
     assert alpha[10:, :15] == pytest.approx(0.95)
@@ -916,35 +915,20 @@ def test_pixels_the_finder_is_not_surer_of_than_the_threshold_are_dropped_and_th
     np.testing.assert_array_equal(strict, np.where(expected == 0.95, expected, 0))  # only the confident blob is left
 
 
-@pytest.mark.parametrize(
-    ("max_coverage", "painted"),
-    [(1.0, 400), (0.99, 240), (0.5, 240), (0.49, 0)],
-    ids=lambda v: str(v),
-)
-def test_a_find_that_fills_more_of_a_piece_than_the_limit_is_dropped_whole_and_one_that_fills_exactly_it_is_kept(
-    max_coverage, painted
-):
-    """On a 20 x 32 picture the 2 x 2 pieces are 16 x 10: the finder paints the top 5 rows of its view (half a piece)
-    and all of the view of the bottom right piece."""
-
-    def half_or_all(box: tuple[int, int, int, int]) -> np.ndarray:
-        matte = np.zeros(size_of(box), np.float32)
-        matte[: matte.shape[0] if box[:2] == (16, 10) else 5] = 1
-        return matte
-
-    assert found(half_or_all, (20, 32), context=0, max_coverage=max_coverage).sum() == painted
-
-
-def test_an_invented_subject_that_fills_a_plain_piece_is_dropped_and_the_true_ones_are_kept():
+def test_a_faint_subject_invented_over_a_whole_piece_is_dropped_and_a_confident_small_one_and_the_true_ones_are_kept():
     shape = (20, 30)
 
     def invents_in_the_last_piece(box: tuple[int, int, int, int]) -> np.ndarray:
-        return np.ones(size_of(box), np.float32) if box[:2] == (15, 10) else true_boundary(shape)(box)
+        if box[:2] != (15, 10):
+            return true_boundary(shape)(box)
+        matte = np.full(size_of(box), 0.6, np.float32)  # the whole piece, but the finder is not sure
+        matte[1:3, 1:3] = 0.95  # and a small thing it is sure of
+        return matte
 
     expected = disc(shape)
     expected[10:, 15:] = 0
+    expected[11:13, 16:18] = 0.95
     np.testing.assert_array_equal(found(invents_in_the_last_piece, context=0), expected)
-    assert found(invents_in_the_last_piece, context=0, max_coverage=1)[10:, 15:].all()  # limit lifted: kept
 
 
 def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_not_affected():
@@ -957,7 +941,7 @@ def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_not
 
     expected = disc(shape)
     expected[:, 15:] = 0
-    np.testing.assert_array_equal(found(nothing_on_the_right, context=0, max_coverage=1), expected)
+    np.testing.assert_array_equal(found(nothing_on_the_right, context=0), expected)
 
 
 def test_a_finder_that_answers_a_matte_that_does_not_fit_its_view_is_refused_naming_both_sizes():

@@ -251,7 +251,6 @@ kind = "subject"
 per = "panes"
 context = 0.3
 threshold = 0.8
-max_coverage = 0.9
 
 [[step]]
 effect = "fill"
@@ -284,7 +283,7 @@ REGIONS_RECIPE = Recipe(
         "panes": Grid(columns=[0.2, 0.17, 0.63], rows=2),
         "glass": Shards(preset="glass", fit="subject", impact=(0.6, 0.2), edge=Edge(style="torn", amount=0.02)),
         "head": Pick(of="panes", pieces=[4]),
-        "found": Subject(per="panes", context=0.3, threshold=0.8, max_coverage=0.9),
+        "found": Subject(per="panes", context=0.3, threshold=0.8),
     },
     steps=[
         Step("fill", {"color": "#ff0000"}, mask="head"),

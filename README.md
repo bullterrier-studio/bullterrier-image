@@ -361,7 +361,6 @@ kind = "subject"
 per = "cells"            # one run of the subject finder per cell; `found` is a selection like any other
 context = 0.25           # the finder sees each cell grown by this share of its size on every side (default 0.25)
 threshold = 0.9          # keep only pixels the finder is surer of than this: it invents faint subjects in plain cells
-max_coverage = 0.99      # drop a find that fills more of its cell than this (a finder that calls a plain cell all subject)
 ```
 
 `bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a

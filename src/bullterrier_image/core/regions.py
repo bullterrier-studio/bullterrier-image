@@ -328,15 +328,6 @@ class Subject(_Model):
         "invents in a plain piece, but also the uncertain parts of a real one; 0 keeps every pixel the finder gives. "
         "Only matters with `per`.",
     )
-    max_coverage: float = param(
-        0.99,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="The most of a piece a find may fill (0 to 1), after `threshold`: a find that fills more is dropped, for a "
-        "finder that calls a whole plain piece (sky, water) the subject. Lowering it drops large subjects that fill "
-        "their piece too; 1 never drops one. Only matters with `per`.",
-    )
 
 
 Kind = Grid | Shards | Pick | Subject
@@ -590,8 +581,8 @@ class Regions(Mapping[str, Partition | Selection]):
     def _subject_of(self, name: str, kind: Subject) -> Selection:
         """The built-in subject without `per`; with it the subject found in every piece, united. For each piece the
         finder is asked once about the piece's box grown by `context`; of its answer only the piece's own pixels the
-        finder is surer of than `threshold` are kept, and the whole find is dropped when it fills more of the piece than
-        `max_coverage`. A piece the finder finds nothing in (SubjectNotFoundError) adds nothing."""
+        finder is surer of than `threshold` are kept. A piece the finder finds nothing in (SubjectNotFoundError) adds
+        nothing."""
         if kind.per is None:
             return self.selection("subject")
         if self._find is None:
@@ -622,8 +613,7 @@ class Regions(Mapping[str, Partition | Selection]):
                 )
             own = labels[top:bottom, left:right] == piece
             sure = own & (matte > kind.threshold)
-            if sure.sum() <= kind.max_coverage * own.sum():
-                found[top:bottom, left:right][sure] = matte[sure]
+            found[top:bottom, left:right][sure] = matte[sure]
         return Selection(_frozen(found))
 
     def _frame(self, name: str, fit: str | None) -> tuple[tuple[int, int, int, int], np.ndarray | None]:

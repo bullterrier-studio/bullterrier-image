@@ -296,12 +296,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   stands in for it. Without `per` it is the built-in `subject`. *Reason:* a search of the whole picture misses small
   things beside big ones (the calf, the fox on its rock, the peak), and the model, made to find a subject in every crop,
   invents faint ones in plain pieces.
-- **Two filters against invented subjects; a third was measured and left out.** `threshold` (0.9) keeps only pixels the
-  finder is surer of than that; `max_coverage` (0.99) drops a find that fills more of its piece. On eight photos (study
+- **One filter against invented subjects; two limits were measured and left out.** `threshold` (0.9) keeps only pixels the
+  finder is surer of than that. On eight photos (study
   grids of 3 cells on the short side, real model, `.superpowers/reports/G-grid-first.md`) the invented blobs the study
   showed peak at 0.83 or less, while the sure finds (calf, fox, cormorants, the elephants) are at 0.9 and up; legit
   subjects fill a whole piece up to 0.98 and touch the view's edge up to 100%, so a limit on the share of the view's
-  border a find touches would drop real subjects before invented ones and is not offered. *Cost:* the finder is unsure of
+  border a find touches would drop real subjects before invented ones and is not offered. A coverage limit (drop a find
+  that fills most of its piece) was tried and not needed: no photo gave a confident invented find; add it back when
+  one does. *Cost:* the finder is unsure of
   big plain parts of a real subject seen in a crop (the white head of the eagle, a dog's chest), so those are dropped
   too; lower `threshold` to keep them with the invented ones. *Revisit when* a model is calibrated better.
 - **The pipeline remembers each crop by what it holds.** A find in a crop is stored by the finder, the photo and the
