@@ -10,12 +10,12 @@ from bullterrier_image.core import registry
 
 NAME = "embers"
 SIZE = 160
-WHITE = {"color": "#ffffff", "opacity": 1.0}
+WHITE = {"color": "#ffffff"}
 
 
 def light(settings: dict, size: int = SIZE) -> np.ndarray:
-    """The light the sparks add to a black picture, (h, w) in 0..1 (white sparks at full opacity unless `settings` say
-    otherwise, so red is the light itself)."""
+    """The light the sparks add to a black picture, (h, w) in 0..1 (white sparks unless `settings` say otherwise, so
+    red is the light itself)."""
     return registry.apply(NAME, np.zeros((size, size, 3), np.float32), **{**WHITE, **settings})[..., 0]
 
 
@@ -49,18 +49,18 @@ def test_a_spark_drifts_by_the_angle_from_straight_up_trailing_the_other_way(ang
 
 
 def test_a_spark_is_longer_wider_and_brighter_by_the_same_depth(lone_ember) -> None:
-    """A near spark has the full `size`, `length` and `opacity`, a far one half of each; so with s the share of any one
-    of them, the streak spans (length + size) x s rows, is size x s wide at brightness opacity x s: peak = s, and the
+    """A near spark has the full `size` and `length` and full brightness, a far one half of each; so with s the share
+    of any one of them, the streak spans (length + size) x s rows, is size x s wide at brightness s: peak = s, and the
     light across a row = size x s x s."""
-    settings = {"angle": 0.0, "length": 50.0, "size": 6.0, "opacity": 0.8}
+    settings = {"angle": 0.0, "length": 50.0, "size": 6.0}
     depths = []
     for seed in range(6):
         streak = lone_ember(seed, **settings)
-        by_brightness = streak.max() / 0.8
+        by_brightness = streak.max()
         depths.append(by_brightness)
         rows = np.flatnonzero(streak.sum(axis=1) > 0)
         by_length = (len(rows) - 1) / (50.0 + 6.0)  # the rounded ends reach half a pixel more at each end
-        by_width = np.sqrt(streak.sum(axis=1)[rows[len(rows) // 2]] / (0.8 * 6.0))
+        by_width = np.sqrt(streak.sum(axis=1)[rows[len(rows) // 2]] / 6.0)
         assert 0.5 <= by_brightness <= 1.0
         assert by_length == pytest.approx(by_brightness, abs=0.05)
         assert by_width == pytest.approx(by_brightness, abs=0.05)

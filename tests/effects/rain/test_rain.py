@@ -12,7 +12,7 @@ from bullterrier_image.core import registry
 NAME = "rain"
 SIZE = 160
 ONE_STREAK = {"density": 0.04}  # 0.04 per 1000 px^2 on 160 x 160 px = 1.02 streaks, rounded to one
-WHITE = {"color": "#ffffff", "opacity": 1.0}
+WHITE = {"color": "#ffffff"}
 
 
 def light(settings: dict, size: int = SIZE) -> np.ndarray:
@@ -53,18 +53,18 @@ def test_a_streak_leans_by_the_angle_from_vertical(angle: float, lone_streak) ->
 
 
 def test_a_streak_is_longer_thicker_and_brighter_by_the_same_depth(lone_streak) -> None:
-    """A near streak is drawn at the full `length`, `thickness` and `opacity`, a far one at half of each (depth 0). So
-    for any streak the fractions s of its length, of its thickness and of its peak opacity are equal: its extent down
-    the picture is length x s, the light across one row is opacity x thickness x s x s (a width of thickness x s at a
-    brightness of opacity x s)."""
-    settings = {"angle": 0.0, "length": 80.0, "thickness": 6.0, "opacity": 0.8}
+    """A near streak is drawn at the full `length` and `thickness` and full brightness, a far one at half of each
+    (depth 0.5). So for any streak the fractions s of its length, of its thickness and of its peak brightness are
+    equal: its extent down the picture is length x s, the light across one row is thickness x s x s (a width of
+    thickness x s at a brightness of s)."""
+    settings = {"angle": 0.0, "length": 80.0, "thickness": 6.0}
     for seed in range(6):
         streak = lone_streak(seed, **settings)
         brightness = streak.max()
         rows = np.flatnonzero(streak.sum(axis=1) > 0)
         by_length = (len(rows) - 6.0) / 80.0  # less the rounded ends, about half the thickness each
-        by_brightness = brightness / 0.8
-        by_width = np.sqrt(streak.sum(axis=1)[rows[len(rows) // 2]] / (0.8 * 6.0))
+        by_brightness = brightness
+        by_width = np.sqrt(streak.sum(axis=1)[rows[len(rows) // 2]] / 6.0)
         assert 0.5 <= by_brightness <= 1.0
         assert by_length == pytest.approx(by_brightness, abs=0.05)
         assert by_width == pytest.approx(by_brightness, abs=0.05)
@@ -77,7 +77,8 @@ def test_longer_streaks_cover_more_of_the_picture(length: float) -> None:
     assert longer > 1.5 * shorter
 
 
-def test_no_streak_is_brighter_than_the_opacity_even_where_streaks_cross() -> None:
-    """The nearest streaks are screened at `opacity`; where two cross the brighter shows, the light does not add up."""
-    dense = light({"density": 5.0, "opacity": 0.5, "seed": 1})
-    assert dense.max() == pytest.approx(0.5, abs=0.01)
+def test_no_streak_is_brighter_than_its_colour_even_where_streaks_cross() -> None:
+    """The nearest streaks screen their full `color` (grey 0x80 here); where two cross the brighter shows, the light
+    does not add up."""
+    dense = light({"density": 5.0, "color": "#808080", "seed": 1})
+    assert dense.max() == pytest.approx(128 / 255, abs=0.01)

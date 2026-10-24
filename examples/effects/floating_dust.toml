@@ -7,3 +7,4 @@ size = 480
 effect = "floating_dust"
 count = 80
 seed = 1
+opacity = 0.55                # the specks mixed in at 55%

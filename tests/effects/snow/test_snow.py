@@ -62,16 +62,16 @@ def test_a_single_layer_makes_every_flake_as_wide_as_the_size(lone_flake) -> Non
 
 
 def test_far_flakes_are_fainter_by_the_same_depth_that_makes_them_smaller(lone_flake) -> None:
-    """The flake at depth d (its radius a share d of `size` / 2) is `opacity` x (0.5 + 0.5 d) at its brightest."""
+    """The flake at depth d (its radius a share d of `size` / 2) is 0.5 + 0.5 d at its brightest."""
     for seed in range(0, 120, 8):
-        flake = lone_flake(seed, size=24.0, layers=4, softness=0.0, opacity=0.8)
+        flake = lone_flake(seed, size=24.0, layers=4, softness=0.0)
         depth = radius_of(flake) / 12.0
-        assert flake.max() == pytest.approx(0.8 * (0.5 + 0.5 * depth), abs=0.03)
+        assert flake.max() == pytest.approx(0.5 + 0.5 * depth, abs=0.03)
 
 
 @pytest.mark.parametrize("softness", [0.0, 0.5, 1.0])
 def test_a_flake_is_half_as_bright_at_its_radius_whatever_its_softness(softness: float, lone_flake) -> None:
-    flake = lone_flake(2, size=40.0, layers=1, softness=softness, opacity=1.0)
+    flake = lone_flake(2, size=40.0, layers=1, softness=softness)
     rows, cols = np.mgrid[0:SIZE, 0:SIZE]
     centre = ((flake * rows).sum() / flake.sum(), (flake * cols).sum() / flake.sum())
     distance = np.hypot(rows - centre[0], cols - centre[1])
@@ -82,7 +82,7 @@ def test_a_flake_is_half_as_bright_at_its_radius_whatever_its_softness(softness:
 
 def test_a_softer_flake_has_a_wider_ramp_from_full_brightness_to_none(lone_flake) -> None:
     def ramp_pixels(softness: float) -> int:
-        flake = lone_flake(2, size=40.0, layers=1, softness=softness, opacity=1.0)
+        flake = lone_flake(2, size=40.0, layers=1, softness=softness)
         return int(((flake > 0.05) & (flake < 0.95)).sum())
 
     widths = [ramp_pixels(softness) for softness in (0.0, 0.5, 1.0)]

@@ -60,14 +60,6 @@ class EmbersParams(EffectParams):
         "farthest have 1 - depth times those of the nearest. 0 = every ember alike, 1 = from the nearest down to "
         "nothing at the farthest.",
     )
-    opacity: float = param(
-        0.9,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How bright the nearest embers are: the share of `color` they screen over the picture along their middle; "
-        "the farthest are fainter. 0 = invisible, 1 = solid colour.",
-    )
     color: Color = param(
         "#ff8a2b",
         doc="The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Embers are screened over the picture, so "
@@ -86,11 +78,11 @@ class EmbersParams(EffectParams):
 def embers(rgb: np.ndarray, params: EmbersParams) -> np.ndarray:
     """Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it.
 
-    Every ember lies at a random distance d from 0 (far) to 1 (near): its width, streak length and brightness are
-    `size`, `length` and `opacity` times 1 - `depth` x (1 - d). It rises at `angle` from vertical, so its streak runs
-    from the spark down the other way, and its edge is `softness` of its radius soft. Where embers overlap the brighter
-    one shows. Embers are screened over the picture, so they only lighten it; the same `seed` always gives the same
-    sparks.
+    Every ember lies at a random distance d from 0 (far) to 1 (near): its width and streak length are `size` and
+    `length` times 1 - `depth` x (1 - d), and it screens that share of `color` along its middle. It rises at `angle`
+    from vertical, so its streak runs from the spark down the other way, and its edge is `softness` of its radius soft.
+    Where embers overlap the brighter one shows. Embers are screened over the picture, so they only lighten it; the
+    same `seed` always gives the same sparks.
     """
     height, width = rgb.shape[:2]
     # constant: three random numbers per particle, its x, y and distance
@@ -100,5 +92,5 @@ def embers(rgb: np.ndarray, params: EmbersParams) -> np.ndarray:
     drift = np.radians(params.angle)
     tail = head + params.length * near[:, None] * np.array([-np.sin(drift), np.cos(drift)])
     radius = params.size / 2 * near
-    light = draw_segments((height, width), head, tail, radius, params.opacity * near, params.softness * radius)
+    light = draw_segments((height, width), head, tail, radius, near, params.softness * radius)
     return screen(rgb, light[..., None] * np.asarray(params.color, np.float32))

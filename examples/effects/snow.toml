@@ -6,3 +6,4 @@ size = 480
 [[step]]
 effect = "snow"
 seed = 1
+opacity = 0.8                 # the flakes mixed in at 80%

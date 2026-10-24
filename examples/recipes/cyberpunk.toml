@@ -27,7 +27,7 @@ threshold = 0.6
 effect = "rain"
 angle = 12
 length = 40
-opacity = 0.5
+opacity = 0.35
 color = "#9fd8ff"
 seed = 3
 

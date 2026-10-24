@@ -502,12 +502,12 @@ def test_the_seed_check_flags_an_effect_that_ignores_its_seed_or_is_not_determin
 
 # --- the effects that scatter particles of light -----------------------------------------------------------------
 
-# effect: the settings that make it draw many white particles at full opacity (snow has no colour of its own)
+# effect: the settings that make it draw many white particles (snow has no colour of its own)
 PARTICLES: dict[str, dict[str, Any]] = {
-    "embers": {"count": 300, "color": "#ffffff", "opacity": 1.0},
-    "floating_dust": {"count": 300, "color": "#ffffff", "opacity": 1.0},
-    "rain": {"density": 3.0, "color": "#ffffff", "opacity": 1.0},
-    "snow": {"density": 3.0, "opacity": 1.0},
+    "embers": {"count": 300, "color": "#ffffff"},
+    "floating_dust": {"count": 300, "color": "#ffffff"},
+    "rain": {"density": 3.0, "color": "#ffffff"},
+    "snow": {"density": 3.0},
 }
 TINTED = ["embers", "floating_dust", "rain"]
 
@@ -551,15 +551,6 @@ def test_particles_are_spread_over_the_whole_of_a_wide_or_a_tall_picture(name, s
         assert all(third.any() for third in thirds)
 
 
-@pytest.mark.parametrize("name", PARTICLES)
-def test_the_opacity_scales_the_light_of_every_particle(name, photo):
-    black = np.zeros_like(photo)
-    full = registry.apply(name, black, **PARTICLES[name], seed=1)
-    half = registry.apply(name, black, **{**PARTICLES[name], "opacity": 0.5}, seed=1)
-    assert full.max() > 0.4
-    np.testing.assert_allclose(half, full / 2, atol=1e-6)
-
-
 # well separated particles, each big and sharp enough to reach full brightness at its middle (snow: its layers 1/4..1)
 SEPARATE = {
     "embers": {"count": 40, "size": 8.0, "length": 0.0, "softness": 0.0},
@@ -577,8 +568,8 @@ def test_depth_spreads_the_brightness_of_the_particles_from_all_alike_to_the_far
         patches, found = ndimage.label(light > 0, structure=np.ones((3, 3)))
         return np.array(ndimage.maximum(light, patches, range(1, found + 1)))
 
-    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # opacity 1, no depth: every one at full brightness
-    spread = peaks(1.0)  # brightness is opacity x the particle's nearness, which runs from 0 (or 1/4 for snow) to 1
+    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # no depth: every one at full brightness
+    spread = peaks(1.0)  # brightness is the particle's nearness, which runs from 0 (or 1/4 for snow) to 1
     assert spread.min() < 0.3
     assert spread.max() > 0.9
 

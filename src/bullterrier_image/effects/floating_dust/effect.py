@@ -44,14 +44,6 @@ class FloatingDustParams(EffectParams):
         "depth times those of the nearest. 0 = every speck alike, 1 = from the nearest down to nothing at the "
         "farthest.",
     )
-    opacity: float = param(
-        0.55,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How bright the nearest specks are: the share of `color` they screen over the picture at their middle; "
-        "the farthest are fainter. 0 = invisible, 1 = solid colour.",
-    )
     color: Color = param(
         "#fff1d6",
         doc="The colour of the light the specks catch: '#rrggbb', '#rgb' or [r, g, b] 0..1. Specks are screened over "
@@ -70,10 +62,10 @@ class FloatingDustParams(EffectParams):
 def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
 
-    Every speck lies at a random distance d from 0 (far) to 1 (near): its width and brightness are `size` and `opacity`
-    times 1 - `depth` x (1 - d). A speck is full brightness inside, half of it at its radius, with an edge `softness` of
-    its radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture, so they only
-    lighten it; the same `seed` always gives the same dust.
+    Every speck lies at a random distance d from 0 (far) to 1 (near): its width is `size` times 1 - `depth` x (1 - d),
+    and it screens that share of `color`. A speck is full brightness inside, half of it at its radius, with an edge
+    `softness` of its radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture,
+    so they only lighten it; the same `seed` always gives the same dust.
     """
     height, width = rgb.shape[:2]
     # constant: three random numbers per particle, its x, y and distance
@@ -81,5 +73,5 @@ def floating_dust(rgb: np.ndarray, params: FloatingDustParams) -> np.ndarray:
     near = 1 - params.depth * (1 - distance)
     centre = np.stack([x * width, y * height], axis=1)
     radius = params.size / 2 * near
-    light = draw_segments((height, width), centre, centre, radius, params.opacity * near, params.softness * radius)
+    light = draw_segments((height, width), centre, centre, radius, near, params.softness * radius)
     return screen(rgb, light[..., None] * np.asarray(params.color, np.float32))

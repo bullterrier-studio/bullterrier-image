@@ -10,12 +10,12 @@ from bullterrier_image.core import registry
 
 NAME = "floating_dust"
 SIZE = 160
-WHITE = {"color": "#ffffff", "opacity": 1.0}
+WHITE = {"color": "#ffffff"}
 
 
 def light(settings: dict, size: int = SIZE) -> np.ndarray:
-    """The light the specks add to a black picture, (h, w) in 0..1 (white specks at full opacity, so red is the light
-    itself) unless `settings` say otherwise."""
+    """The light the specks add to a black picture, (h, w) in 0..1 (white specks, so red is the light itself) unless
+    `settings` say otherwise."""
     return registry.apply(NAME, np.zeros((size, size, 3), np.float32), **{**WHITE, **settings})[..., 0]
 
 
@@ -39,7 +39,7 @@ def test_more_specks_touch_more_of_the_picture() -> None:
 
 
 def test_a_speck_is_a_soft_disc_as_big_and_bright_as_its_depth(lone_speck) -> None:
-    """The disc is `size` x s wide and `opacity` x s bright, s from 0.5 to 1 (the speck's depth): full brightness
+    """The disc is `size` x s wide and s bright, s from 0.5 to 1 (the speck's depth): full brightness
     inside, half of it at the radius `size` x s / 2 whatever the softness, and nothing a feather's half beyond it."""
     brightnesses = []
     for seed in range(8):
