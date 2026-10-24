@@ -1,0 +1,7 @@
+# A hologram: the picture as cyan light, outlined at its edges, with scanlines and a flicker.
+name = "hologram"
+size = 480
+
+[[step]]
+effect = "hologram"
+phase = 0.3
