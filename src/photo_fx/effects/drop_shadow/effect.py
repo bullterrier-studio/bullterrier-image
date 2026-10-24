@@ -7,6 +7,7 @@ import numpy as np
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.blur import gaussian_blur
+from photo_fx.ops.cutout import put_behind
 from photo_fx.ops.shift import shift
 
 
@@ -81,6 +82,4 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, matte: np.ndarray 
         return rgb.copy()
     cast = shift(matte, params.dy, params.dx, edge=params.edge)
     cast = gaussian_blur(cast, params.blur, truncate=params.truncate, edge=params.edge)
-    coverage = (1.0 - matte) * (params.opacity * cast)  # the shadow shows only where the subject is not
-    tint = np.asarray(params.color, np.float32)
-    return (rgb + coverage[..., None] * (tint - rgb)).astype(np.float32)
+    return put_behind(rgb, matte, params.opacity * cast, np.asarray(params.color, np.float32))
