@@ -121,6 +121,25 @@ def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_e
     assert {recipe for _, recipe in remade(folder)} == {"layered.jpg", "layered.png"}
 
 
+def test_changing_an_svg_file_a_recipe_reads_redoes_that_recipe_and_nothing_else(folder):
+    (folder / "assets").mkdir()
+    shape = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect id="r" width="{}" height="5"/></svg>'
+    (folder / "assets" / "cut.svg").write_text(shape.format(5), encoding="utf-8")
+    (folder / "recipes" / "cut.toml").write_text(
+        'format = 2\nname = "cut"\nsize = 64\n[region.s]\nkind = "svg"\nfile = "../assets/cut.svg"\n'
+        '[[step]]\neach = "s"\nlooks = ["none", { effect = "grade", exposure = 0.4 }]\n',
+        encoding="utf-8",
+    )
+    project = load_project(folder / "bt-image.toml")
+    run(project)
+    mark_outputs(folder)
+    assert {i.status for i in run(project)} == {"skipped"}
+
+    (folder / "assets" / "cut.svg").write_text(shape.format(9), encoding="utf-8")  # same name, other shapes
+    redone = sorted((i.recipe, i.status) for i in run(project) if i.status == "done")
+    assert redone == [("cut", "done")] * 2
+
+
 @pytest.mark.parametrize(
     "layer",
     [

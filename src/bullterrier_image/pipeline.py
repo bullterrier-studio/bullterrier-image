@@ -54,7 +54,9 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 from . import imageio
 from . import matte as finding
 from .checks import matte_warnings, still_warnings
+from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
+from .core.regions import Svg
 from .core.runner import subject_from
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .matte import segmenter_identity, subject_matte
@@ -288,11 +290,13 @@ def run(
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
             recipe_text = repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8")
             # a recipe that uses the subject is redone when another finder would find it; one that uses a picture is
-            # redone when that picture's pixels change, whether the recipe is a file or an object (repr: no pixels)
+            # redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a file or an
+            # object (repr: no pixels)
             parts = (
                 photo_hash,
                 recipe_text,
                 *_picture_digests(recipe),
+                *_svg_digests(recipe),
                 settings,
                 code,
                 *((subject_key,) if recipe.needs_matte or recipe.needs_finder else ()),
@@ -518,6 +522,15 @@ def _picture_digests(recipe: Recipe) -> list[str]:
     """The content digest of every picture the recipe's steps (and the looks of its `Each` steps) hold, in order."""
     return [
         v.digest for step in recipe.steps for run in step.runs for v in run.params.values() if isinstance(v, Picture)
+    ]
+
+
+def _svg_digests(recipe: Recipe) -> list[str]:
+    """The content digest of every svg file the recipe's regions read, in order; RecipeError when one cannot be read."""
+    return [
+        hashlib.sha256(svg_bytes(kind.file, kind.max_kilobytes)).hexdigest()
+        for kind in recipe.regions.values()
+        if isinstance(kind, Svg)
     ]
 
 
