@@ -5,7 +5,7 @@ from typing import Literal
 
 from .recipe import Step
 
-def anamorphic_streaks(length: float = 0.25, threshold: float = 0.8, amount: float = 3.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff') -> Step:
+def anamorphic_streaks(length: float = 0.35, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff') -> Step:
     """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
 screened over the picture by `amount`.
 
@@ -16,15 +16,15 @@ edge. The picture only ever gets brighter, and black stays black.
 
 Parameters
 ----------
-length : number, fraction, 0.001 to 1, default 0.25
+length : number, fraction, 0.001 to 1, default 0.35
     How far the streaks reach sideways, as a fraction of the picture's width: the
     distance over which a streak fades to 37% of its brightness (the faint tail runs on,
     to the picture's edge). Raising it makes longer, fainter streaks.
-threshold : number, fraction, 0 to 0.99, default 0.8
+threshold : number, fraction, 0 to 0.99, default 0.7
     The brightness (0..1, per channel) where a streak starts: only values above it light
     the streaks, rising to full at 1. Raising it limits the streaks to the brightest
     highlights.
-amount : number, ratio, 0 to 10, default 3.0
+amount : number, ratio, 0 to 10, default 6.0
     How strongly the streaks are screened over the picture: 0 = off; the streak is
     spread thin along its length, so a long one needs a high amount (above 1 it
     saturates to white sooner).
@@ -371,7 +371,7 @@ blue_highlights : number, fraction, 0 to 1, default 0.75
     lowering it takes blue away. Its ends stay at black and white."""
     ...
 
-def dehaze(amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001) -> Step:
+def dehaze(amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest') -> Step:
     """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).
 
 The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a
@@ -383,7 +383,8 @@ steps are
   `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between
   `transmission_floor` and 1;
 - the scene J = (I - A) / t + A, held to 0..1.
-A picture without haze (a dark channel of 0) comes out as it went in. Colours are those of the sRGB-encoded picture.
+A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond
+the picture's border. Colours are those of the sRGB-encoded picture.
 
 Parameters
 ----------
@@ -416,21 +417,28 @@ airlight_fraction : number, fraction, 0.0001 to 0.1, default 0.001
     haziest), among which the brightest one is taken as the colour of the haze (He, Sun
     and Tang use 0.1 percent = 0.001; at least one pixel is always used). Raising it
     makes the estimate less sensitive to a single odd pixel but can pick a bright object
-    instead of the sky."""
+    instead of the sky.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the darkest-value search sees beyond the picture's edge, which sets the haze
+    estimate along the border: 'nearest' (the edge pixel repeated) and 'reflect'
+    (mirrored, edge pixel repeated) look only at pixels of the patch inside the picture
+    and give the same result; 'mirror' (mirrored about the edge pixel) also looks at
+    pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far
+    side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, edge: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, edge_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
+def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, clock: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_period: float = 3.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. Animate `progress`.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
 has a fixed, random-ish fate, so the same `seed` gives the same motion in every frame: it winds up, detaches,
 drifts, wobbles, glows, fades and is gone, and frames fit together as a continuous animation.
 
-When a piece detaches is set by where it is (`top`, `edge`, `sweep`, with `jitter`); `reach` is how much of the
+When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
 figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
 makes the edges loosen all round first; `ambient` with `clock` keeps the pieces that stay alive.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `edge`.
+`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
 
 Parameters
 ----------
@@ -448,12 +456,12 @@ progress : number, fraction, 0 to 1, default 0.0
 top : number, ratio, 0 to 10, default 1.0
     Weight of height in the order pieces leave: higher pieces go first. 0 = height does
     not matter.
-edge : number, ratio, 0 to 10, default 1.0
+outline : number, ratio, 0 to 10, default 1.0
     Weight of closeness to the outline (and the left, right and top borders) in the
     order: pieces near the edge go before the middle. 0 = closeness does not matter.
 sweep : number, ratio, -1 to 1, default 0.0
     Weight of side in the order: positive starts at the left, negative at the right; its
-    size is how much it matters next to `top` and `edge`.
+    size is how much it matters next to `top` and `outline`.
 reach : number, fraction, 0 to 1, default 1.0
     How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses
     and the rest stays, 1 = everything goes.
@@ -481,10 +489,10 @@ clock : number, seconds, 0 to 3600, default 0.0
 seed : whole number, count, 0 to 2147483647, default 0
     Random seed: each piece's fate is fixed by it, so every frame of one seed fits
     together. Animated, it moves in whole steps (rounded to the nearest whole number).
-edge_depth : number, fraction, 0.01 to 1, default 0.15
+outline_depth : number, fraction, 0.01 to 1, default 0.15
     Distance from the outline (fraction of the picture width) beyond which a piece
-    counts as fully inside, for `edge` and `hover_spread`. Raising it makes closeness to
-    the edge matter deeper in.
+    counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness
+    to the edge matter deeper in.
 jitter : number, fraction, 0 to 1, default 0.2
     Random share of each piece's place in the leaving order: 0 = a clean front, raising
     it makes it ragged.
@@ -507,8 +515,8 @@ finish : number, fraction, 0.5 to 1, default 0.98
     last frame). If `anticipation` and the longest flight do not fit before it, all
     pieces go at once.
 hover_spread : number, fraction, 0 to 1, default 0.45
-    With `hover`: how far into the clip a piece `edge_depth` inside starts to float (the
-    outline starts at 0). 0 = everything floats at once.
+    With `hover`: how far into the clip a piece `outline_depth` inside starts to float
+    (the outline starts at 0). 0 = everything floats at once.
 bob : number, fraction, 0 to 0.05, default 0.004
     Height of the gentle up-and-down of a hovering piece, as a fraction of the picture
     height.
@@ -545,17 +553,28 @@ ambient_wavelength : number, fraction, 0.01 to 2, default 0.2
     Length of one shimmer wave as a fraction of the picture width; with the period it
     sets how fast the wave travels (against the wind).
 open_bottom : true or false, default True
-    True: the bottom border is not an edge for `edge` and `hover` (a portrait is cut off
-    there). False: it counts like the other borders.
+    True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut
+    off there). False: it counts like the other borders.
 normal_smoothing : number, count, 0 to 10, default 1.0
     Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
     direction: raising it makes neighbouring pieces fly in more similar directions; 0
     uses the raw outline.
+normal_truncate : number, ratio, 1 to 10, default 4.0
+    Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times
+    `normal_smoothing` characters from the outline, so the pieces' direction `outward`
+    is read from that far out. Larger is more exact and slower, smaller shortens the
+    reach. Nothing changes with `normal_smoothing` at 0.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `normal_smoothing` blur sees beyond the picture's border: 'reflect'
+    (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about
+    the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
+    'constant' (open space, as if nothing were there, which blurs the outline toward the
+    border).
 matte_threshold : number, fraction, 0 to 1, default 0.5
     With a matte: how much of a piece, 0 to 1, the matte must cover on average for the
-    piece to belong to the figure whose outline `edge` and `hover` start at; 0.5 = more
-    than half. Lowering it takes in more of a soft edge (hair, fur), raising it less.
-    Ignored without a matte.
+    piece to belong to the figure that `outline` and `hover` work from; 0.5 = more than
+    half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored
+    without a matte.
 background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never flies and is drawn black
@@ -630,17 +649,17 @@ bins : whole number, count, 2 to 256, default 256
     (rounded to the nearest whole number)."""
     ...
 
-def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, end: float = 0.3, edge: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
+def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, end: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
 make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
-the top down, between `start` and `end`; and from the outline, within `edge` of the edge of the figure and of the
+the top down, between `start` and `end`; and from the outline, within `outline` of the edge of the figure and of the
 left, right and top borders of the picture (and the bottom unless `open_bottom`).
 
 A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
 sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
-leaving the picture are gone. With `edge` and `outward` at 0 pieces only move up, so everything more than one
+leaving the picture are gone. With `outline` and `outward` at 0 pieces only move up, so everything more than one
 character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
 `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
@@ -663,7 +682,7 @@ start : number, fraction, 0 to 1, default 0.6
 end : number, fraction, 0 to 1, default 0.3
     Height (fraction of the picture, 0 = top) above which every piece has detached.
     Between `end` and `start` the chance rises smoothly.
-edge : number, fraction, 0 to 1, default 0.0
+outline : number, fraction, 0 to 1, default 0.0
     Width of the band (fraction of the picture width) along the figure's outline, and
     the left, right and top borders, where pieces detach; stronger nearer the edge. 0
     switches it off. Raising it eats further in.
@@ -706,15 +725,26 @@ sway_minimum : number, count, 0 to 5, default 0.3
     Sideways sway every detached piece has, however little it climbs, in characters (a
     standard deviation).
 open_bottom : true or false, default True
-    True: the bottom border is not an edge for `edge` (a portrait is simply cut off
+    True: the bottom border is not an edge for `outline` (a portrait is simply cut off
     there). False: it sheds like the other borders.
 normal_smoothing : number, count, 0 to 10, default 1.0
     Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
     direction: raising it makes neighbouring pieces fly in more similar directions; 0
     uses the raw outline.
+normal_truncate : number, ratio, 1 to 10, default 4.0
+    Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times
+    `normal_smoothing` characters from the outline, so the pieces' direction `outward`
+    is read from that far out. Larger is more exact and slower, smaller shortens the
+    reach. Nothing changes with `normal_smoothing` at 0.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `normal_smoothing` blur sees beyond the picture's border: 'reflect'
+    (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about
+    the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
+    'constant' (open space, as if nothing were there, which blurs the outline toward the
+    border).
 matte_threshold : number, fraction, 0 to 1, default 0.5
     With a matte: how much of a piece, 0 to 1, the matte must cover on average for the
-    piece to belong to the figure whose outline `edge` sheds from; 0.5 = more than half.
+    piece to belong to the figure that `outline` sheds from; 0.5 = more than half.
     Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored
     without a matte.
 background_threshold : number, fraction, 0 to 1, default 0.02
@@ -987,7 +1017,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seamlessly)."""
     ...
 
-def halation(radius: float = 20.0, threshold: float = 0.7, amount: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
+def halation(radius: float = 30.0, threshold: float = 0.5, amount: float = 1.8, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
     """A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by
 `radius` px, tinted `color` and screened over the picture by `amount`.
 
@@ -997,14 +1027,14 @@ brightens and leaves black black.
 
 Parameters
 ----------
-radius : number, px, 0 to 500, default 20.0
+radius : number, px, 0 to 500, default 30.0
     Gaussian sigma of the glow in px at the recipe's size: larger spreads the glow
     further from the highlights; 0 keeps it on the highlights themselves.
-threshold : number, fraction, 0 to 0.99, default 0.7
+threshold : number, fraction, 0 to 0.99, default 0.5
     The brightness (0..1) where the glow starts, judged on the brightest of a pixel's
     three channels: only values above it glow, rising to full at 1. Raising it limits
     the halation to the brightest highlights.
-amount : number, ratio, 0 to 10, default 0.7
+amount : number, ratio, 0 to 10, default 1.8
     How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at
     full brightness; above 1 it saturates sooner.
 color : colour, default '#ff4a14'
@@ -1352,27 +1382,26 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     then matters at the border for 'bicubic' only, whose spline fit reads it."""
     ...
 
-def mirror(axis: Literal['vertical', 'horizontal', 'both'] = 'vertical', keep: Literal['first', 'last'] = 'first') -> Step:
-    """Make the picture symmetric: keep one half and replace the other by its reflection.
+def mirror(direction: Literal['left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right'] = 'left_to_right') -> Step:
+    """Make the picture symmetric: keep one half (or quarter) and replace the rest by its reflection.
 
-The mirror line is a vertical line down the middle (`axis` 'vertical'), a horizontal one across it ('horizontal')
-or both ('both'). The kept side (`keep`) is copied untouched, pixel for pixel, so the result is exactly
-symmetric and uses only the picture's own values.
+`direction` names the copy: 'left_to_right' keeps the left half and reflects it onto the right, and so on for
+the other halves; 'top_left' and the other three corners keep that quarter and reflect it across both lines.
+The kept part is copied untouched, pixel for pixel, so the result is exactly symmetric and uses only the
+picture's own values.
 
 Parameters
 ----------
-axis : one of 'vertical', 'horizontal', 'both', default 'vertical'
-    The mirror line, named for the line itself: 'vertical' puts a vertical line down the
-    middle, so the two sides are each other's reflection (left against right, as a face
-    made symmetric); 'horizontal' puts a horizontal line across the middle (top against
-    bottom, as a reflection in water); 'both' does both, so the picture is symmetric in
-    four quarters.
-keep : one of 'first', 'last', default 'first'
-    Which side of each mirror line stays as it is: 'first' keeps the left half (and, for
-    'horizontal' or 'both', the top half), 'last' keeps the right half (and the bottom
-    half). The other side is replaced by the reflection of the kept one. On a picture
-    with an odd width or height the middle column or row lies on the line and stays,
-    whichever side is kept."""
+direction : one of 'left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right', default 'left_to_right'
+    Which part is kept as it is and copied, reflected, onto the rest, named as image
+    editors name it. 'left_to_right' copies the left half onto the right (a face made
+    symmetric about a vertical line down the middle), 'right_to_left' the right half
+    onto the left, 'top_to_bottom' the top half onto the bottom (a reflection in water,
+    about a horizontal line across the middle), 'bottom_to_top' the bottom half onto the
+    top. For a picture symmetric in four quarters, name the quarter that is copied into
+    the other three: 'top_left', 'top_right', 'bottom_left' or 'bottom_right'. On a
+    picture with an odd width or height the middle column or row lies on the line and
+    stays."""
     ...
 
 def motion_blur(angle: float = 0.0, length: float = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect') -> Step:
@@ -1818,9 +1847,9 @@ black_fade : number, fraction, 0.001 to 1, default 0.1
     stays black. Larger keeps more of the shadows untinted."""
     ...
 
-def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
+def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff') -> Step:
     """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-screened over the picture by `amount`.
+screened over the picture by `amount`. `limit` caps how many pixels count as bright.
 
 Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
 picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
@@ -1839,8 +1868,16 @@ length : number, fraction, 0.001 to 1, default 0.1
     fainter-tipped spikes.
 threshold : number, fraction, 0 to 0.99, default 0.95
     The brightness (0..1, per channel) where a spike starts: only values above it make
-    light, rising to full at 1. Raising it limits the spikes to the brightest points;
-    lowered, large bright areas flood the picture with light.
+    light, rising to full at 1. Raising it limits the spikes to the brightest points.
+    Every pixel above it sends out spikes, so at a low threshold a large bright area (a
+    window, a sky, white fur) floods the picture with light: raise the threshold, or cap
+    the number of points with `limit`.
+limit : number, fraction, 0 to 1, default 1.0
+    The most pixels that send out spikes, as a share of all the picture's pixels, the
+    brightest first: the threshold is raised just enough to keep to it (never above
+    0.99, so a picture with more than this share of near-white pixels still lights
+    those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to
+    keep a low `threshold` from flooding large bright areas.
 amount : number, ratio, 0 to 10, default 0.8
     How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
     bright as the point that makes it, at the point; above 1 it saturates to white

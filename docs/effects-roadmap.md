@@ -99,7 +99,7 @@ separate code.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `halftone` ✓ | Dot screen. | `fx.halftone(cell=10, angle=45)` |
-| `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, edge=0.1)` |
+| `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `dither` | Floyd-Steinberg, Atkinson, Bayer, blue-noise, to any palette. | `fx.dither(method="atkinson", palette=["#000","#fff"])` |
 | `pixelate` | Mosaic of flat cells. | `fx.pixelate(cell=12)` |
@@ -172,7 +172,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
 | `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
-| `mirror` ✓ | Symmetry on an axis, or four-way. | `fx.mirror(axis="vertical")` |
+| `mirror` ✓ | Symmetry on an axis, or four-way. | `fx.mirror(direction="left_to_right")` |
 | `kaleidoscope` | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
 | `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
 | `shear` | Skew with edge fill. | `fx.shear(x=0.2)` |
