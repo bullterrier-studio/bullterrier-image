@@ -917,13 +917,13 @@ bins : whole number, count, 2 to 256, default 256
     (rounded to the nearest whole number)."""
     ...
 
-def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, end: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
+def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
 make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
-the top down, between `start` and `end`; and from the outline, within `outline` of the edge of the figure and of the
-left, right and top borders of the picture (and the bottom unless `open_bottom`).
+the top down, over the `ramp` above `start`; and from the outline, within `outline` of the edge of the figure and
+of the left, right and top borders of the picture (and the bottom unless `open_bottom`).
 
 A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
 sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
@@ -947,9 +947,10 @@ font : text or none, default None
 start : number, fraction, 0 to 1, default 0.6
     Height (fraction of the picture, 0 = top) above which pieces begin to detach from
     the top down. 0 switches the top-down dissolve off.
-end : number, fraction, 0 to 1, default 0.3
-    Height (fraction of the picture, 0 = top) above which every piece has detached.
-    Between `end` and `start` the chance rises smoothly.
+ramp : number, fraction, 0.01 to 1, default 0.3
+    Height of the band (fraction of the picture) above `start` over which the chance of
+    detaching rises smoothly from 0 to 1; above the band every piece has detached.
+    Raising it spreads the dissolve out.
 outline : number, fraction, 0 to 1, default 0.0
     Width of the band (fraction of the picture width) along the figure's outline, and
     the left, right and top borders, where pieces detach; stronger nearer the edge. 0
