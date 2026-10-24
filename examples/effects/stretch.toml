@@ -1,0 +1,9 @@
+# A pixel stretch: one row of the photo smeared down and up over the rows beside it.
+name = "stretch"
+size = 480
+
+[[step]]
+effect = "stretch"
+axis = "vertical"
+at = 0.62
+span = 0.12
