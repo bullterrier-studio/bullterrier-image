@@ -225,30 +225,6 @@ def test_edge_distance_does_not_modify_its_input_and_returns_an_immutable_record
         field.distance = field.normal_x  # type: ignore[misc]  # frozen on purpose: the test proves it
 
 
-@pytest.mark.parametrize(
-    "shape",
-    [
-        np.ones((4, 4), dtype=np.uint8),  # not bool
-        np.ones((4, 4), dtype=float),
-        np.ones(4, dtype=bool),  # 1-D
-        np.ones((2, 4, 4), dtype=bool),  # 3-D
-        np.ones((0, 4), dtype=bool),  # empty
-        [[True, False], [False, True]],  # not an array
-    ],
-)
-def test_shape_must_be_a_non_empty_2d_bool_array(shape):
-    with pytest.raises(ValueError, match="shape"):
-        field_of(shape)
-
-
-@pytest.mark.parametrize(
-    "sampling", [(0.0, 1.0), (1.0, 0.0), (-1.0, 1.0), (1.0, -2.0), (1.0,), (1.0, 1.0, 1.0), (float("nan"), 1.0)]
-)
-def test_sampling_must_be_two_positive_numbers(sampling):
-    with pytest.raises(ValueError, match="sampling"):
-        field_of(rectangle(), sampling)
-
-
 def _tall_strip() -> np.ndarray:
     """Columns 20..39 of a 60-row array: below the first rows the nearest edges are the strip's two sides."""
     shape = np.zeros((60, 60), dtype=bool)
@@ -265,12 +241,6 @@ def test_more_smoothing_gives_a_direction_further_beyond_the_shape():
     # whatever the smoothing, the normals on the strip's sides point straight out
     for field in (unsmoothed, light, heavy):
         assert (field.normal_x[45, 20], field.normal_x[45, 39]) == pytest.approx((-1.0, 1.0))
-
-
-@pytest.mark.parametrize("smoothing", [-0.5, float("nan")])
-def test_smoothing_must_be_a_non_negative_number(smoothing):
-    with pytest.raises(ValueError, match="smoothing"):
-        field_of(rectangle(), smoothing=smoothing)
 
 
 def test_a_shorter_cutoff_shortens_the_reach_of_the_smoothing():
@@ -292,12 +262,3 @@ def test_edge_sets_what_the_smoothing_sees_beyond_the_array():
     wrapped = field_of(shape, smoothing=3.0, edge="wrap")
     assert mirrored.normal_x[45, 59] == pytest.approx(1.0)
     assert wrapped.normal_x[45, 59] == pytest.approx(-1.0)
-
-
-@pytest.mark.parametrize(
-    ("option", "bad"),
-    [("truncate", 0.0), ("truncate", -4.0), ("truncate", float("nan")), ("edge", "bogus")],
-)
-def test_the_blurs_cutoff_and_edge_rule_must_be_valid(option, bad):
-    with pytest.raises(ValueError, match=option):
-        field_of(rectangle(), **{option: bad})

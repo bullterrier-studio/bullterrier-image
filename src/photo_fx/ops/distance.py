@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
-from photo_fx.ops.blur import NUMPY_PAD, Edge
+from photo_fx.ops.blur import Edge
 
 
 @dataclass(frozen=True)
@@ -37,32 +37,21 @@ def edge_distance(
 ) -> EdgeField:
     """Distance to the nearest edge, and the outward direction, for every element of a 2-D bool mask.
 
-    `shape` is the mask (True = inside the shape; ValueError unless it is a non-empty 2-D bool array). Its edges are the
-    boundary between True and False, plus the left, right and top borders of the array, so a shape touching those
-    borders is edged there too. The bottom border is an edge only when `open_bottom` is False; by default the shape
-    is taken to carry on past the bottom, as a portrait does when it is cropped at the chest.
+    `shape` is the mask (True = inside the shape). Its edges are the boundary between True and False, plus the left,
+    right and top borders of the array, so a shape touching those borders is edged there too. The bottom border is an
+    edge only when `open_bottom` is False; by default the shape is taken to carry on past the bottom, as a portrait
+    does when it is cropped at the chest.
 
-    `sampling` = (row height, column width) is the size of one element in px (both > 0, else ValueError), so a grid of
-    tall characters gives distances in px of the picture, not in cells. Distances are in the same unit.
+    `sampling` = (row height, column width) is the size of one element in px, so a grid of tall characters gives
+    distances in px of the picture, not in cells. Distances are in the same unit.
 
-    The direction is the negative gradient of the distance after a Gaussian blur of `smoothing` elements (sigma, >= 0,
-    else ValueError; 0 = none), so that it varies gently across a ridge instead of flipping. More smoothing turns the
-    direction more gradually, and lets it reach further beyond the shape (up to `truncate` sigma). `truncate` (> 0, else
-    ValueError) is where the blur's kernel is cut off, in sigmas: smaller is faster and shorter-reaching, larger is
-    more exact. `edge` is what the blur sees beyond the array, as in `photo_fx.ops.blur`: 'reflect' mirrors the field,
-    so a border edge stays an edge (ValueError for a name that module does not know). The caller chooses all three
-    blur settings; none has a hidden default.
+    The direction is the negative gradient of the distance after a Gaussian blur of `smoothing` elements (sigma; 0 =
+    none), so that it varies gently across a ridge instead of flipping. More smoothing turns the direction more
+    gradually, and lets it reach further beyond the shape (up to `truncate` sigma). `truncate` is where the blur's
+    kernel is cut off, in sigmas: smaller is faster and shorter-reaching, larger is more exact. `edge` is what the blur
+    sees beyond the array, as in `photo_fx.ops.blur`: 'reflect' mirrors the field, so a border edge stays an edge. The
+    caller chooses all three blur settings; none has a hidden default.
     """
-    if not isinstance(shape, np.ndarray) or shape.dtype != bool or shape.ndim != 2 or shape.size == 0:
-        raise ValueError("shape must be a non-empty 2-D bool array")
-    if len(sampling) != 2 or not all(np.isfinite(s) and s > 0 for s in sampling):
-        raise ValueError(f"sampling must be two positive numbers (row height, column width), got {sampling!r}")
-    if not (np.isfinite(smoothing) and smoothing >= 0):
-        raise ValueError(f"smoothing must be a number >= 0 (elements), got {smoothing!r}")
-    if not (np.isfinite(truncate) and truncate > 0):
-        raise ValueError(f"truncate must be a number > 0 (sigmas), got {truncate!r}")
-    if edge not in NUMPY_PAD:
-        raise ValueError(f"edge must be one of {', '.join(NUMPY_PAD)}, got {edge!r}")
     row_height, col_width = sampling
 
     # A border is an edge by putting a row/column of "outside" next to it. Leaving the bottom unpadded is what makes it
