@@ -1,0 +1,16 @@
+# The subject on a pale backdrop with five paper-like copies of its silhouette stacked behind it.
+name = "layered_cutouts"
+size = 480
+
+[[step]]
+effect = "fill"
+color = "#f3ead8"
+mask = "background"           # a plain backdrop, so the layers show
+
+[[step]]
+effect = "layered_cutouts"
+layers = 5
+offset = 15
+angle = 45
+color = "#ff8a5b"
+end_color = "#3b1f6b"
