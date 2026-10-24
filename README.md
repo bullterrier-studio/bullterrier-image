@@ -93,8 +93,8 @@ Requires Python 3.12+. As a package:
 ```bash
 pip install photo-fx               # everything but .mp4 / .mov export (unless ffmpeg is already installed)
 pip install "photo-fx[video]"      # also a bundled ffmpeg, for video on any OS
-photo-fx effects                   # lists every effect and its parameters (--category NAME: one category;
-                                   # --list-categories: the categories with their number of effects)
+photo-fx effects                   # lists every effect and its main parameters (--advanced: all of them; --category NAME: one category;
+                                   # --list-categories: the categories with their number of effects; NAME: one effect in full)
 ```
 
 From a checkout, with [uv](https://docs.astral.sh/uv/) (installs the `video` extra too):
@@ -393,7 +393,7 @@ Generated videos are not committed to this repository: only the filmstrip is.
 Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and evaporating
 particles, grouped by category. **[The effect catalogue](docs/effects/README.md)** (an index and a page per category) shows every effect with a picture of it, a
 one-line description, its parameters and defaults, and the example recipe that made the picture.
-`uv run photo-fx effects` prints the full documentation of every parameter.
+`uv run photo-fx effects` prints the main parameters of every effect (`--advanced` adds the technique options, `photo-fx effects NAME` shows one effect in full).
 
 Adding an effect adds files named for it and edits none. `uv run poe new-effect my_effect --category light` writes
 them from the template, working as written:
