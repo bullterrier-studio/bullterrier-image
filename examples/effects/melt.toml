@@ -1,0 +1,10 @@
+# Bright areas melt downward in drips.
+# It also makes the effect's picture in the catalogue.
+name = "melt"
+size = 480
+
+[[step]]
+effect = "melt"
+amount = 40
+scale = 10
+seed = 1
