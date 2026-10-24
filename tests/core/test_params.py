@@ -143,9 +143,6 @@ def _declare(annotation, field):
         (str, lambda: param("a", unit="px", doc="d"), "unit"),
         (Literal["soft", "hard"], lambda: param("soft", doc="Edge: 'soft' blends."), "hard"),
         (float, lambda: 1.0, "param"),  # a plain default: no description, no range
-        (tuple[float, ...], lambda: param((0.5,), doc="d"), "unit"),
-        (tuple[float, ...], lambda: param((0.5,), unit="px", min=0, doc="d"), "max"),
-        (tuple[float, ...], lambda: param((0.5, 3.0), unit="px", min=0, max=1, doc="d"), "default"),
         (tuple[str, ...], lambda: param(("a",), min=0, max=1, doc="d"), "min"),
         (bool, lambda: param(False, unit="count", doc="d"), "unit"),
     ],
@@ -238,7 +235,6 @@ class Kinds(EffectParams):
     radius: float = param(2.0, unit="px", min=0, max=10, doc="How far.")
     mode: Literal["soft", "hard"] = param("soft", doc="Edge: 'soft' or 'hard'.")
     tint: Color = param("#000000", doc="A colour.")
-    offsets: tuple[float, ...] = param((0.25, 0.75), unit="fraction", min=0, max=1, doc="Where the bands sit.")
     names: tuple[str, ...] = param(("a",), doc="Labels.")
 
 
@@ -253,9 +249,6 @@ class Kinds(EffectParams):
         ({"tint": "#fff"}, "tint", (1.0, 1.0, 1.0)),
         ({"tint": np.array([0.25, 0.5, 1.0])}, "tint", (0.25, 0.5, 1.0)),  # as parse_color accepted
         ({"tint": (np.float32(0.5), 0, 1)}, "tint", (0.5, 0.0, 1.0)),
-        ({"offsets": [0.1, 1]}, "offsets", (0.1, 1.0)),  # a list, as TOML writes it
-        ({"offsets": (0, 1)}, "offsets", (0.0, 1.0)),
-        ({"offsets": np.array([0.2, 0.3])}, "offsets", (0.2, 0.3)),
         ({"names": ["x", "y"]}, "names", ("x", "y")),
     ],
 )
@@ -273,23 +266,12 @@ def test_every_kind_of_field_accepts_its_own_kind_of_value(values, field, expect
         ({"mode": 1}, "mode"),
         ({"tint": np.array([0.1, 0.2, 0.3, 0.4])}, "tint"),
         ({"tint": [0.5, 0.5, True]}, "tint"),
-        ({"offsets": ("3", True)}, "offsets"),
-        ({"offsets": [1.5]}, "offsets"),  # each item has the field's range
-        ({"offsets": [float("nan")]}, "offsets"),
-        ({"offsets": "0.5"}, "offsets"),
         ({"names": [1, 2]}, "names"),
     ],
 )
 def test_every_kind_of_field_refuses_values_of_another_kind(values, field):
     with pytest.raises(ValidationError, match=field):
         Kinds(**values)
-
-
-def test_a_list_of_numbers_documents_and_publishes_its_range_per_item():
-    (offsets,) = [doc for doc in Kinds.fields_doc() if doc.name == "offsets"]
-    assert (offsets.unit, offsets.range) == ("fraction", "0 to 1")
-    items = Kinds.json_schema()["properties"]["offsets"]["items"]
-    assert (items["minimum"], items["maximum"]) == (0, 1)
 
 
 def test_whole_number_fields_are_the_int_fields():
@@ -322,18 +304,10 @@ def test_field_names_are_the_fields_in_declaration_order():
     assert Probe.field_names() == ("radius", "count", "mode", "tint", "label")
 
 
-@pytest.mark.parametrize(
-    ("model", "values", "field"),
-    [
-        (Kinds, {"offsets": [0.5, float("nan")]}, r"`offsets\[1\]`"),
-        (Kinds, {"offsets": [0.5, float("inf")]}, r"`offsets\[1\]`"),
-        (Probe, {"radius": float("nan")}, "`radius`"),
-    ],
-    ids=["nan list item", "infinite list item", "nan"],
-)
-def test_a_nan_or_infinity_is_reported_as_not_a_finite_number_not_as_out_of_range(model, values, field):
-    with pytest.raises(ValueError, match=f"{field}.*finite") as raised:
-        model.parse(values, "effect 'probe'")
+@pytest.mark.parametrize("value", [float("nan"), float("inf")], ids=["nan", "infinity"])
+def test_a_nan_or_infinity_is_reported_as_not_a_finite_number_not_as_out_of_range(value):
+    with pytest.raises(ValueError, match=r"`radius`.*finite") as raised:
+        Probe.parse({"radius": value}, "effect 'probe'")
     assert "<=" not in str(raised.value)
 
 

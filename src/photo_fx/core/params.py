@@ -8,8 +8,8 @@
 
 Promises:
 - A model is checked when its class is made (that is, when the effect module is imported): every field is declared with
-  `param` and has a non-empty description; a number, or a list of numbers, has a unit from `UNITS` and a range (min and
-  max, applying to each item of a list) that holds its default; any other field takes no unit or range. A broken
+  `param` and has a non-empty description; a number has a unit from `UNITS` and a range (min and max) that holds its
+  default; any other field takes no unit or range. A broken
   declaration raises `ValueError` naming the model and the field, so it never reaches a recipe.
 - Values are checked when a model is made, strictly, for every kind of field: unknown fields, values of the wrong kind
   (a bool or a numeric-looking string for a number, a string for a switch, a number for a choice) and values out of
@@ -35,7 +35,7 @@ from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_orig
 
 import annotated_types
 import numpy as np
-from pydantic import AllowInfNan, BaseModel, BeforeValidator, ConfigDict, Field, Strict, ValidationError, WithJsonSchema
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, WithJsonSchema
 
 from photo_fx.errors import RecipeError
 from photo_fx.ops.color import parse_color
@@ -122,8 +122,8 @@ def param(
 
     default: the value an effect uses when none is given; it must lie in the range. doc: what the field does, its unit
     and range in words, and what raising it does (shown in `help()`, the catalogue and the command line). unit: one of
-    `UNITS`, required for a number or a list of numbers, not allowed otherwise. min, max: the documented range, both
-    required and inclusive for a number (for a list of numbers they apply to each item); not allowed for anything else.
+    `UNITS`, required for a number, not allowed otherwise. min, max: the documented range, both required and inclusive
+    for a number; not allowed for anything else.
     field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
     A whole-number (`int`) field may be animated: its value then moves in whole steps, rounded to the nearest.
@@ -189,7 +189,7 @@ class FieldDoc(NamedTuple):
     name: str
     type: str  # in words: "number", "whole number", "colour", "one of 'a', 'b'", "list of colours"...
     unit: str | None
-    minimum: float | None  # for a list of numbers, the range of each item
+    minimum: float | None
     maximum: float | None
     default: Any
     doc: str
@@ -258,7 +258,7 @@ class EffectParams(ValidatedModel):
         for name, info in cls.model_fields.items():
             extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
             unit = extra.get("unit")
-            minimum, maximum = _bounds([*info.metadata, *_item_metadata(hints[name])])
+            minimum, maximum = _bounds(info.metadata)
             text = _type_text(hints[name])
             docs.append(
                 FieldDoc(
@@ -304,8 +304,7 @@ def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
 
 def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]:
     """The annotation and pydantic field for a `param` declaration, after checking it; ValueError naming the model and
-    the field if it is broken. Every field is strict; a list field also takes a list or an array; the items of a list
-    of numbers are strict and ranged themselves."""
+    the field if it is broken. Every field is strict; a list field also takes a list or an array."""
 
     def broken(problem: str) -> ValueError:
         return ValueError(f"parameter model {model!r}, field `{name}`: {problem}")
@@ -319,31 +318,25 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
     for choice in _choices(annotation):
         if str(choice) not in spec.doc:
             raise broken(f"the doc must explain every choice; it does not mention {choice!r}")
-    items = _number_items(annotation)
     numeric = _scalar(annotation) <= {int, float} and bool(_scalar(annotation))
     # strict for every kind of value; a choice (Literal) is matched exactly anyway, and pydantic refuses `strict` on it
     constraints: dict[str, Any] = {} if _choices(annotation) else {"strict": True}
-    if numeric or items is not None:
+    if numeric:
         if spec.unit not in UNITS:
             raise broken(f"a number needs a unit from {UNITS}, got {spec.unit!r}")
         if spec.min is None or spec.max is None:
             raise broken("a number needs both min and max (its documented range)")
         if spec.min > spec.max:
             raise broken(f"min {spec.min} is above max {spec.max}")
-        defaults = [spec.default] if numeric else list(spec.default)
-        for value in defaults:
-            if value is not None and not (_is_number(value) and spec.min <= value <= spec.max):
-                raise broken(f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}")
+        if spec.default is not None and not (_is_number(spec.default) and spec.min <= spec.default <= spec.max):
+            raise broken(f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}")
     elif spec.unit is not None or spec.min is not None or spec.max is not None:
-        raise broken("only a number, or a list of numbers, takes a unit, min and max")
+        raise broken("only a number takes a unit, min and max")
     typed: Any = annotation
     if numeric:
         constraints |= {"ge": spec.min, "le": spec.max}
         if float in _scalar(annotation):
             constraints["allow_inf_nan"] = False  # so a nan is reported as such, not as out of range
-    elif items is not None and spec.min is not None and spec.max is not None:  # (both checked above)
-        # each item strict and ranged; the list itself may be written as a list or an array
-        typed = Annotated[_ranged_tuple(annotation, spec.min, spec.max), BeforeValidator(_as_tuple)]
     elif get_origin(annotation) is tuple:
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
     made = Field(
@@ -362,36 +355,6 @@ def _members(annotation: Any) -> tuple[Any, ...]:
 def _scalar(annotation: Any) -> set[Any]:
     """The types of a field without None: {int} for `int`, {float} for `float | None`, {bool} for `bool`..."""
     return {m for m in _members(annotation) if m is not type(None)}
-
-
-def _number_items(annotation: Any) -> tuple[Any, ...] | None:
-    """For a tuple of numbers (`tuple[float, ...]`, `tuple[int, int]`), its item types; None for anything else."""
-    if get_origin(annotation) is not tuple:
-        return None
-    items = tuple(arg for arg in get_args(annotation) if arg is not Ellipsis)
-    return items if items and all(item in (int, float) for item in items) else None
-
-
-def _ranged_tuple(annotation: Any, low: float, high: float) -> Any:
-    """`annotation` (a tuple of numbers) with every item strict and ranged (and finite, for decimals)."""
-
-    def ranged(item: Any) -> Any:
-        if item is Ellipsis:
-            return item
-        finite = (AllowInfNan(False),) if item is float else ()  # checked before the range, so a nan is named as such
-        return Annotated[item, Strict(), annotated_types.Ge(low), annotated_types.Le(high), *finite]
-
-    return tuple[tuple(ranged(arg) for arg in get_args(annotation))]  # type: ignore[misc]  # built at run time
-
-
-def _item_metadata(annotation: Any) -> list[Any]:
-    """The constraints on the items of a list field (its range), found through any `Annotated` wrapping."""
-    while get_origin(annotation) is Annotated:
-        annotation = get_args(annotation)[0]
-    if get_origin(annotation) is not tuple or not get_args(annotation):
-        return []
-    item = get_args(annotation)[0]
-    return list(get_args(item)[1:]) if get_origin(item) is Annotated else []
 
 
 def _bounds(metadata: list[Any]) -> tuple[float | None, float | None]:

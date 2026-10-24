@@ -80,8 +80,8 @@ It returns an array of the same shape, is deterministic, never modifies its inpu
 
 A Pydantic model per effect: a subclass of `EffectParams` (`photo_fx.core.params`; frozen, `extra="forbid"`, every field strict), each field declared with
 `param(default, doc=...)`. Every field needs a default and a description (what it does, its unit and range in words, what raising it does).
-- **Numeric fields** (`int`, `float`) and **lists of numbers** (`tuple[float, ...]`) also need a `unit` (`px`, `fraction`, `degrees`, `stops`, `seconds`, `count`,
-  `ratio`, `cycles`) and an inclusive `min` and `max` that hold the default; for a list they apply to each item.
+- **Numeric fields** (`int`, `float`) also need a `unit` (`px`, `fraction`, `degrees`, `stops`, `seconds`, `count`,
+  `ratio`, `cycles`) and an inclusive `min` and `max` that hold the default.
 - **Other fields** take no unit, min or max: `bool` switches, `Literal[...]` choices (the doc must mention every choice), `str`, `Color` (`'#rrggbb'` or `'#rgb'`
   with the leading `#`, or three numbers 0..1), and lists of those. A list may be written as a list or an array.
 - **Animation:** any numeric parameter may be animated; an `int` field moves in whole steps (rounded to the nearest), and every rendered frame is checked
