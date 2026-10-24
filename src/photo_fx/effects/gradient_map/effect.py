@@ -7,6 +7,7 @@ import numpy as np
 from photo_fx.core.params import Color, EffectParams, param
 from photo_fx.core.registry import effect
 from photo_fx.ops.color import luminance
+from photo_fx.ops.ramp import ramp
 
 # constant: only keeps a flat picture (every pixel equally bright) from dividing by zero; it maps to the first stop.
 _FLAT = 1e-6
@@ -70,11 +71,6 @@ def gradient_map(rgb: np.ndarray, params: GradientMapParams) -> np.ndarray:
     The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its
     ends), so the whole gradient is always visible.
     """
-    colors = np.array(params.stops, dtype=np.float32)
-    count = len(params.stops)
     lum = luminance(rgb)
     lo, hi = np.quantile(lum, [params.shadow_clip, 1.0 - params.highlight_clip], method=params.quantile_method)
-    t = np.clip((lum - lo) / max(hi - lo, _FLAT), 0.0, 1.0) * (count - 1)
-    i = np.minimum(t.astype(int), count - 2)
-    f = (t - i)[..., None]
-    return (colors[i] * (1 - f) + colors[i + 1] * f).astype(np.float32)
+    return ramp(np.clip((lum - lo) / max(hi - lo, _FLAT), 0.0, 1.0), params.stops)
