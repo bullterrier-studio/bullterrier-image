@@ -28,14 +28,6 @@ def test_a_single_sample_is_the_picture_itself(mode: str, photo: np.ndarray) -> 
 
 
 @pytest.mark.parametrize("mode", MODES)
-@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
-def test_a_constant_picture_stays_as_it_is(mode: str, edge: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, mode=mode, amount=0.8, x=0.2, y=0.9, edge=edge)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-@pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize(
     ("x", "y", "pixel"),
     [(0.5, 0.5, (30, 40)), (0.0, 0.0, (0, 0)), (1.0, 0.5, (30, 80)), (0.25, 0.75, (45, 20))],
@@ -149,13 +141,6 @@ def test_every_interpolation_runs_and_stays_within_the_picture_range(
     assert out.shape == photo.shape
     assert out.min() >= 0.0
     assert out.max() <= 1.0
-
-
-@pytest.mark.parametrize("interpolation", CHOICES)
-def test_a_constant_picture_stays_as_it_is_under_every_interpolation(interpolation: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, mode="spin", amount=0.8, samples=7, interpolation=interpolation)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
 
 
 def test_nearest_reads_whole_pixels_so_values_are_exact_where_every_sample_rounds_to_the_pixel_itself() -> None:

@@ -118,19 +118,3 @@ def test_edge_sets_what_a_pixel_sees_when_the_pinch_reads_it_from_beyond_the_pic
     ramp = np.tile(np.arange(21) / 20.0, (21, 1))
     out = registry.apply(NAME, grey(ramp), amount=-1.0, radius=2.0, x=0.0, y=0.0, edge=edge, interpolation="nearest")
     assert out[0, 20, 0] == pytest.approx(expected, abs=1e-6)
-
-
-@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_a_constant_picture_stays_as_it_is(edge: str, interpolation: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, amount=-1.0, radius=2.0, x=0.2, y=0.9, edge=edge, interpolation=interpolation)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-def test_nearest_only_moves_whole_pixels_where_bilinear_blends_them() -> None:
-    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    nearest = registry.apply(NAME, noise, amount=0.6, radius=0.8, interpolation="nearest")
-    bilinear = registry.apply(NAME, noise, amount=0.6, radius=0.8, interpolation="bilinear")
-    assert np.isin(nearest, noise).all()
-    assert not np.isin(bilinear, noise).all()

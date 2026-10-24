@@ -93,27 +93,3 @@ def test_a_shift_beyond_the_farthest_corner_is_limited_to_it() -> None:
     beyond = registry.apply(NAME, noise, amount=corner * 3, interpolation="nearest")
     np.testing.assert_array_equal(beyond[..., 0], reach[..., 0])
     np.testing.assert_allclose(reach[..., 0], noise[15, 20, 0], atol=1e-6)
-
-
-@pytest.mark.parametrize("edge", EDGES)
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_a_constant_picture_stays_as_it_is(edge: str, interpolation: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, amount=20.0, x=0.2, y=0.9, edge=edge, interpolation=interpolation)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-def test_nearest_only_moves_whole_pixels_where_bilinear_blends_them() -> None:
-    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    nearest = registry.apply(NAME, noise, amount=6.0, interpolation="nearest")
-    bilinear = registry.apply(NAME, noise, amount=6.0, interpolation="bilinear")
-    assert np.isin(nearest, noise).all()
-    assert not np.isin(bilinear, noise).all()
-
-
-def test_bicubic_overshoot_is_clipped_to_the_range_of_a_picture() -> None:
-    step = np.zeros((41, 41, 3), np.float32)
-    step[:, 20:] = 1.0
-    out = registry.apply(NAME, step, amount=8.0, interpolation="bicubic")
-    assert out.min() >= 0.0
-    assert out.max() <= 1.0

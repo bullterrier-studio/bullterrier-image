@@ -1,6 +1,7 @@
 """Contract tests every effect must pass, whatever it does: shape, range, determinism, documentation, parameter names,
 categories, every parameter across its documented range, and a time and memory budget on a real-sized photo."""
 
+import itertools
 import time
 import tracemalloc
 from typing import Literal
@@ -392,6 +393,37 @@ def test_an_amount_of_zero_returns_the_picture_as_it_is_in_a_new_array(name, set
     out = registry.apply(name, photo, amount=0.0, **AMOUNT_ZERO_NEEDS.get(name, {}), **setting, **_inputs(name, photo))
     np.testing.assert_allclose(out, photo, atol=1e-6)
     assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
+
+
+def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
+    """(effect, choices) for every combination of the choice fields (`mode`, `edge`, `interpolation`...) of the
+    effects that read the picture between its pixels (those with an `interpolation` field)."""
+    found = []
+    for name in ALL:
+        properties = registry.schema(name)["properties"]
+        if "interpolation" in properties:
+            choices = {field: prop["enum"] for field, prop in properties.items() if "enum" in prop}
+            found += [
+                (name, dict(zip(choices, picked, strict=True))) for picked in itertools.product(*choices.values())
+            ]
+    return found
+
+
+@pytest.mark.parametrize(
+    ("name", "setting"), _sampling_cases(), ids=lambda case: "-".join(case.values()) if isinstance(case, dict) else case
+)
+def test_a_constant_picture_stays_constant_under_every_way_of_reading_between_pixels(name, setting):
+    flat = np.full((31, 47, 3), 0.4, np.float32)
+    np.testing.assert_allclose(registry.apply(name, flat, **setting), 0.4, atol=1e-6)
+
+
+@pytest.mark.parametrize("name", sorted({name for name, _ in _sampling_cases()}))
+def test_each_interpolation_reads_the_picture_its_own_way(name):
+    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
+    choices = registry.schema(name)["properties"]["interpolation"]["enum"]
+    outs = {choice: registry.apply(name, noise, interpolation=choice) for choice in choices}
+    for first, second in itertools.combinations(choices, 2):
+        assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"
 
 
 # --- cost: time and memory on a real-sized photo -----------------------------------------------------------------

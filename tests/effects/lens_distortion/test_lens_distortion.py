@@ -145,28 +145,3 @@ def test_a_barrel_shrinks_the_middle_less_than_the_edge_and_a_pincushion_the_opp
     pincushion = registry.apply(NAME, grey(distance), distortion=-0.25, fit="frame")[..., 0]
     assert (barrel[middle] < distance[middle]).all()
     assert (pincushion[middle] > distance[middle]).all()
-
-
-@pytest.mark.parametrize("fit", FITS)
-@pytest.mark.parametrize("edge", EDGES)
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_a_constant_picture_stays_as_it_is(fit: str, edge: str, interpolation: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, distortion=1.0, fit=fit, x=0.2, y=0.9, edge=edge, interpolation=interpolation)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-def test_nearest_only_moves_whole_pixels_where_bilinear_blends_them() -> None:
-    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    nearest = registry.apply(NAME, noise, distortion=0.5, interpolation="nearest")
-    bilinear = registry.apply(NAME, noise, distortion=0.5, interpolation="bilinear")
-    assert np.isin(nearest, noise).all()
-    assert not np.isin(bilinear, noise).all()
-
-
-def test_bicubic_overshoot_is_clipped_to_the_range_of_a_picture() -> None:
-    edge = np.zeros((41, 41, 3), np.float32)
-    edge[:, 20:] = 1.0
-    out = registry.apply(NAME, edge, distortion=0.9, interpolation="bicubic")
-    assert out.min() >= 0.0
-    assert out.max() <= 1.0

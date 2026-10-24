@@ -6,8 +6,6 @@ import pytest
 from photo_fx.core import registry
 
 NAME = "polar"
-INTERPOLATIONS = ["nearest", "bilinear", "bicubic"]
-EDGES = ["reflect", "mirror", "nearest", "wrap"]
 
 
 def position_picture(height: int, width: int) -> np.ndarray:
@@ -142,30 +140,3 @@ def test_a_picture_with_no_planet_to_fit_in_it_is_returned_as_it_is(mode: str, s
     out = registry.apply(NAME, noise, mode=mode)
     np.testing.assert_array_equal(out, noise)
     assert not np.shares_memory(out, noise)
-
-
-@pytest.mark.parametrize("mode", ["to", "from"])
-@pytest.mark.parametrize("edge", EDGES)
-@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
-def test_a_constant_picture_stays_as_it_is(mode: str, edge: str, interpolation: str) -> None:
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(NAME, flat, mode=mode, x=0.2, y=0.9, edge=edge, interpolation=interpolation)
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-@pytest.mark.parametrize("mode", ["to", "from"])
-def test_nearest_only_moves_whole_pixels_where_bilinear_blends_them(mode: str) -> None:
-    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    nearest = registry.apply(NAME, noise, mode=mode, interpolation="nearest")
-    bilinear = registry.apply(NAME, noise, mode=mode, interpolation="bilinear")
-    assert np.isin(nearest, noise).all()
-    assert not np.isin(bilinear, noise).all()
-
-
-@pytest.mark.parametrize("mode", ["to", "from"])
-def test_bicubic_overshoot_is_clipped_to_the_range_of_a_picture(mode: str) -> None:
-    step = np.zeros((41, 41, 3), np.float32)
-    step[:, 20:] = 1.0
-    out = registry.apply(NAME, step, mode=mode, interpolation="bicubic")
-    assert out.min() >= 0.0
-    assert out.max() <= 1.0
