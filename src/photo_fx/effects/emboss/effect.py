@@ -25,12 +25,12 @@ class EmbossParams(EffectParams):
     )
     depth: float = param(
         6.0,
-        unit="ratio",
+        unit="px",
         min=0,
         max=50,
-        doc="How tall the relief is: brightness change per pixel (0..1) is multiplied by this to give the slope. 0 = "
-        "a flat surface (mid grey), larger = steeper relief and stronger shading, up to the full range for sharp "
-        "edges. The slope is per pixel, so the same value looks stronger on a smaller picture.",
+        doc="How tall the relief is: a white pixel stands this many px above a black one, so the slope between "
+        "neighbours is their brightness difference times this. 0 = a flat surface (mid grey), larger = steeper "
+        "relief and stronger shading, up to full black and white at sharp edges.",
     )
     saturation: float = param(
         0.0,
@@ -50,7 +50,7 @@ class EmbossParams(EffectParams):
 
 @effect(category="texture", params=EmbossParams)
 def emboss(rgb: np.ndarray, params: EmbossParams) -> np.ndarray:
-    """Read the brightness as a relief of slope `depth` x brightness change per px and light it from `angle`.
+    """Read the brightness as a relief `depth` px tall and light it from `angle`.
 
     The shade is 0.5 + 0.5 x the cosine between the surface normal and a horizontal light, so a flat surface is mid
     grey, one facing the light edge-on 1 and one facing away 0, and the shade never leaves 0..1. `saturation` mixes in
