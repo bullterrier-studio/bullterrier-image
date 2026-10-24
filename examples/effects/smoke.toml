@@ -1,0 +1,8 @@
+# Pale smoke rising from the bottom of the photo, swirled by turbulence.
+# It also makes the effect's picture in the catalogue.
+name = "smoke"
+size = 480
+
+[[step]]
+effect = "smoke"
+seed = 4
