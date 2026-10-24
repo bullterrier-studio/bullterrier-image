@@ -1,12 +1,12 @@
 """The `scan_roll` effect: the picture rolled vertically or horizontally, like a video sync that slipped."""
 
-import math
 from typing import Literal
 
 import numpy as np
 
 from photo_fx.core.params import EffectParams, param
 from photo_fx.core.registry import effect
+from photo_fx.ops.shift import shift
 
 
 class ScanRollParams(EffectParams):
@@ -43,27 +43,8 @@ def scan_roll(rgb: np.ndarray, params: ScanRollParams) -> np.ndarray:
     between). What comes into view where the picture left is set by `edge`: with 'wrap' it is the part that left on the
     other side, so nothing is lost and a whole-picture roll is the picture itself.
     """
-    # the array axis that rolls: the rows (0) for 'vertical', the columns (1) for 'horizontal'
-    dimension = int(params.axis == "horizontal")
-    size = rgb.shape[dimension]
-    distance = params.offset * size  # px; positive moves the picture toward higher rows or columns
-    whole = math.floor(distance)
-    fraction = distance - whole
-    lines = np.arange(size)
-
-    def source(index: np.ndarray) -> np.ndarray:
-        """The line of the picture each position of `index` shows, by the rule for beyond its edge."""
-        if params.edge == "wrap":
-            return index % size
-        if params.edge == "nearest":
-            return np.clip(index, 0, size - 1)
-        period = 2 * size if params.edge == "reflect" else max(2 * size - 2, 1)
-        folded = index % period
-        return np.where(folded >= size, period - (folded + 1 if params.edge == "reflect" else folded), folded)
-
-    # the output at line i is the picture at i - distance, which lies between lines i - whole - 1 and i - whole
-    rolled = np.take(rgb, source(lines - whole), axis=dimension)
-    if fraction == 0:
-        return rolled
-    behind = np.take(rgb, source(lines - whole - 1), axis=dimension)
-    return (rolled * (1 - fraction) + behind * fraction).astype(np.float32)
+    horizontal = params.axis == "horizontal"
+    distance = (
+        params.offset * rgb.shape[horizontal]
+    )  # px, along the rows (0) or the columns (1); positive is down or right
+    return shift(rgb, distance * (not horizontal), distance * horizontal, edge=params.edge)
