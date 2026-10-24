@@ -12,7 +12,7 @@ from bullterrier_image.ops.shift import shift
 
 
 class DropShadowParams(EffectParams):
-    """The settings of `drop_shadow`: where the shadow falls, how soft it is, and its colour and opacity."""
+    """The settings of `drop_shadow`: where the shadow falls, how soft it is, and its colour."""
 
     dx: float = param(
         12.0,
@@ -42,14 +42,6 @@ class DropShadowParams(EffectParams):
         doc="The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the "
         "subject; another colour tints it.",
     )
-    opacity: float = param(
-        0.6,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How much of the picture behind the subject the shadow replaces with its colour where it is fullest: "
-        "0 = no shadow, 1 = the picture is fully covered there.",
-    )
     truncate: float = param(
         4.0,
         unit="ratio",
@@ -72,8 +64,9 @@ class DropShadowParams(EffectParams):
 def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, matte: np.ndarray | None = None) -> np.ndarray:
     """A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`.
 
-    The shadow is the subject's silhouette moved, blurred and mixed over the background in `color` by `opacity`; the
-    subject itself is never changed, and the shadow only ever shows where the subject is not.
+    The shadow is the subject's silhouette moved and blurred, laid over the background in `color`: where it is full
+    it replaces the picture, where its blurred edge thins out it shows less. The subject itself is never changed, and
+    the shadow only ever shows where the subject is not.
 
     `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no shadow: the picture comes back unchanged.
@@ -82,4 +75,4 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, matte: np.ndarray 
         return rgb.copy()
     cast = shift(matte, params.dy, params.dx, edge=params.edge)
     cast = gaussian_blur(cast, params.blur, truncate=params.truncate, edge=params.edge)
-    return put_behind(rgb, matte, params.opacity * cast, np.asarray(params.color, np.float32))
+    return put_behind(rgb, matte, cast, np.asarray(params.color, np.float32))

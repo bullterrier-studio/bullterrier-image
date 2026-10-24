@@ -12,4 +12,4 @@ effect = "drop_shadow"
 dx = 26
 dy = 32
 blur = 12
-opacity = 0.85
+opacity = 0.51                # the shadow covers 51% of the backdrop where it is full

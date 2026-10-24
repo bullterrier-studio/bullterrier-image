@@ -19,4 +19,4 @@ effect = "drop_shadow"
 dx = 10
 dy = 16
 blur = 18
-opacity = 0.5
+opacity = 0.3                  # the shadow covers 30% of the gradient where it is full
