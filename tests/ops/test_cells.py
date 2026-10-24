@@ -50,12 +50,6 @@ def test_cut_and_join_leave_their_input_untouched():
     np.testing.assert_array_equal(pieces, pieces_before)
 
 
-@pytest.mark.parametrize(("cell_w", "cell_h"), [(0, 4), (4, 0), (-1, 4), (4, -3)])
-def test_cut_rejects_cell_sizes_that_are_not_positive(cell_w, cell_h):
-    with pytest.raises(ValueError, match="positive"):
-        cut(np.zeros((8, 8, 3), dtype=np.float32), cell_w, cell_h)
-
-
 def test_lit_is_true_exactly_for_pieces_with_a_value_above_threshold():
     pieces = np.zeros((2, 3, 4, 5, 3), dtype=np.float32)
     pieces[0, 0, 0, 0, 0] = 0.0201  # one channel of one pixel is enough

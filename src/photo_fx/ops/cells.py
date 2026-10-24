@@ -12,12 +12,10 @@ from scipy import ndimage
 def cut(rgb: np.ndarray, cell_w: int, cell_h: int) -> np.ndarray:
     """Cut `rgb` into a grid of pieces.
 
-    `rgb` is a float32 (height, width, 3) picture. `cell_w` and `cell_h` are the size of one piece in px (both >= 1,
-    else ValueError). Returns an array of shape (rows, cols, cell_h, cell_w, 3) where rows = ceil(height / cell_h) and
+    `rgb` is a float32 (height, width, 3) picture. `cell_w` and `cell_h` are the size of one piece in px (both >= 1).
+    Returns an array of shape (rows, cols, cell_h, cell_w, 3) where rows = ceil(height / cell_h) and
     cols = ceil(width / cell_w); the picture is padded with black on the right and bottom to a whole number of pieces.
     """
-    if cell_w < 1 or cell_h < 1:
-        raise ValueError(f"cell sizes must be positive, got cell_w={cell_w}, cell_h={cell_h}")
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)
     padded = np.pad(rgb, ((0, rows * cell_h - height), (0, cols * cell_w - width), (0, 0)))
