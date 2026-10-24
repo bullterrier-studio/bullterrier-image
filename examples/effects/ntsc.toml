@@ -1,0 +1,8 @@
+# Composite video: colour bleeds sideways past its edges and a faint chequer crawls over the coloured areas.
+name = "ntsc"
+size = 480
+
+[[step]]
+effect = "ntsc"
+sigma = 6
+crawl = 0.4

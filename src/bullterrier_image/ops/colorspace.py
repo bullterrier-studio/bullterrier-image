@@ -137,3 +137,36 @@ def ycbcr_to_rgb(ycbcr: np.ndarray) -> np.ndarray:
         float32 array of the same shape holding sRGB (r, g, b), 0..1 for the YCbCr of in-range colours; not clipped.
     """
     return ((np.asarray(ycbcr, dtype=np.float32) - _CHROMA_CENTRE) @ _YCBCR_TO_RGB.T).astype(np.float32)
+
+
+# NTSC YIQ with the FCC coefficients (47 CFR 73.682): Y the luma, I the orange-cyan and Q the green-magenta axis of the
+# chroma, which a grey leaves at zero.
+_RGB_TO_YIQ = np.array(
+    [[0.299, 0.587, 0.114], [0.5959, -0.2746, -0.3213], [0.2115, -0.5227, 0.3112]], dtype=np.float32
+)  # constant: the FCC YIQ matrix, as four-digit coefficients
+_YIQ_TO_RGB = np.linalg.inv(_RGB_TO_YIQ).astype(np.float32)
+
+
+def rgb_to_yiq(rgb: np.ndarray) -> np.ndarray:
+    """Convert sRGB to the NTSC YIQ of television (FCC 47 CFR 73.682 coefficients).
+
+    Args:
+        rgb: sRGB values, last axis length 3, 0..1.
+
+    Returns:
+        float32 array of the same shape holding (Y, I, Q): Y is 0..1 (the Rec. 601 luma weights 0.299, 0.587, 0.114),
+        I about -0.6..0.6 and Q about -0.53..0.53, both 0 for a grey. Nothing is clipped.
+    """
+    return (np.asarray(rgb, dtype=np.float32) @ _RGB_TO_YIQ.T).astype(np.float32)
+
+
+def yiq_to_rgb(yiq: np.ndarray) -> np.ndarray:
+    """Convert NTSC YIQ back to sRGB; the inverse of `rgb_to_yiq`.
+
+    Args:
+        yiq: (Y, I, Q) on the last axis, as `rgb_to_yiq` returns them.
+
+    Returns:
+        float32 array of the same shape holding sRGB (r, g, b), 0..1 for the YIQ of in-range colours; not clipped.
+    """
+    return (np.asarray(yiq, dtype=np.float32) @ _YIQ_TO_RGB.T).astype(np.float32)

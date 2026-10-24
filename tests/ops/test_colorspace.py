@@ -1,5 +1,5 @@
-"""Tests of `ops/colorspace.py`: the sRGB transfer function, HSV and JFIF YCbCr, checked against published values and
-the standard library's `colorsys`."""
+"""Tests of `ops/colorspace.py`: the sRGB transfer function, HSV, JFIF YCbCr and NTSC YIQ, checked against published
+values and the standard library's `colorsys`."""
 
 import colorsys
 
@@ -11,8 +11,10 @@ from bullterrier_image.ops.colorspace import (
     linear_to_srgb,
     rgb_to_hsv,
     rgb_to_ycbcr,
+    rgb_to_yiq,
     srgb_to_linear,
     ycbcr_to_rgb,
+    yiq_to_rgb,
 )
 
 # (encoded, linear) pairs from the IEC 61966-2-1 transfer function, worked out by hand:
@@ -125,3 +127,34 @@ def test_ycbcr_to_rgb_undoes_rgb_to_ycbcr_and_keeps_the_shape() -> None:
     back = ycbcr_to_rgb(rgb_to_ycbcr(image))
     assert back.shape == image.shape
     np.testing.assert_allclose(back, image, atol=1e-5)
+
+
+# (Y, I, Q) of the primaries and white: the columns of the FCC matrix as published (47 CFR 73.682), Y = 0.299 R +
+# 0.587 G + 0.114 B, I = 0.5959 R - 0.2746 G - 0.3213 B, Q = 0.2115 R - 0.5227 G + 0.3112 B; a grey has no chroma.
+YIQ = [
+    pytest.param((0, 0, 0), (0, 0, 0), id="black"),
+    pytest.param((1, 1, 1), (1, 0, 0), id="white has no chroma: the I and Q rows sum to zero"),
+    pytest.param((1, 0, 0), (0.299, 0.5959, 0.2115), id="red"),
+    pytest.param((0, 1, 0), (0.587, -0.2746, -0.5227), id="green"),
+    pytest.param((0, 0, 1), (0.114, -0.3213, 0.3112), id="blue"),
+]
+
+
+@pytest.mark.parametrize(("rgb", "yiq"), YIQ)
+def test_rgb_to_yiq_matches_the_fcc_coefficients(rgb: tuple[float, ...], yiq: tuple[float, ...]) -> None:
+    np.testing.assert_allclose(rgb_to_yiq(np.array(rgb, np.float32)), yiq, atol=1e-6)
+
+
+@pytest.mark.parametrize(("rgb", "yiq"), YIQ)
+def test_yiq_to_rgb_matches_the_fcc_coefficients(rgb: tuple[float, ...], yiq: tuple[float, ...]) -> None:
+    np.testing.assert_allclose(yiq_to_rgb(np.array(yiq, np.float32)), rgb, atol=1e-5)
+
+
+def test_yiq_agrees_with_the_standard_librarys_rounder_ntsc_matrix_and_is_inverted_by_yiq_to_rgb() -> None:
+    """`colorsys` uses the older three-digit coefficients (0.30, 0.59, 0.11, ...): close, not equal."""
+    image = np.random.default_rng(6).random((5, 4, 3), dtype=np.float32)
+    ours = rgb_to_yiq(image)
+    for row in range(5):
+        for column in range(4):
+            np.testing.assert_allclose(ours[row, column], colorsys.rgb_to_yiq(*image[row, column]), atol=0.015)
+    np.testing.assert_allclose(yiq_to_rgb(ours), image, atol=1e-5)
