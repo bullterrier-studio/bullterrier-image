@@ -1,0 +1,10 @@
+# A heat-haze wobble: noise bends the picture by up to 24 px, in broad waves with a little fine ripple.
+name = "displace"
+size = 480
+
+[[step]]
+effect = "displace"
+amount = 24
+scale = 60
+octaves = 3
+seed = 1
