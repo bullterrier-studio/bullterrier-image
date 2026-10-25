@@ -125,16 +125,19 @@ def test_no_test_reaches_into_or_patches_bullterrier_image():
 
 def test_an_allowed_entry_silences_exactly_its_violation_and_a_stale_one_is_reported(tmp_path):
     (tmp_path / "test_a.py").write_text(
-        "from bullterrier_image.matte import _one\nfrom bullterrier_image.matte import _two\n", encoding="utf-8"
+        "from bullterrier_image.finding.subject import _one\nfrom bullterrier_image.finding.subject import _two\n",
+        encoding="utf-8",
     )
     allowed = {("test_a.py", "_one"): "a reason", ("test_a.py", "_gone"): "it was removed", ("test_b.py", "_x"): "?"}
-    assert unexplained(tmp_path, allowed) == ["test_a.py line 2: imports private bullterrier_image.matte._two"]
+    assert unexplained(tmp_path, allowed) == [
+        "test_a.py line 2: imports private bullterrier_image.finding.subject._two"
+    ]
     assert stale(tmp_path, allowed) == ["test_a.py: _gone", "test_b.py: _x"]
     assert stale(tmp_path, {("test_a.py", "_one"): "  "}) == ["test_a.py: _one"]  # an entry needs a reason
 
 
 KNOWN_BAD = {
-    "private import": "from bullterrier_image.matte import _refine_edge\n",
+    "private import": "from bullterrier_image.finding.subject import _refine_edge\n",
     "private module": "from bullterrier_image.effects._shared import helper\n",
     "private module import": "import bullterrier_image.core._internal\n",
     "private attribute": "from bullterrier_image.ops import glyphs\nloader = glyphs._load_font\n",
@@ -146,7 +149,7 @@ KNOWN_BAD = {
         "def test(monkeypatch):\n    monkeypatch.setattr(pipeline, 'render', None)\n"
     ),
     "monkeypatch a dotted path": (
-        "def test(monkeypatch):\n    monkeypatch.setattr('bullterrier_image.matte.subject_matte', 0)\n"
+        "def test(monkeypatch):\n    monkeypatch.setattr('bullterrier_image.finding.subject.subject_matte', 0)\n"
     ),
     "monkeypatch delattr": (
         "import bullterrier_image\n\ndef test(monkeypatch):\n    monkeypatch.delattr(bullterrier_image.fx, 'X')\n"
@@ -160,7 +163,9 @@ KNOWN_BAD = {
         "from bullterrier_image import pipeline\n\ndef test(monkeypatch):\n"
         "    monkeypatch.setattr(target=pipeline, name='render', value=None)\n"
     ),
-    "getattr of a private name": "from bullterrier_image import matte\n\nhelper = getattr(matte, '_refine_edge')\n",
+    "getattr of a private name": (
+        "from bullterrier_image.finding import subject\n\nhelper = getattr(subject, '_refine_edge')\n"
+    ),
     "patch.dict": (
         "from unittest import mock\nfrom bullterrier_image.core import vocabulary\n\n"
         "with mock.patch.dict(vocabulary.DISCOURAGED, {'x': 'y'}):\n    pass\n"
@@ -178,7 +183,7 @@ def test_the_checker_reports_each_kind_of_coupling(source):
 
 
 def test_the_checker_reports_the_line_and_the_name():
-    (problem,) = violations("import numpy\n\nfrom bullterrier_image.matte import _refine_edge\n")
+    (problem,) = violations("import numpy\n\nfrom bullterrier_image.finding.subject import _refine_edge\n")
     assert problem.startswith("line 3:")
     assert "_refine_edge" in problem
 
@@ -189,7 +194,7 @@ import sys
 import numpy as np
 import bullterrier_image
 from bullterrier_image.core import registry
-from bullterrier_image.matte import refine_edge
+from bullterrier_image.finding.subject import refine_edge
 
 def _probe(rgb, amount: float = 0.5):
     """A test's own helper may be private."""

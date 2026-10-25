@@ -5,7 +5,7 @@ https://github.com/xuebinqin/DIS, Apache-2.0). It finds whatever stands out (peo
 The ONNX export is the one the rembg project publishes (https://github.com/danielgatis/rembg, MIT); its bytes are
 pinned below by SHA-256, so a changed file is refused, not used.
 
-The model contract (also what a local model file named by `BT_IMAGE_MODEL` must follow): one float32 input
+The model contract (also what a local model file named by `BT_IMAGE_SUBJECT_MODEL` must follow): one float32 input
 (1, 3, 1024, 1024), the photo resized to 1024 x 1024, RGB, each value v / 255 - 0.5; the first output
 (1, 1, 1024, 1024) is the probability (0..1) that a pixel belongs to the subject.
 """

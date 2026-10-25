@@ -16,7 +16,7 @@ from bullterrier_image.cli import main
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.matte import subject_matte
+from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.recipe import Recipe, Step, load_recipe, render
 from bullterrier_image.sheet import contact_sheet
 
@@ -251,7 +251,7 @@ def test_bad_recipe_is_reported_before_any_work(files, capsys):
 
 
 def test_photo_without_a_subject_is_reported_clearly(files, echo_model, monkeypatch, capsys):
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # answers with the red channel; the photo is black
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))  # answers with the red channel; the photo is black
     imageio.save(np.zeros((96, 128, 3), np.float32), files / "me.png")
     (files / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n', encoding="utf-8")
     assert cli("render me.png m.toml") == 1
@@ -342,7 +342,9 @@ def test_steps_takes_a_matte_file_too(cut):
 
 def test_the_segmenter_option_wins_over_the_environment(cut, echo_model, monkeypatch):
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "nonsense")  # refused if it were asked
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # the portable backend answers with the red channel
+    monkeypatch.setenv(
+        "BT_IMAGE_SUBJECT_MODEL", str(echo_model(0))
+    )  # the portable backend answers with the red channel
     assert cli("render me.png cut.toml -o out --segmenter onnx") == 0
     photo = imageio.load(cut / "me.png")
     expected = render(photo, load_recipe(cut / "cut.toml"), subject_matte(photo, segmenter="onnx"))
@@ -361,10 +363,10 @@ def test_an_unknown_segmenter_is_a_usage_error(cut, capsys):
 
 def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo_model, monkeypatch):
     (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))  # the subject is where the photo is red
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))  # the subject is where the photo is red
     assert cli("run bt-image.toml --segmenter onnx -q") == 0
     first = (cut / "done" / "me" / "cut.jpg").read_bytes()
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(1)))  # and now where it is green: another cut-out
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))  # and now where it is green: another cut-out
     assert cli("run bt-image.toml --segmenter onnx -q") == 0
     assert (cut / "done" / "me" / "cut.jpg").read_bytes() != first
 
@@ -391,7 +393,7 @@ MISTAKES = {
     "a sweep beyond the parameter's range": ("sweep me.png recipes/a.toml grain.amount 0..5 -o s.png", "amount"),
     "a sweep of one tile": ("sweep me.png recipes/a.toml grain.amount 0..1 -o s.png --count 1", "count"),
     "a picture type nothing can write": ("sheet me.png recipes/a.toml -o sheet.xyz", ".xyz"),
-    # (the suite's BT_IMAGE_MODEL names no file, so the portable model cannot run)
+    # (the suite's BT_IMAGE_SUBJECT_MODEL names no file, so the portable model cannot run)
     "a segmenter that cannot run": ("render me.png cut.toml -o out --segmenter onnx", "no-such-model"),
 }
 
@@ -526,7 +528,7 @@ def test_help_and_version_load_no_image_library(option):
         *(
             "bullterrier_image.core",
             "bullterrier_image.effects",
-            "bullterrier_image.matte",
+            "bullterrier_image.finding.subject",
             "bullterrier_image.pipeline",
         ),
     ]

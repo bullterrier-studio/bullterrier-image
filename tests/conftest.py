@@ -166,9 +166,10 @@ def matte() -> np.ndarray:
 @pytest.fixture(autouse=True)
 def no_model_download(monkeypatch):
     """No test may download the subject-finding model, or depend on the settings of the person running the tests:
-    `BT_IMAGE_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it, instead of
-    downloading) and `BT_IMAGE_SEGMENTER` is unset. A test that needs a model sets `BT_IMAGE_MODEL` itself."""
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
+    `BT_IMAGE_SUBJECT_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it,
+    instead of downloading) and `BT_IMAGE_SEGMENTER` is unset. A test that needs a model sets `BT_IMAGE_SUBJECT_MODEL`
+    itself."""
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
     monkeypatch.delenv("BT_IMAGE_SEGMENTER", raising=False)
 
 

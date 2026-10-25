@@ -23,7 +23,7 @@ bullterrier-image is before 1.0: only the latest release receives security fixes
 - **The subject model download is pinned.** The portable subject finder downloads its model on first use, over HTTPS
   (redirects included) from an address written in the code, and keeps it only if its exact size and SHA-256 match the
   ones written there; anything else is discarded and no partial file is left. Nothing is downloaded when bullterrier-image is
-  imported. `BT_IMAGE_MODEL` points at a copy you provide instead.
+  imported. `BT_IMAGE_SUBJECT_MODEL` points at a copy you provide instead.
 - **Untrusted pictures.** Pillow's decompression-bomb limit stays on, and a damaged file raises `ImageReadError`.
 - **Cached data** is read without pickle, so a planted cache file cannot run code.
 - **Outputs** carry no EXIF or GPS data from the input photo.

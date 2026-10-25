@@ -21,7 +21,7 @@ from typing import NamedTuple
 from . import fx, imageio
 from .core import registry
 from .errors import ProjectError
-from .matte import subject_matte
+from .finding.subject import subject_matte
 from .ops.resample import resize
 from .recipe import load_recipe, render
 
@@ -75,7 +75,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
 
     Everything is checked before anything is rendered: an unknown name raises `UnknownEffectError` listing the
     effects, a missing example recipe or a `checkout` that is no source checkout `ProjectError`. Example recipes that
-    cut out the subject need a segmenter (see `bullterrier_image.matte`).
+    cut out the subject need a segmenter (see `bullterrier_image.finding.subject`).
     """
     names = _chosen(only, checkout)
     todo = [name for name in names if force or not effect_files(name, checkout=checkout).picture.exists()]

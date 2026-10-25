@@ -7,7 +7,7 @@ background (0), at the picture's own size. Two backends can answer it:
   Linux and Windows, so a recipe cuts the same on every machine. The model (about 180 MB) is not part of the package:
   the first use downloads it into the user's cache folder (`onnx_model_path()`), checks its SHA-256 and keeps it there;
   nothing is downloaded at import time. Offline, download the file by hand (the error says from where and to where) or
-  set `BT_IMAGE_MODEL` to a local copy, which is then used as it is and never downloaded.
+  set `BT_IMAGE_SUBJECT_MODEL` to a local copy, which is then used as it is and never downloaded.
 - `"vision"`, only when asked: Apple Vision's subject segmentation (the "lift subject" feature). macOS only; runs on
   the Neural Engine, needs no download; on macOS before 14 it uses Vision's older people-only model. Its cut differs
   from the portable model's, so a look made with it does not travel to other machines.
@@ -30,13 +30,13 @@ from scipy import ndimage
 
 from bullterrier_image.errors import BackendUnavailableError, SubjectNotFoundError
 
-from . import _onnx, _vision
+from . import _isnet, _vision
 from .download import DownloadError, fetch, user_cache_dir
 
 SEGMENTERS = ("onnx", "vision")
 DEFAULT_SEGMENTER = "onnx"  # the one place that decides: the same cut on every machine
 SEGMENTER_VARIABLE = "BT_IMAGE_SEGMENTER"
-MODEL_VARIABLE = "BT_IMAGE_MODEL"
+MODEL_VARIABLE = "BT_IMAGE_SUBJECT_MODEL"
 _HALF = 0.5  # a pixel is the subject's when the model is at least this sure: the even split of a probability
 _EIGHT_BIT = 255.0  # the largest value of an 8-bit mask
 
@@ -68,12 +68,13 @@ def subject_matte(
 
 
 def onnx_model_path() -> Path:
-    """The model file the portable backend uses: `BT_IMAGE_MODEL` if set, else its place in the user's cache folder.
+    """The model file the portable backend uses: `BT_IMAGE_SUBJECT_MODEL` if set, else its place in the user's cache.
 
-    The file need not exist yet: without `BT_IMAGE_MODEL`, the first `subject_matte` that needs it downloads it there.
+    The file need not exist yet: without `BT_IMAGE_SUBJECT_MODEL`, the first `subject_matte` that needs it downloads
+    it there.
     """
     local = os.environ.get(MODEL_VARIABLE)
-    return Path(local) if local else user_cache_dir() / _onnx.MODEL_FILE
+    return Path(local) if local else user_cache_dir() / _isnet.MODEL_FILE
 
 
 def segmenter_identity(segmenter: str | None = None) -> str:
@@ -81,9 +82,10 @@ def segmenter_identity(segmenter: str | None = None) -> str:
 
     `segmenter` is as for `subject_matte`, and is chosen the same way (the argument, then `BT_IMAGE_SEGMENTER`, then the
     portable model). For the portable model that is a hash of the model: the pinned one when the standard model is meant
-    (it is not downloaded to find out), else of the file `BT_IMAGE_MODEL` names, so the same model at another path
-    is the same segmenter; for Apple Vision it is the macOS version, whose release brings the model. Use it to remember
-    subjects between runs. Raises BackendUnavailableError exactly where `subject_matte` would, naming what was tried.
+    (it is not downloaded to find out), else of the file `BT_IMAGE_SUBJECT_MODEL` names, so the same model at another
+    path is the same segmenter; for Apple Vision it is the macOS version, whose release brings the model. Use it to
+    remember subjects between runs. Raises BackendUnavailableError exactly where `subject_matte` would, naming what
+    was tried.
     """
     name, why = _choose(segmenter)
     if name == "vision":
@@ -91,7 +93,7 @@ def segmenter_identity(segmenter: str | None = None) -> str:
         return f"vision:macOS {platform.mac_ver()[0]}"
     custom = _local_model(f"cannot find the subject with the portable model (onnx, chosen by {why})")
     if custom is None:
-        return f"onnx:sha256 {_onnx.MODEL_SHA256}"
+        return f"onnx:sha256 {_isnet.MODEL_SHA256}"
     with custom.open("rb") as file:
         return f"onnx:sha256 {hashlib.file_digest(file, 'sha256').hexdigest()}"
 
@@ -123,7 +125,7 @@ def _require_vision(why: str) -> None:
 
 
 def _local_model(tried: str) -> Path | None:
-    """The model file `BT_IMAGE_MODEL` names, which must exist; None when the standard model is meant."""
+    """The model file `BT_IMAGE_SUBJECT_MODEL` names, which must exist; None when the standard model is meant."""
     if not os.environ.get(MODEL_VARIABLE):
         return None
     model = onnx_model_path()
@@ -143,14 +145,14 @@ def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
     if model is None:
         model = onnx_model_path()
         try:
-            fetch(_onnx.MODEL_URL, _onnx.MODEL_SHA256, model, size=_onnx.MODEL_SIZE)
+            fetch(_isnet.MODEL_URL, _isnet.MODEL_SHA256, model, size=_isnet.MODEL_SIZE)
         except DownloadError as error:
             raise BackendUnavailableError(
                 f"{tried}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the subject's matte yourself "
                 "(--matte)"
             ) from error
     try:
-        return _onnx.subject_probability(rgb, model)
+        return _isnet.subject_probability(rgb, model)
     except ImportError as error:
         raise BackendUnavailableError(f"{tried}: it needs onnxruntime (pip install onnxruntime): {error}") from error
 

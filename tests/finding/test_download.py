@@ -1,4 +1,4 @@
-"""Tests of `bullterrier_image.matte.download`: the verified, atomic first-use download of a model file.
+"""Tests of `bullterrier_image.finding.download`: the verified, atomic first-use download of a model file.
 
 The network is a real boundary served on the loopback interface: a test-owned HTTP server on an ephemeral port, whose
 handler counts the requests it answers. Expected digests are computed here with hashlib from the served bytes."""
@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from bullterrier_image import BullterrierImageError
-from bullterrier_image.matte.download import DownloadError, fetch, user_cache_dir
+from bullterrier_image.finding.download import DownloadError, fetch, user_cache_dir
 
 PAYLOAD = b"not really a model, but bytes all the same\n" * 1000
 

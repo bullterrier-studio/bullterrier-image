@@ -2,7 +2,7 @@
 import sees. Each layer may import only the layers below it:
 
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
-    adapters   imageio, matte, loader (recipe files)
+    adapters   imageio, finding, loader (recipe files)
     effects    one folder per effect; never import each other
     core       runner > steps > framing | registry | regions > presets | outlines > params | vocabulary > types
     ops        may import errors

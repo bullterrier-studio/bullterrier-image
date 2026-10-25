@@ -45,7 +45,7 @@ Shared numeric code lives in `ops/`, named by concept.
 
 ```
 app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
-adapters   imageio (files), matte (finding the subject), loader (recipe files)   (may import core, ops)
+adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
@@ -56,7 +56,7 @@ Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, ru
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
-The runner is given the subject (a `matte` or a `find_subject` function); `bullterrier_image.recipe` binds `matte.subject_matte`.
+The runner is given the subject (a `matte` or a `find_subject` function); `bullterrier_image.recipe` binds `finding.subject.subject_matte`.
 
 ## The rules
 
@@ -220,7 +220,7 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
 When a test reaches inside (`tests/test_suite_rules.py` fails on private imports and on patching `bullterrier_image`):
 - Inject through a public parameter (`pipeline.run(find_subject=...)`, `gallery.write_docs(checkout=...)`) and count the calls of
   your stand-in.
-- Promote a private name worth testing deliberately (public name, docstring), as `matte.refine_edge` was; else delete the test.
+- Promote a private name worth testing deliberately (public name, docstring), as `finding.subject.refine_edge` was; else delete the test.
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 

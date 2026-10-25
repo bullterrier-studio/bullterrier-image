@@ -5,17 +5,18 @@ regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`) its steps n
 `Each` gives each piece of one its own look. The machinery lives in `bullterrier_image.core` (`steps`, `runner`) and
 `bullterrier_image.loader`; this module re-exports its public names and binds the one thing the core leaves open: how
 the subject is found. `render`, `trace` and `render_all` take the same arguments as the core's, but when a masked step
-needs the subject and no `matte` or `find_subject` is given, they find it with `bullterrier_image.matte.subject_matte`.
+needs the subject and no `matte` or `find_subject` is given, they find it with
+`bullterrier_image.finding.subject.subject_matte`.
 """
 
 import numpy as np
 
-from . import matte as subject
 from .core import runner
 from .core.framing import Framing
 from .core.regions import Curve, Cuts, Edge, Grid, Line, Path, Pick, Shards, Subject, Svg
 from .core.runner import Stage, SubjectFinder
 from .core.steps import Each, Recipe, Step
+from .finding import subject
 from .loader import load_recipe
 
 __all__ = [
@@ -81,6 +82,6 @@ def _finder(find_subject: SubjectFinder | None) -> SubjectFinder:
 for _public in (render, trace, render_all):
     _public.__doc__ = (
         getattr(runner, _public.__name__).__doc__.rstrip()
-        + "\n\n    Without `matte` or `find_subject`, the subject is found with `matte.subject_matte`.\n    "
+        + "\n\n    Without `matte` or `find_subject`, the subject is found with `finding.subject.subject_matte`.\n    "
     )
 del _public

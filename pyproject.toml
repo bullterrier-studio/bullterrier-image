@@ -325,7 +325,7 @@ layers = [
     "pipeline | gallery",
     "sheet | checks | fx",
     "recipe",
-    "imageio : matte : loader",  # adapters: file formats, the subject, recipe files (the loader reads pictures through imageio)
+    "imageio : finding : loader",  # adapters: file formats, finding the subject, recipe files (the loader reads pictures through imageio)
     "effects",
     "plugin",  # the effect-author API for other packages: core's names, so bullterrier-image's own effects may use it too
     "core",  # may import ops

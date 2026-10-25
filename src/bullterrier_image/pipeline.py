@@ -51,15 +51,14 @@ import numpy as np
 from pydantic import AfterValidator, ConfigDict, Field, ValidationError, model_validator
 from pydantic.dataclasses import dataclass as validated_dataclass
 
-from . import imageio
-from . import matte as finding
+from . import finding, imageio
 from .checks import matte_warnings, still_warnings
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
 from .core.regions import Svg
 from .core.runner import subject_from
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
-from .matte import segmenter_identity, subject_matte
+from .finding.subject import segmenter_identity, subject_matte
 from .ops.resample import resize
 from .recipe import Recipe, load_recipe, render, trace
 from .sheet import write_stages
@@ -241,10 +240,10 @@ def run(
     (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
     (a framing with `transparent`) exported to jpg, raise ProjectError.
     `subject` says how the subject of a photo, for the recipes that need it, is found: the name of a segmenter for
-    `subject_matte` (see `bullterrier_image.matte`; None leaves the choice to the environment, then to the portable
-    model), or a function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never again for
-    a photo whose subject is remembered in the project's cache from an earlier run by the same finder; if it raises,
-    the recipes of that photo that need the subject fail, and the rest run. The default finder is known by its
+    `subject_matte` (see `bullterrier_image.finding.subject`; None leaves the choice to the environment, then to the
+    portable model), or a function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never
+    again for a photo whose subject is remembered in the project's cache from an earlier run by the same finder; if it
+    raises, the recipes of that photo that need the subject fail, and the rest run. The default finder is known by its
     `segmenter_identity` (the backend and its model), so switching segmenter or model finds the subjects again and
     redoes the recipes that use them (BackendUnavailableError at once if it cannot run). A function of your own is
     known by its qualified name alone, a callable object by its class: give one whose answers differ another name or

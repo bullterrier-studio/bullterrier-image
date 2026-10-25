@@ -345,17 +345,17 @@ def recipes_redone(items):
 def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(folder, echo_model, monkeypatch):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2", "grainy", "warm"]
     assert recipes_redone(run(project, subject="onnx")) == []  # same segmenter and model: everything is up to date
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(1)))  # another model finds other subjects
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))  # another model finds other subjects
     assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2"]  # only what uses the subject is redone
 
 
 def test_the_segmenter_chosen_by_the_environment_is_part_of_what_is_remembered(folder, echo_model, monkeypatch):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
-    monkeypatch.setenv("BT_IMAGE_MODEL", str(echo_model(0)))
+    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     run(project)
     assert recipes_redone(run(project)) == []

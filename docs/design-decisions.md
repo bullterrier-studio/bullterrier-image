@@ -200,8 +200,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   default is bound lazily, only when a recipe needs it. *Reason:* the cache key must tell finders apart, and a bare
   function or `functools.partial` has no stable name (the partial-finder cache collision). *Consequence:*
   `SubjectFinder`, the segmenter strings and `segmenter_identity` are replaced; the crop-finder alias in regions is
-  `BoxFinder`; the package `matte/` becomes `finding/` (`subject`, `depth`, `download`), and `BT_IMAGE_MODEL` becomes
-  `BT_IMAGE_SUBJECT_MODEL` (new: `BT_IMAGE_DEPTH_MODEL`).
+  `BoxFinder`; the package is `finding/` (`subject`, `depth`, `download`; `depth` is not built yet) and the
+  subject model's variable is `BT_IMAGE_SUBJECT_MODEL` (new: `BT_IMAGE_DEPTH_MODEL`).
 
 ## Errors and I/O
 
@@ -220,7 +220,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
   asks for the platform's own; neither makes the core depend on it. *Consequence:* `segmenter_identity()` of the default
   is the portable model's (the cache keys of subjects remembered under Vision change once, so they are found again). The portable model (about 180 MB) is downloaded on first use into the
-  user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_MODEL` points at a local
+  user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_SUBJECT_MODEL` points at a local
   copy for offline use.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no

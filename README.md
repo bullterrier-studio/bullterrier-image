@@ -129,14 +129,14 @@ depend on the machine.
 The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
 folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else `~/.cache/bt-image` on Linux,
 `%LOCALAPPDATA%\bt-image\Cache` on Windows), checks its SHA-256 against the one pinned in the code and keeps it; nothing is downloaded when bullterrier-image is imported. Offline, or where the download
-is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_MODEL` at a
-copy (`BT_IMAGE_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
+is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_SUBJECT_MODEL` at a
+copy (`BT_IMAGE_SUBJECT_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
 Choose the backend with `--segmenter onnx|vision` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
 with `BT_IMAGE_SEGMENTER=vision`; the option wins over the variable. No model is needed at all if you have the subject's
 matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
 the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
-in [`matte/`](src/bullterrier_image/matte), so a further backend is added there without touching the rest. On Python versions
+in [`finding/`](src/bullterrier_image/finding), so a further backend is added there without touching the rest. On Python versions
 newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
 it is missing, and `--matte` (or, on macOS, `--segmenter vision`) still works.
 
@@ -575,10 +575,10 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   sheet.py                 contact sheets, step sheets and parameter sweeps
   checks.py                automatic quality checks
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
-  recipe.py                the public namespace: the core's recipe names, with the subject finder bound to matte
+  recipe.py                the public namespace: the core's recipe names, with the subject finder bound to `finding.subject`
   imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
   loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
-  matte/                   subject_matte(rgb) -> alpha. Which model finds the subject (IS-Net on ONNX Runtime,
+  finding/                 finding.subject.subject_matte(rgb) -> alpha. Which model finds the subject (IS-Net on ONNX Runtime,
                            downloaded on first use; or Apple Vision, when asked) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
@@ -598,7 +598,7 @@ tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each 
 ```
 
 Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
-`matte` the only place that knows about Vision or the portable model, and effects know nothing about files, mattes or recipes. The layers are
+`finding` the only place that knows about Vision or the portable model, and effects know nothing about files, mattes or recipes. The layers are
 import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone). Why it is
 built this way, decision by decision: [docs/design-decisions.md](docs/design-decisions.md).
 

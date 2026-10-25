@@ -259,10 +259,9 @@ def _segmenter_option(p: argparse.ArgumentParser) -> None:
 
 
 def _segmenter(name: str) -> str:
-    """An argparse type: a segmenter name `bullterrier_image.matte` knows, checked only when the option is given (the
-    list
-    lives with the subject finder, which is slow to import)."""
-    from .matte import SEGMENTERS
+    """An argparse type: a segmenter name `bullterrier_image.finding.subject` knows, checked only when the option is
+    given (the list lives with the subject finder, which is slow to import)."""
+    from .finding.subject import SEGMENTERS
 
     if name not in SEGMENTERS:
         raise argparse.ArgumentTypeError(f"invalid choice: {name!r} (choose from {', '.join(SEGMENTERS)})")
@@ -274,7 +273,7 @@ def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, SubjectFinde
     from functools import partial
 
     from . import imageio
-    from .matte import subject_matte
+    from .finding.subject import subject_matte
 
     matte = imageio.load_matte(args.matte) if args.matte else None
     return matte, partial(subject_matte, segmenter=args.segmenter)
@@ -358,7 +357,7 @@ def _cutout(args: argparse.Namespace) -> int:
 
     from . import imageio
     from .errors import SubjectNotFoundError
-    from .matte import refine_edge
+    from .finding.subject import refine_edge
 
     photo = imageio.load(args.photo)
     matte, find = _subject(args)

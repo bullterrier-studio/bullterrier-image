@@ -167,7 +167,7 @@ def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder |
         raise SubjectNotFoundError(
             f"recipe {recipe.name!r} uses the subject (a mask, a region made from it, or an effect that takes it), so "
             "it needs the subject: pass `matte` (the subject's alpha) "
-            "or `find_subject` (a function photo -> alpha, e.g. bullterrier_image.matte.subject_matte)"
+            "or `find_subject` (a function photo -> alpha, e.g. bullterrier_image.finding.subject.subject_matte)"
         )
     return subject_from(find_subject, rgb)
 
