@@ -98,6 +98,80 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     assert len(remade(folder)) == 8
 
 
+RUN_STATUSES = """
+import json, sys
+from bullterrier_image.pipeline import load_project, run
+print(json.dumps(sorted({i.status for i in run(load_project(sys.argv[1]))})))
+"""
+
+
+@pytest.mark.parametrize(
+    ("change", "status"),
+    [
+        pytest.param(
+            lambda package: edit(package / "presets" / "gradient_map.toml", "#8a5a30", "#305a8a"),
+            "done",
+            id="an edited preset file is shipped data that shapes the result",
+        ),
+        pytest.param(
+            lambda package: (package / "presets" / "curves.toml").rename(package / "presets" / "curves_renamed.toml"),
+            "done",
+            id="a data file renamed with identical bytes is another file",
+        ),
+        pytest.param(lambda package: None, "skipped", id="no change: nothing is made again"),
+        pytest.param(
+            lambda package: write(package / "effects" / "grain" / "__pycache__" / "effect.cpython-0.pyc", "b"),
+            "skipped",
+            id="bytecode caches are no part of what ships",
+        ),
+        pytest.param(
+            lambda package: write(package / ".DS_Store", "x"),
+            "skipped",
+            id="a dotfile is no part of what ships",
+        ),
+        pytest.param(
+            lambda package: write(package / ".cache" / "a.txt", "x"),
+            "skipped",
+            id="a file in a dot folder is no part of what ships",
+        ),
+    ],
+)
+def test_work_is_redone_when_shipped_data_changes_and_not_when_only_a_cache_or_dotfile_appears(
+    folder, project_copy, uv_run_env, change, status
+):
+    write_recipe(folder, "grainy", 'effect = "gradient_map"\npreset = "sepia"')
+    source = project_copy() / "src"
+    package = source / "bullterrier_image"
+
+    def run_project() -> list[str]:  # in a child that imports the (changed) copy, as a person who edited it would
+        child = subprocess.run(
+            [sys.executable, "-c", RUN_STATUSES, str(folder / "bt-image.toml")],
+            env={**uv_run_env, "PYTHONPATH": str(source)},
+            capture_output=True,
+            encoding="utf-8",
+            check=False,
+        )
+        assert child.returncode == 0, child.stderr
+        return json.loads(child.stdout)
+
+    assert run_project() == ["done"]
+    change(package)
+    assert run_project() == [status]
+
+
+def edit(file: Path, old: str, new: str) -> None:
+    """Replace `old` by `new` in the text of `file`, which must contain it."""
+    text = file.read_text(encoding="utf-8")
+    assert old in text
+    file.write_text(text.replace(old, new), encoding="utf-8")
+
+
+def write(file: Path, text: str) -> None:
+    """Write `text` to `file`, making its folders."""
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(text, encoding="utf-8")
+
+
 def write_texture(folder, value) -> None:
     """assets/tex.png: a flat picture of grey level `value`."""
     (folder / "assets").mkdir(exist_ok=True)

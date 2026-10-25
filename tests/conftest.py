@@ -1,8 +1,11 @@
 """What tests in every folder share: the small test picture and matte, the effect-registry helpers, a stand-in for the
-subject-finding model, and the files git tracks. Helpers used by one folder live in that folder's conftest.py."""
+subject-finding model, the files git tracks, a copy of the project to inject one fault into, and the environment
+`uv run` gives a command. Helpers used by one folder live in that folder's conftest.py."""
 
+import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -199,3 +202,23 @@ def echo_model(tmp_path) -> Callable[[int], Path]:
         return path
 
     return write
+
+
+@pytest.fixture
+def project_copy(tmp_path):
+    """`project_copy(*names)` copies the project's src/ (without bytecode caches) and the files `names` at its root into
+    tmp_path, and returns tmp_path: a scratch project to write one fault into, the real one untouched."""
+
+    def copy(*names: str) -> Path:
+        shutil.copytree(ROOT / "src", tmp_path / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        for name in names:
+            shutil.copy(ROOT / name, tmp_path)
+        return tmp_path
+
+    return copy
+
+
+@pytest.fixture
+def uv_run_env() -> dict[str, str]:
+    """The environment a command gets under `uv run`: this one, with its executables first on PATH."""
+    return {**os.environ, "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")])}

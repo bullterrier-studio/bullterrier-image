@@ -539,10 +539,14 @@ def _fingerprint(*parts: str) -> str:
 
 
 def _source_digest(package: Path) -> str:
-    """A hash of the Python source under `package`, so changing the code makes the next run redo what it produced."""
+    """A hash of every file shipped under `package` (code, presets, fonts: relative path and bytes), skipping
+    `__pycache__` and dotfiles, so changing anything that shapes a result makes the next run redo what it produced."""
     digest = hashlib.sha256()
-    for source in sorted(package.rglob("*.py")):
-        digest.update(source.read_bytes())
+    for file in sorted(path for path in package.rglob("*") if path.is_file()):
+        relative = file.relative_to(package)
+        if "__pycache__" in relative.parts or any(part.startswith(".") for part in relative.parts):
+            continue
+        digest.update(relative.as_posix().encode() + b"\0" + file.read_bytes())
     return digest.hexdigest()
 
 

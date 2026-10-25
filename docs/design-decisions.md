@@ -156,9 +156,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
   knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a
   `blend_mode`, not an effect.
-- **The code fingerprint hashes every file of the package** (decided, not built yet) (relative POSIX path and bytes, skipping `__pycache__` and dotfiles),
-  presets and the font included. *Reason:* the cache key must change whenever anything that shapes a result changes; hashing
-  only `.py` files let an edited preset or font serve stale pictures.
+- **The code fingerprint hashes every file of the package** (relative POSIX path and bytes, skipping `__pycache__` and
+  dotfiles), presets and the font included. *Reason:* the cache key must change whenever anything that shapes a result
+  changes; hashing only `.py` files let an edited preset or font serve stale pictures.
 - **A step is written with the same keys in Python as in a recipe file.** `fx.<effect>(...)`
   takes `mask`, `opacity`, `blend_mode` and `preset` as keywords beside the effect's own parameters:
   `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`,
