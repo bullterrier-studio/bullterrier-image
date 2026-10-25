@@ -17,7 +17,8 @@ Promises:
 - Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
   lengths are shares of the picture's long side, so the same declaration cuts the same pieces at any resolution
   (a torn edge too: its noise is laid on the frame).
-- The same declaration, picture size and seed give the same regions on any machine; no global random state is used.
+- The same declaration, picture size and seed give the same regions on the same machine and library versions; no global
+  random state is used.
 - Regions are made once per `resolve` and handed out read-only.
 - A declaration is checked when it is made (a value out of range) and when it is resolved (an unknown name, a name of
   the wrong kind of region, a cycle): a `RecipeError` naming the region and what is valid.

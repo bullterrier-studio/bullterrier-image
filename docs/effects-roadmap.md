@@ -83,7 +83,7 @@ recipes.
 | `noise` ✓ | Gaussian/uniform, colour or mono noise. | `fx.noise(amount=0.1, color=False)` |
 | `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
 | `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
-| `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, depth=6)` |
+| `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, height=6)` |
 | `bump_light` ✓ | Light a height map from a direction. | `fx.bump_light(angle=45, height=8)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
@@ -101,6 +101,7 @@ belong to a layout package, not here.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `halftone` ✓ | Dot screen. | `fx.halftone(cell=10, angle=45)` |
+| `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=0.0016)` |
 | `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `dither` | Floyd-Steinberg, Atkinson, Bayer, blue-noise, to any palette. | `fx.dither(method="atkinson", palette=["#000","#fff"])` |
@@ -248,8 +249,8 @@ subject, and falloff follow the distance.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `depth_haze` | Aerial perspective: mix toward a haze colour by distance. | `fx.depth_haze(density=0.3, color="#d9dccf")` |
-| `depth_grade` | Exposure, contrast and saturation that fall off with distance from a focus depth. | `fx.depth_grade(focus=0.8, exposure=-0.6)` |
+| `depth_haze` (a recipe) | Aerial perspective: `fill` toward a haze colour, masked to a `depth` region. | planned `examples/recipes/depth-haze.toml` |
+| `depth_grade` (a recipe) | Exposure, contrast and saturation per distance: `grade` over `depth_bands` pieces (`each` + `looks`). | planned `examples/recipes/depth-grade.toml` |
 | `relight` | Shade with a directional light from normals estimated from the depth (Lambert, a soft ambient term). | `fx.relight(angle=135, elevation=30, amount=0.4)` |
 | `ambient_occlusion` | Soft darkening in creases and where surfaces meet, from the depth (screen-space). | `fx.ambient_occlusion(radius=24, amount=0.5)` |
 | `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
@@ -280,18 +281,18 @@ Use the subject cut-out, so they target the subject or the background.
 
 ## Compositing
 
-Combine the photo with an asset (a picture that is part of the look, given as a `Picture` parameter), text and blend
-modes.
+Combine the photo with an asset (a picture that is part of the look, given as a `Picture` parameter) and blend modes.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(image="tex.png", mode="soft_light")` |
 | `overlay` ✓ | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom_right", scale=0.2)` |
 | `gradient_overlay` ✓ (a recipe step) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear", blend_mode="screen")` |
-| `text` | Render text with font, outline and shadow. | `fx.text("BULLTERRIER", size=0.08, at="bottom")` |
 
 Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a
 canvas of its own, so it belongs to video or a layout package; before/after side by side is the `compare` command.
+
+Text is bullterrier-vector's (typesetting); a caption here is an `svg` region + `fill`/`outline`.
 
 ## Generated backgrounds
 
@@ -336,12 +337,13 @@ no time of its own.
 | `pixel_dissolve` | Dissolve into blocks. | `fx.pixel_dissolve(progress=0.5, cell=16)` |
 | `scan_reveal` | A bright line sweeps and reveals the effect. | `fx.scan_reveal(progress=0.5, angle=90)` |
 | `wipe` | Linear, iris or clock reveal. | `fx.wipe(kind="iris", progress=0.5)` |
-| `type_on` | Text appears character by character. | `fx.type_on(progress=0.5)` |
 | `explode` | Pieces burst radially from a point. | `fx.explode(progress=0.5, center=[0.5,0.4])` |
 | `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=0.5)` |
 | `melt_down` | Drips run down and pool. | `fx.melt_down(progress=0.5)` |
 | `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=0.5)` |
 | `parallax` | 2.5D depth shift, from the injected depth. | `fx.parallax(amount=0.03)` |
+
+Text appearing character by character is bullterrier-vector's (typesetting) animated by video; a caption here is an `svg` region + `fill`/`outline`.
 
 Effects that need time, several frames or two shots (`flicker`, `breathe`, `camera_shake`, `ken_burns`, `trails`,
 `slit_scan`, `morph`) and animated values (ramps, easing, keyframes) do not belong here: they are for the video and
@@ -362,4 +364,4 @@ What combining effects can give, once the pieces exist:
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster with batch 9, Double exposure with the first `Picture` effect (done with `blend`), Turn to dust with batch 12).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph` and `border`; Double exposure needed the first `Picture` effect (done with `blend`); Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).

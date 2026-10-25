@@ -62,6 +62,18 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   measured in seconds would tie an effect to one clip and one clock. *Consequence:* a parameter that moved with time
   becomes a state parameter in `cycles` or `fraction` (disperse's shimmer is `ambient_phase`); the removed code is in git
   history (before the "remove animation" commits) for when video is built.
+- **Typesetting belongs to bullterrier-vector; image keeps glyphs as texture.** Shaping, layout and text as outlines are
+  vector's. A caption in image is an `svg` region (vector's outlines) plus `fill`, `outline` or `drop_shadow`; there is no
+  `text` effect. Effects that draw glyphs as texture (`ascii`, `evaporate`, `disperse`, later `braille`) stay, on image's own font.
+  *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would drift apart.
+  *Consequence:* `text` and `type_on` leave the roadmap.
+- **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1), shipped
+  in the wheel (`ops/glyphs.FONT`); the `font` parameter of `ascii`, `disperse` and `evaporate`, `BT_IMAGE_FONTS`, the system-font
+  search and the Pillow fallback are gone, and `sheet`, the banner and the piece-number digits use the same file. *Reason:* a
+  look must be the same on every machine; a font found on the system made the output depend on it, a missing path failed at
+  render time, and the file escaped the cache fingerprint. The font must cover the Latin ramps, the block elements
+  `█▓▒░▀▄` and braille U+2800 to 28FF, which a system monospaced font often lacks. *Consequence:* the licence is
+  `MIT AND OFL-1.1` with the OFL text at the repository root (`LICENSE-FONT`); a `Font` value type arrives only on request.
 
 ## Parameters
 
@@ -142,6 +154,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
   knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a
   `blend_mode`, not an effect.
+- **The code fingerprint hashes every file of the package** (relative POSIX path and bytes, skipping `__pycache__` and dotfiles),
+  presets and the font included. *Reason:* the cache key must change whenever anything that shapes a result changes; hashing
+  only `.py` files let an edited preset or font serve stale pictures.
 - **A step is written with the same keys in Python as in a recipe file.** `fx.<effect>(...)`
   takes `mask`, `opacity`, `blend_mode` and `preset` as keywords beside the effect's own parameters:
   `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`,
@@ -176,6 +191,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
+- **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a string and a function from the photo to
+  a map; subject and depth use the same keywords (`matte=`, `depth=`, `find_subject=`, `find_depth=`, on `render`, `trace`,
+  `render_all` and `pipeline.run`), and the factories `subject_finder(segmenter=None)` and `depth_finder()` return one. The
+  default is bound lazily, only when a recipe needs it. *Reason:* the cache key must tell finders apart, and a bare
+  function or `functools.partial` has no stable name (the partial-finder cache collision). *Consequence:*
+  `SubjectFinder`, the segmenter strings and `segmenter_identity` are replaced; the crop-finder alias in regions is
+  `BoxFinder`.
 
 ## Errors and I/O
 
@@ -202,20 +224,29 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject** (decided, not built yet). An effect that needs distance (`depth_of_field`,
-  `parallax`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth map or a
-  function that finds one, and the public API binds the default: a monocular depth model on ONNX Runtime (Depth
-  Anything V2 Small, for its Apache-2.0 licence, to be confirmed when it is built), downloaded and verified like the
-  portable subject model; `--depth` (or `depth=`) takes a map you already have. *Reason:* the matte's shape keeps the
-  engine testable without a model and lets a phone's own depth map or a better model replace the default without
-  touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is found at most once per
-  photo and cached like the matte.
+  `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth
+  map or a `Finder` for one, and the public API binds the default: Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0)
+  on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded like the portable subject model;
+  `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The model's inverse depth is
+  min-max scaled per photo (a flat photo gives zeros). Decided:
+  - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
+    `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
+  - region kinds `Depth` (a selection by distance, with `near`, `far`, `feather`) and `DepthBands` (a partition into `count`
+    equal ranges); `depth_haze` and `depth_grade` are recipes over them, not effects;
+  - framing pads the depth map with 0 (farthest), like the matte;
+  - the finding code is a package, `finding/` (`subject`, `depth`, `download`), with `BT_IMAGE_SUBJECT_MODEL` and
+    `BT_IMAGE_DEPTH_MODEL`; the gallery runs the real model, like the matte.
+  *Reason:* the matte's shape keeps the engine testable without a model and lets a phone's own depth map or a better model
+  replace the default without touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is
+  found at most once per photo and cached like the matte, under the finder's identity.
 
 ## Determinism
 
-- **Same inputs and seed give the same output on the same machine.** Stochastic code takes `seed: int` and uses
-  `numpy.random.default_rng(seed)`, never global random state. *Reason:* caching, debugging and reviews need repeatable
-  output. *Consequence:* byte-identical comparison is the proof for refactors; small floating-point differences between
-  platforms or library builds are tolerated, so tests assert properties with tolerances, not exact pixels.
+- **Same inputs and seed give the same output on the same machine and library versions; across platforms equal within float
+  tolerance.** Stochastic code takes `seed: int` and uses `numpy.random.default_rng(seed)`, never global random state.
+  *Reason:* BLAS, SIMD and library builds round differently, so "any machine" cannot be promised byte for byte; caching,
+  debugging and reviews need repeatable output on one setup. *Consequence:* byte-identical comparison is the proof for
+  refactors; tests assert properties with tolerances, not exact pixels.
 
 ## Performance
 
@@ -266,7 +297,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
   every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
   give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
-  selects nothing, so a recipe also works on a thumbnail.
+  selects nothing, so a recipe also works on a thumbnail. One documented exception: `DepthBands` numbers its ranges nearest
+  first, because "piece 0 is the nearest" is the one rule a depth look can state without knowing the photo.
 - **`Shards.focus` is an exponent offset.** A seed at a share r of the way to the farthest corner moves to r^(1+focus)
   of it; 0 spreads the seeds evenly. *Reason:* the prototype's `(r/R)**(1 + 3*focus)` had a hidden 3 (rule 5); the
   `glass` preset is `focus = 2.5`.

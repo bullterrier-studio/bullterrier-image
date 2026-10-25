@@ -24,7 +24,7 @@ on each other; only video knows the others.
 | Rendering one look many times with different values cheaply | Layered layouts, posters, multi-element canvases → video |
 
 **No time:** no seconds, frames, clips, easing or fps in code, parameters or docs. A parameter is a *state* (`progress`, `phase`,
-`seed`, `offset`); whoever animates it sets it per frame. Filter-shaped compositing (text block, overlay, blend, sticker) stays
+`seed`, `offset`); whoever animates it sets it per frame. Filter-shaped compositing (text as an `svg` region, overlay, blend, sticker) stays
 here; anything needing a canvas of its own or several inputs does not.
 
 ## Names
@@ -70,8 +70,8 @@ The runner is given the subject (a `matte` or a `find_subject` function); `bullt
    the registry, `__init__`, README, `fx.pyi` or `docs/effects/` for a new effect means something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including library options, is a named, documented parameter in the
    field's own terms. Exempt: mathematical and standard constants, each cited in a comment.
-6. **Determinism:** same inputs and `seed` give the same output on any machine. `numpy.random.default_rng(seed)`; no global
-   random state.
+6. **Determinism:** same inputs and `seed` give the same output on the same machine and library versions; across platforms equal within float
+   tolerance. `numpy.random.default_rng(seed)`; no global random state.
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
    (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`,
