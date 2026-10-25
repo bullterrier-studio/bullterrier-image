@@ -23,7 +23,7 @@ class EmbossParams(EffectParams):
         "away from the light are brighter than mid grey and those that rise towards it darker; turning the light "
         "by 180 inverts the picture around mid grey.",
     )
-    depth: float = param(
+    height: float = param(
         6.0,
         unit="px",
         min=0,
@@ -51,13 +51,13 @@ class EmbossParams(EffectParams):
 
 @effect(category="texture", params=EmbossParams)
 def emboss(rgb: np.ndarray, params: EmbossParams) -> np.ndarray:
-    """Read the brightness as a relief `depth` px tall and light it from `angle`.
+    """Read the brightness as a relief `height` px tall and light it from `angle`.
 
     The shade is 0.5 + 0.5 x the cosine between the surface normal and a horizontal light, so a flat surface is mid
     grey, one facing the light edge-on 1 and one facing away 0, and the shade never leaves 0..1. `saturation` mixes in
     the picture multiplied by twice the shade (flat areas keep their colour), clipped to 0..1.
     """
-    rise_y, rise_x = slopes(luminance(rgb), scale=params.depth, edge=params.edge)
+    rise_y, rise_x = slopes(luminance(rgb), scale=params.height, edge=params.edge)
     horizon = 0  # constant: a light level with the picture's plane, so a flat surface catches none and is mid grey
     # The shade is 1 where the surface leans edge-on to the light, 0 where it leans away, 0.5 where it is flat.
     shade = (0.5 + 0.5 * lambert(rise_y, rise_x, angle=params.angle, elevation=horizon)).astype(np.float32)[..., None]

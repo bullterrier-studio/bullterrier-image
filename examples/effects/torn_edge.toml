@@ -5,5 +5,5 @@ size = 480
 
 [[step]]
 effect = "torn_edge"
-depth = 28
+width = 28
 seed = 2

@@ -34,16 +34,16 @@ def test_with_no_stars_the_sky_is_one_flat_colour() -> None:
 @pytest.mark.parametrize("side", [200, 400])
 def test_count_stars_are_made_whatever_the_size_of_the_picture(side: int) -> None:
     """The count is absolute: 40 small stars far apart are 40 separate dots."""
-    patches = ndimage.label(stars(side, count=40, size=2.0, depth=0.0, seed=5) > 0, structure=np.ones((3, 3)))[1]
+    patches = ndimage.label(stars(side, count=40, size=2.0, depth_range=0.0, seed=5) > 0, structure=np.ones((3, 3)))[1]
     assert patches == pytest.approx(40, abs=3)  # a few may touch
 
 
 def test_a_star_is_a_dot_as_wide_and_as_bright_as_its_depth(lone_star) -> None:
-    """With depth d a star's scale is s = 1 - d x u for u random in 0..1, so from 1 - d to 1: it is `size` x s wide and
-    s bright (so the nearest, s = 1, are the biggest and brightest)."""
+    """With depth range d a star's scale is s = 1 - d x u for u random in 0..1, so from 1 - d to 1: it is `size` x s
+    wide and s bright (so the nearest, s = 1, are the biggest and brightest)."""
     peaks = []
     for seed in range(0, 120, 6):
-        star = lone_star(seed, size=12.0, depth=0.6)
+        star = lone_star(seed, size=12.0, depth_range=0.6)
         scale = star.max()
         peaks.append(scale)
         radius = np.sqrt((star > 0).sum() / np.pi) - 0.5  # a disc of radius r touches pixels within r + 0.5
@@ -52,10 +52,10 @@ def test_a_star_is_a_dot_as_wide_and_as_bright_as_its_depth(lone_star) -> None:
     assert 0.9 < max(peaks) <= 1.0
 
 
-@pytest.mark.parametrize(("depth", "lowest"), [(0.0, 1.0), (0.5, 0.5), (1.0, 0.0)])
-def test_depth_sets_how_far_the_stars_range_below_full_brightness(depth: float, lowest: float) -> None:
-    """Every star's brightness lies from 1 - depth to 1, and the brightest of many is almost 1."""
-    sky = stars(count=400, size=12.0, depth=depth, seed=2)
+@pytest.mark.parametrize(("depth_range", "lowest"), [(0.0, 1.0), (0.5, 0.5), (1.0, 0.0)])
+def test_depth_range_sets_how_far_the_stars_range_below_full_brightness(depth_range: float, lowest: float) -> None:
+    """Every star's brightness lies from 1 - depth_range to 1, and the brightest of many is almost 1."""
+    sky = stars(count=400, size=12.0, depth_range=depth_range, seed=2)
     patches, found = ndimage.label(sky > 0, structure=np.ones((3, 3)))
     peaks = np.array(ndimage.maximum(sky, patches, range(1, found + 1)))
     assert peaks.max() == pytest.approx(1.0, abs=0.01)
@@ -64,7 +64,7 @@ def test_depth_sets_how_far_the_stars_range_below_full_brightness(depth: float, 
 
 
 def test_deeper_skies_are_dimmer_on_average() -> None:
-    means = [stars(count=300, size=8.0, depth=depth, seed=3).sum() for depth in (0.0, 0.5, 1.0)]
+    means = [stars(count=300, size=8.0, depth_range=depth_range, seed=3).sum() for depth_range in (0.0, 0.5, 1.0)]
     assert means[0] > means[1] > means[2]
 
 

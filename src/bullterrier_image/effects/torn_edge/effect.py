@@ -12,7 +12,7 @@ TOP, BOTTOM, LEFT, RIGHT = 0, 1, 2, 3  # constant: the four sides, numbered so e
 class TornEdgeParams(EffectParams):
     """A torn paper edge: along each side everything beyond a wandering tear line is replaced by the paper colour."""
 
-    depth: float = param(
+    width: float = param(
         24.0,
         unit="px",
         min=0,
@@ -25,9 +25,9 @@ class TornEdgeParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="How ragged the tear is: the standard deviation of its distance from the side as a fraction of `depth`. "
-        "0 = a straight cut exactly `depth` in, 0.3 is a gentle tear, 1 wanders between the very edge and twice the "
-        "depth.",
+        doc="How ragged the tear is: the standard deviation of its distance from the side as a fraction of `width`. "
+        "0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1 wanders between the very edge and twice the "
+        "width.",
     )
     scale: float = param(
         24.0,
@@ -76,11 +76,11 @@ class TornEdgeParams(EffectParams):
 
 @effect(category="texture", params=TornEdgeParams)
 def torn_edge(rgb: np.ndarray, params: TornEdgeParams) -> np.ndarray:
-    """Tear the border away: each side's pixels closer than a wandering distance of about `depth` px become `fill`.
+    """Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.
 
-    The distance along a side is `depth` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`,
-    `persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `depth` and has a
-    standard deviation `roughness` x `depth` (a negative distance tears nothing there). A pixel is torn away if it is
+    The distance along a side is `width` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`,
+    `persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `width` and has a
+    standard deviation `roughness` x `width` (a negative distance tears nothing there). A pixel is torn away if it is
     closer to a side than that side's distance at its position. Every other pixel is kept exactly; the four sides tear
     independently, and the same `seed` always gives the same tear.
     """
@@ -97,7 +97,7 @@ def torn_edge(rgb: np.ndarray, params: TornEdgeParams) -> np.ndarray:
             lacunarity=params.lacunarity,
             seed=(params.seed << 2) | side,
         )
-        return params.depth * (1 + params.roughness * wander[0])
+        return params.width * (1 + params.roughness * wander[0])
 
     rows, cols = np.arange(height)[:, None], np.arange(width)[None, :]
     torn = (

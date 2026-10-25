@@ -26,7 +26,7 @@ amount = 0.1
 
 [[step]]
 effect = "torn_edge"
-depth = 18
+width = 18
 roughness = 0.4
 fill = "#e9e2d0"
 seed = 2

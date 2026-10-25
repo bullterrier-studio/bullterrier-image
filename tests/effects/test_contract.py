@@ -565,14 +565,14 @@ SEPARATE = {
 
 
 @pytest.mark.parametrize("name", SEPARATE)
-def test_depth_spreads_the_brightness_of_the_particles_from_all_alike_to_the_farthest_nearly_gone(name):
-    def peaks(depth):
-        settings = {**PARTICLES[name], **SEPARATE[name], "depth": depth, "seed": 1}
+def test_depth_range_spreads_the_brightness_of_the_particles_from_all_alike_to_the_farthest_nearly_gone(name):
+    def peaks(depth_range):
+        settings = {**PARTICLES[name], **SEPARATE[name], "depth_range": depth_range, "seed": 1}
         light = registry.apply(name, np.zeros((400, 400, 3), np.float32), **settings)[..., 0]
         patches, found = ndimage.label(light > 0, structure=np.ones((3, 3)))
         return np.array(ndimage.maximum(light, patches, range(1, found + 1)))
 
-    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # no depth: every one at full brightness
+    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # no depth range: every one at full brightness
     spread = peaks(1.0)  # brightness is the particle's nearness, which runs from 0 (or 1/4 for snow) to 1
     assert spread.min() < 0.3
     assert spread.max() > 0.9

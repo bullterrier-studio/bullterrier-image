@@ -33,8 +33,8 @@ class SnowParams(EffectParams):
         min=1,
         max=10,
         doc="How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide as `size` and "
-        "(1 - `depth` x (1 - k / n)) as bright as solid white, so more layers = a smoother range from fine far flakes "
-        "to large near ones. 1 = every flake alike.",
+        "(1 - `depth_range` x (1 - k / n)) as bright as solid white, so more layers = a smoother range from fine far "
+        "flakes to large near ones. 1 = every flake alike.",
     )
     softness: float = param(
         0.5,
@@ -45,13 +45,14 @@ class SnowParams(EffectParams):
         "flake's radius (at least one pixel), so large flakes are blurrier than small ones, like flakes out of "
         "focus. 0 = crisp one-pixel edges, 1 = a flake fading out from its middle.",
     )
-    depth: float = param(
+    depth_range: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="How much fainter the farthest flakes are: a flake in layer k of n has 1 - depth x (1 - k / n) of the "
-        "brightness of the nearest. 0 = every layer equally bright, 1 = the far layers fade to nothing.",
+        doc="The depth range of the layers, how far apart they are in distance, which spreads the flakes' brightness: "
+        "a flake in layer k of n has 1 - `depth_range` x (1 - k / n) of the brightness of the nearest. 0 = every layer "
+        "equally bright, 1 = the far layers fade to nothing.",
     )
     seed: int = param(
         0,
@@ -67,7 +68,7 @@ def snow(rgb: np.ndarray, params: SnowParams) -> np.ndarray:
     """Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers.
 
     Each flake falls in a random layer; at nearness d = k / `layers` (the nearest layer is 1) it is a disc `size` x d
-    wide, 1 - `depth` x (1 - d) bright (1 = solid white), with an edge `softness` of its radius soft. Where flakes
+    wide, 1 - `depth_range` x (1 - d) bright (1 = solid white), with an edge `softness` of its radius soft. Where flakes
     overlap the brighter one shows, and flakes are screened over the picture, so they only lighten it. A higher
     `density` keeps every flake of a lower one and adds more; the same `seed` always gives the same snow.
     """
@@ -83,7 +84,7 @@ def snow(rgb: np.ndarray, params: SnowParams) -> np.ndarray:
         centre,
         centre,
         radius,
-        1 - params.depth * (1 - near),
+        1 - params.depth_range * (1 - near),
         params.softness * radius,
     )
     return screen(rgb, light[..., None])

@@ -27,14 +27,14 @@ class StarfieldParams(EffectParams):
         doc="The diameter in px of the nearest, biggest stars (the others are smaller by their depth). Tuned for a "
         "picture about 480 px high. Larger = bigger stars.",
     )
-    depth: float = param(
+    depth_range: float = param(
         0.7,
         unit="fraction",
         min=0,
         max=1,
-        doc="How far apart the stars are in depth, which spreads their size and brightness: a star is between 1 - "
-        "depth and 1 times the full size and brightness. 0 = every star alike, 1 = from the nearest down to specks "
-        "too small to see.",
+        doc="The depth range of the stars, how far apart they are in distance, which spreads their size and "
+        "brightness: a star is between 1 - `depth_range` and 1 times the full size and brightness. 0 = every star "
+        "alike, 1 = from the nearest down to specks too small to see.",
     )
     color: Color = param(
         "#dfe8ff",
@@ -60,14 +60,14 @@ def starfield(rgb: np.ndarray, params: StarfieldParams) -> np.ndarray:
     """A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input.
 
     The input is used only for its height and width; its content does not show. Every star has a random depth u from 0
-    to 1 and a scale s = 1 - `depth` x u, so near stars (u = 0) are full size and brightness: it is a dot `size` x s
-    wide, s bright, with antialiased edges. Where stars overlap the brighter one shows. Stars are screened over the
-    sky, so they only lighten it; the same `seed` always gives the same sky.
+    to 1 and a scale s = 1 - `depth_range` x u, so near stars (u = 0) are full size and brightness: it is a dot
+    `size` x s wide, s bright, with antialiased edges. Where stars overlap the brighter one shows. Stars are screened
+    over the sky, so they only lighten it; the same `seed` always gives the same sky.
     """
     height, width = rgb.shape[:2]
     # constant: three random numbers per star, its x, y and depth
     x, y, far = np.random.default_rng(params.seed).random((params.count, 3)).T
-    scale = 1 - params.depth * far
+    scale = 1 - params.depth_range * far
     centre = np.stack([x * width, y * height], axis=1)
     light = draw_segments((height, width), centre, centre, params.size / 2 * scale, scale)
     sky = np.zeros((height, width, 3), np.float32) + np.asarray(params.sky, np.float32)

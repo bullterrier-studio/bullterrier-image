@@ -9,6 +9,7 @@ from bullterrier_image import recipe as facade
 from bullterrier_image.core import runner
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.errors import RecipeError
 from bullterrier_image.matte import subject_matte
 from bullterrier_image.ops.resample import resize
 
@@ -54,6 +55,26 @@ def test_recipe_name_defaults_to_the_file_name(tmp_path):
 def test_bad_recipes_fail_at_load_time_and_name_the_problem(tmp_path, text, expect):
     with pytest.raises(ValueError, match=expect):
         load_recipe(write(tmp_path, text))
+
+
+@pytest.mark.parametrize(
+    ("effect_name", "old", "new"),
+    [
+        pytest.param("embers", "depth", "depth_range", id="embers"),
+        pytest.param("floating_dust", "depth", "depth_range", id="floating_dust"),
+        pytest.param("rain", "depth", "depth_range", id="rain"),
+        pytest.param("snow", "depth", "depth_range", id="snow"),
+        pytest.param("starfield", "depth", "depth_range", id="starfield"),
+        pytest.param("emboss", "depth", "height", id="emboss"),
+        pytest.param("torn_edge", "depth", "width", id="torn_edge"),
+    ],
+)
+def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_path, effect_name, old, new):
+    """`depth` is the name of an injected input, so no effect field may carry it."""
+    (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{new}=0.5\n')).steps
+    assert step.runs[0].params == {new: 0.5}
+    with pytest.raises(RecipeError, match=rf"step 1.*{effect_name}.*`{old}` is not a parameter"):
+        load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{old}=0.5\n', "old.toml"))
 
 
 @pytest.mark.parametrize(
