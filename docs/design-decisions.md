@@ -64,16 +64,18 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   history (before the "remove animation" commits) for when video is built.
 - **Typesetting belongs to bullterrier-vector; image keeps glyphs as texture.** Shaping, layout and text as outlines are
   vector's. A caption in image is an `svg` region (vector's outlines) plus `fill`, `outline` or `drop_shadow`; there is no
-  `text` effect. Effects that draw glyphs as texture (`ascii`, `evaporate`, `disperse`, later `braille`) stay, on image's own font.
-  *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would drift apart.
-  *Consequence:* `text` and `type_on` leave the roadmap.
-- **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1), shipped
-  in the wheel (`ops/glyphs.FONT`); the `font` parameter of `ascii`, `disperse` and `evaporate`, `BT_IMAGE_FONTS`, the system-font
-  search and the Pillow fallback are gone, and `sheet`, the banner and the piece-number digits use the same file. *Reason:* a
-  look must be the same on every machine; a font found on the system made the output depend on it, a missing path failed at
-  render time, and the file escaped the cache fingerprint. The font must cover the Latin ramps, the block elements
-  `█▓▒░▀▄` and braille U+2800 to 28FF, which a system monospaced font often lacks. *Consequence:* the licence is
-  `MIT AND OFL-1.1` with the OFL text at the repository root (`LICENSE-FONT`); a `Font` value type arrives only on request.
+  `text` effect. Effects that draw glyphs as texture (`ascii`, `evaporate`, `disperse`, later `braille`) stay, on image's
+  own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
+  drift apart. *Consequence:* `text` and `type_on` leave the roadmap.
+- **One bundled monospaced font, no `font` parameter** (decided, not built yet). Glyph effects draw with JetBrains Mono
+  Regular (SIL OFL 1.1), shipped in the wheel as `src/bullterrier_image/fonts/JetBrainsMono-Regular.ttf` (`ops/glyphs.FONT`).
+  The `font` parameter of `ascii`, `disperse` and `evaporate`, `BT_IMAGE_FONTS`, the system-font search and the Pillow
+  fallback go, and `sheet`, the banner and the piece-number digits use the same file. *Reason:* a font found on the system
+  made the output depend on the host, a missing path failed at render time, and the file escaped the cache fingerprint;
+  one cited asset gives the same look on every host with the same library versions. The font must cover the Latin ramps,
+  the block elements `█▓▒░▀▄` and braille U+2800 to 28FF, which a system monospaced font often lacks. *Consequence:* the
+  licence is `MIT AND OFL-1.1` with the OFL text at the repository root (`LICENSE-FONT`); a `Font` value type arrives only
+  on request.
 
 ## Parameters
 
@@ -154,7 +156,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
   knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a
   `blend_mode`, not an effect.
-- **The code fingerprint hashes every file of the package** (relative POSIX path and bytes, skipping `__pycache__` and dotfiles),
+- **The code fingerprint hashes every file of the package** (decided, not built yet) (relative POSIX path and bytes, skipping `__pycache__` and dotfiles),
   presets and the font included. *Reason:* the cache key must change whenever anything that shapes a result changes; hashing
   only `.py` files let an edited preset or font serve stale pictures.
 - **A step is written with the same keys in Python as in a recipe file.** `fx.<effect>(...)`
@@ -191,13 +193,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
-- **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a string and a function from the photo to
+- **A finder carries its identity: `Finder(identity, find)`** (decided, not built yet). A frozen dataclass of a string and a function from the photo to
   a map; subject and depth use the same keywords (`matte=`, `depth=`, `find_subject=`, `find_depth=`, on `render`, `trace`,
   `render_all` and `pipeline.run`), and the factories `subject_finder(segmenter=None)` and `depth_finder()` return one. The
   default is bound lazily, only when a recipe needs it. *Reason:* the cache key must tell finders apart, and a bare
   function or `functools.partial` has no stable name (the partial-finder cache collision). *Consequence:*
   `SubjectFinder`, the segmenter strings and `segmenter_identity` are replaced; the crop-finder alias in regions is
-  `BoxFinder`.
+  `BoxFinder`; the package `matte/` becomes `finding/` (`subject`, `depth`, `download`), and `BT_IMAGE_MODEL` becomes
+  `BT_IMAGE_SUBJECT_MODEL` (new: `BT_IMAGE_DEPTH_MODEL`).
 
 ## Errors and I/O
 
@@ -231,11 +234,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   min-max scaled per photo (a flat photo gives zeros). Decided:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
-  - region kinds `Depth` (a selection by distance, with `near`, `far`, `feather`) and `DepthBands` (a partition into `count`
-    equal ranges); `depth_haze` and `depth_grade` are recipes over them, not effects;
+  - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth
+    scale with 0 = farthest; `far` above `near` is a `RecipeError`) and `DepthBands` (`kind = "depth_bands"`, a partition into
+    `count` equal ranges, 3 by default, 1 to 100); `depth_haze` and `depth_grade` are recipes over them, not effects;
   - framing pads the depth map with 0 (farthest), like the matte;
-  - the finding code is a package, `finding/` (`subject`, `depth`, `download`), with `BT_IMAGE_SUBJECT_MODEL` and
-    `BT_IMAGE_DEPTH_MODEL`; the gallery runs the real model, like the matte.
+  - `imageio.load_depth(path)` reads a map you already have; no depth found is `DepthNotFoundError` (a
+    `BullterrierImageError` and a `RuntimeError`); the gallery runs the real model, like the matte.
   *Reason:* the matte's shape keeps the engine testable without a model and lets a phone's own depth map or a better model
   replace the default without touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is
   found at most once per photo and cached like the matte, under the finder's identity.
@@ -297,8 +301,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
   every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
   give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
-  selects nothing, so a recipe also works on a thumbnail. One documented exception: `DepthBands` numbers its ranges nearest
-  first, because "piece 0 is the nearest" is the one rule a depth look can state without knowing the photo.
+  selects nothing, so a recipe also works on a thumbnail. One documented exception (decided, not built yet): `DepthBands`
+  numbers its ranges nearest first, because "piece 0 is the nearest" is the one rule a depth look can state without knowing the photo.
 - **`Shards.focus` is an exponent offset.** A seed at a share r of the way to the farthest corner moves to r^(1+focus)
   of it; 0 spreads the seeds evenly. *Reason:* the prototype's `(r/R)**(1 + 3*focus)` had a hidden 3 (rule 5); the
   `glass` preset is `focus = 2.5`.

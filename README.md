@@ -140,7 +140,10 @@ in [`matte/`](src/bullterrier_image/matte), so a further backend is added there 
 newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
 it is missing, and `--matte` (or, on macOS, `--segmenter vision`) still works.
 
-Glyph effects (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font, so a look is identical on every machine.
+**Text effects** (`ascii`, `disperse`, `evaporate` and the text strips of `glitch`) draw with a monospaced font: the first that exists of the
+files listed in `BT_IMAGE_FONTS` (paths separated like `PATH`), or else of the usual system fonts (Menlo, Monaco or
+Courier on macOS, DejaVu Sans Mono on Linux, Consolas on Windows). A machine with none of them, such as a slim Linux
+container, still works with Pillow's built-in font, which is not monospaced.
 
 ## Quick start
 

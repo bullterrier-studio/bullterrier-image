@@ -364,4 +364,4 @@ What combining effects can give, once the pieces exist:
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph` and `border`; Double exposure needed the first `Picture` effect (done with `blend`); Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph` and `border`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
