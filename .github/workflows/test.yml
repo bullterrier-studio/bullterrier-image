@@ -31,12 +31,6 @@ jobs:
         with:
           enable-cache: true
           python-version: ${{ matrix.python }}
-      # the text effects draw with the first monospaced system font found (DejaVu Sans Mono on Linux)
-      - name: Install a monospaced font
-        if: runner.os == 'Linux'
-        run: >-
-          test -f /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
-          || (sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends fonts-dejavu-core)
       - name: Install the locked dependencies
         run: uv sync --locked
       # -ra lists every skipped or expected-failing test with its reason; --durations shows what makes the run slow

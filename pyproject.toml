@@ -3,8 +3,8 @@ name = "bullterrier-image"
 version = "0.1.0"
 description = "Style photos with composable effects (ASCII, halftone, glitch, colour schemes, dispersing particles)."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND OFL-1.1"
+license-files = ["LICENSE", "LICENSE-FONT"]
 authors = [
     { name = "jcakstins", email = "janis.cakstins@gmail.com" }
 ]

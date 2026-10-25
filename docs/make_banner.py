@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from bullterrier_image import imageio
+from bullterrier_image.ops import glyphs
 
 ROOT = Path(__file__).parent.parent
 RESULTS = ROOT / "examples" / "output" / "bullterrier"
@@ -31,8 +32,8 @@ def main() -> None:
     height = MARGIN * 2 + TILE_HEIGHT + LABEL
     canvas = Image.new("RGB", (width, height), BACKGROUND)
     draw = ImageDraw.Draw(canvas)
-    font = ImageFont.load_default(size=22)
-    small = ImageFont.load_default(size=18)
+    font = ImageFont.truetype(glyphs.FONT, 22)
+    small = ImageFont.truetype(glyphs.FONT, 18)
 
     x, y = MARGIN, MARGIN
     canvas.paste(original, (x, y))

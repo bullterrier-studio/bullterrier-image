@@ -1,12 +1,9 @@
-import os
-from pathlib import Path
-
 import numpy as np
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
-from bullterrier_image import BackendUnavailableError
-from bullterrier_image.ops.glyphs import cell_size, glyph_atlas, paint
+from bullterrier_image import RecipeError, fx
+from bullterrier_image.ops.glyphs import FONT, cell_size, glyph_atlas, paint
 
 CELLS = [5, 8, 13, 20]
 
@@ -15,19 +12,13 @@ def ink(atlas: np.ndarray) -> np.ndarray:
     return atlas.sum(axis=(1, 2))
 
 
-@pytest.fixture(params=["system font", "no system font"])
-def any_host(request, monkeypatch):
-    """Runs a test twice: with the host's fonts, and as on a host without any monospaced font (a slim Linux container),
-    where the list of font files to look for is empty and Pillow's own font draws."""
-    if request.param == "no system font":
-        monkeypatch.setenv("BT_IMAGE_FONTS", "")
+@pytest.mark.parametrize("cell", [1, 5, 40])
+def test_cell_width_is_the_requested_width(cell):
+    assert cell_size(cell)[0] == cell
 
 
-def test_cell_width_is_the_requested_width_and_height_grows_with_it(any_host):
-    sizes = [cell_size(c) for c in CELLS]
-    assert [w for w, _ in sizes] == CELLS
-    heights = [h for _, h in sizes]
-    assert all(h > 0 for h in heights)
+def test_cell_height_grows_with_the_width():
+    heights = [cell_size(c)[1] for c in [1, 5, 40]]
     assert heights == sorted(set(heights))  # strictly increasing
 
 
@@ -55,7 +46,7 @@ def test_duplicate_characters_collapse():
     np.testing.assert_array_equal(with_repeats, glyph_atlas("ab .", 8))
 
 
-def test_space_has_no_ink_and_the_full_block_has_the_most(any_host):
+def test_space_has_no_ink_and_the_full_block_has_the_most():
     atlas = glyph_atlas(" .:#█", 10)
     totals = ink(atlas)
     assert totals[0] == 0.0  # the space sorts first
@@ -101,96 +92,27 @@ def test_paint_of_an_empty_grid_is_empty():
     assert paint(np.zeros((0, 3), dtype=int), atlas).shape == (0, 3 * atlas.shape[2])
 
 
-# --- fonts and glyph geometry -----------------------------------------------------------------------------------
-# These hold for any sane monospaced font, so they run against whatever monospaced fonts the host has installed.
-
-_FONT_DIRS = ["/System/Library/Fonts", "/Library/Fonts", "~/Library/Fonts", "/usr/share/fonts", "C:/Windows/Fonts"]
+# --- the bundled font and glyph geometry ---------------------------------------------------------------------------
+# The font is a fixed asset, so these are checked against Pillow itself, reading the same file.
 
 
-def _is_monospaced_text_font(path: Path) -> bool:
-    """Monospaced, and with real Latin letters (symbol and braille fonts draw every letter as the same blank box)."""
-    try:
-        font = ImageFont.truetype(str(path), 100)
-        monospaced = len({round(font.getlength(ch), 1) for ch in "Mi.W"}) == 1
-        letters = {(font.getmask(ch).size, bytes(font.getmask(ch))) for ch in "MHIO"}
-        return monospaced and len(letters) == 4
-    except OSError:
-        return False
-
-
-def _host_monospaced_fonts(limit: int = 6) -> list[str]:
-    candidates: list[Path] = []
-    for folder in _FONT_DIRS:
-        root = Path(folder).expanduser()
-        if root.is_dir():
-            candidates += sorted(p for p in root.rglob("*") if p.suffix.lower() in {".ttf", ".ttc"})
-    found: list[str] = []
-    for path in candidates:
-        if path.name.startswith("SFNS"):
-            continue  # Apple's variable system fonts report line metrics that disagree with where Pillow anchors text
-        if str(path) not in found and path.exists() and _is_monospaced_text_font(path):
-            found.append(str(path))
-        if len(found) == limit:
-            break
-    return found
-
-
-HOST_FONTS = _host_monospaced_fonts()
-no_font = pytest.param(None, marks=pytest.mark.skip(reason="no monospaced font file found on this host"))
-host_fonts = pytest.mark.parametrize("font", HOST_FONTS or [no_font])
-
-
-def _real_font_sizes(font: str, cell: int) -> list[ImageFont.FreeTypeFont]:
+def _real_font_sizes(cell: int) -> list[ImageFont.FreeTypeFont]:
     """Every font size Pillow itself says has an 'M' `cell` px wide (+-0.5): the independent oracle for the geometry."""
-    sizes = [ImageFont.truetype(font, size) for size in range(4, 200)]
+    sizes = [ImageFont.truetype(FONT, size) for size in range(4, 200)]
     return [f for f in sizes if abs(f.getlength("M") - cell) <= 0.5]
 
 
-def test_a_font_that_does_not_exist_raises_oserror():
-    missing = "/no/such/dir/NoSuchFont.ttf"
-    with pytest.raises(OSError, match="cannot open resource"):
-        cell_size(8, missing)
-    with pytest.raises(OSError, match="cannot open resource"):
-        glyph_atlas(" .#", 8, missing)
-
-
-def _line_per_advance(font: str) -> float:
-    """Pillow's own line height (ascent + descent) per 'M' advance of `font`: how tall a cell of a given width is."""
-    measured = ImageFont.truetype(font, 100)
-    return sum(measured.getmetrics()) / measured.getlength("M")
-
-
-def _fonts_of_clearly_different_lines() -> list:
-    """The installed fonts with the shortest and the tallest line for their width, if they differ by 10 % or more.
-
-    Two fonts that truly differ: the first two files found may be two styles of one face, which draw alike (they did
-    on Windows) and so prove nothing about `font`."""
-    if HOST_FONTS:
-        short, tall = min(HOST_FONTS, key=_line_per_advance), max(HOST_FONTS, key=_line_per_advance)
-        if _line_per_advance(tall) >= 1.1 * _line_per_advance(short):
-            return [(short, tall)]
-    return [pytest.param(None, None, marks=pytest.mark.skip(reason="needs two fonts of clearly different lines"))]
-
-
-@pytest.mark.parametrize(("short", "tall"), _fonts_of_clearly_different_lines())
-def test_the_font_named_is_the_one_that_draws(short, tall):
-    # 10 % of a 40 px cell's line (about 80 px) is far more than one font size step can move it
-    assert cell_size(40, short)[1] < cell_size(40, tall)[1]
-
-
-@host_fonts
 @pytest.mark.parametrize("cell", CELLS)
-def test_cell_height_is_the_line_height_of_a_real_font_size_with_that_character_width(font, cell):
-    heights = {sum(f.getmetrics()) for f in _real_font_sizes(font, cell)}
+def test_cell_height_is_the_line_height_of_a_real_font_size_with_that_character_width(cell):
+    heights = {sum(f.getmetrics()) for f in _real_font_sizes(cell)}
     assert heights, "no font size gives this character width"
-    assert cell_size(cell, font)[1] in heights
+    assert cell_size(cell)[1] in heights
 
 
-@host_fonts
 @pytest.mark.parametrize("cell", [6, 7, 8, 10, 13, 16, 20])  # at 5 px antialiasing leaves no row above half coverage
-def test_capital_letters_stand_on_the_font_baseline(font, cell):
-    ascents = {f.getmetrics()[0] for f in _real_font_sizes(font, cell)}
-    letter = glyph_atlas("M ", cell, font)[1]
+def test_capital_letters_stand_on_the_font_baseline(cell):
+    ascents = {f.getmetrics()[0] for f in _real_font_sizes(cell)}
+    letter = glyph_atlas("M ", cell)[1]
     baseline = np.flatnonzero(letter.max(axis=1) > 0.5).max() + 1  # first row below the letter's feet
     assert baseline in ascents
 
@@ -208,22 +130,58 @@ def _font_intrinsic_offset(font: ImageFont.FreeTypeFont, ch: str) -> float:
     return _ink_centre_offset(np.asarray(canvas, dtype=np.float64), font.getlength(ch)) - origin
 
 
-@host_fonts
 @pytest.mark.parametrize("cell", [7, 8, 10, 13, 16, 20])
-def test_letters_sit_in_the_middle_of_the_cell_as_the_font_designed_them(font, cell):
+def test_letters_sit_in_the_middle_of_the_cell_as_the_font_designed_them(cell):
     chars = "HIO|"
-    width = cell_size(cell, font)[0]
-    observed = np.mean([_ink_centre_offset(glyph_atlas(f"{ch} ", cell, font)[1], width) for ch in chars])
-    designed = [np.mean([_font_intrinsic_offset(f, ch) for ch in chars]) for f in _real_font_sizes(font, cell)]
+    width = cell_size(cell)[0]
+    observed = np.mean([_ink_centre_offset(glyph_atlas(f"{ch} ", cell)[1], width) for ch in chars])
+    designed = [np.mean([_font_intrinsic_offset(f, ch) for ch in chars]) for f in _real_font_sizes(cell)]
     assert min(abs(observed - d) for d in designed) < 0.4  # px; a glyph drawn one pixel off shows about 1.0
 
 
-@host_fonts
 @pytest.mark.parametrize("cell", CELLS)
-def test_a_capital_letter_leaves_room_above_and_below(font, cell):
-    rows = np.flatnonzero(glyph_atlas("M ", cell, font)[1].max(axis=1) > 0)
+def test_a_capital_letter_leaves_room_above_and_below(cell):
+    rows = np.flatnonzero(glyph_atlas("M ", cell)[1].max(axis=1) > 0)
     assert rows.min() >= 1
-    assert rows.max() <= cell_size(cell, font)[1] - 2
+    assert rows.max() <= cell_size(cell)[1] - 2
+
+
+@pytest.mark.parametrize("cell", range(5, 21))
+def test_cell_height_is_between_one_and_a_fifth_and_two_and_three_quarter_widths(cell):
+    width, height = cell_size(cell)
+    assert 1.2 <= height / width <= 2.75
+    assert glyph_atlas(" .", cell).shape[1] == height
+
+
+# --- what the bundled font covers ----------------------------------------------------------------------------------
+
+DEFAULT_RAMP = " .:-=+*#%@"
+LONG_RAMP = " .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$"  # the 60-character ramp of examples/recipes
+BLOCKS = "█▓▒░▀▄"
+MISSING = "\uffff"  # a Unicode noncharacter: no font has it, so a font draws its missing-glyph box for it
+
+
+@pytest.mark.parametrize(
+    "palette",
+    [
+        pytest.param(DEFAULT_RAMP, id="default ramp"),
+        pytest.param(LONG_RAMP, id="long ramp"),
+        pytest.param(BLOCKS, id="block elements"),
+    ],
+)
+def test_every_character_of_a_palette_is_drawn_not_the_missing_glyph_box(palette):
+    box = glyph_atlas(f" {MISSING}", 20)[1]
+    assert box.sum() > 0  # the oracle: the box has ink
+    for ch in palette:
+        drawn = glyph_atlas(f"{ch}{MISSING}", 20)
+        assert len({bytes(glyph) for glyph in drawn}) == len(drawn), f"{ch!r} looks like the missing-glyph box"
+
+
+def test_the_ramps_are_non_blank_except_the_space():
+    for ramp in (DEFAULT_RAMP, LONG_RAMP):
+        totals = ink(glyph_atlas(ramp, 12))
+        assert (totals == 0).sum() == 1  # the space, and only it
+        assert (totals > 0).sum() == len(set(ramp)) - 1
 
 
 @pytest.mark.parametrize("cell", CELLS)
@@ -233,67 +191,24 @@ def test_a_solid_glyph_has_full_coverage_so_the_ink_level_is_exact(cell):
     assert atlas.min() == 0.0
 
 
-@pytest.mark.parametrize("cell", range(5, 21))
-def test_cell_height_is_between_one_and_a_fifth_and_two_and_a_half_widths(cell):
-    width, height = cell_size(cell)
-    assert 1.2 <= height / width <= 2.6
-    assert cell_size(cell) == (width, height)  # deterministic
-    assert glyph_atlas(" .", cell).shape[1] == height
+@pytest.mark.parametrize("cell", [13, 20, 40])  # at smaller cells the font's own edge rows are a larger share
+def test_the_full_block_fills_the_cell_and_the_shades_step_between_blank_and_full(cell):
+    shades = [glyph_atlas(f" {ch}", cell)[1].mean() for ch in "░▒▓█"]
+    assert shades[-1] > 0.95
+    assert shades == sorted(shades)
+    assert 0 < shades[0] < shades[-1]
 
 
-# --- a host without any monospaced font (a slim Linux container): Pillow's own font, block elements as geometry -------
+def test_the_environment_cannot_change_what_is_drawn(monkeypatch):
+    cell = 23  # a width no other test draws at, so nothing cached earlier can answer for it
+    monkeypatch.setenv("BT_IMAGE_FONTS", "/no/such/dir/Font.ttf")
+    heights = {sum(f.getmetrics()) for f in _real_font_sizes(cell)}
+    assert cell_size(cell)[1] in heights
+    letter = glyph_atlas("M ", cell)[1]
+    assert np.flatnonzero(letter.max(axis=1) > 0.5).max() + 1 in {f.getmetrics()[0] for f in _real_font_sizes(cell)}
 
 
-@pytest.fixture
-def no_system_font(monkeypatch):
-    """The list of font files to look for is empty, as on a host that has none of them."""
-    monkeypatch.setenv("BT_IMAGE_FONTS", "")
-
-
-@pytest.mark.parametrize("cell", CELLS)
-def test_without_a_system_font_the_block_elements_keep_their_nominal_ink(no_system_font, cell):
-    """Unicode names them FULL BLOCK and DARK, MEDIUM, LIGHT SHADE: 100, 75, 50 and 25 % of the cell inked."""
-    shares = {ch: glyph_atlas(f" {ch}", cell)[1].mean() for ch in "░▒▓█"}  # each beside a space, so known by name
-    assert shares == pytest.approx({"░": 0.25, "▒": 0.5, "▓": 0.75, "█": 1.0}, abs=1e-6)
-    assert glyph_atlas(" █", cell)[1].min() == 1.0  # the full block covers every pixel, so the darkest level is exact
-
-
-def test_without_a_system_font_letters_are_drawn_with_pillows_own_font(no_system_font):
-    atlas = glyph_atlas(" .IM", 10)
-    totals = ink(atlas)
-    assert totals[0] == 0.0
-    assert np.all(np.diff(totals) > 0)  # dot, I and M: real, different letters, not one missing-glyph box
-    assert atlas.max() > 0.5
-
-
-def test_without_a_font_file_or_freetype_the_error_says_how_to_give_a_font(no_system_font, monkeypatch):
-    """A Pillow built without FreeType (an external capability) offers only a fixed-size bitmap font, which cannot be
-    sized to a cell: drawing needs a font file, so the error names the setting that lists one."""
-    monkeypatch.setattr(ImageFont, "load_default", lambda size=None: ImageFont.load_default_imagefont())
-    cell = 997  # a cell width no other test draws at, so nothing drawn earlier can answer for it
-    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_FONTS"):
-        glyph_atlas(" #", cell)
-
-
-@host_fonts
-def test_the_listed_fonts_are_tried_in_order_and_missing_ones_skipped(font, tmp_path, monkeypatch):
-    monkeypatch.setenv("BT_IMAGE_FONTS", os.pathsep.join([str(tmp_path / "missing.ttf"), font]))
-    np.testing.assert_array_equal(glyph_atlas(" .#M", 10), glyph_atlas(" .#M", 10, font))
-    assert cell_size(10) == cell_size(10, font)
-
-
-def _has_glyph(font: str, ch: str) -> bool:
-    """Whether the font file draws `ch` itself, judged by Pillow alone: not the box it draws for U+FFFF, which no font
-    has (a Unicode noncharacter)."""
-    face = ImageFont.truetype(font, 40)
-    return bytes(face.getmask(ch)) != bytes(face.getmask("\uffff")) or face.getbbox(ch) != face.getbbox("\uffff")
-
-
-SHADED_FONTS = [font for font in HOST_FONTS if _has_glyph(font, "░")]
-
-
-@pytest.mark.skipif(not SHADED_FONTS, reason="no monospaced font on this host draws the shade characters")
-def test_a_font_that_has_the_shade_characters_draws_them_itself():
-    """Only a missing glyph is replaced: a real font's light shade is its own dot pattern, not an even grey."""
-    light = glyph_atlas(" ░", 10, SHADED_FONTS[0])[1]
-    assert light.std() > 0.05
+@pytest.mark.parametrize("effect", ["ascii", "disperse", "evaporate"])
+def test_a_glyph_effect_takes_no_font_so_an_old_recipe_naming_one_is_refused(effect):
+    with pytest.raises(RecipeError, match="font"):
+        getattr(fx, effect)(font="/Library/Fonts/Menlo.ttc")

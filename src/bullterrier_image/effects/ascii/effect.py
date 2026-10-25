@@ -28,7 +28,8 @@ class AsciiParams(EffectParams):
         " .:-=+*#%@",
         doc="The character palette, in any order, at least two different characters. It is sorted by how much ink "
         "each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest on light "
-        "paper (see `paper`). Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).",
+        "paper (see `paper`). Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the "
+        "Latin letters and the block elements, not braille.",
     )
     ink: Color | None = param(
         None,
@@ -75,11 +76,6 @@ class AsciiParams(EffectParams):
         doc="How much of the original picture shows through the paper behind the characters, 0 to 1: 0 = text on flat "
         "`paper` (fine detail is lost to the grid), 1 = text laid over the untouched photo.",
     )
-    font: str | None = param(
-        None,
-        doc="Path to a monospaced .ttf/.ttc font; none (the default) uses the first system monospaced font found.",
-        advanced=True,
-    )
 
 
 @effect(category="text", params=AsciiParams)
@@ -87,7 +83,7 @@ def ascii(rgb: np.ndarray, params: AsciiParams) -> np.ndarray:
     """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 
     Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
-    tones survive as denser and lighter characters. A font that cannot be opened raises OSError.
+    tones survive as denser and lighter characters.
     """
     return text_art(
         rgb,
@@ -99,5 +95,4 @@ def ascii(rgb: np.ndarray, params: AsciiParams) -> np.ndarray:
         paper_threshold=params.paper_threshold,
         gamma=params.gamma,
         photo=params.photo,
-        font=params.font,
     )

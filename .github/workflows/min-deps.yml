@@ -22,9 +22,5 @@ jobs:
         with:
           enable-cache: true
           python-version: "3.12"
-      - name: Install a monospaced font
-        run: >-
-          test -f /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
-          || (sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends fonts-dejavu-core)
       - name: Tests on the lowest allowed dependencies (pytest; skips and the 10 slowest tests are listed)
         run: uv run --locked poe check-min-deps -ra --durations=10

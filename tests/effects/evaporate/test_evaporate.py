@@ -6,6 +6,9 @@ import pytest
 from bullterrier_image.core import registry
 from bullterrier_image.ops.glyphs import cell_size
 
+# a picture of whole piece rows: a partial last row counts its padding as outside the matte, and would be an edge
+WHOLE_ROWS = 15 * cell_size(5)[1]
+
 
 def test_evaporate_leaves_everything_below_start_untouched():
     lit = np.ones((96, 128, 3), np.float32)
@@ -108,14 +111,14 @@ def test_evaporate_does_not_treat_dark_parts_of_the_figure_as_its_edge():
 
 
 def test_evaporate_takes_its_edge_from_the_matte_when_given():
-    img = np.ones((200, 200, 3), np.float32)  # everything is lit...
-    matte = np.zeros((200, 200), np.float32)
+    img = np.ones((WHOLE_ROWS, 200, 3), np.float32)  # everything is lit...
+    matte = np.zeros((WHOLE_ROWS, 200), np.float32)
     matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
     kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
     with_matte = registry.apply("evaporate", img, matte=matte, **kwargs)
     without = registry.apply("evaporate", img, **kwargs)
     assert with_matte[150:, 20:60].mean() < 1.0  # outside the silhouette: sheds
-    assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure is further than `outline` from its outline
+    assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure is further than `outline`
     assert without[150:, 20:60].min() == 1.0  # with no matte there is no such outline (only the picture borders)
 
 
@@ -129,8 +132,8 @@ def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift()
 
 
 def test_evaporate_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
-    img = np.ones((200, 200, 3), np.float32)
-    matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
+    img = np.ones((WHOLE_ROWS, 200, 3), np.float32)
+    matte = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint matte everywhere,
     matte[:, 80:120] = 1.0  # and a solid column
     kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
     outside = (slice(150, None), slice(20, 60))  # more than `outline` (10 px) from the picture's borders
@@ -151,9 +154,15 @@ def test_evaporate_wind_pushes_the_pieces_sideways():
 
 def test_evaporate_bottom_border_is_an_edge_only_when_open_bottom_is_off():
     lit = np.ones((100, 120, 3), np.float32)
-    kwargs = {"cell": 5, "start": 0, "outline": 0.2, "seed": 2}
-    assert registry.apply("evaporate", lit, **kwargs)[-10:, 50:70].min() == 1.0
-    assert registry.apply("evaporate", lit, open_bottom=False, **kwargs)[-10:, 50:70].mean() < 1.0
+    last_row = (slice(-cell_size(5)[1], None), slice(50, 70))
+    seeds = range(1, 9)  # which edge pieces shed is random: judge several seeds
+    kwargs = {"cell": 5, "start": 0, "outline": 0.2}
+    for seed in seeds:
+        assert registry.apply("evaporate", lit, seed=seed, **kwargs)[last_row].min() == 1.0
+    closed = [
+        registry.apply("evaporate", lit, open_bottom=False, seed=seed, **kwargs)[last_row].mean() for seed in seeds
+    ]
+    assert np.mean(closed) < 0.95
 
 
 def test_evaporate_without_falloff_keeps_risen_pieces_at_full_brightness():

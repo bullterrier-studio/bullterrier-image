@@ -2,7 +2,7 @@
 
 The one algorithm behind every effect that turns a picture (or part of one) into text. Callers decide what the text
 looks like: the character palette, its size, the colours and how much of the picture shows through. Glyph shapes and
-fonts are `ops.glyphs`'s business.
+the font are `ops.glyphs`'s business.
 """
 
 import numpy as np
@@ -31,7 +31,6 @@ def text_art(
     paper_threshold: float,
     gamma: float,
     photo: float,
-    font: str | None,
 ) -> np.ndarray:
     """Redraw `rgb` (float32 (h, w, 3), 0..1) as characters; returns a new float32 image of the same shape.
 
@@ -45,10 +44,9 @@ def text_art(
         (0..1).
     gamma: exponent on the ink amount, > 0; above 1 puts down less ink in the midtones, below 1 more.
     photo: 0..1, how much of the picture shows through the paper behind the characters (0 = flat paper colour).
-    font: path to a monospaced .ttf/.ttc, or None for the first system font found.
     A cell cut off by the picture's right or bottom edge is measured as if the border pixels continued.
     """
-    atlas = glyph_atlas(chars, cell, font)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
+    atlas = glyph_atlas(chars, cell)  # (n_glyphs, cell_h, cell_w) ink coverage, sorted light -> dense
     n, cell_h, cell_w = atlas.shape
     height, width = rgb.shape[:2]
     rows, cols = -(-height // cell_h), -(-width // cell_w)

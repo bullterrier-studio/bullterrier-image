@@ -137,7 +137,7 @@ KNOWN_BAD = {
     "private import": "from bullterrier_image.matte import _refine_edge\n",
     "private module": "from bullterrier_image.effects._shared import helper\n",
     "private module import": "import bullterrier_image.core._internal\n",
-    "private attribute": "from bullterrier_image.ops import glyphs\nfonts = glyphs._FONTS\n",
+    "private attribute": "from bullterrier_image.ops import glyphs\nloader = glyphs._load_font\n",
     "private attribute of a dotted module": (
         "import bullterrier_image.core.registry\nbullterrier_image.core.registry._EFFECTS.clear()\n"
     ),

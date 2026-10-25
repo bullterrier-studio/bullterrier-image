@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from . import imageio
 from .core import registry
 from .errors import RecipeError
+from .ops import glyphs
 from .ops.resample import resize
 from .recipe import Recipe, Stage, Step
 
@@ -37,7 +38,7 @@ def contact_sheet(tiles: list[tuple[str, np.ndarray]], columns: int = 3, tile: i
     cols = min(columns, len(tiles))
     sheet = Image.new("RGB", (gap + cols * (tile + gap), gap + rows * (tile + label_h + gap)), "#242424")
     draw = ImageDraw.Draw(sheet)
-    font = ImageFont.load_default(size=16)
+    font = ImageFont.truetype(glyphs.FONT, 16)
     for i, (label, image) in enumerate(tiles):
         x = gap + (i % columns) * (tile + gap)
         y = gap + (i // columns) * (tile + label_h + gap)

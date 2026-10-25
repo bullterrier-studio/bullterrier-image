@@ -18,14 +18,8 @@ class EvaporateParams(EffectParams):
         unit="px",
         min=1,
         max=64,
-        doc="Character width in px; a piece is one character (its height comes from `font`). Use the same value as "
-        "the ascii step before this one, so whole characters fly away.",
-    )
-    font: str | None = param(
-        None,
-        doc="Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; "
-        "use the same as the ascii step. A path that cannot be opened fails when the effect runs.",
-        advanced=True,
+        doc="Character width in px; a piece is one character (its height comes from the bundled font). Use the same "
+        "value as the ascii step before this one, so whole characters fly away.",
     )
     start: float = param(
         0.6,
@@ -225,7 +219,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     """
     p = params
     height, width = rgb.shape[:2]
-    cell_w, cell_h = cell_size(p.cell, p.font)
+    cell_w, cell_h = cell_size(p.cell)
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
     lit = cells.lit(pieces, threshold=p.background_threshold)

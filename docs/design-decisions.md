@@ -67,15 +67,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `text` effect. Effects that draw glyphs as texture (`ascii`, `evaporate`, `disperse`, later `braille`) stay, on image's
   own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
   drift apart. *Consequence:* `text` and `type_on` leave the roadmap.
-- **One bundled monospaced font, no `font` parameter** (decided, not built yet). Glyph effects draw with JetBrains Mono
-  Regular (SIL OFL 1.1), shipped in the wheel as `src/bullterrier_image/fonts/JetBrainsMono-Regular.ttf` (`ops/glyphs.FONT`).
-  The `font` parameter of `ascii`, `disperse` and `evaporate`, `BT_IMAGE_FONTS`, the system-font search and the Pillow
-  fallback go, and `sheet`, the banner and the piece-number digits use the same file. *Reason:* a font found on the system
-  made the output depend on the host, a missing path failed at render time, and the file escaped the cache fingerprint;
-  one cited asset gives the same look on every host with the same library versions. The font must cover the Latin ramps,
-  the block elements `█▓▒░▀▄` and braille U+2800 to 28FF, which a system monospaced font often lacks. *Consequence:* the
-  licence is `MIT AND OFL-1.1` with the OFL text at the repository root (`LICENSE-FONT`); a `Font` value type arrives only
-  on request.
+- **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1),
+  shipped in the wheel as `src/bullterrier_image/fonts/JetBrainsMono-Regular.ttf` (`ops/glyphs.FONT`). `sheet`, the banner
+  and the piece-number digits use the same file. There is no `font` parameter, `BT_IMAGE_FONTS`, system-font search or
+  Pillow fallback. *Reason:* a font found on the system made the output depend on the host, a missing path failed at
+  render time, and the file escaped the cache fingerprint; one cited asset gives the same look on every host with the
+  same library versions. It covers the Latin ramps and the block elements `█▓▒░▀▄`, which a system monospaced font often
+  lacks; braille is not covered (a later `braille` effect draws its own dots or picks its font then: YAGNI). Pillow's
+  basic layout engine is pinned: its optional Raqm engine keeps fractional advances where the basic one rounds, which
+  moves a glyph a pixel. *Consequence:* the licence is `MIT AND OFL-1.1` with the OFL text at the repository root
+  (`LICENSE-FONT`); a `Font` value type arrives only on request.
 
 ## Parameters
 

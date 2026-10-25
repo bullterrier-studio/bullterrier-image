@@ -24,7 +24,6 @@ def draw(rgb, *, ink=WHITE, paper=BLACK, photo=0.0, cell=8, chars=CHARS, gamma=1
         paper_threshold=0.5,
         gamma=gamma,
         photo=photo,
-        font=None,
     )
 
 
@@ -37,7 +36,7 @@ def test_a_black_picture_on_black_paper_stays_blank():
 def test_a_white_picture_on_black_paper_is_the_densest_glyph_on_every_cell():
     width, height = cell_size(8)
     out = draw(np.ones((height, 2 * width, 3), np.float32))
-    densest = np.tile(glyph_atlas(CHARS, 8, None)[-1], (1, 2))
+    densest = np.tile(glyph_atlas(CHARS, 8)[-1], (1, 2))
     for channel in range(3):
         np.testing.assert_allclose(out[..., channel], densest, atol=1e-6)
 
@@ -63,14 +62,14 @@ def _glyph_drawn_for_grey(level: float, gamma: float) -> np.ndarray:
 
 
 def test_a_cell_gets_the_glyph_nearest_its_ink_amount():
-    atlas = glyph_atlas(CHARS, 8, None)  # 10 glyphs, index 0 = least ink
+    atlas = glyph_atlas(CHARS, 8)  # 10 glyphs, index 0 = least ink
     # grey 0.3 on black paper wants 0.3 of full ink: 0.3 * 9 = 2.7 glyph steps, nearest is glyph 3 (not 2)
     np.testing.assert_allclose(_glyph_drawn_for_grey(0.3, gamma=1.0), atlas[3], atol=1e-6)
     assert not np.allclose(atlas[3], atlas[2])  # the two candidates really differ
 
 
 def test_gamma_is_applied_to_the_ink_amount():
-    atlas = glyph_atlas(CHARS, 8, None)
+    atlas = glyph_atlas(CHARS, 8)
     # grey 0.6: gamma 1 gives 0.6 * 9 = 5.4 -> glyph 5; gamma 2 gives 0.6**2 = 0.36, 0.36 * 9 = 3.24 -> glyph 3
     np.testing.assert_allclose(_glyph_drawn_for_grey(0.6, gamma=1.0), atlas[5], atol=1e-6)
     np.testing.assert_allclose(_glyph_drawn_for_grey(0.6, gamma=2.0), atlas[3], atol=1e-6)

@@ -25,14 +25,8 @@ class DisperseParams(EffectParams):
         unit="px",
         min=1,
         max=64,
-        doc="Character width in px; a piece is one character (its height comes from `font`). Use the same value as "
-        "the ascii step before this one, so whole characters move.",
-    )
-    font: str | None = param(
-        None,
-        doc="Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; "
-        "use the same as the ascii step. A path that cannot be opened fails when the effect runs.",
-        advanced=True,
+        doc="Character width in px; a piece is one character (its height comes from the bundled font). Use the same "
+        "value as the ascii step before this one, so whole characters move.",
     )
     progress: float = param(
         0.0,
@@ -375,7 +369,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     height, width = rgb.shape[:2]
     if p.progress <= 0.0 and p.ambient <= 0.0:
         return rgb.copy()
-    cell_w, cell_h = cell_size(p.cell, p.font)
+    cell_w, cell_h = cell_size(p.cell)
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
     present = cells.lit(pieces, threshold=p.background_threshold)

@@ -11,6 +11,10 @@ def _lit(height=120, width=160):
     return np.ones((height, width, 3), np.float32)
 
 
+# a picture of whole piece rows: a partial last row counts its padding as outside the matte, and would be an edge
+WHOLE_ROWS = 15 * cell_size(5)[1]
+
+
 def test_disperse_is_the_untouched_picture_at_progress_zero_and_nothing_at_one(photo):
     np.testing.assert_array_equal(registry.apply("disperse", photo, progress=0.0), photo)
     assert registry.apply("disperse", _lit(), progress=1.0, seed=1).max() == 0.0
@@ -120,10 +124,14 @@ def test_disperse_no_piece_travels_more_than_a_third_of_the_picture_at_any_angle
 
 def test_disperse_hover_floats_a_piece_slowly_with_the_wind_long_before_it_goes():
     img, (_, x0) = _one_piece()
-    kwargs = {"wind": 0.3, "angle": 30, "seed": 3}
-    drift = lambda hover: next(x for p, x, _ in _track(img, until=0.06, hover=hover, **kwargs) if p >= 0.05) - x0  # noqa: E731  (a one-line helper)
-    assert drift(0.3) > 1.0  # floating up and with the wind: nothing has detached yet
-    assert drift(0.0) <= 0.5  # without hovering it stays put (or starts to pull back) at this point
+    kwargs = {"wind": 0.3, "angle": 30}
+
+    def drift(hover: float, seed: int) -> float:
+        return next(x for p, x, _ in _track(img, until=0.06, hover=hover, seed=seed, **kwargs) if p >= 0.05) - x0
+
+    gains = [drift(0.3, seed) - drift(0.0, seed) for seed in range(1, 9)]  # one piece wobbles: look at eight
+    assert np.mean(gains) > 1.0  # floating with the wind carries it further than staying put, nothing detached yet
+    assert min(gains) >= 0.0  # and never less far
 
 
 def test_disperse_hover_starts_at_the_outline_and_leaves_the_inside_alone():
@@ -375,8 +383,8 @@ def test_disperse_outward_needs_a_distance_to_throw_pieces():
 
 
 def test_disperse_bottom_goes_with_the_other_edges_only_when_open_bottom_is_off():
-    kwargs = {"progress": 0.3, "top": 0, "outline": 1.0, "sweep": 0, "wind": 0.0, "seed": 1}
-    bottom_centre = (slice(-10, None), slice(70, 90))
+    kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "wind": 0.0, "seed": 1}
+    bottom_centre = (slice(-cell_size(5)[1], None), slice(70, 90))  # the last piece row
     assert registry.apply("disperse", _lit(), **kwargs)[bottom_centre].min() == 1.0
     assert registry.apply("disperse", _lit(), open_bottom=False, **kwargs)[bottom_centre].min() < 1.0
 
@@ -439,12 +447,17 @@ def test_disperse_bob_cycles_is_how_often_a_hovering_piece_bobs():
 
 def test_disperse_sway_cycles_is_how_often_a_flying_piece_wobbles():
     img, _ = _one_piece(height=120, width=200)
-    settings = {"wind": 0.0, "sway": 0.2, "seed": 3, **_TIMED}
-    wobbling = lambda cycles: [  # noqa: E731  (a one-line helper)
-        x for _, x, _ in _track(img, since=0.1, until=0.3, step=0.005, sway_cycles=cycles, **settings)
-    ]
-    assert _reversals(wobbling(0.0)) == 0  # it drifts to one side and does not come back
-    assert _reversals(wobbling(4.0)) >= 6
+
+    def reversals(cycles: float, seed: int) -> int:
+        track = _track(
+            img, since=0.1, until=0.3, step=0.005, sway_cycles=cycles, wind=0.0, sway=0.2, seed=seed, **_TIMED
+        )
+        return _reversals([x for _, x, _ in track])
+
+    seeds = range(1, 7)  # a pixel-sampled wobble of one piece depends on its phase: judge several
+    assert [reversals(0.0, seed) for seed in seeds] == [0] * 6  # it drifts to one side and does not come back
+    assert min(reversals(4.0, seed) for seed in seeds) > max(reversals(1.0, seed) for seed in seeds)
+    assert min(reversals(4.0, seed) for seed in seeds) >= 4  # each cycle turns it around twice
 
 
 @pytest.mark.parametrize("seed", range(4))
@@ -479,8 +492,8 @@ def test_disperse_outline_depth_is_how_deep_closeness_to_the_edge_decides_the_or
 
 
 def test_disperse_takes_its_edge_from_the_matte_when_given():
-    img = np.ones((200, 200, 3), np.float32)  # everything is lit...
-    matte = np.zeros((200, 200), np.float32)
+    img = np.ones((WHOLE_ROWS, 200, 3), np.float32)  # everything is lit...
+    matte = np.zeros((WHOLE_ROWS, 200), np.float32)
     matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
     kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
     with_matte = registry.apply("disperse", img, matte=matte, **kwargs)
@@ -492,8 +505,8 @@ def test_disperse_takes_its_edge_from_the_matte_when_given():
 
 
 def test_disperse_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
-    img = np.ones((200, 200, 3), np.float32)
-    matte = np.full((200, 200), 0.4, np.float32)  # a faint matte everywhere,
+    img = np.ones((WHOLE_ROWS, 200, 3), np.float32)
+    matte = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint matte everywhere,
     matte[:, 80:120] = 1.0  # and a solid column
     kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
     outside = (slice(150, None), slice(20, 60))

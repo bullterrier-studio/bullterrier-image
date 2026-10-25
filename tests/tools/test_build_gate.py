@@ -16,7 +16,7 @@ import pytest
 
 @pytest.fixture
 def project(project_copy) -> Path:
-    return project_copy("pyproject.toml", "README.md", "LICENSE")
+    return project_copy("pyproject.toml", "README.md", "LICENSE", "LICENSE-FONT")
 
 
 def build_check(project: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
