@@ -56,9 +56,10 @@ from .checks import matte_warnings, still_warnings
 from .core import registry
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
-from .core.regions import Svg, map_problem
+from .core.regions import Svg
 from .core.runner import Finder, find_map, known_maps
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
+from .ops.maps import map_problem
 from .ops.resample import resize
 from .recipe import Recipe, default_finder, load_recipe, render, trace
 from .sheet import write_stages

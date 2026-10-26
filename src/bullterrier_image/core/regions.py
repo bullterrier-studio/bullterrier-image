@@ -46,6 +46,7 @@ from scipy import ndimage
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.color import luminance
+from bullterrier_image.ops.maps import map_problem
 from bullterrier_image.ops.noise import frame_fractal
 from bullterrier_image.ops.raster import coverage, paint
 from bullterrier_image.ops.voronoi import centres, nearest
@@ -83,7 +84,6 @@ __all__ = [
     "derived_maps",
     "look_weights",
     "map_error",
-    "map_problem",
     "maps_used",
     "needs",
     "needs_finder",
@@ -652,15 +652,6 @@ Kind = (
 # Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
 # left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
 BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
-
-
-def map_problem(layer: np.ndarray) -> str | None:
-    """What is wrong with the values of the map `layer`, with its least and greatest value; None when they are finite
-    and within 0..1. The one rule for the values of a map that enters from outside (a map given or found, a piece
-    finder's answer)."""
-    finite, low, high = bool(np.isfinite(layer).all()), float(layer.min()), float(layer.max())
-    problem = "that are not finite" if not finite else "below 0" if low < 0 else "above 1" if high > 1 else None
-    return None if problem is None else f"values {problem} (min {low:g}, max {high:g})"
 
 
 def map_error(name: str) -> type[MapNotFoundError]:
