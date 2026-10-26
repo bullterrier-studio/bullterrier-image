@@ -33,7 +33,7 @@ from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import BoxFinder, Partition, Regions, Selection, look_weights, needs_depth, resolve, used
+from .regions import BoxFinder, Partition, Regions, Selection, check_map, look_weights, needs_depth, resolve, used
 from .steps import Each, Recipe, Step
 
 
@@ -87,9 +87,9 @@ def render(
     its `find` is called once with the photo as given when the recipe needs depth (`recipe.needs_depth`) and no `depth`
     was given. Raises SubjectNotFoundError when the recipe needs the subject and neither was given, the finder returns
     None, the matte is not (h, w) or not within 0..1, a `per` region has no finder or the finder's matte does not fit
-    its crop, or the framing crops around a subject that is not there; DepthNotFoundError, naming the step, when the
-    recipe needs depth and neither was given, the finder returns None, or the depth map is not (h, w) or not within
-    0..1.
+    its crop or is not within 0..1, or the framing crops around a subject that is not there; DepthNotFoundError,
+    naming the step, when the recipe needs depth and neither was given, the finder returns None, or the depth map is
+    not (h, w) or not within 0..1.
     """
     image, inputs, regions = _prepare(rgb, recipe, matte, depth, find_subject, find_depth)
     stages = _stages(image, recipe.steps, inputs, regions)
@@ -180,7 +180,7 @@ def render_all(
 
 # What the runner tells about each map of the photo, by input name: the error when it is missing or unusable, what it
 # is, and the keyword of its finder.
-_MAPS = {
+_MAPS: dict[str, tuple[type[SubjectNotFoundError | DepthNotFoundError], str, str]] = {
     "matte": (SubjectNotFoundError, "subject's alpha", "find_subject"),
     "depth": (DepthNotFoundError, "depth map (1 = nearest)", "find_depth"),
 }
@@ -214,15 +214,11 @@ def _maps(
 
 def _checked(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     """`layer`, the map `name` of the photo `rgb`, once it is known to be the photo's (h, w), finite and within 0..1:
-    the one check of a map, for a map given and a finder's answer alike, where it enters."""
+    the one check of a map of the whole photo, for a map given and a finder's answer alike, where it enters."""
     error = _MAPS[name][0]
     if layer.shape != rgb.shape[:2]:
         raise error(f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
-    finite, low, high = bool(np.isfinite(layer).all()), float(layer.min()), float(layer.max())
-    problem = "that are not finite" if not finite else "below 0" if low < 0 else "above 1" if high > 1 else None
-    if problem:
-        raise error(f"{name} has values {problem} (min {low:g}, max {high:g}): a map must be finite and within 0..1")
-    return layer
+    return check_map(name, layer, error)
 
 
 def _missing(name: str, recipe: Recipe) -> SubjectNotFoundError | DepthNotFoundError:

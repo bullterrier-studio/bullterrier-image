@@ -68,6 +68,7 @@ __all__ = [
     "Svg",
     "as_partition",
     "check",
+    "check_map",
     "look_weights",
     "needs",
     "needs_depth",
@@ -545,6 +546,17 @@ Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject | Depth | DepthBands
 BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
 
 
+def check_map(name: str, layer: np.ndarray, error: type[SubjectNotFoundError | DepthNotFoundError]) -> np.ndarray:
+    """`layer`, once it is known to be finite and within 0..1; else `error` naming the map `name`, what is wrong and the
+    least and greatest value. The one check of the values of a map that enters from outside (a matte or depth map
+    given or found, a piece finder's answer)."""
+    finite, low, high = bool(np.isfinite(layer).all()), float(layer.min()), float(layer.max())
+    problem = "that are not finite" if not finite else "below 0" if low < 0 else "above 1" if high > 1 else None
+    if problem:
+        raise error(f"{name} has values {problem} (min {low:g}, max {high:g}): a map must be finite and within 0..1")
+    return layer
+
+
 def _frozen(array: np.ndarray) -> np.ndarray:
     """`array`, read-only: regions are shared by every step that asks for them."""
     array.setflags(write=False)
@@ -933,7 +945,8 @@ class Regions(Mapping[str, Partition | Selection]):
         """The built-in subject without `per`; with it the subject found in every piece, united. For each piece the
         finder is asked once about the piece's box grown by `context`; of its answer only the piece's own pixels the
         finder is surer of than `threshold` are kept. A piece the finder finds nothing in (SubjectNotFoundError) adds
-        nothing."""
+        nothing; an answer that does not fit the view, or is not finite and within 0..1, is a SubjectNotFoundError
+        naming the piece."""
         if kind.per is None:
             return self.selection("subject")
         if self._find is None:
@@ -962,6 +975,7 @@ class Regions(Mapping[str, Partition | Selection]):
                 raise SubjectNotFoundError(
                     f"the subject finder gave a matte of shape {matte.shape} for a view of {view}"
                 )
+            check_map(f"the subject finder's matte of piece {piece} (view {box})", matte, SubjectNotFoundError)
             own = labels[top:bottom, left:right] == piece
             sure = own & (matte > kind.threshold)
             found[top:bottom, left:right][sure] = matte[sure]
@@ -1060,8 +1074,8 @@ def resolve(
     and only if a region needs it (this module never loads a picture or a model); None when there is no finder. The
     caller passes maps of the picture's `(height, width)`, finite and within 0..1 (the runner checks them).
     `find` finds the subject inside a box of the picture (see `BoxFinder`), once for each piece of a `Subject` with
-    `per`; None when there is none. `depth` gives the depth map, float `(height, width)` in 0..1 (1 = nearest), called
-    once for each `Depth` or `DepthBands` made; None when there is none.
+    `per`, its answers checked here (`check_map`); None when there is none. `depth` gives the depth map, float
+    `(height, width)` in 0..1 (1 = nearest), called once for each `Depth` or `DepthBands` made; None when there is none.
 
     Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
     naming the region and the valid names."""

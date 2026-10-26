@@ -855,6 +855,17 @@ def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
 
 
+def test_a_piece_finder_that_answers_values_that_are_not_finite_fails_the_recipe_and_says_so(folder):
+    project = grid_first_project(folder)
+
+    def answers_nan(rgb):
+        return np.full(rgb.shape[:2], np.nan, np.float32)
+
+    by = by_pair(run(project, only="a.png", find_subject=Finder("stand-in", answers_nan)))
+    assert by[("a.png", "grid-first")].status == "failed"
+    assert "not finite" in str(by[("a.png", "grid-first")].error)
+
+
 def test_another_photo_and_a_recipe_that_cuts_other_pieces_ask_about_their_own_crops(folder):
     project = grid_first_project(folder)
     finder = PieceFinder()

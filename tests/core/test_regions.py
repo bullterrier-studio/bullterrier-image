@@ -6,6 +6,7 @@ what a region is for (covering every pixel once, the same pieces at any resoluti
 a property of the result.
 """
 
+import contextlib
 import math
 import tracemalloc
 from collections.abc import Callable
@@ -1095,9 +1096,26 @@ def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_not
     np.testing.assert_array_equal(found(nothing_on_the_right, context=0), expected)
 
 
-def test_a_finder_that_answers_a_matte_that_does_not_fit_its_view_is_refused_naming_both_sizes():
-    with pytest.raises(SubjectNotFoundError, match=r"\(7, 7\).*\(10, 15\)"):
-        found(lambda box: np.ones((7, 7), np.float32), context=0)
+# a piece finder's answer for a view of (height, width), and what is wrong with it (None: it is kept)
+PIECE_ANSWERS = {
+    "1, the top of the range, is kept": (lambda view: np.ones(view, np.float32), None),
+    "a matte that does not fit its view, naming both sizes": (
+        lambda view: np.ones((7, 7), np.float32),
+        r"\(7, 7\).*\(10, 15\)",
+    ),
+    "not a number": (lambda view: np.full(view, np.nan, np.float32), r"piece 0.*not finite"),
+    "an infinity": (lambda view: np.full(view, np.inf, np.float32), r"piece 0.*not finite"),
+    "above 1": (lambda view: np.full(view, 1.2, np.float32), r"piece 0.*above 1.*1\.2"),
+    "below 0": (lambda view: np.full(view, -0.3, np.float32), r"piece 0.*below 0.*-0\.3"),
+}
+
+
+@pytest.mark.parametrize(("answer", "complaint"), PIECE_ANSWERS.values(), ids=PIECE_ANSWERS.keys())
+def test_a_piece_finders_answer_must_fit_its_view_and_be_finite_and_within_0_and_1(answer, complaint):
+    refused = pytest.raises(SubjectNotFoundError, match=complaint) if complaint else contextlib.nullcontext()
+    with refused:
+        alpha = found(lambda box: answer(size_of(box)), context=0)
+        np.testing.assert_array_equal(alpha, np.ones((20, 30), np.float32))  # reached only by an answer kept
 
 
 def test_a_subject_found_piece_by_piece_says_so_when_there_is_no_finder_for_pieces():
