@@ -1,0 +1,8 @@
+# The camera steps to the left: the dog slides right against the room behind it.
+name = "parallax"
+size = 480
+
+[[step]]
+effect = "parallax"
+amount = 0.03
+focus = 0.5
