@@ -17,7 +17,7 @@
 Layers, each importing only from the ones below it (import-linter checks this in the test suite):
     app        cli, pipeline (many photos x many recipes), gallery (the effect catalogue), sheet (comparison images),
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
-    adapters   imageio (files and the one in-memory image type), finding (the subject), loader (recipe files)
+    adapters   imageio (files and the one in-memory image type), finding (the subject and depth), loader (recipe files)
     effects    the effect library: pure functions image -> image, found automatically
     core       the registry and the recipe engine (steps, runner)
     ops        shared numeric primitives, named by concept
@@ -43,6 +43,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         SubjectNotFoundError,
         UnknownEffectError,
     )
+    from .finding.depth import depth_finder, depth_map
     from .finding.subject import subject_finder, subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import (
@@ -82,6 +83,7 @@ _HOMES = {
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".core.params": ("Picture",),
+    ".finding.depth": ("depth_finder", "depth_map"),
     ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
@@ -150,6 +152,8 @@ __all__ = [
     "Svg",
     "UnknownEffectError",
     "__version__",
+    "depth_finder",
+    "depth_map",
     "fx",
     "imageio",
     "load_project",

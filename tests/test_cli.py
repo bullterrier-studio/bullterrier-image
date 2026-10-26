@@ -16,6 +16,7 @@ from bullterrier_image.cli import main
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_finder, subject_matte
 from bullterrier_image.recipe import Recipe, Step, load_recipe, render
 from bullterrier_image.sheet import contact_sheet
@@ -441,9 +442,17 @@ DEPTH_COMMANDS = {
 
 @pytest.mark.parametrize("command", DEPTH_COMMANDS.values(), ids=DEPTH_COMMANDS.keys())
 def test_every_command_that_renders_a_recipe_takes_a_depth_file(deep, capsys, command):
-    assert cli(command) == 1  # no map and no depth model: the recipe cannot run
-    assert "needs depth" in capsys.readouterr().err
+    assert cli(command) == 1  # no map, and the suite's BT_IMAGE_DEPTH_MODEL names no file: the recipe cannot run
+    assert "BT_IMAGE_DEPTH_MODEL" in capsys.readouterr().err
     assert cli(f"{command} --depth depth.png") == 0
+
+
+def test_without_a_depth_file_the_depth_model_finds_the_depth(deep, depth_echo_model):
+    depth_echo_model(0)  # a stand-in: near where the photo is red
+    assert cli("render me.png deep.toml -o out") == 0
+    painted = imageio.load(deep / "out" / "me__deep.png")[..., 0]  # depth_probe paints the depth it is given
+    expected = depth_map(imageio.load(deep / "me.png"))
+    assert np.abs(painted - expected).max() <= 1 / 255  # 8-bit rounding only
 
 
 # --- user mistakes are reported, not thrown at the user ------------------------------------------------------------

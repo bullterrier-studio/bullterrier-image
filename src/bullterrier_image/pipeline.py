@@ -58,6 +58,7 @@ from .core.params import Picture, describe_error
 from .core.regions import Svg
 from .core.runner import Finder, find_map
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
+from .finding.depth import depth_finder
 from .finding.subject import subject_finder
 from .ops.resample import resize
 from .recipe import Recipe, load_recipe, render, trace
@@ -251,9 +252,10 @@ def run(
     another identity (or delete `project.cache`). A damaged cache entry is found again, also with `force`. A recipe
     whose regions find the subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working
     picture, once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
-    `find_depth` finds the depth of a photo for the recipes that take it (no default yet: without one, such a recipe
-    fails naming its step), asked and remembered like `find_subject`. Each map is remembered under its own finder's
-    identity: changing one finder redoes only the recipes that use its map.
+    `find_depth` finds the depth of a photo for the recipes that need it; None means
+    `bullterrier_image.finding.depth.depth_finder()` (the depth model), built only when a recipe needs depth
+    (BackendUnavailableError at once if it cannot run), asked and remembered like `find_subject`. Each map is
+    remembered under its own finder's identity: changing one finder redoes only the recipes that use its map.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -281,13 +283,13 @@ def run(
         )
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
-    # the finder of each map ("matte", "depth") a recipe needs: the default subject finder is built only then, so a
-    # setting nobody uses cannot stop the project; there is no default depth finder yet
+    # the finder of each map ("matte", "depth") a recipe needs: each default is built only then, so a setting nobody
+    # uses cannot stop the project
     finders = {}
     if any(r.needs_matte or r.needs_finder for _, r in recipes):
         finders["matte"] = subject_finder() if find_subject is None else find_subject
-    if any(r.needs_depth for _, r in recipes) and find_depth is not None:
-        finders["depth"] = find_depth
+    if any(r.needs_depth for _, r in recipes):
+        finders["depth"] = depth_finder() if find_depth is None else find_depth
     # What a remembered map depends on besides the photo: which map it is (one finder may find both), its finder's
     # identity, the finding code (the subject's edge clean-up is part of what is remembered) and the libraries.
     finding_code = _source_digest(Path(finding.__file__).parent)
@@ -381,8 +383,8 @@ def _write_record(
 @dataclass
 class _Photo:
     """One photo while its recipes run: read once, and each map found once, on first use. `digest` is the hash of its
-    file; `finders` has the finder of each map ("matte", "depth") its recipes need and `run` has one for, `found_by`
-    what each map depends on besides the photo (see `run`): together they name the photo's remembered maps."""
+    file; `finders` has the finder of each map ("matte", "depth") its recipes need, `found_by` what each map depends on
+    besides the photo (see `run`): together they name the photo's remembered maps."""
 
     path: Path
     digest: str
@@ -402,9 +404,9 @@ class _Photo:
         """The subject matte (`run` gave a finder: a recipe needs the subject)."""
         return self._remember("matte")
 
-    def depth(self) -> np.ndarray | None:
-        """The depth map; None when `run` has no depth finder, so the render says which step needs one."""
-        return self._remember("depth") if "depth" in self.finders else None
+    def depth(self) -> np.ndarray:
+        """The depth map (`run` gave a finder: a recipe needs depth)."""
+        return self._remember("depth")
 
     def _remember(self, name: str) -> np.ndarray:
         """The map `name`, from the on-disk cache when its finder has found it in this photo before, else found

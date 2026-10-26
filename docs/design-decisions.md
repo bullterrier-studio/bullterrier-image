@@ -50,7 +50,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   primitive designed before its user is designed for the wrong user. *Consequence:* the dead-code gate fails on unused
   code; the removed primitives (`colorspace`, `noise`, `edges`, `warp`, `voronoi`, `sprites`) are restored from commit
   3b9b2ed (`git show 3b9b2ed:src/bullterrier_image/ops/<module>.py`) together with the effect that needs them.
-- **One public path per name.** The public API is `bullterrier_image` (with `render` & co. binding the default subject finder),
+- **One public path per name.** The public API is `bullterrier_image` (with `render` & co. binding the default finders),
   `bullterrier_image.recipe`, `bullterrier_image.fx`, `bullterrier_image.imageio` and `bullterrier_image.plugin`, each with `__all__`. *Reason:* two paths to one name with
   different behaviour (a `render` that finds the subject and one that does not) is a trap. *Consequence:* `bullterrier_image.core`
   and `bullterrier_image.ops` are internal and re-export nothing; no compatibility shims before 1.0.
@@ -201,9 +201,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   bound lazily, only when a recipe will ask for the subject. The pipeline's subject, depth and crop caches are keyed by
   the identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
   name (the partial-finder cache collision). *Consequence:* the crop-finder alias in regions is `BoxFinder`; the package
-  is `finding/` (`subject`, `download`) and the subject model's variable is `BT_IMAGE_SUBJECT_MODEL`. Depth takes the
-  same keywords (`depth=`, `find_depth=`); planned, not built yet: `finding.depth.depth_finder()` and
-  `BT_IMAGE_DEPTH_MODEL`.
+  is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
+  `BT_IMAGE_DEPTH_MODEL`. Depth takes the same keywords (`depth=`, `find_depth=`); `finding.depth.depth_finder()` is
+  its default, bound the same lazy way.
 
 ## Errors and I/O
 
@@ -230,14 +230,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject** (built: the input, `depth=`, `find_depth=`, `--depth`, `load_depth`, framing,
-  the pipeline's cache and the region kinds `Depth` and `DepthBands`; not built yet: the default model, the depth
-  effects, the `depth_haze` and `depth_grade` recipes and the gallery's use of depth). An effect that
+  the pipeline's cache, the region kinds `Depth` and `DepthBands`, the default model and the gallery's use of it; not
+  built yet: the depth effects and the `depth_haze` and `depth_grade` recipes). An effect that
   needs distance (`depth_of_field`, `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1,
   1 = nearest. The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
   `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default: Depth Anything V2 Small
   (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded
-  like the portable subject model; `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The
-  model's inverse depth is min-max scaled per photo (a flat photo gives zeros). Decided:
+  like the portable subject model (`BT_IMAGE_DEPTH_MODEL` for a local copy); `--depth` (or `depth=`) takes a map you
+  already have (brightness, white = near). The model sees the photo bicubic-scaled to a short side of 518 px, both sides
+  rounded to multiples of 14, as the original repository feeds it (the export's `preprocessor_config.json` scales by
+  whichever side needs the least, which fits a photo under 518 px by its long side); its inverse depth is stretched
+  bilinear to the photo's size, then min-max scaled per photo (a flat answer gives zeros). Decided:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
   - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth

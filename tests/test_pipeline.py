@@ -479,14 +479,21 @@ def test_a_photo_whose_map_is_not_found_fails_only_the_recipes_that_need_it_and_
     assert len(finder.seen) == 2  # a failed search is not repeated for the photo's second recipe that needs it
 
 
-def test_a_recipe_that_takes_depth_without_a_depth_finder_fails_naming_its_step_and_the_rest_run(folder, depth_probe):
+def test_a_project_that_needs_depth_is_refused_at_once_when_the_depth_model_cannot_run(folder, depth_probe):
+    deep_recipes(folder)  # the suite's BT_IMAGE_DEPTH_MODEL names no file
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_DEPTH_MODEL"):
+        run(load_project(folder / "bt-image.toml"))
+    assert not (folder / "out").exists()
+
+
+def test_the_default_depth_finder_is_remembered_until_the_depth_model_changes(folder, depth_probe, depth_echo_model):
     deep_recipes(folder)
-    by = by_pair(run(load_project(folder / "bt-image.toml")))
-    for photo in ("a.png", "b.png"):
-        assert by[(photo, "deep1")].status == "failed"
-        assert "DepthNotFoundError" in str(by[(photo, "deep1")].error)
-        assert "step 1 (depth_probe)" in str(by[(photo, "deep1")].error)
-        assert by[(photo, "grainy")].status == "done"
+    project = load_project(folder / "bt-image.toml")
+    depth_echo_model(0)  # near where the photo is red
+    assert recipes_redone(run(project)) == ["deep1", "deep2", "grainy", "warm"]
+    assert recipes_redone(run(project)) == []  # same model: everything is up to date
+    depth_echo_model(1)  # another model: near where the photo is green
+    assert recipes_redone(run(project)) == ["deep1", "deep2"]  # only what uses the depth is redone
 
 
 def test_a_depth_map_of_another_size_fails_the_recipes_that_take_it_naming_both_sizes_and_is_asked_once(

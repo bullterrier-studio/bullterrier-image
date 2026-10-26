@@ -152,11 +152,16 @@ from bullterrier_image import Finder, render
 render(photo, look, find_subject=Finder("grounded-sam dog v1", partial(grounded, prompt="dog")))
 ```
 
-**Depth** is a second map, given like the subject: `--depth depth.png` (in Python `depth=imageio.load_depth("depth.png")`)
-takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
+**Depth** is a second map, found like the subject. A recipe that takes depth (an effect, or a depth region, see Regions
+below) runs [Depth Anything V2 Small](https://github.com/DepthAnything/Depth-Anything-V2) (Apache-2.0) on ONNX Runtime,
+on every platform. Its weights (99 MB, the fp32 ONNX export of `onnx-community/depth-anything-v2-small`) are not in the
+package: the first use downloads them into the same cache folder as the subject model and checks their SHA-256 against
+the one pinned in the code. Offline, point `BT_IMAGE_DEPTH_MODEL` at a copy, which is then used as it is and never
+downloaded. The result is relative depth, scaled per photo: the nearest pixel is 1, the farthest 0, a flat answer all 0.
+Your own map replaces the model: `--depth depth.png` (in Python `depth=imageio.load_depth("depth.png")`) takes a
+greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
 `find_depth=Finder("my-depth v1", find)`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run` remembers each
-photo's depth by that identity, apart from its subject. No depth model is bundled yet: a recipe that takes depth (an
-effect, or a depth region, see Regions below) needs `--depth` or `find_depth`, else it fails naming its step. The bundled model arrives with the depth effects.
+photo's depth by that identity, apart from its subject.
 
 **Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
 the wheel), not a system font, so a look does not depend on the machine's fonts.
@@ -622,11 +627,12 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   sheet.py                 contact sheets, step sheets and parameter sweeps
   checks.py                automatic quality checks
   fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
-  recipe.py                the public namespace: the core's recipe names, with the subject finder bound to `finding.subject`
+  recipe.py                the public namespace: the core's recipe names, with the default finders bound (`finding`)
   imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
   loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
-  finding/                 finding.subject.subject_matte(rgb) -> alpha. Which model finds the subject (IS-Net on ONNX Runtime,
-                           downloaded on first use; or Apple Vision, when asked) is hidden here
+  finding/                 finding.subject.subject_matte(rgb) -> alpha, finding.depth.depth_map(rgb) -> depth. Which model
+                           finds them (IS-Net and Depth Anything V2 on ONNX Runtime, downloaded on first use; or Apple
+                           Vision for the subject, when asked) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies

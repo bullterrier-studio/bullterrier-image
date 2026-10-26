@@ -247,7 +247,7 @@ def _map_options(p: argparse.ArgumentParser) -> None:
         "--depth",
         metavar="PICTURE",
         help="the photo's depth map, the photo's size: a greyscale picture (8 or 16 bits), white = nearest, "
-        "black = farthest; needed by a recipe that takes depth (no depth model is bundled yet)",
+        "black = farthest, used instead of the depth model (Depth Anything V2 Small, downloaded on first use)",
     )
     _segmenter_option(p)
 
@@ -312,7 +312,7 @@ def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarra
 
 def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[np.ndarray]":
     """The photo of `args` through each recipe, the subject (the --matte file, else found once) and the depth (the
-    --depth file) shared by them all."""
+    --depth file, else found once) shared by them all."""
     from . import imageio
     from .recipe import render_all
 

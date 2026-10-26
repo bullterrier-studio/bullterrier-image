@@ -23,6 +23,7 @@ from bullterrier_image import ProjectError, UnknownEffectError, fx, gallery, ima
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.ops.resample import resize
 
 
@@ -397,6 +398,20 @@ def test_gallery_pictures_show_the_checkouts_demo_photo_through_the_example_reci
     # JPEG and resampling only
     assert picture.shape == expected.shape
     assert np.abs(picture - expected).mean() < 0.02
+
+
+def test_gallery_pictures_of_a_recipe_that_takes_depth_show_the_depth_models_map(
+    checkout, depth_probe, depth_echo_model
+):
+    depth_echo_model(0)  # a stand-in for the depth model: near where the demo photo is red
+    (checkout / "examples" / "effects" / "depth_probe.toml").write_text(
+        'name = "depth_probe"\nsize = 128\n[[step]]\neffect = "depth_probe"\n', encoding="utf-8"
+    )
+    gallery.render_gallery(only=["depth_probe"], checkout=checkout)
+    picture = imageio.load(gallery.effect_files("depth_probe", checkout=checkout).picture)
+    expected = resize(depth_map(imageio.load(checkout / "examples" / "photos" / "bullterrier.jpeg")), 480)
+    assert picture.shape[:2] == expected.shape
+    assert np.abs(picture[..., 0] - expected).mean() < 0.02  # JPEG and resampling only
 
 
 def test_gallery_rejects_an_unknown_effect_before_rendering(checkout, probe):

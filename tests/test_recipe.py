@@ -11,9 +11,10 @@ from bullterrier_image.core import runner
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
+from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Grid, Subject
+from bullterrier_image.recipe import Depth, Grid, Subject
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -276,3 +277,36 @@ def test_the_default_finder_is_built_only_when_a_recipe_asks_for_the_subject(
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "nonsense")
     with pytest.raises(BackendUnavailableError, match=refused) if refused else nullcontext():
         call(photo, recipe, **({"matte": matte} if given else {}))
+
+
+DEEP = Recipe(
+    "deep", (Step("fill", {"color": "#000000"}, "near"),), size=None, regions={"near": Depth(near=1.0, far=0.5)}
+)
+# With the suite's `BT_IMAGE_DEPTH_MODEL` naming no file, the default depth finder is built only for a recipe that needs
+# depth and is not given it: (recipe, given a depth map, what the refusal names; None: it renders).
+LAZY_DEPTH_DEFAULT = {
+    "a recipe that needs no depth renders": (PLAIN, False, None),
+    "a recipe given the depth it needs renders": (DEEP, True, None),
+    "a recipe that needs depth names the model's variable": (DEEP, False, "BT_IMAGE_DEPTH_MODEL"),
+}
+
+
+@pytest.mark.parametrize("call", CALLS.values(), ids=CALLS.keys())
+@pytest.mark.parametrize(("recipe", "given", "refused"), LAZY_DEPTH_DEFAULT.values(), ids=LAZY_DEPTH_DEFAULT.keys())
+def test_the_default_depth_finder_is_built_only_when_a_recipe_needs_depth(photo, call, recipe, given, refused):
+    ramp = np.tile(np.linspace(0, 1, 128, dtype=np.float32), (96, 1))
+    with pytest.raises(BackendUnavailableError, match=refused) if refused else nullcontext():
+        call(photo, recipe, **({"depth": ramp} if given else {}))
+
+
+def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
+    """Without `depth` or `find_depth`, `bullterrier_image.recipe`'s functions find the depth with `depth_map`, here
+    run by a stand-in model (the external boundary, see `depth_echo_model`)."""
+    depth_echo_model(0)
+    photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
+    expected = runner.render(photo, DEEP, depth=depth_map(photo))
+    flat = np.zeros(photo.shape[:2], np.float32)
+    assert not np.array_equal(expected, runner.render(photo, DEEP, depth=flat))  # the depth matters
+    np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
+    np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
+    np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)

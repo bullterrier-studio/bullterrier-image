@@ -1,5 +1,5 @@
-"""What tests in every folder share: the small test picture and matte, the effect-registry helpers, a stand-in for the
-subject-finding model, the files git tracks, a copy of the project to inject one fault into, and the environment
+"""What tests in every folder share: the small test picture and matte, the effect-registry helpers, stand-ins for the
+subject and depth models, the files git tracks, a copy of the project to inject one fault into, and the environment
 `uv run` gives a command. Helpers used by one folder live in that folder's conftest.py."""
 
 import os
@@ -178,11 +178,12 @@ def matte() -> np.ndarray:
 
 @pytest.fixture(autouse=True)
 def no_model_download(monkeypatch):
-    """No test may download the subject-finding model, or depend on the settings of the person running the tests:
-    `BT_IMAGE_SUBJECT_MODEL` points at a file that does not exist (so the portable backend fails at once, naming it,
-    instead of downloading) and `BT_IMAGE_SEGMENTER` is unset. A test that needs a model sets `BT_IMAGE_SUBJECT_MODEL`
-    itself."""
+    """No test may download a model, or depend on the settings of the person running the tests:
+    `BT_IMAGE_SUBJECT_MODEL` and `BT_IMAGE_DEPTH_MODEL` point at files that do not exist (so the portable subject
+    backend and the depth model fail at once, naming them, instead of downloading) and `BT_IMAGE_SEGMENTER` is unset. A
+    test that needs a model sets the variable itself."""
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
+    monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(Path(__file__).parent / "no-such-depth-model.onnx"))
     monkeypatch.delenv("BT_IMAGE_SEGMENTER", raising=False)
 
 
@@ -213,6 +214,32 @@ def echo_model(tmp_path) -> Callable[[int], Path]:
         onnx.checker.check_model(model)
         path = tmp_path / f"echo-{channel}.onnx"
         onnx.save(model, path)
+        return path
+
+    return write
+
+
+@pytest.fixture
+def depth_echo_model(tmp_path, monkeypatch) -> Callable[[int], Path]:
+    """`depth_echo_model(channel)` writes a tiny ONNX depth model, points `BT_IMAGE_DEPTH_MODEL` at it and returns its
+    path. It stands in for Depth Anything V2 (an external boundary) with the real model's input and output: input
+    `pixel_values` float32 (batch, 3, height, width), any height and width, holding (v/255 - mean) / std per RGB
+    channel; output `predicted_depth` (batch, height, width), larger = nearer. It answers with input `channel` as it
+    receives it, so the depth found is that channel scaled per photo: where the photo is brightest in it is nearest."""
+
+    def write(channel: int) -> Path:
+        graph = helper.make_graph(
+            [helper.make_node("Gather", ["pixel_values", "channel"], ["predicted_depth"], axis=1)],
+            "depth_echo",
+            [helper.make_tensor_value_info("pixel_values", TensorProto.FLOAT, ["batch", 3, "height", "width"])],
+            [helper.make_tensor_value_info("predicted_depth", TensorProto.FLOAT, ["batch", "height", "width"])],
+            initializer=[helper.make_tensor("channel", TensorProto.INT64, [], [channel])],  # a scalar: the axis goes
+        )
+        model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8)
+        onnx.checker.check_model(model)
+        path = tmp_path / f"depth-echo-{channel}.onnx"
+        onnx.save(model, path)
+        monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(path))
         return path
 
     return write
