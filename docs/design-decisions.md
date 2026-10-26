@@ -240,7 +240,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   already have (brightness, white = near). The model sees the photo bicubic-scaled to a short side of 518 px, both sides
   rounded to multiples of 14, as the original repository feeds it (the export's `preprocessor_config.json` scales by
   whichever side needs the least, which fits a photo under 518 px by its long side); its inverse depth is stretched
-  bilinear to the photo's size, then min-max scaled per photo (a flat answer gives zeros). Decided:
+  bilinear to the photo's size, then min-max scaled per photo (a flat answer gives zeros). The input keeps the
+  photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory; there is no cap. Decided:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
   - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth
