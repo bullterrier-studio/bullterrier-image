@@ -1,0 +1,28 @@
+# Stained glass: the picture in flat pieces that gather along its edges, leaded and lit from behind.
+name = "stained-glass"
+size = 480
+
+[[step]]
+effect = "shatter"
+pieces = 420
+offset = 0
+angle = 0
+detail = 0.85
+fill = 1
+gap = 2
+color = "#16120f"
+seed = 3
+
+[[step]]
+effect = "grade"
+saturation = 1.45
+contrast = 1.1
+
+[[step]]
+effect = "bloom"
+radius = 18
+amount = 0.35
+
+[[step]]
+effect = "vignette"
+amount = 0.35

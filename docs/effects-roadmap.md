@@ -111,8 +111,8 @@ belong to a layout package, not here.
 | `cmyk_halftone` | Four-ink halftone at screen angles. | `fx.cmyk_halftone(cell=9)` |
 | `engraving` | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
-| `voronoi_mosaic` | Stained-glass cells with leaded edges. | `fx.voronoi_mosaic(cells=800, edge="#000")` |
-| `low_poly` | Delaunay triangles, one colour each, or just their wireframe. | `fx.low_poly(points=1500, seed=1)` |
+| `voronoi_mosaic` ✓ (`shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Recipe](../examples/recipes/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
+| `low_poly` ✓ (`shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Recipe](../examples/recipes/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
 | `risograph` | Spot-colour layers, misregistration, grain. | `fx.risograph(inks=["#ff4d6d","#2b59ff"])` |
 
 ## Computational and experimental
@@ -161,7 +161,7 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `flow_warp` ✓ | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
 | `stretch` ✓ | Smear one pixel row or column outward. | `fx.stretch(axis="vertical", at=0.5)` |
 | `scatter` ✓ | Random pixel displacement. | `fx.scatter(radius=4, seed=1)` |
-| `shatter` ✓ | Cracked-glass pieces, slightly offset and rotated. | `fx.shatter(pieces=24, gap=1.5, seed=1)` |
+| `shatter` ✓ | Cracked-glass pieces, slightly offset and rotated; or flat stained glass and low-poly triangles (`fill`, `detail`, `shape`). | `fx.shatter(pieces=24, gap=1.5, seed=1)` |
 | `droste` ✓ | Recursive picture-in-picture spiral. | `fx.droste(scale=0.5)` |
 | `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
 

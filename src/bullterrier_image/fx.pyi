@@ -4062,19 +4062,41 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def shatter(pieces: int = 24, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Break the picture into `pieces` random Voronoi pieces, move and turn each, and draw `gap` px lines between them.
+def shatter(pieces: int = 24, shape: Literal['voronoi', 'triangles'] = 'voronoi', detail: float = 0.0, fill: float = 0.0, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px
+lines between them.
 
-The pieces are the cells round `pieces` random points. Each draws its own move (up to `offset` px each way) and its
-own turn (up to `angle` degrees, about its point) from `seed`, and shows the picture moved and turned that way:
-one rigid move of the input per piece, so the picture inside a piece is not bent, only cut along the borders. The
-lines of `color` are drawn along the borders of the pieces where they lie, over the moved pictures.
+The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
+or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to
+`offset` px each way) and its own turn (up to `angle` degrees, about its centre) from `seed`, and shows the picture
+moved and turned that way: one rigid move of the input per piece, so the picture inside a piece is not bent, only
+cut along the borders. `fill` then pulls each piece's colours to their average. The lines of `color` are drawn
+along the borders of the pieces where they lie, over the pictures.
 
 Parameters
 ----------
 pieces : whole number, count, 4 to 500, default 24
-    How many pieces (Voronoi cells round random points) the picture breaks into, 4 to
-    500. More = smaller pieces; the average piece is the picture's area divided by this.
+    How many points the picture breaks round, 4 to 500: with `shape` 'voronoi' each is a
+    piece (the cell nearer to it than to any other, so the average piece is the
+    picture's area divided by this); with 'triangles' the points are corners of
+    triangles, and there are more pieces than points (see `shape`). More = smaller
+    pieces.
+shape : one of 'voronoi', 'triangles', default 'voronoi'
+    The pieces' shape. 'voronoi' = the cells round the points, as broken glass;
+    'triangles' = the Delaunay triangles of the points and of points added round the
+    picture's edge, about as far apart as the others are (about 4 times the square root
+    of `pieces` of them), as in a low-poly picture. That makes 2 x `pieces` + b - 2
+    triangles for b edge points: about 2.75 per point at 24 points on a 4:3 picture,
+    fewer per point as `pieces` grows.
+detail : number, fraction, 0 to 1, default 0.0
+    How far the points follow the picture's detail: 0 = they lie anywhere at random; 1 =
+    they gather along its edges, in proportion to how sharply the brightness changes, so
+    edges break into small pieces and plain areas into large ones. In between mixes the
+    two. A picture with no edges gets random points whatever this is.
+fill : number, fraction, 0 to 1, default 0.0
+    How far each piece is flattened to one colour, the average of what it shows: 0 =
+    each piece shows the picture (moved and turned), as it is; 1 = each piece is one
+    flat colour, as stained glass or low-poly; in between mixes the two.
 offset : number, px, 0 to 200, default 10.0
     The farthest a piece's picture is moved, in pixels, up or down and left or right:
     each piece draws its own random move up to this far in each direction. 0 = no piece
@@ -4103,9 +4125,11 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
     ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What a moved piece shows where it reads from beyond the picture: 'reflect'
-    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
-    (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    What lies beyond the picture's edge, for a moved piece that reads from there and for
+    the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite
+    sides counts as an edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
+    (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the
+    opposite edge)."""
     ...
 
 def shear(x: float = 0.2, y: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

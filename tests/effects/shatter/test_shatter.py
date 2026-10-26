@@ -1,5 +1,7 @@
-"""Behaviour of the `shatter` effect: the picture broken into Voronoi pieces, each moved and turned a little, with dark
-lines between them."""
+"""Behaviour of the `shatter` effect: the picture broken into Voronoi cells or triangles, each moved and turned a little
+or flattened to a colour, with lines between them."""
+
+import warnings
 
 import numpy as np
 import pytest
@@ -49,13 +51,14 @@ def test_with_offset_only_every_piece_is_the_picture_slid_by_one_move_of_its_own
     assert (distinct.max(axis=0) > 0).all()
 
 
+@pytest.mark.parametrize("shape", ["voronoi", "triangles"])
 @pytest.mark.parametrize("pieces", [8, 12])
-def test_with_turning_only_every_piece_is_the_picture_turned_rigidly_by_at_most_angle_degrees(pieces) -> None:
+def test_with_turning_only_every_piece_is_the_picture_turned_rigidly_by_at_most_angle_degrees(pieces, shape) -> None:
     """Within one piece the source of a pixel one step right is one unit away in a direction turned by the piece's
     angle, and the source of the pixel one step down is a quarter turn from that, the same way round (a turn, no
     stretch, no mirror). Neighbours in two pieces differ, so most but not all pairs are rigid."""
     limit = 10.0
-    rows, cols, inside = sources(25, pieces=pieces, offset=0, angle=limit, seed=4)
+    rows, cols, inside = sources(25, pieces=pieces, offset=0, angle=limit, seed=4, shape=shape)
     right = np.stack([rows[:, 1:] - rows[:, :-1], cols[:, 1:] - cols[:, :-1]], axis=-1)[
         :-1
     ]  # (row, col) of a step right
@@ -138,3 +141,126 @@ def test_a_move_that_leaves_the_picture_reads_beyond_its_edge_by_the_edge_rule(e
         NAME, noise, pieces=8, offset=offset, angle=0, gap=0, seed=3, edge=edge, interpolation="nearest"
     )
     assert np.array_equal(out, expected)
+
+
+# --- fill: each piece as one colour --------------------------------------------------------------------------------
+
+
+def colours_of(rgb: np.ndarray) -> np.ndarray:
+    """The distinct colours in a picture, one row each."""
+    return np.unique(rgb.reshape(-1, 3), axis=0)
+
+
+@pytest.mark.parametrize("shape", ["voronoi", "triangles"])
+def test_a_full_fill_paints_each_piece_with_the_average_of_what_it_shows(photo, shape) -> None:
+    """Whatever the pieces show, moved and turned, a flat piece's colour is the mean of the picture it would have shown:
+    the pixels of each flat colour, taken from the unfilled result, average to that colour."""
+    settings = {"pieces": 12, "gap": 0, "seed": 1, "shape": shape}
+    shown = registry.apply(NAME, photo, fill=0.0, **settings)
+    flat = registry.apply(NAME, photo, fill=1.0, **settings)
+    colours = colours_of(flat)
+    assert 1 < len(colours) <= 2 * 12 + 14 - 2
+    for colour in colours:
+        in_piece = (flat == colour).all(axis=-1)
+        np.testing.assert_allclose(shown[in_piece].mean(axis=0), colour, atol=1e-5)
+
+
+@pytest.mark.parametrize("shape", ["voronoi", "triangles"])
+def test_a_fill_between_nothing_and_everything_mixes_the_two_evenly(photo, shape) -> None:
+    shown, flat, half = (
+        registry.apply(NAME, photo, pieces=12, gap=0, fill=f, seed=1, shape=shape) for f in (0.0, 1.0, 0.5)
+    )
+    np.testing.assert_allclose(half, (shown + flat) / 2, atol=1e-6)
+
+
+@pytest.mark.parametrize("shape", ["voronoi", "triangles"])
+def test_flat_pieces_keep_the_average_colour_of_the_picture(photo, shape) -> None:
+    flat = registry.apply(NAME, photo, pieces=20, offset=0, angle=0, gap=0, fill=1.0, seed=3, shape=shape)
+    np.testing.assert_allclose(flat.mean(axis=(0, 1)), photo.mean(axis=(0, 1)), atol=1e-4)
+
+
+# --- shape: Voronoi pieces or the triangles of the same points -----------------------------------------------------
+
+
+def big_picture() -> np.ndarray:
+    """200 x 200 with a gradient and a little noise, so that every piece has a mean of its own."""
+    rows, cols = np.mgrid[0:200, 0:200].astype(np.float32) / 199
+    noise = np.random.default_rng(8).random((200, 200), dtype=np.float32) * 0.2
+    return np.stack([rows, cols, (rows + cols) / 2], axis=-1) * 0.8 + noise[..., None]
+
+
+def test_voronoi_pieces_number_as_many_as_asked_and_triangles_two_per_point_plus_two() -> None:
+    """Euler's formula: n points inside the picture and b on its edge give 2 n + b - 2 triangles. The edge points are as
+    far apart as the others are, one per sqrt(area / pieces) = 63 px here, so 3 parts to each of the four sides."""
+    settings = {"pieces": 10, "offset": 0, "angle": 0, "gap": 0, "fill": 1.0, "seed": 2}
+    assert len(colours_of(registry.apply(NAME, big_picture(), shape="voronoi", **settings))) == 10
+    assert len(colours_of(registry.apply(NAME, big_picture(), shape="triangles", **settings))) == 2 * 10 + 12 - 2
+
+
+def test_each_triangle_is_moved_by_a_move_of_its_own() -> None:
+    rows, cols, inside = sources(9, pieces=10, offset=8, angle=0, seed=5, shape="triangles")
+    rr, cc = np.mgrid[0:HEIGHT, 0:WIDTH]
+    distinct = np.unique(np.round(np.stack([rows - rr, cols - cc], axis=-1)[inside], 2), axis=0)
+    assert (
+        10 < len(distinct) <= 2 * 10 + 8 - 2
+    )  # more moves than points, at most as many as triangles (4 border points)
+    assert np.abs(distinct).max() <= 8.01
+
+
+def test_triangle_lines_are_drawn_in_the_gap_colour_along_the_sides_between_triangles(photo) -> None:
+    """The gap colour covers whole the pixels near a side, so lines appear where triangles meet and most of the picture
+    is untouched (the picture's own edge is no side: `ops/triangles` is tested for that)."""
+    magenta = np.array([1.0, 0.0, 1.0], np.float32)
+    out = registry.apply(NAME, photo, pieces=12, offset=0, angle=0, gap=3, color="#ff00ff", seed=1, shape="triangles")
+    lines = (out == magenta).all(axis=-1)
+    assert 0.02 < lines.mean() < 0.3
+    assert (out == photo).all(axis=-1).mean() > 0.5  # most of the picture is not touched
+
+
+# --- detail: sites where the picture has detail ----------------------------------------------------------------------
+
+
+def half_noise_half_flat() -> np.ndarray:
+    """Noise on the left; on the right a gradient so gentle (0.0005 a column) that it has next to no edges, and yet
+    every piece on it has an average of its own."""
+    picture = np.empty((HEIGHT, WIDTH, 3), np.float32)
+    picture[:, : WIDTH // 2] = np.random.default_rng(6).random((HEIGHT, WIDTH // 2, 3), dtype=np.float32)
+    picture[:, WIDTH // 2 :] = 0.4 + np.arange(WIDTH // 2, WIDTH, dtype=np.float32)[None, :, None] * 0.0005
+    return picture
+
+
+def test_detail_moves_the_pieces_to_where_the_picture_changes() -> None:
+    """Flat pieces on a picture that is noise on the left and almost plain on the right: each piece is a colour of
+    its own, so counting the colours on either side counts the pieces."""
+    picture = half_noise_half_flat()
+    settings = {"pieces": 60, "offset": 0, "angle": 0, "gap": 0, "fill": 1.0, "seed": 2}
+
+    def pieces_each_side(detail: float) -> tuple[int, int]:
+        out = registry.apply(NAME, picture, detail=detail, **settings)
+        return len(colours_of(out[:, : WIDTH // 2 - 2])), len(colours_of(out[:, WIDTH // 2 + 2 :]))
+
+    even_left, even_right = pieces_each_side(0.0)
+    assert 0.4 < even_left / even_right < 2.5  # without detail the sides share the pieces about evenly
+    detailed_left, detailed_right = pieces_each_side(1.0)
+    assert detailed_left > 4 * detailed_right
+    assert detailed_left > even_left
+
+
+def test_a_part_way_detail_puts_a_part_way_more_pieces_on_the_detailed_side() -> None:
+    picture = half_noise_half_flat()
+    settings = {"pieces": 60, "offset": 0, "angle": 0, "gap": 0, "fill": 1.0, "seed": 2}
+    on_the_noise = [
+        len(colours_of(registry.apply(NAME, picture, detail=d, **settings)[:, : WIDTH // 2 - 2]))
+        for d in (0.0, 0.5, 1.0)
+    ]
+    assert on_the_noise[0] < on_the_noise[1] < on_the_noise[2]
+
+
+@pytest.mark.parametrize("shape", ["voronoi", "triangles"])
+def test_more_pieces_than_pixels_leave_some_pieces_empty_and_still_work_without_a_warning(shape) -> None:
+    tiny = np.random.default_rng(9).random((6, 6, 3), dtype=np.float32)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = registry.apply(NAME, tiny, pieces=500, offset=0, angle=0, fill=1.0, gap=0, shape=shape, seed=1)
+    assert np.isfinite(out).all()
+    np.testing.assert_allclose(out.mean(axis=(0, 1)), tiny.mean(axis=(0, 1)), atol=1e-5)

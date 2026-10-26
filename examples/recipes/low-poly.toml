@@ -1,0 +1,35 @@
+# Low poly: the picture as flat triangles, more of them where it has edges, over a soft wireframe.
+name = "low-poly"
+size = 480
+
+[[step]]
+effect = "shatter"
+shape = "triangles"
+pieces = 480
+offset = 0
+angle = 0
+detail = 0.7
+fill = 1
+gap = 0
+seed = 5
+
+[[step]]
+effect = "shatter"
+shape = "triangles"
+pieces = 480
+offset = 0
+angle = 0
+detail = 0.7
+fill = 0
+gap = 1
+color = "#ffffff"
+seed = 5
+opacity = 0.18
+
+[[step]]
+effect = "grade"
+saturation = 1.25
+
+[[step]]
+effect = "vignette"
+amount = 0.3
