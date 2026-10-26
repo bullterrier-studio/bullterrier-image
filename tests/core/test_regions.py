@@ -827,6 +827,7 @@ BAD_VALUES = {
     "no bands": (DepthBands, {"count": 0}, "count"),
     "too many bands": (DepthBands, {"count": 101}, "count"),
     "a share of a band": (DepthBands, {"count": 2.5}, "count"),
+    "a band count named by its kind as a recipe writes it": (DepthBands, {"count": 0}, "^depth_bands: .*count"),
 }
 
 

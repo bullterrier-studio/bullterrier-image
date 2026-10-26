@@ -29,6 +29,7 @@ Dependency direction: imports `params`, `presets` and `ops`; the steps and the r
 """
 
 import math
+import re
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal
@@ -105,12 +106,13 @@ class Selection:
 
 
 class _Model(EffectParams):
-    """What the declarations share: a bad value is a `RecipeError` naming the kind, the field and the value."""
+    """What the declarations share: a bad value is a `RecipeError` naming the kind (as a recipe writes it,
+    `depth_bands` for `DepthBands`), the field and the value."""
 
     def __init__(self, /, **values: Any) -> None:
         """The declaration of `values` (field name -> value, all optional); RecipeError naming each bad field, the
         constraint and the value, and listing the fields when an unknown one is given."""
-        self._init_checked(type(self).__name__.lower(), **values)
+        self._init_checked(re.sub(r"(?<!^)(?=[A-Z])", "_", type(self).__name__).lower(), **values)
 
 
 class Edge(_Model):
