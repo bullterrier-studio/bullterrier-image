@@ -855,15 +855,20 @@ def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
 
 
-def test_a_piece_finder_that_answers_values_that_are_not_finite_fails_the_recipe_and_says_so(folder):
+def test_a_piece_finder_that_answers_values_that_are_not_finite_fails_the_recipe_and_is_never_remembered(folder):
     project = grid_first_project(folder)
+    asked: list[tuple[int, ...]] = []
 
     def answers_nan(rgb):
+        asked.append(rgb.shape)
         return np.full(rgb.shape[:2], np.nan, np.float32)
 
     by = by_pair(run(project, only="a.png", find_subject=Finder("stand-in", answers_nan)))
     assert by[("a.png", "grid-first")].status == "failed"
     assert "not finite" in str(by[("a.png", "grid-first")].error)
+    assert list(project.cache.glob("crop-*")) == []  # a bad answer is never remembered
+    run(project, only="a.png", force=True, find_subject=Finder("stand-in", answers_nan))
+    assert len(asked) == 2  # so the next run asks again
 
 
 def test_another_photo_and_a_recipe_that_cuts_other_pieces_ask_about_their_own_crops(folder):

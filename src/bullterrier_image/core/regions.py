@@ -70,6 +70,7 @@ __all__ = [
     "check",
     "check_map",
     "look_weights",
+    "map_problem",
     "needs",
     "needs_depth",
     "needs_finder",
@@ -546,14 +547,20 @@ Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject | Depth | DepthBands
 BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
 
 
-def check_map(name: str, layer: np.ndarray, error: type[SubjectNotFoundError | DepthNotFoundError]) -> np.ndarray:
-    """`layer`, once it is known to be finite and within 0..1; else `error` naming the map `name`, what is wrong and the
-    least and greatest value. The one check of the values of a map that enters from outside (a matte or depth map
-    given or found, a piece finder's answer)."""
+def map_problem(layer: np.ndarray) -> str | None:
+    """What is wrong with the values of the map `layer`, with its least and greatest value; None when they are finite
+    and within 0..1. The one rule for the values of a map that enters from outside (a matte or depth map given or
+    found, a piece finder's answer)."""
     finite, low, high = bool(np.isfinite(layer).all()), float(layer.min()), float(layer.max())
     problem = "that are not finite" if not finite else "below 0" if low < 0 else "above 1" if high > 1 else None
-    if problem:
-        raise error(f"{name} has values {problem} (min {low:g}, max {high:g}): a map must be finite and within 0..1")
+    return None if problem is None else f"values {problem} (min {low:g}, max {high:g})"
+
+
+def check_map(name: str, layer: np.ndarray, error: type[SubjectNotFoundError | DepthNotFoundError]) -> np.ndarray:
+    """`layer`, once its values are known to be finite and within 0..1; else `error` naming the map `name` and
+    `map_problem`'s answer."""
+    if (problem := map_problem(layer)) is not None:
+        raise error(f"{name} has {problem}: a map must be finite and within 0..1")
     return layer
 
 

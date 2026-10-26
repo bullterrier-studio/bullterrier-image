@@ -55,7 +55,7 @@ from . import finding, imageio
 from .checks import matte_warnings, still_warnings
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
-from .core.regions import Svg
+from .core.regions import Svg, map_problem
 from .core.runner import Finder, find_map
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .finding.depth import depth_finder
@@ -432,8 +432,9 @@ class _Photo:
         """The subject matte of `crop`, a part of one of this photo's working pictures (a recipe's `Subject` with `per`
         asks about each piece), from the on-disk cache when the same finder has been asked about the same pixels before:
         a repeat run asks the model nothing. A crop in which nothing stands out is remembered as an empty matte, so
-        the finder is not asked again about it either. The key is the finder, the photo and the crop's pixels, whatever
-        recipe, framing or size made it."""
+        the finder is not asked again about it either. An answer whose values are not finite and within 0..1 is
+        returned as it is, for the runner to refuse, and never remembered. The key is the finder, the photo and the
+        crop's pixels, whatever recipe, framing or size made it."""
         pixels = np.ascontiguousarray(crop)
         key = _fingerprint(self.digest, self.found_by["matte"], str(pixels.shape), hashlib.sha256(pixels).hexdigest())
         cached = _inside(self.project.output, self.project.cache / f"crop-{key}.npz")
@@ -444,7 +445,8 @@ class _Photo:
             matte = np.asarray(self.finders["matte"].find(pixels), np.float32)
         except SubjectNotFoundError:
             matte = np.zeros(pixels.shape[:2], np.float32)
-        return _keep(cached, matte)
+        # not raised here: the runner reads SubjectNotFoundError from a finder as "nothing in this piece"
+        return matte if map_problem(matte) is not None else _keep(cached, matte)
 
 
 def _remembered(cached: Path, shape: tuple[int, ...]) -> np.ndarray | None:
