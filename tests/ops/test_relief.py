@@ -140,6 +140,28 @@ class TestShade:
         gain = lit(ramp(rise_per_px), **settings)
         np.testing.assert_allclose(gain[:, 1:-1], expected, atol=1e-5)  # a float32 surface
 
+    @pytest.mark.parametrize(
+        ("edge", "first_column_slope"),
+        [
+            pytest.param("reflect", 0.75 / 2, id="reflect repeats the edge pixel: half the slope"),
+            pytest.param("nearest", 0.75 / 2, id="nearest repeats the edge pixel: half the slope"),
+            pytest.param("mirror", 0.0, id="mirror reflects about the edge pixel: flat"),
+            pytest.param("wrap", -0.75 * 22 / 2, id="wrap sees the far side, 23 steps higher: a steep drop"),
+        ],
+    )
+    def test_edge_decides_the_slope_of_the_first_column(self, edge: Edge, first_column_slope: float) -> None:
+        """A ramp 24 px wide rising 3/4 px per px: its first column's neighbour beyond the edge is the edge rule's."""
+        gain = shade(ramp(0.0075), height=100, angle=90, elevation=45, blur=0, truncate=4, edge=edge)
+        np.testing.assert_allclose(gain[:, 0], hand_gain(first_column_slope, 90, 45), atol=1e-5)
+
+    def test_edge_wrap_reaches_the_blur_too_so_a_tile_lights_without_a_seam(self) -> None:
+        """Under 'wrap' the surface is a tile: shifting it round shifts its lighting the same way, border included."""
+        tile = np.random.default_rng(4).random((20, 26), dtype=np.float32)
+        shifted = np.roll(tile, (7, 11), axis=(0, 1))
+        gain = shade(tile, height=5, angle=90, elevation=45, blur=3, truncate=4, edge="wrap")
+        gain_of_shifted = shade(shifted, height=5, angle=90, elevation=45, blur=3, truncate=4, edge="wrap")
+        np.testing.assert_allclose(gain_of_shifted, np.roll(gain, (7, 11), axis=(0, 1)), atol=1e-5)
+
     def test_blur_smooths_the_surface_so_a_spike_lights_less_steeply(self) -> None:
         spike = np.zeros((31, 31), np.float32)
         spike[15, 15] = 1.0

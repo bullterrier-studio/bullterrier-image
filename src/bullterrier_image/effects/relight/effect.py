@@ -75,6 +75,8 @@ def relight(rgb: np.ndarray, params: RelightParams, *, depth: np.ndarray | None 
     central differences. The light's strength is the normal's dot product with the light's direction in proportion to
     what a flat surface gets, so flat areas are unchanged and a slope is brightened or darkened. All channels are
     multiplied by that one grey gain, so the picture's colour ratios are kept, and the result is clipped to 0..1.
+    A sharp step in depth (a subject's outline) lights as a steep cliff and can leave a dark or bright fringe on the
+    background beside it; raise `blur` or lower `height` to soften it.
     `depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
     1 = nearest. Without a depth the picture is unchanged.
     """
