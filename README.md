@@ -688,8 +688,9 @@ commit. Pictures that exist are kept (`uv run poe gallery --force` renders them 
 Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
 [CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook, unless it changes only documentation (pages and `docs/images/`); pushes to other branches are checked by CI when the pull request opens.
 
-The test of Apple Vision is skipped off macOS. The portable backend is tested with tiny stand-in models built in the tests: the suite never
-downloads the real model, and its one test of the real model runs only when the model is already in the cache.
+The test of Apple Vision is skipped off macOS. The portable subject backend and the depth model are tested with tiny
+stand-in models built in the tests: the suite never downloads a real model, and its tests of the real models run only
+when they are already in the cache and assert coarse properties (a model update may change every pixel).
 
 ## License
 

@@ -229,24 +229,24 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
   input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
-- **Depth is injected like the subject** (built: the input, `depth=`, `find_depth=`, `--depth`, `load_depth`, framing,
-  the pipeline's cache, the region kinds `Depth` and `DepthBands`, the default model and the gallery's use of it; not
-  built yet: the depth effects and the `depth_haze` and `depth_grade` recipes). An effect that
-  needs distance (`depth_of_field`, `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1,
-  1 = nearest. The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
-  `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default: Depth Anything V2 Small
-  (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded
-  like the portable subject model (`BT_IMAGE_DEPTH_MODEL` for a local copy); `--depth` (or `depth=`) takes a map you
-  already have (brightness, white = near). The model sees the photo bicubic-scaled to a short side of 518 px, both sides
-  rounded to multiples of 14, as the original repository feeds it (the export's `preprocessor_config.json` scales by
-  whichever side needs the least, which fits a photo under 518 px by its long side); its inverse depth is stretched
-  bilinear to the photo's size, then min-max scaled per photo (a flat answer gives zeros). The input keeps the
-  photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory; there is no cap. Decided:
+- **Depth is injected like the subject.** An effect that needs distance (`depth_of_field`, `parallax`, `relight`,
+  `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; the depth regions read it too.
+  The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
+  `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default:
+  Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against
+  a SHA-256, downloaded like the portable subject model (`BT_IMAGE_DEPTH_MODEL` for a local copy); `--depth` (or
+  `depth=`) takes a map you already have (brightness, white = near). The model sees the photo bicubic-scaled to a short
+  side of 518 px, both sides rounded to multiples of 14, as the original repository feeds it (the export's
+  `preprocessor_config.json` scales by whichever side needs the least, which fits a photo under 518 px by its long
+  side); its inverse depth is stretched bilinear to the photo's size, then min-max scaled per photo (a flat answer gives
+  zeros). The input keeps the photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory;
+  there is no cap. Further:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
   - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth
     scale with 0 = farthest; `far` above `near` is a `RecipeError`) and `DepthBands` (`kind = "depth_bands"`, a partition into
-    `count` equal ranges, 3 by default, 1 to 100); `depth_haze` and `depth_grade` are recipes over them, not effects;
+    `count` equal ranges, 3 by default, 1 to 100); `depth-haze` and `depth-grade` are recipes over them
+    (`examples/recipes/`), not effects;
   - framing pads the depth map with 0 (farthest), like the matte;
   - `imageio.load_depth(path)` reads a map you already have; no depth found is `DepthNotFoundError` (a
     `BullterrierImageError` and a `RuntimeError`); the gallery runs the real model, like the matte.
@@ -256,11 +256,18 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Determinism
 
-- **Same inputs and seed give the same output on the same machine and library versions; across platforms equal within float
-  tolerance.** Stochastic code takes `seed: int` and uses `numpy.random.default_rng(seed)`, never global random state.
+- **Same inputs and seed give the same output on the same machine, library versions and models; across platforms equal
+  within float tolerance.** Stochastic code takes `seed: int` and uses `numpy.random.default_rng(seed)`, never global
+  random state.
   *Reason:* BLAS, SIMD and library builds round differently, so "any machine" cannot be promised byte for byte; caching,
   debugging and reviews need repeatable output on one setup. *Consequence:* byte-identical comparison is the proof for
   refactors; tests assert properties with tolerances, not exact pixels.
+- **External models are replaceable assets, not frozen.** A new subject or depth model changes outputs, and that is
+  accepted; determinism holds for a given model. Updating one changes its URL, SHA-256 and size in its one module
+  (`finding/_isnet.py`, `finding/_depth_anything.py`); the cached copy with the old digest is replaced on next use, and
+  the finder's identity is the model's SHA-256, so the pipeline's cache finds every photo again on the next run. Tests
+  never pin a model's output: logic is tested with stand-in models, a test of a real model asserts coarse properties
+  only. *Reason:* better models keep appearing, and pulling one in should be cheap.
 
 ## Performance
 

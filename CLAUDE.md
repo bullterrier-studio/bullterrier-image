@@ -71,8 +71,8 @@ or `find_depth`); `bullterrier_image.recipe` binds `finding.subject.subject_find
    the registry, `__init__`, README, `fx.pyi` or `docs/effects/` for a new effect means something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including library options, is a named, documented parameter in the
    field's own terms. Exempt: mathematical and standard constants, each cited in a comment.
-6. **Determinism:** same inputs and `seed` give the same output on the same machine and library versions; across platforms equal
-   within float tolerance. `numpy.random.default_rng(seed)`; no global random state.
+6. **Determinism:** same inputs and `seed` give the same output on the same machine, library versions and models; across
+   platforms equal within float tolerance. `numpy.random.default_rng(seed)`; no global random state.
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
    (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `DepthNotFoundError`, `BackendUnavailableError`,
