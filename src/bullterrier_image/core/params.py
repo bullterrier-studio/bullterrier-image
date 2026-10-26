@@ -31,7 +31,6 @@ Promises:
 import hashlib
 import inspect
 import math
-import numbers
 import os
 import re
 import textwrap
@@ -499,7 +498,7 @@ def _into_turn(low: float) -> Callable[[Any], Any]:
     anything else (a bool, text, nan, infinity) on for the field's own strict check to refuse."""
 
     def wrap(value: Any) -> Any:
-        if isinstance(value, bool) or not isinstance(value, numbers.Real) or not math.isfinite(value):
+        if not _is_number(value) or not math.isfinite(value):
             return value
         if low <= value <= low + _TURN:
             return value
