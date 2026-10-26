@@ -17,10 +17,10 @@ from scipy import ndimage
 
 from bullterrier_image import RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
+    BoxFinder,
     Curve,
     Cuts,
     Edge,
-    Finder,
     Grid,
     Kind,
     Line,
@@ -65,7 +65,7 @@ def finder(shape: Shape) -> Callable[[], np.ndarray]:
     return lambda: disc(shape)
 
 
-def true_boundary(shape: Shape) -> Finder:
+def true_boundary(shape: Shape) -> BoxFinder:
     """A finder for a picture of `shape` that answers with the disc where it lies in the box asked about: the subject
     exactly as the picture has it, however the picture is cut (the model's stand-in at the external boundary)."""
     whole = disc(shape)
@@ -889,7 +889,7 @@ def test_making_the_pieces_of_a_1_mp_picture_needs_a_bounded_amount_of_memory(ki
 class Recorder:
     """A finder that records the boxes it is asked about and answers by `answer(box)`: the model's stand-in."""
 
-    def __init__(self, answer: Finder) -> None:
+    def __init__(self, answer: BoxFinder) -> None:
         self.answer = answer
         self.boxes: list[tuple[int, int, int, int]] = []
 
@@ -903,7 +903,7 @@ def size_of(box: tuple[int, int, int, int]) -> tuple[int, int]:
     return box[3] - box[1], box[2] - box[0]
 
 
-def found(find: Finder, shape: Shape = (20, 30), per: Kind | None = None, **fields: object) -> np.ndarray:
+def found(find: BoxFinder, shape: Shape = (20, 30), per: Kind | None = None, **fields: object) -> np.ndarray:
     """The alpha of `Subject(per="panes", **fields)` over `shape`: a 2 x 2 grid (or `per`) found in by `find`."""
     regions = resolve(
         {"panes": per or Grid(columns=2, rows=2), "it": Subject(per="panes", **fields)}, shape, subject=None, find=find

@@ -2,16 +2,18 @@ import json
 import os
 import subprocess
 import sys
+from functools import partial
 from pathlib import Path
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from bullterrier_image import Each, Grid, Picture, Project, Recipe, fx, imageio
+from bullterrier_image import Each, Finder, Grid, Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.errors import BackendUnavailableError, ProjectError, SubjectNotFoundError
+from bullterrier_image.finding.subject import subject_finder
 from bullterrier_image.pipeline import init_project, load_project, run
 
 
@@ -37,6 +39,10 @@ def folder(tmp_path, photo):
     write_recipe(tmp_path, "warm", 'effect = "grade"\nexposure = 0.3')
     write_project(tmp_path, '[export]\nformats = ["jpg", "png"]\n')
     return tmp_path
+
+
+def recipes_redone(items):
+    return sorted({i.recipe for i in items if i.status == "done"})
 
 
 def by_pair(items) -> dict:
@@ -298,11 +304,11 @@ def test_the_subject_is_found_once_per_photo_and_remembered_between_runs(folder)
     masked_recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "bt-image.toml")
-    run(project, subject=finder)
+    run(project, find_subject=Finder("stand-in", finder))
     assert len(finder.seen) == 2  # two photos; two of the four recipes need the subject, and ask once per photo
     photos = sorted(imageio.load(folder / "photos" / name).tobytes() for name in ("a.png", "b.png"))
     assert sorted(seen.tobytes() for seen in finder.seen) == photos  # each photo itself, at full size
-    run(project, force=True, subject=finder)
+    run(project, force=True, find_subject=Finder("stand-in", finder))
     assert len(finder.seen) == 2  # redoing everything reads the remembered subject instead of looking again
 
 
@@ -310,46 +316,52 @@ def test_a_damaged_remembered_subject_is_found_again_even_when_forcing(folder):
     masked_recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "bt-image.toml")
-    run(project, subject=finder)
+    run(project, find_subject=Finder("stand-in", finder))
     for remembered in project.cache.iterdir():  # cut short, as by a full disk or a crash
         remembered.write_bytes(remembered.read_bytes()[:40])
-    assert {i.status for i in run(project, force=True, subject=finder)} == {"done"}
+    assert {i.status for i in run(project, force=True, find_subject=Finder("stand-in", finder))} == {"done"}
     assert len(finder.seen) == 4  # both photos searched again
-    run(project, force=True, subject=finder)
+    run(project, force=True, find_subject=Finder("stand-in", finder))
     assert len(finder.seen) == 4  # and what was found again is remembered
 
 
-def finds_a_wide_disc(rgb):
-    return disc_matte(rgb.shape[:2], 30)
+def finds_a_disc(rgb, radius):
+    return disc_matte(rgb.shape[:2], radius)
 
 
-def finds_a_narrow_disc(rgb):
-    return disc_matte(rgb.shape[:2], 3)
+# A second run with a finder of a wide disc's answers replaced by a narrow disc's (one function, other options): known
+# by its identity alone, so another identity redoes what uses the subject and the same one reuses what is remembered.
+SECOND_FINDERS = {
+    "another identity finds the subjects again for the recipes that use them": ("narrow disc", ["cut1", "cut2"], True),
+    "the same identity reuses the remembered subjects, whatever the function": ("wide disc", [], False),
+}
 
 
-def test_switching_the_subject_finder_finds_the_subjects_again(folder):
+@pytest.mark.parametrize(("identity", "redone", "changed"), SECOND_FINDERS.values(), ids=SECOND_FINDERS.keys())
+def test_a_finder_is_known_by_its_identity(folder, identity, redone, changed):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
-    run(project, subject=finds_a_wide_disc)
-    items = run(project, subject=finds_a_narrow_disc)
-    assert sorted((i.recipe, i.status) for i in items if i.photo == "a.png") == [
-        ("cut1", "done"), ("cut2", "done"), ("grainy", "skipped"), ("warm", "skipped"),
-    ]  # fmt: skip
-    assert all("covers only" in i.warnings[0] for i in items if i.recipe == "cut1")  # the new finder's small disc
-
-
-def recipes_redone(items):
-    return sorted({i.recipe for i in items if i.status == "done"})
+    run(project, find_subject=Finder("wide disc", partial(finds_a_disc, radius=30)))
+    picture = folder / "out" / "a" / "cut1.png"
+    before = picture.read_bytes()
+    items = run(project, find_subject=Finder(identity, partial(finds_a_disc, radius=3)))
+    assert recipes_redone(items) == redone
+    assert (picture.read_bytes() != before) is changed  # the narrow disc's cut-out, or the remembered wide one
 
 
 def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(folder, echo_model, monkeypatch):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
-    assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2", "grainy", "warm"]
-    assert recipes_redone(run(project, subject="onnx")) == []  # same segmenter and model: everything is up to date
+    assert recipes_redone(run(project, find_subject=subject_finder("onnx"))) == ["cut1", "cut2", "grainy", "warm"]
+    assert (
+        recipes_redone(run(project, find_subject=subject_finder("onnx"))) == []
+    )  # same segmenter and model: everything is up to date
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))  # another model finds other subjects
-    assert recipes_redone(run(project, subject="onnx")) == ["cut1", "cut2"]  # only what uses the subject is redone
+    assert recipes_redone(run(project, find_subject=subject_finder("onnx"))) == [
+        "cut1",
+        "cut2",
+    ]  # only what uses the subject is redone
 
 
 def test_the_segmenter_chosen_by_the_environment_is_part_of_what_is_remembered(folder, echo_model, monkeypatch):
@@ -379,8 +391,8 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
             raise KeyboardInterrupt  # Ctrl-C
 
     with pytest.raises(KeyboardInterrupt):
-        run(project, subject=finder, log=interrupted_at_the_second_photo)
-    items = run(project, subject=finder)
+        run(project, find_subject=Finder("stand-in", finder), log=interrupted_at_the_second_photo)
+    items = run(project, find_subject=Finder("stand-in", finder))
     assert sorted((i.photo, i.recipe, i.status) for i in items) == [
         ("a.png", "cut1", "skipped"), ("a.png", "cut2", "skipped"), ("a.png", "grainy", "skipped"),
         ("a.png", "warm", "skipped"), ("b.png", "cut1", "skipped"), ("b.png", "cut2", "done"),
@@ -391,7 +403,7 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
 def test_a_photo_with_no_subject_fails_only_the_recipes_that_need_one_and_is_searched_once(folder):
     masked_recipes(folder)
     finder = StandInFinder(error=RuntimeError("no subject found in the picture"))
-    by = by_pair(run(load_project(folder / "bt-image.toml"), subject=finder))
+    by = by_pair(run(load_project(folder / "bt-image.toml"), find_subject=Finder("stand-in", finder)))
     for recipe in ("cut1", "cut2"):
         assert by[("a.png", recipe)].status == "failed"
         assert "no subject" in str(by[("a.png", recipe)].error)
@@ -406,7 +418,7 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
     def finds_nothing(rgb):
         return None  # a broken finder, typed loosely on purpose: the point of the test
 
-    by = by_pair(run(load_project(folder / "bt-image.toml"), subject=finds_nothing))
+    by = by_pair(run(load_project(folder / "bt-image.toml"), find_subject=Finder("stand-in", finds_nothing)))
     assert by[("a.png", "cut1")].status == "failed"
     assert "`find_subject` returned None" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "grainy")].status == "done"
@@ -414,7 +426,7 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
 
 def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder):
     masked_recipes(folder)
-    items = run(load_project(folder / "bt-image.toml"), subject=StandInFinder(radius=3))
+    items = run(load_project(folder / "bt-image.toml"), find_subject=Finder("stand-in", StandInFinder(radius=3)))
     cut = [i for i in items if i.recipe == "cut1"]
     assert {i.status for i in cut} == {"done"}
     assert all("covers only" in i.warnings[0] for i in cut)
@@ -596,7 +608,7 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     assert (tmp_path / "new" / "photos").is_dir()
     imageio.save(photo, tmp_path / "new" / "photos" / "one.jpg")
     finder = StandInFinder()  # cutout-black needs the subject; the stand-in keeps the model out of the test
-    items = run(load_project(target), subject=finder)
+    items = run(load_project(target), find_subject=Finder("stand-in", finder))
     assert sorted((i.recipe, i.status) for i in items) == [("cutout-black", "done"), ("glitch", "done")]
     assert len(finder.seen) == 1
     with pytest.raises(FileExistsError):
@@ -698,11 +710,11 @@ def grid_first_project(folder) -> Project:
 def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_not_asked_again(folder):
     project = grid_first_project(folder)
     finder = PieceFinder()
-    run(project, only="a.png", subject=finder)
+    run(project, only="a.png", find_subject=Finder("stand-in", finder))
     assert len(finder.crops) == 4  # one for each piece of the picture, at the recipe's size
     assert {crop.shape for crop in finder.crops} == {(24, 32, 3)}
     first = (folder / "out" / "a" / "grid-first.png").read_bytes()
-    run(project, only="a.png", force=True, subject=finder)
+    run(project, only="a.png", force=True, find_subject=Finder("stand-in", finder))
     assert len(finder.crops) == 4  # the repeat render reads what was found
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first  # and comes out the same picture
 
@@ -710,9 +722,9 @@ def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_no
 def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
     project = grid_first_project(folder)
     finder = PieceFinder(empty=(1, 3))
-    run(project, only="a.png", subject=finder)
+    run(project, only="a.png", find_subject=Finder("stand-in", finder))
     first = (folder / "out" / "a" / "grid-first.png").read_bytes()
-    run(project, only="a.png", force=True, subject=finder)
+    run(project, only="a.png", force=True, find_subject=Finder("stand-in", finder))
     assert len(finder.crops) == 4
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
 
@@ -720,33 +732,28 @@ def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
 def test_another_photo_and_a_recipe_that_cuts_other_pieces_ask_about_their_own_crops(folder):
     project = grid_first_project(folder)
     finder = PieceFinder()
-    run(project, subject=finder)
+    run(project, find_subject=Finder("stand-in", finder))
     assert len(finder.crops) == 8  # a.png and b.png (the photo flipped) have other pixels in their pieces
     (folder / "recipes" / "grid-first.toml").write_text(
         GRID_FIRST_RECIPE.replace("columns = 2", "columns = 3"), encoding="utf-8"
     )
-    run(project, only="a.png", subject=finder)
+    run(project, only="a.png", find_subject=Finder("stand-in", finder))
     assert len(finder.crops) == 8 + 6  # other pieces of the same photo: other crops, asked about once each
 
 
-def finds_a_square(rgb):
+def finds_a_square(rgb, start, stop):
     matte = np.zeros(rgb.shape[:2], np.float32)
-    matte[2:8, 2:8] = 1
+    matte[start:stop, start:stop] = 1
     return matte
 
 
-def finds_another_square(rgb):
-    matte = np.zeros(rgb.shape[:2], np.float32)
-    matte[4:9, 4:9] = 1
-    return matte
-
-
-def test_switching_the_finder_finds_the_pieces_again(folder):
+def test_a_finder_of_another_identity_finds_the_pieces_again(folder):
     project = grid_first_project(folder)
-    run(project, only="a.png", subject=finds_a_square)
+    run(project, only="a.png", find_subject=Finder("square 2..8", partial(finds_a_square, start=2, stop=8)))
     picture = folder / "out" / "a" / "grid-first.png"
     before = picture.read_bytes()
-    by_recipe = {i.recipe: i.status for i in run(project, only="a.png", subject=finds_another_square)}
+    another = Finder("square 4..9", partial(finds_a_square, start=4, stop=9))
+    by_recipe = {i.recipe: i.status for i in run(project, only="a.png", find_subject=another)}
     assert by_recipe["grid-first"] == "done"  # a recipe that uses what the finder finds is redone
     assert by_recipe["grainy"] == "skipped"
     assert picture.read_bytes() != before  # the other finder's squares, not the remembered ones

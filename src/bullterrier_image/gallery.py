@@ -87,7 +87,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
         recipe = load_recipe(files.example)
         if recipe.needs_matte and matte is None:
             matte = subject_matte(photo)  # once for all the recipes that need it
-        picture = render(photo, recipe, matte)
+        picture = render(photo, recipe, matte=matte)
         files.picture.parent.mkdir(parents=True, exist_ok=True)
         imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo

@@ -46,10 +46,10 @@ from .params import EffectParams, param
 from .presets import SHIPPED, read
 
 __all__ = [
+    "BoxFinder",
     "Curve",
     "Cuts",
     "Edge",
-    "Finder",
     "Grid",
     "Kind",
     "Line",
@@ -481,7 +481,7 @@ class Subject(_Model):
 Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject
 # Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
 # left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
-Finder = Callable[[tuple[int, int, int, int]], np.ndarray]
+BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
 
 
 def _frozen(array: np.ndarray) -> np.ndarray:
@@ -742,7 +742,7 @@ class Regions(Mapping[str, Partition | Selection]):
         declared: Mapping[str, Kind],
         shape: tuple[int, int],
         subject: Callable[[], np.ndarray] | None,
-        find: Finder | None,
+        find: BoxFinder | None,
     ) -> None:
         """Made by `resolve`, which checks `declared` first."""
         self._declared, self._shape, self._subject, self._find = declared, shape, subject, find
@@ -962,15 +962,15 @@ def resolve(
     shape: tuple[int, int],
     *,
     subject: Callable[[], np.ndarray] | None,
-    find: Finder | None = None,
+    find: BoxFinder | None = None,
 ) -> Regions:
     """The regions `declared` (name -> kind) make over a picture of `shape` (height, width), plus the built-in
     `subject` and `background`, built when asked for (`regions[name]`).
 
     `subject` finds the subject: a function returning its matte, float `(height, width)` in 0..1, called at most once
     and only if a region needs it (this module never loads a picture or a model); None when there is no finder.
-    `find` finds the subject inside a box of the picture (see `Finder`), once for each piece of a `Subject` with `per`;
-    None when there is none.
+    `find` finds the subject inside a box of the picture (see `BoxFinder`), once for each piece of a `Subject` with
+    `per`; None when there is none.
 
     Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
     naming the region and the valid names."""

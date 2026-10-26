@@ -56,9 +56,9 @@ from .checks import matte_warnings, still_warnings
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
 from .core.regions import Svg
-from .core.runner import subject_from
+from .core.runner import Finder, subject_from
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
-from .finding.subject import segmenter_identity, subject_matte
+from .finding.subject import subject_finder
 from .ops.resample import resize
 from .recipe import Recipe, load_recipe, render, trace
 from .sheet import write_stages
@@ -230,7 +230,7 @@ def run(
     dry_run: bool = False,
     only: str | None = None,
     log: Callable[[str], None] = lambda message: None,
-    subject: Callable[[np.ndarray], np.ndarray] | str | None = None,
+    find_subject: Finder | None = None,
 ) -> list[Item]:
     """Process every photo with every recipe and write the report; returns what happened to each pair.
 
@@ -239,17 +239,16 @@ def run(
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
     (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
     (a framing with `transparent`) exported to jpg, raise ProjectError.
-    `subject` says how the subject of a photo, for the recipes that need it, is found: the name of a segmenter for
-    `subject_matte` (see `bullterrier_image.finding.subject`; None leaves the choice to the environment, then to the
-    portable model), or a function `subject(rgb) -> matte` of your own. It is asked at most once per photo, and never
-    again for a photo whose subject is remembered in the project's cache from an earlier run by the same finder; if it
-    raises, the recipes of that photo that need the subject fail, and the rest run. The default finder is known by its
-    `segmenter_identity` (the backend and its model), so switching segmenter or model finds the subjects again and
-    redoes the recipes that use them (BackendUnavailableError at once if it cannot run). A function of your own is
-    known by its qualified name alone, a callable object by its class: give one whose answers differ another name or
-    delete `project.cache`. A damaged cache entry is found again, also with `force`. A recipe whose regions find the
-    subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working picture, once for each
-    crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
+    `find_subject` finds the subject of a photo for the recipes that need it; None means
+    `bullterrier_image.finding.subject.subject_finder()` (the segmenter the environment chooses, else the portable
+    model), built only when a recipe needs the subject (BackendUnavailableError at once if it cannot run). It is asked
+    at most once per photo, and never again for a photo whose subject is remembered in the project's cache from an
+    earlier run by a finder of the same `identity`; if it raises, the recipes of that photo that need the subject fail,
+    and the rest run. A finder is known by its `identity` alone: another identity finds the subjects again and redoes
+    the recipes that use them, the same identity reuses what is remembered, so give a finder whose answers could differ
+    another identity (or delete `project.cache`). A damaged cache entry is found again, also with `force`. A recipe
+    whose regions find the subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working
+    picture, once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -277,9 +276,13 @@ def run(
         )
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
-    # (only asked of the segmenter when a recipe needs the subject: a setting nobody uses cannot stop the project)
-    subject_key = _subject_key(subject) if any(r.needs_matte or r.needs_finder for _, r in recipes) else ""
-    finder = subject if callable(subject) else functools.partial(subject_matte, segmenter=subject)
+    # the default finder is built only when a recipe needs the subject: a setting nobody uses cannot stop the project.
+    # What a remembered subject depends on besides the photo: the finder's identity, the subject-finding code (the edge
+    # clean-up is part of what is remembered) and the libraries.
+    finder, subject_key = None, ""
+    if any(r.needs_matte or r.needs_finder for _, r in recipes):
+        finder = subject_finder() if find_subject is None else find_subject
+        subject_key = _fingerprint(finder.identity, _source_digest(Path(finding.__file__).parent), _library_versions())
     items: list[Item] = []
     total = len(photos) * len(recipes)
     for photo in photos:
@@ -366,12 +369,12 @@ def _write_record(
 @dataclass
 class _Photo:
     """One photo while its recipes run: read and analysed once, on first use. `subject_key` names its remembered
-    subject: the photo's content and what finds the subject."""
+    subject: the photo's content and what finds the subject. `finder` is None when no recipe needs the subject."""
 
     path: Path
     subject_key: str
     project: Project
-    find_subject: Callable[[np.ndarray], np.ndarray]
+    finder: Finder | None
     _rgb: np.ndarray | None = field(default=None, repr=False)
     _matte: np.ndarray | None = field(default=None, repr=False)
     _matte_error: Exception | None = field(default=None, repr=False)
@@ -390,7 +393,8 @@ class _Photo:
             self._matte = _remembered(cached, self.rgb().shape[:2])
             if self._matte is None:
                 try:
-                    self._matte = subject_from(self.find_subject, self.rgb())  # analyse
+                    # analyse (`run` gave a finder: a recipe needs the subject)
+                    self._matte = subject_from(self.finder, self.rgb())  # type: ignore[arg-type]  # see above
                 except Exception as error:  # remembered, so the photo's other recipes fail without asking again
                     self._matte_error = error
                     raise
@@ -413,7 +417,7 @@ class _Photo:
         if remembered is not None:
             return remembered
         try:
-            matte = np.asarray(self.find_subject(pixels), np.float32)
+            matte = np.asarray(self.finder.find(pixels), np.float32)  # type: ignore[union-attr]  # a recipe needs it
         except SubjectNotFoundError:
             matte = np.zeros(pixels.shape[:2], np.float32)
         packed = io.BytesIO()
@@ -472,10 +476,11 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
         warnings += matte_warnings(matte, project.subject_share)
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
-    find = photo.find_in_crop if recipe.needs_finder else None
-    stages = trace(photo.rgb(), recipe, matte, find_subject=find) if project.steps else None
+    # the photo's own finder of pieces: its answers depend on the photo and the finder, as `subject_key` does
+    find = Finder(photo.subject_key, photo.find_in_crop) if recipe.needs_finder else None
+    stages = trace(photo.rgb(), recipe, matte=matte, find_subject=find) if project.steps else None
     # style (a trace ends in the render)
-    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte, find_subject=find)
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte=matte, find_subject=find)
     warnings += still_warnings(image)  # check
     outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None
@@ -562,18 +567,6 @@ def _library_versions() -> str:
         except metadata.PackageNotFoundError:  # onnxruntime is optional
             continue
     return "; ".join(versions)
-
-
-def _subject_key(subject: Callable[[np.ndarray], np.ndarray] | str | None) -> str:
-    """What a remembered subject depends on besides the photo: who finds it (for the default finder the segmenter that
-    would run, its backend and model; for a finder of the caller's its qualified name, a callable object being known by
-    its class), the subject-finding code (the edge clean-up is part of what is remembered) and the libraries."""
-    if callable(subject):
-        name = getattr(subject, "__qualname__", type(subject).__qualname__)
-        finder = f"finder {subject.__module__}.{name}"
-    else:
-        finder = f"segmenter {segmenter_identity(subject)}"
-    return _fingerprint(finder, _source_digest(Path(finding.__file__).parent), _library_versions())
 
 
 def _read_manifest(output: Path) -> list[Item]:

@@ -1,7 +1,8 @@
 """Finding the subject of a picture: the person, pet or object that stands out.
 
 One question, one answer: `subject_matte(rgb)` returns how much each pixel belongs to the subject (1) or to the
-background (0), at the picture's own size. Two backends can answer it:
+background (0), at the picture's own size; `subject_finder()` is the same as a `Finder` that the renderers take
+(`find_subject=`), named by its backend and model. Two backends can answer it:
 
 - `"onnx"`, the default everywhere: a portable model, IS-Net (general use, Apache-2.0), run by ONNX Runtime on macOS,
   Linux and Windows, so a recipe cuts the same on every machine. The model (about 180 MB) is not part of the package:
@@ -19,6 +20,7 @@ No model at all is needed when the caller already has the subject's matte: every
 black-and-white or transparent PNG with `imageio.load_matte`, or pass `--matte` on the command line).
 """
 
+import functools
 import hashlib
 import os
 import platform
@@ -28,6 +30,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from bullterrier_image.core.runner import Finder
 from bullterrier_image.errors import BackendUnavailableError, SubjectNotFoundError
 
 from . import _isnet, _vision
@@ -77,25 +80,28 @@ def onnx_model_path() -> Path:
     return Path(local) if local else user_cache_dir() / _isnet.MODEL_FILE
 
 
-def segmenter_identity(segmenter: str | None = None) -> str:
-    """Which segmenter would run, as text that changes exactly when its answers could: the backend and its model.
+def subject_finder(segmenter: str | None = None) -> Finder:
+    """`subject_matte` with its default edge clean-up, as a `Finder`: the segmenter is chosen now and kept.
 
     `segmenter` is as for `subject_matte`, and is chosen the same way (the argument, then `BT_IMAGE_SEGMENTER`, then the
-    portable model). For the portable model that is a hash of the model: the pinned one when the standard model is meant
-    (it is not downloaded to find out), else of the file `BT_IMAGE_SUBJECT_MODEL` names, so the same model at another
-    path is the same segmenter; for Apple Vision it is the macOS version, whose release brings the model. Use it to
-    remember subjects between runs. Raises BackendUnavailableError exactly where `subject_matte` would, naming what
-    was tried.
+    portable model). The identity names the backend and its model, so it changes exactly when the answers could: for
+    the portable model a hash of the model, the pinned one when the standard model is meant (it is not downloaded to
+    find out), else of the file `BT_IMAGE_SUBJECT_MODEL` names, so the same model at another path is the same finder;
+    for Apple Vision the macOS version, whose release brings the model. Raises BackendUnavailableError for an unknown
+    segmenter name (naming the choices) or a backend that cannot run here, naming what was tried.
     """
     name, why = _choose(segmenter)
     if name == "vision":
         _require_vision(why)
-        return f"vision:macOS {platform.mac_ver()[0]}"
-    custom = _local_model(f"cannot find the subject with the portable model (onnx, chosen by {why})")
-    if custom is None:
-        return f"onnx:sha256 {_isnet.MODEL_SHA256}"
-    with custom.open("rb") as file:
-        return f"onnx:sha256 {hashlib.file_digest(file, 'sha256').hexdigest()}"
+        identity = f"vision:macOS {platform.mac_ver()[0]}"
+    else:
+        custom = _local_model(f"cannot find the subject with the portable model (onnx, chosen by {why})")
+        if custom is None:
+            identity = f"onnx:sha256 {_isnet.MODEL_SHA256}"
+        else:
+            with custom.open("rb") as file:
+                identity = f"onnx:sha256 {hashlib.file_digest(file, 'sha256').hexdigest()}"
+    return Finder(identity, functools.partial(subject_matte, segmenter=name))
 
 
 def _choose(segmenter: str | None) -> tuple[str, str]:

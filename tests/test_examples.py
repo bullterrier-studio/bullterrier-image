@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import Recipe, Step, gallery, load_project, load_recipe, render
+from bullterrier_image import Finder, Recipe, Step, gallery, load_project, load_recipe, render
 from bullterrier_image.core import registry
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
@@ -46,7 +46,7 @@ def _is_a_combination(recipe: Recipe) -> bool:
 def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     recipe = load_recipe(path)
     assert _is_a_combination(recipe), f"{path.name} uses fewer than three different effects"
-    assert max(render(photo, recipe, matte).shape[:2]) == recipe.size  # rendered at the recipe's size
+    assert max(render(photo, recipe, matte=matte).shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
 def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
@@ -61,14 +61,14 @@ def test_every_regions_example_declares_regions_and_renders_to_something_other_t
     recipe = load_recipe(path)
     assert recipe.name == path.stem
     assert recipe.regions
-    out = render(photo, recipe, matte, find_subject=a_disc_in_every_view)
+    out = render(photo, recipe, matte=matte, find_subject=Finder("stand-in", a_disc_in_every_view))
     assert max(out.shape[:2]) == recipe.size
     assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
 
 
 def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, matte):
     recipe = load_recipe(EXAMPLES / "transparent" / "avatar.toml")
-    out = render(photo, recipe, matte)
+    out = render(photo, recipe, matte=matte)
     assert out.shape == (512, 512, 4)  # the recipe's size, as a square
     assert (out[0, 0, 3], out[256, 256, 3]) == (0, 1)  # clear in the corner, opaque in the middle
 

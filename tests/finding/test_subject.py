@@ -15,7 +15,7 @@ import pytest
 
 from bullterrier_image import BackendUnavailableError, Grid, Subject, SubjectNotFoundError, imageio
 from bullterrier_image.core.regions import resolve
-from bullterrier_image.finding.subject import onnx_model_path, refine_edge, segmenter_identity, subject_matte
+from bullterrier_image.finding.subject import onnx_model_path, refine_edge, subject_finder, subject_matte
 from bullterrier_image.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
@@ -115,20 +115,20 @@ def test_an_unknown_segmenter_in_the_environment_is_refused_naming_the_variable(
     assert "onnx" in str(caught.value)
 
 
-# --- the identity of the segmenter that would run: what the pipeline remembers subjects by -------------------------
+# --- subject_finder: the segmenter that would run, named by an identity the pipeline remembers subjects by ---------
 
 
 def test_the_identity_follows_the_content_of_the_model_not_its_place(echo_model, monkeypatch, tmp_path):
     red = echo_model(0)
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(red))
-    identity = segmenter_identity("onnx")
-    assert segmenter_identity("onnx") == identity  # same inputs, same identity
+    identity = subject_finder("onnx").identity
+    assert subject_finder("onnx").identity == identity  # same inputs, same identity
     copy = tmp_path / "elsewhere.onnx"
     copy.write_bytes(red.read_bytes())
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(copy))
-    assert segmenter_identity("onnx") == identity  # the same model at another path is the same segmenter
+    assert subject_finder("onnx").identity == identity  # the same model at another path is the same segmenter
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))
-    assert segmenter_identity("onnx") != identity  # another model, another identity
+    assert subject_finder("onnx").identity != identity  # another model, another identity
 
 
 def test_the_standard_model_has_an_identity_of_its_own_without_being_downloaded(echo_model, monkeypatch, tmp_path):
@@ -138,45 +138,54 @@ def test_the_standard_model_has_an_identity_of_its_own_without_being_downloaded(
     monkeypatch.setenv("XDG_CACHE_HOME", str(home / "cache"))
     monkeypatch.setenv("LOCALAPPDATA", str(home / "local"))
     monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")
-    standard = segmenter_identity("onnx")
-    assert standard == segmenter_identity("onnx")
+    standard = subject_finder("onnx").identity
+    assert standard == subject_finder("onnx").identity
     assert not any(home.rglob("*"))  # nothing was fetched to find out
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
-    assert segmenter_identity("onnx") != standard
+    assert subject_finder("onnx").identity != standard
 
 
 def test_the_identity_is_chosen_like_the_backend_is(echo_red, monkeypatch):
-    explicit = segmenter_identity("onnx")
+    explicit = subject_finder("onnx").identity
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
-    assert segmenter_identity() == explicit  # the environment variable chooses when nothing is given
+    assert subject_finder().identity == explicit  # the environment variable chooses when nothing is given
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "coreml")
-    assert segmenter_identity("onnx") == explicit  # and an explicit choice wins over it
+    assert subject_finder("onnx").identity == explicit  # and an explicit choice wins over it
     with pytest.raises(BackendUnavailableError, match="BT_IMAGE_SEGMENTER"):
-        segmenter_identity()
+        subject_finder()
 
 
-def test_the_identity_of_a_segmenter_that_cannot_run_says_why_as_subject_matte_does():
-    with pytest.raises(BackendUnavailableError, match="coreml"):
-        segmenter_identity("coreml")
+def test_a_finder_of_a_segmenter_that_cannot_run_is_refused_saying_why_as_subject_matte_does():
+    with pytest.raises(BackendUnavailableError, match="coreml") as caught:
+        subject_finder("coreml")
+    assert "onnx, vision" in str(caught.value)  # the choices
     with pytest.raises(
         BackendUnavailableError, match="no-such-model"
     ):  # the suite's BT_IMAGE_SUBJECT_MODEL names no file
-        segmenter_identity("onnx")
+        subject_finder("onnx")
+
+
+def test_the_finder_answers_as_subject_matte_with_the_segmenter_chosen_when_it_was_made(echo_red, monkeypatch):
+    photo = ramp()
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
+    finder = subject_finder()
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "coreml")  # refused if it were read again
+    np.testing.assert_array_equal(finder.find(photo), subject_matte(photo, segmenter="onnx"))
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="Apple Vision exists only on macOS")
 def test_on_macos_vision_and_the_portable_model_have_different_identities(echo_red, monkeypatch):
-    assert segmenter_identity("vision") != segmenter_identity("onnx")
+    assert subject_finder("vision").identity != subject_finder("onnx").identity
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "vision")
-    assert segmenter_identity() == segmenter_identity("vision")
+    assert subject_finder().identity == subject_finder("vision").identity
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
-    assert segmenter_identity() == segmenter_identity("onnx")
+    assert subject_finder().identity == subject_finder("onnx").identity
 
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
 def test_off_macos_the_identity_of_apple_vision_is_refused_like_its_use():
     with pytest.raises(BackendUnavailableError, match="macOS"):
-        segmenter_identity("vision")
+        subject_finder("vision")
 
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="Apple Vision exists on macOS, so it is not refused there")
@@ -195,8 +204,8 @@ def test_the_default_is_the_portable_model_on_every_platform(echo_red):
 
 def test_the_default_identity_is_the_portable_models_where_vision_exists_too(monkeypatch):
     monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")  # the standard model: the identity is pinned, nothing is downloaded
-    assert segmenter_identity().startswith("onnx:")
-    assert segmenter_identity() == segmenter_identity("onnx")
+    assert subject_finder().identity.startswith("onnx:")
+    assert subject_finder().identity == subject_finder("onnx").identity
 
 
 def test_a_default_that_cannot_run_names_the_model_it_needs(monkeypatch):

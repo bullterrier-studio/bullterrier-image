@@ -56,7 +56,8 @@ Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, ru
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
-The runner is given the subject (a `matte` or a `find_subject` function); `bullterrier_image.recipe` binds `finding.subject.subject_matte`.
+The runner is given the subject (a `matte` or a `find_subject` `Finder(identity, find)`); `bullterrier_image.recipe` binds
+`finding.subject.subject_finder()` when a recipe needs it.
 
 ## The rules
 
@@ -209,7 +210,7 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   worth a public name; otherwise test it through the behaviour it serves.
 - Never monkeypatch or mock our own code; never assert call counts or order on it. Substitute only true external boundaries
   (subject-finding model, clock, network, filesystem via `tmp_path`), preferably by injecting through a public parameter
-  (`find_subject=`).
+  (`find_subject=Finder("stand-in", ...)`).
 - No source or AST inspection in behaviour tests (architecture tests are the exception; their docstring says so).
 - Assert observable outputs only: returned arrays (as properties), files written, exceptions raised. For errors, the type plus a
   short substring naming the argument or value, never the whole sentence.

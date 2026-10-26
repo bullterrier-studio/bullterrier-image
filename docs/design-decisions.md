@@ -191,17 +191,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   one; a frame that needs a canvas larger than the photo (polaroid, film strip) belongs to a layout package; a border
   drawn inside the picture's edge is an ordinary effect. The transparency keys live in `[frame]` with the geometry,
   because they are the same model and one place says how a recipe's picture is framed and cut.
-- **The subject is injected.** The runner is given a `matte` or a `find_subject` function; `bullterrier_image.recipe` binds the
+- **The subject is injected.** The runner is given a `matte` or a `find_subject` `Finder`; `bullterrier_image.recipe` binds the
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
-- **A finder carries its identity: `Finder(identity, find)`** (decided, not built yet). A frozen dataclass of a string and a function from the photo to
-  a map; subject and depth use the same keywords (`matte=`, `depth=`, `find_subject=`, `find_depth=`, on `render`, `trace`,
-  `render_all` and `pipeline.run`), and the factories `subject_finder(segmenter=None)` and `depth_finder()` return one. The
-  default is bound lazily, only when a recipe needs it. *Reason:* the cache key must tell finders apart, and a bare
-  function or `functools.partial` has no stable name (the partial-finder cache collision). *Consequence:*
-  `SubjectFinder`, the segmenter strings and `segmenter_identity` are replaced; the crop-finder alias in regions is
-  `BoxFinder`; the package is `finding/` (`subject`, `depth`, `download`; `depth` is not built yet) and the
-  subject model's variable is `BT_IMAGE_SUBJECT_MODEL` (new: `BT_IMAGE_DEPTH_MODEL`).
+- **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a non-blank string and a function from
+  the photo to a map; `render`, `trace`, `render_all` and `pipeline.run` take `matte=` and `find_subject=`, and
+  `finding.subject.subject_finder(segmenter=None)` returns the default, named by its backend and model. The default is
+  bound lazily, only when a recipe will ask for the subject. The pipeline's subject and crop caches are keyed by the
+  identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
+  name (the partial-finder cache collision). *Consequence:* the crop-finder alias in regions is `BoxFinder`; the package
+  is `finding/` (`subject`, `download`) and the subject model's variable is `BT_IMAGE_SUBJECT_MODEL`. Planned, not built
+  yet: depth with the same keywords (`depth=`, `find_depth=`), `finding.depth.depth_finder()` and `BT_IMAGE_DEPTH_MODEL`.
 
 ## Errors and I/O
 
@@ -218,7 +218,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Two backends behind one function**, `subject_matte(rgb)`: IS-Net on ONNX Runtime, the default on every platform, and
   Apple Vision on macOS, used only when asked (`segmenter="vision"`, `BT_IMAGE_SEGMENTER=vision`); `--matte` (or `matte=`)
   skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
-  asks for the platform's own; neither makes the core depend on it. *Consequence:* `segmenter_identity()` of the default
+  asks for the platform's own; neither makes the core depend on it. *Consequence:* `subject_finder()`'s identity by default
   is the portable model's (the cache keys of subjects remembered under Vision change once, so they are found again). The portable model (about 180 MB) is downloaded on first use into the
   user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_SUBJECT_MODEL` points at a local
   copy for offline use.

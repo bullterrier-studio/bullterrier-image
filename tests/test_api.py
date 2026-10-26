@@ -415,11 +415,11 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
 def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, matte):
     steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.glow(opacity=0.7, blend_mode="screen")]
     look = Recipe("t", size=64, steps=steps)
-    np.testing.assert_array_equal(trace(photo, look, matte)[-1].image, render(photo, look, matte))
+    np.testing.assert_array_equal(trace(photo, look, matte=matte)[-1].image, render(photo, look, matte=matte))
 
 
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, matte):
-    stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), matte)
+    stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), matte=matte)
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], matte)  # white where the subject is
     assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe("t", [fx.grain()], size=None)))

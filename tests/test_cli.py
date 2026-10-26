@@ -16,7 +16,7 @@ from bullterrier_image.cli import main
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.finding.subject import subject_matte
+from bullterrier_image.finding.subject import subject_finder, subject_matte
 from bullterrier_image.recipe import Recipe, Step, load_recipe, render
 from bullterrier_image.sheet import contact_sheet
 
@@ -229,7 +229,7 @@ def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that
     tiles = []
     for split in (-6, 0, 6):
         look = Recipe("masked", [Step("glitch", {"split": split, "bands": 3, "seed": 5}, mask="subject")], size=128)
-        tiles.append((f"split={split}", render(photo, look, imageio.load_matte(cut / "matte.png"))))
+        tiles.append((f"split={split}", render(photo, look, matte=imageio.load_matte(cut / "matte.png"))))
     imageio.save(contact_sheet(tiles), cut / "expected.png")
     np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))
 
@@ -320,6 +320,43 @@ def test_render_with_a_matte_file_keeps_exactly_the_subject_it_marks(cut):
     np.testing.assert_allclose(out[:, 64:], imageio.load(cut / "me.png")[:, 64:])  # subject: untouched
 
 
+PER_CELL = """format = 2
+name = "per"
+size = 64
+
+[region.cells]
+kind = "grid"
+columns = 2
+rows = 2
+
+[region.found]
+kind = "subject"
+per = "cells"
+context = 0
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
+
+[[step]]
+effect = "fill"
+color = "#ffffff"
+mask = "found"
+"""
+
+
+def test_a_matte_file_is_the_whole_subject_and_the_segmenter_still_finds_it_in_each_piece(cut, echo_model, monkeypatch):
+    monkeypatch.setenv(
+        "BT_IMAGE_SUBJECT_MODEL", str(echo_model(0))
+    )  # the portable backend answers with the red channel
+    (cut / "per.toml").write_text(PER_CELL, encoding="utf-8")
+    assert cli("render me.png per.toml -o out --matte matte.png") == 0
+    photo, matte = imageio.load(cut / "me.png"), imageio.load_matte(cut / "matte.png")
+    expected = render(photo, load_recipe(cut / "per.toml"), matte=matte, find_subject=subject_finder())
+    np.testing.assert_allclose(imageio.load(cut / "out" / "me__per.png"), expected, atol=0.5 / 255)
+
+
 def test_cutout_with_a_matte_file_uses_it_as_the_transparency(cut):
     assert cli("cutout me.png -o c.png --matte matte.png") == 0
     with Image.open(cut / "c.png") as img:
@@ -347,7 +384,7 @@ def test_the_segmenter_option_wins_over_the_environment(cut, echo_model, monkeyp
     )  # the portable backend answers with the red channel
     assert cli("render me.png cut.toml -o out --segmenter onnx") == 0
     photo = imageio.load(cut / "me.png")
-    expected = render(photo, load_recipe(cut / "cut.toml"), subject_matte(photo, segmenter="onnx"))
+    expected = render(photo, load_recipe(cut / "cut.toml"), matte=subject_matte(photo, segmenter="onnx"))
     np.testing.assert_allclose(imageio.load(cut / "out" / "me__cut.png"), expected, atol=0.5 / 255)
     (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
     assert cli("run bt-image.toml --segmenter onnx") == 0  # and in a project run

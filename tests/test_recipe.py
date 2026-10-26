@@ -1,17 +1,19 @@
 import json
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from bullterrier_image import Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
+from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import runner
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.errors import RecipeError
+from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.ops.resample import resize
+from bullterrier_image.recipe import Grid, Subject
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -82,7 +84,7 @@ def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_
 )
 def test_a_masked_step_changes_only_its_region(photo, matte, mask, color, filled, region):
     """`region` is the matte value of the pixels the mask selects."""
-    out = render(photo, Recipe("m", (Step("fill", {"color": color}, mask),), size=None), matte)
+    out = render(photo, Recipe("m", (Step("fill", {"color": color}, mask),), size=None), matte=matte)
     np.testing.assert_allclose(out[matte == 1 - region], photo[matte == 1 - region], atol=1e-6)
     assert np.allclose(out[matte == region], filled)
 
@@ -101,7 +103,7 @@ def test_opacity_blends_the_step_in_partway(photo):
 
 def test_opacity_combines_with_a_mask(photo, matte):
     r = Recipe("b", (Step("fill", {"color": "#000000"}, "background", 0.5),), size=None)
-    out = render(photo, r, matte)
+    out = render(photo, r, matte=matte)
     np.testing.assert_allclose(out[matte == 0], photo[matte == 0] * 0.5, atol=1e-6)
     np.testing.assert_allclose(out[matte == 1], photo[matte == 1], atol=1e-6)
 
@@ -161,7 +163,7 @@ def test_the_mode_combines_first_and_the_opacity_mixes_that_in(photo):
 
 
 def test_a_mode_on_the_background_leaves_the_subject_untouched(photo, matte):
-    out = render(photo, fill("#ff8000", blend_mode="multiply", mask="background"), matte)
+    out = render(photo, fill("#ff8000", blend_mode="multiply", mask="background"), matte=matte)
     np.testing.assert_array_equal(out[matte == 1], photo[matte == 1])
     np.testing.assert_allclose(out[matte == 0], photo[matte == 0] * ORANGE, atol=0.002)
 
@@ -183,7 +185,7 @@ def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo,
 
     r = Recipe("s", (Step("silhouette_probe"),), size=None)
     assert r.needs_matte  # an effect that wants the silhouette makes the recipe look for the person
-    render(photo, r, matte)
+    render(photo, r, matte=matte)
     assert len(seen) == 1
     np.testing.assert_array_equal(seen[0], matte)
 
@@ -204,13 +206,13 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
 
 
 def test_size_scales_photo_and_matte_together(photo, matte):
-    out = render(photo, Recipe("s", (Step("fill", {"color": "#000000"}, "background"),), size=64), matte)
+    out = render(photo, Recipe("s", (Step("fill", {"color": "#000000"}, "background"),), size=64), matte=matte)
     assert out.shape == (48, 64, 3)
 
 
 def test_matte_of_the_wrong_size_is_rejected(photo):
     with pytest.raises(SubjectNotFoundError, match="matte"):
-        render(photo, Recipe("r", (Step("grain"),), size=None), np.ones((5, 5), np.float32))
+        render(photo, Recipe("r", (Step("grain"),), size=None), matte=np.ones((5, 5), np.float32))
 
 
 def test_shipped_recipes_all_load():
@@ -229,8 +231,8 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
     alpha = subject_matte(photo)
-    expected = runner.render(photo, masked, alpha)
-    assert not np.array_equal(expected, runner.render(photo, masked, np.ones_like(alpha)))  # the subject matters
+    expected = runner.render(photo, masked, matte=alpha)
+    assert not np.array_equal(expected, runner.render(photo, masked, matte=np.ones_like(alpha)))  # the subject matters
     np.testing.assert_array_equal(facade.render(photo, masked), expected)
     np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
@@ -238,6 +240,39 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, matte):
     masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
-    found = facade.render(photo, masked, find_subject=lambda rgb: 1.0 - matte)
-    np.testing.assert_array_equal(found, runner.render(photo, masked, 1.0 - matte))
-    assert not np.array_equal(found, runner.render(photo, masked, matte))
+    found = facade.render(photo, masked, find_subject=Finder("stand-in", lambda rgb: 1.0 - matte))
+    np.testing.assert_array_equal(found, runner.render(photo, masked, matte=1.0 - matte))
+    assert not np.array_equal(found, runner.render(photo, masked, matte=matte))
+
+
+PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
+MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
+PIECE_BY_PIECE = Recipe(
+    "pieces",
+    (Step("fill", {"color": "#000000"}, "found"),),
+    size=None,
+    regions={"cells": Grid(columns=2), "found": Subject(per="cells")},
+)
+# With a segmenter setting that names no segmenter, the default finder is built only for a recipe that will ask it:
+# (recipe, given a matte, what the refusal names; None: it renders).
+LAZY_DEFAULT = {
+    "a recipe that needs no subject renders": (PLAIN, False, None),
+    "a recipe given the matte it needs renders": (MASKED, True, None),
+    "a recipe that needs the subject names the choices": (MASKED, False, "onnx, vision"),
+    "a recipe finding the subject piece by piece asks even with a matte": (PIECE_BY_PIECE, True, "onnx, vision"),
+}
+CALLS = {
+    "render": lambda photo, recipe, **keys: facade.render(photo, recipe, **keys),
+    "trace": lambda photo, recipe, **keys: facade.trace(photo, recipe, **keys),
+    "render_all": lambda photo, recipe, **keys: facade.render_all(photo, [recipe], **keys),
+}
+
+
+@pytest.mark.parametrize("call", CALLS.values(), ids=CALLS.keys())
+@pytest.mark.parametrize(("recipe", "given", "refused"), LAZY_DEFAULT.values(), ids=LAZY_DEFAULT.keys())
+def test_the_default_finder_is_built_only_when_a_recipe_asks_for_the_subject(
+    photo, matte, monkeypatch, call, recipe, given, refused
+):
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "nonsense")
+    with pytest.raises(BackendUnavailableError, match=refused) if refused else nullcontext():
+        call(photo, recipe, **({"matte": matte} if given else {}))

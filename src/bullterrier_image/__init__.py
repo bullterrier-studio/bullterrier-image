@@ -17,7 +17,7 @@
 Layers, each importing only from the ones below it (import-linter checks this in the test suite):
     app        cli, pipeline (many photos x many recipes), gallery (the effect catalogue), sheet (comparison images),
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
-    adapters   imageio (files and the one in-memory image type), matte (finding the subject), loader (recipe files)
+    adapters   imageio (files and the one in-memory image type), finding (the subject), loader (recipe files)
     effects    the effect library: pure functions image -> image, found automatically
     core       the registry and the recipe engine (steps, runner)
     ops        shared numeric primitives, named by concept
@@ -49,6 +49,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Cuts,
         Each,
         Edge,
+        Finder,
         Framing,
         Grid,
         Line,
@@ -81,8 +82,8 @@ _HOMES = {
     ".finding.subject": ("subject_matte",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Cuts", "Curve", "Each", "Edge", "Framing", "Grid", "Line", "Path", "Pick", "Recipe", "Shards", "Stage",
-        "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
+        "Cuts", "Curve", "Each", "Edge", "Finder", "Framing", "Grid", "Line", "Path", "Pick", "Recipe", "Shards",
+        "Stage", "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -122,6 +123,7 @@ __all__ = [
     "Cuts",
     "Each",
     "Edge",
+    "Finder",
     "Framing",
     "Grid",
     "ImageReadError",

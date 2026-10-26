@@ -1,12 +1,12 @@
 """Running a `Recipe` on a photo: `render` (one still), `render_all` (several recipes on one photo) and `trace` (every
-intermediate picture, as `Stage`s).
+intermediate picture, as `Stage`s); `Finder`, how the runner is told to find a map in a photo.
 
 Promises: the input photo is never modified; the same photo, recipe and matte always give the same pixels; `trace`'s
 last stage is exactly what `render` returns, because both run the same code; an effect that changes the image shape is
 an error; `render` keeps alive only the image the next step needs, so a render's memory peak is its busiest step's
 own (that step's input, scratch and output) plus the scaled matte, whatever the number of steps, while `trace` keeps
 every stage. The runner is given everything it uses: the photo, and the subject either as a
-`matte` or as a `find_subject` function, which it calls at most once per render (once per photo in `render_all`) and
+`matte` or as a `find_subject` `Finder`, which it asks at most once per render (once per photo in `render_all`) and
 only if the recipe needs the subject: a step on it, an effect that takes it, or a region in use that is made from it
 (regions declared but unused need nothing). A region that finds the subject piece by piece (`Subject` with `per`) asks
 `find_subject` about the crop of the working picture of each piece, once per piece per render, even when a `matte` was
@@ -26,25 +26,43 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from bullterrier_image.errors import SubjectNotFoundError
+from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.composite import composite
 from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import Finder, Partition, Regions, Selection, look_weights, resolve, used
+from .regions import BoxFinder, Partition, Regions, Selection, look_weights, resolve, used
 from .steps import Each, Recipe, Step
 
-# Finds the subject of a photo: float32 (h, w, 3) 0..1 -> its alpha, float32 (h, w) 0..1 (white = subject).
-SubjectFinder = Callable[[np.ndarray], np.ndarray]
+
+@dataclass(frozen=True)
+class Finder:
+    """A function that finds a map in a photo, and the name of its answers: `identity` changes exactly when they could.
+
+    `find` takes a photo, float32 (h, w, 3) in 0..1, and returns its map, float32 (h, w) in 0..1 (for the subject: its
+    alpha, white = subject), or raises SubjectNotFoundError when there is nothing to find. `identity` is non-blank text
+    naming the function and whatever shapes its answers (model, version, options): two finders with one identity are
+    taken to answer alike, so a cache keyed by it (`pipeline.run`) reuses their answers. RecipeError, naming the field,
+    for a blank `identity` or a `find` that cannot be called.
+    """
+
+    identity: str
+    find: Callable[[np.ndarray], np.ndarray]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.identity, str) or not self.identity.strip():
+            raise RecipeError(f"Finder identity must be non-blank text naming its answers, got {self.identity!r}")
+        if not callable(self.find):
+            raise RecipeError(f"Finder find must be a function photo -> map, got {self.find!r}")
 
 
 def render(
     rgb: np.ndarray,
     recipe: Recipe,
-    matte: np.ndarray | None = None,
     *,
-    find_subject: SubjectFinder | None = None,
+    matte: np.ndarray | None = None,
+    find_subject: Finder | None = None,
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
@@ -61,9 +79,10 @@ def render(
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
     height and width, 0..1 (white = subject), or None. find_subject: called with the photo as given (before it is
     framed or scaled) when the recipe needs the subject and no `matte` was given, and with the crop of the working
-    picture of each piece for a `Subject` region with `per`. Raises SubjectNotFoundError when the recipe needs the
-    subject and neither was given, the finder returns None, the matte is not the photo's size, a `per` region has no
-    finder or the finder's matte does not fit its crop, or the framing crops around a subject that is not there.
+    picture of each piece for a `Subject` region with `per` (see `Finder`). Raises SubjectNotFoundError when the
+    recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's size, a `per`
+    region has no finder or the finder's matte does not fit its crop, or the framing crops around a subject that is
+    not there.
     """
     image, matte, regions = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte, regions)
@@ -83,9 +102,9 @@ class Stage:
 def trace(
     rgb: np.ndarray,
     recipe: Recipe,
-    matte: np.ndarray | None = None,
     *,
-    find_subject: SubjectFinder | None = None,
+    matte: np.ndarray | None = None,
+    find_subject: Finder | None = None,
 ) -> list[Stage]:
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
@@ -123,21 +142,27 @@ def _region_stage(name: str, region: Partition | Selection, rgb: np.ndarray) -> 
 
 
 def render_all(
-    rgb: np.ndarray, recipes: list[Recipe], *, find_subject: SubjectFinder | None = None
+    rgb: np.ndarray,
+    recipes: list[Recipe],
+    *,
+    matte: np.ndarray | None = None,
+    find_subject: Finder | None = None,
 ) -> list[np.ndarray]:
     """Run several recipes on one photo; the subject is found at most once, however many recipes need it.
 
     rgb: the photo (see `render`). recipes: the recipes to run; the results come back in the same order, one still each.
-    find_subject: called once with the photo as given when any recipe needs the subject (SubjectNotFoundError if it is
-    needed and missing).
+    matte: the subject's alpha, used by every recipe (see `render`), or None. find_subject: called once with the photo
+    as given when any recipe needs the subject and no `matte` was given (SubjectNotFoundError if it is needed and
+    missing), and about the pieces of a `Subject` with `per` as for `render`.
     """
     masked = next((recipe for recipe in recipes if recipe.needs_matte), None)
-    matte = None if masked is None else _find_subject(rgb, masked, find_subject)
-    return [render(rgb, recipe, matte, find_subject=find_subject) for recipe in recipes]
+    if matte is None and masked is not None:
+        matte = _find_subject(rgb, masked, find_subject)
+    return [render(rgb, recipe, matte=matte, find_subject=find_subject) for recipe in recipes]
 
 
 def _prepare(
-    rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None, find_subject: SubjectFinder | None
+    rgb: np.ndarray, recipe: Recipe, matte: np.ndarray | None, find_subject: Finder | None
 ) -> tuple[np.ndarray, np.ndarray | None, Regions]:
     """Find the subject if the recipe needs it, then frame the photo and the matte together and scale both to the
     recipe's size, and set up the recipe's regions for that picture. The one place the photo is framed (a depth map,
@@ -154,29 +179,29 @@ def _prepare(
     return rgb, matte, resolve(recipe.regions, rgb.shape[:2], subject=found, find=_finder_in(rgb, find_subject))
 
 
-def _finder_in(rgb: np.ndarray, find_subject: SubjectFinder | None) -> Finder | None:
-    """The finder for the pieces of the working picture `rgb` (see `regions.Finder`): `find_subject` asked about the
-    crop of the box. None when no finder was given."""
+def _finder_in(rgb: np.ndarray, find_subject: Finder | None) -> BoxFinder | None:
+    """The finder for the pieces of the working picture `rgb` (see `regions.BoxFinder`): `find_subject` asked about
+    the crop of the box. None when no finder was given."""
     if find_subject is None:
         return None
-    return lambda box: find_subject(rgb[box[1] : box[3], box[0] : box[2]])
+    return lambda box: find_subject.find(rgb[box[1] : box[3], box[0] : box[2]])
 
 
-def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: SubjectFinder | None) -> np.ndarray:
+def _find_subject(rgb: np.ndarray, recipe: Recipe, find_subject: Finder | None) -> np.ndarray:
     if find_subject is None:
         raise SubjectNotFoundError(
             f"recipe {recipe.name!r} uses the subject (a mask, a region made from it, or an effect that takes it), so "
             "it needs the subject: pass `matte` (the subject's alpha) "
-            "or `find_subject` (a function photo -> alpha, e.g. bullterrier_image.finding.subject.subject_matte)"
+            "or `find_subject` (a Finder, e.g. bullterrier_image.finding.subject.subject_finder())"
         )
     return subject_from(find_subject, rgb)
 
 
-def subject_from(find_subject: SubjectFinder, rgb: np.ndarray) -> np.ndarray:
+def subject_from(find_subject: Finder, rgb: np.ndarray) -> np.ndarray:
     """Ask `find_subject` for the subject of `rgb` and return its matte. The one place a finder is called and its answer
     checked (the runner and the pipeline both use it): SubjectNotFoundError if it returned None, since a finder must
     answer or raise, and carrying on would drop the subject without a word."""
-    matte = find_subject(rgb)
+    matte = find_subject.find(rgb)
     if matte is None:
         raise SubjectNotFoundError(
             "`find_subject` returned None: it must return the subject's alpha (float32, the photo's height and width, "

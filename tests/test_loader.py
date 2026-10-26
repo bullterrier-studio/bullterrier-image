@@ -13,7 +13,7 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Curve, Cuts, Edge, Grid, Line, Pick, Shards, Subject, Svg
+from bullterrier_image.recipe import Curve, Cuts, Edge, Finder, Grid, Line, Pick, Shards, Subject, Svg
 from bullterrier_image.recipe import Path as PathRegion
 
 STEP = "[[step]]\neffect = 'grade'\n"
@@ -316,7 +316,8 @@ def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, m
     loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
     finder = lambda crop: np.where(crop[..., 0] > 0.5, 1.0, 0.0).astype(np.float32)  # noqa: E731  (a stand-in model)
     np.testing.assert_array_equal(
-        render(photo, loaded, matte, find_subject=finder), render(photo, REGIONS_RECIPE, matte, find_subject=finder)
+        render(photo, loaded, matte=matte, find_subject=Finder("stand-in", finder)),
+        render(photo, REGIONS_RECIPE, matte=matte, find_subject=Finder("stand-in", finder)),
     )
 
 
@@ -386,7 +387,7 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
         ],
     )
     assert loaded == written
-    np.testing.assert_array_equal(render(photo, loaded, matte), render(photo, written, matte))
+    np.testing.assert_array_equal(render(photo, loaded, matte=matte), render(photo, written, matte=matte))
 
 
 def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):

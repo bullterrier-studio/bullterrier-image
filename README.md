@@ -132,13 +132,25 @@ folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else
 is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_SUBJECT_MODEL` at a
 copy (`BT_IMAGE_SUBJECT_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
-Choose the backend with `--segmenter onnx|vision` (or `subject_matte(rgb, segmenter=...)` in Python), or for every run
+Choose the backend with `--segmenter onnx|vision` (in Python `find_subject=subject_finder("vision")`, from
+`bullterrier_image.finding.subject`), or for every run
 with `BT_IMAGE_SEGMENTER=vision`; the option wins over the variable. No model is needed at all if you have the subject's
 matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
 the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
 in [`finding/`](src/bullterrier_image/finding), so a further backend is added there without touching the rest. On Python versions
 newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
 it is missing, and `--matte` (or, on macOS, `--segmenter vision`) still works.
+
+**Your own finder** is a `Finder`: a function from the photo (float32 `(h, w, 3)`, 0..1) to its matte (`(h, w)`, 0..1),
+and an identity that names its answers. `bt-image run` remembers subjects by the identity, so change it whenever the
+answers could change (another model, prompt or option):
+
+```python
+from functools import partial
+from bullterrier_image import Finder, render
+
+render(photo, look, find_subject=Finder("grounded-sam dog v1", partial(grounded, prompt="dog")))
+```
 
 **Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
 the wheel), not a system font, so a look does not depend on the machine's fonts.
@@ -403,7 +415,8 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 ```
 
 `bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a
-repeat run asks the model nothing. A `--matte` file does not stand in for the finder here: a cell is a part of the picture.
+repeat run asks the model nothing. A `--matte` file does not stand in for the finder here (a cell is a part of the
+picture): the segmenter still finds the subject in each cell.
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
 examples are in [`examples/regions/`](examples/regions/); [the pictures](docs/gallery/regions/README.md).

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # annotations only; the commands import what they use when they run
     import numpy as np
 
-    from .recipe import Recipe, SubjectFinder
+    from .recipe import Finder, Recipe
 
 _DEBUG_VARIABLE = "BT_IMAGE_DEBUG"
 
@@ -244,7 +244,7 @@ def _subject_options(p: argparse.ArgumentParser) -> None:
         "--matte",
         metavar="PICTURE",
         help="the subject's matte, the photo's size: a cut-out PNG (its transparency) or a black-and-white mask "
-        "(white = subject); no model is used",
+        "(white = subject); no model is used, except by a region that finds the subject piece by piece",
     )
     _segmenter_option(p)
 
@@ -268,15 +268,14 @@ def _segmenter(name: str) -> str:
     return name
 
 
-def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, SubjectFinder]":
-    """The subject as the command line gives it: a matte file (--matte), and how to find it otherwise (--segmenter)."""
-    from functools import partial
-
+def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, Finder | None]":
+    """The subject as the command line gives it: a matte file (--matte), and the finder --segmenter names (None: the
+    library's default, built only if a recipe asks for it)."""
     from . import imageio
-    from .finding.subject import subject_matte
+    from .finding.subject import subject_finder
 
     matte = imageio.load_matte(args.matte) if args.matte else None
-    return matte, partial(subject_matte, segmenter=args.segmenter)
+    return matte, None if args.segmenter is None else subject_finder(args.segmenter)
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
@@ -303,10 +302,7 @@ def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[
     from .recipe import render_all
 
     matte, find = _subject(args)
-    if matte is not None:
-        given = matte
-        find = lambda photo: given  # noqa: E731  (render_all asks with the photo as given, which the matte fits)
-    return render_all(imageio.load(args.photo), recipes, find_subject=find)
+    return render_all(imageio.load(args.photo), recipes, matte=matte, find_subject=find)
 
 
 def _render(args: argparse.Namespace) -> int:
@@ -357,13 +353,13 @@ def _cutout(args: argparse.Namespace) -> int:
 
     from . import imageio
     from .errors import SubjectNotFoundError
-    from .finding.subject import refine_edge
+    from .finding.subject import refine_edge, subject_matte
 
     photo = imageio.load(args.photo)
-    matte, find = _subject(args)
+    matte = imageio.load_matte(args.matte) if args.matte else None
     if matte is None:
         options = {k: v for k, v in (("shrink", args.shrink), ("feather", args.feather)) if v is not None}
-        alpha = find(photo, **options)
+        alpha = subject_matte(photo, segmenter=args.segmenter, **options)
     elif matte.shape != photo.shape[:2]:
         (mh, mw), (ph, pw) = matte.shape, photo.shape[:2]
         raise SubjectNotFoundError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
@@ -379,6 +375,7 @@ def _cutout(args: argparse.Namespace) -> int:
 def _run(args: argparse.Namespace) -> int:
     from dataclasses import replace
 
+    from .finding.subject import subject_finder
     from .pipeline import load_project, run
 
     project = load_project(args.project)
@@ -390,7 +387,7 @@ def _run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         only=args.only,
         log=lambda message: _progress(args, message),
-        subject=args.segmenter,
+        find_subject=None if args.segmenter is None else subject_finder(args.segmenter),
     )
     failed = [i for i in items if i.status == "failed"]
     flagged = [i for i in items if i.warnings]
@@ -411,7 +408,7 @@ def _steps(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
     matte, find = _subject(args)
-    stages = trace(imageio.load(args.photo), recipe, matte, find_subject=find)
+    stages = trace(imageio.load(args.photo), recipe, matte=matte, find_subject=find)
     for stage in stages:
         _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))
