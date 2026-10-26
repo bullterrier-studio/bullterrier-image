@@ -3447,6 +3447,41 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
+def quadtree(threshold: float = 0.06, max_cell: float = 0.125, min_cell: float = 0.01, gap: float = 0.002, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges.
+
+Each cell is filled with the average colour of the photo under it. A cell splits into four while its colours spread
+more than `threshold` and its halves would still be at least `min_cell` wide; the first grid's cells are at most
+`max_cell` wide. `gap` draws a line between cells and `rounding` rounds their corners.
+
+Parameters
+----------
+threshold : number, fraction, 0 to 0.5, default 0.06
+    How uneven a cell has to be before it splits into four: the spread of its colour,
+    the largest standard deviation of red, green or blue inside it, on a 0 to 0.5 scale
+    (0.5 is the most any cell can have, half black and half white). 0 splits every cell
+    that is not perfectly flat; 0.5 splits none. Raising it gives bigger cells and a
+    coarser picture.
+max_cell : number, fraction, 0.005 to 1, default 0.125
+    The largest a cell can be, as a share of the picture's long side: the picture starts
+    as an even grid of cells at most this size. Raising it makes the flat parts coarser.
+min_cell : number, fraction, 0.002 to 1, default 0.01
+    The smallest a cell can be, as a share of the picture's long side, never above
+    `max_cell`. A cell does not split into halves smaller than this. Lowering it keeps
+    finer detail at edges.
+gap : number, fraction, 0 to 0.05, default 0.002
+    Width of the line between neighbouring cells, as a share of the picture's long side:
+    0 = cells touch, about 0.002 a thin grid, 0.01 or more visible tiles. The picture's
+    own edge gets no line. A cell no wider than the line is all line, so keep it below
+    `min_cell`.
+gap_color : colour, default '#000000'
+    The colour of the lines between cells, and of the corners a `rounding` cuts away:
+    '#rrggbb', '#rgb' or three numbers 0 to 1.
+rounding : number, fraction, 0 to 1, default 0.0
+    How round each cell's corners are, as a share of half its shorter side: 0 = square
+    cells, 1 = a circle in each square cell."""
+    ...
+
 def radial_blur(mode: Literal['spin', 'zoom'] = 'zoom', amount: float = 0.1, x: float = 0.5, y: float = 0.5, samples: int = 8, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
 

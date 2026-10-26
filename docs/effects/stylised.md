@@ -8,6 +8,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` +3 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
+| <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=0.125` `min_cell=0.01` `gap=0.002` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=0.004` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
 | <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights. | `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
@@ -52,6 +53,17 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a seam). |
 
 </details>
+
+### `quadtree`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `threshold` | number | fraction | 0 to 0.5 | `0.06` | How uneven a cell has to be before it splits into four: the spread of its colour, the largest standard deviation of red, green or blue inside it, on a 0 to 0.5 scale (0.5 is the most any cell can have, half black and half white). 0 splits every cell that is not perfectly flat; 0.5 splits none. Raising it gives bigger cells and a coarser picture. |
+| `max_cell` | number | fraction | 0.005 to 1 | `0.125` | The largest a cell can be, as a share of the picture's long side: the picture starts as an even grid of cells at most this size. Raising it makes the flat parts coarser. |
+| `min_cell` | number | fraction | 0.002 to 1 | `0.01` | The smallest a cell can be, as a share of the picture's long side, never above `max_cell`. A cell does not split into halves smaller than this. Lowering it keeps finer detail at edges. |
+| `gap` | number | fraction | 0 to 0.05 | `0.002` | Width of the line between neighbouring cells, as a share of the picture's long side: 0 = cells touch, about 0.002 a thin grid, 0.01 or more visible tiles. The picture's own edge gets no line. A cell no wider than the line is all line, so keep it below `min_cell`. |
+| `gap_color` | colour |  |  | `'#000000'` | The colour of the lines between cells, and of the corners a `rounding` cuts away: '#rrggbb', '#rgb' or three numbers 0 to 1. |
+| `rounding` | number | fraction | 0 to 1 | `0.0` | How round each cell's corners are, as a share of half its shorter side: 0 = square cells, 1 = a circle in each square cell. |
 
 ### `reaction_diffusion`
 
