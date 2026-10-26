@@ -27,6 +27,14 @@ def test_green_is_never_touched(interpolation: str, edge: str, x: float, y: floa
     assert np.abs(out[..., 2] - photo[..., 2]).max() > 0.05
 
 
+def test_green_is_exactly_the_picture_even_through_a_spline() -> None:
+    """Black and white noise has pixels a bicubic spline reads as 1e-17 instead of 0; with 3 samples green is the
+    middle copy alone and must come out exactly as it went in."""
+    noise = np.random.default_rng(5).integers(0, 2, (40, 50, 3)).astype(np.float32)
+    out = registry.apply(NAME, noise, amount=10, interpolation="bicubic")
+    np.testing.assert_array_equal(out[..., 1], noise[..., 1])
+
+
 def test_red_moves_out_and_blue_moves_in_from_a_white_dot() -> None:
     """The axis on the left edge of 101 columns (x = 0, row 50): the farthest corner is hypot(50, 100) = 111.8 px
     away. With amount 22.36 (a fifth of that) a point d px from the axis has its red shifted outward by d / 5 and its
@@ -93,3 +101,61 @@ def test_a_shift_beyond_the_farthest_corner_is_limited_to_it() -> None:
     beyond = registry.apply(NAME, noise, amount=corner * 3, interpolation="nearest")
     np.testing.assert_array_equal(beyond[..., 0], reach[..., 0])
     np.testing.assert_allclose(reach[..., 0], noise[15, 20, 0], atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("samples", "expected"),
+    [(4, [0.870667, 0.90, 0.929333]), (5, [0.87, 0.90, 0.93])],
+    ids=["four copies", "five copies"],
+)
+def test_more_samples_weight_the_copies_by_the_spectrum_from_red_to_blue(samples: int, expected: list[float]) -> None:
+    """On 101 x 101 px with amount 5 sqrt(2) (a tenth of the corner distance) the extreme copies read each point at 0.9
+    and 1.1 of its distance and, on a ramp column / 100, the pixel 40 px right of the centre shows them as 0.86 and
+    0.94. Five copies (red, yellow, green, cyan, blue at 0.9 to 1.1 in steps of 0.05) read 0.86, 0.88, 0.90, 0.92 and
+    0.94: red is made of the first two, green of the middle three, blue of the last two, each averaged. Four copies sit
+    a third apart in the spectrum (0.9, 0.9667, 1.0333, 1.1 -> 0.86, 0.8867, 0.9133, 0.94); red is made of the first
+    with weight 1 and the second with 2/3, green of the middle two, blue of the third with 2/3 and the last with 1."""
+    ramp = grey(np.tile(np.arange(101) / 100.0, (101, 1)))
+    out = registry.apply(NAME, ramp, amount=5 * math.sqrt(2), samples=samples, interpolation="bilinear")
+    assert out[50, 90] == pytest.approx(expected, abs=1e-5)
+
+
+def test_more_samples_spread_a_white_dots_fringe_into_more_pixels() -> None:
+    """Three copies put a dot's red in one place (the red copy); seven add the yellowish copies, which also carry red,
+    at other scales, so the red channel lights three pixels."""
+    dot = np.zeros((101, 101, 3), np.float32)
+    dot[50, 60] = 1.0
+    amount = 0.2 * math.hypot(50, 100)
+    lit = {
+        samples: np.count_nonzero(
+            registry.apply(NAME, dot, amount=amount, samples=samples, x=0.0, y=0.5, interpolation="nearest")[..., 0]
+        )
+        for samples in (3, 7)
+    }
+    assert lit == {3: 1, 7: 3}
+
+
+@pytest.mark.parametrize("samples", [3, 4, 7, 32])
+def test_a_flat_colour_stays_as_it_is_whatever_the_number_of_samples(samples: int) -> None:
+    flat = np.full((21, 31, 3), (0.2, 0.5, 0.9), np.float32)
+    out = registry.apply(NAME, flat, amount=15, samples=samples)
+    np.testing.assert_allclose(out, flat, atol=1e-6)
+
+
+@pytest.mark.parametrize(("x", "y"), [(0.5, 0.5), (0.2, 0.7)], ids=["middle", "off centre"])
+def test_the_pixel_at_the_centre_is_never_changed_whatever_the_number_of_samples(x: float, y: float) -> None:
+    """Every copy reads the centre pixel from itself. On 51 x 51 px a centre at 0.2 / 0.7 is the pixel (35, 10)."""
+    noise = np.random.default_rng(7).random((51, 51, 3), dtype=np.float32)
+    row, col = round(y * 50), round(x * 50)
+    out = registry.apply(NAME, noise, amount=20, x=x, y=y, samples=9)
+    np.testing.assert_allclose(out[row, col], noise[row, col], atol=1e-6)
+    assert np.abs(out - noise).max() > 0.05  # and elsewhere it is not
+
+
+@pytest.mark.parametrize("samples", [3, 4, 7])
+def test_a_shift_beyond_the_farthest_corner_is_limited_to_it_whatever_the_number_of_samples(samples: int) -> None:
+    noise = np.random.default_rng(3).random((31, 41, 3), dtype=np.float32)
+    corner = math.hypot(15, 20)
+    reach = registry.apply(NAME, noise, amount=corner, samples=samples, interpolation="nearest")
+    beyond = registry.apply(NAME, noise, amount=corner * 3, samples=samples, interpolation="nearest")
+    np.testing.assert_array_equal(beyond, reach)

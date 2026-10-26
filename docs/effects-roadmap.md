@@ -71,7 +71,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `starburst` ✓ | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=0.15)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
-| `chromatic_aberration` ✓ | Radial red/blue fringing. | `fx.chromatic_aberration(amount=4)` |
+| `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
 | `soft_focus` ✓ | Dreamy glow over a sharp image (Orton). | `fx.soft_focus(opacity=0.5)` |
 | `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
 | `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
@@ -198,7 +198,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `signal_noise` ✓ | Static bands and dropouts. | `fx.signal_noise(bands=3, seed=1)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
-| `prism` ✓ | Rainbow dispersion. | `fx.prism(amount=18)` |
 | `anaglyph` ✓ | Red/cyan 3D look. | `fx.anaglyph(shift=6)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
 | `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |
@@ -368,7 +367,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | `fade` | `levels(output_black)` |
 | `invert` | a `levels` preset |
 | `clarity` | a `sharpen` preset |
-| `prism` | `chromatic_aberration` + `samples` |
 | `noise`, `film_grain` | `grain` (`shadows`, `highlights`, `color`, `distribution`) |
 | `black_and_white` | a `channel_mixer` preset |
 | `vibrance` | `grade` + `vibrance` |

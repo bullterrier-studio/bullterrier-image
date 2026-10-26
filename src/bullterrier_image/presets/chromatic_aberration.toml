@@ -1,0 +1,6 @@
+# Looks that are one chromatic aberration.
+
+[prism]
+description = "Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."
+amount = 9
+samples = 7
