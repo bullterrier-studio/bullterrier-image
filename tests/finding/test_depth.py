@@ -13,7 +13,7 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
-from bullterrier_image import BackendUnavailableError, imageio
+from bullterrier_image import BackendUnavailableError, Depth, DepthNotFoundError, Recipe, Step, imageio, render
 from bullterrier_image.finding.depth import depth_finder, depth_map, depth_model_path
 from bullterrier_image.ops.resample import resize
 
@@ -90,6 +90,29 @@ def test_each_channel_reaches_the_model_in_rgb_order(depth_echo_model, channel, 
     depth = depth_map(photo)
     top, bottom = depth[:5].mean(), depth[-5:].mean()
     assert (top < bottom) if nearest == "top" else (top > bottom)
+
+
+def test_a_model_answering_nan_is_refused_by_the_render_not_taken_for_a_flat_answer(tmp_path, monkeypatch):
+    """A broken model's NaN is not 'everything equally far': it reaches the runner's check of the map and is refused."""
+    graph = helper.make_graph(
+        [
+            helper.make_node("Gather", ["pixel_values", "zero_index"], ["red"], axis=1),
+            helper.make_node("Mul", ["red", "nan"], ["predicted_depth"]),
+        ],
+        "nan",
+        [helper.make_tensor_value_info("pixel_values", TensorProto.FLOAT, ["batch", 3, "height", "width"])],
+        [helper.make_tensor_value_info("predicted_depth", TensorProto.FLOAT, ["batch", "height", "width"])],
+        initializer=[
+            helper.make_tensor("zero_index", TensorProto.INT64, [], [0]),
+            helper.make_tensor("nan", TensorProto.FLOAT, [], [float("nan")]),
+        ],
+    )
+    model = tmp_path / "nan.onnx"
+    onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8), model)
+    monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(model))
+    near = Recipe("near", (Step("fill", {"color": "#000000"}, "near"),), size=None, regions={"near": Depth()})
+    with pytest.raises(DepthNotFoundError, match="not finite"):
+        render(ramp(), near)
 
 
 # --- the model's input: short side 518 px, both sides multiples of 14 ----------------------------------------------

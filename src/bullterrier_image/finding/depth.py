@@ -51,7 +51,8 @@ def depth_map(rgb: np.ndarray) -> np.ndarray:
     nearness = stretch(answer, *rgb.shape[:2])
     low = nearness.min()
     span = nearness.max() - low  # in float32 as the values are, so the nearest pixel becomes exactly 1
-    return (nearness - low) / span if span > 0 else np.zeros_like(nearness)
+    # a span of 0 is a flat answer; NaN (a broken model) is no span to compare, so it passes on to the map's check
+    return (nearness - low) / span if span != 0 else np.zeros_like(nearness)
 
 
 def depth_model_path() -> Path:
