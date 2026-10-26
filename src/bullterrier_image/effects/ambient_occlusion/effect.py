@@ -15,7 +15,7 @@ class AmbientOcclusionParams(EffectParams):
     within `radius`."""
 
     radius: float = param(
-        24.0,
+        10.0,
         unit="px",
         min=1,
         max=200,
@@ -24,7 +24,7 @@ class AmbientOcclusionParams(EffectParams):
         "keeps the darkening to fine creases.",
     )
     gain: float = param(
-        10.0,
+        4.0,
         unit="ratio",
         min=1,
         max=100,

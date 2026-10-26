@@ -4,5 +4,3 @@ size = 480
 
 [[step]]
 effect = "ambient_occlusion"
-radius = 10
-gain = 4

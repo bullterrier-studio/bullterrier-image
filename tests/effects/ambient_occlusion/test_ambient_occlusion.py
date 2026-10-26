@@ -32,7 +32,9 @@ def disc(inside: float, outside: float, radius: float = 8) -> np.ndarray:
 
 
 def bowl(width: float = 8) -> np.ndarray:
-    """A smooth pit: a plane at depth 0.8 dipping to 0.3 at the middle, a Gaussian dip of `width` px sigma."""
+    """A smooth pit: a plane at depth 0.8 dipping to 0.3 at the middle, a Gaussian dip of `width` px sigma.
+
+    Not a flat-bottomed pit: at its centre the Gaussian average is mostly pit depth, so its cavity peaks at the rim."""
     y, x = np.mgrid[0:SIZE, 0:SIZE]
     return (0.8 - 0.5 * np.exp(-((x - MIDDLE) ** 2 + (y - MIDDLE) ** 2) / (2 * width**2))).astype(np.float32)
 
