@@ -15,6 +15,7 @@ from pathlib import Path as File
 import numpy as np
 import pytest
 from scipy import ndimage
+from scipy.integrate import trapezoid
 
 from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
@@ -1345,7 +1346,7 @@ def test_a_bezier_cut_leaves_the_area_on_each_side_that_the_curves_own_formula_g
     p = np.array([[0.38, 0], [0.15, 0.45], [0.85, 0.55], [0.62, 1]]) * (200, 100)
     t = np.linspace(0, 1, 20001)[:, None]
     curve = (1 - t) ** 3 * p[0] + 3 * (1 - t) ** 2 * t * p[1] + 3 * (1 - t) * t**2 * p[2] + t**3 * p[3]
-    left_area = np.trapezoid(curve[:, 0], curve[:, 1])
+    left_area = trapezoid(curve[:, 0], curve[:, 1])
     labels = labels_of({"c": Cuts(lines=[Curve(path=WAVE)])}, "c", shape)
     assert labels.max() == 1
     assert (labels == 0).sum() == pytest.approx(left_area, rel=5e-3)
