@@ -79,7 +79,8 @@ class _Layer(ValidatedModel):
         None,
         description='Apply only where this selection says: the "subject", "background", "depth" or "light" of the '
         "photo, or the name of a selection the recipe declares (path, pick, subject, band, combine, a gradient or "
-        "given); None: everywhere.",
+        'given); None: everywhere. Where the subject map is empty "subject" selects nothing and "background" '
+        "everything.",
     )
     opacity: float = Field(
         ge=0,

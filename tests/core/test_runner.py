@@ -1386,3 +1386,20 @@ def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(pho
     unscaled_error = np.abs(resize(unscaled, 64) - small).mean()
     assert scaled_error < 0.02
     assert scaled_error * 3 < unscaled_error
+
+
+@pytest.mark.parametrize(
+    ("mask", "expected"),
+    [
+        pytest.param(
+            "subject", lambda photo: photo, id="the subject of nobody selects nothing: the step changes nothing"
+        ),
+        pytest.param(
+            "background", np.zeros_like, id="the background of nobody is the whole picture: all of it is filled"
+        ),
+    ],
+)
+def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_background_everything(photo, mask, expected):
+    recipe = Recipe("masked", (Step("fill", {"color": "#000000"}, mask),), size=None)
+    out = runner.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
+    np.testing.assert_array_equal(out, expected(photo))

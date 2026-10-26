@@ -343,7 +343,7 @@ combined with that picture by the blend mode, then mixed in by the opacity, only
 
 | Key | Values | What it does |
 |---|---|---|
-| `mask` | `"subject"`, `"background"` or the name of a selection region | Apply the step only there (the subject is found first). |
+| `mask` | `"subject"`, `"background"` or the name of a selection region | Apply the step only there (the subject is found first). When the picture has no subject (an empty map), `"subject"` selects nothing and `"background"` the whole picture. |
 | `opacity` | 0 to 1, default 1 (or the effect's own) | How much of the step shows: 0 none, 1 fully. An effect meant to be mixed in partway (a shadow, rain) may set the default of its steps' opacity; its documentation (`help(fx.rain)`, `bt-image effects rain`, the catalogue) and its `fx` signature show it, and a step's own `opacity` replaces it. |
 | `blend_mode` | `normal` (default), `multiply`, `screen`, `overlay`, `soft_light`, `difference`, `color` | How the result combines with the picture below it: `normal` shows the result, `multiply` darkens, `screen` lightens, `overlay` and `soft_light` deepen contrast, `difference` subtracts, `color` takes the result's hue and saturation and keeps the brightness below. These are the W3C blend modes, the same as the `blend` effect's `mode`. |
 | `preset` | a preset's name | Start from one of the effect's named parameter sets (see Presets, below). |
