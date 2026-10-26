@@ -159,3 +159,10 @@ def test_a_shift_beyond_the_farthest_corner_is_limited_to_it_whatever_the_number
     reach = registry.apply(NAME, noise, amount=corner, samples=samples, interpolation="nearest")
     beyond = registry.apply(NAME, noise, amount=corner * 3, samples=samples, interpolation="nearest")
     np.testing.assert_array_equal(beyond, reach)
+
+
+@pytest.mark.parametrize("samples", [3, 4, 7, 32])
+@pytest.mark.parametrize("interpolation", INTERPOLATIONS)
+def test_amount_zero_returns_the_picture_bit_for_bit(samples: int, interpolation: str, photo: np.ndarray) -> None:
+    out = registry.apply(NAME, photo, amount=0.0, samples=samples, interpolation=interpolation)
+    np.testing.assert_array_equal(out, photo)
