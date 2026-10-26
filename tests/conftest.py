@@ -22,6 +22,16 @@ from bullterrier_image.core.registry import effect, unregister
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def no_enclosing_git(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run every test as if no git were running it. A git hook (the gate that runs before a push) passes the repository
+    it serves in `GIT_*` variables, `GIT_DIR` among them, which would send the git of a test, in this process or in a
+    subprocess, to that repository instead of the throwaway one: its `git init`, `git config` and `git add` would land
+    in the real repository."""
+    for name in [name for name in os.environ if name.startswith("GIT_")]:
+        monkeypatch.delenv(name)
+
+
 @pytest.fixture(scope="session")
 def repository_files() -> Callable[[Path], list[str]]:
     """`repository_files(root)` lists the files of the git repository at `root` as paths relative to it: those git
