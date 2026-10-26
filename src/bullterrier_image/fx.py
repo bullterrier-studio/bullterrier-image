@@ -122,7 +122,7 @@ def stub_text() -> str:
         "",
         "import collections.abc",
         "import os",
-        "from typing import Literal",
+        "from typing import Literal, Union",
         "",
         "import numpy",
         "",

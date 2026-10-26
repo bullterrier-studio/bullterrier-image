@@ -1,0 +1,9 @@
+# Three inks, blue-noise dots two pixels wide: the picture as a limited-colour print.
+name = "dither"
+size = 480
+
+[[step]]
+effect = "dither"
+method = "blue_noise"
+cell = 0.008
+palette = ["#0b1026", "#ff5a36", "#f7e7c6"]

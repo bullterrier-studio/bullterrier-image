@@ -33,7 +33,6 @@ recipes.
 | `solarize` ✓ | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
 | `fade` ✓ | Lift the blacks for a matte film look. | `fx.fade(amount=0.12)` |
-| `palette_quantize` ✓ | Reduce to N colours (k-means) or a named palette. | `fx.palette_quantize(palette="gameboy")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` | Apply a `.cube` 3D colour lookup table. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
@@ -105,7 +104,7 @@ belong to a layout package, not here.
 | `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=0.2, min_cell=0.012)` |
-| `dither` | Floyd-Steinberg, Atkinson, Bayer, blue-noise, to any palette. | `fx.dither(method="atkinson", palette=["#000","#fff"])` |
+| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `amount=0` is plain palette reduction. | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
 | `edges` | Outlines by Sobel, Canny or difference of Gaussians. | `fx.edges(method="dog", width=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | `line_halftone` | Lines whose width carries tone. | `fx.line_halftone(spacing=8, angle=30)` |

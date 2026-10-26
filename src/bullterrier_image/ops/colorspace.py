@@ -170,3 +170,34 @@ def yiq_to_rgb(yiq: np.ndarray) -> np.ndarray:
         float32 array of the same shape holding sRGB (r, g, b), 0..1 for the YIQ of in-range colours; not clipped.
     """
     return (np.asarray(yiq, dtype=np.float32) @ _YIQ_TO_RGB.T).astype(np.float32)
+
+
+def rgb_to_oklab(rgb: np.ndarray) -> np.ndarray:
+    """Convert sRGB to Oklab (Bjorn Ottosson, 2020), a space in which equal distances look about equally different.
+
+    Args:
+        rgb: sRGB values, last axis length 3, 0..1.
+
+    Returns:
+        float32 array of the same shape holding (L, a, b): L the lightness, 0 for black and 1 for white, a the
+        green-red and b the blue-yellow axis, both about 0 for a grey and within about -0.4..0.4 for sRGB colours.
+    """
+    # constant: Ottosson's matrix from linear sRGB to cone responses
+    to_cones = np.array(
+        [
+            [0.4122214708, 0.5363325363, 0.0514459929],
+            [0.2119034982, 0.6806995451, 0.1073969566],
+            [0.0883024619, 0.2817188376, 0.6299787005],
+        ],
+        dtype=np.float32,
+    )
+    # constant: Ottosson's matrix from compressed cone responses to lightness and the two colour axes
+    to_lab = np.array(
+        [
+            [0.2104542553, 0.7936177850, -0.0040720468],
+            [1.9779984951, -2.4285922050, 0.4505937099],
+            [0.0259040371, 0.7827717662, -0.8086757660],
+        ],
+        dtype=np.float32,
+    )
+    return (np.cbrt(srgb_to_linear(rgb) @ to_cones.T) @ to_lab.T).astype(np.float32)

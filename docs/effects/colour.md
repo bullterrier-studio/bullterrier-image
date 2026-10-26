@@ -18,7 +18,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/hue_shift.jpg" width="160" alt="hue_shift"> | `hue_shift` | Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme. | `hue=90.0` | [hue_shift.toml](../../examples/effects/hue_shift.toml) |
 | <img src="../gallery/invert.jpg" width="160" alt="invert"> | `invert` | Turn the picture into its negative: every red, green and blue value v becomes 1 - v. | none | [invert.toml](../../examples/effects/invert.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
-| <img src="../gallery/palette_quantize.jpg" width="160" alt="palette_quantize"> | `palette_quantize` | Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`. | `palette='photo'` `colors=8` `init='k-means++'` `sample=10000` `seed=0` +2 advanced | [palette_quantize.toml](../../examples/effects/palette_quantize.toml) |
 | <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
 | <img src="../gallery/solarize.jpg" width="160" alt="solarize"> | `solarize` | Invert every red, green and blue value that is above `threshold` and leave the others as they are. | `threshold=0.5` | [solarize.toml](../../examples/effects/solarize.toml) |
@@ -185,25 +184,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `gamma` | number | ratio | 0.1 to 10 | `1.0` | The midtone gamma: 1 = linear, above 1 brightens the midtones, below 1 darkens them; black and white stay where they are (output = input ** (1 / gamma), as in Photoshop). |
 | `output_black` | number | fraction | 0 to 1 | `0.0` | The darkest value that can be output (0..1): raising it lifts the blacks to a matte grey. Above `output_white` the tones are reversed. |
 | `output_white` | number | fraction | 0 to 1 | `1.0` | The brightest value that can be output (0..1): lowering it dims the whites. |
-
-### `palette_quantize`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `palette` | one of 'photo', 'gameboy', 'cga', 'ega', 'pico8' |  |  | `'photo'` | Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); the others are fixed palettes: 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in Oklab, a space where equal distances look equally different. |
-| `colors` | whole number | count | 2 to 256 | `8` | How many colours to find when `palette` is 'photo' (ignored for a fixed palette). Raising it keeps more detail and gradation; fewer than this many are used if the picture has fewer distinct colours. |
-| `init` | one of 'k-means++', 'random' |  |  | `'k-means++'` | How the search for colours starts (palette 'photo'): 'k-means++' spreads the starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better set; 'random' starts from `colors` random pixels. |
-| `sample` | whole number | count | 1 to 1000000 | `10000` | How many randomly chosen pixels the colours are searched on when `palette` is 'photo'; every pixel is still repainted. A picture with fewer pixels is searched whole. Raising it costs time and can find rare colours; lowering it is faster but may miss small areas of colour. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the choice of sample pixels and starting colours: the same seed always gives the same picture, another seed may find slightly different colours. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `iterations` | whole number | count | 1 to 100 | `20` | The most k-means rounds to run when `palette` is 'photo'. Each round moves every colour to the average of the pixels nearest to it; raising it lets the search settle further. |
-| `tolerance` | number | fraction | 0 to 1 | `0.001` | Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result. |
-
-</details>
 
 ### `posterize`
 

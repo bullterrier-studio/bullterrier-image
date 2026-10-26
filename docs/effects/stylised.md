@@ -6,12 +6,35 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
+| <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as a pattern of dots of `cell` size. | `method='floyd_steinberg'` `palette='photo'` `colors=8` `cell=0.0005` `pattern=1.0` +5 advanced | [dither.toml](../../examples/effects/dither.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` +3 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=0.125` `min_cell=0.01` `gap=0.002` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=0.004` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
 | <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights. | `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
+
+### `dither`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `method` | one of 'floyd_steinberg', 'atkinson', 'bayer', 'blue_noise' |  |  | `'floyd_steinberg'` | How tones become a pattern of dots. 'floyd_steinberg' and 'atkinson' pass each pixel's error on to its neighbours (organic grain; Floyd-Steinberg keeps every tone, Atkinson drops a quarter of the error, so highlights and shadows go clean and the contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix. 'blue_noise' is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern. Both of those mix colours of any palette, in steps of a sixteenth. |
+| `palette` | one of 'photo', 'gameboy', 'cga', 'ega', 'pico8' or list of colours |  |  | `'photo'` | Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16 PICO-8 colours) are fixed palettes; or give your own list of at least two colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1). Colours are matched in Oklab, a space where equal distances look equally different. |
+| `colors` | whole number | count | 2 to 256 | `8` | How many colours to find when `palette` is 'photo' (ignored for any other palette). Raising it keeps more detail and gradation; fewer than this many are used if the picture has fewer distinct colours. 'bayer' and 'blue_noise' take longer with more colours. |
+| `cell` | number | fraction | 0.0005 to 0.1 | `0.0005` | The size of one dot, as a share of the picture's long side (at least one pixel): the picture is dithered on a grid of this size and shown with hard square dots. The default is one pixel on a picture up to 2000 px wide; about 0.004 is two pixels on a 480 px picture and 0.02 or more a chunky pixel look. Raising it gives coarser, larger dots. |
+| `pattern` | number | fraction | 0 to 1 | `1.0` | How much of the dot pattern is used: 1 = the method as designed; lower passes less error on (floyd_steinberg, atkinson) or mixes fewer colours per dot (bayer, blue_noise), so flatter areas; 0 gives each dot its nearest palette colour, plain flat colours with no pattern, whatever the method. |
+
+<details><summary>Advanced parameters (5)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `init` | one of 'k-means++', 'random' |  |  | `'k-means++'` | How the search for colours starts (palette 'photo'): 'k-means++' spreads the starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better set; 'random' starts from `colors` random pixels. |
+| `iterations` | whole number | count | 1 to 100 | `20` | The most k-means rounds to run when `palette` is 'photo'. Each round moves every colour to the average of the pixels nearest to it; raising it lets the search settle further. |
+| `tolerance` | number | fraction | 0 to 1 | `0.001` | Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result. |
+| `sample` | whole number | count | 1 to 1000000 | `10000` | How many randomly chosen dots the colours are searched on when `palette` is 'photo'; every dot is still repainted. A picture with fewer dots is searched whole. Raising it costs time and can find rare colours; lowering it is faster but may miss small areas of colour. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the choice of sample dots and starting colours when `palette` is 'photo': the same seed always gives the same picture, another seed may find slightly different colours. |
+
+</details>
 
 ### `halftone`
 

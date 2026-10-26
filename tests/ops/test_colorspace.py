@@ -10,6 +10,7 @@ from bullterrier_image.ops.colorspace import (
     hsv_to_rgb,
     linear_to_srgb,
     rgb_to_hsv,
+    rgb_to_oklab,
     rgb_to_ycbcr,
     rgb_to_yiq,
     srgb_to_linear,
@@ -158,3 +159,33 @@ def test_yiq_agrees_with_the_standard_librarys_rounder_ntsc_matrix_and_is_invert
         for column in range(4):
             np.testing.assert_allclose(ours[row, column], colorsys.rgb_to_yiq(*image[row, column]), atol=0.015)
     np.testing.assert_allclose(yiq_to_rgb(ours), image, atol=1e-5)
+
+
+# Oklab of the sRGB primaries and the greys at its ends, as Ottosson publishes them (three decimals).
+OKLAB_PAIRS = [
+    pytest.param((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="black"),
+    pytest.param((1.0, 1.0, 1.0), (1.0, 0.0, 0.0), id="white"),
+    pytest.param((1.0, 0.0, 0.0), (0.628, 0.225, 0.126), id="red"),
+    pytest.param((0.0, 1.0, 0.0), (0.867, -0.234, 0.180), id="green"),
+    pytest.param((0.0, 0.0, 1.0), (0.452, -0.032, -0.312), id="blue"),
+]
+
+
+@pytest.mark.parametrize(("rgb", "lab"), OKLAB_PAIRS)
+def test_rgb_to_oklab_matches_the_published_values(rgb: tuple[float, ...], lab: tuple[float, ...]) -> None:
+    np.testing.assert_allclose(rgb_to_oklab(np.array(rgb)), lab, atol=1e-3)
+
+
+def test_a_grey_has_no_colour_in_oklab_and_lightness_rises_with_it() -> None:
+    greys = np.repeat(np.linspace(0, 1, 11, dtype=np.float32)[:, None], 3, axis=1)
+    lab = rgb_to_oklab(greys)
+    np.testing.assert_allclose(lab[:, 1:], 0.0, atol=1e-4)
+    assert (np.diff(lab[:, 0]) > 0).all()
+
+
+def test_oklab_keeps_any_leading_shape_and_does_not_modify_its_input() -> None:
+    rgb = np.random.default_rng(2).random((3, 4, 5, 3), dtype=np.float32)
+    before = rgb.copy()
+    assert rgb_to_oklab(rgb).shape == rgb.shape
+    assert rgb_to_oklab(rgb).dtype == np.float32
+    np.testing.assert_array_equal(rgb, before)

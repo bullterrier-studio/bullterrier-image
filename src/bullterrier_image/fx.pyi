@@ -2,7 +2,7 @@
 
 import collections.abc
 import os
-from typing import Literal
+from typing import Literal, Union
 
 import numpy
 
@@ -1042,6 +1042,73 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when its move reads from beyond the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Redraw the picture in a few colours, its tones kept as a pattern of dots of `cell` size.
+
+The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
+afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours
+(found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives
+plain flat colours. Colours are matched, and errors measured, in Oklab.
+
+Parameters
+----------
+method : one of 'floyd_steinberg', 'atkinson', 'bayer', 'blue_noise', default 'floyd_steinberg'
+    How tones become a pattern of dots. 'floyd_steinberg' and 'atkinson' pass each
+    pixel's error on to its neighbours (organic grain; Floyd-Steinberg keeps every tone,
+    Atkinson drops a quarter of the error, so highlights and shadows go clean and the
+    contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix.
+    'blue_noise' is an even, grainless scatter from a repeating 64 x 64 tile, the one
+    with no visible pattern. Both of those mix colours of any palette, in steps of a
+    sixteenth.
+palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8' or list of colours, default 'photo'
+    Where the colours come from. 'photo' finds `colors` colours in the picture itself
+    (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
+    (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16
+    PICO-8 colours) are fixed palettes; or give your own list of at least two colours,
+    in any order ('#rrggbb', '#rgb' or three numbers 0 to 1). Colours are matched in
+    Oklab, a space where equal distances look equally different.
+colors : whole number, count, 2 to 256, default 8
+    How many colours to find when `palette` is 'photo' (ignored for any other palette).
+    Raising it keeps more detail and gradation; fewer than this many are used if the
+    picture has fewer distinct colours. 'bayer' and 'blue_noise' take longer with more
+    colours.
+cell : number, fraction, 0.0005 to 0.1, default 0.0005
+    The size of one dot, as a share of the picture's long side (at least one pixel): the
+    picture is dithered on a grid of this size and shown with hard square dots. The
+    default is one pixel on a picture up to 2000 px wide; about 0.004 is two pixels on a
+    480 px picture and 0.02 or more a chunky pixel look. Raising it gives coarser,
+    larger dots.
+pattern : number, fraction, 0 to 1, default 1.0
+    How much of the dot pattern is used: 1 = the method as designed; lower passes less
+    error on (floyd_steinberg, atkinson) or mixes fewer colours per dot (bayer,
+    blue_noise), so flatter areas; 0 gives each dot its nearest palette colour, plain
+    flat colours with no pattern, whatever the method.
+
+Advanced parameters
+-------------------
+init : one of 'k-means++', 'random', default 'k-means++'
+    How the search for colours starts (palette 'photo'): 'k-means++' spreads the
+    starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better
+    set; 'random' starts from `colors` random pixels.
+iterations : whole number, count, 1 to 100, default 20
+    The most k-means rounds to run when `palette` is 'photo'. Each round moves every
+    colour to the average of the pixels nearest to it; raising it lets the search settle
+    further.
+tolerance : number, fraction, 0 to 1, default 0.001
+    Stop the k-means rounds early once no colour has moved farther than this in Oklab
+    (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a
+    rougher result.
+sample : whole number, count, 1 to 1000000, default 10000
+    How many randomly chosen dots the colours are searched on when `palette` is 'photo';
+    every dot is still repainted. A picture with fewer dots is searched whole. Raising
+    it costs time and can find rare colours; lowering it is faster but may miss small
+    areas of colour.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for the choice of sample dots and starting colours when `palette` is
+    'photo': the same seed always gives the same picture, another seed may find slightly
+    different colours."""
     ...
 
 def drop_shadow(dx: float = 12.0, dy: float = 18.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2984,51 +3051,6 @@ Advanced parameters
 resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
     The filter that sizes the image: 'nearest' keeps hard pixels, 'bilinear' is soft,
     'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking."""
-    ...
-
-def palette_quantize(palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'] = 'photo', colors: int = 8, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Reduce the picture to a few colours: `colors` found in it by k-means, or a named `palette`.
-
-Distances are measured in Oklab, so a pixel gets the colour that looks closest to it, not the one with the nearest
-red, green and blue numbers. With palette 'photo' the colours are searched on `sample` random pixels, then every
-pixel is given its nearest colour and each colour becomes the average of the pixels it replaced, so the picture's
-overall colour is kept. With a named palette the pixels are painted in the palette's exact colours.
-
-Parameters
-----------
-palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', default 'photo'
-    Where the colours come from. 'photo' finds `colors` colours in the picture itself
-    (k-means); the others are fixed palettes: 'gameboy' (the 4 greens widely used to
-    draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA
-    colours) and 'pico8' (the 16 PICO-8 colours). Every pixel gets the nearest colour in
-    Oklab, a space where equal distances look equally different.
-colors : whole number, count, 2 to 256, default 8
-    How many colours to find when `palette` is 'photo' (ignored for a fixed palette).
-    Raising it keeps more detail and gradation; fewer than this many are used if the
-    picture has fewer distinct colours.
-init : one of 'k-means++', 'random', default 'k-means++'
-    How the search for colours starts (palette 'photo'): 'k-means++' spreads the
-    starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better
-    set; 'random' starts from `colors` random pixels.
-sample : whole number, count, 1 to 1000000, default 10000
-    How many randomly chosen pixels the colours are searched on when `palette` is
-    'photo'; every pixel is still repainted. A picture with fewer pixels is searched
-    whole. Raising it costs time and can find rare colours; lowering it is faster but
-    may miss small areas of colour.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for the choice of sample pixels and starting colours: the same seed
-    always gives the same picture, another seed may find slightly different colours.
-
-Advanced parameters
--------------------
-iterations : whole number, count, 1 to 100, default 20
-    The most k-means rounds to run when `palette` is 'photo'. Each round moves every
-    colour to the average of the pixels nearest to it; raising it lets the search settle
-    further.
-tolerance : number, fraction, 0 to 1, default 0.001
-    Stop the k-means rounds early once no colour has moved farther than this in Oklab
-    (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a
-    rougher result."""
     ...
 
 def paper_texture(kind: Literal['paper', 'canvas', 'linen'] = 'paper', amount: float = 0.1, scale: float = 6.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, spacing: float = 6.0, fibre: float = 0.3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
