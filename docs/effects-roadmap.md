@@ -9,7 +9,10 @@ watercolor, woodcut, pop art, film emulation, pixel and brick novelties, novelty
 
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
 `src/bullterrier_image/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
-recipes.
+recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
+it becomes a new effect only when it is a new idea. Planned merges of today's effects: "Planned consolidation", at the end.
+
+**Next:** `lut`, then `edges`. After them, effects are added only when a video look needs one.
 
 ## Colour and tone
 
@@ -34,7 +37,7 @@ recipes.
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
 | `fade` ✓ | Lift the blacks for a matte film look. | `fx.fade(amount=0.12)` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
-| `lut` | Apply a `.cube` 3D colour lookup table. | `fx.lut(file="film.cube", amount=0.8)` |
+| `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
 | `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |
@@ -53,7 +56,8 @@ recipes.
 | `glow` ✓ | Soft bloom around highlights. | `fx.glow(radius=28)` |
 | `sharpen` ✓ | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
 | `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
-| `denoise` | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
+| `denoise` (deferred) | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
+| `lens_blur` aperture (planned) | `blades` on `lens_blur`: hexagonal or cat's-eye bokeh; 0 = a disc. | `fx.lens_blur(radius=12, highlights=4, blades=6)` |
 | `shadows_highlights` ✓ | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
 | `dehaze` ✓ | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
 | `tone_map` ✓ | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
@@ -104,39 +108,38 @@ belong to a layout package, not here.
 | `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=0.2, min_cell=0.012)` |
-| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `amount=0` is plain palette reduction. | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
-| `edges` | Outlines by Sobel, Canny or difference of Gaussians. | `fx.edges(method="dog", width=2)` |
+| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction. | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
+| `edges` (next) | Outlines by Sobel, Canny or difference of Gaussians; on the existing `ops.edges`. | `fx.edges(method="dog", width=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
-| `line_halftone` | Lines whose width carries tone. | `fx.line_halftone(spacing=8, angle=30)` |
-| `cmyk_halftone` | Four-ink halftone at screen angles. | `fx.cmyk_halftone(cell=9)` |
+| line and CMYK screens (planned, on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none or cmyk (four inks at the screen angles). Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", cell=9)` |
 | `engraving` | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
 | `voronoi_mosaic` ✓ (`shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Recipe](../examples/recipes/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
 | `low_poly` ✓ (`shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Recipe](../examples/recipes/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
-| `risograph` | Spot-colour layers, misregistration, grain. | `fx.risograph(inks=["#ff4d6d","#2b59ff"])` |
+| `risograph` (a recipe, planned) | Spot-colour layers, misregistration, grain: `dither` or `halftone` with inks, each offset, then `grain`. Needs inks with a per-ink offset on those two. | `fx.halftone(inks=["#ff4d6d","#2b59ff"], ...)` |
 
 ## Computational and experimental
 
-Looks made by running an algorithm on the picture rather than filtering it. The iterative ones (`reaction_diffusion`,
-`cellular_automata`) take an explicit step count so they stay within the render budget.
+Looks made by running an algorithm on the picture rather than filtering it. The iterative one (`reaction_diffusion`)
+takes an explicit step count so it stays within the render budget.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `liquid_metal` ✓ | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=35, tint="#c9d6ff")` |
 | `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
+| `glass` (after `distance_field`) | The picture refracted through a region's shape with a lit bevel: fluted or ribbed glass, glass blocks, "liquid glass" over a logo, text or the subject. May absorb `lenticular` (fluted glass). | `fx.glass(kind="fluted", refraction=1.4)` with `partition = "logo"` |
 | `reaction_diffusion` ✓ | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=300)` |
-| `cellular_automata` | Life-like rules run on the thresholded picture. | `fx.cellular_automata(rule="life", steps=12, threshold=0.5)` |
 | `lenticular` ✓ | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strip=6, shift=5)` |
+
+Dropped: `cellular_automata` (noisy specks, little value).
 
 ## Text and symbols
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `ascii_edges` | Characters follow edge direction (`/ \ \| _`). | `fx.ascii_edges(cell=6)` |
-| `braille` | Unicode braille dots, 2x4 per character. | `fx.braille(cell=4)` |
-| `half_blocks` | Terminal-style `▀▄` pixel art. | `fx.half_blocks(cell=6)` |
-| `text_mosaic` | The photo built from the words of a supplied text. | `fx.text_mosaic(text=open("poem.txt").read())` |
-| `typographic_portrait` | Lines of text, weight carries tone. | `fx.typographic_portrait(text="...")` |
+| glyph matching (planned, on `ascii`) | Pick each character by how its shape matches the cell rather than by its ink: edge characters (`/ \ \| _`), braille (2x4 dots) or half blocks (`▀▄`). Replaces `ascii_edges`, `braille` and `half_blocks`. | `fx.ascii(match="shape", chars="braille")` |
+| text order (planned, on `ascii`) | The photo built from a supplied text, its characters in order, tone carried by colour. Replaces `text_mosaic`. | `fx.ascii(text=open("poem.txt").read())` |
+| `typographic_portrait` (deferred) | Lines of text, weight carries tone (needs variable font weights). | `fx.typographic_portrait(text="...")` |
 
 ## Distortion and geometry
 
@@ -236,6 +239,8 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `clarity` on the near. | `fill` with `mask` = a `band` of `depth` region |
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
+| coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
+| depth contours (planned, on `topographic`) | Contour lines of the depth instead of brightness, with a `band` of depth that video sweeps: a LiDAR or scanner look. Needs field parameters ("Planned consolidation"). | `fx.topographic(field="depth", levels=24)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 | `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
 
@@ -314,11 +319,11 @@ no time of its own.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `disperse` ✓ | Pieces detach, drift on the wind and fade. | `fx.disperse(progress=0.45, wind=0.3)` |
-| `assemble` | The reverse: pieces fly in and settle. | `fx.assemble(progress=0.5)` |
-| `dissolve` | Pixels vanish in noise order, with a burning edge. | `fx.dissolve(progress=0.5, edge="#ff7a2b")` |
-| `pixel_dissolve` | Dissolve into blocks. | `fx.pixel_dissolve(progress=0.5, cell=16)` |
-| `explode` | Pieces burst radially from a point. | `fx.explode(progress=0.5, center=[0.5,0.4])` |
+| `dissolve` | Pixels or blocks of `cell` px vanish in noise order, with a burning edge (covers the old `pixel_dissolve`). | `fx.dissolve(progress=0.5, cell=16, edge="#ff7a2b")` |
+| burst (planned, on `disperse`) | Pieces burst outward from a point (`x`, `y`) as well as drifting on the wind. Replaces `explode`. | `fx.disperse(progress=0.5, burst=1, x=0.5, y=0.4)` |
 | `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=0.03, focus=0.5)` |
+
+Dropped: `assemble`. Pieces flying in and settling is `disperse` with `progress` running from 1 to 0, set by video.
 
 Text appearing character by character is bullterrier-vector's (typesetting) animated by video; a caption here is an `svg` region + `fill`/`outline`.
 
@@ -331,14 +336,68 @@ control packages.
 What combining effects can give, once the pieces exist:
 
 - **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain, CRT glass
-- **Risograph poster**: levels, risograph inks, paper texture
+- **Risograph poster**: levels, risograph inks (`halftone` or `dither` with inks), paper texture
 - **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml)): green ASCII on a curved CRT screen with shadow mask, scanlines and glow
 - **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
-- **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
+- **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `halftone` has CMYK separation; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs inks on `halftone` or `dither`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
+
+## Planned consolidation (before 1.0; breaking, no aliases)
+
+Fewer effects, each fully customisable and distinct. A merged effect has fewer parameters than the effects it replaces,
+and each parameter matters for every look. About 128 effects become about 94. The ✓ rows above stay until each merge
+lands.
+
+**Core: field parameters.** An effect may name a field (`depth`, `light`, `subject`, a region such as a gradient or a
+band), resolved like a `Drive`'s `by`; only named fields are built. This merges `relight`, `bump_light` and `emboss`
+(`field`), and `depth_of_field` with `tilt_shift` (`focus_blur`; the tilt look = a linear-gradient field), and gives
+`topographic` depth contours.
+
+**Merges that change no picture:**
+
+| Goes | Into |
+| --- | --- |
+| `glow` | `bloom(octaves=1)` |
+| `soft_focus` | a `bloom` preset |
+| `halation` | `bloom` + `color` |
+| `fade` | `levels(output_black)` |
+| `invert` | a `levels` preset |
+| `clarity` | a `sharpen` preset |
+| `byte_corrupt` | `jpeg_crush` + `hits` |
+| `prism` | `chromatic_aberration` + `samples` |
+| `noise`, `film_grain` | `grain` (`shadows`, `highlights`, `color`, `distribution`) |
+| `black_and_white` | a `channel_mixer` preset |
+| `vibrance` | `grade` + `vibrance` |
+| `mirror` | `kaleidoscope(segments=1)` |
+| `shear` | `perspective` + `shear_x`, `shear_y` |
+| `anaglyph` | `rgb_split` + `pair` |
+| `plasma` | `noise_field(kind="sine")` + `warp` |
+
+**Family merges:**
+
+| Goes | Into |
+| --- | --- |
+| `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
+| `drop_shadow`, `layered_cutouts`, `long_shadow` | one silhouette-copies effect |
+| `glitch` | a recipe: `slice_shift` + `rgb_split` |
+| `sparkle` | `starburst` + `count`, `dot` |
+| `fog`, `smoke` | one, with presets |
+| `crt`, `hologram` | recipes (`scanlines` gains `softness`; `lens_distortion` gains a border colour; needs `edges`) |
+| `fisheye` | `lens_distortion` + `model` |
+| `scatter` | `displace` |
+| `split_tone`, `color_balance` | one three-range tool |
+| `overlay` | `blend` + `fit="width"` |
+| `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |
+| `shadows_highlights` + `tone_map` | one, if one set of curves covers both looks |
+
+**Conventions, applied with the merges:**
+- Angles of a direction are measured clockwise from pointing right.
+- The size of a mark is in px (tuned for 480); placement and reach are a share of the long side.
+- Scattered marks use `density`.
+- `edge` defaults to 'reflect' for blurs and warps, and to 'nearest' for shifts and copies.
