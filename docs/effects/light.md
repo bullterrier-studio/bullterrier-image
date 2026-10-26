@@ -6,11 +6,13 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
+| <img src="../gallery/ambient_occlusion.jpg" width="160" alt="ambient_occlusion"> | `ambient_occlusion` | Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer. | `radius=10.0` `gain=4.0` +2 advanced | [ambient_occlusion.toml](../../examples/effects/ambient_occlusion.toml) |
 | <img src="../gallery/anamorphic_streaks.jpg" width="160" alt="anamorphic_streaks"> | `anamorphic_streaks` | Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened over the picture by `amount`. | `length=0.35` `threshold=0.7` `amount=6.0` `color='#8fb8ff'` | [anamorphic_streaks.toml](../../examples/effects/anamorphic_streaks.toml) |
 | <img src="../gallery/bloom.jpg" width="160" alt="bloom"> | `bloom` | Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture. | `radius=32.0` `threshold=0.6` `amount=0.7` `octaves=4` `persistence=0.5` +2 advanced | [bloom.toml](../../examples/effects/bloom.toml) |
 | <img src="../gallery/chromatic_aberration.jpg" width="160" alt="chromatic_aberration"> | `chromatic_aberration` | Shift red outward and blue inward from the centre `x`, `y` by up to `amount` px, leaving green alone. | `amount=4.0` `x=0.5` `y=0.5` +2 advanced | [chromatic_aberration.toml](../../examples/effects/chromatic_aberration.toml) |
 | <img src="../gallery/clarity.jpg" width="160" alt="clarity"> | `clarity` | Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when the whole face sits in a narrow band of brightness. | `radius=30.0` `amount=1.0` +3 advanced | [clarity.toml](../../examples/effects/clarity.toml) |
 | <img src="../gallery/dehaze.jpg" width="160" alt="dehaze"> | `dehaze` | Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009). | `amount=0.9` `patch=15` `radius=30.0` `airlight_fraction=0.001` +3 advanced | [dehaze.toml](../../examples/effects/dehaze.toml) |
+| <img src="../gallery/depth_of_field.jpg" width="160" alt="depth_of_field"> | `depth_of_field` | A shallow depth of field: each pixel is blurred by w x `radius`, w = clip((\|depth - focus\| - width / 2) / feather, 0, 1), so the depths within `width` / 2 of `focus` are returned exactly as they are. | `focus=0.8` `width=0.15` `feather=0.4` `radius=10.0` +3 advanced | [depth_of_field.toml](../../examples/effects/depth_of_field.toml) |
 | <img src="../gallery/gaussian_blur.jpg" width="160" alt="gaussian_blur"> | `gaussian_blur` | Soften the picture with a Gaussian blur of standard deviation `radius` px. | `radius=4.0` +3 advanced | [gaussian_blur.toml](../../examples/effects/gaussian_blur.toml) |
 | <img src="../gallery/glow.jpg" width="160" alt="glow"> | `glow` | Soft bloom around the bright parts: what is brighter than `threshold` is blurred by `radius` px and screened over the picture by `amount`. | `radius=24.0` `amount=0.6` `threshold=0.55` +3 advanced | [glow.toml](../../examples/effects/glow.toml) |
 | <img src="../gallery/halation.jpg" width="160" alt="halation"> | `halation` | A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by `radius` px, tinted `color` and screened over the picture by `amount`. | `radius=30.0` `threshold=0.5` `amount=1.8` `color='#ff4a14'` +2 advanced | [halation.toml](../../examples/effects/halation.toml) |
@@ -21,6 +23,7 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/light_rays.jpg" width="160" alt="light_rays"> | `light_rays` | God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`. | `x=0.5` `y=0.3` `length=0.5` `threshold=0.7` `amount=2.5` `decay=0.9` +3 advanced | [light_rays.toml](../../examples/effects/light_rays.toml) |
 | <img src="../gallery/motion_blur.jpg" width="160" alt="motion_blur"> | `motion_blur` | Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would. | `angle=0.0` `length=24.0` +1 advanced | [motion_blur.toml](../../examples/effects/motion_blur.toml) |
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
+| <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture's depth, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=200.0` `blur=2.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +2 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
 | <img src="../gallery/soft_focus.jpg" width="160" alt="soft_focus"> | `soft_focus` | A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one. | `radius=12.0` +2 advanced | [soft_focus.toml](../../examples/effects/soft_focus.toml) |
@@ -28,6 +31,24 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/tilt_shift.jpg" width="160" alt="tilt_shift"> | `tilt_shift` | A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to `radius` and its colour raised by `saturation`. | `focus=0.5` `width=0.2` `feather=0.25` `angle=0.0` `radius=10.0` `saturation=0.3` `levels=4` +2 advanced | [tilt_shift.toml](../../examples/effects/tilt_shift.toml) |
 | <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
 | <img src="../gallery/vignette.jpg" width="160" alt="vignette"> | `vignette` | Fade the picture toward `color` from `radius` out to its corners, the centre untouched. | `amount=0.5` `radius=0.5` `feather=0.5` `roundness=1.0` `color='#000000'` | [vignette.toml](../../examples/effects/vignette.toml) |
+
+### `ambient_occlusion`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `radius` | number | px | 1 to 200 | `10.0` | The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at the recipe's size over which the surrounding depth is averaged. Raising it darkens wider areas around nearer things; lowering it keeps the darkening to fine creases. |
+| `gain` | number | ratio | 1 to 100 | `4.0` | How strongly a depth difference darkens: a pixel lying d farther than its surroundings (depth 0..1) is darkened by gain x d, at most to black. Raising it darkens shallow creases more and turns deep ones black sooner. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the averaging Gaussian is cut off, in sigmas: it reaches truncate x radius px. Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the averaging sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge, so a tileable picture darkens without a seam). |
+
+</details>
+
+A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 ### `anamorphic_streaks`
 
@@ -107,6 +128,25 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | `edge_threshold` | number | fraction | 0.001 to 1 | `0.03` | The brightness step (0..1, Rec. 709 luma) that counts as an edge the refined haze estimate must not blur across: steps above it keep the haze of their own side, steps below it are smoothed. Raising it gives a smoother estimate and halos around edges; lowering it follows ever smaller edges. |
 | `transmission_floor` | number | fraction | 0.01 to 1 | `0.1` | The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that reaches the camera: colours are stretched by at most 1 / transmission_floor, so a low floor clears thick haze but amplifies noise and clips; 1 allows no stretch at all. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the darkest-value search sees beyond the picture's edge, which sets the haze estimate along the border: 'nearest' (the edge pixel repeated) and 'reflect' (mirrored, edge pixel repeated) look only at pixels of the patch inside the picture and give the same result; 'mirror' (mirrored about the edge pixel) also looks at pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far side's darkest values set the haze at the border. |
+
+</details>
+
+### `depth_of_field`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `focus` | number | fraction | 0 to 1 | `0.8` | The depth that stays sharp, as a fraction of the picture's depth range: 1 = the nearest, 0 = the farthest. Raising it moves the focus towards the camera. |
+| `width` | number | fraction | 0 to 1 | `0.15` | How wide a band of depth around the focus stays exactly as it is, as a fraction of the depth range. Raising it keeps more of the picture sharp. |
+| `feather` | number | fraction | 0.01 to 1 | `0.4` | How far in depth beyond the band's edge the blur takes to reach its full radius, as a fraction of the depth range: the blur grows evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt one. |
+| `radius` | number | px | 0 to 100 | `10.0` | The Gaussian sigma in px at the recipe's size that the blur reaches at the full distance from the focus (a further `feather` from the band's edge): larger blurs the out-of-focus picture more; 0 = no blur. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `levels` | whole number | count | 1 to 16 | `6` | How many blurred copies of the picture the blur is built from: copy k has the sigma radius x k / levels, and each pixel mixes the two copies (or the sharp picture and the first) nearest its distance from the focus. More is smoother between levels and slower; 1 mixes the sharp picture with one blur. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its sigma px. Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
 
 </details>
 
@@ -277,6 +317,24 @@ Glow, bloom and local contrast: they add or shape the light in the picture.
 | `samples` | whole number | count | 1 to 256 | `8` | How many points along each arc or ray are averaged, spread evenly over its length and read from the picture by the chosen interpolation: more is smoother and slower (the time grows with it), and a smear of more than a few pixels per sample shows as separate ghost copies. With 1 the picture is unchanged. |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but steps and ghosts show in smooth areas), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest and most exact on smooth gradients, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smear sees beyond the picture's edge (arcs and rays near the corners leave it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
+
+### `relight`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `angle` | number | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that face it are brightened, those that face away darkened. |
+| `elevation` | number | degrees | 1 to 90 | `45.0` | How high the light stands above the picture's plane, in degrees: 90 = straight above (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 = grazing, so the shapes are dramatic and the lit side is clipped to white. |
+| `height` | number | px | 0 to 1000 | `200.0` | How tall the whole depth range stands as a relief, in px at the recipe's size: the nearest depth (1) stands this many px above the farthest (0), so the slope between neighbours is their depth difference times this. 0 = flat (the picture is unchanged), larger = steeper shapes that catch more of the light. |
+| `blur` | number | px | 0 to 50 | `2.0` | Gaussian sigma in px with which the depth is smoothed before its slopes are taken: 0 = every ripple of the depth map is lit (its noise shows), larger = softer lighting that follows only the broad shapes. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a seam). |
 
 </details>
 

@@ -9,6 +9,44 @@ import numpy
 from .core.params import Picture
 from .recipe import Step
 
+def ambient_occlusion(radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer.
+
+Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus
+its own depth, positive where it lies farther than its surroundings. It is darkened by clip(gain x cavity, 0, 1),
+one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping
+depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and
+leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
+`depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
+1 = nearest. Without a depth the picture is unchanged.
+
+Parameters
+----------
+radius : number, px, 1 to 200, default 10.0
+    The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at
+    the recipe's size over which the surrounding depth is averaged. Raising it darkens
+    wider areas around nearer things; lowering it keeps the darkening to fine creases.
+gain : number, ratio, 1 to 100, default 4.0
+    How strongly a depth difference darkens: a pixel lying d farther than its
+    surroundings (depth 0..1) is darkened by gain x d, at most to black. Raising it
+    darkens shallow creases more and turns deep ones black sooner.
+
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the averaging Gaussian is cut off, in sigmas: it reaches truncate x radius px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the averaging sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge, so a tileable picture darkens without a
+    seam).
+
+Step opacity
+------------
+0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
+    ...
+
 def anaglyph(shift: float = 6.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Red from the brightness moved `shift` px left, green and blue from the brightness moved `shift` px right.
 
@@ -64,11 +102,11 @@ color : colour, default '#8fb8ff'
     makes them."""
     ...
 
-def ascii(cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, gamma: float = 1.0, photo: float = 0.0, font: str | None = None, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def ascii(cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, gamma: float = 1.0, photo: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 
 Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
-tones survive as denser and lighter characters. A font that cannot be opened raises OSError.
+tones survive as denser and lighter characters.
 
 Parameters
 ----------
@@ -79,7 +117,8 @@ chars : text, default ' .:-=+*#%@'
     The character palette, in any order, at least two different characters. It is sorted
     by how much ink each glyph puts down, so the densest is used for the brightest areas
     on dark paper and the darkest on light paper (see `paper`). Try ' .:-=+*#%@', '
-    .oO0@', '01', or blocks like ' ░▒▓█' (the font must have them).
+    .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the Latin letters and the
+    block elements, not braille.
 ink : colour or none, default None
     The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
     default) colours each character from the average colour of the photo under it,
@@ -105,13 +144,7 @@ gamma : number, ratio, 0.1 to 10, default 1.0
 photo : number, fraction, 0 to 1, default 0.0
     How much of the original picture shows through the paper behind the characters, 0 to
     1: 0 = text on flat `paper` (fine detail is lost to the grid), 1 = text laid over
-    the untouched photo.
-
-Advanced parameters
--------------------
-font : text or none, default None
-    Path to a monospaced .ttf/.ttc font; none (the default) uses the first system
-    monospaced font found."""
+    the untouched photo."""
     ...
 
 def aurora(colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 0.7, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
@@ -770,7 +803,48 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, font: str | None = None, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def depth_of_field(focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """A shallow depth of field: each pixel is blurred by w x `radius`, w = clip((|depth - focus| - width / 2) /
+feather, 0, 1), so the depths within `width` / 2 of `focus` are returned exactly as they are.
+
+The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
+sharp picture being copy 0) either side of w x `levels`. `depth` is filled in by the recipe from the depth model
+(never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Without a depth the picture is unchanged.
+
+Parameters
+----------
+focus : number, fraction, 0 to 1, default 0.8
+    The depth that stays sharp, as a fraction of the picture's depth range: 1 = the
+    nearest, 0 = the farthest. Raising it moves the focus towards the camera.
+width : number, fraction, 0 to 1, default 0.15
+    How wide a band of depth around the focus stays exactly as it is, as a fraction of
+    the depth range. Raising it keeps more of the picture sharp.
+feather : number, fraction, 0.01 to 1, default 0.4
+    How far in depth beyond the band's edge the blur takes to reach its full radius, as
+    a fraction of the depth range: the blur grows evenly across it. Raising it makes a
+    gentler fall-off, lowering it an abrupt one.
+radius : number, px, 0 to 100, default 10.0
+    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
+    distance from the focus (a further `feather` from the band's edge): larger blurs the
+    out-of-focus picture more; 0 = no blur.
+
+Advanced parameters
+-------------------
+levels : whole number, count, 1 to 16, default 6
+    How many blurred copies of the picture the blur is built from: copy k has the sigma
+    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
+    the first) nearest its distance from the focus. More is smoother between levels and
+    slower; 1 mixes the sharp picture with one blur.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
+    sigma px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
+    ...
+
+def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
@@ -786,8 +860,9 @@ makes the edges loosen all round first; `ambient` with `ambient_phase` makes the
 Parameters
 ----------
 cell : whole number, px, 1 to 64, default 5
-    Character width in px; a piece is one character (its height comes from `font`). Use
-    the same value as the ascii step before this one, so whole characters move.
+    Character width in px; a piece is one character (its height comes from the bundled
+    font). Use the same value as the ascii step before this one, so whole characters
+    move.
 progress : number, fraction, 0 to 1, default 0.0
     The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).
 top : number, ratio, 0 to 10, default 1.0
@@ -815,10 +890,6 @@ seed : whole number, count, 0 to 2147483647, default 0
 
 Advanced parameters
 -------------------
-font : text or none, default None
-    Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None
-    for the system font; use the same as the ascii step. A path that cannot be opened
-    fails when the effect runs.
 hover : number, fraction, 0 to 1, default 0.0
     Share of its journey a piece floats slowly along the wind before it goes (about
     0..0.3 looks right). The outline starts at once, deeper pieces later (see
@@ -1137,12 +1208,13 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     mirrors it about the edge line."""
     ...
 
-def embers(count: int = 120, size: float = 7.0, softness: float = 1.0, length: float = 8.0, angle: float = 15.0, depth: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ff8a2b', seed: int = 0, *, mask: str | None = None, opacity: float = 0.9, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def embers(count: int = 120, size: float = 7.0, softness: float = 1.0, length: float = 8.0, angle: float = 15.0, depth_range: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ff8a2b', seed: int = 0, *, mask: str | None = None, opacity: float = 0.9, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it.
 
 Every ember lies at a random distance d from 0 (far) to 1 (near): its width and streak length are `size` and
-`length` times 1 - `depth` x (1 - d), and it screens that share of `color` along its middle. It rises at `angle`
-from vertical, so its streak runs from the spark down the other way, and its edge is `softness` of its radius soft.
+`length` times 1 - `depth_range` x (1 - d), and it screens that share of `color` along its middle. It rises at
+`angle` from vertical, so its streak runs from the spark down the other way, and its edge is `softness` of its
+radius soft.
 Where embers overlap the brighter one shows. Embers are screened over the picture, so they only lighten it; the
 same `seed` always gives the same sparks.
 
@@ -1153,23 +1225,24 @@ count : whole number, count, 0 to 2000, default 120
     density). 0 = none (the picture unchanged), 120 is a lively shower of sparks.
 size : number, px, 1 to 30, default 7.0
     The width in px of the nearest, largest embers; the farthest are narrower by
-    `depth`. Tuned for a picture about 480 px high. Larger = fatter sparks.
+    `depth_range`. Tuned for a picture about 480 px high. Larger = fatter sparks.
 softness : number, fraction, 0 to 1, default 1.0
     How soft an ember's edge is: it falls from full brightness to none across this
     fraction of the ember's radius (at least one pixel). 0 = crisp sparks, 1 = sparks
     glowing out from their middle.
 length : number, px, 0 to 200, default 8.0
     The length in px of the streak each nearest ember leaves behind it; the farthest are
-    shorter by `depth`. Tuned for a picture about 480 px high. 0 = round dots, larger =
-    faster-looking sparks.
+    shorter by `depth_range`. Tuned for a picture about 480 px high. 0 = round dots,
+    larger = faster-looking sparks.
 angle : number, degrees, -45 to 45, default 15.0
     How far the embers drift from straight up, in degrees: positive drifts to the right
     as they rise (wind from the left), negative to the left. 0 = straight up. The
     streaks trail the other way.
-depth : number, fraction, 0 to 1, default 0.5
-    How far apart the embers are in depth, which spreads their width, streak length and
-    brightness: the farthest have 1 - depth times those of the nearest. 0 = every ember
-    alike, 1 = from the nearest down to nothing at the farthest.
+depth_range : number, fraction, 0 to 1, default 0.5
+    The depth range of the embers, how far apart they are in distance, which spreads
+    their width, streak length and brightness: the farthest have 1 - `depth_range` times
+    those of the nearest. 0 = every ember alike, 1 = from the nearest down to nothing at
+    the farthest.
 color : colour, default '#ff8a2b'
     The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Embers are screened
     over the picture, so they only lighten it.
@@ -1182,8 +1255,8 @@ Step opacity
 0.9: a step of this effect is mixed in at 0.9 unless it sets its own `opacity`, which replaces this."""
     ...
 
-def emboss(angle: float = 315.0, depth: float = 6.0, saturation: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
-    """Read the brightness as a relief `depth` px tall and light it from `angle`.
+def emboss(angle: float = 315.0, height: float = 6.0, saturation: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """Read the brightness as a relief `height` px tall and light it from `angle`.
 
 The shade is 0.5 + 0.5 x the cosine between the surface normal and a horizontal light, so a flat surface is mid
 grey, one facing the light edge-on 1 and one facing away 0, and the shade never leaves 0..1. `saturation` mixes in
@@ -1197,7 +1270,7 @@ angle : number, degrees, 0 to 360, default 315.0
     choice: it reads as raised). Surfaces that rise away from the light are brighter
     than mid grey and those that rise towards it darker; turning the light by 180
     inverts the picture around mid grey.
-depth : number, px, 0 to 50, default 6.0
+height : number, px, 0 to 50, default 6.0
     How tall the relief is: a white pixel stands this many px above a black one, so the
     slope between neighbours is their brightness difference times this. 0 = a flat
     surface (mid grey), larger = steeper relief and stronger shading, up to full black
@@ -1248,7 +1321,7 @@ bins : whole number, count, 2 to 256, default 256
     brightnesses), 256 matches 8-bit pictures."""
     ...
 
-def evaporate(cell: int = 5, font: str | None = None, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
+def evaporate(cell: int = 5, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
@@ -1268,8 +1341,9 @@ a matte the lit pieces are used, with enclosed dark gaps filled in.
 Parameters
 ----------
 cell : whole number, px, 1 to 64, default 5
-    Character width in px; a piece is one character (its height comes from `font`). Use
-    the same value as the ascii step before this one, so whole characters fly away.
+    Character width in px; a piece is one character (its height comes from the bundled
+    font). Use the same value as the ascii step before this one, so whole characters fly
+    away.
 start : number, fraction, 0 to 1, default 0.6
     Height (fraction of the picture, 0 = top) above which pieces begin to detach from
     the top down. 0 switches the top-down dissolve off.
@@ -1294,10 +1368,6 @@ seed : whole number, count, 0 to 2147483647, default 0
 
 Advanced parameters
 -------------------
-font : text or none, default None
-    Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None
-    for the system font; use the same as the ascii step. A path that cannot be opened
-    fails when the effect runs.
 ramp : number, fraction, 0.01 to 1, default 0.3
     Height of the band (fraction of the picture) above `start` over which the chance of
     detaching rises smoothly from 0 to 1; above the band every piece has detached.
@@ -1456,13 +1526,13 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     slower, and may ring beside hard edges)."""
     ...
 
-def floating_dust(count: int = 80, size: float = 24.0, softness: float = 0.8, depth: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#fff1d6', seed: int = 0, *, mask: str | None = None, opacity: float = 0.55, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def floating_dust(count: int = 80, size: float = 24.0, softness: float = 0.8, depth_range: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#fff1d6', seed: int = 0, *, mask: str | None = None, opacity: float = 0.55, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust.
 
-Every speck lies at a random distance d from 0 (far) to 1 (near): its width is `size` times 1 - `depth` x (1 - d),
-and it screens that share of `color`. A speck is full brightness inside, half of it at its radius, with an edge
-`softness` of its radius soft. Where specks overlap the brighter one shows. Specks are screened over the picture,
-so they only lighten it; the same `seed` always gives the same dust.
+Every speck lies at a random distance d from 0 (far) to 1 (near): its width is `size` times 1 - `depth_range` x
+(1 - d), and it screens that share of `color`. A speck is full brightness inside, half of it at its radius, with an
+edge `softness` of its radius soft. Where specks overlap the brighter one shows. Specks are screened over the
+picture, so they only lighten it; the same `seed` always gives the same dust.
 
 Parameters
 ----------
@@ -1471,16 +1541,17 @@ count : whole number, count, 0 to 1000, default 80
     density). 0 = none (the picture unchanged), 80 is a scattering, 400 a dusty air.
 size : number, px, 1 to 200, default 24.0
     The diameter in px of the nearest, largest specks; the farthest are narrower by
-    `depth`. Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if
-    the dust were closer to the lens.
+    `depth_range`. Tuned for a picture about 480 px high. Larger = bigger bokeh discs,
+    as if the dust were closer to the lens.
 softness : number, fraction, 0 to 1, default 0.8
     How soft a speck's edge is: the edge falls from full brightness to none across this
     fraction of the speck's radius (at least one pixel). 0 = crisp discs, 1 = specks
     fading out from their middle.
-depth : number, fraction, 0 to 1, default 0.5
-    How far apart the specks are in depth, which spreads their size and brightness: the
-    farthest have 1 - depth times those of the nearest. 0 = every speck alike, 1 = from
-    the nearest down to nothing at the farthest.
+depth_range : number, fraction, 0 to 1, default 0.5
+    The depth range of the specks, how far apart they are in distance, which spreads
+    their size and brightness: the farthest have 1 - `depth_range` times those of the
+    nearest. 0 = every speck alike, 1 = from the nearest down to nothing at the
+    farthest.
 color : colour, default '#fff1d6'
     The colour of the light the specks catch: '#rrggbb', '#rgb' or [r, g, b] 0..1.
     Specks are screened over the picture, so they only lighten it.
@@ -3010,6 +3081,43 @@ fibre : number, fraction, 0 to 1, default 0.3
     same as 'paper'). Ignored for 'paper'."""
     ...
 
+def parallax(angle: float = 0.0, amount: float = 0.02, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera
+move would.
+
+Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
+the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background
+beside it stretched over the gap: a 2.5D look, not a new view. `depth` is filled in by the recipe from the depth
+model (never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Without a depth the picture is unchanged.
+
+Parameters
+----------
+angle : number, degrees, 0 to 360, default 0.0
+    The direction the nearest layers move, counter-clockwise as seen in the picture: 0 =
+    right, 90 = up, 180 = left. Layers farther than the focus move the opposite way.
+amount : number, fraction, 0 to 0.1, default 0.02
+    How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a
+    fraction of the picture's long side: a layer moves amount x (its depth - focus) of
+    it. Raising it exaggerates the shift; 0 leaves the picture unchanged.
+focus : number, fraction, 0 to 1, default 0.5
+    The depth that stays still, as a fraction of the picture's depth range: 1 = the
+    nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the
+    opposite way; raising it moves more of the picture against `angle`.
+
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
+    ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pixel near the border sees when its shift reads from beyond the picture:
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
 def pattern(kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.
 
@@ -3385,12 +3493,12 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def rain(density: float = 1.0, angle: float = 10.0, length: float = 32.0, thickness: float = 1.5, depth: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#dbe6f5', seed: int = 0, *, mask: str | None = None, opacity: float = 0.7, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def rain(density: float = 1.0, angle: float = 10.0, length: float = 32.0, thickness: float = 1.5, depth_range: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#dbe6f5', seed: int = 0, *, mask: str | None = None, opacity: float = 0.7, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`.
 
 Every streak lies at a random distance d from 0 (far) to 1 (near): its length and width are `length` and
-`thickness` times 1 - `depth` x (1 - d), and it screens that share of `color` along its middle, so the rain has
-depth. A streak is drawn with antialiased edges and is cut off by the picture's edge. Streaks are screened over
+`thickness` times 1 - `depth_range` x (1 - d), and it screens that share of `color` along its middle, so the rain
+has depth. A streak is drawn with antialiased edges and is cut off by the picture's edge. Streaks are screened over
 the picture, so they only lighten it. A higher `density` keeps every streak of a lower one and adds more; the same
 `seed` always gives the same rain.
 
@@ -3404,15 +3512,17 @@ angle : number, degrees, -45 to 45, default 10.0
     How far the streaks lean from straight down, in degrees: positive leans toward the
     right as they fall (wind from the left), negative toward the left. 0 = vertical.
 length : number, px, 1 to 200, default 32.0
-    The length of the nearest streaks in px; the farthest are shorter by `depth`. Tuned
-    for a picture about 480 px high. Larger = longer streaks, as with a slower shutter.
+    The length of the nearest streaks in px; the farthest are shorter by `depth_range`.
+    Tuned for a picture about 480 px high. Larger = longer streaks, as with a slower
+    shutter.
 thickness : number, px, 1 to 20, default 1.5
-    The width of the nearest streaks in px; the farthest are narrower by `depth`. Tuned
-    for a picture about 480 px high. Larger = fatter drops.
-depth : number, fraction, 0 to 1, default 0.5
-    How far apart the streaks are in depth, which spreads their length, width and
-    brightness: the farthest have 1 - depth times those of the nearest. 0 = every streak
-    alike, 1 = from the nearest down to nothing at the farthest.
+    The width of the nearest streaks in px; the farthest are narrower by `depth_range`.
+    Tuned for a picture about 480 px high. Larger = fatter drops.
+depth_range : number, fraction, 0 to 1, default 0.5
+    The depth range of the streaks, how far apart they are in distance, which spreads
+    their length, width and brightness: the farthest have 1 - `depth_range` times those
+    of the nearest. 0 = every streak alike, 1 = from the nearest down to nothing at the
+    farthest.
 color : colour, default '#dbe6f5'
     The colour of the rain: '#rrggbb', '#rgb' or [r, g, b] 0..1. Streaks are screened
     over the picture, so they only lighten it.
@@ -3519,6 +3629,51 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 Step opacity
 ------------
 0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
+    ...
+
+def relight(angle: float = 315.0, elevation: float = 45.0, height: float = 200.0, blur: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """Light the picture's depth, read as a relief `height` px tall, from `angle` at `elevation`.
+
+The lighting comes from the shape of the depth, not from the picture's brightness: the height is the depth
+smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its length with the slopes taken per pixel by
+central differences. The light's strength is the normal's dot product with the light's direction in proportion to
+what a flat surface gets, so flat areas are unchanged and a slope is brightened or darkened. All channels are
+multiplied by that one grey gain, so the picture's colour ratios are kept, and the result is clipped to 0..1.
+A sharp step in depth (a subject's outline) lights as a steep cliff and can leave a dark or bright fringe on the
+background beside it; raise `blur` or lower `height` to soften it.
+`depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
+1 = nearest. Without a depth the picture is unchanged.
+
+Parameters
+----------
+angle : number, degrees, 0 to 360, default 315.0
+    Where the light comes from, in degrees clockwise from the top of the picture: 0 =
+    above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that
+    face it are brightened, those that face away darkened.
+elevation : number, degrees, 1 to 90, default 45.0
+    How high the light stands above the picture's plane, in degrees: 90 = straight above
+    (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 =
+    grazing, so the shapes are dramatic and the lit side is clipped to white.
+height : number, px, 0 to 1000, default 200.0
+    How tall the whole depth range stands as a relief, in px at the recipe's size: the
+    nearest depth (1) stands this many px above the farthest (0), so the slope between
+    neighbours is their depth difference times this. 0 = flat (the picture is
+    unchanged), larger = steeper shapes that catch more of the light.
+blur : number, px, 0 to 50, default 2.0
+    Gaussian sigma in px with which the depth is smoothed before its slopes are taken: 0
+    = every ripple of the depth map is lit (its noise shows), larger = softer lighting
+    that follows only the broad shapes.
+
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0).
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
+    edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a
+    seam)."""
     ...
 
 def rgb_split(angle: float = 30.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
@@ -4068,11 +4223,11 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def snow(density: float = 0.5, size: float = 14.0, layers: int = 4, softness: float = 0.5, depth: float = 0.5, seed: int = 0, *, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def snow(density: float = 0.5, size: float = 14.0, layers: int = 4, softness: float = 0.5, depth_range: float = 0.5, seed: int = 0, *, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers.
 
 Each flake falls in a random layer; at nearness d = k / `layers` (the nearest layer is 1) it is a disc `size` x d
-wide, 1 - `depth` x (1 - d) bright (1 = solid white), with an edge `softness` of its radius soft. Where flakes
+wide, 1 - `depth_range` x (1 - d) bright (1 = solid white), with an edge `softness` of its radius soft. Where flakes
 overlap the brighter one shows, and flakes are screened over the picture, so they only lighten it. A higher
 `density` keeps every flake of a lower one and adds more; the same `seed` always gives the same snow.
 
@@ -4088,17 +4243,19 @@ size : number, px, 1 to 100, default 14.0
     fell closer to the lens.
 layers : whole number, count, 1 to 10, default 4
     How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide
-    as `size` and (1 - `depth` x (1 - k / n)) as bright as solid white, so more layers =
-    a smoother range from fine far flakes to large near ones. 1 = every flake alike.
+    as `size` and (1 - `depth_range` x (1 - k / n)) as bright as solid white, so more
+    layers = a smoother range from fine far flakes to large near ones. 1 = every flake
+    alike.
 softness : number, fraction, 0 to 1, default 0.5
     How soft a flake's edge is: the edge falls from full brightness to none across this
     fraction of the flake's radius (at least one pixel), so large flakes are blurrier
     than small ones, like flakes out of focus. 0 = crisp one-pixel edges, 1 = a flake
     fading out from its middle.
-depth : number, fraction, 0 to 1, default 0.5
-    How much fainter the farthest flakes are: a flake in layer k of n has 1 - depth x (1
-    - k / n) of the brightness of the nearest. 0 = every layer equally bright, 1 = the
-    far layers fade to nothing.
+depth_range : number, fraction, 0 to 1, default 0.5
+    The depth range of the layers, how far apart they are in distance, which spreads the
+    flakes' brightness: a flake in layer k of n has 1 - `depth_range` x (1 - k / n) of
+    the brightness of the nearest. 0 = every layer equally bright, 1 = the far layers
+    fade to nothing.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always puts the same flakes in the same places, another
     seed others.
@@ -4309,13 +4466,13 @@ color : colour, default '#ffffff'
     of the light that makes them."""
     ...
 
-def starfield(count: int = 600, size: float = 3.0, depth: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dfe8ff', sky: str | list[float] | tuple[float, float, float] = '#04060f', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def starfield(count: int = 600, size: float = 3.0, depth_range: float = 0.7, color: str | list[float] | tuple[float, float, float] = '#dfe8ff', sky: str | list[float] | tuple[float, float, float] = '#04060f', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input.
 
 The input is used only for its height and width; its content does not show. Every star has a random depth u from 0
-to 1 and a scale s = 1 - `depth` x u, so near stars (u = 0) are full size and brightness: it is a dot `size` x s
-wide, s bright, with antialiased edges. Where stars overlap the brighter one shows. Stars are screened over the
-sky, so they only lighten it; the same `seed` always gives the same sky.
+to 1 and a scale s = 1 - `depth_range` x u, so near stars (u = 0) are full size and brightness: it is a dot
+`size` x s wide, s bright, with antialiased edges. Where stars overlap the brighter one shows. Stars are screened
+over the sky, so they only lighten it; the same `seed` always gives the same sky.
 
 Parameters
 ----------
@@ -4325,10 +4482,11 @@ count : whole number, count, 0 to 20000, default 600
 size : number, px, 1 to 50, default 3.0
     The diameter in px of the nearest, biggest stars (the others are smaller by their
     depth). Tuned for a picture about 480 px high. Larger = bigger stars.
-depth : number, fraction, 0 to 1, default 0.7
-    How far apart the stars are in depth, which spreads their size and brightness: a
-    star is between 1 - depth and 1 times the full size and brightness. 0 = every star
-    alike, 1 = from the nearest down to specks too small to see.
+depth_range : number, fraction, 0 to 1, default 0.7
+    The depth range of the stars, how far apart they are in distance, which spreads
+    their size and brightness: a star is between 1 - `depth_range` and 1 times the full
+    size and brightness. 0 = every star alike, 1 = from the nearest down to specks too
+    small to see.
 color : colour, default '#dfe8ff'
     The colour of the stars' light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is
     a cold white. Stars are screened over the sky, so they only lighten it.
@@ -4586,24 +4744,24 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def torn_edge(depth: float = 24.0, roughness: float = 0.5, scale: float = 24.0, octaves: int = 3, persistence: float = 0.4, lacunarity: float = 2.0, fill: str | list[float] | tuple[float, float, float] = '#f5f0e6', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
-    """Tear the border away: each side's pixels closer than a wandering distance of about `depth` px become `fill`.
+def torn_edge(width: float = 24.0, roughness: float = 0.5, scale: float = 24.0, octaves: int = 3, persistence: float = 0.4, lacunarity: float = 2.0, fill: str | list[float] | tuple[float, float, float] = '#f5f0e6', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+    """Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.
 
-The distance along a side is `depth` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`,
-`persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `depth` and has a
-standard deviation `roughness` x `depth` (a negative distance tears nothing there). A pixel is torn away if it is
+The distance along a side is `width` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`,
+`persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `width` and has a
+standard deviation `roughness` x `width` (a negative distance tears nothing there). A pixel is torn away if it is
 closer to a side than that side's distance at its position. Every other pixel is kept exactly; the four sides tear
 independently, and the same `seed` always gives the same tear.
 
 Parameters
 ----------
-depth : number, px, 0 to 200, default 24.0
+width : number, px, 0 to 200, default 24.0
     How far in the tear is from each side on average, in px: 0 = no tear. Larger = more
     of the border torn away.
 roughness : number, fraction, 0 to 1, default 0.5
     How ragged the tear is: the standard deviation of its distance from the side as a
-    fraction of `depth`. 0 = a straight cut exactly `depth` in, 0.3 is a gentle tear, 1
-    wanders between the very edge and twice the depth.
+    fraction of `width`. 0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1
+    wanders between the very edge and twice the width.
 scale : number, px, 1 to 200, default 24.0
     Size of the tear's broadest bays and tongues along the side, in px (the spacing of
     the first noise lattice). Larger = long slow waves, small = a jagged edge.

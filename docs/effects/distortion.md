@@ -15,6 +15,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
 | <img src="../gallery/mirror.jpg" width="160" alt="mirror"> | `mirror` | Make the picture symmetric: keep one half (or quarter) and replace the rest by its reflection. | `direction='left_to_right'` | [mirror.toml](../../examples/effects/mirror.toml) |
+| <img src="../gallery/parallax.jpg" width="160" alt="parallax"> | `parallax` | Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera move would. | `angle=0.0` `amount=0.02` `focus=0.5` +2 advanced | [parallax.toml](../../examples/effects/parallax.toml) |
 | <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, turn it, zoom it. | `vertical=0.25` `horizontal=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
 | <img src="../gallery/pinch_bulge.jpg" width="160" alt="pinch_bulge"> | `pinch_bulge` | Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`. | `amount=0.5` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [pinch_bulge.toml](../../examples/effects/pinch_bulge.toml) |
 | <img src="../gallery/pixel_sort.jpg" width="160" alt="pixel_sort"> | `pixel_sort` | Sort every run of pixels whose key lies between `low` and `high` along the rows (or columns) by that key. | `by='brightness'` `low=0.25` `high=0.75` `axis='horizontal'` `order='ascending'` | [pixel_sort.toml](../../examples/effects/pixel_sort.toml) |
@@ -177,6 +178,23 @@ Warps that bend, ripple or displace the picture's geometry.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `direction` | one of 'left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right' |  |  | `'left_to_right'` | Which part is kept as it is and copied, reflected, onto the rest, named as image editors name it. 'left_to_right' copies the left half onto the right (a face made symmetric about a vertical line down the middle), 'right_to_left' the right half onto the left, 'top_to_bottom' the top half onto the bottom (a reflection in water, about a horizontal line across the middle), 'bottom_to_top' the bottom half onto the top. For a picture symmetric in four quarters, name the quarter that is copied into the other three: 'top_left', 'top_right', 'bottom_left' or 'bottom_right'. On a picture with an odd width or height the middle column or row lies on the line and stays. |
+
+### `parallax`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `angle` | number | degrees | 0 to 360 | `0.0` | The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, 180 = left. Layers farther than the focus move the opposite way. |
+| `amount` | number | fraction | 0 to 0.1 | `0.02` | How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a fraction of the picture's long side: a layer moves amount x (its depth - focus) of it. Raising it exaggerates the shift; 0 leaves the picture unchanged. |
+| `focus` | number | fraction | 0 to 1 | `0.5` | The depth that stays still, as a fraction of the picture's depth range: 1 = the nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the opposite way; raising it moves more of the picture against `angle`. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when its shift reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
 
 ### `perspective`
 

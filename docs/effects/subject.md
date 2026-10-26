@@ -6,9 +6,9 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +31 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
+| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
 | <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`. | `dx=12.0` `dy=18.0` `blur=24.0` `color='#000000'` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
-| <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `start=0.6` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` +15 advanced | [evaporate.toml](../../examples/effects/evaporate.toml) |
+| <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `start=0.6` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` +14 advanced | [evaporate.toml](../../examples/effects/evaporate.toml) |
 | <img src="../gallery/fill.jpg" width="160" alt="fill"> | `fill` | Replace the whole picture with one colour. | `color='#000000'` | [fill.toml](../../examples/effects/fill.toml) |
 | <img src="../gallery/layered_cutouts.jpg" width="160" alt="layered_cutouts"> | `layered_cutouts` | Copies of the subject's silhouette stacked behind it, each `offset` px farther along `angle`, like cut paper. | `layers=4` `offset=14.0` `angle=45.0` `color='#ff8a5b'` `end_color='#3b1f6b'` `layer_opacity=1.0` +1 advanced | [layered_cutouts.toml](../../examples/effects/layered_cutouts.toml) |
 | <img src="../gallery/long_shadow.jpg" width="160" alt="long_shadow"> | `long_shadow` | A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it. | `angle=45.0` `length=300.0` `color='#000000'` `fade=1.0` +1 advanced | [long_shadow.toml](../../examples/effects/long_shadow.toml) |
@@ -21,7 +21,7 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from `font`). Use the same value as the ascii step before this one, so whole characters move. |
+| `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from the bundled font). Use the same value as the ascii step before this one, so whole characters move. |
 | `progress` | number | fraction | 0 to 1 | `0.0` | The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone). |
 | `top` | number | ratio | 0 to 10 | `1.0` | Weight of height in the order pieces leave: higher pieces go first. 0 = height does not matter. |
 | `outline` | number | ratio | 0 to 10 | `1.0` | Weight of closeness to the outline (and the left, right and top borders) in the order: pieces near the edge go before the middle. 0 = closeness does not matter. |
@@ -31,11 +31,10 @@ Effects that work on the cut-out subject, apart from its background.
 | `angle` | number | degrees | -180 to 180 | `10.0` | Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: each piece's fate is fixed by it, so one seed always gives the same pieces the same fates. |
 
-<details><summary>Advanced parameters (31)</summary>
+<details><summary>Advanced parameters (30)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
 | `hover` | number | fraction | 0 to 1 | `0.0` | Share of its journey a piece floats slowly along the wind before it goes (about 0..0.3 looks right). The outline starts at once, deeper pieces later (see `hover_spread`). 0 = off. |
 | `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece is also thrown away from the edge it came from (by up to `outward_distance`); pieces then fly in different directions, so leave it at 0 when everything should travel together on the wind. |
 | `ambient` | number | ratio | 0 to 1 | `0.0` | Depth of the slow shimmer of the pieces that stay, as a share of their brightness (about 0..0.1 looks right; brightening stops at white). 0 = off. |
@@ -93,7 +92,7 @@ A step of `drop_shadow` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from `font`). Use the same value as the ascii step before this one, so whole characters fly away. |
+| `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from the bundled font). Use the same value as the ascii step before this one, so whole characters fly away. |
 | `start` | number | fraction | 0 to 1 | `0.6` | Height (fraction of the picture, 0 = top) above which pieces begin to detach from the top down. 0 switches the top-down dissolve off. |
 | `outline` | number | fraction | 0 to 1 | `0.0` | Width of the band (fraction of the picture width) along the figure's outline, and the left, right and top borders, where pieces detach; stronger nearer the edge. 0 switches it off. Raising it eats further in. |
 | `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece turns away from the edge it came from (the left of the head sheds to the left): 0 = straight up, 1 = as much sideways as up. |
@@ -102,11 +101,10 @@ A step of `drop_shadow` has `opacity = 0.6` unless it sets its own.
 | `vanish` | number | fraction | 0 to 1 | `0.3` | Share of detached pieces already gone before they climb (0..1); `thinning` removes more with height. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: the same seed always gives the same dissolve, another seed another one. |
 
-<details><summary>Advanced parameters (15)</summary>
+<details><summary>Advanced parameters (14)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `font` | text or none |  |  | `None` | Path to the monospaced .ttf/.ttc whose character height sizes the pieces, or None for the system font; use the same as the ascii step. A path that cannot be opened fails when the effect runs. |
 | `ramp` | number | fraction | 0.01 to 1 | `0.3` | Height of the band (fraction of the picture) above `start` over which the chance of detaching rises smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out. |
 | `rise_gamma` | number | ratio | 0 to 5 | `0.6` | Gamma of the climb against how strongly a piece is pulled away (0..1): a piece climbs up to `rise` x pull^rise_gamma. Below 1 even weakly pulled pieces climb far, above 1 only the strongly pulled ones. |
 | `rise_minimum` | number | fraction | 0 to 1 | `0.1` | Shortest climb as a share of a piece's longest one; 1 makes every piece climb the full way. |

@@ -6,13 +6,13 @@ Weather and air: fog, haze, rain and the like.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/embers.jpg" width="160" alt="embers"> | `embers` | Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it. | `count=120` `size=7.0` `softness=1.0` `length=8.0` `angle=15.0` `depth=0.5` `color='#ff8a2b'` `seed=0` | [embers.toml](../../examples/effects/embers.toml) |
-| <img src="../gallery/floating_dust.jpg" width="160" alt="floating_dust"> | `floating_dust` | Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust. | `count=80` `size=24.0` `softness=0.8` `depth=0.5` `color='#fff1d6'` `seed=0` | [floating_dust.toml](../../examples/effects/floating_dust.toml) |
+| <img src="../gallery/embers.jpg" width="160" alt="embers"> | `embers` | Screen `count` sparks of `color` at random places over the picture, each rising with a streak behind it. | `count=120` `size=7.0` `softness=1.0` `length=8.0` `angle=15.0` `depth_range=0.5` `color='#ff8a2b'` `seed=0` | [embers.toml](../../examples/effects/embers.toml) |
+| <img src="../gallery/floating_dust.jpg" width="160" alt="floating_dust"> | `floating_dust` | Screen `count` soft round specks of `color` at random places over the picture, as out-of-focus dust. | `count=80` `size=24.0` `softness=0.8` `depth_range=0.5` `color='#fff1d6'` `seed=0` | [floating_dust.toml](../../examples/effects/floating_dust.toml) |
 | <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom. | `density=0.8` `color='#cfd8e3'` `gradient=0.7` `patchiness=0.6` `scale=150.0` `octaves=4` `seed=0` +2 advanced | [fog.toml](../../examples/effects/fog.toml) |
 | <img src="../gallery/lens_drops.jpg" width="160" alt="lens_drops"> | `lens_drops` | Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`. | `count=14` `radius=24.0` `size_variation=0.5` `refraction=1.5` `blur=1.5` `highlight=0.0` `seed=0` +3 advanced | [lens_drops.toml](../../examples/effects/lens_drops.toml) |
-| <img src="../gallery/rain.jpg" width="160" alt="rain"> | `rain` | Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`. | `density=1.0` `angle=10.0` `length=32.0` `thickness=1.5` `depth=0.5` `color='#dbe6f5'` `seed=0` | [rain.toml](../../examples/effects/rain.toml) |
+| <img src="../gallery/rain.jpg" width="160" alt="rain"> | `rain` | Screen falling streaks of `color` over the picture, `density` of them per 1000 px², leaning by `angle`. | `density=1.0` `angle=10.0` `length=32.0` `thickness=1.5` `depth_range=0.5` `color='#dbe6f5'` `seed=0` | [rain.toml](../../examples/effects/rain.toml) |
 | <img src="../gallery/smoke.jpg" width="160" alt="smoke"> | `smoke` | Mix soft-edged plumes of `color` into the picture, up to `amount` thick. | `amount=0.5` `color='#e6e6e6'` `coverage=0.45` `scale=100.0` `rise=2.0` `turbulence=30.0` `octaves=4` `seed=0` +5 advanced | [smoke.toml](../../examples/effects/smoke.toml) |
-| <img src="../gallery/snow.jpg" width="160" alt="snow"> | `snow` | Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers. | `density=0.5` `size=14.0` `layers=4` `softness=0.5` `depth=0.5` `seed=0` | [snow.toml](../../examples/effects/snow.toml) |
+| <img src="../gallery/snow.jpg" width="160" alt="snow"> | `snow` | Screen white flakes over the picture, `density` of them per 1000 px², in `layers` depth layers. | `density=0.5` `size=14.0` `layers=4` `softness=0.5` `depth_range=0.5` `seed=0` | [snow.toml](../../examples/effects/snow.toml) |
 | <img src="../gallery/sparkle.jpg" width="160" alt="sparkle"> | `sparkle` | Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each. | `count=60` `threshold=0.75` `size=10.0` `size_variation=0.5` `rays=2.0` `thickness=1.0` `seed=0` | [sparkle.toml](../../examples/effects/sparkle.toml) |
 
 ### `embers`
@@ -20,11 +20,11 @@ Weather and air: fog, haze, rain and the like.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `count` | whole number | count | 0 to 2000 | `120` | How many embers there are, whatever the size of the picture (a number, not a density). 0 = none (the picture unchanged), 120 is a lively shower of sparks. |
-| `size` | number | px | 1 to 30 | `7.0` | The width in px of the nearest, largest embers; the farthest are narrower by `depth`. Tuned for a picture about 480 px high. Larger = fatter sparks. |
+| `size` | number | px | 1 to 30 | `7.0` | The width in px of the nearest, largest embers; the farthest are narrower by `depth_range`. Tuned for a picture about 480 px high. Larger = fatter sparks. |
 | `softness` | number | fraction | 0 to 1 | `1.0` | How soft an ember's edge is: it falls from full brightness to none across this fraction of the ember's radius (at least one pixel). 0 = crisp sparks, 1 = sparks glowing out from their middle. |
-| `length` | number | px | 0 to 200 | `8.0` | The length in px of the streak each nearest ember leaves behind it; the farthest are shorter by `depth`. Tuned for a picture about 480 px high. 0 = round dots, larger = faster-looking sparks. |
+| `length` | number | px | 0 to 200 | `8.0` | The length in px of the streak each nearest ember leaves behind it; the farthest are shorter by `depth_range`. Tuned for a picture about 480 px high. 0 = round dots, larger = faster-looking sparks. |
 | `angle` | number | degrees | -45 to 45 | `15.0` | How far the embers drift from straight up, in degrees: positive drifts to the right as they rise (wind from the left), negative to the left. 0 = straight up. The streaks trail the other way. |
-| `depth` | number | fraction | 0 to 1 | `0.5` | How far apart the embers are in depth, which spreads their width, streak length and brightness: the farthest have 1 - depth times those of the nearest. 0 = every ember alike, 1 = from the nearest down to nothing at the farthest. |
+| `depth_range` | number | fraction | 0 to 1 | `0.5` | The depth range of the embers, how far apart they are in distance, which spreads their width, streak length and brightness: the farthest have 1 - `depth_range` times those of the nearest. 0 = every ember alike, 1 = from the nearest down to nothing at the farthest. |
 | `color` | colour |  |  | `'#ff8a2b'` | The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Embers are screened over the picture, so they only lighten it. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same embers in the same places, another seed others. |
 
@@ -35,9 +35,9 @@ A step of `embers` has `opacity = 0.9` unless it sets its own.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `count` | whole number | count | 0 to 1000 | `80` | How many specks there are, whatever the size of the picture (a number, not a density). 0 = none (the picture unchanged), 80 is a scattering, 400 a dusty air. |
-| `size` | number | px | 1 to 200 | `24.0` | The diameter in px of the nearest, largest specks; the farthest are narrower by `depth`. Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if the dust were closer to the lens. |
+| `size` | number | px | 1 to 200 | `24.0` | The diameter in px of the nearest, largest specks; the farthest are narrower by `depth_range`. Tuned for a picture about 480 px high. Larger = bigger bokeh discs, as if the dust were closer to the lens. |
 | `softness` | number | fraction | 0 to 1 | `0.8` | How soft a speck's edge is: the edge falls from full brightness to none across this fraction of the speck's radius (at least one pixel). 0 = crisp discs, 1 = specks fading out from their middle. |
-| `depth` | number | fraction | 0 to 1 | `0.5` | How far apart the specks are in depth, which spreads their size and brightness: the farthest have 1 - depth times those of the nearest. 0 = every speck alike, 1 = from the nearest down to nothing at the farthest. |
+| `depth_range` | number | fraction | 0 to 1 | `0.5` | The depth range of the specks, how far apart they are in distance, which spreads their size and brightness: the farthest have 1 - `depth_range` times those of the nearest. 0 = every speck alike, 1 = from the nearest down to nothing at the farthest. |
 | `color` | colour |  |  | `'#fff1d6'` | The colour of the light the specks catch: '#rrggbb', '#rgb' or [r, g, b] 0..1. Specks are screened over the picture, so they only lighten it. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same specks in the same places, another seed others. |
 
@@ -92,9 +92,9 @@ A step of `floating_dust` has `opacity = 0.55` unless it sets its own.
 | --- | --- | --- | --- | --- | --- |
 | `density` | number | count | 0 to 5 | `1.0` | How many streaks fall: streaks per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none (the picture unchanged), 1 is a steady shower, 3 a downpour. |
 | `angle` | number | degrees | -45 to 45 | `10.0` | How far the streaks lean from straight down, in degrees: positive leans toward the right as they fall (wind from the left), negative toward the left. 0 = vertical. |
-| `length` | number | px | 1 to 200 | `32.0` | The length of the nearest streaks in px; the farthest are shorter by `depth`. Tuned for a picture about 480 px high. Larger = longer streaks, as with a slower shutter. |
-| `thickness` | number | px | 1 to 20 | `1.5` | The width of the nearest streaks in px; the farthest are narrower by `depth`. Tuned for a picture about 480 px high. Larger = fatter drops. |
-| `depth` | number | fraction | 0 to 1 | `0.5` | How far apart the streaks are in depth, which spreads their length, width and brightness: the farthest have 1 - depth times those of the nearest. 0 = every streak alike, 1 = from the nearest down to nothing at the farthest. |
+| `length` | number | px | 1 to 200 | `32.0` | The length of the nearest streaks in px; the farthest are shorter by `depth_range`. Tuned for a picture about 480 px high. Larger = longer streaks, as with a slower shutter. |
+| `thickness` | number | px | 1 to 20 | `1.5` | The width of the nearest streaks in px; the farthest are narrower by `depth_range`. Tuned for a picture about 480 px high. Larger = fatter drops. |
+| `depth_range` | number | fraction | 0 to 1 | `0.5` | The depth range of the streaks, how far apart they are in distance, which spreads their length, width and brightness: the farthest have 1 - `depth_range` times those of the nearest. 0 = every streak alike, 1 = from the nearest down to nothing at the farthest. |
 | `color` | colour |  |  | `'#dbe6f5'` | The colour of the rain: '#rrggbb', '#rgb' or [r, g, b] 0..1. Streaks are screened over the picture, so they only lighten it. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same streaks in the same places, another seed others. |
 
@@ -131,9 +131,9 @@ A step of `rain` has `opacity = 0.7` unless it sets its own.
 | --- | --- | --- | --- | --- | --- |
 | `density` | number | count | 0 to 5 | `0.5` | How many flakes fall: flakes per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none (the picture unchanged), 0.5 is a light flurry, 3 a blizzard. |
 | `size` | number | px | 1 to 100 | `14.0` | The diameter of the nearest, largest flakes in px; flakes in farther layers are smaller. Tuned for a picture about 480 px high. Larger = bigger flakes, as if they fell closer to the lens. |
-| `layers` | whole number | count | 1 to 10 | `4` | How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide as `size` and (1 - `depth` x (1 - k / n)) as bright as solid white, so more layers = a smoother range from fine far flakes to large near ones. 1 = every flake alike. |
+| `layers` | whole number | count | 1 to 10 | `4` | How many depth layers the flakes fall in. The flake in layer k of n is k / n as wide as `size` and (1 - `depth_range` x (1 - k / n)) as bright as solid white, so more layers = a smoother range from fine far flakes to large near ones. 1 = every flake alike. |
 | `softness` | number | fraction | 0 to 1 | `0.5` | How soft a flake's edge is: the edge falls from full brightness to none across this fraction of the flake's radius (at least one pixel), so large flakes are blurrier than small ones, like flakes out of focus. 0 = crisp one-pixel edges, 1 = a flake fading out from its middle. |
-| `depth` | number | fraction | 0 to 1 | `0.5` | How much fainter the farthest flakes are: a flake in layer k of n has 1 - depth x (1 - k / n) of the brightness of the nearest. 0 = every layer equally bright, 1 = the far layers fade to nothing. |
+| `depth_range` | number | fraction | 0 to 1 | `0.5` | The depth range of the layers, how far apart they are in distance, which spreads the flakes' brightness: a flake in layer k of n has 1 - `depth_range` x (1 - k / n) of the brightness of the nearest. 0 = every layer equally bright, 1 = the far layers fade to nothing. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same flakes in the same places, another seed others. |
 
 A step of `snow` has `opacity = 0.8` unless it sets its own.
