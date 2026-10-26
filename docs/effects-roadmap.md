@@ -45,7 +45,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `thermal` ✓ (a preset of `gradient_map`) | Heat-camera false colour. | `fx.gradient_map(preset="thermal")` |
 | `infrared` ✓ (a preset of `channel_mixer`) | False-colour infrared (swapped channels, bright foliage). | `fx.channel_mixer(preset="infrared")` |
 | `xray` ✓ (a preset of `gradient_map`) | Inverted and blue (not edge-lit). | `fx.gradient_map(preset="xray")` |
-| `night_vision` ✓ (a preset of `gradient_map`) | Green phosphor (no noise or vignette: add `film_grain` and `vignette`). | `fx.gradient_map(preset="night_vision")` |
+| `night_vision` ✓ (a preset of `gradient_map`) | Green phosphor (no noise or vignette: add `grain` and `vignette`). | `fx.gradient_map(preset="night_vision")` |
 
 ## Light, focus and detail
 
@@ -78,8 +78,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `grain` ✓ | Film grain. | `fx.grain(amount=0.07)` |
-| `film_grain` ✓ | Grain that depends on brightness, per channel. | `fx.film_grain(shadows=0.1, highlights=0.03)` |
+| `grain` ✓ | Film grain that depends on brightness, grey or per channel. | `fx.grain(amount=0.065, balance=-0.54, color=True)` |
 | `noise` ✓ | Gaussian/uniform, colour or mono noise. | `fx.noise(amount=0.1, color=False)` |
 | `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
 | `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |

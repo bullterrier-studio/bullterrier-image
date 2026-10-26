@@ -1,9 +1,12 @@
-# Heavy, slightly clumped film grain.
+# Grainy shadows, cleaner highlights, in slightly clumped specks of colour.
+# It also makes the effect's picture in the catalogue.
 name = "grain"
 size = 480
 
 [[step]]
 effect = "grain"
-amount = 0.12
+amount = 0.065
+balance = -0.538   # shadows 0.1, highlights 0.03
 size = 1.5
+color = true
 seed = 1
