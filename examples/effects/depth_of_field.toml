@@ -1,0 +1,10 @@
+# Focused on the dog: the room behind it melts away.
+name = "depth_of_field"
+size = 480
+
+[[step]]
+effect = "depth_of_field"
+focus = 0.58
+width = 0.25
+feather = 0.3
+radius = 8
