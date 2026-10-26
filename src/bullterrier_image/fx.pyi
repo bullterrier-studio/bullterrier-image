@@ -2228,8 +2228,8 @@ def jpeg_crush(quality: int = 6, *, mask: str | None = None, opacity: float = 1.
 
 The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction
 (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all
-of it undone. There is no file and no byte: the result does not depend on any image library, so it is the same on
-every machine. A picture whose sides are not multiples of 16 is extended by repeating its last row and column
+of it undone. There is no file and no byte: the result does not depend on any image library, so it is alike on
+every platform. A picture whose sides are not multiples of 16 is extended by repeating its last row and column
 and cropped back.
 
 Parameters
@@ -3885,9 +3885,10 @@ def seams(width: float = 0.004, color: str | list[float] | tuple[float, float, f
     """Draw a solid line or band along every border between the pieces of a partition.
 
 The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
-not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a grid, shards,
-or a selection such as the subject (counted as two pieces, what it chooses and what it does not), which outlines
-its hard edge. Without a partition (or with a single piece) there is no border and the picture is unchanged.
+not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
+(grid, shards, cuts, svg or depth_bands) or a selection such as the subject (counted as two pieces, what it chooses
+and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
+border and the picture is unchanged.
 
 `partition` is filled in by the recipe (never set it in a recipe file): int32 labels, one piece number per pixel.
 
