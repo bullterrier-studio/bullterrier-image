@@ -79,6 +79,7 @@ class DisperseParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward.",
     )
     hover: float = param(

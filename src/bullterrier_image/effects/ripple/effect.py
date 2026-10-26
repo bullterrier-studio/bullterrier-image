@@ -32,8 +32,9 @@ class RippleParams(EffectParams):
     phase: float = param(
         0.0,
         unit="degrees",
-        min=-360,
-        max=360,
+        min=-180,
+        max=180,
+        cyclic=True,
         doc="Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the "
         "picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole "
         "cycle and so the same as 0. Changing it slides the wave along.",
@@ -43,6 +44,7 @@ class RippleParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the "
         "picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 "
         "sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to "

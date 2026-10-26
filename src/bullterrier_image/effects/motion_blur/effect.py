@@ -17,6 +17,7 @@ class MotionBlurParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, "
         "45 = rising to the right. Opposite directions (0 and 180) give the same blur.",
     )

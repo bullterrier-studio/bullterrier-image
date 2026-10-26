@@ -19,6 +19,7 @@ class RimLightParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="The direction the light comes from, counter-clockwise from the right: 0 = from the right, 90 = from "
         "above, 180 or -180 = from the left, -90 = from below. Only edges whose outward direction faces it are lit.",
     )

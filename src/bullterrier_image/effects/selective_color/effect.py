@@ -18,6 +18,7 @@ class SelectiveColorParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120 green, 180 cyan, 240 blue, "
         "300 magenta; 360 is red again.",
     )

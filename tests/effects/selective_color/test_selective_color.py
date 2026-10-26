@@ -152,7 +152,6 @@ def test_a_photo_with_neutral_adjustments_is_unchanged_in_any_range(photo: np.nd
 @pytest.mark.parametrize(
     ("settings", "match"),
     [
-        pytest.param({"hue": 361}, "hue", id="hue centre past a full turn"),
         pytest.param({"width": -1}, "width", id="negative width"),
         pytest.param({"feather": 181}, "feather", id="feather past half a turn"),
         pytest.param({"hue_shift": 200}, "hue_shift", id="shift past half a turn"),
@@ -166,3 +165,9 @@ def test_a_setting_that_is_out_of_range_or_unknown_is_refused(
 ) -> None:
     with pytest.raises(ValueError, match=match):
         registry.apply(NAME, photo, **settings)
+
+
+def test_a_hue_centre_past_a_full_turn_selects_the_same_colours_as_the_centre_inside_it(photo: np.ndarray) -> None:
+    np.testing.assert_array_equal(
+        registry.apply(NAME, photo, hue=361, hue_shift=40), registry.apply(NAME, photo, hue=1, hue_shift=40)
+    )

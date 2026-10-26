@@ -19,6 +19,7 @@ class ParallaxParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, "
         "180 = left. Layers farther than the focus move the opposite way.",
     )

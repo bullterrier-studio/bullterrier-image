@@ -38,6 +38,7 @@ class LightLeakParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The side the light comes in from, as the direction from the picture's centre, counterclockwise as seen "
         "on it: 0 = the right edge, 90 = the top, 180 = the left, 270 = the bottom; in between, the corner.",
     )

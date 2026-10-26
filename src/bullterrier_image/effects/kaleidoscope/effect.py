@@ -27,6 +27,7 @@ class KaleidoscopeParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="Where the pattern starts, as the direction in degrees, clockwise from pointing right, of the first mirror "
         "axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns "
         "the mirror axes, and shows a different wedge of the picture. The pattern repeats every 360 / segments "

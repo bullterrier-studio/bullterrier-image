@@ -27,8 +27,9 @@ class HalftoneParams(EffectParams):
     angle: float = param(
         45.0,
         unit="degrees",
-        min=-360,
-        max=360,
+        min=-180,
+        max=180,
+        cyclic=True,
         doc="Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many degrees below the "
         "x axis (negative = above). The grid is square, so 90 degrees on looks the same; 45 is the classic screen "
         "angle for one ink.",

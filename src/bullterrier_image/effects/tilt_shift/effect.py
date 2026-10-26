@@ -44,6 +44,7 @@ class TiltShiftParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The direction of the band, counterclockwise as seen on the picture: 0 = horizontal, with the focus "
         "counted from the top; 90 = vertical, counted from the left; 45 runs from the lower left to the upper right.",
     )

@@ -24,8 +24,9 @@ class HueShiftParams(EffectParams):
     hue: float = param(
         90.0,
         unit="degrees",
-        min=-360,
-        max=360,
+        min=-180,
+        max=180,
+        cyclic=True,
         drivable=True,
         doc="The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged).",
     )

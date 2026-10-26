@@ -368,7 +368,16 @@ def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, fie
     assert_a_picture_like(registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small)), small)
 
 
-@pytest.mark.parametrize(("name", "field", "side"), _bounds())
+def _cyclic() -> list[tuple[str, str]]:
+    """(effect, field) for every cyclic angle of every effect."""
+    return [(name, doc.name) for name in ALL for doc in registry.parameters(name).fields_doc() if doc.cyclic]
+
+
+@pytest.mark.parametrize(
+    ("name", "field", "side"),
+    [bound for bound in _bounds() if bound[:2] not in _cyclic()],
+    ids=lambda value: str(value),
+)
 def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, photo):
     with pytest.raises(ValueError, match=f"`{field}`"):
         registry.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
@@ -735,7 +744,7 @@ def test_two_levels_mix_the_effect_at_the_least_and_the_greatest_value_by_the_fi
     np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_least + ramp[..., None] * at_greatest, atol=1e-6, rtol=0)
 
 
-@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable not in _cyclic()])
 def test_a_drive_that_leaves_the_parameters_range_is_refused_naming_the_field(name, field):
     least, greatest = _range(name, field)
     for start, end in ((least - 1, greatest), (least, greatest + 1)):
@@ -759,3 +768,42 @@ def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_i
     for field in numbers:
         with pytest.raises(RecipeError, match=rf"{name}.*`{field}` cannot be driven"):
             Step(name, {field: Drive(by="f", start=_range(name, field)[0], end=_range(name, field)[1])})
+
+
+# The share of pixels allowed to differ a turn apart: a hard-edged screen flips the dots that sit on an exact cell edge.
+EDGE_FLIPS = {("halftone", "angle"): 0.1}
+
+
+@pytest.mark.parametrize(("name", "field"), _cyclic())
+def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real(name, field, photo):
+    small = _small(photo)
+    doc = next(d for d in registry.parameters(name).fields_doc() if d.name == field)
+    low, high = doc.minimum, doc.maximum
+    assert low is not None
+    assert high is not None
+    at_low = registry.apply(name, small, **_setting(name, field, low), **_inputs(name, small))
+    at_high = registry.apply(name, small, **_setting(name, field, high), **_inputs(name, small))
+    differing = (np.abs(at_low - at_high).max(axis=-1) > 1e-3).mean()
+    assert differing <= EDGE_FLIPS.get((name, field), 0), f"{name}.{field}: min and max are a turn apart"
+    # four turns and a degree past the bottom of the turn is the same direction as one degree past it
+    beyond = registry.apply(name, small, **{field: low + 4 * 360 + 1}, **_inputs(name, small))
+    inside = registry.apply(name, small, **{field: low + 1}, **_inputs(name, small))
+    np.testing.assert_array_equal(beyond, inside)
+
+
+@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable in _cyclic()])
+def test_a_drive_of_a_cyclic_angle_may_run_past_the_turn_each_level_being_the_plain_effect_at_its_direction(
+    name, field, photo
+):
+    least, _ = _range(name, field)
+    driven = Recipe(
+        "driven",
+        [Step(name, {field: Drive(by="f", start=least, end=least + 720, levels=5)})],
+        size=None,
+        regions={"f": Given()},
+    )
+    maps = _inputs(name, photo)
+    for level, written in enumerate([least, least + 180, least + 360, least + 540, least + 720]):
+        got = runner.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
+        plain = Recipe("plain", [Step(name, {field: written})], size=None)
+        np.testing.assert_allclose(got, runner.render(photo, plain, maps=maps), atol=1e-6, rtol=0)

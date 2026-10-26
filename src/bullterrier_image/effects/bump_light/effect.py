@@ -19,6 +19,7 @@ class BumpLightParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, "
         "180 = below, 270 = the left, 315 = the upper left. Slopes that face it are brightened, those that face "
         "away darkened.",

@@ -17,6 +17,7 @@ class RgbSplitParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The direction red moves, in degrees counter-clockwise from pointing right (as on a protractor), 0 to 360: "
         "0 = right, 90 = up, 180 = left, 270 = down. Blue moves the opposite way.",
     )

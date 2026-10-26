@@ -26,6 +26,7 @@ class DrosteParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="How far each copy is turned from the one around it, in degrees: positive turns the copies clockwise as "
         "the picture is seen, negative anticlockwise, 0 leaves them upright (nested frames); other values make the "
         "copies spiral into the middle.",

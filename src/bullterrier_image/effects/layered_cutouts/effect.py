@@ -33,6 +33,7 @@ class LayeredCutoutsParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="The direction the layers step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the "
         "lower right, 90 = down, 180 = to the left, -90 = up.",
     )

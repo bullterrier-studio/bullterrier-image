@@ -64,6 +64,7 @@ class StarburstParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. "
         "The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
     )

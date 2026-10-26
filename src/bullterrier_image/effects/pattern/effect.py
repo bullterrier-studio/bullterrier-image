@@ -30,6 +30,7 @@ class PatternParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="Turns the pattern clockwise on screen about the picture's top-left corner. At 0 the stripes are vertical "
         "and the checks, dots and grid lines are aligned with the picture's edges; at 90 the stripes are horizontal.",
     )

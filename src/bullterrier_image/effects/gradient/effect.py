@@ -29,6 +29,7 @@ class GradientParams(EffectParams):
         unit="degrees",
         min=0,
         max=360,
+        cyclic=True,
         doc="Linear: the direction the colours run, measured clockwise on screen from the right: 0 = left to right, 90 "
         "= top to bottom. Conic: where the sweep starts, on the same scale (0 = right of the centre, 90 = below it). "
         "Ignored by 'radial'.",

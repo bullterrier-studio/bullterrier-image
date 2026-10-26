@@ -80,6 +80,7 @@ class FlowWarpParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="The direction the flow runs in on average, in degrees clockwise from pointing right: 0 carries the "
         "picture to the right, 90 down, -90 up, 180 to the left. With `variation` 0 the whole picture is carried this "
         "way.",

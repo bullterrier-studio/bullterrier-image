@@ -38,6 +38,7 @@ class PerspectiveParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="How far the picture is turned about its centre, after the keystones, in degrees: positive turns "
         "clockwise, negative counter-clockwise; 0 = none. The corners it uncovers are filled by `edge`.",
     )

@@ -18,6 +18,7 @@ class LongShadowParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        cyclic=True,
         doc="The direction the shadow is cast, clockwise as seen in the picture: 0 = to the right, 45 = to the lower "
         "right, 90 = down, 180 = to the left, -90 = up. Angles that are not a multiple of 45 leave the shadow's "
         "edges about a pixel soft.",
