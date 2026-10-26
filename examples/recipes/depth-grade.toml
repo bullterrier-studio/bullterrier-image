@@ -1,0 +1,28 @@
+# A grade per distance: the front warm and a little brighter, the middle two bands (the dog) as they are, the back cool
+# and muted.
+# Needs recipe format 2 and the depth.
+format = 2
+name = "depth-grade"
+size = 768
+
+[region.bands]                 # four equal ranges of depth, nearest first: the dog spans the middle two
+kind = "depth_bands"
+count = 4
+
+[[step]]
+each = "bands"
+looks = [
+    { effect = "white_balance", temperature = 0.7 },
+    "none",
+    "none",
+    { effect = "split_tone", shadow = "#1b3a6b", highlight = "#a9c4e0", amount = 0.45 },
+]
+
+[[step]]
+each = "bands"
+looks = [
+    { effect = "grade", exposure = 0.3 },
+    "none",
+    "none",
+    { effect = "grade", saturation = 0.5, contrast = 0.85 },
+]

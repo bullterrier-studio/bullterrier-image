@@ -78,12 +78,20 @@ Every picture here is made from one photo by the recipe linked under it (`exampl
     <td align="center" width="20%"><img src="examples/output/bullterrier/portrait-pop.jpg" alt="portrait-pop"></td>
     <td align="center" width="20%"><img src="examples/output/bullterrier/evaporate.jpg" alt="evaporate"></td>
     <td align="center" width="20%"><img src="examples/output/bullterrier/double-exposure.jpg" alt="double-exposure"></td>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/depth-haze.jpg" alt="depth-haze"></td>
   </tr>
   <tr>
     <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.<br><code>gradient</code> <code>outline</code> <code>drop_shadow</code></sub></td>
     <td valign="top"><a href="examples/recipes/portrait-pop.toml"><b>portrait-pop</b></a><br><sub>Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.<br><code>black_and_white</code> <code>gaussian_blur</code> <code>vibrance</code> <code>vignette</code></sub></td>
     <td valign="top"><a href="examples/recipes/evaporate.toml"><b>evaporate</b></a><br><sub>The dog drawn as text, caught part-way through dispersing: the right side lets go first and is blown right and up.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code> <code>disperse</code></sub></td>
     <td valign="top"><a href="examples/recipes/double-exposure.toml"><b>double-exposure</b></a><br><sub>The dog in black and white with a night sky of aurora and stars multiplied into its silhouette: a second picture used by a recipe.<br><code>black_and_white</code> <code>blend</code> <code>vignette</code></sub></td>
+    <td valign="top"><a href="examples/recipes/depth-haze.toml"><b>depth-haze</b></a><br><sub>Aerial perspective: the room behind the dog mists over by its depth; what is near stays crisp.<br><code>grade</code> <code>fill</code> <code>clarity</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="20%"><img src="examples/output/bullterrier/depth-grade.jpg" alt="depth-grade"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/recipes/depth-grade.toml"><b>depth-grade</b></a><br><sub>A grade per band of depth: the front warm and brighter, the dog as it is, the back cool and muted.<br><code>white_balance</code> <code>split_tone</code> <code>grade</code></sub></td>
   </tr>
 </table>
 

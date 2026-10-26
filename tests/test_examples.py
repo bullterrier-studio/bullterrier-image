@@ -42,11 +42,18 @@ def _is_a_combination(recipe: Recipe) -> bool:
     return len({run.effect for step in recipe.steps for run in step.runs}) >= 3
 
 
+def a_floor_rising_away(photo: np.ndarray) -> np.ndarray:
+    """A stand-in depth map (the model is an external boundary): the bottom row nearest (1), the top farthest (0)."""
+    height, width = photo.shape[:2]
+    return np.repeat(np.linspace(0, 1, height, dtype=np.float32)[:, None], width, axis=1)
+
+
 @pytest.mark.parametrize("path", sorted((EXAMPLES / "recipes").glob("*.toml")), ids=lambda path: path.stem)
 def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
     recipe = load_recipe(path)
     assert _is_a_combination(recipe), f"{path.name} uses fewer than three different effects"
-    assert max(render(photo, recipe, matte=matte).shape[:2]) == recipe.size  # rendered at the recipe's size
+    out = render(photo, recipe, matte=matte, depth=a_floor_rising_away(photo))
+    assert max(out.shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
 def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
