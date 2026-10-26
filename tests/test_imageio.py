@@ -384,7 +384,8 @@ def halves(low, high, dtype=np.uint8) -> np.ndarray:
     return values
 
 
-PNG, JPEG = ("m.png", 0, 1e-6), ("m.jpg", 5, 0.02)  # file, columns left unchecked beside the middle, tolerance
+PNG, JPEG, TIFF = ("m.png", 0, 1e-6), ("m.jpg", 5, 0.02), ("m.tif", 0, 1e-6)  # file, columns left unchecked
+# beside the middle, tolerance
 
 
 @pytest.mark.parametrize(
@@ -420,14 +421,37 @@ def test_a_matte_file_gives_its_subject_share_per_pixel(tmp_path, picture, file,
         # a picture with transparency gives its brightness, never its alpha: grey 102 under alpha 255 and 0
         (Image.fromarray(np.dstack([halves(0, 102)] * 3 + [halves(255, 0)]), "RGBA"), PNG, 0.0, 0.4),
         (Image.fromarray(np.dstack([halves(0, 255)] * 3), "RGB"), JPEG, 0.0, 1.0),  # within a JPEG's rounding
+        # 32-bit integer levels within the 16-bit range read as 16 bits
+        (Image.fromarray(halves(0, 102 * 257, np.int32), "I"), TIFF, 0.0, 0.4),
     ],
-    ids=["8-bit greyscale PNG", "16-bit greyscale PNG", "brightness of a transparent PNG", "black and white RGB JPEG"],
+    ids=[
+        "8-bit greyscale PNG",
+        "16-bit greyscale PNG",
+        "brightness of a transparent PNG",
+        "black and white RGB JPEG",
+        "32-bit integer TIFF of 16-bit levels",
+    ],
 )
 def test_a_depth_file_gives_its_brightness_per_pixel_white_nearest(tmp_path, picture, file, left, right):
     name, margin, atol = file
-    picture.save(tmp_path / name, quality=100)  # (PNG has no quality setting and ignores it)
+    picture.save(tmp_path / name, quality=100)  # (PNG and TIFF have no quality setting and ignore it)
     depth = imageio.load_depth(tmp_path / name)
     assert depth.dtype == np.float32
     assert depth.shape == (20, 30)
     np.testing.assert_allclose(depth[:, : 15 - margin], left, atol=atol)
     np.testing.assert_allclose(depth[:, 15 + margin :], right, atol=atol)
+
+
+@pytest.mark.parametrize(
+    ("picture", "mode"),
+    [
+        pytest.param(Image.fromarray(halves(0, 0.4, np.float32), "F"), "'F'", id="float levels have no white"),
+        pytest.param(Image.fromarray(halves(0, 70000, np.int32), "I"), "'I'", id="integer levels above 16 bits"),
+        pytest.param(Image.fromarray(halves(-5, 100, np.int32), "I"), "'I'", id="negative integer levels"),
+    ],
+)
+@pytest.mark.parametrize("read", [imageio.load_matte, imageio.load_depth], ids=["load_matte", "load_depth"])
+def test_a_map_file_whose_levels_do_not_map_to_0_to_1_is_refused_naming_its_mode(tmp_path, read, picture, mode):
+    picture.save(tmp_path / "map.tif")
+    with pytest.raises(ImageReadError, match=rf"map\.tif.*{mode}"):
+        read(tmp_path / "map.tif")

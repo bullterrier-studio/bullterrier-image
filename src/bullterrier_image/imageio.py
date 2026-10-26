@@ -50,8 +50,9 @@ def load_matte(path: str | Path) -> np.ndarray:
     """Read a subject matte someone already has: float32 (height, width), 1 = subject, 0 = background.
 
     A picture with transparency (a cut-out PNG) gives its alpha channel; any other gives its brightness, so a
-    black-and-white mask works as it is. 8- and 16-bit files keep their full range; EXIF rotation, the first-frame
-    rule and ImageReadError are as in `load`, so the matte lines up with the photo it was made for.
+    black-and-white mask works as it is. 8- and 16-bit files keep their full range; float levels, or integers beyond
+    16 bits, are ImageReadError naming the mode. EXIF rotation, the first-frame rule and ImageReadError are as in
+    `load`, so the matte lines up with the photo it was made for.
     """
     with _picture(path) as img:
         if not img.mode.startswith("I") and (img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info):
@@ -63,18 +64,28 @@ def load_depth(path: str | Path) -> np.ndarray:
     """Read a depth map someone already has: float32 (height, width), 1 = nearest, 0 = farthest.
 
     Gives the picture's brightness (white = near), never its alpha. 8- and 16-bit files keep their full range, so the
-    same depth saved in either reads the same; EXIF rotation, the first-frame rule and ImageReadError are as in `load`,
-    so the map lines up with the photo it was made for.
+    same depth saved in either reads the same; float levels, or integers beyond 16 bits, are ImageReadError naming the
+    mode. EXIF rotation, the first-frame rule and ImageReadError are as in `load`, so the map lines up with the photo it
+    was made for.
     """
     with _picture(path) as img:
         return _brightness(img)
 
 
 def _brightness(img: Image.Image) -> np.ndarray:
-    """The picture's brightness, float32 (height, width) 0..1: 16-bit greyscale over 65535, anything else as 8-bit
-    greyscale over 255."""
-    if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants, or "I" from older Pillow)
-        return np.clip(np.asarray(img, np.float32) / _SIXTEEN_BIT, 0.0, 1.0)
+    """The picture's brightness, float32 (height, width) 0..1: integer greyscale over 65535, anything else as 8-bit
+    greyscale over 255. ImageReadError, naming the mode, for levels with no faithful 0..1: float greyscale (F) and
+    integer levels outside 0..65535."""
+    if img.mode == "F":
+        raise ImageReadError("its mode 'F' (float levels) has no white: save the map as 8- or 16-bit greyscale")
+    if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants), or 32-bit integers ("I")
+        levels = np.asarray(img, np.float32)
+        if levels.min() < 0 or levels.max() > _SIXTEEN_BIT:
+            raise ImageReadError(
+                f"its mode {img.mode!r} holds levels {levels.min():.0f}..{levels.max():.0f}, outside 16 bits "
+                "(0..65535): save the map as 8- or 16-bit greyscale"
+            )
+        return levels / _SIXTEEN_BIT
     return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
 
 
