@@ -48,10 +48,11 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .finding.subject import subject_finder, subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import (
+        Band,
+        Bands,
+        Combine,
         Curve,
         Cuts,
-        Depth,
-        DepthBands,
         Each,
         Edge,
         Finder,
@@ -59,8 +60,10 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Given,
         Grid,
         Line,
+        LinearGradient,
         Path,
         Pick,
+        RadialGradient,
         Recipe,
         Shards,
         Stage,
@@ -89,8 +92,9 @@ _HOMES = {
     ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Cuts", "Curve", "Depth", "DepthBands", "Each", "Edge", "Finder", "Framing", "Given", "Grid", "Line", "Path",
-        "Pick", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
+        "Band", "Bands", "Combine", "Cuts", "Curve", "Each", "Edge", "Finder", "Framing", "Given", "Grid", "Line",
+        "LinearGradient", "Path", "Pick", "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg",
+        "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -125,11 +129,12 @@ def _installed_version() -> str:
 
 __all__ = [
     "BackendUnavailableError",
+    "Band",
+    "Bands",
     "BullterrierImageError",
+    "Combine",
     "Curve",
     "Cuts",
-    "Depth",
-    "DepthBands",
     "DepthNotFoundError",
     "Each",
     "Edge",
@@ -139,6 +144,7 @@ __all__ = [
     "Grid",
     "ImageReadError",
     "Line",
+    "LinearGradient",
     "MapNotFoundError",
     "NonFiniteImageError",
     "Path",
@@ -146,6 +152,7 @@ __all__ = [
     "Picture",
     "Project",
     "ProjectError",
+    "RadialGradient",
     "Recipe",
     "RecipeError",
     "Shards",

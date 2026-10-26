@@ -160,7 +160,7 @@ from bullterrier_image import Finder, render
 render(photo, look, finders={"subject": Finder("grounded-sam dog v1", partial(grounded, prompt="dog"))})
 ```
 
-**Depth** is a second map, found like the subject. A recipe that takes depth (an effect, or a depth region, see Regions
+**Depth** is a second map, found like the subject. A recipe that takes depth (an effect, or a region made from it, see Regions
 below) runs [Depth Anything V2 Small](https://github.com/DepthAnything/Depth-Anything-V2) (Apache-2.0) on ONNX Runtime,
 on every platform. Its weights (99 MB, the fp32 ONNX export of `onnx-community/depth-anything-v2-small`) are not in the
 package: the first use downloads them into the same cache folder as the subject model and checks their SHA-256 against
@@ -464,33 +464,65 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 repeat run asks the model nothing. A `subject` map you hand in does not stand in for the finder here (a cell is a part of the
 picture): the segmenter still finds the subject in each cell.
 
-**By distance.** Two kinds read the depth map (1 = nearest, 0 = farthest; the recipe then needs
-depth). `depth` is a selection: everything from `far` to `near`, fading out linearly over `feather` beyond both (all
-shares of the depth scale; `far` above `near` is an error). `depth_bands` is a partition into `count` equal ranges of
-depth, numbered **nearest first** (the one exception to reading order), so piece 0 is the front of any photo; a range
-no pixel falls in is dropped and the rest renumbered:
+**By a field.** A selection also has *values*, and a *field* is one read for them: the built-in `depth` (1 = nearest, 0 =
+farthest; the recipe then needs depth), `light` (the picture's own brightness, 0 black to 1 white, made from the picture the
+steps work on, so it needs no map or model), `subject`, a `given` map, a gradient, or any other selection. Three kinds
+cut a field by its values; `of` names the field:
+
+- `band` is a selection: the pixels where the field lies from `low` to `high`, fading out linearly over `feather` beyond
+  both (all shares of the field's 0..1 scale; `low` above `high` is an error).
+- `bands` is a partition into `count` equal ranges of the field, numbered **highest first** (the one exception to reading
+  order), so piece 0 is the nearest of the depth, the brightest of the light; a range no pixel falls in is dropped and the
+  rest renumbered.
+- `combine` is a selection of several: their product (`multiply`, all of them), the least (`min`) or the greatest
+  (`max`, any of them).
+
+Two kinds make a field from position: `linear_gradient` rises evenly across the picture in the direction of `angle`
+(counter-clockwise from the right, so 90 rises upward), 0 at one edge and 1 at the other; `radial_gradient` rises from a
+centre (`x`, `y`, shares of the picture) to 1 at `radius`, a share of the long side. A band of a gradient is a tilt-shift
+zone or a vignette ring; a band of light is the shadows or the highlights; a combination of the subject and the shadows
+is the shadows on the subject:
 
 ```toml
-format = 2
+format = 3
 
 [region.front]
-kind = "depth"
-near = 1.0
-far = 0.6
+kind = "band"
+of = "depth"
+low = 0.6
+high = 1.0
 feather = 0.1
 
-[region.bands]
-kind = "depth_bands"
+[region.tones]                    # the picture's own brightness in three ranges: brightest first
+kind = "bands"
+of = "light"
 count = 3
 
+[region.shadows]
+kind = "band"
+of = "light"
+low = 0
+high = 0.3
+
+[region.dark_subject]
+kind = "combine"
+of = ["subject", "shadows"]
+
 [[step]]
-each = "bands"                    # nearest, middle, farthest
+each = "tones"                    # highlights, midtones, shadows
 looks = ["none", { effect = "grade", saturation = 0.7 }, { effect = "grade", saturation = 0.4, exposure = 0.3 }]
 
 [[step]]
 effect = "clarity"
 mask = "front"                    # only what is near
+
+[[step]]
+effect = "glow"
+mask = "dark_subject"             # only the shadows on the subject
 ```
+
+Version 2 of the file format named the depth kinds `depth` and `depth_bands`; they are `band` and `bands` with
+`of = "depth"` now (`far` is `low`, `near` is `high`), and a file that still uses them says so.
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
 examples are in [`examples/regions/`](examples/regions/); [the pictures](docs/gallery/regions/README.md).

@@ -3,18 +3,20 @@
 A **partition** (`Partition`) gives every pixel to exactly one piece; the pieces are numbered 0..n-1 in *reading
 order*: piece k comes before piece k+1 when its first pixel comes earlier in the raster scan (left to right along each
 row, rows from the top). For a grid that is row after row; for any other kind it is a rule with no constants. The one
-exception is `DepthBands`, numbered by distance, nearest first. A kind that makes more pieces than a small picture has
-pixels (or bands than its depths fill) yields only the pieces that have a pixel, so n can be smaller than asked for. A
+exception is `Bands`, numbered by value, highest first. A kind that makes more pieces than a small picture has
+pixels (or bands than its values fill) yields only the pieces that have a pixel, so n can be smaller than asked for. A
 **selection** (`Selection`) says how much each pixel is chosen, 0..1.
 
-The kinds are models declared like an effect's parameters (partitions `Grid`, `Shards`, `Cuts`, `Svg` and
-`DepthBands`; selections `Path`, `Pick`, `Subject`, `Depth` and `Given`; `Edge` bends the borders of the kinds with
-`fit`), so
-every field has a unit, a range and a description: `Shards.documentation()` lists them. A recipe or a script declares
-them by name, and `resolve` turns the declarations into the regions of one picture, building only what is asked for.
-`Subject` with `per` is *grid first*: the subject is found inside each piece of a partition, one call of the injected
-finder per piece, and the finds are united. `Depth` and `DepthBands` read the injected depth map (1 = nearest); `Given`
-is a map the caller hands in under the region's own name.
+The kinds are models declared like an effect's parameters (partitions `Grid`, `Shards`, `Cuts`, `Svg` and `Bands`;
+selections `Path`, `Pick`, `Subject`, `Band`, `Combine`, `LinearGradient`, `RadialGradient` and `Given`; `Edge` bends
+the borders of the kinds with `fit`), so every field has a unit, a range and a description: `Shards.documentation()`
+lists them. A recipe or a script declares them by name, and `resolve` turns the declarations into the regions of one
+picture, building only what is asked for. `Subject` with `per` is *grid first*: the subject is found inside each piece
+of a partition, one call of the injected finder per piece, and the finds are united. A **field** is a selection read for
+its values, not only as a mask: the built-in `depth` (1 = nearest, the injected map), `light` (the picture's brightness,
+made by the runner from the working picture), `subject`, a `Given` map handed in under the region's own name, a
+gradient, or any other selection. `Band` chooses the pixels where a field lies in a range, `Bands` cuts a field into
+equal ranges (highest first), `Combine` multiplies, takes the least or the greatest of several.
 `look_weights` turns a partition and a look for each piece into the weights that blend the looks.
 
 Promises:
@@ -30,6 +32,7 @@ Promises:
 Dependency direction: imports `params`, `presets` and `ops`; the steps and the runner build on it.
 """
 
+import functools
 import math
 import re
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -42,6 +45,7 @@ from scipy import ndimage
 
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
+from bullterrier_image.ops.color import luminance
 from bullterrier_image.ops.noise import frame_fractal
 from bullterrier_image.ops.raster import coverage, paint
 from bullterrier_image.ops.voronoi import centres, nearest
@@ -51,19 +55,23 @@ from .params import EffectParams, param
 from .presets import SHIPPED, read
 
 __all__ = [
+    "DERIVED",
+    "Band",
+    "Bands",
     "BoxFinder",
+    "Combine",
     "Curve",
     "Cuts",
-    "Depth",
-    "DepthBands",
     "Edge",
     "Given",
     "Grid",
     "Kind",
     "Line",
+    "LinearGradient",
     "Partition",
     "Path",
     "Pick",
+    "RadialGradient",
     "Regions",
     "Selection",
     "Shards",
@@ -72,6 +80,7 @@ __all__ = [
     "as_partition",
     "check",
     "check_map",
+    "derived_maps",
     "look_weights",
     "map_error",
     "map_problem",
@@ -82,7 +91,10 @@ __all__ = [
     "used",
 ]
 
-BUILT_IN = ("subject", "background", "depth")
+BUILT_IN = ("subject", "background", "depth", "light")
+# The built-in maps made from the working picture itself, by name: not found, handed in or cached, so the runner makes
+# them for each render. `light` is the picture's brightness (Rec. 709 weights, `ops.color.luminance`).
+DERIVED = {"light": luminance}
 
 _HALF = 0.5  # constant: a pixel is chosen when more than half of it is (the hard edge of a selection)
 _LACUNARITY = 2.0  # constant: each octave of fractal noise has twice the frequency of the one before (the standard)
@@ -94,7 +106,7 @@ _MOST = 1000  # the most columns, rows, or shares of a grid
 @dataclass(frozen=True, eq=False)
 class Partition:
     """Every pixel in exactly one piece. `labels` is int32 `(height, width)`: the piece of each pixel, numbered
-    0..`count`-1 in piece order (the module docstring: reading order, `DepthBands` nearest first); every number
+    0..`count`-1 in piece order (the module docstring: reading order, `Bands` highest first); every number
     occurs. `ids` maps an SVG id to the numbers of the pieces of the shapes that have it (empty for a shape that is
     covered completely, and for every kind but `Svg`). Read-only when made by `resolve`."""
 
@@ -112,7 +124,7 @@ class Selection:
 
 class _Model(EffectParams):
     """What the declarations share: a bad value is a `RecipeError` naming the kind (as a recipe writes it,
-    `depth_bands` for `DepthBands`), the field and the value."""
+    `linear_gradient` for `LinearGradient`), the field and the value."""
 
     def __init__(self, /, **values: Any) -> None:
         """The declaration of `values` (field name -> value, all optional); RecipeError naming each bad field, the
@@ -301,14 +313,13 @@ class Pick(_Model):
 
     of: str = param(
         "",
-        doc="The name of the partition (grid, shards, cuts, svg or depth_bands) whose pieces are picked; it must be "
-        "set.",
+        doc="The name of the partition (grid, shards, cuts, svg or bands) whose pieces are picked; it must be set.",
     )
     pieces: tuple[int | str, ...] = param(
         (0,),
         min_length=1,
-        doc="The pieces to choose, at least one: numbers counted from 0 in piece order (reading order; depth_bands "
-        "nearest first) or, for an `Svg` partition, the `id` of a shape (text; every piece of every shape with that "
+        doc="The pieces to choose, at least one: numbers counted from 0 in piece order (reading order; bands "
+        "highest first) or, for an `Svg` partition, the `id` of a shape (text; every piece of every shape with that "
         "id). A number the partition has no piece for chooses nothing, so a recipe also works on a picture too small "
         "to have that many pieces; an id the file lacks is an error.",
     )
@@ -465,7 +476,7 @@ class Subject(_Model):
 
     per: str | None = param(
         None,
-        doc="The name of a partition (grid, shards, cuts, svg or depth_bands): the subject is found inside each of "
+        doc="The name of a partition (grid, shards, cuts, svg or bands): the subject is found inside each of "
         "its pieces separately and the finds are united, so small things a whole-picture search misses (a calf "
         "behind its mother, a fox on a rock) are found. Not set = the subject of the whole picture, as the built-in "
         "'subject'.",
@@ -492,55 +503,125 @@ class Subject(_Model):
     )
 
 
-class Depth(_Model):
-    """A selection: the pixels between two distances, fading out beyond them. Distances are shares of the depth scale:
-    1 is the nearest, 0 the farthest."""
+class Band(_Model):
+    """A selection: the pixels where another selection (a field of the photo) lies between two values, fading out
+    linearly beyond them. The values are shares of the field's own scale (0 to 1)."""
 
-    near: float = param(
-        1.0,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="The nearest depth chosen fully, as a share of the depth scale (0 to 1; 1 is the nearest, 0 the farthest). "
-        "Raising it takes in nearer pixels; 1 reaches to the front.",
+    of: str = param(
+        "",
+        doc="The name of the selection whose values are cut, which must be set: a built-in one (`depth`: 1 is the "
+        "nearest; `light`: the picture's brightness, 1 is white; `subject`) or one the recipe declares (a `given` map, "
+        "a gradient, another band). Its value at a pixel decides how far the pixel is chosen.",
     )
-    far: float = param(
+    low: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="The farthest depth chosen fully (0 to 1, at most `near`): every pixel from `far` to `near` is chosen. "
-        "Raising it leaves out the farther pixels; 0 reaches to the back.",
+        doc="The lowest value chosen fully (0 to 1, at most `high`): every pixel whose value lies from `low` to `high` "
+        "is chosen. Raising it leaves out the lower values; 0 reaches down to the bottom of the scale.",
+    )
+    high: float = param(
+        1.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The highest value chosen fully (0 to 1): see `low`. Lowering it leaves out the higher values; 1 reaches "
+        "up to the top of the scale.",
     )
     feather: float = param(
         0.1,
         unit="fraction",
         min=0,
         max=1,
-        doc="How far beyond `near` and `far` the choice fades out, as a share of the depth scale (0 to 1): it falls "
-        "linearly from 1 at the bound to 0 this far past it. Raising it softens the edge; 0 cuts it hard.",
+        doc="How far beyond `low` and `high` the choice fades out, as a share of the scale (0 to 1): it falls linearly "
+        "from 1 at the bound to 0 this far past it. Raising it softens the edge; 0 cuts it hard.",
     )
 
     @model_validator(mode="after")
-    def _far_not_above_near(self) -> "Depth":
-        """`far` is no nearer than `near`."""
-        if self.far > self.near:
-            raise ValueError(f"`far` {self.far} is above `near` {self.near}: far must be at most near")
+    def _low_not_above_high(self) -> "Band":
+        """`low` is no higher than `high`."""
+        if self.low > self.high:
+            raise ValueError(f"`low` {self.low} is above `high` {self.high}: low must be at most high")
         return self
 
 
-class DepthBands(_Model):
-    """A partition into bands of distance: equal ranges of the depth scale, numbered nearest first."""
+class Bands(_Model):
+    """A partition into bands of a field: equal ranges of its scale, numbered highest first."""
 
+    of: str = param(
+        "",
+        doc="The name of the selection whose values are cut into bands, which must be set (see `Band.of`). Band 0 "
+        "holds its highest values: the nearest for `depth`, the brightest for `light`.",
+    )
     count: int = param(
         3,
         unit="count",
         min=1,
         max=100,
-        doc="How many equal ranges the depth scale is cut into (1 to 100). Band 0 is the nearest, the last the "
-        "farthest: by distance, not in reading order. A depth on a border goes to the farther band (0 to the "
-        "farthest); a band no pixel lies in has no piece and the rest are renumbered, nearest first. Raising it "
-        "makes thinner bands.",
+        doc="How many equal ranges the scale is cut into (1 to 100). Band 0 is the highest, the last the lowest: by "
+        "value, not in reading order. A value on a border goes to the lower band (0 to the lowest); a band no pixel "
+        "lies in has no piece and the rest are renumbered, highest first. Raising it makes thinner bands.",
+    )
+
+
+class Combine(_Model):
+    """A selection made of other selections: where all of them are chosen (multiply, min) or any of them is (max)."""
+
+    op: Literal["multiply", "min", "max"] = param(
+        "multiply",
+        doc="How the selections are put together at each pixel: 'multiply' (their product: all of them, fading where "
+        "any fades), 'min' (the least of them: all of them, hard where any is hard) or 'max' (the greatest: any of "
+        "them).",
+    )
+    of: tuple[str, ...] = param(
+        ("", ""),
+        min_length=2,
+        doc="The names of the selections to combine, at least two, which must be set: built-in ones (`subject`, "
+        "`background`, `depth`, `light`) or ones the recipe declares.",
+    )
+
+
+class LinearGradient(_Model):
+    """A selection that rises evenly across the picture in one direction: 0 at one edge, 1 at the opposite one."""
+
+    angle: float = param(
+        90.0,
+        unit="degrees",
+        min=-360,
+        max=360,
+        doc="The direction in which the value rises, counter-clockwise from the right (-360 to 360): 0 rises to the "
+        "right, 90 upward, 180 to the left, 270 downward. The value is a share of the picture's extent along that "
+        "direction, so the far corners are 0 and 1 at any aspect ratio.",
+    )
+
+
+class RadialGradient(_Model):
+    """A selection that rises evenly from a point: 0 at the centre, 1 at `radius` and beyond."""
+
+    x: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="Where the centre is across the picture, as a share of its width (0 to 1): 0 is the left edge, 1 the "
+        "right.",
+    )
+    y: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="Where the centre is down the picture, as a share of its height (0 to 1): 0 is the top edge, 1 the bottom.",
+    )
+    radius: float = param(
+        0.5,
+        unit="fraction",
+        min=0.01,
+        max=2,
+        doc="The distance from the centre at which the value reaches 1, as a share of the picture's long side (0.01 to "
+        "2). Raising it spreads the gradient wider; 0.5 reaches the edges' midpoints of a picture as wide as it is "
+        "tall, centred.",
     )
 
 
@@ -551,7 +632,21 @@ class Given(_Model):
     is not). It has no fields."""
 
 
-Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject | Depth | DepthBands | Given
+Kind = (
+    Grid
+    | Shards
+    | Cuts
+    | Path
+    | Svg
+    | Pick
+    | Subject
+    | Band
+    | Bands
+    | Combine
+    | LinearGradient
+    | RadialGradient
+    | Given
+)
 # Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
 # left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
 BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
@@ -762,15 +857,44 @@ def _drawn(
     return Partition(_frozen(labels), len(drawn), ids)
 
 
-def _by_depth(kind: Depth | DepthBands, depth: np.ndarray) -> Partition | Selection:
-    """The region `kind` makes of the depth map `depth` (float32 `(height, width)`, 1 = nearest)."""
-    if isinstance(kind, Depth):
-        outside = np.maximum(np.maximum(kind.far - depth, depth - kind.near), 0)  # how far beyond far..near
-        alpha = np.clip(1 - outside / kind.feather, 0, 1) if kind.feather else outside == 0
-        return Selection(_frozen(alpha.astype(np.float32)))
-    bands = np.minimum(np.floor((1 - depth.astype(np.float64)) * kind.count), kind.count - 1)  # 0 = the nearest
-    present, labels = np.unique(bands.ravel(), return_inverse=True)  # numbered by band, so still nearest first
-    return Partition(_frozen(labels.reshape(depth.shape).astype(np.int32)), len(present))
+def _band(kind: Band, field: np.ndarray) -> Selection:
+    """The selection `kind` makes of the field `field` (float32 `(height, width)`, 0..1)."""
+    outside = np.maximum(np.maximum(kind.low - field, field - kind.high), 0)  # how far beyond low..high
+    alpha = np.clip(1 - outside / kind.feather, 0, 1) if kind.feather else outside == 0
+    return Selection(_frozen(alpha.astype(np.float32)))
+
+
+def _bands(kind: Bands, field: np.ndarray) -> Partition:
+    """The partition `kind` makes of the field `field` (float32 `(height, width)`, 0..1): band 0 holds the highest."""
+    bands = np.minimum(np.floor((1 - field.astype(np.float64)) * kind.count), kind.count - 1)  # 0 = the highest
+    present, labels = np.unique(bands.ravel(), return_inverse=True)  # numbered by band, so still highest first
+    return Partition(_frozen(labels.reshape(field.shape).astype(np.int32)), len(present))
+
+
+def _combined(kind: Combine, fields: Sequence[np.ndarray]) -> Selection:
+    """The selection `kind` makes of the selections `fields` (each float32 `(height, width)`, 0..1)."""
+    combine = {"multiply": np.multiply, "min": np.minimum, "max": np.maximum}[kind.op]
+    return Selection(_frozen(functools.reduce(combine, fields).astype(np.float32)))
+
+
+def _linear(kind: LinearGradient, shape: tuple[int, int]) -> Selection:
+    """The linear gradient `kind` over a picture of `shape`: its position along the direction as a share of the
+    picture's extent that way, taken at each pixel's centre."""
+    height, width = shape
+    x, y = centres(shape)
+    angle = math.radians(kind.angle)
+    extent = width * abs(math.cos(angle)) + height * abs(math.sin(angle))
+    along = ((x - width / 2) * math.cos(angle) - (y - height / 2) * math.sin(angle)) / extent + _HALF
+    return Selection(_frozen(np.clip(along, 0, 1).astype(np.float32)))
+
+
+def _radial(kind: RadialGradient, shape: tuple[int, int]) -> Selection:
+    """The radial gradient `kind` over a picture of `shape`: a pixel's distance from the centre as a share of
+    `radius`, from 0 at the centre to 1."""
+    height, width = shape
+    x, y = centres(shape)
+    distance = np.hypot(x - kind.x * width, y - kind.y * height)
+    return Selection(_frozen(np.clip(distance / (kind.radius * max(shape)), 0, 1).astype(np.float32)))
 
 
 def look_weights(partition: Partition, assignment: Sequence[int], count: int, *, feather: float) -> np.ndarray:
@@ -796,9 +920,9 @@ def _type_of(name: str, declared: Mapping[str, Kind]) -> Literal["partition", "s
     if name in BUILT_IN:
         return "selection"
     match declared.get(name):
-        case Grid() | Shards() | Cuts() | Svg() | DepthBands():
+        case Grid() | Shards() | Cuts() | Svg() | Bands():
             return "partition"
-        case Pick() | Path() | Subject() | Depth() | Given():
+        case Pick() | Path() | Subject() | Band() | Combine() | LinearGradient() | RadialGradient() | Given():
             return "selection"
         case _:
             return None
@@ -828,17 +952,19 @@ def needs(
     raise RecipeError(f"{owner}: `{field}` names {name!r}, {problem}; valid {kind}s: {valid}{hint}")
 
 
-def _reference(kind: Kind) -> str | None:
-    """The name of the region that `kind` is made from, if any."""
+def _references(kind: Kind) -> tuple[str, ...]:
+    """The names of the regions that `kind` is made from."""
     match kind:
-        case Pick():
+        case Pick() | Band() | Bands():
+            return (kind.of,)
+        case Combine():
             return kind.of
         case Subject():
-            return kind.per
-        case Depth() | DepthBands() | Given():
-            return None
+            return () if kind.per is None else (kind.per,)
+        case Given() | LinearGradient() | RadialGradient():
+            return ()
         case _:
-            return kind.fit
+            return () if kind.fit is None else (kind.fit,)
 
 
 class Regions(Mapping[str, Partition | Selection]):
@@ -898,7 +1024,7 @@ class Regions(Mapping[str, Partition | Selection]):
 
     def _make(self, name: str) -> Partition | Selection:
         match name:
-            case "subject" | "depth":
+            case "subject" | "depth" | "light":
                 return Selection(self._map(name, f"the built-in region {name!r}"))
             case "background":
                 return Selection(_frozen(1 - self.selection("subject").alpha))
@@ -909,8 +1035,17 @@ class Regions(Mapping[str, Partition | Selection]):
             return self._subject_of(name, kind)
         if isinstance(kind, Pick):
             return self._pick(name, kind)
-        if isinstance(kind, Depth | DepthBands):
-            return _by_depth(kind, self._map("depth", f"region {name!r}"))
+        match kind:
+            case Band():
+                return _band(kind, self.selection(kind.of).alpha)
+            case Bands():
+                return _bands(kind, self.selection(kind.of).alpha)
+            case Combine():
+                return _combined(kind, [self.selection(of).alpha for of in kind.of])
+            case LinearGradient():
+                return _linear(kind, self._shape)
+            case RadialGradient():
+                return _radial(kind, self._shape)
         box, chosen = self._frame(name, kind.fit)
         x, y = _coordinates(self._shape, kind.edge)
         try:
@@ -1021,18 +1156,28 @@ def check(declared: Mapping[str, Kind]) -> None:
             raise RecipeError(f"region {name!r} is a built-in region ({', '.join(BUILT_IN)}) and cannot be declared")
         if isinstance(kind, Pick):
             needs(f"region {name!r}", "of", kind.of, "partition", declared)
+        elif isinstance(kind, Band | Bands):
+            needs(f"region {name!r}", "of", kind.of, "selection", declared)
+        elif isinstance(kind, Combine):
+            for of in kind.of:
+                needs(f"region {name!r}", "of", of, "selection", declared)
         elif isinstance(kind, Subject):
             if kind.per is not None:
                 needs(f"region {name!r}", "per", kind.per, "partition", declared)
         elif isinstance(kind, _Laid) and kind.fit is not None:
             needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
     for start in declared:
-        chain = [start]
-        while (ref := _reference(declared[chain[-1]])) is not None and ref in declared:
-            if ref in chain:
-                loop = " -> ".join(repr(each) for each in [*chain[chain.index(ref) :], ref])
-                raise RecipeError(f"regions refer to each other in a cycle: {loop}")
-            chain.append(ref)
+        _no_cycle([start], declared)
+
+
+def _no_cycle(chain: list[str], declared: Mapping[str, Kind]) -> None:
+    """RecipeError if a region reachable from the last of `chain` (the regions followed so far) is already in it."""
+    for ref in _references(declared[chain[-1]]):
+        if ref in chain:
+            loop = " -> ".join(repr(each) for each in [*chain[chain.index(ref) :], ref])
+            raise RecipeError(f"regions refer to each other in a cycle: {loop}")
+        if ref in declared:
+            _no_cycle([*chain, ref], declared)
 
 
 def used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
@@ -1044,15 +1189,12 @@ def used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
         name = todo.pop()
         if name not in seen:
             seen.add(name)
-            ref = None if name in BUILT_IN else _reference(declared[name])
-            todo += [] if ref is None else [ref]
+            todo += [] if name in BUILT_IN else _references(declared[name])
     return seen
 
 
-def maps_used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
-    """The names of the maps of the photo that making the regions `names` reads: `subject` for the built-in `subject`
-    and `background` and for a `Subject` without `per`, `depth` for the built-in `depth`, a `Depth` and a `DepthBands`,
-    and a `Given` region's own name."""
+def _wanted(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
+    """The names of the maps (found or derived) that making the regions `names` reads."""
     wanted: set[str] = set()
     for name in used(declared, names):
         if name in BUILT_IN:
@@ -1061,11 +1203,23 @@ def maps_used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
         match declared[name]:
             case Subject(per=None):
                 wanted.add("subject")
-            case Depth() | DepthBands():
-                wanted.add("depth")
             case Given():
                 wanted.add(name)
     return wanted
+
+
+def maps_used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
+    """The names of the maps of the photo that making the regions `names` reads and the caller must supply: `subject`
+    for the built-in `subject` and `background` and for a `Subject` without `per`, `depth` for the built-in `depth`
+    (so for a `Band` or `Bands` of it, however indirectly), and a `Given` region's own name. Not `light`, which is made
+    from the picture itself (see `derived_maps`)."""
+    return _wanted(declared, names) - DERIVED.keys()
+
+
+def derived_maps(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
+    """The names of the maps made from the working picture (`DERIVED`) that making the regions `names` reads: `light`
+    for the built-in `light`, however indirectly."""
+    return _wanted(declared, names) & DERIVED.keys()
 
 
 def needs_finder(declared: Mapping[str, Kind], names: Iterable[str]) -> bool:

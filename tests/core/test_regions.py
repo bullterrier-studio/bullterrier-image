@@ -18,19 +18,23 @@ from scipy import ndimage
 
 from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
+    DERIVED,
+    Band,
+    Bands,
     BoxFinder,
+    Combine,
     Curve,
     Cuts,
-    Depth,
-    DepthBands,
     Edge,
     Given,
     Grid,
     Kind,
     Line,
+    LinearGradient,
     Partition,
     Path,
     Pick,
+    RadialGradient,
     Regions,
     Selection,
     Shards,
@@ -38,6 +42,7 @@ from bullterrier_image.core.regions import (
     Svg,
     as_partition,
     check,
+    derived_maps,
     look_weights,
     maps_used,
     needs,
@@ -121,13 +126,19 @@ def declared() -> dict[str, Kind]:
         "torn_mosaic": Svg(file=MOSAIC, edge=Edge(style="torn")),
         "mosaic_on_subject": Svg(file=MOSAIC, fit="subject"),
         "pick_of_mosaic": Pick(of="mosaic", pieces=["ring", "sun", 0]),
-        "near": Depth(),
-        "hard_band": Depth(near=0.6, far=0.4, feather=0),
+        "near": Band(of="depth"),
+        "hard_band": Band(of="depth", low=0.4, high=0.6, feather=0),
         "grid_on_near": Grid(columns=2, rows=2, fit="near"),
         "pick_of_grid_on_near": Pick(of="grid_on_near", pieces=[1]),
-        "bands": DepthBands(),
-        "many_bands": DepthBands(count=100),
+        "bands": Bands(of="depth"),
+        "many_bands": Bands(of="depth", count=100),
         "pick_of_bands": Pick(of="bands", pieces=[0]),
+        "tilt": LinearGradient(),
+        "spot": RadialGradient(),
+        "near_and_tilted": Combine(of=("near", "tilt")),
+        "near_or_spot": Combine(op="max", of=("near", "spot")),
+        "bands_of_the_tilt": Bands(of="tilt", count=4),
+        "band_of_a_band": Band(of="near", low=0.3, high=0.9),
     }
 
 
@@ -140,7 +151,7 @@ def first_pixels(labels: np.ndarray) -> list[int]:
 def assert_a_region(region: Partition | Selection, shape: Shape, nearest_first: np.ndarray | None = None) -> None:
     """The promises of both kinds: a partition numbers the pieces that exist 0..n-1 in reading order (or, given the
     depth as `nearest_first`, by depth: every pixel of a piece at least as near as every pixel of the pieces after it,
-    as `DepthBands` numbers them) and gives every pixel one; a selection holds floats from 0 to 1; neither can be
+    as `Bands` numbers them) and gives every pixel one; a selection holds floats from 0 to 1; neither can be
     written to."""
     match region:
         case Partition(labels=labels, count=count):
@@ -165,8 +176,8 @@ def assert_a_region(region: Partition | Selection, shape: Shape, nearest_first: 
 
 def numbering(kind: Kind, shape: Shape) -> np.ndarray | None:
     """What `assert_a_region` checks the pieces of `kind` over a picture of `shape` are numbered by: the depth for
-    `DepthBands` (nearest first), None (reading order) for every other kind."""
-    return ramp(shape) if isinstance(kind, DepthBands) else None
+    `Bands` of depth (nearest first), None (reading order) for every other kind."""
+    return ramp(shape) if isinstance(kind, Bands) and kind.of == "depth" else None
 
 
 def labels_of(regions: dict, name: str, shape: Shape) -> np.ndarray:
@@ -232,9 +243,11 @@ AT_THE_LIMITS: dict[str, Kind] = {
     "grid of tiny and huge shares": Grid(columns=[0.001, 1000], rows=[1000, 0.001]),
     "grid on the subject, torn": Grid(columns=3, rows=3, fit="subject", edge=Edge(style="torn", amount=0.1)),
     **{f"subject {id_}": Subject(per="panes", **values) for id_, values in extremes(Subject)},
-    **{f"depth {id_}": Depth(**values) for id_, values in extremes(Depth, far=0)},
-    **{f"depth bands {id_}": DepthBands(**values) for id_, values in extremes(DepthBands)},
-    "depth of nothing between": Depth(near=0.5, far=0.5, feather=0),
+    **{f"band {id_}": Band(**values) for id_, values in extremes(Band, of="depth", low=0)},
+    **{f"bands {id_}": Bands(**values) for id_, values in extremes(Bands, of="depth")},
+    **{f"linear gradient {id_}": LinearGradient(**values) for id_, values in extremes(LinearGradient)},
+    **{f"radial gradient {id_}": RadialGradient(**values) for id_, values in extremes(RadialGradient)},
+    "a band of nothing between": Band(of="depth", low=0.5, high=0.5, feather=0),
 }
 
 
@@ -546,7 +559,7 @@ def test_the_subject_is_the_given_map_and_the_background_is_what_is_left():
     regions = resolve({}, shape, maps={"subject": finder(shape)})
     np.testing.assert_array_equal(regions.selection("subject").alpha, disc(shape))
     np.testing.assert_allclose(regions.selection("background").alpha, 1 - disc(shape), atol=1e-7)
-    assert set(regions) == {"subject", "background", "depth"}
+    assert set(regions) == {"subject", "background", "depth", "light"}
 
 
 def test_asking_whether_a_region_exists_makes_nothing_and_needs_no_map():
@@ -567,8 +580,11 @@ def test_regions_are_made_once_and_handed_out_read_only():
     ("kind", "error", "complaint"),
     [
         pytest.param(Shards(fit="subject"), SubjectNotFoundError, "subject", id="the subject"),
-        pytest.param(Depth(), DepthNotFoundError, "'s'.*depth", id="the depth of a selection, naming it"),
-        pytest.param(DepthBands(), DepthNotFoundError, "'s'.*depth", id="the depth of bands, naming them"),
+        pytest.param(Band(of="depth"), DepthNotFoundError, "depth", id="a band of the depth"),
+        pytest.param(Bands(of="depth"), DepthNotFoundError, "depth", id="bands of the depth"),
+        pytest.param(
+            Combine(of=("subject", "depth")), SubjectNotFoundError, "subject", id="a combination with the subject"
+        ),
     ],
 )
 def test_a_region_made_from_a_map_says_so_when_there_is_none(kind, error, complaint):
@@ -619,8 +635,19 @@ BAD_DECLARATIONS = {
     "per names a selection": ({"s": Subject(per="subject")}, "'s'.*per.*'subject'.*selection.*partition"),
     "per names no region": ({"g": Grid(), "s": Subject(per="gone")}, "'s'.*'gone'.*valid.*g"),
     "a cycle through per": ({"s": Subject(per="p"), "p": Shards(fit="s")}, "cycle.*'s'.*'p'"),
-    "fit names depth bands": ({"b": DepthBands(), "g": Grid(fit="b")}, "'g'.*fit.*'b'.*partition.*selection"),
-    "pick of a depth selection": ({"n": Depth(), "p": Pick(of="n")}, "'p'.*'n'.*selection.*partition"),
+    "fit names bands": ({"b": Bands(of="depth"), "g": Grid(fit="b")}, "'g'.*fit.*'b'.*partition.*selection"),
+    "pick of a band": ({"n": Band(of="depth"), "p": Pick(of="n")}, "'p'.*'n'.*selection.*partition"),
+    "a band of nothing named": ({"n": Band()}, "'n'.*of.*''.*no region"),
+    "a band of a partition": ({"g": Grid(), "n": Band(of="g")}, "'n'.*of.*'g'.*partition.*selection"),
+    "bands of a region that is not there": ({"b": Bands(of="gone")}, "'b'.*of.*'gone'.*no region.*valid.*depth"),
+    "a combination of nothing named": ({"c": Combine()}, "'c'.*of.*''.*no region"),
+    "a combination with a partition": ({"g": Grid(), "c": Combine(of=("depth", "g"))}, "'c'.*of.*'g'.*partition"),
+    "a band of itself": ({"n": Band(of="n")}, "cycle.*'n'.*'n'"),
+    "a combination through a band": (
+        {"c": Combine(of=("depth", "n")), "n": Band(of="c")},
+        "cycle.*'c'.*'n'",
+    ),
+    "a name taken by the built-in light": ({"light": Grid()}, "'light'.*built-in"),
 }
 
 
@@ -658,8 +685,8 @@ def test_needs_accepts_a_region_of_the_wanted_kind_and_otherwise_names_the_owner
     declared: dict[str, Kind] = {
         "panes": Grid(columns=2),
         "head": Pick(of="panes", pieces=[1]),
-        "near": Depth(),
-        "bands": DepthBands(),
+        "near": Band(of="depth"),
+        "bands": Bands(of="depth"),
     }
     if fine:
         needs(owner, field, name, wanted, declared)
@@ -721,8 +748,8 @@ USED = {
         {"far", "pick_inner", "inner", "subject"},
     ),
     "two asking for the same": (["pick", "grid", "pick"], {"pick", "grid"}),
-    "a pick of depth bands brings the bands": (["pick_of_bands"], {"pick_of_bands", "bands"}),
-    "a depth selection is made from no other region": (["near"], {"near"}),
+    "a pick of bands brings the bands and what they are of": (["pick_of_bands"], {"pick_of_bands", "bands", "depth"}),
+    "a band of the built-in depth is made from that region": (["near"], {"near", "depth"}),
 }
 
 
@@ -868,16 +895,30 @@ BAD_VALUES = {
     "threshold past 1": (Subject, {"threshold": 1.1}, "threshold"),
     "negative threshold": (Subject, {"threshold": -0.1}, "threshold"),
     "a per that is no text": (Subject, {"per": 3}, "per"),
-    "far beyond near": (Depth, {"near": 0.3, "far": 0.6}, r"far.*0\.6.*near.*0\.3"),
-    "the default far beyond a near below it": (Depth, {"near": 0.2}, r"far.*0\.5.*near.*0\.2"),
-    "near past 1": (Depth, {"near": 1.5}, "near"),
-    "a negative far": (Depth, {"far": -0.1}, "far"),
-    "feather past 1": (Depth, {"feather": 1.1}, "feather"),
-    "a misspelt depth field": (Depth, {"nearest": 1}, "nearest"),
-    "no bands": (DepthBands, {"count": 0}, "count"),
-    "too many bands": (DepthBands, {"count": 101}, "count"),
-    "a share of a band": (DepthBands, {"count": 2.5}, "count"),
-    "a band count named by its kind as a recipe writes it": (DepthBands, {"count": 0}, "^depth_bands: .*count"),
+    "low above high": (Band, {"low": 0.6, "high": 0.3}, r"low.*0\.6.*high.*0\.3"),
+    "the default low above a high below it": (Band, {"high": 0.2}, r"low.*0\.5.*high.*0\.2"),
+    "high past 1": (Band, {"high": 1.5}, "high"),
+    "a negative low": (Band, {"low": -0.1}, "low"),
+    "feather past 1": (Band, {"feather": 1.1}, "feather"),
+    "a misspelt band field": (Band, {"nearest": 1}, "nearest"),
+    "an of that is no text": (Band, {"of": 3}, "of"),
+    "no bands": (Bands, {"count": 0}, "count"),
+    "too many bands": (Bands, {"count": 101}, "count"),
+    "a share of a band": (Bands, {"count": 2.5}, "count"),
+    "a band count named by its kind as a recipe writes it": (Bands, {"count": 0}, "^bands: .*count"),
+    "one selection combined": (Combine, {"of": ("depth",)}, "of"),
+    "an operation that is not offered": (Combine, {"op": "xor"}, "op"),
+    "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^combine: .*op"),
+    "an angle past a full turn": (LinearGradient, {"angle": 361}, "angle"),
+    "a gradient named by its kind as a recipe writes it": (LinearGradient, {"angle": 361}, "^linear_gradient: .*angle"),
+    "a centre off the picture": (RadialGradient, {"x": 1.1}, "x"),
+    "a radius of nothing": (RadialGradient, {"radius": 0}, "radius"),
+    "a radius past 2": (RadialGradient, {"radius": 2.5}, "radius"),
+    "a radial gradient named by its kind as a recipe writes it": (
+        RadialGradient,
+        {"radius": 0},
+        "^radial_gradient: .*radius",
+    ),
 }
 
 
@@ -913,7 +954,26 @@ def test_every_shipped_preset_cuts_a_picture_differently_from_the_default(preset
     assert not np.array_equal(named, default)
 
 
-@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge, Cuts, Line, Curve, Path, Svg, Depth, DepthBands])
+@pytest.mark.parametrize(
+    "model",
+    [
+        Grid,
+        Shards,
+        Pick,
+        Subject,
+        Edge,
+        Cuts,
+        Line,
+        Curve,
+        Path,
+        Svg,
+        Band,
+        Bands,
+        Combine,
+        LinearGradient,
+        RadialGradient,
+    ],
+)
 def test_every_field_is_documented_with_its_unit_and_range(model):
     text = model.documentation()
     for doc in model.fields_doc():
@@ -1551,49 +1611,70 @@ def test_svg_leaves_the_region_a_partition_with_a_piece_for_each_shape_of_a_real
     assert partition.count == 12  # eleven shapes and the outside
 
 
-# ---- depth: a selection between two distances, and bands of distance ----------------------------------------------
+# ---- a band of a field, and bands of a field ------------------------------------------------------------------------
 
 # Down the picture: from the nearest (1) to the farthest (0).
 DEPTHS = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.3, 0.0]
-DEPTH_SELECTIONS = {
+BANDS_OF_DEPTH = {
     "the default: everything from half way to the front, fading over a tenth behind": (
-        Depth(),
+        Band(of="depth"),
         [1, 1, 1, 1, 1, 1, 0.5, 0, 0, 0],
     ),
     "a band fading over a fifth on both sides": (
-        Depth(near=0.8, far=0.5, feather=0.2),
+        Band(of="depth", low=0.5, high=0.8, feather=0.2),
         [0, 0.5, 1, 1, 1, 1, 0.75, 0.5, 0, 0],
     ),
-    "no feather cuts a hard edge": (Depth(near=0.8, far=0.5, feather=0), [0, 0, 1, 1, 1, 1, 0, 0, 0, 0]),
-    "near and far at one depth: only the feather's ramp round it": (
-        Depth(near=0.6, far=0.6, feather=0.2),
+    "no feather cuts a hard edge": (Band(of="depth", low=0.5, high=0.8, feather=0), [0, 0, 1, 1, 1, 1, 0, 0, 0, 0]),
+    "low and high at one value: only the feather's ramp round it": (
+        Band(of="depth", low=0.6, high=0.6, feather=0.2),
         [0, 0, 0, 0.5, 1, 0.5, 0.25, 0, 0, 0],
     ),
-    "the whole scale": (Depth(near=1, far=0, feather=1), [1] * 10),
+    "the whole scale": (Band(of="depth", low=0, high=1, feather=1), [1] * 10),
 }
 
 
-@pytest.mark.parametrize(("kind", "chosen"), DEPTH_SELECTIONS.values(), ids=DEPTH_SELECTIONS.keys())
-def test_a_depth_selection_chooses_from_far_to_near_and_fades_linearly_over_the_feather_beyond(kind, chosen):
+@pytest.mark.parametrize(("kind", "chosen"), BANDS_OF_DEPTH.values(), ids=BANDS_OF_DEPTH.keys())
+def test_a_band_chooses_from_low_to_high_and_fades_linearly_over_the_feather_beyond(kind, chosen):
     alpha = resolve({"d": kind}, (len(DEPTHS), 3), maps={"depth": down(DEPTHS)}).selection("d").alpha
     np.testing.assert_allclose(alpha, np.tile(np.asarray(chosen, np.float32)[:, None], (1, 3)), atol=1e-6)
 
 
-DEPTH_BANDS = {
-    "three equal bands, the nearest first, the borders at 2/3 and 1/3": (
+def test_a_band_reads_whatever_selection_it_is_of_not_only_the_depth():
+    star = np.tile(np.asarray([0.0, 0.2, 0.4, 0.6, 0.8, 1.0], np.float32)[:, None], (1, 3))
+    alpha = (
+        resolve({"star": Given(), "mid": Band(of="star", low=0.4, high=0.6, feather=0.2)}, (6, 3), maps={"star": star})
+        .selection("mid")
+        .alpha
+    )
+    np.testing.assert_allclose(alpha[:, 0], [0, 0, 1, 1, 0, 0], atol=1e-6)
+    np.testing.assert_allclose(alpha[:, 0], alpha[:, 2])  # the same down every column
+
+
+def test_a_band_of_a_band_cuts_the_first_ones_alpha_again():
+    regions = resolve(
+        {"near": Band(of="depth", low=0.5, high=1, feather=0.5), "core": Band(of="near", low=1, high=1, feather=0)},
+        (5, 3),
+        maps={"depth": down([1.0, 0.75, 0.5, 0.25, 0.0])},
+    )
+    np.testing.assert_allclose(regions.selection("near").alpha[:, 0], [1, 1, 1, 0.5, 0], atol=1e-6)
+    np.testing.assert_array_equal(regions.selection("core").alpha[:, 0], [1, 1, 1, 0, 0])  # only where `near` is 1
+
+
+BANDS_OF_A_FIELD = {
+    "three equal bands, the highest first, the borders at 2/3 and 1/3": (
         3,
         [1.0, 0.9, 0.67, 0.66, 0.34, 0.33, 0.1, 0.0],
         [0, 0, 0, 1, 1, 2, 2, 2],
     ),
-    "a depth on a border goes to the farther band; 1 and 0 to the end bands": (
+    "a value on a border goes to the lower band; 1 and 0 to the end bands": (
         4,
         [1.0, 0.75, 0.5, 0.25, 0.0],
         [0, 1, 2, 3, 3],
     ),
     "one band is one piece": (1, [1.0, 0.5, 0.0], [0, 0, 0]),
-    "a constant depth is one piece": (3, [0.5, 0.5, 0.5], [0, 0, 0]),
-    "the nearest first even when it lies below the farthest": (3, [0.1, 0.1, 0.9, 0.9], [1, 1, 0, 0]),
-    "an empty band drops out and the rest are renumbered, nearest first": (
+    "a constant field is one piece": (3, [0.5, 0.5, 0.5], [0, 0, 0]),
+    "the highest first even when it lies below the lowest": (3, [0.1, 0.1, 0.9, 0.9], [1, 1, 0, 0]),
+    "an empty band drops out and the rest are renumbered, highest first": (
         5,
         [0.05, 0.95, 0.5, 0.95, 0.05],
         [2, 0, 1, 0, 2],
@@ -1601,16 +1682,165 @@ DEPTH_BANDS = {
 }
 
 
-@pytest.mark.parametrize(("count", "depths", "pieces"), DEPTH_BANDS.values(), ids=DEPTH_BANDS.keys())
-def test_depth_bands_cut_the_depth_scale_into_equal_ranges_numbered_nearest_first(count, depths, pieces):
-    shape = (len(depths), 3)
-    partition = resolve({"b": DepthBands(count=count)}, shape, maps={"depth": down(depths)}).partition("b")
+@pytest.mark.parametrize(("count", "values", "pieces"), BANDS_OF_A_FIELD.values(), ids=BANDS_OF_A_FIELD.keys())
+def test_bands_cut_the_scale_into_equal_ranges_numbered_highest_first(count, values, pieces):
+    shape = (len(values), 3)
+    partition = resolve({"b": Bands(of="depth", count=count)}, shape, maps={"depth": down(values)}).partition("b")
     np.testing.assert_array_equal(partition.labels, np.tile(np.asarray(pieces, np.int32)[:, None], (1, 3)))
     assert partition.count == max(pieces) + 1
-    assert_a_region(partition, shape, down(depths))
+    assert_a_region(partition, shape, down(values))
 
 
-def test_a_pick_of_band_0_selects_the_nearest_band():
+def test_bands_of_a_given_map_are_numbered_by_that_map_not_by_the_depth():
+    star = down([0.1, 0.9, 0.5])
+    regions = resolve(
+        {"star": Given(), "b": Bands(of="star", count=3)}, (3, 3), maps={"star": star, "depth": down([0.9, 0.1, 0.5])}
+    )
+    np.testing.assert_array_equal(regions.partition("b").labels[:, 0], [2, 0, 1])
+
+
+def test_a_pick_of_band_0_selects_the_highest_band():
     depths = [0.2, 0.9, 0.5, 0.8]
-    regions = resolve({"b": DepthBands(count=3), "front": Pick(of="b")}, (4, 3), maps={"depth": down(depths)})
+    regions = resolve({"b": Bands(of="depth", count=3), "front": Pick(of="b")}, (4, 3), maps={"depth": down(depths)})
     np.testing.assert_array_equal(regions.selection("front").alpha[:, 0], [0, 1, 0, 1])
+
+
+# ---- light: the picture's own brightness -----------------------------------------------------------------------------
+
+
+def test_light_is_the_brightness_of_the_working_picture_with_rec_709_weights():
+    # by hand: pure red, green and blue pixels, then a white one and a black one; the weights sum to 1
+    photo = np.asarray([[[1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 0]]], np.float32)
+    light = DERIVED["light"](photo)
+    np.testing.assert_allclose(light[0], [0.2126, 0.7152, 0.0722, 1.0, 0.0], atol=1e-6)
+    assert light.dtype == np.float32
+
+
+def test_a_band_of_light_chooses_the_bright_part_of_the_picture():
+    light = np.tile(np.linspace(0, 1, 11, dtype=np.float32), (2, 1))
+    regions = resolve({"bright": Band(of="light", low=0.7, high=1, feather=0)}, (2, 11), maps={"light": light})
+    np.testing.assert_array_equal(regions.selection("bright").alpha[0], [0] * 7 + [1] * 4)
+
+
+def test_light_is_made_from_the_picture_so_no_one_supplies_it():
+    regions: dict[str, Kind] = {"bright": Band(of="light"), "star": Given()}
+    assert maps_used(regions, ["bright"]) == set()  # nothing to supply
+    assert derived_maps(regions, ["bright"]) == {"light"}
+    assert derived_maps(regions, ["star"]) == set()
+    assert maps_used(regions, ["star"]) == {"star"}
+
+
+# ---- combine: selections put together -------------------------------------------------------------------------------
+
+A = np.asarray([[0.0, 0.5, 1.0, 0.25]], np.float32)
+B = np.asarray([[1.0, 0.5, 0.0, 0.75]], np.float32)
+COMBINED = {
+    "multiply is the product: all of them, fading where any fades": ("multiply", [0.0, 0.25, 0.0, 0.1875]),
+    "min is the least of them": ("min", [0.0, 0.5, 0.0, 0.25]),
+    "max is the greatest of them": ("max", [1.0, 0.5, 1.0, 0.75]),
+}
+
+
+@pytest.mark.parametrize(("op", "expected"), COMBINED.values(), ids=COMBINED.keys())
+def test_a_combination_puts_its_selections_together_pixel_by_pixel(op, expected):
+    regions = resolve(
+        {"a": Given(), "b": Given(), "both": Combine(op=op, of=("a", "b"))}, (1, 4), maps={"a": A, "b": B}
+    )
+    np.testing.assert_allclose(regions.selection("both").alpha[0], expected, atol=1e-7)
+
+
+def test_a_combination_of_three_takes_them_all():
+    c = np.asarray([[0.5, 0.5, 0.5, 0.5]], np.float32)
+    regions = resolve(
+        {"a": Given(), "b": Given(), "c": Given(), "all": Combine(op="min", of=("a", "b", "c"))},
+        (1, 4),
+        maps={"a": A, "b": B, "c": c},
+    )
+    np.testing.assert_allclose(regions.selection("all").alpha[0], [0.0, 0.5, 0.0, 0.25], atol=1e-7)
+
+
+def test_a_combination_of_the_subject_and_a_band_of_the_depth_needs_both_maps():
+    regions: dict[str, Kind] = {"near": Band(of="depth"), "both": Combine(of=("subject", "near"))}
+    assert maps_used(regions, ["both"]) == {"subject", "depth"}
+
+
+# ---- gradients -------------------------------------------------------------------------------------------------------
+
+
+def test_a_gradient_rising_to_the_right_is_the_share_of_the_width_at_each_pixels_centre():
+    alpha = resolve({"g": LinearGradient(angle=0)}, (3, 8), maps={}).selection("g").alpha
+    expected = (np.arange(8) + 0.5) / 8  # by hand: the centre of column i is at i + 0.5 of 8 px
+    np.testing.assert_allclose(alpha, np.tile(expected, (3, 1)), atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("angle", "by_hand"),
+    [
+        pytest.param(0, lambda alpha: alpha[:, ::-1], id="rising to the right is the mirror of rising to the left"),
+        pytest.param(180, lambda alpha: alpha[:, ::-1], id="a half turn"),
+        pytest.param(90, lambda alpha: alpha[::-1], id="rising upward is the mirror of rising downward"),
+    ],
+)
+def test_opposite_directions_make_mirror_gradients(angle, by_hand):
+    shape = (6, 10)
+    here = resolve({"g": LinearGradient(angle=angle)}, shape, maps={}).selection("g").alpha
+    opposite = resolve({"g": LinearGradient(angle=angle + 180)}, shape, maps={}).selection("g").alpha
+    np.testing.assert_allclose(opposite, 1 - here, atol=1e-6)  # the same rise the other way: v and 1 - v
+    np.testing.assert_allclose(opposite, by_hand(here), atol=1e-6)
+
+
+def test_a_gradient_rising_upward_is_1_at_the_top_and_0_at_the_bottom():
+    alpha = resolve({"g": LinearGradient(angle=90)}, (8, 3), maps={}).selection("g").alpha
+    np.testing.assert_allclose(alpha[:, 0], 1 - (np.arange(8) + 0.5) / 8, atol=1e-6)
+    np.testing.assert_allclose(alpha, np.tile(alpha[:, :1], (1, 3)))  # constant along each row
+
+
+def test_a_diagonal_gradient_reaches_0_and_1_at_the_far_corners_whatever_the_aspect():
+    alpha = resolve({"g": LinearGradient(angle=45)}, (10, 40), maps={}).selection("g").alpha
+    assert alpha[-1, 0] < 0.03  # bottom left: the start of a rise towards the top right
+    assert alpha[0, -1] > 0.97
+    assert alpha[5, 20] == pytest.approx(0.5, abs=0.02)  # the middle of the picture is half way
+
+
+def test_the_same_gradient_has_the_same_shape_at_two_sizes():
+    small = resolve({"g": LinearGradient(angle=30)}, (20, 30), maps={}).selection("g").alpha
+    large = resolve({"g": LinearGradient(angle=30)}, (80, 120), maps={}).selection("g").alpha
+    np.testing.assert_allclose(large[2::4, 2::4], small, atol=0.03)  # a share of the frame, not of a pixel count
+
+
+def test_a_radial_gradient_is_the_distance_from_its_centre_as_a_share_of_the_radius_capped_at_1():
+    alpha = resolve({"g": RadialGradient(x=0.5, y=0.5, radius=0.5)}, (9, 9), maps={}).selection("g").alpha
+    assert alpha[4, 4] == 0  # the centre pixel's centre is the centre
+    assert alpha[4, 8] == pytest.approx(4 / 4.5, abs=1e-6)  # 4 px away of 0.5 x 9 px
+    assert alpha[0, 0] == 1  # the corner is past the radius
+    np.testing.assert_allclose(alpha, alpha.T, atol=1e-6)  # round: the same either way
+    np.testing.assert_allclose(alpha, alpha[::-1, ::-1], atol=1e-6)  # and about the centre
+
+
+def test_a_radial_gradients_radius_is_a_share_of_the_pictures_long_side_even_when_that_is_the_height():
+    alpha = resolve({"g": RadialGradient(x=0.5, y=0.5, radius=0.25)}, (80, 40), maps={}).selection("g").alpha
+    # a portrait picture: the long side is the 80 rows, so the radius is 20 px. The centre is at (20, 40) in px, a pixel
+    # corner, so every pixel centre is a half pixel off it in each direction.
+    assert alpha[40, 20] == pytest.approx(np.hypot(0.5, 0.5) / 20, abs=1e-6)
+    assert alpha[49, 20] == pytest.approx(np.hypot(0.5, 9.5) / 20, abs=1e-6)  # 9.5 px below
+    assert alpha[40, 29] == pytest.approx(np.hypot(9.5, 0.5) / 20, abs=1e-6)  # and 9.5 px across: the same unit
+    assert alpha[60, 20] == 1  # at the radius and beyond
+
+
+def test_a_radial_gradient_follows_its_centre_and_scales_with_the_picture():
+    off = resolve({"g": RadialGradient(x=0.25, y=0.75, radius=0.4)}, (40, 80), maps={}).selection("g").alpha
+    row, column = np.unravel_index(off.argmin(), off.shape)
+    assert (int(row), int(column)) in {(29, 19), (29, 20), (30, 19), (30, 20)}  # near (0.25 x 80, 0.75 x 40) = (20, 30)
+    assert off[row, column] < 0.03
+    double = resolve({"g": RadialGradient(x=0.25, y=0.75, radius=0.4)}, (80, 160), maps={}).selection("g").alpha
+    np.testing.assert_allclose(double[1::2, 1::2], off, atol=0.03)
+
+
+def test_a_tilt_is_a_band_of_a_gradient_and_a_vignette_is_a_gradient_beyond_a_radius():
+    regions = resolve(
+        {"rise": LinearGradient(angle=90), "middle": Band(of="rise", low=0.4, high=0.6, feather=0)},
+        (10, 4),
+        maps={},
+    )
+    # the rows' centres rise 0.95 (top) to 0.05 (bottom) in steps of 0.1: only 0.55 and 0.45 lie in 0.4..0.6
+    np.testing.assert_array_equal(regions.selection("middle").alpha[:, 0], [0, 0, 0, 0, 1, 1, 0, 0, 0, 0])

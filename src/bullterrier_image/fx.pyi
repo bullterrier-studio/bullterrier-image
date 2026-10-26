@@ -3886,7 +3886,7 @@ def seams(width: float = 0.004, color: str | list[float] | tuple[float, float, f
 
 The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
 not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
-(grid, shards, cuts, svg or depth_bands) or a selection such as the subject (counted as two pieces, what it chooses
+(grid, shards, cuts, svg or bands) or a selection such as the subject (counted as two pieces, what it chooses
 and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
 border and the picture is unchanged.
 

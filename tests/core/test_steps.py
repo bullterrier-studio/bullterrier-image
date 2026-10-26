@@ -17,7 +17,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Depth, DepthBands, Each, Given, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Band, Bands, Each, Given, Grid, Pick, Shards, Subject
 
 
 class GainParams(EffectParams):
@@ -205,7 +205,12 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
 def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_uses_takes_it(
     depth_probe, steps, needs
 ):
-    regions: dict[str, Kind] = {"g": Grid(), "near": Depth(), "bands": DepthBands(), "front": Pick(of="bands")}
+    regions: dict[str, Kind] = {
+        "g": Grid(),
+        "near": Band(of="depth"),
+        "bands": Bands(of="depth"),
+        "front": Pick(of="bands"),
+    }
     recipe = Recipe("look", steps(), regions=regions)
     assert ("subject" in recipe.maps_needed, "depth" in recipe.maps_needed) == needs
 
@@ -346,7 +351,7 @@ def test_a_recipe_declaring_regions_accepts_steps_that_name_them_in_every_place_
 BAD_REFERENCES = {
     "a mask no region has": (
         lambda: Recipe("r", [Step("grade"), Step("grade", mask="nope")], regions=REGIONS),
-        r"step 2: `mask` names 'nope', which is no region; valid selections: subject, background, depth, head",
+        r"step 2: `mask` names 'nope', which is no region; valid selections: subject, background, depth, light, head",
     ),
     "a mask that is a partition": (
         lambda: Recipe("r", [Step("grade", mask="panes")], regions=REGIONS),
@@ -375,11 +380,11 @@ BAD_REFERENCES = {
     "a partition no region has": (
         lambda: Recipe("r", [Step("partition_probe", partition="nope")], regions=REGIONS),
         r"step 1: `partition` names 'nope', which is no region; "
-        r"valid regions: subject, background, depth, panes, glass, head",
+        r"valid regions: subject, background, depth, light, panes, glass, head",
     ),
     "a recipe that declares no regions": (
         lambda: Recipe("r", [Step("grade", mask="glass")]),
-        r"valid selections: subject, background, depth .*declares no regions of its own.*regions=",
+        r"valid selections: subject, background, depth, light .*declares no regions of its own.*regions=",
     ),
     "a region fitted to a partition": (
         lambda: Recipe("r", [Step("grade")], regions={"a": Grid(), "b": Shards(fit="a")}),

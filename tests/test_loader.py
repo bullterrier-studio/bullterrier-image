@@ -14,10 +14,10 @@ from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
+    Band,
+    Bands,
     Curve,
     Cuts,
-    Depth,
-    DepthBands,
     Edge,
     Finder,
     Given,
@@ -350,17 +350,19 @@ def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, s
     )
 
 
-DEPTH_FILE = """
-format = 2
+FIELDS_FILE = """
+format = 3
 
 [region.near]
-kind = "depth"
-near = 0.9
-far = 0.6
+kind = "band"
+of = "depth"
+low = 0.6
+high = 0.9
 feather = 0.05
 
 [region.bands]
-kind = "depth_bands"
+kind = "bands"
+of = "depth"
 count = 4
 
 [[step]]
@@ -374,16 +376,16 @@ mask = "near"
 """
 
 
-def test_depth_regions_load_as_the_recipe_written_in_python(tmp_path):
+def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
     written = Recipe(
         "look",
-        regions={"near": Depth(near=0.9, far=0.6, feather=0.05), "bands": DepthBands(count=4)},
+        regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
             Each("bands", [Step("grade", {"exposure": 0.5}), "none"]),
             Step("fill", {"color": "#ff0000"}, mask="near"),
         ],
     )
-    assert load_recipe(_write(tmp_path, DEPTH_FILE)) == written
+    assert load_recipe(_write(tmp_path, FIELDS_FILE)) == written
     assert "depth" in written.maps_needed
 
 
@@ -484,18 +486,22 @@ def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_pa
         load_recipe(_write(tmp_path, header + text, "old.toml"))
 
 
+# the kinds, in the order the error for a bad one lists them
+ALL_KINDS = (
+    "grid, shards, cuts, path, svg, pick, subject, band, bands, combine, linear_gradient, radial_gradient, given"
+)
 REGION_MISTAKES = {
     "a kind that does not exist": (
         '[region.g]\nkind = "hexagons"\n',
-        r"region 'g': .*'hexagons'.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
+        rf"region 'g': .*'hexagons'.*{ALL_KINDS}",
     ),
     "no kind": (
         "[region.g]\ncolumns = 2\n",
-        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
+        rf"region 'g': .*`kind`.*{ALL_KINDS}",
     ),
     "a kind that is not text": (
         "[region.g]\nkind = 3\n",
-        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
+        rf"region 'g': .*`kind`.*{ALL_KINDS}",
     ),
     "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),
     "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
@@ -512,19 +518,76 @@ REGION_MISTAKES = {
     "a pick of nothing": ('[region.p]\nkind = "pick"\nof = "gone"\n', r"region 'p': `of` names 'gone'"),
     "a cycle": ('[region.a]\nkind = "shards"\nfit = "b"\n[region.b]\nkind = "pick"\nof = "a"\n', r"cycle"),
     "a name taken by a built-in": ('[region.subject]\nkind = "grid"\n', r"region 'subject' is a built-in"),
-    "a depth far beyond near": (
-        '[region.n]\nkind = "depth"\nnear = 0.4\nfar = 0.7\n',
-        r"region 'n'.*`far` 0\.7.*`near` 0\.4",
+    "a band with low above high": (
+        '[region.n]\nkind = "band"\nof = "depth"\nlow = 0.7\nhigh = 0.4\n',
+        r"region 'n'.*`low` 0\.7.*`high` 0\.4",
     ),
-    "a depth feather out of range": ('[region.n]\nkind = "depth"\nfeather = 2\n', r"region 'n'.*`feather`.*2"),
-    "no depth bands": ('[region.b]\nkind = "depth_bands"\ncount = 0\n', r"region 'b'.*`count`.*0"),
+    "a band feather out of range": (
+        '[region.n]\nkind = "band"\nof = "depth"\nfeather = 2\n',
+        r"region 'n'.*`feather`.*2",
+    ),
+    "no bands": ('[region.b]\nkind = "bands"\nof = "depth"\ncount = 0\n', r"region 'b'.*`count`.*0"),
+    "a band of nothing": ('[region.n]\nkind = "band"\n', r"region 'n': `of` names ''.*no region"),
+    "a band of a region that is not there": (
+        '[region.n]\nkind = "band"\nof = "gone"\n',
+        r"region 'n': `of` names 'gone'",
+    ),
+    "a combination of one": ('[region.c]\nkind = "combine"\nof = ["depth"]\n', r"region 'c'.*`of`"),
+    "a combination with an operation that is not offered": (
+        '[region.c]\nkind = "combine"\nop = "xor"\nof = ["depth", "subject"]\n',
+        r"region 'c'.*`op`.*xor",
+    ),
+    "a gradient with an angle past a turn": (
+        '[region.g]\nkind = "linear_gradient"\nangle = 400\n',
+        r"region 'g'.*`angle`.*400",
+    ),
+    "a radial gradient with a radius of nothing": (
+        '[region.g]\nkind = "radial_gradient"\nradius = 0\n',
+        r"region 'g'.*`radius`.*0",
+    ),
+    "a name taken by the built-in light": ('[region.light]\nkind = "grid"\n', r"region 'light' is a built-in"),
 }
 
 
 @pytest.mark.parametrize(("text", "complaint"), REGION_MISTAKES.values(), ids=REGION_MISTAKES.keys())
 def test_a_mistake_in_a_region_names_the_file_the_region_and_the_problem(tmp_path, text, complaint):
     with pytest.raises(RecipeError, match=rf"^bad\.toml: .*{complaint}"):
-        load_recipe(_write(tmp_path, "format = 2\n" + text + STEP, "bad.toml"))
+        load_recipe(_write(tmp_path, "format = 3\n" + text + STEP, "bad.toml"))
+
+
+REPLACED_KINDS = {
+    "depth": (
+        '[region.n]\nkind = "depth"\nnear = 0.9\nfar = 0.6\n',
+        r'`kind` \'depth\' is gone.*kind = "band".*of = "depth".*`low`.*`far`.*`high`.*`near`',
+    ),
+    "depth_bands": (
+        '[region.b]\nkind = "depth_bands"\ncount = 4\n',
+        r'`kind` \'depth_bands\' is gone.*kind = "bands".*of = "depth".*`count`',
+    ),
+}
+
+
+@pytest.mark.parametrize(("text", "complaint"), REPLACED_KINDS.values(), ids=REPLACED_KINDS.keys())
+@pytest.mark.parametrize("header", ["format = 2\n", "format = 3\n"])
+def test_a_region_kind_format_3_replaced_is_refused_saying_what_to_write_instead(tmp_path, header, text, complaint):
+    with pytest.raises(RecipeError, match=rf"^old\.toml: region '[nb]': {complaint}"):
+        load_recipe(_write(tmp_path, header + text + STEP, "old.toml"))
+
+
+NEW_KINDS = {
+    "a band": '[region.n]\nkind = "band"\nof = "depth"\n',
+    "bands": '[region.b]\nkind = "bands"\nof = "depth"\n',
+    "a combination": '[region.c]\nkind = "combine"\nof = ["depth", "subject"]\n',
+    "a linear gradient": '[region.g]\nkind = "linear_gradient"\n',
+    "a radial gradient": '[region.g]\nkind = "radial_gradient"\n',
+}
+
+
+@pytest.mark.parametrize("text", NEW_KINDS.values(), ids=NEW_KINDS.keys())
+def test_the_region_kinds_format_3_added_are_refused_in_format_2_naming_format_3(tmp_path, text):
+    with pytest.raises(RecipeError, match=r"^old\.toml: region '\w': `kind` '\w+' needs `format = 3`"):
+        load_recipe(_write(tmp_path, "format = 2\n" + text + STEP, "old.toml"))
+    assert load_recipe(_write(tmp_path, "format = 3\n" + text + STEP, "new.toml")).regions  # and fine in format 3
 
 
 EACH = '[region.g]\nkind = "grid"\n'

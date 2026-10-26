@@ -14,7 +14,7 @@ from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Depth, Grid, Subject
+from bullterrier_image.recipe import Band, Grid, Subject
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -284,7 +284,10 @@ def test_the_default_finder_is_built_only_when_a_recipe_asks_for_the_subject(
 
 
 DEEP = Recipe(
-    "deep", (Step("fill", {"color": "#000000"}, "near"),), size=None, regions={"near": Depth(near=1.0, far=0.5)}
+    "deep",
+    (Step("fill", {"color": "#000000"}, "near"),),
+    size=None,
+    regions={"near": Band(of="depth", low=0.5, high=1.0)},
 )
 # With the suite's `BT_IMAGE_DEPTH_MODEL` naming no file, the default depth finder is built only for a recipe that needs
 # depth and is not given it: (recipe, given a depth map, what the refusal names; None: it renders).

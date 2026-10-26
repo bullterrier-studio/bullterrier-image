@@ -1,19 +1,21 @@
 # Aerial perspective: the room behind the dog mists over with a pale haze and loses contrast; what is near stays crisp.
-# Needs recipe format 2 and the depth.
-format = 2
+# Needs recipe format 3 and the depth.
+format = 3
 name = "depth-haze"
 size = 768
 
 [region.far]                   # the back of the room, fading out toward the dog
-kind = "depth"
-near = 0.15
-far = 0.0
+kind = "band"
+of = "depth"                   # the depth map, 1 = nearest
+low = 0.0
+high = 0.15
 feather = 0.15
 
 [region.near]                  # the dog and the blanket
-kind = "depth"
-near = 1.0
-far = 0.35
+kind = "band"
+of = "depth"
+low = 0.35
+high = 1.0
 feather = 0.1
 
 [[step]]

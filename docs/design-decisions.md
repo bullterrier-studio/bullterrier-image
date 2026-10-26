@@ -247,7 +247,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   input of `--map subject=`, of `maps=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject.** An effect that needs distance (`depth_of_field`, `parallax`, `relight`,
-  `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; the depth regions read it too.
+  `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; regions made of it (a `band` or `bands` of `depth`) read it too.
   The runner is given a depth map or a `Finder` for one (`maps={"depth": ...}`, `finders={"depth": ...}`; neither, when needed, is
   `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default:
   Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against
@@ -260,9 +260,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   there is no cap. Further:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
-  - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth
-    scale with 0 = farthest; `far` above `near` is a `RecipeError`) and `DepthBands` (`kind = "depth_bands"`, a partition into
-    `count` equal ranges, 3 by default, 1 to 100); `depth-haze` and `depth-grade` are recipes over them
+  - the depth is a field (see "Fields"): `depth-haze` and `depth-grade` are recipes of a `band` and `bands` of it
     (`examples/recipes/`), not effects;
   - framing pads the depth map with 0 (farthest), like the matte;
   - `imageio.load_map(path)` reads a map you already have; no depth found is `DepthNotFoundError` (a
@@ -312,8 +310,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Regions
 
 - **A recipe declares named regions; a region is a partition or a selection.** `[region.<name>]` with a `kind`. A
-  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in piece order: reading order, `depth_bands`
-  nearest first; see "Piece numbers come from one rule"); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
+  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in piece order: reading order, `bands`
+  highest first; see "Piece numbers come from one rule"); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
   SVG shapes and the subject are all "which pixels", so one idea serves them all and effects never learn about regions.
 - **Steps use regions by name, with one word per idea.** `mask` is where a step applies (on every step, any selection;
   `subject` and `background` are built in); `each` + `looks` gives each piece of a partition its own look; `partition`
@@ -325,6 +323,22 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Positions are shares of the frame, lengths shares of the picture's long side.** The frame is the picture, or the
   box of the selection named by `fit`. The same look comes out at any resolution, torn edges too (their noise is laid
   on the frame, not on the pixel grid).
+- **A field is a selection read for its values; `band`, `bands` and `combine` cut and join fields, `light` and two
+  gradients make them.** A selection is already a float map 0..1, so no second concept is declared: a field is whatever
+  selection a region's `of` names, built in (`depth`, `light`, `subject`) or the recipe's own. `band` (a selection)
+  chooses where a field lies from `low` to `high`, fading linearly over `feather`; `bands` (a partition) cuts the field
+  into `count` equal ranges, highest first; `combine` multiplies, takes the least or the greatest of several;
+  `linear_gradient` and `radial_gradient` rise evenly with position (shares of the picture and of its long side, so a
+  look has one shape at every resolution). `light` is the Rec. 709 brightness of the picture the steps work on, made by
+  the runner after the framing and scaling, once per render, so it is not found, handed in or cached, and the first step
+  does not change it. *Reason:* the depth selection and depth bands were already a band and bands of one field; making
+  `of` a name instead of a built-in gives the same thing for brightness, a drawing's silhouette or a gradient with no
+  new mechanism, and video needs a recipe to cut any map it hands in. *Consequence:* `Depth` and `DepthBands` (`kind =
+  "depth"`, `"depth_bands"`) are `band` and `bands` with `of = "depth"` (`far` is `low`, `near` is `high`; the same
+  values give the same pixels), recipe format 3 adds the new kinds and a file of format 2 that uses them, or still uses
+  the old ones, is refused saying what to write; `light` is a built-in region name, so none may be declared with it.
+  Left out until a recipe needs them: edges, saturation and colour distance as fields, `1 - x`, and a feathered gradient
+  shape.
 - **Region kinds are a closed set in one module, with presets as data.** Not plugins: nobody else writes kinds, and a
   shared plugin registry would be speculative. Python writes regions with the kinds' own Pydantic models. *Revisit
   when* another package wants to add kinds.
@@ -335,8 +349,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
   every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
   give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
-  selects nothing, so a recipe also works on a thumbnail. One documented exception: `DepthBands`
-  numbers its ranges nearest first, because "piece 0 is the nearest" is the one rule a depth look can state without knowing the photo.
+  selects nothing, so a recipe also works on a thumbnail. One documented exception: `Bands`
+  numbers its ranges highest first, because "piece 0 is the nearest, the brightest" is the one rule a look over a field can
+  state without knowing the photo.
 - **`Shards.focus` is an exponent offset.** A seed at a share r of the way to the farthest corner moves to r^(1+focus)
   of it; 0 spreads the seeds evenly. *Reason:* the prototype's `(r/R)**(1 + 3*focus)` had a hidden 3 (rule 5); the
   `glass` preset is `focus = 2.5`.

@@ -35,6 +35,7 @@ from bullterrier_image.ops.resample import resize
 
 from . import registry
 from .regions import (
+    DERIVED,
     BoxFinder,
     Given,
     Partition,
@@ -294,6 +295,7 @@ def _prepare(
     if recipe.size:
         rgb = resize(rgb, recipe.size)
         maps = {name: resize(layer, recipe.size) for name, layer in maps.items()}
+    maps |= {name: DERIVED[name](rgb) for name in sorted(recipe.derived_maps)}  # made from the picture as it is worked
     find = _finder_in(rgb, (finders or {}).get("subject"))
     return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find)
 

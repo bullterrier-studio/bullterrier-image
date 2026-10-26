@@ -66,7 +66,7 @@ MAP_INPUTS = ("subject", "depth")
 
 # What a recipe hands an effect besides the image and its parameters, by name: the maps above and `partition`, the
 # pieces of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading
-# order, `depth_bands` nearest first). An effect declares the ones it needs as keyword-only parameters after `params`,
+# order, `bands` highest first). An effect declares the ones it needs as keyword-only parameters after `params`,
 # each with a default.
 INPUTS = (*MAP_INPUTS, "partition")
 

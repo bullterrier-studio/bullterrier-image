@@ -1,12 +1,12 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
-regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth`, `DepthBands`, `Given`) its steps name:
-`mask` limits a step to one, `Each` gives each piece of one its own look. The machinery lives in
-`bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`; this module re-exports its public names and
-binds what the core leaves open: how the subject and the depth are found. `render`, `trace` and `render_all` take the
-same arguments as the core's, but when a recipe will ask for the subject (it needs the subject and no `subject` map is
-given, or it finds the subject piece by piece) and `finders` has no `subject`, they find it with
+regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
+`RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of one its own look. The
+machinery lives in `bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`; this module re-exports
+its public names and binds what the core leaves open: how the subject and the depth are found. `render`, `trace` and
+`render_all` take the same arguments as the core's, but when a recipe will ask for the subject (it needs the subject and
+no `subject` map is given, or it finds the subject piece by piece) and `finders` has no `subject`, they find it with
 `bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a `depth` map nor a `depth`
 finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is built only then, so a recipe that needs
 neither never depends on the model settings. Any other map (a `Given` region's) is handed in by name in `maps`.
@@ -18,7 +18,24 @@ import numpy as np
 
 from .core import registry, runner
 from .core.framing import Framing
-from .core.regions import Curve, Cuts, Depth, DepthBands, Edge, Given, Grid, Line, Path, Pick, Shards, Subject, Svg
+from .core.regions import (
+    Band,
+    Bands,
+    Combine,
+    Curve,
+    Cuts,
+    Edge,
+    Given,
+    Grid,
+    Line,
+    LinearGradient,
+    Path,
+    Pick,
+    RadialGradient,
+    Shards,
+    Subject,
+    Svg,
+)
 from .core.runner import Finder, Stage
 from .core.steps import Each, Recipe, Step
 from .finding import subject
@@ -26,10 +43,11 @@ from .finding.depth import depth_finder
 from .loader import load_recipe
 
 __all__ = [
+    "Band",
+    "Bands",
+    "Combine",
     "Curve",
     "Cuts",
-    "Depth",
-    "DepthBands",
     "Each",
     "Edge",
     "Finder",
@@ -37,8 +55,10 @@ __all__ = [
     "Given",
     "Grid",
     "Line",
+    "LinearGradient",
     "Path",
     "Pick",
+    "RadialGradient",
     "Recipe",
     "Shards",
     "Stage",

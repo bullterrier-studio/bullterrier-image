@@ -35,6 +35,7 @@ from . import registry
 from .framing import Framing
 from .params import ValidatedModel
 from .regions import Kind, check, maps_used, needs, needs_finder
+from .regions import derived_maps as _derived_maps
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
 Reference = tuple[str, str, Literal["partition", "selection"] | None]
@@ -183,7 +184,7 @@ class Each(_Layer):
     """
 
     each: str = Field(
-        description="The name of the partition whose pieces get a look each (grid, shards, cuts, svg or depth_bands)."
+        description="The name of the partition whose pieces get a look each (grid, shards, cuts, svg or bands)."
     )
     looks: tuple[Step | Literal["none"], ...] = Field(
         min_length=1,
@@ -320,7 +321,8 @@ class Recipe(ValidatedModel):
         a valid one from any text.
     steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
     regions: the regions the steps can name besides the built-in `subject` and `background`: a name for each `Grid`,
-        `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth` or `DepthBands` (see
+        `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
+        `RadialGradient` or `Given` (see
         `bullterrier_image.core.regions`). They are checked here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
@@ -388,12 +390,19 @@ class Recipe(ValidatedModel):
         """The names of the maps of the photo that rendering must be given or find: `subject` when a step's effect takes
         it, the framing crops around it or keeps only it, or a region a step uses is made from it (the built-in
         `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (an effect
-        that takes it, a `Depth`, a `DepthBands`, the built-in `depth`); and the name of every `Given` region a step
-        uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map
-        (see `needs_finder`)."""
+        that takes it, the built-in `depth` or a region made from it, however indirectly); and the name of every `Given`
+        region a step uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder,
+        not a map (see `needs_finder`)."""
         taken = {name for name in registry.MAP_INPUTS if self.taking(name)}
         framed = {"subject"} if self.frame.needs_subject else set()
         return frozenset(taken | framed | maps_used(self.regions, self._names_used()))
+
+    @property
+    def derived_maps(self) -> frozenset[str]:
+        """The names of the maps the render makes from the working picture itself (`regions.DERIVED`: `light`, the
+        picture's brightness) because a region a step uses is made from them, however indirectly. Nobody supplies
+        these: they are not in `maps_needed`."""
+        return frozenset(_derived_maps(self.regions, self._names_used()))
 
     def taking(self, name: str) -> list[tuple[int, str]]:
         """The steps whose effect, or the effect of one of whose looks, takes the injected input `name` (one of

@@ -1,12 +1,13 @@
 # A grade per distance: the front warm and a little brighter, the middle two bands (the dog) as they are, the back cool
 # and muted.
-# Needs recipe format 2 and the depth.
-format = 2
+# Needs recipe format 3 and the depth.
+format = 3
 name = "depth-grade"
 size = 768
 
 [region.bands]                 # four equal ranges of depth, nearest first: the dog spans the middle two
-kind = "depth_bands"
+kind = "bands"
+of = "depth"
 count = 4
 
 [[step]]

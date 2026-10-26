@@ -15,7 +15,7 @@ from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Depth, DepthBands, Finder, Given, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Band, Bands, Combine, Finder, Given, Grid, Pick, Shards, Subject
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
@@ -136,7 +136,10 @@ def deep(**keys) -> Recipe:
 
 
 FRONT = Recipe(  # paints red only the front quarter of the depth scale
-    "front", [Step("fill", {"color": "#ff0000"}, mask="near")], size=None, regions={"near": Depth(far=0.75, feather=0)}
+    "front",
+    [Step("fill", {"color": "#ff0000"}, mask="near")],
+    size=None,
+    regions={"near": Band(of="depth", low=0.75, feather=0)},
 )
 # Nearest at the top, farthest at the bottom, falling evenly down the 96 rows of the photo.
 DOWN = np.tile(1 - (np.arange(96, dtype=np.float32)[:, None] + 0.5) / 96, (1, 128))
@@ -395,6 +398,89 @@ def test_a_missing_subject_or_depth_is_caught_as_a_map_error(photo, recipe):
         runner.render(photo, recipe)
 
 
+# --- light: a field made from the picture the steps work on ----------------------------------------------------------
+
+LUMA = np.asarray([0.2126, 0.7152, 0.0722])  # Rec. 709, written here again so that the test does not use the code's
+DARK = Recipe(  # paints red where the picture is no brighter than half
+    "dark",
+    [Step("fill", {"color": "#ff0000"}, mask="dark")],
+    size=None,
+    regions={"dark": Band(of="light", low=0, high=0.5, feather=0)},
+)
+
+
+def red_where_dark(picture: np.ndarray) -> np.ndarray:
+    """`picture` with red where its brightness (by the weights above, in float64) is at most a half."""
+    return np.where((picture @ LUMA <= 0.5)[..., None], PAINTED["fill"], picture)
+
+
+def test_a_recipe_that_uses_light_needs_no_map_from_anyone(photo):
+    assert DARK.maps_needed == frozenset()
+    assert DARK.derived_maps == frozenset({"light"})
+    np.testing.assert_array_equal(runner.render(photo, DARK), red_where_dark(photo))  # no maps, no finders
+
+
+@pytest.mark.parametrize(
+    ("frame", "size", "by_hand"),
+    [
+        pytest.param(Framing(), None, lambda a: a, id="the photo as it is"),
+        pytest.param(Framing(flip="x"), None, lambda a: a[:, ::-1], id="a flip"),
+        pytest.param(Framing(aspect=1.0), None, lambda a: a[:, 16:112], id="a crop"),
+        pytest.param(Framing(), 64, lambda a: resize(a, 64), id="the recipe's size"),
+    ],
+)
+def test_light_is_the_brightness_of_the_picture_the_steps_work_on_after_framing_and_scaling(
+    photo, frame, size, by_hand
+):
+    recipe = Recipe("dark", DARK.steps, size=size, frame=frame, regions=DARK.regions)
+    np.testing.assert_array_equal(runner.render(photo, recipe), red_where_dark(by_hand(photo)))
+
+
+def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(photo):
+    # a first step that blacks the whole picture out must not change where the second one finds the dark: the regions
+    # are made once for the picture the recipe receives
+    recipe = Recipe(
+        "after",
+        [Step("fill", {"color": "#000000"}), *DARK.steps],
+        size=None,
+        regions=DARK.regions,
+    )
+    dark = (photo @ LUMA <= 0.5)[..., None]  # of the PHOTO: the black the first step made is no darker than half
+    expected = np.where(dark, PAINTED["fill"], 0.0)
+    np.testing.assert_array_equal(runner.render(photo, recipe), expected)
+
+
+def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subject):
+    lit_subject = Recipe(
+        "lit-subject",
+        [Step("fill", {"color": "#ff0000"}, mask="lit_subject")],
+        size=None,
+        regions={
+            "bright": Band(of="light", low=0.5, high=1, feather=0),
+            "lit_subject": Combine(of=("subject", "bright")),
+        },
+    )
+    assert lit_subject.maps_needed == frozenset({"subject"})
+    bright = (photo @ LUMA > 0.5).astype(np.float64)
+    weight = (subject * bright)[..., None]
+    np.testing.assert_allclose(
+        runner.render(photo, lit_subject, maps={"subject": subject}),
+        photo * (1 - weight) + PAINTED["fill"] * weight,
+        atol=1e-6,
+    )
+
+
+def test_trace_shows_a_region_made_of_light_and_ends_in_the_render(photo):
+    stages = runner.trace(photo, DARK)
+    assert "region 'dark' (white = chosen)" in [stage.label for stage in stages]
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, DARK))
+
+
+def test_nobody_can_hand_in_light_it_is_made_here(photo):
+    with pytest.raises(RecipeError, match="`maps` names 'light'"):
+        runner.render(photo, DARK, maps={"light": np.zeros(photo.shape[:2], np.float32)})
+
+
 # --- framing: the photo and its subject are framed together, before the steps ------------------------------------
 
 
@@ -606,7 +692,7 @@ def fill(color: str, **keys) -> Step:
 
 def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo):
     looks = Each("bands", [fill(RED), fill(GREEN), fill(BLUE)], feather=0)
-    recipe = Recipe("by-distance", [looks], size=None, regions={"bands": DepthBands(count=3)})
+    recipe = Recipe("by-distance", [looks], size=None, regions={"bands": Bands(of="depth", count=3)})
     by_hand = np.empty((96, 128, 3), np.float32)
     by_hand[:32], by_hand[32:64], by_hand[64:] = RGB[RED], RGB[GREEN], RGB[BLUE]  # nearer than 2/3, than 1/3, the rest
     np.testing.assert_allclose(runner.render(photo, recipe, maps={"depth": DOWN}), by_hand, atol=1e-6)

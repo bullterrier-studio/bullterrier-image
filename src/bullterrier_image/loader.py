@@ -41,15 +41,17 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
 (`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `cuts` (`lines`: tables `{x, y, angle}` or `{path}`), `path`
 (`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids), `subject` (`per`,
-`context`, `threshold`), `depth` (`near`, `far`, `feather`), `depth_bands` (`count`) or `given` (no fields; format 3),
-the fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth`, `DepthBands` and `Given`; `fit` lays
-a grid, shards, cuts, path or svg over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears
-the borders. A *partition* (a grid, shards, cuts, svg or depth_bands) cuts the picture into numbered pieces, a
-*selection* (a `path`, a `pick`, a `subject`, a `depth`, a `given` map or the built-in `subject`, `background` and
-`depth`) chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition; `depth` and
-`depth_bands` read the depth map (bands are numbered nearest first). Steps name regions: `mask` (a selection) limits a
-step to it, and `partition` names the partition an effect such as `seams` draws. A step with `each` (a partition) and
-`looks` gives every piece its own look:
+`context`, `threshold`) and, from format 3, `band` (`of`, `low`, `high`, `feather`), `bands` (`of`, `count`), `combine`
+(`op`, `of`), `linear_gradient` (`angle`), `radial_gradient` (`x`, `y`, `radius`) and `given` (no fields); they are the
+fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
+`RadialGradient` and `Given`. `fit` lays a grid, shards, cuts, path or svg over a selection and `edge` is a table
+(`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid, shards, cuts, svg or bands) cuts the
+picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`, a `band`, a `combine`, a gradient, a
+`given` map or the built-in `subject`, `background`, `depth` and `light`) chooses pixels; a `subject` with `per` finds
+the subject inside each piece of a partition. `band`, `bands` and `combine` are made of another selection named by `of`,
+read for its values: the built-in `depth` (1 = nearest), `light` (the picture's brightness) or any other (bands are
+numbered highest first). Steps name regions: `mask` (a selection) limits a step to it, and `partition` names the
+partition an effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -97,7 +99,21 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.regions import Cuts, Depth, DepthBands, Given, Grid, Kind, Pick, Shards, Subject, Svg
+from .core.regions import (
+    Band,
+    Bands,
+    Combine,
+    Cuts,
+    Given,
+    Grid,
+    Kind,
+    LinearGradient,
+    Pick,
+    RadialGradient,
+    Shards,
+    Subject,
+    Svg,
+)
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step, safe_name
 
@@ -106,10 +122,16 @@ __all__ = ["load_recipe", "with_pictures"]
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`,
 # `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region
-# kind `given`, and a file of an earlier format may not use it.
+# kinds `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, and a file of an earlier format
+# may not use them.
 _FORMATS = (1, 2, 3)
 _NEW_IN_2 = ("each", "looks", "partition")
-_KINDS_NEW_IN_3 = ("given",)
+_KINDS_NEW_IN_3 = ("given", "band", "bands", "combine", "linear_gradient", "radial_gradient")
+# region kinds format 3 replaced, with what to write instead
+_REPLACED_IN_3 = {
+    "depth": 'write `kind = "band"` with `of = "depth"`, `low` where `far` was and `high` where `near` was',
+    "depth_bands": 'write `kind = "bands"` with `of = "depth"` and the same `count`',
+}
 # the top-level keys of a recipe file, each as it is written (a table or a list of tables in brackets), in the order the
 # error for an unknown one lists them
 _KEYS = {
@@ -129,8 +151,11 @@ _KINDS: dict[str, type[Kind]] = {
     "svg": Svg,
     "pick": Pick,
     "subject": Subject,
-    "depth": Depth,
-    "depth_bands": DepthBands,
+    "band": Band,
+    "bands": Bands,
+    "combine": Combine,
+    "linear_gradient": LinearGradient,
+    "radial_gradient": RadialGradient,
     "given": Given,
 }
 
@@ -247,6 +272,8 @@ def _regions(tables: object, file: str, folder: Path) -> dict[str, Kind]:
     for name, table in tables.items():
         fields = dict(table)
         kind = fields.pop("kind", None)
+        if kind in _REPLACED_IN_3:
+            raise RecipeError(f"{file}: region {name!r}: `kind` {kind!r} is gone; {_REPLACED_IN_3[kind]} (format = 3)")
         if not isinstance(kind, str) or kind not in _KINDS:
             raise RecipeError(
                 f"{file}: region {name!r}: `kind` is {kind!r}; write one of: {', '.join(_KINDS)}"
