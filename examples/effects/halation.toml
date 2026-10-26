@@ -1,6 +1,0 @@
-# A film-style red-orange glow around the brightest highlights.
-name = "halation"
-size = 480
-
-[[step]]
-effect = "halation"

@@ -4,7 +4,7 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.light import highlights, screen
@@ -27,8 +27,9 @@ class BloomParams(EffectParams):
         unit="fraction",
         min=0,
         max=0.99,
-        doc="The brightness (0..1, per channel) where the bloom starts: only values above it give light, rising to "
-        "full at 1. Raising it limits the bloom to the brightest highlights.",
+        doc="The brightness (0..1) where the bloom starts, judged on each channel on its own (on the brightest of the "
+        "three when `color` is set): only values above it give light, rising to full at 1. Raising it limits the "
+        "bloom to the brightest highlights.",
     )
     amount: float = param(
         0.7,
@@ -38,6 +39,12 @@ class BloomParams(EffectParams):
         drivable=True,
         doc="How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 "
         "it saturates to white sooner.",
+    )
+    color: Color | None = param(
+        None,
+        doc="The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) lets each highlight "
+        "keep its own colour. A colour makes every highlight bloom in it, whatever its own colour is, with the "
+        "strength of its brightest channel: '#ff4a14' is the red-orange of film halation, white a neutral glow.",
     )
     octaves: int = param(
         4,
@@ -88,10 +95,12 @@ def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
     """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
 
     The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
-    `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens, keeps
-    the colour of the light (each channel blooms on its own) and leaves black black.
+    `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and
+    leaves black black. Each channel blooms on its own, so the light keeps its colour; with `color` the brightest
+    channel sets the strength and the halo takes that colour instead, as film halation does: light that bounces back
+    through the film base exposes one layer whatever the colour of the highlight.
     """
-    bright = highlights(rgb, params.threshold)
+    bright = highlights(rgb if params.color is None else rgb.max(axis=-1), params.threshold)
     weights = params.persistence ** np.arange(params.octaves)
     weights /= weights.sum()  # the halo is an average, so an even picture stays as bright as its highlights
     halo = np.zeros_like(bright)
@@ -100,4 +109,7 @@ def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
         halo += float(weight) * gaussian_blur(
             bright, sigma, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
         )
-    return screen(rgb, params.amount * halo)
+    light = params.amount * halo
+    if params.color is not None:
+        light = light[..., None] * np.asarray(params.color, np.float32)
+    return screen(rgb, light)

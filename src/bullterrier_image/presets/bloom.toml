@@ -6,3 +6,11 @@ radius = 12
 threshold = 0
 octaves = 1
 amount = 0.5
+
+[halation]
+description = "Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base."
+radius = 30
+threshold = 0.5
+amount = 1.8
+octaves = 1
+color = "#ff4a14"

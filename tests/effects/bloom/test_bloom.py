@@ -130,32 +130,85 @@ def test_constant_value_is_the_highlight_assumed_beyond_the_edge() -> None:
     assert out_of_range[0, 0, 0] > 0.4  # in the corner, 3/4 of the blur's weight is beyond the edge
 
 
-def soft_focus(picture: np.ndarray, **values: float) -> np.ndarray:
+def with_preset(preset: str, picture: np.ndarray, **values: float) -> np.ndarray:
     size = picture.shape[1]  # the recipe is as wide as the picture, so its px are the picture's px
-    return render(picture, Recipe("soft-focus", size=size, steps=[fx.bloom(preset="soft_focus", **values)]))
+    return render(picture, Recipe("preset", size=size, steps=[fx.bloom(preset=preset, **values)]))
 
 
-def test_the_soft_focus_preset_screens_half_a_blurred_copy_of_the_whole_picture() -> None:
-    """With nothing to blur (radius 0) the copy is the picture itself: v screened with v / 2 is v + v/2 (1 - v)."""
-    dim = flat(0.2)
-    np.testing.assert_allclose(soft_focus(dim, radius=0), flat(0.28), atol=1e-6)  # 0.2 + 0.1 x 0.8, by hand
+# What each preset is, as a light: the sigma of its one Gaussian and its strength per channel on a white spot
+# (halation's colour #ff4a14 is 255, 74, 20 of 255).
+PRESET_LIGHT = {
+    "soft_focus": (12.0, (0.5, 0.5, 0.5)),
+    "halation": (30.0, (1.8, 1.8 * 74 / 255, 1.8 * 20 / 255)),
+}
 
 
-def test_the_soft_focus_preset_blurs_by_its_radius_and_brightens_shadows_too(photo: np.ndarray) -> None:
-    out = soft_focus(photo)
-    assert (out >= photo - 1e-6).all()
-    assert (out[photo < 0.3] > photo[photo < 0.3]).all()  # threshold 0: even the shadows glow
-    far, near = soft_focus(photo, radius=2), soft_focus(photo, radius=0)
-    assert np.abs(far - near).max() > 1e-3  # the radius is used
-
-
-def test_the_soft_focus_preset_spreads_one_point_as_a_single_gaussian_of_sigma_12_at_half_strength() -> None:
-    """The impulse response worked out here: a lone white pixel on black becomes 0.5 x a 2-D Gaussian of sigma 12."""
-    size, centre, sigma = 161, 80, 12.0
+@pytest.mark.parametrize("preset", PRESET_LIGHT)
+def test_a_preset_spreads_a_white_spot_as_one_gaussian_of_its_sigma_in_its_light(preset: str) -> None:
+    """The impulse response worked out here: a lone white pixel on black becomes, in each channel, the preset's
+    strength times a 2-D Gaussian of its sigma (a single octave)."""
+    sigma, strengths = PRESET_LIGHT[preset]
+    size = 2 * round(4 * sigma) + 1
+    centre = size // 2
     picture = flat(0.0, size)
     picture[centre, centre] = 1.0
     y, x = np.mgrid[0:size, 0:size]
     squared = ((x - centre) ** 2 + (y - centre) ** 2).astype(np.float64)
-    expected = 0.5 * np.exp(-squared / (2 * sigma**2)) / (2 * np.pi * sigma**2)
-    inside = (squared > 0) & (squared <= 30**2)  # well within the blur's reach of 4 sigma
-    np.testing.assert_allclose(soft_focus(picture)[..., 0][inside], expected[inside], atol=2e-6)
+    gaussian = np.exp(-squared / (2 * sigma**2)) / (2 * np.pi * sigma**2)
+    inside = (squared > 0) & (squared <= (2.5 * sigma) ** 2)  # well within the blur's reach of 4 sigma
+    out = with_preset(preset, picture)
+    for channel, strength in enumerate(strengths):
+        np.testing.assert_allclose(out[..., channel][inside], strength * gaussian[inside], atol=2e-6)
+
+
+def test_the_soft_focus_preset_screens_half_a_blurred_copy_of_the_whole_picture() -> None:
+    """With nothing to blur (radius 0) the copy is the picture itself: v screened with v / 2 is v + v/2 (1 - v)."""
+    np.testing.assert_allclose(with_preset("soft_focus", flat(0.2), radius=0), flat(0.28), atol=1e-6)  # 0.2 + 0.1 x 0.8
+
+
+def test_the_soft_focus_preset_brightens_shadows_too(photo: np.ndarray) -> None:
+    out = with_preset("soft_focus", photo)
+    assert (out >= photo - 1e-6).all()
+    assert (out[photo < 0.3] > photo[photo < 0.3]).all()  # threshold 0: even the shadows glow
+
+
+def test_the_halation_preset_lights_an_even_picture_in_the_film_orange_from_its_brightest_channel() -> None:
+    """With nothing to blur (radius 0): the light is amount 1.8 x (0.7 - 0.5) / (1 - 0.5) = 0.72 of #ff4a14."""
+    light = 0.72 * np.array([1.0, 74 / 255, 20 / 255])
+    expected = [screen(v, c) for v, c in zip((0.7, 0.5, 0.2), light, strict=True)]
+    picture = np.broadcast_to(np.array([0.7, 0.5, 0.2], np.float32), (16, 16, 3)).copy()
+    np.testing.assert_allclose(with_preset("halation", picture, radius=0)[8, 8], expected, atol=1e-5)
+
+
+@pytest.mark.parametrize(
+    ("pixel", "color", "amount", "threshold"),
+    [
+        pytest.param((0.9, 0.3, 0.1), (1.0, 0.5, 0.0), 1.0, 0.5, id="the brightest channel sets the light"),
+        pytest.param((0.2, 0.9, 0.4), (0.0, 0.0, 1.0), 2.0, 0.6, id="a green highlight glows blue"),
+        pytest.param((0.4, 0.45, 0.3), (1.0, 1.0, 1.0), 3.0, 0.5, id="nothing above the threshold, no light"),
+    ],
+)
+def test_a_colour_tints_the_light_of_the_brightest_channel(
+    pixel: tuple[float, float, float], color: tuple[float, float, float], amount: float, threshold: float
+) -> None:
+    """On an even picture the halo is the highlight of the brightest channel, (max - threshold) / (1 - threshold),
+    and the light is that times the colour, per channel, screened over the pixel."""
+    highlight = max(0.0, (max(pixel) - threshold) / (1 - threshold))
+    expected = [screen(v, min(amount * highlight * c, 1.0)) for v, c in zip(pixel, color, strict=True)]
+    picture = np.broadcast_to(np.array(pixel, np.float32), (32, 32, 3)).copy()
+    out = registry.apply(NAME, picture, radius=4.0, amount=amount, threshold=threshold, octaves=1, color=color)
+    np.testing.assert_allclose(out[16, 16], expected, atol=1e-5)
+
+
+def test_without_a_colour_each_channel_blooms_on_its_own_and_with_white_they_bloom_together() -> None:
+    red_light = flat(0.0, 41)
+    red_light[18:23, 18:23, 0] = 1.0
+    own = registry.apply(NAME, red_light, radius=4.0, amount=1.0)
+    white = registry.apply(NAME, red_light, radius=4.0, amount=1.0, color="#ffffff")
+    assert own[20, 27, 1:].max() == 0.0  # the light keeps its red
+    assert white[20, 27, 1] > 0.01  # a white tint spills the red spot's light into every channel
+    np.testing.assert_allclose(white[20, 27, 0], white[20, 27, 1], atol=1e-6)
+
+
+def test_a_black_colour_gives_no_light(photo: np.ndarray) -> None:
+    np.testing.assert_array_equal(registry.apply(NAME, photo, color=(0.0, 0.0, 0.0)), photo)
