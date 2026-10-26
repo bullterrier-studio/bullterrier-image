@@ -1,0 +1,8 @@
+# The creases around the dog and on the sofa darken, a believable contact shadow.
+name = "ambient_occlusion"
+size = 480
+
+[[step]]
+effect = "ambient_occlusion"
+radius = 10
+gain = 4
