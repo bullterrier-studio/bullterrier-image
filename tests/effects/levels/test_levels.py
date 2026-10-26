@@ -44,6 +44,15 @@ def test_the_defaults_leave_the_picture_unchanged(photo: np.ndarray) -> None:
             id="output points set the range",
         ),
         pytest.param(
+            {"output_black": 0.2}, [0.0, 0.5, 1.0], [0.2, 0.6, 1.0], id="a raised output black lifts black, white stays"
+        ),
+        pytest.param(
+            {"output_black": 0.5}, [0.0, 0.25, 0.5], [0.5, 0.625, 0.75], id="half: values move halfway to white"
+        ),
+        pytest.param(
+            {"output_black": 1.0}, [0.0, 0.3, 1.0], [1.0, 1.0, 1.0], id="output black 1 lifts everything to white"
+        ),
+        pytest.param(
             {"output_black": 1.0, "output_white": 0.0},
             [0.0, 0.25, 1.0],
             [1.0, 0.75, 0.0],
@@ -92,6 +101,15 @@ def test_a_brighter_input_is_never_darker_in_the_output(photo: np.ndarray, setti
     ramp = np.sort(photo[..., 0].ravel())  # every red value of the photo, darkest first
     out = registry.apply(NAME, np.repeat(ramp[None, :, None], 3, axis=2), **settings)[0, :, 0]
     assert np.all(np.diff(out) >= -1e-6)
+
+
+@pytest.mark.parametrize("output_black", [0.05, 0.12, 0.4, 0.9])
+def test_a_raised_output_black_is_the_darkest_output_and_no_pixel_gets_darker(
+    photo: np.ndarray, output_black: float
+) -> None:
+    out = registry.apply(NAME, photo, output_black=output_black)
+    assert out.min() >= output_black - 1e-6
+    assert np.all(out >= photo - 1e-6)
 
 
 @pytest.mark.parametrize("output_black", [0.0, 0.3, 0.7, 1.0])

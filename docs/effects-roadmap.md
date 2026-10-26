@@ -22,7 +22,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
 | `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
-| `levels` ✓ | Black point, white point, gamma. | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
+| `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
@@ -35,7 +35,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
 | `solarize` ✓ | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
-| `fade` ✓ | Lift the blacks for a matte film look. | `fx.fade(amount=0.12)` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
@@ -220,9 +219,9 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
 radius of `gaussian_blur`, `soft_focus`, `glow`, `bloom`; `motion_blur`'s `length`; the amounts of `glow`, `bloom`,
-`halation`, `vibrance`, `fade`, `grain`, `noise`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
-`grade`'s `exposure`, `contrast`, `saturation`; `white_balance`'s `temperature` and `tint`; `hue_shift`'s `hue`; `fog`'s
-`density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
+`halation`, `vibrance`, `grain`, `noise`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
+`grade`'s `exposure`, `contrast`, `saturation`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
+`hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
 

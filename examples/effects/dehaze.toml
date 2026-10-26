@@ -3,8 +3,8 @@ name = "dehaze"
 size = 480
 
 [[step]]
-effect = "fade"
-amount = 0.4
+effect = "levels"
+output_black = 0.4
 
 [[step]]
 effect = "dehaze"

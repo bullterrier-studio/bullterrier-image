@@ -1,4 +1,5 @@
-# Crisper blacks and whites, with the midtones lifted a touch: input points and gamma.
+# Crisper blacks and whites, with the midtones lifted a touch (input points and gamma), then the blacks raised to a
+# matte, faded-film grey (output black).
 name = "levels"
 size = 480
 
@@ -7,3 +8,7 @@ effect = "levels"
 black = 0.08
 white = 0.92
 gamma = 1.15
+
+[[step]]
+effect = "levels"
+output_black = 0.1

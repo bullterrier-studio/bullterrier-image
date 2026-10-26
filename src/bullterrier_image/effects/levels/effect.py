@@ -39,8 +39,9 @@ class LevelsParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="The darkest value that can be output (0..1): raising it lifts the blacks to a matte grey. Above "
-        "`output_white` the tones are reversed.",
+        drivable=True,
+        doc="The darkest value that can be output (0..1): raising it lifts the blacks to a matte grey, the faded-film "
+        "look (0.1 = gentle, 1 = everything white). Above `output_white` the tones are reversed.",
     )
     output_white: float = param(
         1.0,

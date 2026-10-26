@@ -22,7 +22,7 @@ looks = [
 [[step]]
 each = "tones"
 feather = 0.004
-looks = ["none", "none", { effect = "fade", amount = 0.12 }]
+looks = ["none", "none", { effect = "levels", output_black = 0.12 }]
 
 [[step]]
 effect = "clarity"

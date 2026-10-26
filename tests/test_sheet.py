@@ -181,7 +181,10 @@ def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps
 def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive():
     look = Recipe(
         "look",
-        [Step("grain", GRAIN_PARAMS, name="dust"), Step("fade", {"amount": Drive(by="near", start=0.0, end=0.2)})],
+        [
+            Step("grain", GRAIN_PARAMS, name="dust"),
+            Step("levels", {"output_black": Drive(by="near", start=0.0, end=0.2)}),
+        ],
         size=48,
         frame=Framing(angle=10),
         regions={"near": Band(of="depth", low=0.4)},
@@ -193,9 +196,9 @@ def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive(
         0.8,
     ]
     assert [r.parameters()["dust.amount"].value for _, r in sweep(look, "dust.amount", 0, 0.2, 3)] == [0, 0.1, 0.2]
-    ends = sweep(look, "fade.amount.end", 0.2, 0.6, 3)
-    assert [r.parameters()["fade.amount.end"].value for _, r in ends] == pytest.approx([0.2, 0.4, 0.6])
-    assert labels(ends) == ["amount.end=0.2", "amount.end=0.4", "amount.end=0.6"]
+    ends = sweep(look, "levels.output_black.end", 0.2, 0.6, 3)
+    assert [r.parameters()["levels.output_black.end"].value for _, r in ends] == pytest.approx([0.2, 0.4, 0.6])
+    assert labels(ends) == ["output_black.end=0.2", "output_black.end=0.4", "output_black.end=0.6"]
     assert labels(sweep(look, "frame.angle", 0, 30, 3)) == ["angle=0", "angle=15", "angle=30"]
     assert labels(sweep(look, "region.near.low", 0, 0.8, 3)) == ["near.low=0", "near.low=0.4", "near.low=0.8"]
 
@@ -203,9 +206,14 @@ def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive(
 def test_a_sweep_of_the_levels_of_a_drive_takes_whole_numbers():
     look = Recipe(
         "look",
-        [Step("fade", {"amount": Drive(by="near", start=0.0, end=0.2)})],
+        [Step("levels", {"output_black": Drive(by="near", start=0.0, end=0.2)})],
         size=48,
         regions={"near": Band(of="depth")},
     )
-    tiles = sweep(look, "fade.amount.levels", 2, 16, 4)
-    assert labels(tiles) == ["amount.levels=2", "amount.levels=7", "amount.levels=11", "amount.levels=16"]
+    tiles = sweep(look, "levels.output_black.levels", 2, 16, 4)
+    assert labels(tiles) == [
+        "output_black.levels=2",
+        "output_black.levels=7",
+        "output_black.levels=11",
+        "output_black.levels=16",
+    ]
