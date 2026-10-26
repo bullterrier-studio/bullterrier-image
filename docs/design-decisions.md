@@ -349,8 +349,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   too; lower `threshold` to keep them with the invented ones. *Revisit when* a model is calibrated better.
 - **The pipeline remembers each crop by what it holds.** A find in a crop is stored by the finder, the photo and the
   crop's pixels (and its size), so whatever recipe, framing or size made the crop, a repeat run asks the model nothing;
-  "nothing found" is remembered too. The existing whole-photo entries and their keys are unchanged. The answer is kept in
-  16 bits and the first run uses the kept value, so the first and later runs give the same pixels.
+  "nothing found" is remembered too. Every remembered map, of a crop or of the whole photo, is kept in 16 bits and the
+  first run uses the kept value, so the first and later runs give the same pixels.
 - **Cuts, paths and SVG shapes are drawn in the frame's units and filled by one scanline fill.** A path's coordinates
   (`Cuts` curves, `Path.d`) are shares of the frame, and the unit square is stretched to it, so an arc is a circle only
   in a square frame; a straight cut's `angle` is measured on the picture's pixels, counter-clockwise from horizontal.

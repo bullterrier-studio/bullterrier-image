@@ -407,9 +407,9 @@ class _Photo:
         return self._remember("depth") if "depth" in self.finders else None
 
     def _remember(self, name: str) -> np.ndarray:
-        """The map `name`, from the on-disk cache when its finder has found it in this photo before, else found and
-        remembered. The one place a map of the whole photo is found and kept. A failure is remembered too, so the
-        photo's other recipes fail without asking again."""
+        """The map `name`, from the on-disk cache when its finder has found it in this photo before, else found
+        (checked to fit the photo) and remembered. The one place a map of the whole photo is found and kept. A failed
+        search is remembered too, so the photo's other recipes fail without asking again."""
         if name in self._errors:
             raise self._errors[name]
         if name not in self._maps:
@@ -418,10 +418,11 @@ class _Photo:
             found = _remembered(cached, self.rgb().shape[:2])
             if found is None:
                 try:
-                    found = _keep(cached, find_map(name, self.finders[name], self.rgb()))  # analyse
+                    found = find_map(name, self.finders[name], self.rgb())  # analyse
                 except Exception as error:  # remembered, so the photo's other recipes fail without asking again
                     self._errors[name] = error
                     raise
+                found = _keep(cached, found)  # a failure to write is the disk's, not the map's: not remembered
             self._maps[name] = found
         return self._maps[name]
 

@@ -195,23 +195,28 @@ def _maps(
 ) -> dict[str, np.ndarray]:
     """The maps of the photo `rgb` that `recipes` need or that were given, by input name: each the one given, else
     found once by its finder when a recipe needs it (an error naming that recipe when there is no finder either), and
-    checked to be the photo's (h, w). The one place a map is found and checked, the subject and the depth alike."""
+    checked to be the photo's (h, w). The subject and the depth alike."""
     wanted = {
         "matte": (matte, find_subject, [recipe for recipe in recipes if recipe.needs_matte]),
         "depth": (depth, find_depth, [recipe for recipe in recipes if recipe.needs_depth]),
     }
     maps = {}
     for name, (layer, finder, needing) in wanted.items():
-        if layer is None and needing:
+        if layer is not None:
+            maps[name] = _checked(name, layer, rgb)
+        elif needing:
             if finder is None:
                 raise _missing(name, needing[0])
-            layer = find_map(name, finder, rgb)
-        if layer is None:
-            continue
-        if layer.shape != rgb.shape[:2]:
-            raise _MAPS[name][0](f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
-        maps[name] = layer
+            maps[name] = find_map(name, finder, rgb)
     return maps
+
+
+def _checked(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
+    """`layer`, the map `name` of the photo `rgb`, once it is known to be the photo's (h, w): the one check of a map's
+    size, for a map given and a finder's answer alike."""
+    if layer.shape != rgb.shape[:2]:
+        raise _MAPS[name][0](f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
+    return layer
 
 
 def _missing(name: str, recipe: Recipe) -> SubjectNotFoundError | DepthNotFoundError:
@@ -233,7 +238,7 @@ def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
     """Ask `finder` for the map `name` ("matte" or "depth") of the photo `rgb` and return it. The one place a finder of
     a whole photo is called and its answer checked (the runner and the pipeline both use it): SubjectNotFoundError
     (for the matte) or DepthNotFoundError (for depth) if it returned None, since a finder must answer or raise, and
-    carrying on would drop the map without a word."""
+    carrying on would drop the map without a word, or a map that is not the photo's (h, w), naming both sizes."""
     error, what, keyword = _MAPS[name]
     answer = finder.find(rgb)
     if answer is None:
@@ -241,7 +246,7 @@ def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
             f"`{keyword}` returned None: it must return the {what} (float32, the photo's height and width, 0..1) or "
             "raise when it finds none"
         )
-    return answer
+    return _checked(name, answer, rgb)
 
 
 def _prepare(

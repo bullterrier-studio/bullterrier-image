@@ -14,7 +14,6 @@ from bullterrier_image.cli import main
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.errors import BackendUnavailableError, ProjectError, SubjectNotFoundError
 from bullterrier_image.finding.subject import subject_finder
-from bullterrier_image.ops.resample import resize
 from bullterrier_image.pipeline import init_project, load_project, run
 
 
@@ -281,29 +280,29 @@ def disc_matte(shape=(96, 128), radius=30):
     return (np.hypot(x - shape[1] / 2, y - shape[0] / 2) <= radius).astype(np.float32)
 
 
-def masked_recipes(folder):
+def masked_recipes(folder) -> list[str]:
+    """Two recipes that use the subject; returns their names."""
     for name in ("cut1", "cut2"):
         write_recipe(folder, name, 'effect = "fill"\nmask = "background"')
+    return ["cut1", "cut2"]
 
 
-def deep_recipes(folder):
-    """Two recipes that take the depth map (needs the `depth_probe` fixture)."""
+def deep_recipes(folder) -> list[str]:
+    """Two recipes that take the depth map (needs the `depth_probe` fixture); returns their names."""
     for name in ("deep1", "deep2"):
         write_recipe(folder, name, 'effect = "depth_probe"')
+    return ["deep1", "deep2"]
 
 
-# Each map a recipe can need: `run` given a finder of it, what writes the project's two recipes that need it, and their
-# names.
+# Each map a recipe can need: `run` given a finder of it, and what writes the project's two recipes that need it.
 MAPS = {
     "the subject": (
         lambda project, finder, **options: run(project, find_subject=finder, **options),
         masked_recipes,
-        ["cut1", "cut2"],
     ),
     "the depth": (
         lambda project, finder, **options: run(project, find_depth=finder, **options),
         deep_recipes,
-        ["deep1", "deep2"],
     ),
 }
 
@@ -328,8 +327,8 @@ def finds_a_disc(rgb, radius):
     return disc_matte(rgb.shape[:2], radius)
 
 
-@pytest.mark.parametrize(("run_with", "recipes", "_"), MAPS.values(), ids=MAPS.keys())
-def test_a_map_is_found_once_per_photo_and_remembered_between_runs(folder, depth_probe, run_with, recipes, _):
+@pytest.mark.parametrize(("run_with", "recipes"), MAPS.values(), ids=MAPS.keys())
+def test_a_map_is_found_once_per_photo_and_remembered_between_runs(folder, depth_probe, run_with, recipes):
     recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "bt-image.toml")
@@ -341,8 +340,8 @@ def test_a_map_is_found_once_per_photo_and_remembered_between_runs(folder, depth
     assert len(finder.seen) == 2  # redoing everything reads the remembered map instead of looking again
 
 
-@pytest.mark.parametrize(("run_with", "recipes", "_"), MAPS.values(), ids=MAPS.keys())
-def test_a_damaged_remembered_map_is_found_again_even_when_forcing(folder, depth_probe, run_with, recipes, _):
+@pytest.mark.parametrize(("run_with", "recipes"), MAPS.values(), ids=MAPS.keys())
+def test_a_damaged_remembered_map_is_found_again_even_when_forcing(folder, depth_probe, run_with, recipes):
     recipes(folder)
     finder = StandInFinder()
     project = load_project(folder / "bt-image.toml")
@@ -356,12 +355,13 @@ def test_a_damaged_remembered_map_is_found_again_even_when_forcing(folder, depth
 
 
 def test_the_depth_a_finder_finds_is_the_map_the_recipe_takes(folder, depth_probe):
-    deep_recipes(folder)
+    (folder / "recipes" / "deep.toml").write_text(  # at the photo's own size: the map is not scaled
+        'name = "deep"\nsize = 128\n[[step]]\neffect = "depth_probe"\n', encoding="utf-8"
+    )
     write_project(folder, '[export]\nformats = ["png"]\n')
     run(load_project(folder / "bt-image.toml"), find_depth=Finder("stand-in", StandInFinder(radius=30)))
-    painted = imageio.load(folder / "out" / "a" / "deep1.png")[..., 0]  # depth_probe paints the depth it is given
-    expected = resize(disc_matte(), 64)  # the 128x96 photo's disc, at the recipe's 64 px
-    np.testing.assert_allclose(painted, expected, atol=0.5 / 255)
+    painted = imageio.load(folder / "out" / "a" / "deep.png")[..., 0]  # depth_probe paints the depth it is given
+    np.testing.assert_array_equal(painted, disc_matte())  # the 128x96 photo's disc: 1 inside, 0 outside
 
 
 # A first run with the wide finder for both maps, then a second with (subject finder, depth finder): each map is known
@@ -464,11 +464,11 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
     ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("run_with", "recipes", "needing"), MAPS.values(), ids=MAPS.keys())
+@pytest.mark.parametrize(("run_with", "recipes"), MAPS.values(), ids=MAPS.keys())
 def test_a_photo_whose_map_is_not_found_fails_only_the_recipes_that_need_it_and_is_searched_once(
-    folder, depth_probe, run_with, recipes, needing
+    folder, depth_probe, run_with, recipes
 ):
-    recipes(folder)
+    needing = recipes(folder)
     finder = StandInFinder(error=RuntimeError("nothing found in the picture"))
     by = by_pair(run_with(load_project(folder / "bt-image.toml"), Finder("stand-in", finder)))
     for recipe in needing:
@@ -499,13 +499,36 @@ def test_a_depth_map_of_another_size_fails_the_recipes_that_take_it_naming_both_
         asked.append(rgb.shape)
         return np.zeros((48, 64), np.float32)
 
-    by = by_pair(run(load_project(folder / "bt-image.toml"), find_depth=Finder("half size", finds_half_the_photo)))
+    project = load_project(folder / "bt-image.toml")
+    by = by_pair(run(project, find_depth=Finder("half size", finds_half_the_photo)))
     for recipe in ("deep1", "deep2"):
         assert by[("a.png", recipe)].status == "failed"
         assert "(48, 64)" in str(by[("a.png", recipe)].error)
         assert "(96, 128)" in str(by[("a.png", recipe)].error)
     assert by[("a.png", "warm")].status == "done"
     assert len(asked) == 2  # once per photo, not once per recipe
+    assert list(project.cache.glob("*")) == []  # a map that does not fit is never remembered
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0, reason="makes a folder read-only with chmod: POSIX, not as root"
+)
+def test_a_map_the_cache_cannot_keep_fails_only_its_pair_and_is_found_again_for_the_next(folder):
+    masked_recipes(folder)
+    project = load_project(folder / "bt-image.toml")
+    project.cache.mkdir(parents=True)
+    project.cache.chmod(0o500)  # read-only, as a locked or full disk refuses the write
+    finder = StandInFinder()
+
+    def repaired_after_the_first_pair(message):
+        project.cache.chmod(0o700)
+
+    found = Finder("stand-in", finder)
+    by = by_pair(run(project, only="a.png", find_subject=found, log=repaired_after_the_first_pair))
+    assert by[("a.png", "cut1")].status == "failed"
+    assert "PermissionError" in str(by[("a.png", "cut1")].error)
+    assert by[("a.png", "cut2")].status == "done"  # a disk failure is not the map's: the next pair finds it again
+    assert len(finder.seen) == 2
 
 
 def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_and_says_so(folder):
