@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from bullterrier_image import Recipe, fx, render
 from bullterrier_image.core import registry
 
 NAME = "bloom"
@@ -127,3 +128,34 @@ def test_constant_value_is_the_highlight_assumed_beyond_the_edge() -> None:
     out_of_range = registry.apply(NAME, flat(0.0, 81), radius=2.0, octaves=1, edge="constant", constant_value=1.0)
     np.testing.assert_allclose(out_of_range[40, 40], 0.0, atol=1e-6)  # 40 px in: 20 sigma from the edge
     assert out_of_range[0, 0, 0] > 0.4  # in the corner, 3/4 of the blur's weight is beyond the edge
+
+
+def soft_focus(picture: np.ndarray, **values: float) -> np.ndarray:
+    size = picture.shape[1]  # the recipe is as wide as the picture, so its px are the picture's px
+    return render(picture, Recipe("soft-focus", size=size, steps=[fx.bloom(preset="soft_focus", **values)]))
+
+
+def test_the_soft_focus_preset_screens_half_a_blurred_copy_of_the_whole_picture() -> None:
+    """With nothing to blur (radius 0) the copy is the picture itself: v screened with v / 2 is v + v/2 (1 - v)."""
+    dim = flat(0.2)
+    np.testing.assert_allclose(soft_focus(dim, radius=0), flat(0.28), atol=1e-6)  # 0.2 + 0.1 x 0.8, by hand
+
+
+def test_the_soft_focus_preset_blurs_by_its_radius_and_brightens_shadows_too(photo: np.ndarray) -> None:
+    out = soft_focus(photo)
+    assert (out >= photo - 1e-6).all()
+    assert (out[photo < 0.3] > photo[photo < 0.3]).all()  # threshold 0: even the shadows glow
+    far, near = soft_focus(photo, radius=2), soft_focus(photo, radius=0)
+    assert np.abs(far - near).max() > 1e-3  # the radius is used
+
+
+def test_the_soft_focus_preset_spreads_one_point_as_a_single_gaussian_of_sigma_12_at_half_strength() -> None:
+    """The impulse response worked out here: a lone white pixel on black becomes 0.5 x a 2-D Gaussian of sigma 12."""
+    size, centre, sigma = 161, 80, 12.0
+    picture = flat(0.0, size)
+    picture[centre, centre] = 1.0
+    y, x = np.mgrid[0:size, 0:size]
+    squared = ((x - centre) ** 2 + (y - centre) ** 2).astype(np.float64)
+    expected = 0.5 * np.exp(-squared / (2 * sigma**2)) / (2 * np.pi * sigma**2)
+    inside = (squared > 0) & (squared <= 30**2)  # well within the blur's reach of 4 sigma
+    np.testing.assert_allclose(soft_focus(picture)[..., 0][inside], expected[inside], atol=2e-6)

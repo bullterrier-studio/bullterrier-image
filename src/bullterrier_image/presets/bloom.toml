@@ -1,0 +1,8 @@
+# Looks that are one bloom.
+
+[soft_focus]
+description = "Orton soft focus: a blurred copy of the whole picture, half-strength, screened over the sharp one."
+radius = 12
+threshold = 0
+octaves = 1
+amount = 0.5

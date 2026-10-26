@@ -64,13 +64,12 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `motion_blur` ✓ | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
 | `radial_blur` ✓ | Spin or zoom blur from a point. | `fx.radial_blur(mode="zoom", amount=0.1)` |
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
-| `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo. | `fx.bloom(radius=40, threshold=0.7)` |
+| `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; preset `soft_focus` is the Orton glow of the whole picture. | `fx.bloom(radius=40, threshold=0.7)` |
 | `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
 | `starburst` ✓ | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=0.15)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
-| `soft_focus` ✓ | Dreamy glow over a sharp image (Orton). | `fx.soft_focus(opacity=0.5)` |
 | `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
 | `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
@@ -217,7 +216,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 
 Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
-radius of `gaussian_blur`, `soft_focus`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
+radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
 `halation`, `vibrance`, `grain`, `noise`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
 `hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
@@ -359,7 +358,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 
 | Goes | Into |
 | --- | --- |
-| `soft_focus` | a `bloom` preset |
 | `halation` | `bloom` + `color` |
 | `fade` | `levels(output_black)` |
 | `invert` | a `levels` preset |

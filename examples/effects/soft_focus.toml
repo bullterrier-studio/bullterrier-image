@@ -1,8 +1,0 @@
-# A dreamy Orton glow: sharp detail under a soft, bright haze.
-name = "soft_focus"
-size = 480
-
-[[step]]
-effect = "soft_focus"
-radius = 14
-opacity = 0.3                 # the step mixes the full soft focus in at 30%

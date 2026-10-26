@@ -1,16 +1,18 @@
-# Highlights bleed into a soft halo with a bright core, on a dimmed picture so the light stands out; the background
-# is black so the light spills onto it.
+# Highlights bleed into a soft halo with a bright core, spilling onto a black background; the soft_focus preset first
+# glows the whole picture a little.
 name = "bloom"
 size = 480
+
+[[step]]
+effect = "bloom"
+preset = "soft_focus"         # the whole picture, not only the highlights
+radius = 14
+amount = 0.3
 
 [[step]]
 effect = "fill"
 color = "#000000"
 mask = "background"
-
-[[step]]
-effect = "levels"
-gamma = 0.8
 
 [[step]]
 effect = "bloom"
