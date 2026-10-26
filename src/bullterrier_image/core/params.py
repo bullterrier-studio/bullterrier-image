@@ -44,6 +44,7 @@ import annotated_types
 import numpy as np
 from PIL import ImageColor
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainValidator, ValidationError, WithJsonSchema
+from pydantic.fields import FieldInfo
 
 from bullterrier_image.errors import RecipeError
 
@@ -308,6 +309,7 @@ class Drive(ValidatedModel):
         ge=2,
         le=16,
         strict=True,
+        json_schema_extra={"unit": "count"},
         description="How many evenly spaced values between `start` and `end` the effect is rendered at (2 to 16); each "
         "pixel mixes the two nearest. More is smoother and costs more renders; 2 mixes the effect at `start` and at "
         "`end`.",
@@ -422,14 +424,13 @@ class EffectParams(ValidatedModel):
         docs = []
         for name, info in cls.model_fields.items():
             extra = _extra(info)
-            unit = extra.get("unit")
-            minimum, maximum = _bounds(info.metadata)
+            minimum, maximum = bounds(info)
             text = _type_text(hints[name]) + (" (drivable)" if extra.get("drivable") else "")
             docs.append(
                 FieldDoc(
                     name,
                     text,
-                    unit if isinstance(unit, str) else None,
+                    unit_of(info),
                     minimum,
                     maximum,
                     info.default,
@@ -469,6 +470,13 @@ _MISSING = object()
 def _extra(info: Any) -> dict[str, Any]:
     """What `param` put in a field's JSON-schema extras (unit, advanced, drivable)."""
     return info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+
+
+def unit_of(info: FieldInfo) -> str | None:
+    """The unit the field `info` (a pydantic `FieldInfo`) was declared with, by `param` or by a `json_schema_extra` of
+    `{"unit": ...}`; None when it has none."""
+    unit = _extra(info).get("unit")
+    return unit if isinstance(unit, str) else None
 
 
 def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
@@ -540,10 +548,10 @@ def _scalar(annotation: Any) -> set[Any]:
     return {m for m in _members(annotation) if m is not type(None)}
 
 
-def _bounds(metadata: list[Any]) -> tuple[float | None, float | None]:
-    """The (min, max) a field's constraints give."""
-    low = next((m.ge for m in metadata if isinstance(m, annotated_types.Ge)), None)
-    high = next((m.le for m in metadata if isinstance(m, annotated_types.Le)), None)
+def bounds(info: FieldInfo) -> tuple[float | None, float | None]:
+    """The (min, max) the constraints of the field `info` (a pydantic `FieldInfo`) give, None for a side it has not."""
+    low = next((m.ge for m in info.metadata if isinstance(m, annotated_types.Ge)), None)
+    high = next((m.le for m in info.metadata if isinstance(m, annotated_types.Le)), None)
     return low, high  # type: ignore[return-value]  # bounds given to `param` as numbers
 
 

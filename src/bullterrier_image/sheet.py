@@ -8,11 +8,10 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from . import imageio
-from .core import registry
 from .errors import RecipeError
 from .ops import glyphs
 from .ops.resample import resize
-from .recipe import Recipe, Stage, Step
+from .recipe import Recipe, Stage
 
 _RGBA = 4  # the channels of a picture with transparency
 _CHECKER = 8  # px: the side of a square of the checkerboard that shows through transparency
@@ -63,66 +62,28 @@ def contact_sheet(tiles: list[tuple[str, np.ndarray]], columns: int = 3, tile: i
 
 
 def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5) -> list[tuple[str, Recipe]]:
-    """`recipe` once for each of `count` values of one parameter, evenly spaced from `start` to `end`, each with the
-    label `parameter=value`: the tiles of a sheet that shows what the parameter does.
+    """`recipe` once for each of `count` values of one number, evenly spaced from `start` to `end`, each with the label
+    `number=value`: the tiles of a sheet that shows what the number does.
 
-    target: `effect.parameter`, e.g. `glitch.split`; `effect#2.parameter` picks the second step of an effect the recipe
-    has twice (the number is required then). The parameter must be a number. The value replaces whatever the recipe
-    has there. A whole-number parameter takes the values rounded to the nearest whole number, each once. count: 2 to
-    24. A value outside the parameter's range is refused as in any recipe, naming it, never clamped.
+    target: the number's address (`Recipe.parameters` lists them): `glitch.split`, `grain#2.amount` for the second of
+    an effect the recipe has twice, `pulse.gain` for a step called `pulse`, `pulse.gain.end` for the end of a drive,
+    `region.near.low`, `frame.angle`. The value replaces whatever the recipe has there. A whole-number parameter takes
+    the values rounded to the nearest whole number, each once. count: 2 to 24. A value outside the number's range is
+    refused as in any recipe, naming it, never clamped.
 
-    Raises RecipeError for a target the recipe does not have (naming what it does have), a parameter the effect does
-    not have or that is not a number (naming the valid ones), a count outside 2 to 24, a start equal to the end, or a
-    value outside the range.
+    Raises RecipeError for a target the recipe does not have (naming what it does have), a count outside 2 to 24, a
+    start equal to the end, or a value outside the range.
     """
     if not 2 <= count <= 24:
         raise RecipeError(f"count must be 2 to 24 tiles, got {count}")
     if start == end:
         raise RecipeError(f"a sweep needs a range: start and end are both {start:g}")
-    index, step, name = _locate(recipe, target)
+    number = recipe.parameter(target)
     values = np.linspace(start, end, count).tolist()
-    if name in registry.parameters(step.effect).whole_number_fields():
+    if number.whole:
         values = list(dict.fromkeys(round(value) for value in values))
-    tiles = []
-    for value in values:
-        swept = Step(
-            step.effect,
-            {**step.params, name: value},
-            step.mask,
-            step.opacity,
-            step.blend_mode,
-            partition=step.partition,
-        )
-        steps = [*recipe.steps[:index], swept, *recipe.steps[index + 1 :]]
-        tiles.append((f"{name}={value:g}", recipe.model_copy(update={"steps": tuple(steps)})))  # keeps the rest
-    return tiles
-
-
-def _locate(recipe: Recipe, target: str) -> tuple[int, Step, str]:
-    """The index and the step, and the name of the parameter, that `target` (see `sweep`) points at: one of the
-    recipe's own effect steps (not a look of an `Each`). The parameter is checked by the effect's model when the tile is
-    made, which names it and the valid ones."""
-    found = re.fullmatch(r"(\w+)(?:#(\d+))?\.(\w+)", target)
-    if not found:
-        raise RecipeError(f"sweep target {target!r} is not `effect.parameter` (or `effect#2.parameter`)")
-    effect, number, name = found.groups()
-    effects = [(i, step) for i, step in enumerate(recipe.steps) if isinstance(step, Step)]
-    steps = [(i, step) for i, step in effects if step.effect == effect]
-    if not steps:
-        have = ", ".join(dict.fromkeys(step.effect for _, step in effects))
-        raise RecipeError(f"sweep target {target!r}: recipe {recipe.name!r} has no {effect!r} step; it has: {have}")
-    if number is None and len(steps) > 1:
-        raise RecipeError(
-            f"sweep target {target!r}: recipe {recipe.name!r} has {len(steps)} {effect!r} steps; "
-            f"choose one, from {effect}#1.{name} to {effect}#{len(steps)}.{name}"
-        )
-    pick = int(number or 1)
-    if not 1 <= pick <= len(steps):
-        raise RecipeError(
-            f"sweep target {target!r}: recipe {recipe.name!r} has {len(steps)} {effect!r} steps, no #{pick}"
-        )
-    index, step = steps[pick - 1]
-    return index, step, name
+    label = target.partition(".")[2]
+    return [(f"{label}={value:g}", recipe.with_values({target: value})) for value in values]
 
 
 def write_stages(stages: list[Stage], folder: str | Path, quality: int = 92) -> Path:

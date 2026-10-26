@@ -241,11 +241,12 @@ def test_a_modelled_effects_builder_has_the_models_signature_then_the_step_keys(
         "mask",
         "opacity",
         "blend_mode",
+        "name",
     ]  # no image, subject
-    assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00", None, 1.0, "normal"]
+    assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00", None, 1.0, "normal", None]
     assert "tint: str | list[float] | tuple[float, float, float]" in str(signature)
     keyword_only = [p.name for p in signature.parameters.values() if p.kind is inspect.Parameter.KEYWORD_ONLY]
-    assert keyword_only == ["mask", "opacity", "blend_mode"]
+    assert keyword_only == ["mask", "opacity", "blend_mode", "name"]
 
 
 def test_a_modelled_effects_builder_takes_positional_and_keyword_values(lantern):
@@ -302,7 +303,8 @@ def test_the_stub_shows_the_step_keys_and_a_preset_or_a_partition_exactly_where_
         presets = {"preset": (f"Literal{names!r} | None", None)} if names else {}
         step_keys = {"mask": MASK, "opacity": ("float", registry.opacity(name)), "blend_mode": BLEND_MODE}
         partition = {"partition": ("str | None", None)} if "partition" in registry.inputs(name) else {}
-        assert _keywords(function) == {**step_keys, **partition, **presets}, name
+        called = {"name": ("str | None", None)}
+        assert _keywords(function) == {**step_keys, **partition, **presets, **called}, name
         if names:
             assert "preset" in inspect.signature(getattr(fx, name)).parameters
         else:

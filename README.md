@@ -232,9 +232,9 @@ stdout and progress and errors to stderr. A mistake (a file that is not an image
 output folder that cannot be written) prints one line, `error: ...`, and exits with 1; usage mistakes exit with 2, Ctrl-C
 with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `BT_IMAGE_DEBUG=1`.
 
-`sweep` shows what one parameter does: the recipe at five values of it (`--count`, 2 to 24), side by side, each labelled. The
-target is `effect.parameter` (`effect#2.parameter` for an effect the recipe uses twice); a range that starts below zero
-goes after `--`, as in `... -o out/sweep.png -- -2..2`.
+`sweep` shows what one number does: the recipe at five values of it (`--count`, 2 to 24), side by side, each labelled. The
+target is the number's address (see [Addresses](#recipes)): `effect.parameter`, `effect#2.parameter` for an effect the
+recipe uses twice; a range that starts below zero goes after `--`, as in `... -o out/sweep.png -- -2..2`.
 
 ```
 uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
@@ -560,6 +560,32 @@ default) and each pixel mixes the two renders either side of its field value, li
 exactly the render at the middle value, a field between two levels is their mix. A driven step costs up to `levels`
 times the effect, and a value no pixel needs is not rendered (a field that is 0 everywhere costs one render). More
 levels is smoother where the field changes slowly; two levels mix the effect at `start` and at `end`.
+
+**Addresses.** Every number of a recipe has an address, so a program that drives a look (a video tool mapping a beat
+onto a glow, frame after frame) can read what the numbers are and set them without rebuilding the recipe:
+
+```python
+from bullterrier_image import load_recipe
+
+look = load_recipe("pulse.toml")
+for address, number in look.parameters().items():  # pulse.radius 24.0 px 0 500, pulse.exposure.end 0.4 stops -10 10 ...
+    print(address, number.value, number.unit, number.minimum, number.maximum, number.whole)
+
+frame_look = look.with_values({"pulse.radius": 12 + 20 * kick, "pulse.exposure.end": 0.4 * level})  # a copy
+```
+
+A step's numbers start with its `name` (`name = "pulse"` on a `[[step]]`, `fx.glow(name="pulse")`: letters, digits and
+underscores, one per step; the address survives reordering the steps). Without a name a step is its effect, `glow`, when
+the recipe has one such step, else the effect and its number counted from 1, `glow#2`; an `each` step is `each`. After
+the step: the effect's numbers (`pulse.radius`), its `opacity`, the `.start`, `.end` and `.levels` of a driven number
+(`pulse.radius.end`), and for an `each` step its `feather` and the numbers of a look (`each.looks[0].radius`, counted
+from 0 as the pieces are). Then `region.near.low` for the numbers of a region and `frame.angle` for the framing's.
+`parameters()` lists them in the order of the recipe, each a `Parameter` with its `value` (the default where the recipe
+does not write it), `unit`, `minimum` and `maximum`, what it does (`doc`) and whether it must be a whole number.
+`with_values` returns a new recipe (the original is untouched, and every step, region and frame it does not change is
+shared with the copy), checks each value against the number's range as any recipe does, and refuses an address the
+recipe does not have, naming it and listing the valid ones and the nearest. A whole number may be written `3.0`. `bt-image
+sweep` takes the same addresses.
 
 Version 2 of the file format named the depth kinds `depth` and `depth_bands`; they are `band` and `bands` with
 `of = "depth"` now (`far` is `low`, `near` is `high`), and a file that still uses them says so.

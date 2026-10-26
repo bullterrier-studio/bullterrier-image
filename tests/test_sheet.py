@@ -4,7 +4,8 @@ from PIL import Image
 
 from bullterrier_image import RecipeError
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.recipe import Each, Grid, Recipe, Stage, Step, render
+from bullterrier_image.core.params import Drive
+from bullterrier_image.recipe import Band, Each, Grid, Recipe, Stage, Step, render
 from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
 GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
@@ -172,3 +173,39 @@ def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps
     tiles = sweep(look, "seams.width", 0.002, 0.02, 3)
     assert [tile.steps[1].partition for _, tile in tiles] == ["panes"] * 3  # type: ignore[union-attr]
     assert all(tile.steps[0] == look.steps[0] and tile.regions == look.regions for _, tile in tiles)
+
+
+# --- a sweep by any address -------------------------------------------------------------------------------------------
+
+
+def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive():
+    look = Recipe(
+        "look",
+        [Step("grain", GRAIN_PARAMS, name="dust"), Step("fade", {"amount": Drive(by="near", start=0.0, end=0.2)})],
+        size=48,
+        frame=Framing(angle=10),
+        regions={"near": Band(of="depth", low=0.4)},
+    )
+    assert [r.frame.angle for _, r in sweep(look, "frame.angle", 0, 30, 3)] == [0, 15, 30]
+    assert [r.parameters()["region.near.low"].value for _, r in sweep(look, "region.near.low", 0, 0.8, 3)] == [
+        0,
+        0.4,
+        0.8,
+    ]
+    assert [r.parameters()["dust.amount"].value for _, r in sweep(look, "dust.amount", 0, 0.2, 3)] == [0, 0.1, 0.2]
+    ends = sweep(look, "fade.amount.end", 0.2, 0.6, 3)
+    assert [r.parameters()["fade.amount.end"].value for _, r in ends] == pytest.approx([0.2, 0.4, 0.6])
+    assert labels(ends) == ["amount.end=0.2", "amount.end=0.4", "amount.end=0.6"]
+    assert labels(sweep(look, "frame.angle", 0, 30, 3)) == ["angle=0", "angle=15", "angle=30"]
+    assert labels(sweep(look, "region.near.low", 0, 0.8, 3)) == ["near.low=0", "near.low=0.4", "near.low=0.8"]
+
+
+def test_a_sweep_of_the_levels_of_a_drive_takes_whole_numbers():
+    look = Recipe(
+        "look",
+        [Step("fade", {"amount": Drive(by="near", start=0.0, end=0.2)})],
+        size=48,
+        regions={"near": Band(of="depth")},
+    )
+    tiles = sweep(look, "fade.amount.levels", 2, 16, 4)
+    assert labels(tiles) == ["amount.levels=2", "amount.levels=7", "amount.levels=11", "amount.levels=16"]

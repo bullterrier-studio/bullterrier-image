@@ -21,21 +21,43 @@ names) and `errors` only. The recipe-file reader
 module and do not know each other.
 """
 
+import difflib
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 import numpy as np
 from pydantic import Field, field_validator, model_validator
+from pydantic.fields import FieldInfo
 
 from bullterrier_image.errors import RecipeError
 from bullterrier_image.ops.composite import BlendMode
 
 from . import registry
 from .framing import Framing
-from .params import Drive, EffectParams, ValidatedModel
+from .params import Drive, EffectParams, ValidatedModel, bounds, unit_of
 from .regions import Kind, check, maps_used, needs, needs_finder
 from .regions import derived_maps as _derived_maps
+
+_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+_ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besides a step: a step cannot be called so
+
+
+@dataclass(frozen=True)
+class Parameter:
+    """One number of a recipe, as `Recipe.parameters` lists it: its `value` now, its `unit` (`px`, `fraction`,
+    `count`...) and range (`minimum` and `maximum`, None where it has no bound), what it does (`doc`) and whether it
+    must be a whole number (`whole`: a count, a seed). The unit and range are those of the number's own declaration, so
+    a control that maps a signal onto it can scale to them and stay inside."""
+
+    value: float
+    unit: str
+    minimum: float | None
+    maximum: float | None
+    doc: str
+    whole: bool = False
+
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
 Reference = tuple[str, str, Literal["partition", "selection"] | None]
@@ -59,6 +81,7 @@ class _Layer(ValidatedModel):
         le=1,
         strict=True,
         allow_inf_nan=False,
+        json_schema_extra={"unit": "fraction"},
         description="How much of the step shows: 0 none, 1 fully; when none is given, the effect's own default "
         "(`registry.opacity`, 1 for most effects, and for an `each` step).",
     )
@@ -68,6 +91,24 @@ class _Layer(ValidatedModel):
         "'multiply' darkens, 'screen' lightens, 'overlay' and 'soft_light' deepen contrast, 'difference' subtracts, "
         "'color' takes the result's hue and saturation and keeps the input's brightness.",
     )
+
+    name: str | None = Field(
+        None,
+        description="A name for the step, so its numbers have addresses that survive reordering: letters, digits and "
+        "underscores, starting with a letter; no two steps of a recipe share one, and it is not `region`, `frame` or "
+        "`each` nor the name of an effect the recipe uses. None: the step is reached by its effect (and its number "
+        "among the steps of that effect).",
+    )
+
+    @field_validator("name")
+    @classmethod
+    def _a_word(cls, name: str | None) -> str | None:
+        """A name is a word that cannot be taken for the rest of an address."""
+        if name is not None and not _NAME.fullmatch(name):
+            raise ValueError(f"must be letters, digits and underscores, starting with a letter, got {name!r}")
+        if name in _ADDRESS_WORDS:
+            raise ValueError(f"{name!r} is reserved: an address starts with `region`, `frame` or `each`")
+        return name
 
     def references(self) -> list[Reference]:
         """The regions this step names, as `(key, name, kind)`; the recipe checks them against its regions."""
@@ -102,6 +143,7 @@ class Step(_Layer):
         blend_mode: str = "normal",
         preset: str | None = None,
         partition: str | None = None,
+        name: str | None = None,
         **unknown: Any,
     ) -> None:
         """Validate and make the step; RecipeError saying what is wrong and what is valid (`unknown` keywords, which
@@ -129,6 +171,7 @@ class Step(_Layer):
             opacity=opacity,
             blend_mode=blend_mode,
             partition=partition,
+            name=name,
             **unknown,
         )
 
@@ -222,6 +265,7 @@ class Each(_Layer):
         le=0.05,
         strict=True,
         allow_inf_nan=False,
+        json_schema_extra={"unit": "fraction"},
         description="How softly a piece's look fades into its neighbours' across a border, as a share of the "
         "picture's long side (0 to 0.05): the standard deviation of a Gaussian. 0 gives hard borders; about 0.001 "
         "only smooths the stair-steps of the pixels; raising it blends the looks over a wider band.",
@@ -237,6 +281,7 @@ class Each(_Layer):
         assign: str = "cycle",
         seed: int = 0,
         feather: float = 0.001,
+        name: str | None = None,
         **unknown: Any,
     ) -> None:
         """Validate and make the step; RecipeError saying what is wrong and what is valid. opacity: None shows the
@@ -251,6 +296,7 @@ class Each(_Layer):
             assign=assign,
             seed=seed,
             feather=feather,
+            name=name,
             **unknown,
         )
 
@@ -341,7 +387,10 @@ def _kind(fields: type[EffectParams], name: str) -> str:
 
 
 def _described(text: str, layer: _Layer, width: int) -> str:
-    """`text` followed by what the layer adds (blend mode, mask, opacity), cut to `width` characters."""
+    """`text` (after the layer's name, if it has one) followed by what the layer adds (blend mode, mask, opacity), cut
+    to `width` characters."""
+    if layer.name:
+        text = f"{layer.name}: {text}"
     if layer.blend_mode != "normal":
         text += f" {layer.blend_mode}"
     if layer.mask:
@@ -454,7 +503,24 @@ class Recipe(ValidatedModel):
         for number, step in enumerate(self.steps, start=1):
             for key, name, wanted in step.references():
                 needs(f"step {number}", key, name, wanted, self.regions)
+        self._check_names()
         return self
+
+    def _check_names(self) -> None:
+        """RecipeError unless the step names are unique and none is the name of an effect the recipe uses (it would be
+        taken for that effect in an address)."""
+        used = {step.effect for step in self.steps if isinstance(step, Step)}
+        first: dict[str, int] = {}
+        for number, step in enumerate(self.steps, start=1):
+            if step.name is None:
+                continue
+            if step.name in first:
+                raise RecipeError(f"`name` {step.name!r} is the name of steps {first[step.name]} and {number}")
+            if step.name in used:
+                raise RecipeError(
+                    f"step {number}: `name` {step.name!r} is also an effect this recipe uses; choose another"
+                )
+            first[step.name] = number
 
     @property
     def maps_needed(self) -> frozenset[str]:
@@ -495,3 +561,242 @@ class Recipe(ValidatedModel):
     def _names_used(self) -> list[str]:
         """The names of the regions the steps refer to."""
         return [name for step in self.steps for _, name, _ in step.references()]
+
+    def parameters(self) -> dict[str, Parameter]:
+        """Every number of the recipe that can be set, by address, in the order of the recipe: the numbers of each step
+        (`pulse.gain`; for a driven one `pulse.gain.start`, `.end` and `.levels`), its `opacity`, an `Each`'s `feather`
+        and its looks' numbers (`each.looks[0].gain`), then the numbers of each region (`region.near.low`), then of the
+        frame (`frame.angle`). A step is addressed by its `name`, else by its effect (`gain`) when the recipe has one
+        such step, else by the effect and its number among them (`gain#2`; an `Each` is `each`, `each#2`); the other
+        forms an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
+        default where the recipe does not write it), unit, range and what it does."""
+        found: dict[str, Parameter] = {}
+        for head, step in zip(self._heads(), self.steps, strict=True):
+            found |= {f"{head}.{rest}": number for rest, number in _step_numbers(step).items()}
+        for name, kind in self.regions.items():
+            found |= {f"region.{name}.{field}": number for field, number in _numbers(kind).items()}
+        return found | {f"frame.{field}": number for field, number in _numbers(self.frame).items()}
+
+    def parameter(self, address: str) -> Parameter:
+        """The number at `address` (see `parameters`; any form an address may take); RecipeError naming the address
+        when there is none, with what is valid."""
+        target, rest = self._reach(address, {})
+        return self._numbers_of(target)[rest]
+
+    def with_values(self, values: Mapping[str, float]) -> "Recipe":
+        """A copy of the recipe with each number at an address of `values` set to its value; the recipe itself is left
+        as it is, and every step, region and frame that is not touched is shared with the copy. An address is a key of
+        `parameters`, or reaches the same number as one: a step by its effect (`gain.radius`) when the recipe has one,
+        or by effect and number (`gain#1.radius`, counted from 1 among the steps of that effect). A whole-number value
+        may be written as a float (`3.0`). Every changed step, region and frame is checked afresh, so a value out of
+        its range is refused naming the address, the number and the range; so is an address the recipe does not have
+        (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
+        and a `.start` of a number that is not driven."""
+        changes: dict[tuple, dict[str, Any]] = {}
+        where: dict[tuple, list[str]] = {}
+        cache: dict[tuple, dict[str, Parameter]] = {}
+        for address, value in values.items():
+            target, rest = self._reach(address, cache)
+            if self._numbers_of(target, cache)[rest].whole and isinstance(value, float) and value.is_integer():
+                value = int(value)
+            changes.setdefault(target, {})[rest] = value
+            where.setdefault(target, []).append(address)
+        steps, regions, frame = list(self.steps), dict(self.regions), self.frame
+        for target, put in changes.items():
+            try:
+                match target:
+                    case ("step", index):
+                        steps[index] = _set_step(steps[index], put)
+                    case ("region", name):
+                        regions[name] = _set_numbers(regions[name], put)
+                    case _:
+                        frame = _set_numbers(frame, put)
+            except RecipeError as error:
+                raise RecipeError(f"{', '.join(repr(address) for address in where[target])}: {error}") from None
+        return Recipe(self.name, steps, self.size, frame, regions)
+
+    def _heads(self) -> list[str]:
+        """What each step's address starts with, in order: its name, else its effect (`each` for an `Each`) when it is
+        the recipe's only step of that kind, else the effect and its number among those (`gain#2`)."""
+        kinds = [_called(step) for step in self.steps]
+        seen: dict[str, int] = {}
+        heads = []
+        for step, kind in zip(self.steps, kinds, strict=True):
+            seen[kind] = seen.get(kind, 0) + 1
+            heads.append(step.name or (kind if kinds.count(kind) == 1 else f"{kind}#{seen[kind]}"))
+        return heads
+
+    def _reach(self, address: str, cache: dict[tuple, dict[str, Parameter]]) -> tuple[tuple, str]:
+        """What `address` points at, as (the step, region or frame, the rest of the address): `(("step", index), rest)`,
+        `(("region", name), rest)` or `(("frame",), rest)`; RecipeError naming the address when it points at nothing."""
+        parts = address.split(".")
+        if len(parts) < 2:
+            raise RecipeError(
+                f"{address!r}: not an address; write a step's number as `step.number`, a region's as "
+                "`region.name.number` and the frame's as `frame.number` (see `Recipe.parameters`)"
+            )
+        head = parts[0]
+        if head == "frame":
+            target: tuple = ("frame",)
+            rest, label = ".".join(parts[1:]), "'frame'"
+        elif head == "region":
+            name = ".".join(parts[1:-1])
+            if name not in self.regions:
+                raise RecipeError(
+                    f"{address!r}: no region {name!r}; the recipe's regions: {', '.join(self.regions) or 'none'}"
+                )
+            target, rest, label = ("region", name), parts[-1], f"region {name!r}"
+        else:
+            target, rest, label = ("step", self._step_index(head, address)), ".".join(parts[1:]), repr(head)
+        numbers = cache.setdefault(target, self._numbers_of(target))
+        if rest in numbers:
+            return target, rest
+        base, _, part = rest.rpartition(".")
+        if f"{rest}.start" in numbers:
+            raise RecipeError(
+                f"{address!r}: {rest!r} is driven by a field: set {rest}.start, {rest}.end or {rest}.levels"
+            )
+        if base in numbers and part in ("start", "end", "levels"):
+            raise RecipeError(f"{address!r}: {base!r} is not driven by a field, so it has no {part!r}")
+        near = difflib.get_close_matches(address, list(self.parameters()), n=3)
+        hint = f"; did you mean {', '.join(near)}?" if near else ""
+        raise RecipeError(f"{address!r}: {label} has no number {rest!r}; its numbers: {', '.join(numbers)}{hint}")
+
+    def _step_index(self, head: str, address: str) -> int:
+        """The index of the step an address starts with `head` for: a step's name, its effect (`each` for an `Each`)
+        when the recipe has one such step, or its effect and number (`gain#2`, from 1); RecipeError otherwise."""
+        heads = self._heads()
+        if head in heads:
+            return heads.index(head)
+        kind, _, number = head.partition("#")
+        same = [index for index, step in enumerate(self.steps) if _called(step) == kind]
+        if number and same:
+            if number.isdigit() and 1 <= int(number) <= len(same):
+                return same[int(number) - 1]
+            raise RecipeError(f"{address!r}: no step {head!r}; the recipe has {len(same)} {kind!r} steps")
+        if len(same) > 1:
+            numbered = ", ".join(f"{kind}#{n}.{address.partition('.')[2]}" for n in range(1, len(same) + 1))
+            raise RecipeError(f"{address!r}: the recipe has {len(same)} {kind!r} steps; write one of {numbered}")
+        listed = [*heads, *(f"region.{name}" for name in self.regions), "frame"]
+        raise RecipeError(f"{address!r}: no step, region or frame called {head!r}; it has: {', '.join(listed)}")
+
+    def _numbers_of(
+        self, target: tuple, cache: dict[tuple, dict[str, Parameter]] | None = None
+    ) -> dict[str, Parameter]:
+        """The numbers (by the rest of an address) of the step, region or frame `target` (see `_reach`)."""
+        if cache is not None and target in cache:
+            return cache[target]
+        match target:
+            case ("step", index):
+                return _step_numbers(self.steps[index])
+            case ("region", name):
+                return _numbers(self.regions[name])
+            case _:
+                return _numbers(self.frame)
+
+
+def _called(step: Step | Each) -> str:
+    """What a step is called in an address when it has no name: its effect, or `each`."""
+    return step.effect if isinstance(step, Step) else "each"
+
+
+def _number(value: float, info: FieldInfo, *, whole: bool = False) -> Parameter:
+    """The `Parameter` of the number of value `value` that the field `info` declares."""
+    low, high = bounds(info)
+    return Parameter(value, unit_of(info) or "", low, high, info.description or "", whole)
+
+
+def _numbers(model: EffectParams) -> dict[str, Parameter]:
+    """The numbers of the parameter model `model` (an effect's, a region kind's or the framing), by field, at the values
+    it holds: every field that has a range, so not a colour, a choice, a text or a list."""
+    return {
+        doc.name: Parameter(
+            getattr(model, doc.name), doc.unit or "", doc.minimum, doc.maximum, doc.doc, doc.type == "whole number"
+        )
+        for doc in type(model).fields_doc()
+        if doc.minimum is not None
+    }
+
+
+def _step_numbers(step: Step | Each) -> dict[str, Parameter]:
+    """The numbers of a step by the rest of an address: an effect's (a driven one as `.start`, `.end` and `.levels`),
+    then `opacity`; an `Each`'s `feather`, `opacity` and its looks' as `looks[0].gain`."""
+    if isinstance(step, Each):
+        found = {
+            "feather": _number(step.feather, Each.model_fields["feather"]),
+            "opacity": _number(step.opacity, Each.model_fields["opacity"]),
+        }
+        for index, look in enumerate(step.looks):
+            if isinstance(look, Step):
+                found |= {f"looks[{index}].{rest}": number for rest, number in _step_numbers(look).items()}
+        return found
+    found = {}
+    for name, number in _numbers(registry.get(step.effect).validate(step.fixed)).items():
+        if name in step.drives:
+            drive = step.drives[name]
+            found[f"{name}.start"] = replace(number, value=drive.start)
+            found[f"{name}.end"] = replace(number, value=drive.end)
+            found[f"{name}.levels"] = _number(drive.levels, Drive.model_fields["levels"], whole=True)
+        else:
+            found[name] = number
+    return found | {"opacity": _number(step.opacity, Step.model_fields["opacity"])}
+
+
+def _set_step(step: Step | Each, put: Mapping[str, Any]) -> Step | Each:
+    """`step` with the numbers `put` (by the rest of an address, see `_step_numbers`) set: a new step, checked."""
+    return _set_each(step, put) if isinstance(step, Each) else _set_effect_step(step, put)
+
+
+def _set_each(each: Each, put: Mapping[str, Any]) -> Each:
+    """`each` with its `feather`, `opacity` and the numbers of its looks (`looks[0].gain`) set from `put`."""
+    own = {rest: value for rest, value in put.items() if not rest.startswith("looks[")}
+    by_look: dict[int, dict[str, Any]] = {}
+    for rest, value in put.items():
+        if rest.startswith("looks["):
+            number, _, inner = rest[len("looks[") :].partition("].")
+            by_look.setdefault(int(number), {})[inner] = value
+    looks = [
+        _set_effect_step(look, by_look[index]) if isinstance(look, Step) and index in by_look else look
+        for index, look in enumerate(each.looks)
+    ]
+    return Each(
+        each.each,
+        looks,
+        mask=each.mask,
+        opacity=own.get("opacity", each.opacity),
+        blend_mode=each.blend_mode,
+        assign=each.assign,
+        seed=each.seed,
+        feather=own.get("feather", each.feather),
+        name=each.name,
+    )
+
+
+def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
+    """`step` with its numbers, `opacity` and the ends of its drives set from `put`."""
+    params, opacity = dict(step.params), step.opacity
+    ends: dict[str, dict[str, Any]] = {}
+    for rest, value in put.items():
+        name, _, part = rest.partition(".")
+        if rest == "opacity":
+            opacity = value
+        elif part:
+            ends.setdefault(name, {})[part] = value
+        else:
+            params[rest] = value
+    for name, parts in ends.items():
+        params[name] = Drive(**{**params[name].model_dump(), **parts})
+    return Step(
+        step.effect,
+        params,
+        mask=step.mask,
+        opacity=opacity,
+        blend_mode=step.blend_mode,
+        partition=step.partition,
+        name=step.name,
+    )
+
+
+def _set_numbers[M: EffectParams](model: M, put: Mapping[str, Any]) -> M:
+    """`model` (a region kind or the framing) with the numbers `put` set; a new model, checked afresh."""
+    return type(model)(**{**model.model_dump(), **put})

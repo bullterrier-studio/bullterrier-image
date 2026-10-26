@@ -72,9 +72,10 @@ INPUTS = (*MAP_INPUTS, "partition")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
-# partition it draws, and (of a step that gives each piece of a partition its look, an `Each`) `each` and `looks`.
+# partition it draws, (of a step that gives each piece of a partition its look, an `Each`) `each` and `looks`, and an
+# optional `name` that addresses the step's numbers (`Recipe.parameters`).
 # No effect parameter may take one of these names (nor an input's), so a key means the same in every step.
-STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset", "partition", "each", "looks")
+STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset", "partition", "each", "looks", "name")
 
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
 # never followed by a space; "e.g." and "i.e." are, so they are skipped.

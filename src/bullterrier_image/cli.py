@@ -123,7 +123,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("recipe", help="the recipe .toml whose parameter is swept")
     p.add_argument(
         "target",
-        help="effect.parameter, e.g. glitch.split; effect#2.parameter for the second step of an effect used twice",
+        help="the number's address, e.g. glitch.split; glitch#2.split for the second step of an effect used twice, "
+        "pulse.gain for a step called pulse, pulse.gain.end for the end of a drive, region.near.low, frame.angle",
     )
     p.add_argument(
         "range",

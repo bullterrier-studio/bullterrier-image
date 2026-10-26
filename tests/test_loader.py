@@ -579,6 +579,60 @@ def test_a_drive_in_a_look_of_an_earlier_format_is_refused_naming_the_look(tmp_p
         load_recipe(_write(tmp_path, text, "old.toml"))
 
 
+NAMED_FILE = """
+format = 3
+
+[region.g]
+kind = "grid"
+
+[[step]]
+effect = "glow"
+name = "pulse"
+radius = 30
+
+[[step]]
+each = "g"
+name = "pieces"
+looks = ["none", { effect = "grade", exposure = 0.5 }]
+"""
+
+
+def test_a_step_and_an_each_take_a_name_in_a_recipe_file_and_it_addresses_their_numbers(tmp_path):
+    recipe = load_recipe(_write(tmp_path, NAMED_FILE))
+    assert [step.name for step in recipe.steps] == ["pulse", "pieces"]
+    numbers = recipe.parameters()
+    assert numbers["pulse.radius"].value == 30
+    assert numbers["pieces.feather"].value == 0.001
+    assert numbers["pieces.looks[1].exposure"].value == 0.5
+    assert recipe.with_values({"pulse.radius": 12}).parameters()["pulse.radius"].value == 12
+
+
+NAME_MISTAKES = {
+    "a name that is not a word": ("name = 'my-pulse'", r"step 1: .*`name`.*letters, digits and underscores"),
+    "a reserved name": ("name = 'region'", r"step 1: .*`name`.*reserved"),
+    "a name that is no text": ("name = 3", r"step 1: .*`name`"),
+}
+
+
+@pytest.mark.parametrize(("line", "complaint"), NAME_MISTAKES.values(), ids=NAME_MISTAKES.keys())
+def test_a_bad_name_is_refused_naming_the_file_the_step_and_the_key(tmp_path, line, complaint):
+    with pytest.raises(RecipeError, match=rf"^bad\.toml: .*{complaint}"):
+        load_recipe(_write(tmp_path, f"format = 3\n[[step]]\neffect = 'grade'\n{line}\n", "bad.toml"))
+
+
+def test_two_steps_of_a_file_with_one_name_are_refused_naming_the_file_and_the_steps(tmp_path):
+    text = "format = 3\n[[step]]\neffect = 'grade'\nname = 'a'\n[[step]]\neffect = 'grade'\nname = 'a'\n"
+    with pytest.raises(RecipeError, match=r"^bad\.toml: .*`name` 'a' is the name of steps 1 and 2"):
+        load_recipe(_write(tmp_path, text, "bad.toml"))
+
+
+@pytest.mark.parametrize("header", ["", "format = 1\n", "format = 2\n"], ids=["no format", "format 1", "format 2"])
+def test_a_step_name_needs_format_3_and_a_file_of_an_earlier_one_says_so(tmp_path, header):
+    text = header + "[[step]]\neffect = 'grade'\nname = 'warm'\n"
+    with pytest.raises(RecipeError, match=r"^old\.toml: step 1: `name` needs `format = 3`"):
+        load_recipe(_write(tmp_path, text, "old.toml"))
+
+
 NEW_IN_FORMAT_2 = {
     "a region table": '[region.g]\nkind = "grid"\n' + STEP,
     "an each step": '[[step]]\neach = "subject"\nlooks = ["none"]\n',

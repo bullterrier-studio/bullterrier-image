@@ -339,6 +339,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the old ones, is refused saying what to write; `light` is a built-in region name, so none may be declared with it.
   Left out until a recipe needs them: edges, saturation and colour distance as fields, `1 - x`, and a feathered gradient
   shape.
+- **Every number has an address: `Recipe.parameters()` lists them, `Recipe.with_values()` sets them.** An address is
+  `<step>.<number>`, `<step>.<number>.start|end|levels` for a driven number, `<step>.opacity`, `each.looks[0].<number>`
+  for a look, `region.<name>.<number>` and `frame.<number>`; a step is its optional `name`, else its effect (`each` for an
+  `Each`) when the recipe has one such step, else the effect and its number from 1 (`glow#2`, which `sweep` already
+  wrote). `parameters()` gives each a `Parameter` (value, unit, minimum, maximum, doc, whole) from the number's own
+  declaration; `with_values` returns a copy, re-validating only what changed. *Reason:* the video package maps a control
+  signal onto a number within its limits, every frame, and must learn the numbers, units and ranges from image, not
+  hold a copy of them; before this only `sweep` could name a value, and only a top-level step's parameter. One grammar
+  serves `sweep`, a driver and an editor. *Consequence:* `name` is a step key (reserved, so no effect may have a parameter
+  called it) and a name is a word that cannot start another address (`region`, `frame`, `each`), is unique in the recipe
+  and is not an effect the recipe uses; a driven number is addressed by its ends, never by itself; a value out of range
+  fails at once naming the address; `sweep` takes any address; looks count from 0 like pieces. Not addressable: a
+  colour, a choice, a list, a text, a picture, `size` and the names of regions (not numbers, or not a look's value).
 - **A field varies a parameter: `Drive(by, start, end, levels)`, rendered at levels and mixed.** A number an effect marks
   drivable (`param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
   `end` where it is 1. Effects do not change: the runner renders the effect at `levels` evenly spaced values and each pixel
@@ -384,8 +397,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   comes out at any resolution; how softly the looks blend across a border, default 0.001 to smooth the pixels'
   stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
   apply to the blended looks. `partition`, `each` and `looks` are reserved like the other step keys, so no effect
-  parameter takes them; `seed` and `feather` are not, as an `Each` has no effect parameters to clash with. A look is a
-  step with its own `opacity` (its effect's default unless given) and `blend_mode`.
+  parameter takes them (`name` too, see "Every number has an address"); `seed` and `feather` are not, as an `Each` has
+  no effect parameters to clash with. A look is a step with its own `opacity` (its effect's default unless given) and
+  `blend_mode`.
 - **Regions are made for the working picture, once per render, and only as steps ask.** After framing and scaling, so a
   piece number means the same on the picture that is rendered. A recipe needs the subject only if a region *in use*
   (named by a step, or what such a region is laid over or picked from) is made from it, so declaring a region that

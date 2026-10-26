@@ -62,6 +62,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Grid,
         Line,
         LinearGradient,
+        Parameter,
         Path,
         Pick,
         RadialGradient,
@@ -94,8 +95,8 @@ _HOMES = {
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
         "Band", "Bands", "Combine", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder", "Framing", "Given", "Grid",
-        "Line", "LinearGradient", "Path", "Pick", "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject",
-        "Svg", "load_recipe", "render", "render_all", "trace",
+        "Line", "LinearGradient", "Parameter", "Path", "Pick", "RadialGradient", "Recipe", "Shards", "Stage", "Step",
+        "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -149,6 +150,7 @@ __all__ = [
     "LinearGradient",
     "MapNotFoundError",
     "NonFiniteImageError",
+    "Parameter",
     "Path",
     "Pick",
     "Picture",

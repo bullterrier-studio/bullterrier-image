@@ -19,7 +19,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Bands, Each, Given, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Band, Bands, Each, Given, Grid, Pick, Shards, Subject, render
 
 
 class GainParams(EffectParams):
@@ -254,6 +254,259 @@ def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed)
     assert recipe.maps_needed == frozenset(needed)
     assert recipe.derived_maps == (frozenset({"light"}) if by == "light" else frozenset())
 
+
+# --- addresses: every number of a recipe has a name, and a copy of the recipe can have any of them set ----------------
+
+
+@pytest.fixture
+def pulse(gain):
+    """A recipe with every kind of number: a named step, a driven one, an `Each` with a look, a band and a frame."""
+    return Recipe(
+        "pulse",
+        [
+            Step("gain_probe", {"gain": 2.0, "taps": 3}, name="pulse"),
+            Step("gain_probe", {"gain": Drive(by="near", start=0.5, end=2.5)}, opacity=0.5),
+            Each("g", [Step("gain_probe", {"offset": 0.1}), "none"], feather=0.002),
+        ],
+        regions={"g": Grid(columns=3), "near": Band(of="depth", low=0.4)},
+        frame=Framing(angle=15, aspect=1.5),
+        size=256,
+    )
+
+
+PULSE_ADDRESSES = [
+    "pulse.gain", "pulse.offset", "pulse.taps", "pulse.opacity",
+    "gain_probe#2.gain.start", "gain_probe#2.gain.end", "gain_probe#2.gain.levels",
+    "gain_probe#2.offset", "gain_probe#2.taps", "gain_probe#2.opacity",
+    "each.feather", "each.opacity",
+    "each.looks[0].gain", "each.looks[0].offset", "each.looks[0].taps", "each.looks[0].opacity",
+    "region.near.low", "region.near.high", "region.near.feather",
+]  # fmt: skip
+
+
+def test_a_recipe_lists_every_number_in_it_by_address_in_the_order_of_the_recipe(pulse):
+    listed = list(pulse.parameters())
+    assert listed[: len(PULSE_ADDRESSES)] == PULSE_ADDRESSES  # steps, then looks, then regions
+    assert [address for address in listed if address.startswith("frame.")][:2] == ["frame.angle", "frame.aspect"]
+    assert listed[-1].startswith("frame.")  # the frame last
+    assert "frame.fill" not in listed  # a colour is not a number
+    assert "region.g.columns" not in listed  # nor is a list of them
+
+
+def test_a_number_is_listed_with_its_value_unit_range_and_what_it_does(pulse):
+    gain = pulse.parameters()["pulse.gain"]
+    assert (gain.value, gain.unit, gain.minimum, gain.maximum, gain.whole) == (2.0, "ratio", 0, 4, False)
+    assert gain.doc.startswith("Multiplies every value")
+    taps = pulse.parameters()["pulse.taps"]
+    assert (taps.value, taps.unit, taps.minimum, taps.maximum, taps.whole) == (3, "count", 1, 9, True)
+
+
+def test_a_number_nobody_wrote_is_listed_at_its_default_and_one_that_was_written_at_what_was_written(pulse):
+    listed = pulse.parameters()
+    assert (listed["pulse.offset"].value, listed["pulse.gain"].value) == (0.0, 2.0)
+    assert listed["region.near.low"].value == 0.4
+    assert listed["region.near.high"].value == 1.0  # the default
+    assert listed["frame.angle"].value == 15
+    assert listed["each.feather"].value == 0.002
+
+
+def test_a_driven_number_is_listed_by_its_two_ends_and_its_levels_not_by_itself(pulse):
+    listed = pulse.parameters()
+    assert "gain_probe#2.gain" not in listed
+    start, end, levels = (listed[f"gain_probe#2.gain.{part}"] for part in ("start", "end", "levels"))
+    assert (start.value, end.value, levels.value) == (0.5, 2.5, 5)
+    assert (start.unit, start.minimum, start.maximum) == ("ratio", 0, 4)  # the ends have the range of the number itself
+    assert (end.unit, end.minimum, end.maximum) == ("ratio", 0, 4)
+    assert (levels.unit, levels.minimum, levels.maximum, levels.whole) == ("count", 2, 16, True)
+
+
+def test_a_steps_opacity_is_a_number_of_the_step_at_its_own_or_its_effects_default(pulse):
+    assert pulse.parameters()["gain_probe#2.opacity"].value == 0.5
+    assert pulse.parameters()["pulse.opacity"].value == 1.0
+    assert pulse.parameters()["pulse.opacity"].unit == "fraction"
+
+
+def test_an_effect_the_recipe_uses_once_is_addressed_by_its_name_and_one_it_uses_twice_by_its_number(gain):
+    once = Recipe("once", [Step("gain_probe", {"gain": 2.0}), Step("fill")], size=None)
+    assert "gain_probe.gain" in once.parameters()
+    twice = Recipe("twice", [Step("gain_probe"), Step("fill"), Step("gain_probe")], size=None)
+    assert "gain_probe#1.gain" in twice.parameters()
+    assert "gain_probe#2.gain" in twice.parameters()
+    assert "gain_probe.gain" not in twice.parameters()
+
+
+def test_a_step_may_be_reached_by_its_name_by_its_effect_or_by_its_effect_and_number(pulse):
+    for address in ("pulse.gain", "gain_probe#1.gain"):
+        assert pulse.with_values({address: 3.0}).parameters()["pulse.gain"].value == 3.0
+    assert pulse.with_values({"gain_probe#2.gain.end": 3.0}).parameters()["gain_probe#2.gain.end"].value == 3.0
+
+
+WITH_VALUES = {
+    "a number of a step": ("pulse.gain", 3.5, "pulse.gain"),
+    "a whole number written as a float": ("pulse.taps", 4.0, "pulse.taps"),
+    "the start of a drive": ("gain_probe#2.gain.start", 1.0, "gain_probe#2.gain.start"),
+    "the end of a drive": ("gain_probe#2.gain.end", 3.0, "gain_probe#2.gain.end"),
+    "the levels of a drive": ("gain_probe#2.gain.levels", 8, "gain_probe#2.gain.levels"),
+    "the opacity of a step": ("gain_probe#2.opacity", 0.25, "gain_probe#2.opacity"),
+    "the feather of an each": ("each.feather", 0.004, "each.feather"),
+    "the opacity of an each": ("each.opacity", 0.5, "each.opacity"),
+    "a number of a look": ("each.looks[0].offset", 0.3, "each.looks[0].offset"),
+    "the opacity of a look": ("each.looks[0].opacity", 0.5, "each.looks[0].opacity"),
+    "a number of a region": ("region.near.low", 0.2, "region.near.low"),
+    "a number of the frame": ("frame.angle", -20, "frame.angle"),
+}
+
+
+@pytest.mark.parametrize(("address", "value", "listed"), WITH_VALUES.values(), ids=WITH_VALUES.keys())
+def test_a_copy_of_a_recipe_has_the_number_at_an_address_set_and_nothing_else_changed(pulse, address, value, listed):
+    before = pulse.parameters()
+    after = pulse.with_values({address: value}).parameters()
+    assert after[listed].value == value
+    assert {a: p.value for a, p in after.items() if a != listed} == {
+        a: p.value for a, p in before.items() if a != listed
+    }
+
+
+def test_the_recipe_that_was_set_is_left_as_it_was_and_what_was_not_touched_is_shared(pulse):
+    before = pulse.parameters()
+    after = pulse.with_values({"pulse.gain": 3.0})
+    assert pulse.parameters() == before
+    assert after is not pulse
+    assert after.steps[1] is pulse.steps[1]  # a step that was not touched is the same object
+    assert after.steps[2] is pulse.steps[2]
+    assert after.regions is pulse.regions or after.regions == pulse.regions
+    assert (after.name, after.size, after.frame) == (pulse.name, pulse.size, pulse.frame)
+
+
+def test_several_numbers_of_one_step_are_set_in_one_call(pulse):
+    after = pulse.with_values({"pulse.gain": 1.5, "pulse.offset": 0.2, "pulse.opacity": 0.5})
+    assert [after.parameters()[f"pulse.{name}"].value for name in ("gain", "offset", "opacity")] == [1.5, 0.2, 0.5]
+
+
+def test_setting_nothing_gives_an_equal_recipe(pulse):
+    assert pulse.with_values({}) == pulse
+
+
+def test_a_recipe_with_a_number_set_renders_as_one_written_with_it(photo, gain, subject):
+    written = Recipe("pulse", [Step("gain_probe", {"gain": Drive(by="light", start=0.5, end=3.0)})], size=None)
+    other = Recipe("pulse", [Step("gain_probe", {"gain": Drive(by="light", start=0.5, end=2.0)})], size=None)
+    np.testing.assert_array_equal(
+        render(photo, other.with_values({"gain_probe.gain.end": 3.0})), render(photo, written)
+    )
+
+
+BAD_ADDRESSES = {
+    "a step the recipe has not": (
+        {"missing.gain": 1.0},
+        r"'missing\.gain'.*no step, region or frame called 'missing'"
+        r".*pulse, gain_probe#2, each, region\.g, region\.near, frame",
+    ),
+    "a number the step has not": (
+        {"pulse.gian": 1.0},
+        r"'pulse\.gian'.*'pulse' has no number 'gian'.*gain, offset, taps, opacity",
+    ),
+    "a number that is not a number": ({"pulse.mode": 1.0}, r"'pulse\.mode'.*no number 'mode'"),
+    "a driven number by itself": ({"gain_probe#2.gain": 1.0}, r"'gain_probe#2\.gain'.*driven.*gain\.start.*gain\.end"),
+    "the end of a number that is not driven": ({"pulse.gain.end": 1.0}, r"'pulse\.gain\.end'.*not driven"),
+    "a region the recipe has not": ({"region.gone.low": 0.1}, r"'region\.gone\.low'.*no region 'gone'.*g, near"),
+    "a number of a region it has not": (
+        {"region.near.nope": 0.1},
+        r"'region\.near\.nope'.*no number 'nope'.*low, high, feather",
+    ),
+    "a frame number it has not": ({"frame.nope": 0.1}, r"'frame\.nope'.*no number 'nope'.*angle"),
+    "a number out of its range": ({"pulse.gain": 9.0}, r"pulse_?.*`gain`.*<= 4.*9"),
+    "an end out of the range of the number": ({"gain_probe#2.gain.end": 9.0}, r"gain_probe.*`gain`.*<= 4.*9"),
+    "levels of one": ({"gain_probe#2.gain.levels": 1}, r"levels"),
+    "a whole number that is not": ({"pulse.taps": 2.5}, r"taps"),
+    "an opacity past 1": ({"pulse.opacity": 1.5}, r"opacity"),
+    "a frame number out of range": ({"frame.angle": 400}, r"angle"),
+    "a region number out of range": ({"region.near.low": 1.5}, r"low"),
+    "a value that is not a number": ({"pulse.gain": "high"}, r"gain"),
+    "no dot at all": ({"pulse": 1.0}, r"'pulse'.*an address"),
+}
+
+
+@pytest.mark.parametrize(("values", "complaint"), BAD_ADDRESSES.values(), ids=BAD_ADDRESSES.keys())
+def test_an_address_or_value_that_is_wrong_is_refused_naming_the_address_and_what_is_valid(pulse, values, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        pulse.with_values(values)
+
+
+def test_an_effect_the_recipe_uses_twice_cannot_be_named_without_its_number(gain):
+    twice = Recipe("twice", [Step("gain_probe"), Step("fill"), Step("gain_probe")], size=None)
+    with pytest.raises(
+        RecipeError, match=r"'gain_probe\.gain'.*2 'gain_probe' steps.*gain_probe#1\.gain.*gain_probe#2\.gain"
+    ):
+        twice.with_values({"gain_probe.gain": 1.0})
+    with pytest.raises(RecipeError, match=r"'gain_probe#3\.gain'.*no step"):
+        twice.with_values({"gain_probe#3.gain": 1.0})
+    with pytest.raises(RecipeError, match=r"'gain_probe#0\.gain'.*no step"):
+        twice.with_values({"gain_probe#0.gain": 1.0})
+
+
+def test_a_misspelt_address_suggests_the_nearest_ones(pulse):
+    with pytest.raises(RecipeError, match=r"did you mean.*pulse\.gain"):
+        pulse.with_values({"pulse.gaim": 1.0})
+
+
+def test_one_parameter_can_be_asked_for_by_any_address_that_reaches_it(pulse):
+    assert pulse.parameter("gain_probe#1.gain") == pulse.parameters()["pulse.gain"]
+    with pytest.raises(RecipeError, match=r"'pulse\.gian'"):
+        pulse.parameter("pulse.gian")
+
+
+NAMES = {
+    "letters, digits and underscores": ("pulse_2", None),
+    "a hyphen": ("my-pulse", "name"),
+    "a dot": ("my.pulse", "name"),
+    "a hash": ("pulse#2", "name"),
+    "a space": ("my pulse", "name"),
+    "empty": ("", "name"),
+    "a digit first": ("2pulse", "name"),
+    "region, which starts an address": ("region", "reserved"),
+    "frame, which starts an address": ("frame", "reserved"),
+}
+
+
+@pytest.mark.parametrize(("name", "complaint"), NAMES.values(), ids=NAMES.keys())
+def test_a_step_name_is_a_word_that_cannot_be_taken_for_the_rest_of_an_address(gain, name, complaint):
+    if complaint is None:
+        assert Step("gain_probe", name=name).name == name
+        return
+    with pytest.raises(RecipeError, match=complaint):
+        Step("gain_probe", name=name)
+
+
+def test_two_steps_of_a_recipe_cannot_share_a_name_or_take_the_name_of_an_effect_it_uses(gain):
+    with pytest.raises(RecipeError, match=r"'pulse'.*steps 1 and 2"):
+        Recipe("look", [Step("gain_probe", name="pulse"), Step("gain_probe", name="pulse")], size=None)
+    with pytest.raises(RecipeError, match=r"'gain_probe'.*effect"):
+        Recipe("look", [Step("gain_probe", name="gain_probe")], size=None)
+    with pytest.raises(RecipeError, match=r"'each'.*effect|reserved"):
+        Recipe("look", [Each("g", ["none"], name="each")], regions={"g": Grid()}, size=None)
+    assert Recipe("look", [Step("gain_probe", name="a"), Step("gain_probe", name="b")], size=None)
+
+
+def test_a_step_named_describes_itself_with_its_name_and_an_each_too(gain):
+    assert Step("gain_probe", {"gain": 2}, name="pulse").describe() == "pulse: gain_probe(gain=2)"
+    assert Each("g", ["none"], name="pieces").describe() == "pieces: each g [none]"
+    assert Step("gain_probe").name is None
+
+
+def test_a_step_name_is_a_step_key_so_fx_takes_it_and_no_effect_may_have_a_parameter_called_it(gain, throwaway_effects):
+    assert "name" in registry.STEP_KEYS
+    assert fx.gain_probe(gain=2, name="pulse").name == "pulse"
+
+    class Clash(EffectParams):
+        """A parameter called like a step key."""
+
+        name: str = param("x", doc="A name.")
+
+    with pytest.raises(ValueError, match=r"`name` is supplied by the recipe"):
+        effect(category="light", params=Clash)(lambda rgb, params: rgb)
+
+
+# --- the effect's own default opacity --------
 
 # --- the effect's own default opacity --------------------------------------------------------------------------------
 

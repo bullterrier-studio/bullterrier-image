@@ -70,6 +70,9 @@ varies it across the picture by a field (format 3): `radius = { by = "near", sta
 effect is rendered at `levels` evenly spaced values between (2 to 16, default 5) and each pixel mixes the two nearest.
 All the tables of one step name one `by` and one `levels`.
 
+A step (an `each` step too) may take `name = "pulse"` (format 3: letters, digits and underscores, one per step), which
+addresses its numbers, `pulse.radius`, for a program that sets them (`Recipe.parameters`, `Recipe.with_values`).
+
 A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
 it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
 three numbers):
@@ -129,11 +132,11 @@ __all__ = ["load_recipe", "with_pictures"]
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`, `looks`
 # and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region kinds
-# `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, and a file of an earlier format may
-# not use them, nor a parameter driven by a field (a table with `by`). It also replaced the kinds `depth` and
-# `depth_bands` by `band` and `bands` and took the region name `light`: the one place a file's meaning changed, so a
-# file of any format that uses the old kinds is refused saying what to write, and one that declares a region called
-# `light` is refused as it is for `subject`.
+# `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, a parameter driven by a field (a table
+# with `by`) and the step key `name`, and a file of an earlier format may not use them. It also replaced the kinds
+# `depth` and `depth_bands` by `band` and `bands` and took the region name `light`: the one place a file's meaning
+# changed, so a file of any format that uses the old kinds is refused saying what to write, and one that declares a
+# region called `light` is refused as it is for `subject`.
 _FORMATS = (1, 2, 3)
 _NEW_IN_2 = ("each", "looks", "partition")
 _KINDS_NEW_IN_3 = ("given", "band", "bands", "combine", "linear_gradient", "radial_gradient")
@@ -263,6 +266,8 @@ def load_recipe(path: str | Path) -> Recipe:
     steps = []
     for i, entry in enumerate(entries, start=1):
         where = f"{path.name}: step {i}"
+        if raw.get("format", _FORMATS[0]) < 3 and "name" in entry:
+            raise RecipeError(f"{where}: `name` needs `format = 3` at the top of the file")
         if raw.get("format", _FORMATS[0]) < 3 and (drive := _drive_in(entry)) is not None:
             raise RecipeError(
                 f"{where}{drive[0]}: `{drive[1]}` is a table with `by`, a drive, which needs `format = 3`"

@@ -38,7 +38,7 @@ from .core.regions import (
     Svg,
 )
 from .core.runner import Finder, Stage
-from .core.steps import Each, Recipe, Step
+from .core.steps import Each, Parameter, Recipe, Step
 from .finding import subject
 from .finding.depth import depth_finder
 from .loader import load_recipe
@@ -58,6 +58,7 @@ __all__ = [
     "Grid",
     "Line",
     "LinearGradient",
+    "Parameter",
     "Path",
     "Pick",
     "RadialGradient",
