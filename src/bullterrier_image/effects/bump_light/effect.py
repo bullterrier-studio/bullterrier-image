@@ -7,9 +7,8 @@ import numpy as np
 
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.color import luminance
-from bullterrier_image.ops.relief import lambert, slopes
+from bullterrier_image.ops.relief import shade
 
 
 class BumpLightParams(EffectParams):
@@ -78,8 +77,13 @@ def bump_light(rgb: np.ndarray, params: BumpLightParams) -> np.ndarray:
     brightened or darkened. All channels are multiplied by that one grey gain, so the picture's colour ratios are
     kept, and the result is clipped to 0..1.
     """
-    surface = gaussian_blur(luminance(rgb), params.blur, truncate=params.truncate, edge=params.edge)
-    rise_y, rise_x = slopes(surface, scale=params.height, edge=params.edge)
-    lit = lambert(rise_y, rise_x, angle=params.angle, elevation=params.elevation)
-    gain = lit / np.sin(np.radians(params.elevation))  # a flat surface catches sin(elevation): that is no change
+    gain = shade(
+        luminance(rgb),
+        height=params.height,
+        angle=params.angle,
+        elevation=params.elevation,
+        blur=params.blur,
+        truncate=params.truncate,
+        edge=params.edge,
+    )
     return np.clip(rgb * gain[..., None], 0, 1).astype(np.float32)

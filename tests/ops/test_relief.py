@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.ops.convolve import Edge
-from bullterrier_image.ops.relief import lambert, slopes
+from bullterrier_image.ops.relief import lambert, shade, slopes
 
 HEIGHT = np.array([[0.0, 1.0, 4.0, 9.0], [2.0, 2.0, 2.0, 2.0], [5.0, 3.0, 1.0, 0.0]])
 
@@ -80,3 +80,78 @@ class TestLambert:
     ) -> None:
         caught = lambert(np.array([[rise_y]]), np.array([[rise_x]]), angle=angle, elevation=elevation)
         assert caught[0, 0] == pytest.approx(expected, abs=1e-9)
+
+
+def ramp(rise_per_px: float, size: int = 24) -> np.ndarray:
+    """A height field that rises `rise_per_px` per px to the right (negative: to the left), level down the picture."""
+    return np.tile(0.5 + rise_per_px * (np.arange(size) - size / 2), (size, 1)).astype(np.float32)
+
+
+def hand_gain(slope_x: float, angle: float, elevation: float) -> float:
+    """The gain a surface rising `slope_x` px per px to the right gets, from the geometry: the unit normal
+    (-slope_x, 0, 1) / sqrt(1 + slope_x^2) dotted with the unit vector towards the light (x right, y down, z up), over
+    what a flat surface (normal (0, 0, 1)) catches."""
+    a, e = np.radians(angle), np.radians(elevation)
+    light = np.array([np.cos(e) * np.sin(a), -np.cos(e) * np.cos(a), np.sin(e)])
+    normal = np.array([-slope_x, 0.0, 1.0]) / np.hypot(slope_x, 1.0)
+    return float(normal @ light / light[2])
+
+
+def lit(
+    surface: np.ndarray, *, height: float = 100.0, angle: float = 90.0, elevation: float = 45.0, blur: float = 0.0
+) -> np.ndarray:
+    """`shade` with the tests' usual light: from the right, 45 degrees up, on an unsmoothed relief 100 px tall."""
+    return shade(surface, height=height, angle=angle, elevation=elevation, blur=blur, truncate=4.0, edge="reflect")
+
+
+class TestShade:
+    @pytest.mark.parametrize(
+        ("surface", "settings"),
+        [
+            pytest.param(np.full((9, 7), 0.3, np.float32), {}, id="flat surface"),
+            pytest.param(np.full((9, 7), 1.0, np.float32), {"angle": 200, "elevation": 1}, id="flat, grazing light"),
+            pytest.param(np.full((9, 7), 0.0, np.float32), {"elevation": 90, "blur": 5}, id="flat, light above"),
+            pytest.param(ramp(0.01), {"height": 0}, id="height 0 flattens a ramp"),
+            pytest.param(
+                np.random.default_rng(3).random((9, 7), dtype=np.float32), {"height": 0}, id="height 0, noise"
+            ),
+        ],
+    )
+    def test_a_flat_surface_gets_a_gain_of_1(self, surface: np.ndarray, settings: dict[str, float]) -> None:
+        gain = lit(surface, **settings)
+        np.testing.assert_allclose(gain, 1.0, atol=1e-6)
+
+    @pytest.mark.parametrize(
+        ("rise_per_px", "settings", "expected"),
+        [
+            pytest.param(-0.0075, {}, 1.4, id="rises away from a light at the right: faces it, (1 + 3/4) / (5/4)"),
+            pytest.param(0.0075, {}, 0.2, id="rises towards a light at the right: faces away, (1 - 3/4) / (5/4)"),
+            pytest.param(0.0075, {"angle": 270}, 1.4, id="the light moved to the left: the same slope faces it"),
+            pytest.param(0.0075, {"angle": 0}, 0.8, id="light across the slope: only the tilt dims, 1 / (5/4)"),
+            pytest.param(0.0075, {"elevation": 90}, 0.8, id="light straight above: only the tilt dims"),
+            pytest.param(0.0075, {"angle": 270, "elevation": 20}, hand_gain(0.75, 270, 20), id="low light, left"),
+            pytest.param(-0.004, {"angle": 60, "elevation": 70, "height": 50}, hand_gain(-0.2, 60, 70), id="any angle"),
+        ],
+    )
+    def test_on_a_ramp_the_gain_is_lamberts_law_worked_out_by_hand(
+        self, rise_per_px: float, settings: dict[str, float], expected: float
+    ) -> None:
+        """Inside the ramp, that is: the border columns see the edge rule."""
+        gain = lit(ramp(rise_per_px), **settings)
+        np.testing.assert_allclose(gain[:, 1:-1], expected, atol=1e-5)  # a float32 surface
+
+    def test_blur_smooths_the_surface_so_a_spike_lights_less_steeply(self) -> None:
+        spike = np.zeros((31, 31), np.float32)
+        spike[15, 15] = 1.0
+        spread = [float(np.ptp(lit(spike, height=5.0, blur=blur))) for blur in (0, 1, 3, 6)]
+        assert spread == sorted(spread, reverse=True)
+        assert len(set(spread)) == 4
+        assert spread[-1] > 0
+
+    def test_the_gain_is_a_float64_array_of_the_surfaces_shape_and_the_surface_is_left_alone(self) -> None:
+        surface = np.random.default_rng(5).random((13, 21), dtype=np.float32)
+        before = surface.copy()
+        gain = lit(surface, blur=2.0)
+        assert gain.dtype == np.float64
+        assert gain.shape == (13, 21)
+        np.testing.assert_array_equal(surface, before)
