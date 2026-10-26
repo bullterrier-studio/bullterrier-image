@@ -5,6 +5,8 @@ from typing import Literal
 import numpy as np
 from scipy import fft, ndimage
 
+from .levels import level_weight
+
 Edge = Literal["reflect", "constant", "nearest", "mirror", "wrap"]
 
 # constant: kernel radius in px from which FFT beats direct convolution (measured: equal at 12 MP, FFT ahead at 1 MP)
@@ -78,11 +80,13 @@ def graded_blur(
     if radius == 0:
         return rgb.copy()  # every copy is the picture itself
     position = weight * levels  # 0 = sharp ... levels = the full radius
-    out = np.clip(1.0 - position, 0.0, 1.0)[..., None] * rgb  # the sharp copy's share
-    for level in range(1, levels + 1):
-        share = np.clip(1.0 - np.abs(position - level), 0.0, 1.0)
+    out = np.zeros_like(rgb)
+    for level in range(levels + 1):
+        share = level_weight(position, level)
         if share.max() > 0:
-            out += share[..., None] * gaussian_blur(rgb, radius * level / levels, truncate=truncate, edge=edge)
+            sigma = radius * level / levels
+            copy = gaussian_blur(rgb, sigma, truncate=truncate, edge=edge) if sigma else rgb  # level 0 is the sharp one
+            out += share[..., None] * copy
     return out
 
 
