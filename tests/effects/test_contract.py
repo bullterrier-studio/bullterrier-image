@@ -770,6 +770,12 @@ def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_i
             Step(name, {field: Drive(by="f", start=_range(name, field)[0], end=_range(name, field)[1])})
 
 
+# What an effect needs for its angle to show: at its defaults it changes nothing, so any angle would look cyclic.
+CYCLIC_NEEDS = {
+    ("disperse", "angle"): {"progress": 0.5},
+    ("selective_color", "hue"): {"hue_shift": 90.0, "width": 120.0},
+}
+
 # The share of pixels allowed to differ a turn apart: a hard-edged screen flips the dots that sit on an exact cell edge.
 EDGE_FLIPS = {("halftone", "angle"): 0.1}
 
@@ -781,13 +787,16 @@ def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real
     low, high = doc.minimum, doc.maximum
     assert low is not None
     assert high is not None
-    at_low = registry.apply(name, small, **_setting(name, field, low), **_inputs(name, small))
-    at_high = registry.apply(name, small, **_setting(name, field, high), **_inputs(name, small))
+    needs = {**CYCLIC_NEEDS.get((name, field), {})}
+    at_low = registry.apply(name, small, **needs, **{field: low}, **_inputs(name, small))
+    at_high = registry.apply(name, small, **needs, **{field: high}, **_inputs(name, small))
+    at_45 = registry.apply(name, small, **needs, **{field: low + 45}, **_inputs(name, small))
+    assert np.abs(at_45 - at_low).max() > 1e-3, f"{name}.{field} shows nothing: the test would pass for any field"
     differing = (np.abs(at_low - at_high).max(axis=-1) > 1e-3).mean()
     assert differing <= EDGE_FLIPS.get((name, field), 0), f"{name}.{field}: min and max are a turn apart"
     # four turns and a degree past the bottom of the turn is the same direction as one degree past it
-    beyond = registry.apply(name, small, **{field: low + 4 * 360 + 1}, **_inputs(name, small))
-    inside = registry.apply(name, small, **{field: low + 1}, **_inputs(name, small))
+    beyond = registry.apply(name, small, **needs, **{field: low + 4 * 360 + 1}, **_inputs(name, small))
+    inside = registry.apply(name, small, **needs, **{field: low + 1}, **_inputs(name, small))
     np.testing.assert_array_equal(beyond, inside)
 
 
