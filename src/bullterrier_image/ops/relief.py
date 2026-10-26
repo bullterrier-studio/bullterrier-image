@@ -51,4 +51,5 @@ def shade(
     smooth = gaussian_blur(surface, blur, truncate=truncate, edge=edge)
     rise_y, rise_x = slopes(smooth, scale=height, edge=edge)
     lit = lambert(rise_y, rise_x, angle=angle, elevation=elevation)
-    return lit / np.sin(np.radians(elevation))  # a flat surface catches sin(elevation)
+    # a flat surface catches sin(elevation); float64 whatever the numpy version promotes the float32 slopes to
+    return (lit / np.sin(np.radians(elevation))).astype(np.float64, copy=False)
