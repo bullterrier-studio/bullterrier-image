@@ -6,7 +6,7 @@ import numpy as np
 
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.ops.blur import gaussian_blur
+from bullterrier_image.ops.blur import graded_blur
 from bullterrier_image.ops.color import luminance
 
 
@@ -109,16 +109,7 @@ def tilt_shift(rgb: np.ndarray, params: TiltShiftParams) -> np.ndarray:
     extent = height * abs(cos) + width * abs(sin)  # the picture's extent at right angles to the band, in px
     across = 0.5 - (rows * cos - cols * sin) / extent  # 0..1 across the picture, 0 at the side the focus counts from
     weight = np.clip((np.abs(across - params.focus) - params.width / 2) / params.feather, 0.0, 1.0)
-    position = weight * params.levels  # 0 = sharp ... levels = the full radius
-    if params.radius == 0:
-        out = rgb.copy()  # every copy is the picture itself
-    else:
-        out = np.clip(1.0 - position, 0.0, 1.0)[..., None] * rgb  # the sharp copy's share
-        for level in range(1, params.levels + 1):
-            share = np.clip(1.0 - np.abs(position - level), 0.0, 1.0)
-            if share.max() > 0:
-                sigma = params.radius * level / params.levels
-                out += share[..., None] * gaussian_blur(rgb, sigma, truncate=params.truncate, edge=params.edge)
+    out = graded_blur(rgb, weight, params.radius, levels=params.levels, truncate=params.truncate, edge=params.edge)
     if params.saturation > 0:
         grey = luminance(rgb)[..., None]
         colourful = grey + (out - grey) * (1.0 + params.saturation * weight)[..., None]

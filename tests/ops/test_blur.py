@@ -1,4 +1,4 @@
-"""Tests of `ops/blur.py`: the Gaussian blur the effects share, against scipy's direct convolution as the oracle."""
+"""Tests of `ops/blur.py`: the Gaussian blurs the effects share, against scipy's direct convolution as the oracle."""
 
 import time
 
@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image.ops.blur import Edge, gaussian_blur
+from bullterrier_image.ops.blur import Edge, gaussian_blur, graded_blur
 
 EDGES: list[Edge] = ["reflect", "mirror", "nearest", "wrap", "constant"]
 TOLERANCE = 1e-5  # the bound `gaussian_blur` documents for pictures in 0..1
@@ -124,3 +124,63 @@ def test_a_large_blur_costs_a_few_times_a_small_one_not_a_hundred():
     image = picture((1000, 1000), seed=6)
     small, large = cpu_seconds(image, 2.0), cpu_seconds(image, 150.0)
     assert large < 15 * small
+
+
+COLOUR = (40, 56, 3)  # a colour picture larger than every kernel below at radius 6, so each edge rule shows
+
+
+@pytest.mark.parametrize(
+    ("weight", "radius"),
+    [
+        pytest.param(0.0, 6.0, id="weight 0 everywhere: the sharp picture"),
+        pytest.param(1.0, 0.0, id="radius 0: no blur at any weight"),
+        pytest.param(0.4, 0.0, id="radius 0 between levels: no blur"),
+    ],
+)
+def test_the_graded_blur_returns_an_unblurred_picture_as_a_copy(weight: float, radius: float) -> None:
+    image = picture(COLOUR, seed=7)
+    got = graded_blur(image, np.full(COLOUR[:2], weight, np.float32), radius, levels=4, truncate=4.0, edge="reflect")
+    np.testing.assert_array_equal(got, image)
+    assert got is not image
+
+
+@pytest.mark.parametrize("edge", ["reflect", "mirror", "nearest", "wrap"])
+@pytest.mark.parametrize("levels", [1, 4, 16])
+def test_weight_1_everywhere_is_the_gaussian_at_the_full_radius(levels: int, edge) -> None:
+    image = picture(COLOUR, seed=8)
+    got = graded_blur(image, np.ones(COLOUR[:2], np.float32), 6.0, levels=levels, truncate=4.0, edge=edge)
+    assert np.abs(got.astype(np.float64) - scipy_blur(image, 6.0, edge)).max() <= TOLERANCE
+
+
+@pytest.mark.parametrize(
+    ("levels", "weight", "mix"),
+    [
+        pytest.param(4, 0.375, [(2.0, 0.5), (4.0, 0.5)], id="halfway between levels 1 and 2 of 4: half of each"),
+        pytest.param(4, 0.125, [(0.0, 0.5), (2.0, 0.5)], id="halfway to level 1: half sharp, half sigma radius / 4"),
+        pytest.param(2, 0.75, [(4.0, 0.5), (8.0, 0.5)], id="halfway between levels 1 and 2 of 2"),
+        pytest.param(1, 0.25, [(0.0, 0.75), (8.0, 0.25)], id="1 level: a quarter of the way to the full blur"),
+        pytest.param(4, 0.5, [(4.0, 1.0)], id="on level 2 of 4: that copy alone"),
+    ],
+)
+def test_a_weight_between_two_levels_mixes_the_two_copies_either_side(
+    levels: int, weight: float, mix: list[tuple[float, float]]
+) -> None:
+    """Radius 8: copy k of `levels` has sigma 8 x k / levels, the sharp picture being copy 0; a weight w puts a pixel at
+    w x levels on that stack, a share of each copy either side by how near it lies. The left half of the picture has
+    weight 0 and stays sharp, so every pixel follows its own weight."""
+    image = picture(COLOUR, seed=9)
+    weights = np.zeros(COLOUR[:2], np.float32)
+    weights[:, COLOUR[1] // 2 :] = weight
+    got = graded_blur(image, weights, 8.0, levels=levels, truncate=4.0, edge="reflect")
+    copies = [share * (image if sigma == 0 else blur(image, sigma, "reflect")) for sigma, share in mix]
+    expected = np.where(weights[..., None] > 0, np.sum(copies, axis=0), image)
+    np.testing.assert_allclose(got, expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("levels", [1, 3, 16])
+def test_the_graded_blur_never_leaves_the_range_of_the_picture(levels: int) -> None:
+    image = picture(COLOUR, seed=10) * 0.5 + 0.3  # 0.3..0.8: away from 0 and 1, so a wider range would show
+    weights = np.random.default_rng(11).random(COLOUR[:2], dtype=np.float32)
+    got = graded_blur(image, weights, 40.0, levels=levels, truncate=4.0, edge="reflect")
+    assert got.min() >= image.min()
+    assert got.max() <= image.max()

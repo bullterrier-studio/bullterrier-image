@@ -1,4 +1,4 @@
-"""Gaussian blur of a picture, at a cost that hardly grows with the blur's size."""
+"""Gaussian blur of a picture, at a cost that hardly grows with the blur's size, evenly or graded pixel by pixel."""
 
 from typing import Literal
 
@@ -55,6 +55,35 @@ def gaussian_blur(
     if constant_value is not None and edge == "constant":
         low, high = min(low, constant_value), max(high, constant_value)
     return np.clip(blurred, low, high).astype(image.dtype, copy=False)
+
+
+def graded_blur(
+    rgb: np.ndarray,
+    weight: np.ndarray,
+    radius: float,
+    *,
+    levels: int,
+    truncate: float,
+    edge: Literal["reflect", "nearest", "mirror", "wrap"],
+) -> np.ndarray:
+    """`rgb` (h, w, channels) blurred by a different amount at every pixel: `weight` (h, w), 0..1, gives each pixel's
+    share of the full blur, a Gaussian of sigma `radius` px; 0 = sharp.
+
+    The blur is `levels` copies of the picture, copy k blurred to sigma radius x k / levels (`gaussian_blur`, with
+    `truncate` and `edge`), the sharp picture being copy 0; a pixel mixes the two copies either side of weight x
+    `levels`, each by 1 - its distance from it. Pixels of weight 0 are returned exactly as they are, those of weight
+    1 are the full blur; a copy no pixel uses is never made. Radius 0 returns a copy. The result stays within the
+    picture's range. A new array; the input is left alone.
+    """
+    if radius == 0:
+        return rgb.copy()  # every copy is the picture itself
+    position = weight * levels  # 0 = sharp ... levels = the full radius
+    out = np.clip(1.0 - position, 0.0, 1.0)[..., None] * rgb  # the sharp copy's share
+    for level in range(1, levels + 1):
+        share = np.clip(1.0 - np.abs(position - level), 0.0, 1.0)
+        if share.max() > 0:
+            out += share[..., None] * gaussian_blur(rgb, radius * level / levels, truncate=truncate, edge=edge)
+    return out
 
 
 def _convolve_axis(
