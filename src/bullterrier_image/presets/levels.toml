@@ -1,0 +1,6 @@
+# Looks that are one levels remap.
+
+[invert]
+description = "The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement."
+output_black = 1.0
+output_white = 0.0

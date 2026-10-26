@@ -3,7 +3,9 @@
 import numpy as np
 import pytest
 
+from bullterrier_image import fx
 from bullterrier_image.core import registry
+from bullterrier_image.recipe import Recipe, render
 
 NAME = "levels"
 
@@ -123,3 +125,20 @@ def test_the_output_never_leaves_0_to_1_not_even_by_rounding(
     )
     assert out.min() >= 0.0
     assert out.max() <= 1.0
+
+
+def _negative(picture: np.ndarray) -> np.ndarray:
+    return render(picture, Recipe("negative", [fx.levels(preset="invert")], size=None))
+
+
+def test_the_invert_preset_makes_every_channel_value_v_one_minus_v(photo: np.ndarray) -> None:
+    np.testing.assert_allclose(_negative(photo), 1.0 - photo, atol=1e-6)
+
+
+def test_inverting_twice_gives_back_the_picture(photo: np.ndarray) -> None:
+    np.testing.assert_allclose(_negative(_negative(photo)), photo, atol=1e-6)
+
+
+def test_the_invert_preset_reverses_the_order_of_brightness_in_every_channel() -> None:
+    ramp = np.linspace(0, 1, 11, dtype=np.float32)[None, :, None] * np.ones((1, 1, 3), np.float32)
+    assert (np.diff(_negative(ramp), axis=1) < 0).all()  # strictly darker as the input brightens

@@ -554,8 +554,8 @@ GALLERY_RUNS = {  # command arguments -> the files it must add or change in the 
         False,
     ),
     "--only names several effects": (
-        ["--only", "grain", "invert"],
-        {"docs/gallery/grain.jpg", "docs/gallery/invert.jpg"},
+        ["--only", "grain", "levels"],
+        {"docs/gallery/grain.jpg", "docs/gallery/levels.jpg"},
         False,
     ),
     "without --only the catalogue pages are written too": ([], _catalogue_pages(), False),

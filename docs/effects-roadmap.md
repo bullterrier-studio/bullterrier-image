@@ -31,7 +31,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `selective_color` ✓ | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue=30, saturation=0.6)` |
 | `color_balance` ✓ | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights_red=0.05, highlights_blue=-0.05)` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
-| `invert` ✓ | Negative. | `fx.invert()` |
+| `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
 | `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
 | `solarize` ✓ | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |

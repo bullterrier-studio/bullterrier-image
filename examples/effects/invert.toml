@@ -1,6 +1,0 @@
-# The photographic negative: every colour becomes its complement.
-name = "invert"
-size = 480
-
-[[step]]
-effect = "invert"
