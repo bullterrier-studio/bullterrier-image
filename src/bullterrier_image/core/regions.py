@@ -2,16 +2,18 @@
 
 A **partition** (`Partition`) gives every pixel to exactly one piece; the pieces are numbered 0..n-1 in *reading
 order*: piece k comes before piece k+1 when its first pixel comes earlier in the raster scan (left to right along each
-row, rows from the top). For a grid that is row after row; for any other kind it is a rule with no constants. A kind
-that makes more pieces than a small picture has pixels yields only the pieces that have a pixel, so n can be smaller
-than asked for. A **selection** (`Selection`) says how much each pixel is chosen, 0..1.
+row, rows from the top). For a grid that is row after row; for any other kind it is a rule with no constants. The one
+exception is `DepthBands`, numbered by distance, nearest first. A kind that makes more pieces than a small picture has
+pixels (or bands than its depths fill) yields only the pieces that have a pixel, so n can be smaller than asked for. A
+**selection** (`Selection`) says how much each pixel is chosen, 0..1.
 
-The kinds are models declared like an effect's parameters (partitions `Grid`, `Shards`, `Cuts` and `Svg`; selections
-`Path`, `Pick` and `Subject`; `Edge` bends the borders of all but `Pick` and `Subject`), so every field has a unit, a
-range and a description: `Shards.documentation()` lists them. A recipe or a script declares them by name, and `resolve`
-turns the declarations into the regions of one picture, building only what is asked for. `Subject` with `per` is *grid
-first*: the subject is found inside each piece of a partition, one call of the injected finder per piece, and the finds
-are united. `look_weights` turns a partition and a look for each piece into the weights that blend the looks.
+The kinds are models declared like an effect's parameters (partitions `Grid`, `Shards`, `Cuts`, `Svg` and
+`DepthBands`; selections `Path`, `Pick`, `Subject` and `Depth`; `Edge` bends the borders of the kinds with `fit`), so
+every field has a unit, a range and a description: `Shards.documentation()` lists them. A recipe or a script declares
+them by name, and `resolve` turns the declarations into the regions of one picture, building only what is asked for.
+`Subject` with `per` is *grid first*: the subject is found inside each piece of a partition, one call of the injected
+finder per piece, and the finds are united. `Depth` and `DepthBands` read the injected depth map (1 = nearest).
+`look_weights` turns a partition and a look for each piece into the weights that blend the looks.
 
 Promises:
 - Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
@@ -35,7 +37,7 @@ import numpy as np
 from pydantic import BeforeValidator, field_validator, model_validator
 from scipy import ndimage
 
-from bullterrier_image.errors import RecipeError, SubjectNotFoundError
+from bullterrier_image.errors import DepthNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.noise import frame_fractal
 from bullterrier_image.ops.raster import coverage, paint
@@ -49,6 +51,8 @@ __all__ = [
     "BoxFinder",
     "Curve",
     "Cuts",
+    "Depth",
+    "DepthBands",
     "Edge",
     "Grid",
     "Kind",
@@ -65,6 +69,7 @@ __all__ = [
     "check",
     "look_weights",
     "needs",
+    "needs_depth",
     "needs_finder",
     "needs_subject",
     "resolve",
@@ -478,7 +483,59 @@ class Subject(_Model):
     )
 
 
-Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject
+class Depth(_Model):
+    """A selection: the pixels between two distances, fading out beyond them. Distances are shares of the depth scale:
+    1 is the nearest, 0 the farthest."""
+
+    near: float = param(
+        1.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The nearest depth chosen fully, as a share of the depth scale (0 to 1; 1 is the nearest, 0 the farthest). "
+        "Raising it takes in nearer pixels; 1 reaches to the front.",
+    )
+    far: float = param(
+        0.5,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The farthest depth chosen fully (0 to 1, at most `near`): every pixel from `far` to `near` is chosen. "
+        "Raising it leaves out the farther pixels; 0 reaches to the back.",
+    )
+    feather: float = param(
+        0.1,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How far beyond `near` and `far` the choice fades out, as a share of the depth scale (0 to 1): it falls "
+        "linearly from 1 at the bound to 0 this far past it. Raising it softens the edge; 0 cuts it hard.",
+    )
+
+    @model_validator(mode="after")
+    def _far_not_above_near(self) -> "Depth":
+        """`far` is no nearer than `near`."""
+        if self.far > self.near:
+            raise ValueError(f"`far` {self.far} is above `near` {self.near}: far must be at most near")
+        return self
+
+
+class DepthBands(_Model):
+    """A partition into bands of distance: equal ranges of the depth scale, numbered nearest first."""
+
+    count: int = param(
+        3,
+        unit="count",
+        min=1,
+        max=100,
+        doc="How many equal ranges the depth scale is cut into (1 to 100). Band 0 is the nearest, the last the "
+        "farthest: by distance, not in reading order. A depth on a border goes to the farther band (0 to the "
+        "farthest); a band no pixel lies in has no piece and the rest are renumbered, nearest first. Raising it "
+        "makes thinner bands.",
+    )
+
+
+Kind = Grid | Shards | Cuts | Path | Svg | Pick | Subject | Depth | DepthBands
 # Finds the subject inside a box of the picture, `(left, top, right, bottom)` in px: float32 `(bottom - top, right -
 # left)` alpha, 0..1, or SubjectNotFoundError when nothing stands out there.
 BoxFinder = Callable[[tuple[int, int, int, int]], np.ndarray]
@@ -666,6 +723,17 @@ def _drawn(
     return Partition(_frozen(labels), len(drawn), ids)
 
 
+def _by_depth(kind: Depth | DepthBands, depth: np.ndarray) -> Partition | Selection:
+    """The region `kind` makes of the depth map `depth` (float32 `(height, width)`, 1 = nearest)."""
+    if isinstance(kind, Depth):
+        outside = np.maximum(np.maximum(kind.far - depth, depth - kind.near), 0)  # how far beyond far..near
+        alpha = np.clip(1 - outside / kind.feather, 0, 1) if kind.feather else outside == 0
+        return Selection(_frozen(alpha.astype(np.float32)))
+    bands = np.minimum(np.floor((1 - depth.astype(np.float64)) * kind.count), kind.count - 1)  # 0 = the nearest
+    present, labels = np.unique(bands.ravel(), return_inverse=True)  # numbered by band, so still nearest first
+    return Partition(_frozen(labels.reshape(depth.shape).astype(np.int32)), len(present))
+
+
 def look_weights(partition: Partition, assignment: Sequence[int], count: int, *, feather: float) -> np.ndarray:
     """The weights that blend `count` looks over a picture: float32 `(count, height, width)`, between 0 and 1 and
     summing to 1 at every pixel. `assignment[k]` is the look (0..`count`-1) of piece k, so there is one entry per
@@ -689,9 +757,9 @@ def _type_of(name: str, declared: Mapping[str, Kind]) -> Literal["partition", "s
     if name in BUILT_IN:
         return "selection"
     match declared.get(name):
-        case Grid() | Shards() | Cuts() | Svg():
+        case Grid() | Shards() | Cuts() | Svg() | DepthBands():
             return "partition"
-        case Pick() | Path() | Subject():
+        case Pick() | Path() | Subject() | Depth():
             return "selection"
         case _:
             return None
@@ -728,6 +796,8 @@ def _reference(kind: Kind) -> str | None:
             return kind.of
         case Subject():
             return kind.per
+        case Depth() | DepthBands():
+            return None
         case _:
             return kind.fit
 
@@ -735,7 +805,7 @@ def _reference(kind: Kind) -> str | None:
 class Regions(Mapping[str, Partition | Selection]):
     """The regions of one picture by name: the built-in `subject` and `background` and every declared region. A
     region is made the first time it is asked for (with what it is made from), then kept; the subject finder runs at
-    most once, and not at all when no region needs it."""
+    most once, and not at all when no region needs it; the depth is asked for once per region made from it."""
 
     def __init__(
         self,
@@ -743,15 +813,16 @@ class Regions(Mapping[str, Partition | Selection]):
         shape: tuple[int, int],
         subject: Callable[[], np.ndarray] | None,
         find: BoxFinder | None,
+        depth: Callable[[], np.ndarray] | None,
     ) -> None:
         """Made by `resolve`, which checks `declared` first."""
-        self._declared, self._shape, self._subject, self._find = declared, shape, subject, find
+        self._declared, self._shape, self._subject, self._find, self._depth = declared, shape, subject, find, depth
         self._made: dict[str, Partition | Selection] = {}
 
     def __getitem__(self, name: str) -> Partition | Selection:
         """The region `name`; KeyError when it is neither built in nor declared. SubjectNotFoundError when it needs
-        the subject and there is no finder, or the finder's matte is not the picture's size; RecipeError when its
-        `fit` selection chooses nothing in this picture."""
+        the subject and there is no finder, or the finder's matte is not the picture's size; DepthNotFoundError, naming
+        the region, likewise for the depth; RecipeError when its `fit` selection chooses nothing in this picture."""
         if name not in self._made:
             self._made[name] = self._make(name)
         return self._made[name]
@@ -791,18 +862,8 @@ class Regions(Mapping[str, Partition | Selection]):
     def _make(self, name: str) -> Partition | Selection:
         match name:
             case "subject":
-                if self._subject is None:
-                    raise SubjectNotFoundError(
-                        "a region needs the subject of the picture, but no subject finder was given"
-                    )
-                matte = np.asarray(
-                    self._subject(), np.float32
-                ).view()  # a view: frozen alone, the finder's array untouched
-                if matte.shape != self._shape:
-                    raise SubjectNotFoundError(
-                        f"the subject finder gave a matte of shape {matte.shape}, not {self._shape}"
-                    )
-                return Selection(_frozen(matte))
+                missing = "a region needs the subject of the picture, but no subject finder was given"
+                return Selection(self._map(self._subject, SubjectNotFoundError, missing, "the subject finder's matte"))
             case "background":
                 return Selection(_frozen(1 - self.selection("subject").alpha))
         kind = self._declared[name]
@@ -810,6 +871,9 @@ class Regions(Mapping[str, Partition | Selection]):
             return self._subject_of(name, kind)
         if isinstance(kind, Pick):
             return self._pick(name, kind)
+        if isinstance(kind, Depth | DepthBands):
+            missing = f"region {name!r} is made from the depth of the picture, but no depth was given"
+            return _by_depth(kind, self._map(self._depth, DepthNotFoundError, missing, "the depth map"))
         box, chosen = self._frame(name, kind.fit)
         x, y = _coordinates(self._shape, kind.edge)
         try:
@@ -830,6 +894,22 @@ class Regions(Mapping[str, Partition | Selection]):
                     return _drawn(kind, self._shape, box, x, y)
         except RecipeError as error:
             raise RecipeError(f"region {name!r}: {error}") from None
+
+    def _map(
+        self,
+        given: Callable[[], np.ndarray] | None,
+        error: type[SubjectNotFoundError | DepthNotFoundError],
+        missing: str,
+        what: str,
+    ) -> np.ndarray:
+        """The map of the whole picture that `given` returns, read-only as float32 (a view: the giver's array is left
+        writable). `error` with `missing` when nothing gives it, or naming both sizes when it is not the picture's."""
+        if given is None:
+            raise error(missing)
+        layer = np.asarray(given(), np.float32).view()
+        if layer.shape != self._shape:
+            raise error(f"{what} is {layer.shape}, not the picture's {self._shape}")
+        return _frozen(layer)
 
     def _pick(self, name: str, kind: Pick) -> Selection:
         """The pixels of the pieces `kind` lists: a number as it is, an SVG id as the pieces of its shapes."""
@@ -914,7 +994,7 @@ def check(declared: Mapping[str, Kind]) -> None:
         elif isinstance(kind, Subject):
             if kind.per is not None:
                 needs(f"region {name!r}", "per", kind.per, "partition", declared)
-        elif kind.fit is not None:
+        elif isinstance(kind, _Laid) and kind.fit is not None:
             needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
     for start in declared:
         chain = [start]
@@ -957,12 +1037,21 @@ def needs_finder(declared: Mapping[str, Kind], names: Iterable[str]) -> bool:
     )
 
 
+def needs_depth(declared: Mapping[str, Kind], names: Iterable[str]) -> bool:
+    """Whether making the regions `names` needs the depth of the picture: one of the regions `used` is a `Depth` or a
+    `DepthBands`."""
+    return any(
+        name not in BUILT_IN and isinstance(declared[name], Depth | DepthBands) for name in used(declared, names)
+    )
+
+
 def resolve(
     declared: Mapping[str, Kind],
     shape: tuple[int, int],
     *,
     subject: Callable[[], np.ndarray] | None,
     find: BoxFinder | None = None,
+    depth: Callable[[], np.ndarray] | None = None,
 ) -> Regions:
     """The regions `declared` (name -> kind) make over a picture of `shape` (height, width), plus the built-in
     `subject` and `background`, built when asked for (`regions[name]`).
@@ -970,9 +1059,10 @@ def resolve(
     `subject` finds the subject: a function returning its matte, float `(height, width)` in 0..1, called at most once
     and only if a region needs it (this module never loads a picture or a model); None when there is no finder.
     `find` finds the subject inside a box of the picture (see `BoxFinder`), once for each piece of a `Subject` with
-    `per`; None when there is none.
+    `per`; None when there is none. `depth` gives the depth map, float `(height, width)` in 0..1 (1 = nearest), called
+    once for each `Depth` or `DepthBands` made; None when there is none.
 
     Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
     naming the region and the valid names."""
     check(declared)
-    return Regions(declared, shape, subject, find)
+    return Regions(declared, shape, subject, find, depth)

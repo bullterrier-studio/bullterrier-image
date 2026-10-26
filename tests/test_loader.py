@@ -13,7 +13,20 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import ImageReadError, RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Curve, Cuts, Edge, Finder, Grid, Line, Pick, Shards, Subject, Svg
+from bullterrier_image.recipe import (
+    Curve,
+    Cuts,
+    Depth,
+    DepthBands,
+    Edge,
+    Finder,
+    Grid,
+    Line,
+    Pick,
+    Shards,
+    Subject,
+    Svg,
+)
 from bullterrier_image.recipe import Path as PathRegion
 
 STEP = "[[step]]\neffect = 'grade'\n"
@@ -321,6 +334,43 @@ def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, m
     )
 
 
+DEPTH_FILE = """
+format = 2
+
+[region.near]
+kind = "depth"
+near = 0.9
+far = 0.6
+feather = 0.05
+
+[region.bands]
+kind = "depth_bands"
+count = 4
+
+[[step]]
+each = "bands"
+looks = [{ effect = "grade", exposure = 0.5 }, "none"]
+
+[[step]]
+effect = "fill"
+color = "#ff0000"
+mask = "near"
+"""
+
+
+def test_depth_regions_load_as_the_recipe_written_in_python(tmp_path):
+    written = Recipe(
+        "look",
+        regions={"near": Depth(near=0.9, far=0.6, feather=0.05), "bands": DepthBands(count=4)},
+        steps=[
+            Each("bands", [Step("grade", {"exposure": 0.5}), "none"]),
+            Step("fill", {"color": "#ff0000"}, mask="near"),
+        ],
+    )
+    assert load_recipe(_write(tmp_path, DEPTH_FILE)) == written
+    assert written.needs_depth
+
+
 SHAPES_FILE = """
 format = 2
 size = 64
@@ -419,12 +469,15 @@ def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_pa
 REGION_MISTAKES = {
     "a kind that does not exist": (
         '[region.g]\nkind = "hexagons"\n',
-        r"region 'g': .*'hexagons'.*grid, shards, cuts, path, svg, pick, subject",
+        r"region 'g': .*'hexagons'.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
     ),
-    "no kind": ("[region.g]\ncolumns = 2\n", r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject"),
+    "no kind": (
+        "[region.g]\ncolumns = 2\n",
+        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
+    ),
     "a kind that is not text": (
         "[region.g]\nkind = 3\n",
-        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject",
+        r"region 'g': .*`kind`.*grid, shards, cuts, path, svg, pick, subject, depth, depth_bands",
     ),
     "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),
     "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
@@ -441,6 +494,12 @@ REGION_MISTAKES = {
     "a pick of nothing": ('[region.p]\nkind = "pick"\nof = "gone"\n', r"region 'p': `of` names 'gone'"),
     "a cycle": ('[region.a]\nkind = "shards"\nfit = "b"\n[region.b]\nkind = "pick"\nof = "a"\n', r"cycle"),
     "a name taken by a built-in": ('[region.subject]\nkind = "grid"\n', r"region 'subject' is a built-in"),
+    "a depth far beyond near": (
+        '[region.n]\nkind = "depth"\nnear = 0.4\nfar = 0.7\n',
+        r"region 'n'.*`far` 0\.7.*`near` 0\.4",
+    ),
+    "a depth feather out of range": ('[region.n]\nkind = "depth"\nfeather = 2\n', r"region 'n'.*`feather`.*2"),
+    "no depth bands": ('[region.b]\nkind = "depth_bands"\ncount = 0\n', r"region 'b'.*`count`.*0"),
 }
 
 

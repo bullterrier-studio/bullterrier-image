@@ -1,21 +1,21 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
-regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`) its steps name: `mask` limits a step to one,
-`Each` gives each piece of one its own look. The machinery lives in `bullterrier_image.core` (`steps`, `runner`) and
-`bullterrier_image.loader`; this module re-exports its public names and binds the one thing the core leaves open: how
-the subject is found. `render`, `trace` and `render_all` take the same arguments as the core's, but when a recipe will
-ask for the subject (it needs the subject and no `matte` is given, or it finds the subject piece by piece) and no
-`find_subject` is given, they find it with `bullterrier_image.finding.subject.subject_finder()`, built only then (so a
-recipe that needs no subject never depends on the segmenter settings). Depth has no default finder: a recipe that needs
-it is given `depth` or `find_depth`.
+regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth`, `DepthBands`) its steps name: `mask`
+limits a step to one, `Each` gives each piece of one its own look. The machinery lives in `bullterrier_image.core`
+(`steps`, `runner`) and `bullterrier_image.loader`; this module re-exports its public names and binds the one thing the
+core leaves open: how the subject is found. `render`, `trace` and `render_all` take the same arguments as the core's,
+but when a recipe will ask for the subject (it needs the subject and no `matte` is given, or it finds the subject piece
+by piece) and no `find_subject` is given, they find it with `bullterrier_image.finding.subject.subject_finder()`, built
+only then (so a recipe that needs no subject never depends on the segmenter settings). Depth has no default finder: a
+recipe that needs it is given `depth` or `find_depth`.
 """
 
 import numpy as np
 
 from .core import runner
 from .core.framing import Framing
-from .core.regions import Curve, Cuts, Edge, Grid, Line, Path, Pick, Shards, Subject, Svg
+from .core.regions import Curve, Cuts, Depth, DepthBands, Edge, Grid, Line, Path, Pick, Shards, Subject, Svg
 from .core.runner import Finder, Stage
 from .core.steps import Each, Recipe, Step
 from .finding import subject
@@ -24,6 +24,8 @@ from .loader import load_recipe
 __all__ = [
     "Curve",
     "Cuts",
+    "Depth",
+    "DepthBands",
     "Each",
     "Edge",
     "Finder",

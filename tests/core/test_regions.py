@@ -9,17 +9,20 @@ a property of the result.
 import math
 import tracemalloc
 from collections.abc import Callable
+from itertools import pairwise
 from pathlib import Path as File
 
 import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image import RecipeError, SubjectNotFoundError
+from bullterrier_image import DepthNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
     BoxFinder,
     Curve,
     Cuts,
+    Depth,
+    DepthBands,
     Edge,
     Grid,
     Kind,
@@ -36,6 +39,7 @@ from bullterrier_image.core.regions import (
     check,
     look_weights,
     needs,
+    needs_depth,
     needs_finder,
     needs_subject,
     resolve,
@@ -63,6 +67,19 @@ def disc(shape: Shape) -> np.ndarray:
 def finder(shape: Shape) -> Callable[[], np.ndarray]:
     """A subject finder for a picture of `shape`, standing in for the model (an external boundary)."""
     return lambda: disc(shape)
+
+
+def ramp(shape: Shape) -> Callable[[], np.ndarray]:
+    """A depth map for a picture of `shape` (the depth model's stand-in): nearest at the top left, farthest at the
+    bottom right, falling evenly along both sides, so every kind of picture holds near and far pixels."""
+    height, width = shape
+    y, x = np.mgrid[0:height, 0:width] + 0.5
+    return lambda: (1 - (y / height + x / width) / 2).astype(np.float32)
+
+
+def down(depths: list[float], width: int = 3) -> Callable[[], np.ndarray]:
+    """A depth map whose rows hold `depths`, top to bottom, the same across each row."""
+    return lambda: np.tile(np.asarray(depths, np.float32)[:, None], (1, width))
 
 
 def true_boundary(shape: Shape) -> BoxFinder:
@@ -104,6 +121,13 @@ def declared() -> dict[str, Kind]:
         "torn_mosaic": Svg(file=MOSAIC, edge=Edge(style="torn")),
         "mosaic_on_subject": Svg(file=MOSAIC, fit="subject"),
         "pick_of_mosaic": Pick(of="mosaic", pieces=["ring", "sun", 0]),
+        "near": Depth(),
+        "hard_band": Depth(near=0.6, far=0.4, feather=0),
+        "grid_on_near": Grid(columns=2, rows=2, fit="near"),
+        "pick_of_grid_on_near": Pick(of="grid_on_near", pieces=[1]),
+        "bands": DepthBands(),
+        "many_bands": DepthBands(count=100),
+        "pick_of_bands": Pick(of="bands", pieces=[0]),
     }
 
 
@@ -113,15 +137,21 @@ def first_pixels(labels: np.ndarray) -> list[int]:
     return [int(np.flatnonzero(flat == piece)[0]) for piece in range(int(flat.max()) + 1)]
 
 
-def assert_a_region(region: Partition | Selection, shape: Shape) -> None:
-    """The promises of both kinds: a partition numbers the pieces that exist 0..n-1 in reading order and gives every
-    pixel one; a selection holds floats from 0 to 1; neither can be written to."""
+def assert_a_region(region: Partition | Selection, shape: Shape, nearest_first: np.ndarray | None = None) -> None:
+    """The promises of both kinds: a partition numbers the pieces that exist 0..n-1 in reading order (or, given the
+    depth as `nearest_first`, by depth: every pixel of a piece at least as near as every pixel of the pieces after it,
+    as `DepthBands` numbers them) and gives every pixel one; a selection holds floats from 0 to 1; neither can be
+    written to."""
     match region:
         case Partition(labels=labels, count=count):
             assert labels.shape == shape
             assert labels.dtype == np.int32
             np.testing.assert_array_equal(np.unique(labels), np.arange(count))
-            assert first_pixels(labels) == sorted(first_pixels(labels))
+            if nearest_first is None:
+                assert first_pixels(labels) == sorted(first_pixels(labels))
+            else:
+                depths = [nearest_first[labels == piece] for piece in range(count)]
+                assert all(nearer.min() >= farther.max() for nearer, farther in pairwise(depths))
             assert not labels.flags.writeable
         case Selection(alpha=alpha):
             assert alpha.shape == shape
@@ -131,6 +161,12 @@ def assert_a_region(region: Partition | Selection, shape: Shape) -> None:
             assert not alpha.flags.writeable
         case _:
             pytest.fail(f"neither a partition nor a selection: {region!r}")
+
+
+def numbering(kind: Kind, shape: Shape) -> np.ndarray | None:
+    """What `assert_a_region` checks the pieces of `kind` over a picture of `shape` are numbered by: the depth for
+    `DepthBands` (nearest first), None (reading order) for every other kind."""
+    return ramp(shape)() if isinstance(kind, DepthBands) else None
 
 
 def labels_of(regions: dict, name: str, shape: Shape) -> np.ndarray:
@@ -154,9 +190,9 @@ def same_pieces(labels: np.ndarray, other: np.ndarray) -> np.ndarray:
 @pytest.mark.parametrize("size", ODD_SIZES, ids=lambda s: f"{s[0]}x{s[1]}")
 @pytest.mark.parametrize("name", list(declared()))
 def test_every_kind_gives_a_partition_or_selection_at_any_size_and_the_same_one_every_time(name, size):
-    first = resolve(declared(), size, subject=finder(size), find=true_boundary(size))[name]
-    again = resolve(declared(), size, subject=finder(size), find=true_boundary(size))[name]
-    assert_a_region(first, size)
+    first = resolve(declared(), size, subject=finder(size), find=true_boundary(size), depth=ramp(size))[name]
+    again = resolve(declared(), size, subject=finder(size), find=true_boundary(size), depth=ramp(size))[name]
+    assert_a_region(first, size, numbering(declared()[name], size))
     match first, again:
         case Partition(), Partition():
             np.testing.assert_array_equal(first.labels, again.labels)
@@ -192,6 +228,9 @@ AT_THE_LIMITS: dict[str, Kind] = {
     "grid of tiny and huge shares": Grid(columns=[0.001, 1000], rows=[1000, 0.001]),
     "grid on the subject, torn": Grid(columns=3, rows=3, fit="subject", edge=Edge(style="torn", amount=0.1)),
     **{f"subject {id_}": Subject(per="panes", **values) for id_, values in extremes(Subject)},
+    **{f"depth {id_}": Depth(**values) for id_, values in extremes(Depth, far=0)},
+    **{f"depth bands {id_}": DepthBands(**values) for id_, values in extremes(DepthBands)},
+    "depth of nothing between": Depth(near=0.5, far=0.5, feather=0),
 }
 
 
@@ -199,8 +238,8 @@ AT_THE_LIMITS: dict[str, Kind] = {
 @pytest.mark.parametrize("name", AT_THE_LIMITS)
 def test_every_field_works_at_its_minimum_and_maximum(name, size):
     regions = {"panes": Grid(columns=3, rows=2), "it": AT_THE_LIMITS[name]}
-    resolved = resolve(regions, size, subject=finder(size), find=true_boundary(size))["it"]
-    assert_a_region(resolved, size)
+    resolved = resolve(regions, size, subject=finder(size), find=true_boundary(size), depth=ramp(size))["it"]
+    assert_a_region(resolved, size, numbering(AT_THE_LIMITS[name], size))
 
 
 def test_pieces_are_numbered_in_reading_order_so_a_looks_list_is_predictable():
@@ -532,16 +571,33 @@ def test_regions_are_made_once_and_handed_out_read_only():
         regions.partition("glass").labels[0, 0] = 5
 
 
-def test_a_finder_that_returns_a_matte_of_another_size_is_refused():
-    regions = resolve({"s": Shards(fit="subject")}, (20, 30), subject=lambda: np.ones((10, 10), np.float32))
-    with pytest.raises(SubjectNotFoundError, match="10"):
+WRONG_SIZE = lambda: np.ones((10, 10), np.float32)  # noqa: E731  (a map for another picture)
+MAPS = {
+    "the subject": (Shards(fit="subject"), {"subject": WRONG_SIZE}, SubjectNotFoundError),
+    "the depth of a selection": (Depth(), {"depth": WRONG_SIZE}, DepthNotFoundError),
+    "the depth of bands": (DepthBands(), {"depth": WRONG_SIZE}, DepthNotFoundError),
+}
+
+
+@pytest.mark.parametrize(("kind", "given", "error"), MAPS.values(), ids=MAPS.keys())
+def test_a_map_of_another_size_than_the_picture_is_refused_naming_both_sizes(kind, given, error):
+    regions = resolve({"s": kind}, (20, 30), **{"subject": None, **given})
+    with pytest.raises(error, match=r"\(10, 10\).*\(20, 30\)"):
         regions["s"]
 
 
-def test_a_region_that_needs_the_subject_says_so_when_there_is_no_finder():
-    regions = resolve({"s": Shards(fit="subject"), "g": Grid()}, (20, 30), subject=None)
+@pytest.mark.parametrize(
+    ("kind", "error", "complaint"),
+    [
+        pytest.param(Shards(fit="subject"), SubjectNotFoundError, "subject", id="the subject"),
+        pytest.param(Depth(), DepthNotFoundError, "'s'.*depth", id="the depth of a selection, naming it"),
+        pytest.param(DepthBands(), DepthNotFoundError, "'s'.*depth", id="the depth of bands, naming them"),
+    ],
+)
+def test_a_region_made_from_a_map_says_so_when_there_is_none(kind, error, complaint):
+    regions = resolve({"s": kind, "g": Grid()}, (20, 30), subject=None)
     regions["g"]
-    with pytest.raises(SubjectNotFoundError, match="subject"):
+    with pytest.raises(error, match=complaint):
         regions["s"]
 
 
@@ -586,6 +642,8 @@ BAD_DECLARATIONS = {
     "per names a selection": ({"s": Subject(per="subject")}, "'s'.*per.*'subject'.*selection.*partition"),
     "per names no region": ({"g": Grid(), "s": Subject(per="gone")}, "'s'.*'gone'.*valid.*g"),
     "a cycle through per": ({"s": Subject(per="p"), "p": Shards(fit="s")}, "cycle.*'s'.*'p'"),
+    "fit names depth bands": ({"b": DepthBands(), "g": Grid(fit="b")}, "'g'.*fit.*'b'.*partition.*selection"),
+    "pick of a depth selection": ({"n": Depth(), "p": Pick(of="n")}, "'p'.*'n'.*selection.*partition"),
 }
 
 
@@ -609,6 +667,10 @@ NEEDS = {
     "a partition where a selection is wanted": ("step 2", "mask", "panes", "selection", False),
     "a selection where a partition is wanted": ("step 2", "each", "head", "partition", False),
     "no such region": ("step 2", "mask", "nope", "selection", False),
+    "a depth selection where a selection is wanted": ("step 2", "mask", "near", "selection", True),
+    "depth bands where a partition is wanted": ("step 2", "each", "bands", "partition", True),
+    "depth bands where a selection is wanted": ("step 2", "mask", "bands", "selection", False),
+    "a depth selection where a partition is wanted": ("step 2", "each", "near", "partition", False),
 }
 
 
@@ -616,7 +678,12 @@ NEEDS = {
 def test_needs_accepts_a_region_of_the_wanted_kind_and_otherwise_names_the_owner_field_and_valid_names(
     owner, field, name, wanted, fine
 ):
-    declared: dict[str, Kind] = {"panes": Grid(columns=2), "head": Pick(of="panes", pieces=[1])}
+    declared: dict[str, Kind] = {
+        "panes": Grid(columns=2),
+        "head": Pick(of="panes", pieces=[1]),
+        "near": Depth(),
+        "bands": DepthBands(),
+    }
     if fine:
         needs(owner, field, name, wanted, declared)
         return
@@ -625,6 +692,8 @@ def test_needs_accepts_a_region_of_the_wanted_kind_and_otherwise_names_the_owner
     listed = str(raised.value).split("valid ", 1)[1]
     assert ("panes" in listed) == (wanted != "selection")  # only the regions of the wanted kind are listed
     assert ("head" in listed) == (wanted != "partition")
+    assert ("bands" in listed) == (wanted != "selection")
+    assert ("near" in listed) == (wanted != "partition")
 
 
 def test_check_refuses_what_resolve_refuses_without_needing_a_picture():
@@ -647,6 +716,7 @@ NEEDS_SUBJECT = {
     "the subject found piece by piece needs no subject of the whole picture": (["subject_per_grid"], False),
     "the subject without `per` is the subject": (["subject_whole"], True),
     "a region laid over the subject found piece by piece": (["over_found"], False),
+    "regions made from depth": (["near", "bands", "pick_of_bands"], False),
 }
 
 
@@ -674,6 +744,8 @@ USED = {
         {"far", "pick_inner", "inner", "subject"},
     ),
     "two asking for the same": (["pick", "grid", "pick"], {"pick", "grid"}),
+    "a pick of depth bands brings the bands": (["pick_of_bands"], {"pick_of_bands", "bands"}),
+    "a depth selection is made from no other region": (["near"], {"near"}),
 }
 
 
@@ -694,6 +766,27 @@ def test_a_selection_asked_for_as_pieces_is_split_and_a_partition_is_kept():
     split = regions.pieces("subject")
     assert split.count == 2
     np.testing.assert_array_equal(split.labels, as_partition(regions.selection("subject")).labels)
+
+
+NEEDS_DEPTH = {
+    "nothing asked": ([], False),
+    "a grid": (["grid"], False),
+    "the subject": (["subject", "background", "subject_per_grid"], False),
+    "a depth selection": (["near"], True),
+    "depth bands": (["bands"], True),
+    "a pick of depth bands": (["pick_of_bands"], True),
+    "a grid laid over a depth selection": (["grid_on_near"], True),
+    "a pick of that grid": (["pick_of_grid_on_near"], True),
+    "shards laid over that pick": (["over_pick_of_near"], True),
+    "a region and, among others, one that does": (["grid", "bands"], True),
+}
+
+
+@pytest.mark.parametrize(("names", "expected"), NEEDS_DEPTH.values(), ids=NEEDS_DEPTH.keys())
+def test_regions_need_the_depth_when_they_are_made_from_it_however_indirectly(names, expected):
+    regions = {**declared(), "over_pick_of_near": Shards(fit="pick_of_grid_on_near")}
+    check(regions)
+    assert needs_depth(regions, names) is expected
 
 
 # ---- the models ----------------------------------------------------------------------------------------------------
@@ -740,6 +833,15 @@ BAD_VALUES = {
     "threshold past 1": (Subject, {"threshold": 1.1}, "threshold"),
     "negative threshold": (Subject, {"threshold": -0.1}, "threshold"),
     "a per that is no text": (Subject, {"per": 3}, "per"),
+    "far beyond near": (Depth, {"near": 0.3, "far": 0.6}, r"far.*0\.6.*near.*0\.3"),
+    "the default far beyond a near below it": (Depth, {"near": 0.2}, r"far.*0\.5.*near.*0\.2"),
+    "near past 1": (Depth, {"near": 1.5}, "near"),
+    "a negative far": (Depth, {"far": -0.1}, "far"),
+    "feather past 1": (Depth, {"feather": 1.1}, "feather"),
+    "a misspelt depth field": (Depth, {"nearest": 1}, "nearest"),
+    "no bands": (DepthBands, {"count": 0}, "count"),
+    "too many bands": (DepthBands, {"count": 101}, "count"),
+    "a share of a band": (DepthBands, {"count": 2.5}, "count"),
 }
 
 
@@ -775,7 +877,7 @@ def test_every_shipped_preset_cuts_a_picture_differently_from_the_default(preset
     assert not np.array_equal(named, default)
 
 
-@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge, Cuts, Line, Curve, Path, Svg])
+@pytest.mark.parametrize("model", [Grid, Shards, Pick, Subject, Edge, Cuts, Line, Curve, Path, Svg, Depth, DepthBands])
 def test_every_field_is_documented_with_its_unit_and_range(model):
     text = model.documentation()
     for doc in model.fields_doc():
@@ -1393,3 +1495,68 @@ def test_svg_leaves_the_region_a_partition_with_a_piece_for_each_shape_of_a_real
     }
     assert all(len(pieces) == 1 for pieces in partition.ids.values())
     assert partition.count == 12  # eleven shapes and the outside
+
+
+# ---- depth: a selection between two distances, and bands of distance ----------------------------------------------
+
+# Down the picture: from the nearest (1) to the farthest (0).
+DEPTHS = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.45, 0.4, 0.3, 0.0]
+DEPTH_SELECTIONS = {
+    "the default: everything from half way to the front, fading over a tenth behind": (
+        Depth(),
+        [1, 1, 1, 1, 1, 1, 0.5, 0, 0, 0],
+    ),
+    "a band fading over a fifth on both sides": (
+        Depth(near=0.8, far=0.5, feather=0.2),
+        [0, 0.5, 1, 1, 1, 1, 0.75, 0.5, 0, 0],
+    ),
+    "no feather cuts a hard edge": (Depth(near=0.8, far=0.5, feather=0), [0, 0, 1, 1, 1, 1, 0, 0, 0, 0]),
+    "near and far at one depth: only the feather's ramp round it": (
+        Depth(near=0.6, far=0.6, feather=0.2),
+        [0, 0, 0, 0.5, 1, 0.5, 0.25, 0, 0, 0],
+    ),
+    "the whole scale": (Depth(near=1, far=0, feather=1), [1] * 10),
+}
+
+
+@pytest.mark.parametrize(("kind", "chosen"), DEPTH_SELECTIONS.values(), ids=DEPTH_SELECTIONS.keys())
+def test_a_depth_selection_chooses_from_far_to_near_and_fades_linearly_over_the_feather_beyond(kind, chosen):
+    alpha = resolve({"d": kind}, (len(DEPTHS), 3), subject=None, depth=down(DEPTHS)).selection("d").alpha
+    np.testing.assert_allclose(alpha, np.tile(np.asarray(chosen, np.float32)[:, None], (1, 3)), atol=1e-6)
+
+
+DEPTH_BANDS = {
+    "three equal bands, the nearest first, the borders at 2/3 and 1/3": (
+        3,
+        [1.0, 0.9, 0.67, 0.66, 0.34, 0.33, 0.1, 0.0],
+        [0, 0, 0, 1, 1, 2, 2, 2],
+    ),
+    "a depth on a border goes to the farther band; 1 and 0 to the end bands": (
+        4,
+        [1.0, 0.75, 0.5, 0.25, 0.0],
+        [0, 1, 2, 3, 3],
+    ),
+    "one band is one piece": (1, [1.0, 0.5, 0.0], [0, 0, 0]),
+    "a constant depth is one piece": (3, [0.5, 0.5, 0.5], [0, 0, 0]),
+    "the nearest first even when it lies below the farthest": (3, [0.1, 0.1, 0.9, 0.9], [1, 1, 0, 0]),
+    "an empty band drops out and the rest are renumbered, nearest first": (
+        5,
+        [0.05, 0.95, 0.5, 0.95, 0.05],
+        [2, 0, 1, 0, 2],
+    ),
+}
+
+
+@pytest.mark.parametrize(("count", "depths", "pieces"), DEPTH_BANDS.values(), ids=DEPTH_BANDS.keys())
+def test_depth_bands_cut_the_depth_scale_into_equal_ranges_numbered_nearest_first(count, depths, pieces):
+    shape = (len(depths), 3)
+    partition = resolve({"b": DepthBands(count=count)}, shape, subject=None, depth=down(depths)).partition("b")
+    np.testing.assert_array_equal(partition.labels, np.tile(np.asarray(pieces, np.int32)[:, None], (1, 3)))
+    assert partition.count == max(pieces) + 1
+    assert_a_region(partition, shape, down(depths)())
+
+
+def test_a_pick_of_band_0_selects_the_nearest_band():
+    depths = [0.2, 0.9, 0.5, 0.8]
+    regions = resolve({"b": DepthBands(count=3), "front": Pick(of="b")}, (4, 3), subject=None, depth=down(depths))
+    np.testing.assert_array_equal(regions.selection("front").alpha[:, 0], [0, 1, 0, 1])

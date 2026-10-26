@@ -34,7 +34,7 @@ from bullterrier_image.ops.composite import BlendMode
 from . import registry
 from .framing import Framing
 from .params import ValidatedModel
-from .regions import Kind, check, needs, needs_finder, needs_subject
+from .regions import Kind, check, needs, needs_depth, needs_finder, needs_subject
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
 Reference = tuple[str, str, Literal["partition", "selection"] | None]
@@ -320,8 +320,8 @@ class Recipe(ValidatedModel):
         a valid one from any text.
     steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
     regions: the regions the steps can name besides the built-in `subject` and `background`: a name for each `Grid`,
-        `Shards`, `Cuts`, `Path`, `Svg`, `Pick` or `Subject` (see `bullterrier_image.core.regions`). They are checked
-        here, and made for each picture only when a step uses them.
+        `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth` or `DepthBands` (see
+        `bullterrier_image.core.regions`). They are checked here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo, the subject matte and the depth map
@@ -392,8 +392,9 @@ class Recipe(ValidatedModel):
 
     @property
     def needs_depth(self) -> bool:
-        """True if a step's effect, or a look's, takes the depth map: rendering must be given it or a depth finder."""
-        return bool(self.taking("depth"))
+        """True if a step's effect, or a look's, takes the depth map, or a region a step uses is made from it (a `Depth`
+        or `DepthBands`, or a region laid over or picked from one): rendering must be given it or a depth finder."""
+        return bool(self.taking("depth")) or needs_depth(self.regions, self._names_used())
 
     def taking(self, name: str) -> list[tuple[int, str]]:
         """The steps whose effect, or the effect of one of whose looks, takes the injected input `name` (one of

@@ -40,14 +40,15 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
 (`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `cuts` (`lines`: tables `{x, y, angle}` or `{path}`), `path`
-(`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids) or `subject` (`per`,
-`context`, `threshold`), the fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick` and `Subject`; `fit` lays a grid,
-shards, cuts, path or svg over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the
-borders. A *partition* (a grid, shards, cuts or svg) cuts the picture into numbered pieces, a *selection* (a `path`, a
-`pick`, a `subject` or the built-in `subject` and `background`) chooses pixels; a `subject` with `per` finds the subject
-inside each piece of a partition. Steps name regions: `mask` (a selection) limits a step to it, and `partition` names
-the partition an effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own
-look:
+(`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids), `subject` (`per`,
+`context`, `threshold`), `depth` (`near`, `far`, `feather`) or `depth_bands` (`count`), the fields of `Grid`, `Shards`,
+`Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth` and `DepthBands`; `fit` lays a grid, shards, cuts, path or svg over a
+selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid,
+shards, cuts, svg or depth_bands) cuts the picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`,
+a `depth` or the built-in `subject` and `background`) chooses pixels; a `subject` with `per` finds the subject inside
+each piece of a partition; `depth` and `depth_bands` read the depth map (bands are numbered nearest first). Steps name
+regions: `mask` (a selection) limits a step to it, and `partition` names the partition an effect such as `seams` draws.
+A step with `each` (a partition) and `looks` gives every piece its own look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -94,7 +95,7 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.regions import Cuts, Grid, Kind, Pick, Shards, Subject, Svg
+from .core.regions import Cuts, Depth, DepthBands, Grid, Kind, Pick, Shards, Subject, Svg
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step, safe_name
 
@@ -124,6 +125,8 @@ _KINDS: dict[str, type[Kind]] = {
     "svg": Svg,
     "pick": Pick,
     "subject": Subject,
+    "depth": Depth,
+    "depth_bands": DepthBands,
 }
 
 

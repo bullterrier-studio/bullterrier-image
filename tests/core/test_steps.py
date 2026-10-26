@@ -17,7 +17,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Each, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Depth, DepthBands, Each, Grid, Pick, Shards, Subject
 
 
 class GainParams(EffectParams):
@@ -195,10 +195,18 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
         ),
         pytest.param(lambda: [Step("depth_probe", mask="subject")], (True, True), id="a step that needs both"),
         pytest.param(lambda: [Each("g", [Step("grade"), "none"])], (False, False), id="neither"),
+        pytest.param(lambda: [Step("grade", mask="near")], (False, True), id="a mask made from depth"),
+        pytest.param(lambda: [Each("bands", ["none"])], (False, True), id="an each over depth bands"),
+        pytest.param(lambda: [Step("grade", mask="front")], (False, True), id="a pick of depth bands"),
+        pytest.param(lambda: [Each("g", [Step("grade", mask="near")])], (False, True), id="a look's mask"),
+        pytest.param(lambda: [Step("grade")], (False, False), id="depth regions no step uses"),
     ],
 )
-def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_takes_it(depth_probe, steps, needs):
-    recipe = Recipe("look", steps(), regions={"g": Grid()})
+def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_uses_takes_it(
+    depth_probe, steps, needs
+):
+    regions: dict[str, Kind] = {"g": Grid(), "near": Depth(), "bands": DepthBands(), "front": Pick(of="bands")}
+    recipe = Recipe("look", steps(), regions=regions)
     assert (recipe.needs_matte, recipe.needs_depth) == needs
 
 

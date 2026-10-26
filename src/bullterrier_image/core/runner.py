@@ -8,14 +8,14 @@ own (that step's input, scratch and output) plus the scaled maps, whatever the n
 every stage. The runner is given everything it uses: the photo, the subject either as a `matte` or as a `find_subject`
 `Finder`, and the depth either as a `depth` map or as a `find_depth` `Finder`. It asks each finder at most once per
 render (once per photo in `render_all`) and only if the recipe needs its map: the subject for a step on it, an effect
-that takes it, or a region in use that is made from it (regions declared but unused need nothing); the depth for an
-effect that takes it. A region that finds the subject piece by piece (`Subject` with `per`) asks `find_subject` about
-the crop of the working picture of each piece, once per piece per render, even when a `matte` was given (a matte of the
-whole photo does not answer for a part). It never loads a file or looks for a map on its own;
-`bullterrier_image.recipe` binds the default subject finder for users. The maps are found on the photo as given, before
-the recipe's `Framing` is applied, so a crop can follow the subject and the maps move with the photo; the framed photo
-and maps are then scaled to the recipe's size. The recipe's regions are made once per render, for that scaled picture,
-and only as steps ask for them.
+that takes it, or a region in use that is made from it (regions declared but unused need nothing); the depth likewise,
+for an effect that takes it or a region in use made from it (`Depth`, `DepthBands`). A region that finds the subject
+piece by piece (`Subject` with `per`) asks `find_subject` about the crop of the working picture of each piece, once per
+piece per render, even when a `matte` was given (a matte of the whole photo does not answer for a part). It never loads
+a file or looks for a map on its own; `bullterrier_image.recipe` binds the default subject finder for users. The maps
+are found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
+move with the photo; the framed photo and maps are then scaled to the recipe's size. The recipe's regions are made once
+per render, for that scaled picture, and only as steps ask for them.
 
 Dependency direction: imports `steps`, `regions`, the effect registry and `ops` (to scale the photo and blend a step);
 never the recipe-file reader `loader`, so recipes built in Python run without it.
@@ -33,7 +33,7 @@ from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import BoxFinder, Partition, Regions, Selection, look_weights, resolve, used
+from .regions import BoxFinder, Partition, Regions, Selection, look_weights, needs_depth, resolve, used
 from .steps import Each, Recipe, Step
 
 
@@ -227,9 +227,15 @@ def _missing(name: str, recipe: Recipe) -> SubjectNotFoundError | DepthNotFoundE
             "it needs the subject: pass `matte` (the subject's alpha) "
             "or `find_subject` (a Finder, e.g. bullterrier_image.finding.subject.subject_finder())"
         )
-    steps = ", ".join(f"step {number} ({effect})" for number, effect in recipe.taking("depth"))
+    taking = [f"step {number} ({effect})" for number, effect in recipe.taking("depth")]
+    regions = [
+        f"step {number} (its `{key}` {name!r}, a region made from depth)"
+        for number, step in enumerate(recipe.steps, start=1)
+        for key, name, _ in step.references()
+        if needs_depth(recipe.regions, [name])
+    ]
     return DepthNotFoundError(
-        f"recipe {recipe.name!r} {steps} takes the depth map, so it needs depth: pass `depth` (float32 (h, w), 0..1, "
+        f"recipe {recipe.name!r} needs depth for {', '.join(taking + regions)}: pass `depth` (float32 (h, w), 0..1, "
         "1 = nearest, e.g. from bullterrier_image.imageio.load_depth) or `find_depth` (a Finder)"
     )
 
@@ -266,8 +272,10 @@ def _prepare(
     if recipe.size:
         rgb = resize(rgb, recipe.size)
         inputs = {name: resize(layer, recipe.size) for name, layer in inputs.items()}
-    subject = None if matte is None else (lambda: inputs["matte"])  # the subject of the working picture, for a region
-    return rgb, inputs, resolve(recipe.regions, rgb.shape[:2], subject=subject, find=_finder_in(rgb, find_subject))
+    subject = None if matte is None else (lambda: inputs["matte"])  # the maps of the working picture, for a region
+    depth_map = None if depth is None else (lambda: inputs["depth"])
+    find = _finder_in(rgb, find_subject)
+    return rgb, inputs, resolve(recipe.regions, rgb.shape[:2], subject=subject, find=find, depth=depth_map)
 
 
 def _finder_in(rgb: np.ndarray, find_subject: Finder | None) -> BoxFinder | None:

@@ -229,11 +229,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
   input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
-- **Depth is injected like the subject** (built: the input, `depth=`, `find_depth=`, `--depth`, `load_depth`, framing
-  and the pipeline's cache; not built yet: the default model, the region kinds, the gallery's use of it). An effect that
+- **Depth is injected like the subject** (built: the input, `depth=`, `find_depth=`, `--depth`, `load_depth`, framing,
+  the pipeline's cache and the region kinds `Depth` and `DepthBands`; not built yet: the default model, the depth
+  effects, the `depth_haze` and `depth_grade` recipes and the gallery's use of depth). An effect that
   needs distance (`depth_of_field`, `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1,
   1 = nearest. The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
-  `DepthNotFoundError` naming the step), and the public API binds the default: Depth Anything V2 Small
+  `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default: Depth Anything V2 Small
   (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded
   like the portable subject model; `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The
   model's inverse depth is min-max scaled per photo (a flat photo gives zeros). Decided:
@@ -306,7 +307,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
   every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
   give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
-  selects nothing, so a recipe also works on a thumbnail. One documented exception (decided, not built yet): `DepthBands`
+  selects nothing, so a recipe also works on a thumbnail. One documented exception: `DepthBands`
   numbers its ranges nearest first, because "piece 0 is the nearest" is the one rule a depth look can state without knowing the photo.
 - **`Shards.focus` is an exponent offset.** A seed at a share r of the way to the farthest corner moves to r^(1+focus)
   of it; 0 spreads the seeds evenly. *Reason:* the prototype's `(r/R)**(1 + 3*focus)` had a hidden 3 (rule 5); the

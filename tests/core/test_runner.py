@@ -15,7 +15,7 @@ from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Finder, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Depth, DepthBands, Finder, Grid, Pick, Shards, Subject
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
@@ -128,6 +128,17 @@ def deep(**keys) -> Recipe:
     return Recipe("deep", [Step("depth_probe")], **{"size": None, **keys})
 
 
+FRONT = Recipe(  # paints red only the front quarter of the depth scale
+    "front", [Step("fill", {"color": "#ff0000"}, mask="near")], size=None, regions={"near": Depth(far=0.75, feather=0)}
+)
+# Nearest at the top, farthest at the bottom, falling evenly down the 96 rows of the photo.
+DOWN = np.tile(1 - (np.arange(96, dtype=np.float32)[:, None] + 0.5) / 96, (1, 128))
+NEEDING_DEPTH = {  # a recipe that needs depth, and what the error for no depth names
+    "an effect that takes it": (deep, "depth_probe"),
+    "a region made from it": (lambda: FRONT, "'near'"),
+}
+
+
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
 def test_an_effect_that_takes_depth_is_given_the_depth_map(photo, depth_probe, given):
     np.testing.assert_array_equal(runner.render(photo, deep(), **given(RAMP))[..., 0], RAMP)
@@ -154,14 +165,15 @@ def test_the_depth_finder_is_not_asked_when_nothing_needs_depth(photo, matte, de
     assert finder.seen == []
 
 
+@pytest.mark.parametrize(("recipe", "named"), NEEDING_DEPTH.values(), ids=NEEDING_DEPTH.keys())
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_the_step_and_both_ways(
-    run, photo, depth_probe
+    run, photo, depth_probe, recipe, named
 ):
     with pytest.raises(DepthNotFoundError, match="step 1") as raised:
-        run(photo, deep())
+        run(photo, recipe())
     message = str(raised.value)
-    assert "depth_probe" in message
+    assert named in message
     assert "`depth`" in message
     assert "`find_depth`" in message
 
@@ -174,11 +186,12 @@ def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_t
         pytest.param(RAMP[..., None], r"\(96, 128, 1\)", id="the photo's height and width with a channel"),
     ],
 )
+@pytest.mark.parametrize("recipe", [needing for needing, _ in NEEDING_DEPTH.values()], ids=NEEDING_DEPTH.keys())
 def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes(
-    photo, depth_probe, given, wrong, size
+    photo, depth_probe, given, wrong, size, recipe
 ):
     with pytest.raises(DepthNotFoundError, match=size + r".*\(96, 128\)"):
-        runner.render(photo, deep(), **given(wrong))
+        runner.render(photo, recipe(), **given(wrong))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -211,6 +224,13 @@ def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, dept
     assert out.shape == (148, 159, 3)
     assert (out[0, 0, 0], out[0, -1, 0], out[-1, 0, 0], out[-1, -1, 0]) == (0, 0, 0, 0)
     assert out[74, 79, 0] == pytest.approx(1)
+
+
+def test_a_recipe_whose_only_need_for_depth_is_a_region_asks_the_finder_and_traces_the_depth(photo):
+    finder = CountingFinder(DOWN)
+    stages = runner.trace(photo, FRONT, find_depth=Finder("stand-in depth", finder))
+    assert finder.seen == [(96, 128, 3)]
+    assert "depth (white = nearest)" in [stage.label for stage in stages]
 
 
 def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, matte, depth_probe):
@@ -431,6 +451,21 @@ RGB = {RED: (1.0, 0.0, 0.0), GREEN: (0.0, 1.0, 0.0), BLUE: (0.0, 0.0, 1.0), WHIT
 
 def fill(color: str, **keys) -> Step:
     return Step("fill", {"color": color}, **keys)
+
+
+def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo):
+    looks = Each("bands", [fill(RED), fill(GREEN), fill(BLUE)], feather=0)
+    recipe = Recipe("by-distance", [looks], size=None, regions={"bands": DepthBands(count=3)})
+    by_hand = np.empty((96, 128, 3), np.float32)
+    by_hand[:32], by_hand[32:64], by_hand[64:] = RGB[RED], RGB[GREEN], RGB[BLUE]  # nearer than 2/3, than 1/3, the rest
+    np.testing.assert_allclose(runner.render(photo, recipe, depth=DOWN), by_hand, atol=1e-6)
+
+
+@pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
+def test_a_step_masked_to_a_depth_selection_changes_only_what_lies_within_it(photo, given):
+    out = runner.render(photo, FRONT, **given(DOWN))
+    np.testing.assert_allclose(out[:24], np.broadcast_to(RGB[RED], (24, 128, 3)), atol=1e-6)  # depth 0.75 and more
+    np.testing.assert_array_equal(out[24:], photo[24:])
 
 
 def columns(count: int) -> dict[str, Grid | Pick | Shards]:

@@ -155,8 +155,8 @@ render(photo, look, find_subject=Finder("grounded-sam dog v1", partial(grounded,
 **Depth** is a second map, given like the subject: `--depth depth.png` (in Python `depth=imageio.load_depth("depth.png")`)
 takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
 `find_depth=Finder("my-depth v1", find)`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run` remembers each
-photo's depth by that identity, apart from its subject. No depth model is bundled yet: a recipe that takes depth needs
-`--depth` or `find_depth`, else it fails naming its step. The bundled model arrives with the depth effects.
+photo's depth by that identity, apart from its subject. No depth model is bundled yet: a recipe that takes depth (an
+effect, or a depth region, see Regions below) needs `--depth` or `find_depth`, else it fails naming its step. The bundled model arrives with the depth effects.
 
 **Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
 the wheel), not a system font, so a look does not depend on the machine's fonts.
@@ -423,6 +423,34 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 `bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a
 repeat run asks the model nothing. A `--matte` file does not stand in for the finder here (a cell is a part of the
 picture): the segmenter still finds the subject in each cell.
+
+**By distance.** Two kinds read the depth map (1 = nearest, 0 = farthest; the recipe then needs
+depth). `depth` is a selection: everything from `far` to `near`, fading out linearly over `feather` beyond both (all
+shares of the depth scale; `far` above `near` is an error). `depth_bands` is a partition into `count` equal ranges of
+depth, numbered **nearest first** (the one exception to reading order), so piece 0 is the front of any photo; a range
+no pixel falls in is dropped and the rest renumbered:
+
+```toml
+format = 2
+
+[region.front]
+kind = "depth"
+near = 1.0
+far = 0.6
+feather = 0.1
+
+[region.bands]
+kind = "depth_bands"
+count = 3
+
+[[step]]
+each = "bands"                    # nearest, middle, farthest
+looks = ["none", { effect = "grade", saturation = 0.7 }, { effect = "grade", saturation = 0.4, exposure = 0.3 }]
+
+[[step]]
+effect = "clarity"
+mask = "front"                    # only what is near
+```
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
 examples are in [`examples/regions/`](examples/regions/); [the pictures](docs/gallery/regions/README.md).
