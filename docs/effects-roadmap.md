@@ -72,7 +72,7 @@ recipes.
 | `halation` ✓ | Red glow around highlights, as on film. | `fx.halation(radius=20)` |
 | `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
-| `depth_of_field` | Blur by distance, from the injected depth (a model, or a map you supply). | `fx.depth_of_field(focus=0.4)` |
+| `depth_of_field` ✓ | Blur by distance, from the injected depth (the model, or a map you supply); a band around `focus` stays sharp. | `fx.depth_of_field(focus=0.58, radius=8)` |
 
 ## Texture and finish
 
@@ -240,19 +240,18 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 
 ## Depth and light from geometry
 
-A feature to consider: effects that read the injected depth (`docs/design-decisions.md`, "Depth is injected like the
-subject"; the open depth round) and, from it, the surface normals, so light and atmosphere follow the scene's geometry
-instead of the subject's silhouette. A model only estimates the map; every effect stays plain, deterministic maths on
-the photo's own pixels, never a generative model that repaints them. Why: grading the background apart from the
-subject makes it look pasted in (a sticker); depth lets the ground under the subject's feet be treated like the
-subject, and falloff follow the distance.
+Effects and recipes that read the injected depth (`docs/design-decisions.md`, "Depth is injected like the subject") and,
+from it, the surface's shape, so light and atmosphere follow the scene's geometry instead of the subject's silhouette. A
+model only estimates the map; every effect is plain, deterministic maths on the photo's own pixels, never a generative
+model that repaints them. Why: grading the background apart from the subject makes it look pasted in (a sticker); depth
+treats the ground under the subject's feet like the subject, and falloff follows the distance.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `depth_haze` (a recipe) | Aerial perspective: `fill` toward a haze colour, masked to a `depth` region. | planned `examples/recipes/depth-haze.toml` |
-| `depth_grade` (a recipe) | Exposure, contrast and saturation per distance: `grade` over `depth_bands` pieces (`each` + `looks`). | planned `examples/recipes/depth-grade.toml` |
-| `relight` | Shade with a directional light from normals estimated from the depth (Lambert, a soft ambient term). | `fx.relight(angle=135, elevation=30, amount=0.4)` |
-| `ambient_occlusion` | Soft darkening in creases and where surfaces meet, from the depth (screen-space). | `fx.ambient_occlusion(radius=24, amount=0.5)` |
+| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `depth` region of the far part; `clarity` on the near. | `fill` with `mask` = a `kind = "depth"` region |
+| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `depth_bands` pieces (`each` + `looks`). | `each` over a `kind = "depth_bands"` region |
+| `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
+| `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 | `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
 
 ## Subject-aware effects
@@ -341,7 +340,7 @@ no time of its own.
 | `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=0.5)` |
 | `melt_down` | Drips run down and pool. | `fx.melt_down(progress=0.5)` |
 | `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=0.5)` |
-| `parallax` | 2.5D depth shift, from the injected depth. | `fx.parallax(amount=0.03)` |
+| `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=0.03, focus=0.5)` |
 
 Text appearing character by character is bullterrier-vector's (typesetting) animated by video; a caption here is an `svg` region + `fill`/`outline`.
 
