@@ -57,7 +57,7 @@ Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, ru
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
-(`finders={"subject": ...}`). `subject` and `depth` are built in; any other is a recipe's `given` region.
+(`finders={"subject": ...}`). `subject`, `depth` and `light` (made from the picture) are built in; any other map is a recipe's `given` region.
 `bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
 ## The rules

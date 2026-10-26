@@ -248,8 +248,8 @@ treats the ground under the subject's feet like the subject, and falloff follows
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `depth` region of the far part; `clarity` on the near. | `fill` with `mask` = a `kind = "depth"` region |
-| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `depth_bands` pieces (`each` + `looks`). | `each` over a `kind = "depth_bands"` region |
+| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `clarity` on the near. | `fill` with `mask` = a `band` of `depth` region |
+| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 | `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |

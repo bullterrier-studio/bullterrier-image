@@ -355,12 +355,15 @@ which it fits to the photo and blends by its own transparency.
 `kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
 stone, with presets `glass`, `torn`, `stone` and `mosaic`), `cuts` (straight and curved lines across the picture), `svg`
 (the shapes of an SVG file), a `path` (everything inside a closed SVG path), a `pick` of some pieces of a partition, a
-`subject`, or a `given` map (see [Maps of your own](#platforms)). Grids, shards, cuts and svg are *partitions*: every pixel
-is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps` draws them numbered). A `path`, a
-`pick`, a `subject`, a `given` map and the built-in `subject`, `background` and `depth` are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole picture, and
-`edge = { style = "torn" }` tears its borders. A step uses regions by name: `mask` limits it to a selection, `each` +
-`looks` gives every piece of a partition its own look (each look is rendered once over the whole picture, so the cost is
-the number of looks, not pieces), and `partition` names the partition the `seams` effect draws lines along:
+`subject`, or a `given` map (see [Maps of your own](#platforms)); with `format = 3` also a `band`, `bands`, `combine`,
+`linear_gradient` or `radial_gradient` (see "By a field" below). Grids, shards, cuts, svg and bands are *partitions*:
+every pixel is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps` draws them numbered).
+A `path`, a `pick`, a `subject`, a `given` map, a `band`, a `combine`, a gradient and the built-in `subject`,
+`background`, `depth` and `light` are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole
+picture, and `edge = { style = "torn" }` tears its borders. A step uses regions by name: `mask` limits it to a
+selection, `each` + `looks` gives every piece of a partition its own look (each look is rendered once over the whole
+picture, so the cost is the number of looks, not pieces), and `partition` names the partition the `seams` effect draws
+lines along:
 
 
 ```toml
@@ -465,8 +468,8 @@ repeat run asks the model nothing. A `subject` map you hand in does not stand in
 picture): the segmenter still finds the subject in each cell.
 
 **By a field.** A selection also has *values*, and a *field* is one read for them: the built-in `depth` (1 = nearest, 0 =
-farthest; the recipe then needs depth), `light` (the picture's own brightness, 0 black to 1 white, made from the picture the
-steps work on, so it needs no map or model), `subject`, a `given` map, a gradient, or any other selection. Three kinds
+farthest; the recipe then needs depth), `light` (the picture's own brightness, 0 black to 1 white, made from the picture as the
+recipe receives it, before its first step, so it needs no map or model), `subject`, a `given` map, a gradient, or any other selection. Three kinds
 cut a field by its values; `of` names the field:
 
 - `band` is a selection: the pixels where the field lies from `low` to `high`, fading out linearly over `feather` beyond

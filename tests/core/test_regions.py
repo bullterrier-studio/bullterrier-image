@@ -580,11 +580,12 @@ def test_regions_are_made_once_and_handed_out_read_only():
     ("kind", "error", "complaint"),
     [
         pytest.param(Shards(fit="subject"), SubjectNotFoundError, "subject", id="the subject"),
-        pytest.param(Band(of="depth"), DepthNotFoundError, "depth", id="a band of the depth"),
-        pytest.param(Bands(of="depth"), DepthNotFoundError, "depth", id="bands of the depth"),
+        pytest.param(Band(of="depth"), DepthNotFoundError, "'s'.*depth", id="a band of the depth, naming it"),
+        pytest.param(Bands(of="depth"), DepthNotFoundError, "'s'.*depth", id="bands of the depth, naming them"),
         pytest.param(
-            Combine(of=("subject", "depth")), SubjectNotFoundError, "subject", id="a combination with the subject"
+            Combine(of=("subject", "depth")), SubjectNotFoundError, "'s'.*subject", id="a combination, naming it"
         ),
+        pytest.param(Band(of="light"), MapNotFoundError, "'s'.*light", id="a band of the light, naming it"),
     ],
 )
 def test_a_region_made_from_a_map_says_so_when_there_is_none(kind, error, complaint):
@@ -1650,6 +1651,25 @@ def test_a_band_reads_whatever_selection_it_is_of_not_only_the_depth():
     np.testing.assert_allclose(alpha[:, 0], alpha[:, 2])  # the same down every column
 
 
+def test_a_long_chain_of_regions_made_of_one_another_is_checked_without_running_out_of_stack():
+    regions: dict[str, Kind] = {"r0": Band(of="depth")}
+    regions |= {f"r{i}": Band(of=f"r{i - 1}") for i in range(1, 3000)}
+    check(regions)  # a recursive walk of it would exceed Python's stack
+
+
+def test_regions_that_share_what_they_are_made_of_are_checked_in_a_time_that_does_not_grow_with_the_paths():
+    # each region combines the one before with itself: 2 to the 40th paths from the last one down to the first
+    regions: dict[str, Kind] = {"r0": Band(of="depth")}
+    regions |= {f"r{i}": Combine(of=(f"r{i - 1}", f"r{i - 1}")) for i in range(1, 41)}
+    check(regions)  # walking every path would take longer than anyone waits
+
+
+def test_a_cycle_is_found_however_long_and_however_many_ways_lead_to_it():
+    regions: dict[str, Kind] = {"a": Combine(of=("depth", "b")), "b": Combine(of=("c", "c")), "c": Band(of="a")}
+    with pytest.raises(RecipeError, match=r"cycle.*'a'.*'b'.*'c'.*'a'"):
+        check(regions)
+
+
 def test_a_band_of_a_band_cuts_the_first_ones_alpha_again():
     regions = resolve(
         {"near": Band(of="depth", low=0.5, high=1, feather=0.5), "core": Band(of="near", low=1, high=1, feather=0)},
@@ -1793,6 +1813,16 @@ def test_a_gradient_rising_upward_is_1_at_the_top_and_0_at_the_bottom():
     alpha = resolve({"g": LinearGradient(angle=90)}, (8, 3), maps={}).selection("g").alpha
     np.testing.assert_allclose(alpha[:, 0], 1 - (np.arange(8) + 0.5) / 8, atol=1e-6)
     np.testing.assert_allclose(alpha, np.tile(alpha[:, :1], (1, 3)))  # constant along each row
+
+
+def test_an_oblique_gradient_on_a_wide_picture_has_the_values_worked_out_by_hand():
+    # 45 degrees on 40 columns x 10 rows: the extent that way is 40 cos 45 + 10 sin 45 = 50 cos 45, and a pixel centre
+    # (x, y) is ((x - 20) cos 45 - (y - 5) sin 45) / (50 cos 45) + 0.5, where cos 45 = sin 45 cancels
+    alpha = resolve({"g": LinearGradient(angle=45)}, (10, 40), maps={}).selection("g").alpha
+    assert alpha[0, 39] == pytest.approx((19.5 + 4.5) / 50 + 0.5, abs=1e-6)  # 0.98: top right
+    assert alpha[9, 0] == pytest.approx((-19.5 - 4.5) / 50 + 0.5, abs=1e-6)  # 0.02: bottom left
+    assert alpha[2, 30] == pytest.approx((10.5 + 2.5) / 50 + 0.5, abs=1e-6)  # 0.76
+    assert alpha[5, 20] == pytest.approx(0.5, abs=1e-6)  # (0.5 - 0.5) cos 45 over the extent: the middle
 
 
 def test_a_diagonal_gradient_reaches_0_and_1_at_the_far_corners_whatever_the_aspect():

@@ -25,7 +25,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     [[step]]
     effect = "fill"
     color = "#000000"
-    mask = "background"            # "subject", "background", "depth" or a region that is a selection: apply only there
+    mask = "background"            # "subject", "background", "depth", "light" or a region that is a selection
     opacity = 0.3                  # optional, 0..1: mix the effect in partway (default 1 = fully)
 
     [[step]]
@@ -60,8 +60,9 @@ partition an effect such as `seams` draws. A step with `each` (a partition) and 
     feather = 0.001                # soft borders between pieces, a share of the long side
     mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
 
-Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them. A region
-of `kind = "given"` (a map handed in at render time) needs `format = 3`.
+Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them. The region
+kinds `given` (a map handed in at render time), `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient` need
+`format = 3`.
 
 A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
 it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
@@ -123,7 +124,9 @@ __all__ = ["load_recipe", "with_pictures"]
 # format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`,
 # `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region
 # kinds `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, and a file of an earlier format
-# may not use them.
+# may not use them. It also replaced the kinds `depth` and `depth_bands` by `band` and `bands` and took the region name
+# `light`: the one place a file's meaning changed, so a file of any format that uses the old kinds is refused saying
+# what to write, and one that declares a region called `light` is refused as it is for `subject`.
 _FORMATS = (1, 2, 3)
 _NEW_IN_2 = ("each", "looks", "partition")
 _KINDS_NEW_IN_3 = ("given", "band", "bands", "combine", "linear_gradient", "radial_gradient")

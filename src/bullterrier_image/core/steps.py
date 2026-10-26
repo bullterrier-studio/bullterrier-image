@@ -50,8 +50,9 @@ class _Layer(ValidatedModel):
 
     mask: str | None = Field(
         None,
-        description='Apply only where this selection says: the "subject", "background" or "depth" of the photo, or the '
-        "name of a selection the recipe declares (path, pick, subject, depth or given); None: everywhere.",
+        description='Apply only where this selection says: the "subject", "background", "depth" or "light" of the '
+        "photo, or the name of a selection the recipe declares (path, pick, subject, band, combine, a gradient or "
+        "given); None: everywhere.",
     )
     opacity: float = Field(
         ge=0,
@@ -320,10 +321,10 @@ class Recipe(ValidatedModel):
         COM1-9, LPT1-9, in any case, with or without an extension); anything else is a RecipeError. `safe_name` makes
         a valid one from any text.
     steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
-    regions: the regions the steps can name besides the built-in `subject` and `background`: a name for each `Grid`,
-        `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
-        `RadialGradient` or `Given` (see
-        `bullterrier_image.core.regions`). They are checked here, and made for each picture only when a step uses them.
+    regions: the regions the steps can name besides the built-in `subject`, `background`, `depth` and `light`: a name
+        for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`,
+        `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked here, and
+        made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo and its maps (the subject, the depth,
@@ -338,7 +339,8 @@ class Recipe(ValidatedModel):
     steps: tuple[Step | Each, ...] = Field(description="The steps, run in order, each on the previous one's output.")
     regions: dict[str, Kind] = Field(
         default_factory=dict,
-        description="The regions the steps name, by name, besides the built-in 'subject' and 'background'.",
+        description="The regions the steps name, by name, besides the built-in 'subject', 'background', 'depth' and "
+        "'light'.",
     )
     size: int | None = Field(
         1024, ge=1, strict=True, description="Longest side of the working image in px; None keeps the photo's size."

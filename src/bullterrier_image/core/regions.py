@@ -92,6 +92,7 @@ __all__ = [
 ]
 
 BUILT_IN = ("subject", "background", "depth", "light")
+BUILT_IN_MAPS = ("subject", "depth", "light")  # the built-in regions that are a map of the photo as it is
 # The built-in maps made from the working picture itself, by name: not found, handed in or cached, so the runner makes
 # them for each render. `light` is the picture's brightness (Rec. 709 weights, `ops.color.luminance`).
 DERIVED = {"light": luminance}
@@ -968,8 +969,8 @@ def _references(kind: Kind) -> tuple[str, ...]:
 
 
 class Regions(Mapping[str, Partition | Selection]):
-    """The regions of one picture by name: the built-in `subject`, `background` and `depth` and every declared region.
-    A region is made the first time it is asked for (with what it is made from), then kept."""
+    """The regions of one picture by name: the built-in `subject`, `background`, `depth` and `light` and every declared
+    region. A region is made the first time it is asked for (with what it is made from), then kept."""
 
     def __init__(
         self,
@@ -1037,11 +1038,11 @@ class Regions(Mapping[str, Partition | Selection]):
             return self._pick(name, kind)
         match kind:
             case Band():
-                return _band(kind, self.selection(kind.of).alpha)
+                return _band(kind, self._values(name, kind.of))
             case Bands():
-                return _bands(kind, self.selection(kind.of).alpha)
+                return _bands(kind, self._values(name, kind.of))
             case Combine():
-                return _combined(kind, [self.selection(of).alpha for of in kind.of])
+                return _combined(kind, [self._values(name, of) for of in kind.of])
             case LinearGradient():
                 return _linear(kind, self._shape)
             case RadialGradient():
@@ -1066,6 +1067,13 @@ class Regions(Mapping[str, Partition | Selection]):
                     return _drawn(kind, self._shape, box, x, y)
         except RecipeError as error:
             raise RecipeError(f"region {name!r}: {error}") from None
+
+    def _values(self, user: str, of: str) -> np.ndarray:
+        """The values of the selection `of`, read by the region `user`: a built-in map straight from the maps given, so
+        that a missing one is named for `user`; any other selection as it is made."""
+        if of in BUILT_IN_MAPS:
+            return self._map(of, f"region {user!r}")
+        return self.selection(of).alpha
 
     def _map(self, name: str, user: str) -> np.ndarray:
         """The map `name` of the whole picture, read-only as float32 (a view: the giver's array is left writable);
@@ -1148,8 +1156,9 @@ class Regions(Mapping[str, Partition | Selection]):
 
 
 def check(declared: Mapping[str, Kind]) -> None:
-    """RecipeError unless the declared regions are consistent: a `fit` names a selection, an `of` a partition, no name
-    is one of the built-ins and regions do not refer to each other in a cycle. Builds nothing, needs no picture; the
+    """RecipeError unless the declared regions are consistent: a `fit` names a selection, a `Pick`'s `of` a partition, a
+    `Band`'s, `Bands`' or `Combine`'s `of` a selection, no name is one of the built-ins and regions do not refer to each
+    other in a cycle. Builds nothing, needs no picture; the
     message names the region and lists the valid names."""
     for name, kind in declared.items():
         if name in BUILT_IN:
@@ -1166,18 +1175,29 @@ def check(declared: Mapping[str, Kind]) -> None:
                 needs(f"region {name!r}", "per", kind.per, "partition", declared)
         elif isinstance(kind, _Laid) and kind.fit is not None:
             needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
+    _no_cycle(declared)
+
+
+def _no_cycle(declared: Mapping[str, Kind]) -> None:
+    """RecipeError if declared regions refer to each other in a cycle. One walk that visits every region once (and
+    keeps no Python stack), however many ways lead to a region and however long the chains."""
+    done: set[str] = set()
     for start in declared:
-        _no_cycle([start], declared)
-
-
-def _no_cycle(chain: list[str], declared: Mapping[str, Kind]) -> None:
-    """RecipeError if a region reachable from the last of `chain` (the regions followed so far) is already in it."""
-    for ref in _references(declared[chain[-1]]):
-        if ref in chain:
-            loop = " -> ".join(repr(each) for each in [*chain[chain.index(ref) :], ref])
-            raise RecipeError(f"regions refer to each other in a cycle: {loop}")
-        if ref in declared:
-            _no_cycle([*chain, ref], declared)
+        if start in done:
+            continue
+        path, walks = [start], [iter(_references(declared[start]))]
+        while walks:
+            for ref in walks[-1]:
+                if ref in path:
+                    loop = " -> ".join(repr(each) for each in [*path[path.index(ref) :], ref])
+                    raise RecipeError(f"regions refer to each other in a cycle: {loop}")
+                if ref in declared and ref not in done:
+                    path.append(ref)
+                    walks.append(iter(_references(declared[ref])))
+                    break
+            else:  # every reference of the last region on the path is checked
+                done.add(path.pop())
+                walks.pop()
 
 
 def used(declared: Mapping[str, Kind], names: Iterable[str]) -> set[str]:
@@ -1239,13 +1259,14 @@ def resolve(
     find: BoxFinder | None = None,
 ) -> Regions:
     """The regions `declared` (name -> kind) make over a picture of `shape` (height, width), plus the built-in
-    `subject` and `background`, built when asked for (`regions[name]`).
+    `subject`, `background`, `depth` and `light`, built when asked for (`regions[name]`).
 
-    `maps` are the maps of the picture by name (`subject`, `depth`, a `Given` region's name), each float
-    `(height, width)` in 0..1: the ones `maps_used` says the regions in use read (this module never loads a picture or
-    a model); the caller passes maps of the picture's `(height, width)`, finite and within 0..1 (the runner checks
-    them). `find` finds the subject inside a box of the picture (see `BoxFinder`), once for each piece of a `Subject`
-    with `per`, its answers checked here (`check_map`); None when there is none.
+    `maps` are the maps of the picture by name (`subject`, `depth`, a `Given` region's name, and the `DERIVED` ones such
+    as `light`), each float `(height, width)` in 0..1: the ones `maps_used` and `derived_maps` say the regions in use
+    read (this module never loads a picture or a model); the caller passes maps of the picture's `(height, width)`,
+    finite and within 0..1 (the runner checks them). `find` finds the subject inside a box of the picture (see
+    `BoxFinder`), once for each piece of a `Subject` with `per`, its answers checked here (`check_map`); None when there
+    is none.
 
     Every reference is checked here, for all declared regions, whether asked for or not (see `check`). RecipeError
     naming the region and the valid names."""
