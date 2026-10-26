@@ -54,7 +54,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `scale` | number | ratio | 0.1 to 0.9 | `0.5` | How much smaller each copy is than the one around it, strictly between 0 and 1: 0.5 = each copy is half the size of the last, 0.9 = a slow shrink with many copies close together, 0.1 = one small copy. The copy has the picture's own shape and sits in its middle. |
-| `turn` | number | degrees | -180 to 180 | `20.0` | How far each copy is turned from the one around it, in degrees: positive turns the copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them upright (nested frames); other values make the copies spiral into the middle. |
+| `turn` | number (cyclic) | degrees | -180 to 180 | `20.0` | How far each copy is turned from the one around it, in degrees: positive turns the copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them upright (nested frames); other values make the copies spiral into the middle. |
 | `repeats` | whole number | count | 1 to 12 | `4` | How many copies are drawn inside one another at most, 1 to 12: the copy this deep shows the picture's middle instead of a further copy. Raising it adds ever smaller copies towards the middle. |
 
 <details><summary>Advanced parameters (2)</summary>
@@ -90,7 +90,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | `scale` | number | px | 1 to 1024 | `80.0` | Size of the coarsest swirls of the flow in pixels, the spacing of the first noise lattice. Larger = broad, sweeping currents; small = fine, busy eddies. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed to make the flow, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth currents, more = more fine, ragged detail. Layers finer than one pixel are dropped. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same flow, another seed a different one. |
-| `angle` | number | degrees | -180 to 180 | `0.0` | The direction the flow runs in on average, in degrees clockwise from pointing right: 0 carries the picture to the right, 90 down, -90 up, 180 to the left. With `variation` 0 the whole picture is carried this way. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | The direction the flow runs in on average, in degrees clockwise from pointing right: 0 carries the picture to the right, 90 down, -90 up, 180 to the left. With `variation` 0 the whole picture is carried this way. |
 | `variation` | number | degrees | 0 to 360 | `60.0` | How far the noise turns the flow away from `angle`: the typical turn, in degrees, either way (the noise's standard deviation). 0 = one straight current; 60 = streaks that wander about the angle; 360 = currents running every way, with eddies where they meet. |
 
 <details><summary>Advanced parameters (5)</summary>
@@ -110,7 +110,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `segments` | whole number | count | 2 to 64 | `6` | How many times the pattern repeats round the centre: the full circle is cut into this many equal sectors, each holding a wedge of the picture (half a sector wide) and its mirror image, so every wedge borders its own reflection and the seams between them do not show. 2 = a picture mirrored across a line through the centre and again across the line at right angles; raising it makes more, narrower wedges. |
-| `angle` | number | degrees | -180 to 180 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right, of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. The pattern repeats every 360 / segments degrees. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right, of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. The pattern repeats every 360 / segments degrees. |
 | `x` | number | fraction | 0 to 1 | `0.5` | The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
 | `y` | number | fraction | 0 to 1 | `0.5` | The centre's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
 
@@ -183,7 +183,7 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `0.0` | The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, 180 = left. Layers farther than the focus move the opposite way. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, 180 = left. Layers farther than the focus move the opposite way. |
 | `amount` | number | fraction | 0 to 0.1 | `0.02` | How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a fraction of the picture's long side: a layer moves amount x (its depth - focus) of it. Raising it exaggerates the shift; 0 leaves the picture unchanged. |
 | `focus` | number | fraction | 0 to 1 | `0.5` | The depth that stays still, as a fraction of the picture's depth range: 1 = the nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the opposite way; raising it moves more of the picture against `angle`. |
 
@@ -202,7 +202,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `vertical` | number | fraction | -0.9 to 0.9 | `0.25` | The vertical keystone: the fraction by which the far edge shrinks while the near one keeps its width, straight lines staying straight, as when a camera tilts back to shoot a tall building. Positive makes the top the far side (the top edge narrows to 1 - vertical of the bottom edge), negative makes the bottom the far side; 0 = none. Raising it makes a steeper converging; it stops short of 1, where the far edge would shrink to a point. |
 | `horizontal` | number | fraction | -0.9 to 0.9 | `0.0` | The horizontal keystone: the fraction by which the far edge shrinks while the near one keeps its height, as when a camera turns to the side. Positive makes the right side the far side (the right edge shortens to 1 - horizontal of the left edge), negative makes the left side the far side; 0 = none. Applied after the vertical keystone. |
-| `rotate` | number | degrees | -180 to 180 | `0.0` | How far the picture is turned about its centre, after the keystones, in degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners it uncovers are filled by `edge`. |
+| `rotate` | number (cyclic) | degrees | -180 to 180 | `0.0` | How far the picture is turned about its centre, after the keystones, in degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners it uncovers are filled by `edge`. |
 | `scale` | number | fraction | -0.9 to 4 | `0.0` | How much the picture is enlarged about its centre, after the keystones and the turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half the size (the empty margin is filled by `edge`). Enlarging it hides the corners that the keystone and turn uncover. |
 
 <details><summary>Advanced parameters (2)</summary>
@@ -265,8 +265,8 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `wavelength` | number | px | 2 to 4000 | `40.0` | The distance in pixels from one crest of the wave to the next, along the wave's direction. Raising it gives long, lazy swells; lowering it gives tight, fine ripples (below about 4 px the wave is too fine for the pixels to show it). |
 | `amplitude` | number | px | 0 to 500 | `6.0` | How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the picture unchanged. |
-| `phase` | number | degrees | -360 to 360 | `0.0` | Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it slides the wave along. |
-| `angle` | number | degrees | -180 to 180 | `0.0` | The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to this direction. |
+| `phase` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it slides the wave along. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to this direction. |
 
 <details><summary>Advanced parameters (2)</summary>
 

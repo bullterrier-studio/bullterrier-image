@@ -348,7 +348,7 @@ kept, and the result is clipped to 0..1.
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 315.0
+angle : number (cyclic), degrees, 0 to 360, default 315.0
     Where the light comes from, in degrees clockwise from the top of the picture: 0 =
     above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Slopes
     that face it are brightened, those that face away darkened.
@@ -881,7 +881,7 @@ wind : number, fraction, -1 to 1, default 0.2
     The farthest any piece is carried by the time it vanishes, as a fraction of the
     picture width: positive blows right, negative left. Keep it under a third, or pieces
     cross too much of the picture in one go.
-angle : number, degrees, -180 to 180, default 10.0
+angle : number (cyclic), degrees, -180 to 180, default 10.0
     Direction of the wind above the horizontal (on the side `wind` blows to); negative
     blows downward.
 seed : whole number, count, 0 to 2147483647, default 0
@@ -1101,7 +1101,7 @@ scale : number, ratio, 0.1 to 0.9, default 0.5
     = each copy is half the size of the last, 0.9 = a slow shrink with many copies close
     together, 0.1 = one small copy. The copy has the picture's own shape and sits in its
     middle.
-turn : number, degrees, -180 to 180, default 20.0
+turn : number (cyclic), degrees, -180 to 180, default 20.0
     How far each copy is turned from the one around it, in degrees: positive turns the
     copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them
     upright (nested frames); other values make the copies spiral into the middle.
@@ -1264,7 +1264,7 @@ the picture multiplied by twice the shade (flat areas keep their colour), clippe
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 315.0
+angle : number (cyclic), degrees, 0 to 360, default 315.0
     Where the light comes from, in degrees clockwise from the top of the picture: 0 =
     above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left (the usual
     choice: it reads as raised). Surfaces that rise away from the light are brighter
@@ -1641,7 +1641,7 @@ octaves : whole number, count, 1 to 8, default 3
     ragged detail. Layers finer than one pixel are dropped.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same flow, another seed a different one.
-angle : number, degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, -180 to 180, default 0.0
     The direction the flow runs in on average, in degrees clockwise from pointing right:
     0 carries the picture to the right, 90 down, -90 up, 180 to the left. With
     `variation` 0 the whole picture is carried this way.
@@ -1904,7 +1904,7 @@ kind : one of 'linear', 'radial', 'conic', default 'linear'
 colors : list of colours, default ('#12002b', '#ff2bd6')
     The gradient's colours in order, evenly spaced; at least two. Linear: from the start
     of the band to its end. Radial: from the centre outwards. Conic: round the turn.
-angle : number, degrees, 0 to 360, default 90.0
+angle : number (cyclic), degrees, 0 to 360, default 90.0
     Linear: the direction the colours run, measured clockwise on screen from the right:
     0 = left to right, 90 = top to bottom. Conic: where the sweep starts, on the same
     scale (0 = right of the centre, 90 = below it). Ignored by 'radial'.
@@ -2045,7 +2045,7 @@ Parameters
 cell : whole number, px, 1 to 200, default 14
     Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
     bigger dots, a coarser print.
-angle : number, degrees, -360 to 360, default 45.0
+angle : number (cyclic), degrees, -180 to 180, default 45.0
     Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many
     degrees below the x axis (negative = above). The grid is square, so 90 degrees on
     looks the same; 45 is the classic screen angle for one ink.
@@ -2180,7 +2180,7 @@ except for very saturated colours whose rotated version cannot be displayed and 
 
 Parameters
 ----------
-hue : number (drivable), degrees, -360 to 360, default 90.0
+hue : number (drivable) (cyclic), degrees, -180 to 180, default 90.0
     The turn around the colour wheel: 120 sends red to green, 360 is a full turn
     (unchanged)."""
     ...
@@ -2258,7 +2258,7 @@ segments : whole number, count, 2 to 64, default 6
     and its mirror image, so every wedge borders its own reflection and the seams
     between them do not show. 2 = a picture mirrored across a line through the centre
     and again across the line at right angles; raising it makes more, narrower wedges.
-angle : number, degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, -180 to 180, default 0.0
     Where the pattern starts, as the direction in degrees, clockwise from pointing
     right, of the first mirror axis and of the wedge that follows it: 0 puts an axis
     along the line right of the centre; turning it turns the mirror axes, and shows a
@@ -2303,7 +2303,7 @@ offset : number, px, 0 to 200, default 14.0
     How far each layer lies beyond the one before it, in px at the recipe's size: the
     first is `offset` from the subject, the last `layers` x `offset`. 0 = every layer
     hidden behind the subject.
-angle : number, degrees, -180 to 180, default 45.0
+angle : number (cyclic), degrees, -180 to 180, default 45.0
     The direction the layers step away in, clockwise as seen in the picture: 0 = to the
     right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up.
 color : colour, default '#ff8a5b'
@@ -2584,7 +2584,7 @@ size : number, fraction, 0.01 to 1, default 0.25
     its diagonal: each patch is a soft bump whose width is between half of this and all
     of it, centred between the edge and this far in. Raising it floods more of the
     picture.
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The side the light comes in from, as the direction from the picture's centre,
     counterclockwise as seen on it: 0 = the right edge, 90 = the top, 180 = the left,
     270 = the bottom; in between, the corner.
@@ -2710,7 +2710,7 @@ no subject and so no shadow: the picture comes back unchanged.
 
 Parameters
 ----------
-angle : number, degrees, -180 to 180, default 45.0
+angle : number (cyclic), degrees, -180 to 180, default 45.0
     The direction the shadow is cast, clockwise as seen in the picture: 0 = to the
     right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. Angles that
     are not a multiple of 45 leave the shadow's edges about a pixel soft.
@@ -2807,7 +2807,7 @@ flat, the mean is kept and the result never leaves the picture's own range. The 
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction of the motion, counter-clockwise as seen in the picture: 0 =
     horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180)
     give the same blur.
@@ -3092,7 +3092,7 @@ model (never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Withou
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction the nearest layers move, counter-clockwise as seen in the picture: 0 =
     right, 90 = up, 180 = left. Layers farther than the focus move the opposite way.
 amount : number, fraction, 0 to 0.1, default 0.02
@@ -3135,7 +3135,7 @@ cell : number, px, 2 to 512, default 32.0
     The size of one repeat in px: the distance from one stripe to the next, the side of
     a check, a dot or a grid square. Tuned for a picture about 480 px high; larger = a
     coarser pattern.
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     Turns the pattern clockwise on screen about the picture's top-left corner. At 0 the
     stripes are vertical and the checks, dots and grid lines are aligned with the
     picture's edges; at 90 the stripes are horizontal.
@@ -3179,7 +3179,7 @@ horizontal : number, fraction, -0.9 to 0.9, default 0.0
     side the far side (the right edge shortens to 1 - horizontal of the left edge),
     negative makes the left side the far side; 0 = none. Applied after the vertical
     keystone.
-rotate : number, degrees, -180 to 180, default 0.0
+rotate : number (cyclic), degrees, -180 to 180, default 0.0
     How far the picture is turned about its centre, after the keystones, in degrees:
     positive turns clockwise, negative counter-clockwise; 0 = none. The corners it
     uncovers are filled by `edge`.
@@ -3646,7 +3646,7 @@ background beside it; raise `blur` or lower `height` to soften it.
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 315.0
+angle : number (cyclic), degrees, 0 to 360, default 315.0
     Where the light comes from, in degrees clockwise from the top of the picture: 0 =
     above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that
     face it are brightened, those that face away darkened.
@@ -3686,7 +3686,7 @@ or fractional distances are allowed; what a channel shows where it has left the 
 
 Parameters
 ----------
-angle : number, degrees, 0 to 360, default 30.0
+angle : number (cyclic), degrees, 0 to 360, default 30.0
     The direction red moves, in degrees counter-clockwise from pointing right (as on a
     protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the
     opposite way.
@@ -3718,7 +3718,7 @@ with a subject that has no edge (empty or full), there is nothing to light and t
 
 Parameters
 ----------
-angle : number, degrees, -180 to 180, default 40.0
+angle : number (cyclic), degrees, -180 to 180, default 40.0
     The direction the light comes from, counter-clockwise from the right: 0 = from the
     right, 90 = from above, 180 or -180 = from the left, -90 = from below. Only edges
     whose outward direction faces it are lit.
@@ -3773,12 +3773,12 @@ amplitude : number, px, 0 to 500, default 6.0
     How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's
     direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the
     picture unchanged.
-phase : number, degrees, -360 to 360, default 0.0
+phase : number (cyclic), degrees, -180 to 180, default 0.0
     Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the
     line through the picture's centre and rising away from it in the wave's direction,
     90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it
     slides the wave along.
-angle : number, degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, -180 to 180, default 0.0
     The direction the wave travels in, in degrees clockwise from pointing right: 0 sends
     the wave along the picture's width, so each column is moved up or down and the
     crests are horizontal ripples running across; 90 sends it down the picture, so each
@@ -3914,7 +3914,7 @@ construction, so the result needs no clipping.
 
 Parameters
 ----------
-hue : number, degrees, 0 to 360, default 0.0
+hue : number (cyclic), degrees, 0 to 360, default 0.0
     Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120
     green, 180 cyan, 240 blue, 300 magenta; 360 is red again.
 width : number, degrees, 0 to 360, default 60.0
@@ -4458,7 +4458,7 @@ amount : number, ratio, 0 to 10, default 0.8
     How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
     bright as the point that makes it, at the point; above 1 it saturates to white
     sooner.
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction of the first spike, counterclockwise as seen on the picture: 0 = to
     the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45
     turns the cross into an X.
@@ -4630,7 +4630,7 @@ feather : number, fraction, 0.01 to 1, default 0.25
     of the picture's extent at right angles to the band: the blur and the colour boost
     grow evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt
     one.
-angle : number, degrees, 0 to 360, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction of the band, counterclockwise as seen on the picture: 0 = horizontal,
     with the focus counted from the top; 90 = vertical, counted from the left; 45 runs
     from the lower left to the upper right.

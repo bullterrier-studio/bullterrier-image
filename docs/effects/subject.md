@@ -28,7 +28,7 @@ Effects that work on the cut-out subject, apart from its background.
 | `sweep` | number | ratio | -1 to 1 | `0.0` | Weight of side in the order: positive starts at the left, negative at the right; its size is how much it matters next to `top` and `outline`. |
 | `reach` | number | fraction | 0 to 1 | `1.0` | How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses and the rest stays, 1 = everything goes. |
 | `wind` | number | fraction | -1 to 1 | `0.2` | The farthest any piece is carried by the time it vanishes, as a fraction of the picture width: positive blows right, negative left. Keep it under a third, or pieces cross too much of the picture in one go. |
-| `angle` | number | degrees | -180 to 180 | `10.0` | Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `10.0` | Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: each piece's fate is fixed by it, so one seed always gives the same pieces the same fates. |
 
 <details><summary>Advanced parameters (30)</summary>
@@ -142,7 +142,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `layers` | whole number | count | 1 to 20 | `4` | How many copies of the silhouette are stacked behind the subject. Raising it makes a deeper stack. |
 | `offset` | number | px | 0 to 200 | `14.0` | How far each layer lies beyond the one before it, in px at the recipe's size: the first is `offset` from the subject, the last `layers` x `offset`. 0 = every layer hidden behind the subject. |
-| `angle` | number | degrees | -180 to 180 | `45.0` | The direction the layers step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `45.0` | The direction the layers step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. |
 | `color` | colour |  |  | `'#ff8a5b'` | The colour of the layer nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `end_color` | colour |  |  | `'#3b1f6b'` | The colour of the farthest layer; the layers between step evenly from `color` to it. With one layer only `color` is used. |
 | `layer_opacity` | number | fraction | 0 to 1 | `1.0` | How much of what lies behind each layer it covers: 1 = fully (paper), below 1 the layers show through each other and the picture; 0 = no layers. Not the step's `opacity`: each layer is laid at this over the ones beyond it, so where layers overlap they compound (two layers at 0.5 cover 0.75), while the step's `opacity` mixes the finished stack in once. |
@@ -159,7 +159,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | -180 to 180 | `45.0` | The direction the shadow is cast, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. Angles that are not a multiple of 45 leave the shadow's edges about a pixel soft. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `45.0` | The direction the shadow is cast, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. Angles that are not a multiple of 45 leave the shadow's edges about a pixel soft. |
 | `length` | number | px | 0 to 5000 | `300.0` | How far the shadow reaches from the subject's outline, in px at the recipe's size; 0 = no shadow (the silhouette behind itself, which shows only as a faint fringe where the cut-out is soft). Raising it makes the shadow longer; the effect's time grows only with the logarithm of it. |
 | `color` | colour |  |  | `'#000000'` | The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the subject; another colour tints it. |
 | `fade` | number | fraction | 0 to 1 | `1.0` | How much of its opacity the shadow loses along its length, in a straight line: 0 = solid to the end, 0.5 = half as opaque at the end, 1 = fades out completely at `length`. |
@@ -215,7 +215,7 @@ A step of `reflection` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | -180 to 180 | `40.0` | The direction the light comes from, counter-clockwise from the right: 0 = from the right, 90 = from above, 180 or -180 = from the left, -90 = from below. Only edges whose outward direction faces it are lit. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `40.0` | The direction the light comes from, counter-clockwise from the right: 0 = from the right, 90 = from above, 180 or -180 = from the left, -90 = from below. Only edges whose outward direction faces it are lit. |
 | `color` | colour |  |  | `'#ff9a4d'` | The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm orange. |
 | `width` | number | px | 1 to 200 | `12.0` | Depth of the lit band inside the subject's edge, in px at the recipe's size: raising it lets the light reach further in. |
 | `amount` | number | ratio | 0 to 5 | `1.0` | How strong the light is where it is brightest (an edge that faces the light head-on): 0 = off, 1 = the colour at full strength, above 1 saturates sooner. |

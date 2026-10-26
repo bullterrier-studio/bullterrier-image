@@ -173,7 +173,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `30.0` | The direction red moves, in degrees counter-clockwise from pointing right (as on a protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the opposite way. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `30.0` | The direction red moves, in degrees counter-clockwise from pointing right (as on a protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the opposite way. |
 | `amount` | number | px | 0 to 500 | `8.0` | How far red and blue each move from where they were, in pixels, 0 to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction of a pixel blends the two pixels it lies between. Raising it pulls the colour fringes further apart. |
 
 <details><summary>Advanced parameters (1)</summary>

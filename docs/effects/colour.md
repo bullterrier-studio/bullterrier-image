@@ -169,7 +169,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `hue` | number (drivable) | degrees | -360 to 360 | `90.0` | The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged). |
+| `hue` | number (drivable) (cyclic) | degrees | -180 to 180 | `90.0` | The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged). |
 
 ### `invert`
 
@@ -215,7 +215,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `hue` | number | degrees | 0 to 360 | `0.0` | Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120 green, 180 cyan, 240 blue, 300 magenta; 360 is red again. |
+| `hue` | number (cyclic) | degrees | 0 to 360 | `0.0` | Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120 green, 180 cyan, 240 blue, 300 magenta; 360 is red again. |
 | `width` | number | degrees | 0 to 360 | `60.0` | Full width of the range, 0..360 degrees, centred on `hue`; colours inside it are changed at full strength. 360 takes in every colour; raising it widens the range. |
 | `feather` | number | degrees | 0 to 180 | `30.0` | How far beyond each edge of the range the change fades out, 0..180 degrees: the weight falls in a straight line from full at the edge to none that far away. 0 gives a hard edge; raising it blends the range into its neighbours. |
 | `hue_shift` | number | degrees | -180 to 180 | `0.0` | How far the selected hues are turned round the colour wheel, -180..180 degrees; positive goes red toward yellow, green, blue. 0 keeps the hue. |

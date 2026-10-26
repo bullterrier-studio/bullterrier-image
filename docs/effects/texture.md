@@ -22,7 +22,7 @@ Grain and other surface texture laid over the picture.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Slopes that face it are brightened, those that face away darkened. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Slopes that face it are brightened, those that face away darkened. |
 | `elevation` | number | degrees | 1 to 90 | `45.0` | How high the light stands above the picture's plane, in degrees: 90 = straight above (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 = grazing, so the relief is dramatic and the lit side is clipped to white. |
 | `height` | number | px | 0 to 100 | `8.0` | How tall the relief is: a white pixel stands this many px above a black one, so the slope between neighbours is their brightness difference times this. 0 = flat (the picture is unchanged), larger = steeper relief and stronger lighting. |
 | `blur` | number | px | 0 to 20 | `1.0` | Gaussian sigma in px with which the brightness is smoothed before it is read as height: 0 = every pixel is a bump (noise and grain shows), larger = broader, softer swells. |
@@ -88,7 +88,7 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left (the usual choice: it reads as raised). Surfaces that rise away from the light are brighter than mid grey and those that rise towards it darker; turning the light by 180 inverts the picture around mid grey. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left (the usual choice: it reads as raised). Surfaces that rise away from the light are brighter than mid grey and those that rise towards it darker; turning the light by 180 inverts the picture around mid grey. |
 | `height` | number | px | 0 to 50 | `6.0` | How tall the relief is: a white pixel stands this many px above a black one, so the slope between neighbours is their brightness difference times this. 0 = a flat surface (mid grey), larger = steeper relief and stronger shading, up to full black and white at sharp edges. |
 | `saturation` | number | fraction | 0 to 1 | `0.0` | How much of the picture's colour comes back: 0 = a grey emboss on mid grey, 1 = the picture itself shaded by the relief (flat areas keep their colour), in between a mix of the two. |
 

@@ -261,7 +261,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 | `color` | colour |  |  | `'#ff8a3d'` | The tint of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the orange of a leaking film back; red or yellow give other leaks. |
 | `amount` | number | ratio | 0 to 2 | `0.8` | How strongly the light is screened over the picture: 0 = off, 1 = the brightest patch at full brightness in `color`; above 1 it saturates to white sooner. |
 | `size` | number | fraction | 0.01 to 1 | `0.25` | How big the patches are and how deep they reach into the picture, as a fraction of its diagonal: each patch is a soft bump whose width is between half of this and all of it, centred between the edge and this far in. Raising it floods more of the picture. |
-| `angle` | number | degrees | 0 to 360 | `0.0` | The side the light comes in from, as the direction from the picture's centre, counterclockwise as seen on it: 0 = the right edge, 90 = the top, 180 = the left, 270 = the bottom; in between, the corner. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The side the light comes in from, as the direction from the picture's centre, counterclockwise as seen on it: 0 = the right edge, 90 = the top, 180 = the left, 270 = the bottom; in between, the corner. |
 | `blobs` | whole number | count | 1 to 16 | `3` | How many patches of light there are, at random places along that side (each brighter or fainter and stretched along the edge by chance). Overlapping patches merge into one wash; raising it gives a more even, wider leak. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same leak (the same patches in the same places), another seed a different one. |
 
@@ -290,7 +290,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `0.0` | The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180) give the same blur. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180) give the same blur. |
 | `length` | number (drivable) | px | 0 to 500 | `24.0` | How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster motion; 0 leaves the picture unchanged. |
 
 <details><summary>Advanced parameters (1)</summary>
@@ -324,7 +324,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that face it are brightened, those that face away darkened. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that face it are brightened, those that face away darkened. |
 | `elevation` | number | degrees | 1 to 90 | `45.0` | How high the light stands above the picture's plane, in degrees: 90 = straight above (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 = grazing, so the shapes are dramatic and the lit side is clipped to white. |
 | `height` | number | px | 0 to 1000 | `200.0` | How tall the whole depth range stands as a relief, in px at the recipe's size: the nearest depth (1) stands this many px above the farthest (0), so the slope between neighbours is their depth difference times this. 0 = flat (the picture is unchanged), larger = steeper shapes that catch more of the light. |
 | `blur` | number | px | 0 to 50 | `2.0` | Gaussian sigma in px with which the depth is smoothed before its slopes are taken: 0 = every ripple of the depth map is lit (its noise shows), larger = softer lighting that follows only the broad shapes. |
@@ -397,7 +397,7 @@ A step of `soft_focus` has `opacity = 0.5` unless it sets its own.
 | `threshold` | number | fraction | 0 to 0.99 | `0.95` | The brightness (0..1, per channel) where a spike starts: only values above it make light, rising to full at 1. Raising it limits the spikes to the brightest points. Every pixel above it sends out spikes, so at a low threshold a large bright area (a window, a sky, white fur) floods the picture with light: raise the threshold, or cap the number of points with `limit`. |
 | `limit` | number | fraction | 0 to 1 | `1.0` | The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to keep a low `threshold` from flooding large bright areas. |
 | `amount` | number | ratio | 0 to 10 | `0.8` | How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as bright as the point that makes it, at the point; above 1 it saturates to white sooner. |
-| `angle` | number | degrees | 0 to 360 | `0.0` | The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X. |
 | `color` | colour |  |  | `'#ffffff'` | The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that makes them. |
 
 ### `tilt_shift`
@@ -407,7 +407,7 @@ A step of `soft_focus` has `opacity = 0.5` unless it sets its own.
 | `focus` | number | fraction | 0 to 1 | `0.5` | Where the middle of the sharp band lies across the picture, as a fraction of its extent at right angles to the band: 0 = the top (for angle 0), 0.5 = the middle, 1 = the bottom. |
 | `width` | number | fraction | 0 to 1 | `0.2` | How wide the sharp band is, as a fraction of the picture's extent at right angles to it: the whole band stays exactly as it is. Raising it keeps more of the picture sharp. |
 | `feather` | number | fraction | 0.01 to 1 | `0.25` | How far from the band's edge the blur takes to reach its full radius, as a fraction of the picture's extent at right angles to the band: the blur and the colour boost grow evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt one. |
-| `angle` | number | degrees | 0 to 360 | `0.0` | The direction of the band, counterclockwise as seen on the picture: 0 = horizontal, with the focus counted from the top; 90 = vertical, counted from the left; 45 runs from the lower left to the upper right. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the band, counterclockwise as seen on the picture: 0 = horizontal, with the focus counted from the top; 90 = vertical, counted from the left; 45 runs from the lower left to the upper right. |
 | `radius` | number | px | 0 to 100 | `10.0` | The Gaussian sigma in px at the recipe's size that the blur reaches at the full distance from the band (a further `feather` from its edge): larger blurs the far picture more; 0 = no blur. |
 | `saturation` | number | ratio | 0 to 2 | `0.3` | How much colour is added away from the band, the usual miniature look: where the blur is at its full radius each colour moves this much further (1 + saturation times) from the grey of the pixel, and partway through the feather by the same share; nothing in the band. 0 = no change in colour. |
 | `levels` | whole number | count | 1 to 16 | `4` | How many blurred copies of the picture the blur is built from: copy k has the sigma radius x k / levels, and each pixel mixes the two copies (or the sharp picture and the first) nearest its distance from the band. More is smoother between levels and slower; 1 mixes the sharp picture with one blur. |
