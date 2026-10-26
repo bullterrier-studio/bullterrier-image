@@ -30,7 +30,8 @@ def assert_a_picture_like(out: np.ndarray, rgb: np.ndarray) -> None:
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_keeps_shape_dtype_and_range_is_deterministic_and_leaves_its_input_alone(name, photo):
     before = photo.copy()
-    first, second = registry.apply(name, photo), registry.apply(name, photo)
+    inputs = _inputs(name, photo)
+    first, second = registry.apply(name, photo, **inputs), registry.apply(name, photo, **inputs)
     assert_a_picture_like(first, photo)
     np.testing.assert_array_equal(first, second)
     np.testing.assert_array_equal(photo, before)
@@ -458,14 +459,15 @@ def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
 )
 def test_a_constant_picture_stays_constant_under_every_way_of_reading_between_pixels(name, setting):
     flat = np.full((31, 47, 3), 0.4, np.float32)
-    np.testing.assert_allclose(registry.apply(name, flat, **FLAT_NEEDS.get(name, {}), **setting), 0.4, atol=1e-6)
+    out = registry.apply(name, flat, **FLAT_NEEDS.get(name, {}), **setting, **_inputs(name, flat))
+    np.testing.assert_allclose(out, 0.4, atol=1e-6)
 
 
 @pytest.mark.parametrize("name", sorted({name for name, _ in _sampling_cases()}))
 def test_each_interpolation_reads_the_picture_its_own_way(name):
     noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
     choices = registry.parameters(name).model_json_schema()["properties"]["interpolation"]["enum"]
-    outs = {choice: registry.apply(name, noise, interpolation=choice) for choice in choices}
+    outs = {choice: registry.apply(name, noise, interpolation=choice, **_inputs(name, noise)) for choice in choices}
     for first, second in itertools.combinations(choices, 2):
         assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"
 
