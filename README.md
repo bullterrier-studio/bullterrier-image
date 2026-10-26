@@ -5,17 +5,14 @@
 <h1 align="center">bullterrier-image</h1>
 
 <p align="center">
-  <b>A photo-effects pipeline you can script.</b><br>
-  Describe a look as a short recipe, run it on one photo or a thousand, and get ASCII art, glitch, halftone,<br>
-  neon grades and dispersing particles, with caching, quality checks and an HTML report.
+  <b>Photo effects pipeline you can script.</b><br>
+  Describe a look as short recipe. Run on one photo or a thousand.<br>
+  ASCII art, glitch, halftone, neon grades, dispersing particles.
 </p>
 
 <p align="center">
   <a href="https://github.com/bullterrier-studio/bullterrier-image/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/bullterrier-studio/bullterrier-image/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-3776ab?logo=python&logoColor=white">
-  <img alt="uv" src="https://img.shields.io/badge/built%20with-uv-de5fe9">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-pytest-2ea44f">
-  <img alt="Code style" src="https://img.shields.io/badge/lint-ruff-261230">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey">
 </p>
@@ -24,200 +21,35 @@
   <img src="docs/images/banner.jpg" alt="One photo of a bull terrier turned into five styles: neon-pulse, glitch, ascii-colour, halftone-print and ember-glitch">
 </p>
 
-It can cut the subject (a person, a pet, an object) out of the photo first, so effects can target the subject or the
-background separately.
-
-<table>
-  <tr>
-    <td width="33%" valign="top"><b>Recipes are data</b><br>A look is a list of effects in TOML or Python. Changing a number is a one-line edit, and the same recipe runs on any photo.</td>
-    <td width="33%" valign="top"><b>A real pipeline</b><br>Many photos x many recipes, cached on disk. One bad photo never stops the batch, and everything lands in a manifest and a browsable report.</td>
-    <td width="33%" valign="top"><b>Developer friendly</b><br>Small pure-function effects, each with its category, example and gallery picture. Typos fail when a recipe is loaded, not halfway through a batch, and editors autocomplete every parameter.</td>
-  </tr>
-  <tr>
-    <td width="33%" valign="top"><b>Transparent</b><br>See the picture after every step with <code>bt-image steps</code>, so a look that is not right can be debugged, not guessed at.</td>
-    <td width="33%" valign="top"><b>Checked automatically</b><br>A missed cut-out or a blank result is flagged without anyone having to look.</td>
-    <td width="33%" valign="top"><b>One picture, any moment</b><br>Effects like <code>disperse</code> show one moment of a process, set by a plain parameter (<code>progress</code>), so a video tool can drive it from anything, a beat included.</td>
-  </tr>
-</table>
-
-## Gallery
-
-Every picture here is made from one photo by the recipe linked under it (`examples/recipes/`). Reproduce them with `bt-image run examples/bt-image.toml`.
-
-<table>
-  <tr>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/neon-pulse.jpg" alt="neon-pulse"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/glitch.jpg" alt="glitch"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/ascii-colour.jpg" alt="ascii-colour"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/halftone-print.jpg" alt="halftone-print"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/ember-glitch.jpg" alt="ember-glitch"></td>
-  </tr>
-  <tr>
-    <td valign="top"><a href="examples/recipes/neon-pulse.toml"><b>neon-pulse</b></a><br><sub>Hot magenta and cyan on black, split into a faint chromatic fringe, with a glow that spills onto the dark.<br><code>clarity</code> <code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code></sub></td>
-    <td valign="top"><a href="examples/recipes/glitch.toml"><b>glitch</b></a><br><sub>The classic: the subject on black, digitally damaged, with film grain.<br><code>fill</code> <code>glitch</code> <code>grain</code></sub></td>
-    <td valign="top"><a href="examples/recipes/ascii-colour.toml"><b>ascii-colour</b></a><br><sub>The photo redrawn as text, every character in the colour of the photo underneath, over a faint ghost of the photo.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code></sub></td>
-    <td valign="top"><a href="examples/recipes/halftone-print.toml"><b>halftone-print</b></a><br><sub>A newsprint dot screen: tone becomes dot size, in warm white ink on black.<br><code>clarity</code> <code>halftone</code> <code>fill</code></sub></td>
-    <td valign="top"><a href="examples/recipes/ember-glitch.toml"><b>ember-glitch</b></a><br><sub>A fire palette, then torn glitch strips with a red and blue split.<br><code>gradient_map</code> <code>fill</code> <code>glitch</code> <code>glow</code> <code>grain</code></sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/cyberpunk.jpg" alt="cyberpunk"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/vaporwave.jpg" alt="vaporwave"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/terminal.jpg" alt="terminal"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/newsprint.jpg" alt="newsprint"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
-  </tr>
-  <tr>
-    <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>A neon night street: magenta and violet grade, colour fringes, scanlines, a glow, rain and the curved glass of a tube. Would gain neon edges (batch 8).<br><code>split_tone</code> <code>chromatic_aberration</code> <code>scanlines</code> <code>bloom</code> <code>rain</code> <code>vignette</code> <code>crt</code></sub></td>
-    <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>A sunset gradient with a glowing grid screened over it behind a duotoned dog, split into colour ghosts.<br><code>gradient</code> <code>pattern</code> <code>gradient_map</code> <code>rgb_split</code></sub></td>
-    <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>The photo as a green phosphor terminal: characters on a curved CRT screen with a shadow mask, scanlines and glow.<br><code>clarity</code> <code>ascii</code> <code>crt</code></sub></td>
-    <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (the sepia preset of gradient_map).<br><code>black_and_white</code> <code>clarity</code> <code>levels</code> <code>halftone</code> <code>paper_texture</code> <code>torn_edge</code></sub></td>
-    <td valign="top"><a href="examples/recipes/northern-lights.toml"><b>northern-lights</b></a><br><sub>The dog under a night sky: aurora curtains and stars behind, a cold tint on the fur, a rim of aurora light on the edge, a soft glow.<br><code>aurora</code> <code>starfield</code> <code>split_tone</code> <code>rim_light</code> <code>bloom</code> <code>grain</code></sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/sticker.jpg" alt="sticker"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/portrait-pop.jpg" alt="portrait-pop"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/evaporate.jpg" alt="evaporate"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/double-exposure.jpg" alt="double-exposure"></td>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/depth-haze.jpg" alt="depth-haze"></td>
-  </tr>
-  <tr>
-    <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>A die-cut sticker: a white border round the subject, a soft shadow under it, on a sunset gradient.<br><code>gradient</code> <code>outline</code> <code>drop_shadow</code></sub></td>
-    <td valign="top"><a href="examples/recipes/portrait-pop.toml"><b>portrait-pop</b></a><br><sub>Portrait mode: the background goes grey and soft, the subject stays in colour and gets a lift.<br><code>black_and_white</code> <code>gaussian_blur</code> <code>vibrance</code> <code>vignette</code></sub></td>
-    <td valign="top"><a href="examples/recipes/evaporate.toml"><b>evaporate</b></a><br><sub>The dog drawn as text, caught part-way through dispersing: the right side lets go first and is blown right and up.<br><code>grade</code> <code>clarity</code> <code>ascii</code> <code>fill</code> <code>disperse</code></sub></td>
-    <td valign="top"><a href="examples/recipes/double-exposure.toml"><b>double-exposure</b></a><br><sub>The dog in black and white with a night sky of aurora and stars multiplied into its silhouette: a second picture used by a recipe.<br><code>black_and_white</code> <code>blend</code> <code>vignette</code></sub></td>
-    <td valign="top"><a href="examples/recipes/depth-haze.toml"><b>depth-haze</b></a><br><sub>Aerial perspective: the room behind the dog mists over by its depth; what is near stays crisp.<br><code>grade</code> <code>fill</code> <code>clarity</code></sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="20%"><img src="examples/output/bullterrier/depth-grade.jpg" alt="depth-grade"></td>
-  </tr>
-  <tr>
-    <td valign="top"><a href="examples/recipes/depth-grade.toml"><b>depth-grade</b></a><br><sub>A grade per band of depth: the front warm and brighter, the dog as it is, the back cool and muted.<br><code>white_balance</code> <code>split_tone</code> <code>grade</code></sub></td>
-  </tr>
-</table>
-
-Effects are meant to be combined: every recipe chains three or more of them over the same photo, and a step can be limited to the subject or the background (`mask`), mixed in partway (`opacity`) or laid over the picture in a blend mode such as screen or multiply (`blend_mode`).
-
-## Contents
-
-[Gallery](#gallery) | [Install](#install) | [Platforms](#platforms) | [Quick start](#quick-start) | [The pipeline](#the-pipeline) | [Recipes](#recipes) |
-[Python API](#python-api) | [Seeing what each step does](#seeing-what-each-step-does) |
-[Effects](#effects) | [Automatic checks](#automatic-checks) | [Project layout](#project-layout) | [Development](#development)
+- **Recipes are data.** Look = list of effects, TOML or Python. Same recipe, any photo.
+- **Batch ready.** Many photos x many recipes, cached. One bad photo never stops the run. HTML report.
+- **Subject-aware.** Target subject or background apart.
+- **Fails early.** Typo fails at load, not halfway through batch.
 
 ## Install
 
-Requires Python 3.12+. As a package:
+Python 3.12+. macOS, Linux, Windows.
 
 ```bash
 pip install bullterrier-image
-bt-image effects                   # lists every effect and its main parameters (--advanced: all of them; --category NAME: one category;
-                                   # --list-categories: the categories with their number of effects; NAME: one effect in full)
+bt-image effects        # list every effect
 ```
 
-From a checkout, with [uv](https://docs.astral.sh/uv/):
+## Quick start
+
+Repo ships demo project: one photo, a dozen recipes.
 
 ```bash
 git clone https://github.com/bullterrier-studio/bullterrier-image.git
 cd bullterrier-image
 uv sync
-uv run bt-image effects
-```
-
-## Platforms
-
-bullterrier-image runs on macOS, Linux and Windows, on Python 3.12, 3.13 and 3.14. Every effect works everywhere; three things
-depend on the machine.
-
-**Finding the subject** (cut-outs, `mask = "background"`, anything that needs a silhouette) has two backends:
-
-| Backend | Where | Notes |
-|---|---|---|
-| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default everywhere, so a recipe cuts alike on every platform. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
-| `vision`: Apple Vision subject segmentation | macOS | Only when asked (`--segmenter vision`, `BT_IMAGE_SEGMENTER=vision`). Built in: no download, runs on the Neural Engine. Its cut differs from the portable model's. |
-
-The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
-folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else `~/.cache/bt-image` on Linux,
-`%LOCALAPPDATA%\bt-image\Cache` on Windows), checks its SHA-256 against the one pinned in the code and keeps it; nothing is downloaded when bullterrier-image is imported. Offline, or where the download
-is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_SUBJECT_MODEL` at a
-copy (`BT_IMAGE_SUBJECT_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
-
-Choose the backend with `--segmenter onnx|vision` (in Python `finders={"subject": subject_finder("vision")}`, from
-`bullterrier_image.finding.subject`), or for every run
-with `BT_IMAGE_SEGMENTER=vision`; the option wins over the variable. No model is needed at all if you have the subject's
-matte already: `--map subject=cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject)
-of the photo's size, and in Python every renderer takes `maps={"subject": imageio.load_map("cutout.png")}`. Subject finding lives
-in [`finding/`](src/bullterrier_image/finding), so a further backend is added there without touching the rest. On Python versions
-newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
-it is missing, and `--map subject=FILE` (or, on macOS, `--segmenter vision`) still works.
-
-**Your own finder** is a `Finder`: a function from the photo (float32 `(h, w, 3)`, 0..1) to its matte (`(h, w)`, 0..1),
-and an identity that names its answers. `bt-image run` remembers subjects by the identity, so change it whenever the
-answers could change (another model, prompt or option):
-
-```python
-from functools import partial
-from bullterrier_image import Finder, render
-
-render(photo, look, finders={"subject": Finder("grounded-sam dog v1", partial(grounded, prompt="dog"))})
-```
-
-**Depth** is a second map, found like the subject. A recipe that takes depth (an effect, or a region made from it, see Regions
-below) runs [Depth Anything V2 Small](https://github.com/DepthAnything/Depth-Anything-V2) (Apache-2.0) on ONNX Runtime,
-on every platform. Its weights (99 MB, the fp32 ONNX export of `onnx-community/depth-anything-v2-small`) are not in the
-package: the first use downloads them into the same cache folder as the subject model and checks their SHA-256 against
-the one pinned in the code. Offline, point `BT_IMAGE_DEPTH_MODEL` at a copy, which is then used as it is and never
-downloaded. The result is relative depth, scaled per photo: the nearest pixel is 1, the farthest 0, a flat answer all 0, so one
-value is not the same distance in two photos. To scale photos alike, take the unscaled answer, `inverse_depth(rgb)` (larger
-= nearer, on the model's own scale), scale it with one range of your own and hand it in as `maps={"depth": ...}`.
-Your own map replaces the model: `--map depth=depth.png` (in Python `maps={"depth": imageio.load_map("depth.png")}`)
-takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
-`finders={"depth": Finder("my-depth v1", find)}`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run`
-remembers each photo's depth by that identity, apart from its subject.
-
-**Maps of your own.** The subject and the depth are two of the photo's *maps*: one value per pixel, 0..1, the photo's
-size, each known by a name. A recipe can name a map of its own with a `given` region (`format = 3`) and use it like any
-selection (`mask = "star"`); whoever renders it hands the map in by that name, as a picture (`--map star=star.png`; a
-picture with transparency gives its alpha, any other its brightness) or an array, or names a `Finder` that finds it:
-
-```toml
-format = 3
-
-[region.star]
-kind = "given"
-
-[[step]]
-effect = "glow"
-mask = "star"
-```
-
-```python
-render(photo, look, maps={"star": star_alpha})  # an array of the photo's size, float32 0..1
-render(photo, look, finders={"star": Finder("star v1", find)})  # or found once per photo
-```
-
-A map moves with the photo through the recipe's framing (flip, turn, crop, border: a border is 0 in every map), so it
-only has to match the photo as it was given. A name that no recipe declares (`maps={"strar": ...}`) is refused, listing
-the names there are; a recipe that uses a map nobody gave is refused naming the map (`MapNotFoundError`; for the subject
-and the depth, `SubjectNotFoundError` and `DepthNotFoundError`). A project (`bt-image run`) holds no maps of its own, so a
-recipe with a `given` region needs `finders=` in `bullterrier_image.run`.
-
-**Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
-the wheel), not a system font, so a look does not depend on the machine's fonts.
-
-## Quick start
-
-The repository ships a demo project: one photo and a dozen recipes in the layout `bt-image init` makes.
-
-```bash
 uv run bt-image run examples/bt-image.toml
 open examples/output/index.html            # macOS; xdg-open on Linux, start on Windows
 ```
 
-That processes `examples/photos/bullterrier.jpeg` with every recipe in `examples/recipes/` (about ten seconds on a
-recent Mac, once the subject model is downloaded: the first run does that). Run it
-again and finished work is skipped; edit one recipe and only that one is redone. Add photos to `examples/photos/` and
-they join the batch.
+First run downloads subject model (once). Run again: finished work skipped.
 
-To start your own project:
+Own project:
 
 ```bash
 uv run bt-image init my-project            # bt-image.toml, a photos/ folder, two starter recipes
@@ -225,88 +57,9 @@ cp ~/Pictures/me.jpg my-project/photos/
 uv run bt-image run my-project/bt-image.toml
 ```
 
-### The command line
+## A recipe
 
-`bt-image --help` lists the commands (`render`, `sheet`, `sweep`, `cutout`, `run`, `steps`, `init`, `effects`) and
-`bt-image COMMAND --help` shows one command's options and an example. `bt-image --version` prints the version, and
-`python -m bullterrier_image` is the same program for when the `bt-image` script is not on your `PATH`. Results are printed to
-stdout and progress and errors to stderr. A mistake (a file that is not an image, an unknown effect in a recipe, an
-output folder that cannot be written) prints one line, `error: ...`, and exits with 1; usage mistakes exit with 2, Ctrl-C
-with 130. `-q` hides the progress lines. For a traceback, add `--debug` or set `BT_IMAGE_DEBUG=1`.
-
-`sweep` shows what one number does: the recipe at five values of it (`--count`, 2 to 24), side by side, each labelled. The
-target is the number's address (see [Addresses](#recipes)): `effect.parameter`, `effect#2.parameter` for an effect the
-recipe uses twice; a range that starts below zero goes after `--`, as in `... -o out/sweep.png -- -2..2`.
-
-```
-uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
-```
-
-## The pipeline
-
-```
- photos/*.jpg              recipes/*.toml  (or Recipe objects in Python)
-      │                           │
-      ▼                           ▼
- ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌──────────┐
- │ ingest  │ → │ analyse │ → │  style  │ → │  check  │ → │ export  │ → │  report  │
- └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘   └──────────┘
-  orientation    find the      run the       cut-out       jpg/png/webp   manifest.json
-  + colour       subject       recipe's      sensible?     several        index.html
-  profile        (cached)      steps                       sizes
-```
-
-| Stage | What it does |
-| --- | --- |
-| **ingest** | Reads the photo, applying EXIF rotation and colour profile, into one internal format (float RGB). |
-| **analyse** | Finds the subject and the depth once per photo, each only if a recipe needs it, and caches them on disk by photo hash and finder identity. |
-| **style** | Runs each recipe's steps in order. |
-| **check** | Flags a cut-out that covers an implausible share of the photo, and blank or blown-out results. |
-| **export** | Writes every format and size you asked for. |
-| **report** | `manifest.json` (machine-readable) and `index.html` (browse everything, warnings included). |
-
-**Image files in and out** (`bullterrier_image.imageio`):
-
-- **Reading.** Anything Pillow opens: JPEG, PNG, WebP, TIFF, GIF, BMP... in any mode: 8-bit RGB, greyscale, 1-bit,
-  palette and CMYK; 16-bit greyscale at full precision. Transparency is composited over white, so a colour hidden under
-  a transparent pixel never shows. An animation (GIF, APNG) gives its first frame.
-- **Colour.** An embedded ICC profile (Display P3, a CMYK press profile, a grey gamma) is converted to sRGB from the
-  picture's own colour space. Pictures without a usable profile, and 16-bit greyscale, are taken as sRGB, the web's
-  rule for untagged images.
-- **Errors.** A missing, non-image, truncated or oversized file raises `ImageReadError` naming it. Pillow's
-  decompression-bomb limit is kept: pictures over about 179 megapixels (twice `PIL.Image.MAX_IMAGE_PIXELS`) are
-  refused; raise that limit yourself for bigger files you trust.
-- **Writing.** Stills embed a small sRGB profile and nothing else: no EXIF and no GPS position from your photo, and no
-  timestamp, so the same picture always gives the same file. JPEG and WebP quality is the project's `quality` export
-  setting (92 unless set; also used by `bt-image steps`), or 95 for `imageio.save`, `bt-image render`, `sheet` and
-  `cutout`; JPEGs keep full-resolution colour.
-
-Good batch behaviour is built in, and tested:
-
-- **Incremental.** Each result is fingerprinted from the photo, the recipe, the export settings and the tool's own code. Unchanged work is skipped, and a missing output file is made again.
-- **Resilient.** One photo or recipe failing is recorded and the rest carry on. The exit code is non-zero if anything failed (`--strict` also fails on warnings, for CI).
-- **Safe to preview.** `--dry-run` shows what would run and writes nothing. `--only 'dog*.jpg'` limits a run to some photos. `--force` redoes everything.
-
-The project file is `bt-image.toml`:
-
-```toml
-photos  = ["photos/*.jpg", "photos/*.png"]   # globs, relative to this file
-recipes = ["recipes"]                        # recipe files, or folders of them
-output  = "output"
-
-[export]
-formats = ["jpg"]          # jpg, png or webp
-sizes   = [2048, 1080]     # longest side in px; sizes larger than the render are never enlarged
-quality = 92
-steps   = false            # true: also save the picture after every step of every recipe
-
-[checks]
-subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
-```
-
-## Recipes
-
-A recipe is an ordered list of effects. Each `[[step]]` names an effect, and the other keys are that effect's parameters.
+Ordered list of effects. Each `[[step]]` names an effect; other keys are its parameters.
 
 ```toml
 name = "ember-glitch"
@@ -334,307 +87,7 @@ blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
 
-Removing a background is just a `fill` step masked to the background. Unknown effects, misspelt parameters and bad
-values fail when the recipe loads, naming the file and the step.
-
-**Step keys.** Besides `effect` and the effect's own parameters, every step takes the same four keys. The runner applies
-them after any effect, so each step is a layer over the picture below it, as in an image editor: the effect's result is
-combined with that picture by the blend mode, then mixed in by the opacity, only where the mask says.
-
-| Key | Values | What it does |
-|---|---|---|
-| `mask` | `"subject"`, `"background"` or the name of a selection region | Apply the step only there (the subject is found first). When the picture has no subject (an empty map), `"subject"` selects nothing and `"background"` the whole picture. |
-| `opacity` | 0 to 1, default 1 (or the effect's own) | How much of the step shows: 0 none, 1 fully. An effect meant to be mixed in partway (a shadow, rain) may set the default of its steps' opacity; its documentation (`help(fx.rain)`, `bt-image effects rain`, the catalogue) and its `fx` signature show it, and a step's own `opacity` replaces it. |
-| `blend_mode` | `normal` (default), `multiply`, `screen`, `overlay`, `soft_light`, `difference`, `color` | How the result combines with the picture below it: `normal` shows the result, `multiply` darkens, `screen` lightens, `overlay` and `soft_light` deepen contrast, `difference` subtracts, `color` takes the result's hue and saturation and keeps the brightness below. These are the W3C blend modes, the same as the `blend` effect's `mode`. |
-| `preset` | a preset's name | Start from one of the effect's named parameter sets (see Presets, below). |
-
-No effect has a parameter with one of these names, so a key means the same in every step, and the same in Python:
-`fx.glow(opacity=0.6, blend_mode="screen")`. A gradient screened over the photo, or a texture multiplied into it, is
-an ordinary step with a `blend_mode`; the `blend` effect is for a second picture of your own (`image = "grain.png"`),
-which it fits to the photo and blends by its own transparency.
-
-**Regions.** A recipe says *where* a step goes by naming regions. With `format = 2`, `[region.NAME]` declares one by its
-`kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
-stone, with presets `glass`, `torn`, `stone` and `mosaic`), `cuts` (straight and curved lines across the picture), `svg`
-(the shapes of an SVG file), a `path` (everything inside a closed SVG path), a `pick` of some pieces of a partition, a
-`subject`, or a `given` map (see [Maps of your own](#platforms)); with `format = 3` also a `band`, `bands`, `combine`,
-`linear_gradient` or `radial_gradient` (see "By a field" below). Grids, shards, cuts, svg and bands are *partitions*:
-every pixel is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps` draws them numbered).
-A `path`, a `pick`, a `subject`, a `given` map, a `band`, a `combine`, a gradient and the built-in `subject`,
-`background`, `depth` and `light` are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole
-picture, and `edge = { style = "torn" }` tears its borders. A step uses regions by name: `mask` limits it to a
-selection, `each` + `looks` gives every piece of a partition its own look (each look is rendered once over the whole
-picture, so the cost is the number of looks, not pieces), and `partition` names the partition the `seams` effect draws
-lines along:
-
-
-```toml
-format = 2
-
-[region.glass]
-kind = "shards"
-preset = "glass"
-fit = "subject"
-
-[[step]]
-each = "glass"
-looks = [{ effect = "halftone", cell = 8 }, "none", { effect = "gradient_map", preset = "cyanotype" }]  # "none": as it was
-assign = "random"                 # or "cycle" (the default): how the pieces get looks; seed = 4 makes it repeatable
-mask = "subject"
-
-[[step]]
-effect = "seams"
-partition = "glass"
-width = 0.0016
-```
-
-In Python the regions are declared with the kinds' own models and the `each` step is `Each`:
-
-```python
-from bullterrier_image import Each, Recipe, Shards, fx
-
-glass = Recipe(
-    "glass",
-    regions={"glass": Shards(preset="glass", fit="subject")},
-    steps=[
-        Each(
-            "glass",
-            [fx.halftone(cell=8), "none", fx.gradient_map(preset="cyanotype")],
-            assign="random",
-            seed=4,
-            mask="subject",
-        ),
-        fx.seams(partition="glass", width=0.0016),
-    ],
-)
-```
-
-Cuts, paths and SVG files, in the units every region uses (positions are shares of the frame: the picture, or the box
-of the `fit` selection):
-
-```toml
-format = 2
-
-[region.diagonal]                  # a straight cut: through (x, y) at an angle in degrees, counter-clockwise from horizontal
-kind = "cuts"
-lines = [{ x = 0.5, y = 0.5, angle = 62 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]  # and a curve
-
-[region.blob]                      # a selection: inside a closed path (M L H V C S Q T A Z, absolute or relative)
-kind = "path"
-d = "M 0.08 0.42 C 0.1 0.25, 0.32 0.22, 0.38 0.38 C 0.44 0.52, 0.36 0.74, 0.22 0.72 Z"
-
-[region.shapes]                    # every shape of the file is a piece
-kind = "svg"
-file = "shapes.svg"                # relative to the recipe file
-
-[region.leaf]
-kind = "pick"
-of = "shapes"
-pieces = ["leaf", 0]               # a shape by its id, or a piece by its number
-```
-
-- **Units.** A `path`'s or curve's coordinates run 0 to 1 across and down, and that unit square is stretched to the
-  frame: an arc `A 0.25 0.25` is a circle only in a square frame. A line's `angle` is measured on the picture's pixels.
-  The nonzero fill rule decides what is inside a `path` (an inner outline drawn the other way round is a hole); its
-  border is soft by the share of each pixel it covers (`samples` sets how many scanlines measure that). A curve cut
-  should run from border to border; an end that does not is carried straight on to the nearest border.
-- **SVG files** are placed by their `viewBox` and `preserveAspectRatio` (default: fitted inside, centred; without a
-  `viewBox` the `width` and `height` are the view box). Each `rect`, `circle`, `ellipse`, `polygon`, `polyline` and
-  `path` is a piece; colours and strokes are ignored, the `fill-rule` is kept (holes are holes), later shapes lie on top,
-  a `use` is drawn where it is used. The area outside every shape is one more piece, numbered like any piece by its
-  first pixel (0 when the top left pixel is outside every shape). `pick` takes a shape by its `id`: `pieces = ["leaf"]`.
-- **An SVG file is untrusted input.** Nothing in it is run or fetched (scripts, links and external images are ignored).
-  A file that declares XML entities, is larger than `max_kilobytes` (default 1024), has more than `max_shapes` shapes
-  (default 1000, counting what each `use` repeats) or nests deeper than 64 levels is refused with an error naming the
-  limit and its value.
-
-**Grid first.** `kind = "subject"` with `per` finds the subject inside each piece of a partition on its own and unites the
-finds, so small things a search of the whole picture misses show up (a calf behind its mother). Without `per` it is the
-built-in `subject`:
-
-```toml
-[region.cells]
-kind = "grid"
-columns = 3
-rows = 4
-
-[region.found]
-kind = "subject"
-per = "cells"            # one run of the subject finder per cell; `found` is a selection like any other
-context = 0.25           # the finder sees each cell grown by this share of its size on every side (default 0.25)
-threshold = 0.9          # keep only pixels the finder is surer of than this: it invents faint subjects in plain cells
-```
-
-`bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a
-repeat run asks the model nothing. A `subject` map you hand in does not stand in for the finder here (a cell is a part of the
-picture): the segmenter still finds the subject in each cell.
-
-**By a field.** A selection also has *values*, and a *field* is one read for them: the built-in `depth` (1 = nearest, 0 =
-farthest; the recipe then needs depth), `light` (the picture's own brightness, 0 black to 1 white, made from the picture as the
-recipe receives it, before its first step, so it needs no map or model), `subject`, a `given` map, a gradient, or any other selection. Three kinds
-cut a field by its values; `of` names the field:
-
-- `band` is a selection: the pixels where the field lies from `low` to `high`, fading out linearly over `feather` beyond
-  both (all shares of the field's 0..1 scale; `low` above `high` is an error).
-- `bands` is a partition into `count` equal ranges of the field, numbered **highest first** (the one exception to reading
-  order), so piece 0 is the nearest of the depth, the brightest of the light; a range no pixel falls in is dropped and the
-  rest renumbered.
-- `combine` is a selection of several: their product (`multiply`, all of them), the least (`min`) or the greatest
-  (`max`, any of them).
-
-Two kinds make a field from position: `linear_gradient` rises evenly across the picture in the direction of `angle`
-(counter-clockwise from the right, so 90 rises upward), 0 at one edge and 1 at the other; `radial_gradient` rises from a
-centre (`x`, `y`, shares of the picture) to 1 at `radius`, a share of the long side. A band of a gradient is a tilt-shift
-zone or a vignette ring; a band of light is the shadows or the highlights; a combination of the subject and the shadows
-is the shadows on the subject:
-
-```toml
-format = 3
-
-[region.front]
-kind = "band"
-of = "depth"
-low = 0.6
-high = 1.0
-feather = 0.1
-
-[region.tones]                    # the picture's own brightness in three ranges: brightest first
-kind = "bands"
-of = "light"
-count = 3
-
-[region.shadows]
-kind = "band"
-of = "light"
-low = 0
-high = 0.3
-
-[region.dark_subject]
-kind = "combine"
-of = ["subject", "shadows"]
-
-[[step]]
-each = "tones"                    # highlights, midtones, shadows
-looks = ["none", { effect = "grade", saturation = 0.7 }, { effect = "grade", saturation = 0.4, exposure = 0.3 }]
-
-[[step]]
-effect = "clarity"
-mask = "front"                    # only what is near
-
-[[step]]
-effect = "glow"
-mask = "dark_subject"             # only the shadows on the subject
-```
-
-**Driving a parameter.** A field can also vary a number across the picture. An effect's documentation marks the numbers
-it lets a field drive, `(drivable)`: the ones whose result changes smoothly with the value (a blur radius, an amount, an
-exposure, a saturation). Write the number as a table with `by`, the field, and the values it takes where the field is 0
-and where it is 1:
-
-```toml
-format = 3
-
-[region.far]                      # 1 where the depth is up to 0.5 (the far half), fading to 0 by 0.6
-kind = "band"
-of = "depth"
-low = 0
-high = 0.5
-feather = 0.1
-
-[[step]]
-effect = "gaussian_blur"
-radius = { by = "far", start = 0, end = 12 }     # sharp up close, blurred far away
-
-[[step]]
-effect = "grade"
-exposure = { by = "light", start = 0.4, end = 0, levels = 3 }   # lift the shadows, leave the highlights
-saturation = { by = "light", start = 1.2, end = 1, levels = 3 }    # and give them a little more colour
-```
-
-In Python, `fx.grade(exposure=Drive(by="light", start=0.4, end=0))` (`from bullterrier_image import Drive`). `start` and
-`end`, and so every value between, must lie in the number's range (a cyclic angle takes any): a bad one fails when the step is made, naming the
-effect, the number and the value, and so does a number that is not drivable (a whole number, a choice, anything its
-effect does not declare). All the tables of one step name one `by` and one `levels`. The step still takes `mask`,
-`opacity` and `blend_mode`, and a look of an `Each` can be driven.
-
-**What a drive costs.** The effect is rendered at `levels` evenly spaced values between `start` and `end` (2 to 16, 5 by
-default) and each pixel mixes the two renders either side of its field value, linearly: a field of 0.5 with 5 levels is
-exactly the render at the middle value, a field between two levels is their mix. A driven step costs up to `levels`
-times the effect, and a value no pixel needs is not rendered (a field that is 0 everywhere costs one render). More
-levels is smoother where the field changes slowly; two levels mix the effect at `start` and at `end`.
-
-**Addresses.** Every number of a recipe (not a colour, a choice, a list or a picture) has an address, so a program that
-drives a look (a video tool mapping a beat onto a glow, frame after frame) can read what the numbers are and set them
-without rebuilding the recipe:
-
-```python
-from bullterrier_image import load_recipe
-
-look = load_recipe("pulse.toml")
-for address, number in look.parameters().items():  # pulse.radius 24.0 px 0 500, pulse.exposure.end 0.4 stops -10 10 ...
-    print(address, number.value, number.unit, number.minimum, number.maximum, number.whole)
-
-frame_look = look.with_values({"pulse.radius": 12 + 20 * kick, "pulse.exposure.end": 0.4 * level})  # a copy
-```
-
-A step's numbers start with its `name` (`name = "pulse"` on a `[[step]]`, `fx.glow(name="pulse")`: letters, digits and
-underscores, one per step; the address survives reordering the steps). Without a name a step is its effect, `glow`, when
-the recipe has one such step, else the effect and its number counted from 1, `glow#2`; an `each` step is `each`. After
-the step: the effect's numbers (`pulse.radius`), its `opacity`, the `.start`, `.end` and `.levels` of a driven number
-(`pulse.radius.end`), and for an `each` step its `feather` and the numbers of a look (`each.looks[0].radius`, counted
-from 0 as the pieces are). Then `region.near.low` for the numbers of a region and `frame.angle` for the framing's.
-`parameters()` lists them in the order of the recipe, each a `Parameter` with its `value` (the default where the recipe
-does not write it), `unit`, `minimum` and `maximum`, what it does (`doc`), whether it must be a whole number and whether
-it is `cyclic`.
-`with_values` returns a new recipe (the original is untouched, and every step, region and frame it does not change is
-shared with the copy), checks each value against the number's range as any recipe does (a cyclic angle takes any real and
-stores the same direction inside its turn), and refuses an address the
-recipe does not have, naming it and listing the valid ones and the nearest. A whole number may be written `3.0`. `bt-image
-sweep` takes the same addresses.
-
-Version 2 of the file format named the depth kinds `depth` and `depth_bands`; they are `band` and `bands` with
-`of = "depth"` now (`far` is `low`, `near` is `high`), and a file that still uses them says so.
-
-Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
-examples are in [`examples/regions/`](examples/regions/) ([the pictures](docs/gallery/regions/README.md)) and, for fields,
-[`examples/fields/`](examples/fields/) ([the pictures](docs/gallery/fields/README.md)).
-
-**Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
-before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the
-subject, so a masked step after it still finds the subject:
-
-```toml
-size = 512
-
-[frame]
-aspect = 1                        # crop to this width over height...
-anchor = "subject"                # ...around the subject (or "center", "top", "bottom", "left", "right")
-margin = 0.1                      # room kept around the subject, as a share of its size
-transparent = "circle"            # "background" (the subject), "circle" or "rounded": the render has an alpha channel
-```
-
-The order is fixed: `flip`, `angle` (with `fit` and `resample`), the crop, the `pad_*` borders (with `fill`), then
-`size`. `Recipe(..., frame=Framing(...))` is the same in Python; `Framing.documentation()` lists every field with its unit
-and range. A recipe with `transparent` renders to PNG or WebP (RGBA), never JPEG: a project that exports it to `jpg`
-fails before anything is rendered.
-
-**`bt-image cutout` or `transparent = "background"`?** Both cut the subject out; they are for different jobs.
-`bt-image cutout photo.jpg -o dog.png` makes a cut-out *file*: the photo at its own size with the subject's alpha, after
-an optional clean-up of the edge (`--shrink` pulls it in, `--feather` softens it), with no recipe. Make one when the
-cut-out is an input you will reuse and want to check once: the `--map subject=` of a later run (`maps={"subject": ...}` in Python), so the
-subject is not found again, or a picture parameter such as `overlay`'s `image` (`examples/assets/bullterrier-cutout.png`
-is one). `transparent = "background"` in a recipe's `[frame]` ends a *look*: the finished picture, at the recipe's size and
-after every step, cut out around the subject, as a sticker or an avatar is.
-
-**Presets.** Some built-in effects ship named parameter sets for common looks: `preset = "sepia"` on a `gradient_map` step,
-or `fx.gradient_map(preset="sepia")` in Python. Parameters you write next to it win over the preset's
-(`fx.gradient_map(preset="sepia", shadow_clip=0.05)`), and `bt-image effects gradient_map` lists the presets of an effect.
-They are data (`src/bullterrier_image/presets/<effect>.toml`), checked like any step; third-party effects have none.
-
-## Python API
-
-The same recipes can be written in Python with `fx`. Every effect is a function with its real signature and docstring, so
-editors complete names and parameters (`fx.pyi` is generated by `poe regenerate`).
+Same in Python:
 
 ```python
 from bullterrier_image import Recipe, fx, imageio, render
@@ -655,72 +108,7 @@ neon_glitch = Recipe(
 imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
 
-**One look at any size.** A recipe's pixel values (the numbers in `px`: a radius, a cell, a shift) are written for its
-`size`, or for the photo's own longest side when it has none. `render(photo, recipe, size=480)` (also `trace` and
-`render_all`) makes the picture 480 px on its longest side and multiplies every pixel value, including the ends of a driven
-number, by 480 over that size, so the look is the same at a draft size and at the full one, differing only in detail. A
-whole number is rounded, a value stops at its minimum when shrinking, and growing has no ceiling.
-
-A step is written with the same keys as in a recipe file: after the effect's own parameters, every `fx` function takes
-`mask`, `opacity`, `blend_mode` and (for an effect with presets) `preset` as keywords, so
-`fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`, `opacity = 0.8`,
-`blend_mode = "screen"`.
-
-`fx.glitch(spilt=8)` raises at once and lists the valid parameters, the same as a typo in a TOML file does. Code-built
-recipes can be handed straight to the pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`. See
-[`examples/python_api.py`](examples/python_api.py) for a complete, runnable example.
-
-Every effect declares its parameters once, as a frozen Pydantic model in which each field has a description, a unit, a
-range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `bt-image effects` and
-[docs/effects/](docs/effects/README.md) all come from it, so `fx.grade(exposure=12)` fails at once naming the effect, the
-field, the limit and the value. Writing an effect follows the same pattern: `uv run poe new-effect <name>
---category <category>` starts one from the template, and [`effects/grade/effect.py`](src/bullterrier_image/effects/grade/effect.py)
-is a worked example.
-
-An angle in degrees whose value and the value 360 further give the same picture (a direction, a rotation, a hue) is `(cyclic)`
-in the documentation: its range is one turn, and any real number is accepted and means the same direction inside it
-(270 on -180..180 is -90). Other angles (an elevation, a lean) keep their range and refuse what is outside.
-
-Importing `bullterrier_image` is quick: the effects load the first time one is asked for, once, under a lock, so threads can
-render at the same time; register effects at import time only.
-
-### Writing a plugin
-
-Effects can live in your own package. Write them against `bullterrier_image.plugin`, which holds everything an effect author
-needs (`EffectParams`, `param`, `Color`, `effect`, `CATEGORIES`):
-
-```python
-import numpy as np
-from bullterrier_image.plugin import Color, EffectParams, effect, param
-
-
-class TintParams(EffectParams):
-    """Settings of the tint."""
-
-    colour: Color = param("#ff8800", doc="The colour mixed in.")
-    amount: float = param(0.3, unit="fraction", min=0, max=1, doc="How much of it, 0..1. Raising it tints more.")
-
-
-@effect(category="colour", params=TintParams)
-def tint(rgb: np.ndarray, params: TintParams) -> np.ndarray:
-    """Mixes a flat colour into the picture."""
-    return (rgb * (1 - params.amount) + np.asarray(params.colour, np.float32) * params.amount).astype(np.float32)
-```
-
-Declare the module as an entry point in your package's `pyproject.toml` and install the package; `tint` is then
-available by name in TOML recipes, as `fx.tint(...)` and in `bt-image effects`:
-
-```toml
-[project.entry-points."bullterrier_image.effects"]
-my_effects = "my_package.effects"
-```
-
-A plugin that fails to load stops the first effect lookup with an error naming it; set `BT_IMAGE_PLUGINS=builtin` to
-load only bullterrier-image's own effects. Effect names must be unique across every installed package.
-
-## Seeing what each step does
-
-When a look is not right, the cause is rarely the last step. Print the picture after every step:
+Look wrong? See picture after every step:
 
 ```bash
 uv run bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml
@@ -730,110 +118,56 @@ uv run bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-gl
   <img src="examples/output/steps/ember-glitch/_sheet.jpg" alt="Every step of the ember-glitch recipe">
 </p>
 
-The sheet (written to `out/steps/<photo>__<recipe>/`, with one picture per step) shows the photo, the subject cut-out
-(white = subject), and the result of each step, with the exact parameters. In Python it is `trace(photo, recipe)`, and `bt-image run --steps` does it for a whole batch (linked from the report).
-The last picture is exactly what `render` returns, because both run the same code.
+## Gallery
 
-## Effects
+More from same photo. All 16 recipes: [`examples/recipes/`](examples/recipes).
 
-Colour grades and gradient maps, light and texture, halftone, ASCII art, glitch, background removal and dispersing
-particles, grouped by category. **[The effect catalogue](docs/effects/README.md)** (an index and a page per category) shows every effect with a picture of it, a
-one-line description, its parameters and defaults, and the example recipe that made the picture.
-`uv run bt-image effects` prints the main parameters of every effect (`--advanced` adds the technique options, `bt-image effects NAME` shows one effect in full).
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/cyberpunk.jpg" alt="cyberpunk"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/vaporwave.jpg" alt="vaporwave"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/terminal.jpg" alt="terminal"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/newsprint.jpg" alt="newsprint"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>Neon night street: fringes, scanlines, rain.</sub></td>
+    <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>Sunset gradient, glowing grid, duotoned dog.</sub></td>
+    <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>Green phosphor CRT: scanlines, glow.</sub></td>
+    <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>Newspaper clipping: dots, torn edge.</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/sticker.jpg" alt="sticker"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/depth-haze.jpg" alt="depth-haze"></td>
+    <td align="center" width="25%"><img src="examples/output/bullterrier/double-exposure.jpg" alt="double-exposure"></td>
+  </tr>
+  <tr>
+    <td valign="top"><a href="examples/recipes/northern-lights.toml"><b>northern-lights</b></a><br><sub>Aurora behind, aurora rim light on the fur.</sub></td>
+    <td valign="top"><a href="examples/recipes/sticker.toml"><b>sticker</b></a><br><sub>Die-cut: white border, soft shadow.</sub></td>
+    <td valign="top"><a href="examples/recipes/depth-haze.toml"><b>depth-haze</b></a><br><sub>Room behind mists over by depth.</sub></td>
+    <td valign="top"><a href="examples/recipes/double-exposure.toml"><b>double-exposure</b></a><br><sub>Aurora multiplied into the silhouette.</sub></td>
+  </tr>
+</table>
 
-Adding an effect adds files named for it and edits none. `uv run poe new-effect my_effect --category light` writes
-them from the template, working as written:
+## Docs
 
-- `src/bullterrier_image/effects/my_effect/effect.py` (and `__init__.py`): its parameter model and a pure function
-  `def my_effect(rgb, params) -> rgb` with the decorator `@effect(category="...", params=...)`. Its docstring becomes its
-  documentation. Every package in [`src/bullterrier_image/effects/`](src/bullterrier_image/effects) is found automatically. Effects never
-  import each other: what two of them share goes to `src/bullterrier_image/ops/`.
-- `tests/effects/my_effect/test_my_effect.py`: tests of the property that defines it.
-- `examples/effects/my_effect.toml`: a short example recipe (size 480), which makes its picture in the catalogue,
-  `docs/gallery/my_effect.jpg` (`uv run poe gallery --only my_effect`).
-
-The shared tests then check automatically that it keeps the image's shape and range, is deterministic, does not modify
-its input, has a category, a docstring, defaults and an example recipe, and uses the shared parameter names (`amount`,
-not `strength`).
-
-## Automatic checks
-
-So that a person does not have to look at every result, these run during every export and appear in the report. They
-never block an export, and `--strict` turns them into a failing exit code:
-
-| Check | Flags |
-| --- | --- |
-| Subject coverage | A cut-out covering under 2% or over 97% of the photo (the subject was missed, or there is no background to separate). |
-| Blank or broken result | An all-black or all-white picture, a flat colour with no detail, or invalid pixel values. |
-
-## Project layout
-
-```
-src/bullterrier_image/                  layers, top to bottom; each imports only from the layers below it
-  cli.py         app       the `bt-image` command (no logic of its own); `python -m bullterrier_image` runs it too
-  pipeline.py              many photos x many recipes: cache, checks, export, report
-  gallery.py               what is generated from the effects (catalogue page, pictures, fx.pyi); new-effect, driven by tools/dev.py
-  sheet.py                 contact sheets, step sheets and parameter sweeps
-  checks.py                automatic quality checks
-  fx.py                    the effects as validated step builders for Python (+ generated fx.pyi)
-  recipe.py                the public namespace: the core's recipe names, with the default finders bound (`finding`)
-  imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
-  loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
-  finding/                 finding.subject.subject_matte(rgb) -> alpha, finding.depth.depth_map(rgb) -> depth (and
-                           inverse_depth(rgb), before the per-photo scaling). Which model
-                           finds them (IS-Net and Depth Anything V2 on ONNX Runtime, downloaded on first use; or Apple
-                           Vision for the subject, when asked) is hidden here
-  presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)
-  effects/       effects   the effect library, one package per effect (code only), found automatically;
-                           _template/ is what `poe new-effect` copies
-  plugin.py                the effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
-  core/          core      registry.py (effects register here), params.py (parameter models), presets.py (reads the
-                           data in presets/), types.py,
-                           vocabulary.py, and the recipe engine: steps.py (`Step`, `Recipe`), framing.py (`Framing`),
-                           runner.py (render, render_all, trace; given the photo and the subject)
-  ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance,
-                           frame, glyphs, resample, textart (internal; core may import ops; ops imports nothing above it)
-  errors.py      errors    BullterrierImageError and its subclasses: the bottom layer, importable from every other one
-examples/        the demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/), older experiments (experiments/), a Python example; see examples/README.md
-  effects/       one short example recipe per effect, <effect>.toml
-docs/            the effect catalogue (effects/, generated: an index and a page per category) and its pictures (gallery/<effect>.jpg), roadmap, design decisions
-tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py for each effect's package
-```
-
-Each module owns one decision and callers never see it: `imageio` is the only place that knows about file formats,
-`finding` the only place that knows about Vision or the portable model, and effects know nothing about files, mattes or recipes. The layers are
-import-linter contracts in `pyproject.toml`, checked by the test suite (`uv run lint-imports` runs them alone). Why it is
-built this way, decision by decision: [docs/design-decisions.md](docs/design-decisions.md).
+- **[Effect catalogue](docs/effects/README.md)**: every effect with picture, parameters, defaults.
+- [Recipes](docs/recipes.md): step keys, regions, fields, driven numbers, framing, presets.
+- [Python API](docs/python-api.md): `fx`, sizes, addresses, plugins.
+- [Pipeline and command line](docs/pipeline.md): batch behaviour, project file, checks, `bt-image` commands.
+- [Subject and depth](docs/subject-and-depth.md): models, offline use, own finders and maps.
+- [Development](docs/development.md): layout, adding an effect. Why built this way: [design decisions](docs/design-decisions.md).
 
 ## Development
 
 ```bash
 uv sync
-uv run poe setup       # once per clone: installs the git hooks and the commit-message template
-uv run poe check       # before every push or merge: format, lint, dead code, dependencies, build, types, tests
-uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
-uv run poe fix         # applies the automatic lint and format fixes
-uv run poe new-effect my_effect --category light   # a new effect's files, from the template
-uv run bt-image render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
-uv run poe regenerate   # at integration: fx.pyi, docs/effects/, missing pictures
+uv run poe setup       # once per clone: git hooks and commit-message template
+uv run poe check       # before every push: format, lint, types, tests
 ```
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`type(scope): imperative subject`, header at
-most 72 characters, body explaining why); a `commit-msg` hook checks it. The details are in [CLAUDE.md](CLAUDE.md#git-conventions).
-How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md), what changed in each release in [CHANGELOG.md](CHANGELOG.md),
-and how to report a security problem privately in [SECURITY.md](SECURITY.md).
-
-Generated shared files (`src/bullterrier_image/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches that
-add effects never conflict over them; each effect's picture is a file of its own. After merging, `uv run poe regenerate` brings them up to date in one
-commit. Pictures that exist are kept (`uv run poe gallery --force` renders them all again; an effect named with `--only` is always rendered).
-
-Every gate (ruff, vulture, deptry, the build check, mypy, the tests) is configured in `pyproject.toml` and listed in
-[CLAUDE.md](CLAUDE.md#lint-types-and-the-other-gates); a push to `main` (or a tag) runs the whole gate through the pre-push hook, unless it changes only documentation (pages and `docs/images/`); pushes to other branches are checked by CI when the pull request opens.
-
-The test of Apple Vision is skipped off macOS. The portable subject backend and the depth model are tested with tiny
-stand-in models built in the tests: the suite never downloads a real model, and its tests of the real models run only
-when they are already in the cache and assert coarse properties (a model update may change every pixel).
+[CONTRIBUTING.md](CONTRIBUTING.md) | [CHANGELOG.md](CHANGELOG.md) | [SECURITY.md](SECURITY.md)
 
 ## License
 
-[MIT](LICENSE) © 2026 Janis Cakstins. The bundled font, JetBrains Mono, is under the [SIL OFL 1.1](LICENSE-FONT).
+[MIT](LICENSE) © 2026 Janis Cakstins. Bundled font, JetBrains Mono: [SIL OFL 1.1](LICENSE-FONT).
