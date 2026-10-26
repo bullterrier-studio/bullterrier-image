@@ -27,11 +27,11 @@ import platform
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 from scipy import ndimage
 
 from bullterrier_image.core.runner import Finder
 from bullterrier_image.errors import BackendUnavailableError, SubjectNotFoundError
+from bullterrier_image.ops.resample import stretch
 
 from . import _isnet, _vision
 from .download import DownloadError, fetch, user_cache_dir
@@ -64,7 +64,7 @@ def subject_matte(
     if mask is None or not (mask >= (_HALF * _EIGHT_BIT if eight_bit else _HALF)).any():
         raise SubjectNotFoundError("no subject found in the picture (no person, pet or object stood out)")
     height, width = rgb.shape[:2]
-    alpha = np.asarray(Image.fromarray(mask).resize((width, height), Image.Resampling.BILINEAR), np.float32)
+    alpha = stretch(mask, height, width)
     if eight_bit:
         alpha /= _EIGHT_BIT
     return refine_edge(alpha, shrink, feather)

@@ -21,3 +21,13 @@ def resize(array: np.ndarray, longest_side: int) -> np.ndarray:
     scaled = [np.asarray(Image.fromarray(c.astype(np.float32, copy=False)).resize(size, resample)) for c in channels]
     out = scaled[0] if array.ndim == 2 else np.dstack(scaled)
     return np.clip(out, 0.0, 1.0)
+
+
+def stretch(layer: np.ndarray, height: int, width: int) -> np.ndarray:
+    """Scale a one-channel map (h, w) to exactly (height, width), bilinear: a model's answer back to the photo's size.
+
+    The aspect ratio follows the target, not the map. Values are not clipped: each output pixel blends its input
+    neighbours, so it stays within their range. float32 maps stay float; uint8 maps give their levels (0..255) as
+    float32.
+    """
+    return np.asarray(Image.fromarray(layer).resize((width, height), Image.Resampling.BILINEAR), np.float32)
