@@ -19,10 +19,11 @@ shift = 0.05
 seed = 4
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = 22
 amount = 0.55
 threshold = 0.5
+octaves = 1
 
 [[step]]
 effect = "grain"

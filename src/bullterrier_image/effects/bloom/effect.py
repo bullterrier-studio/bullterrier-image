@@ -45,8 +45,8 @@ class BloomParams(EffectParams):
         min=1,
         max=8,
         doc="How many scales the halo is built from: octave 1 has the sigma `radius`, each next one half of the "
-        "one before (radius / 2, radius / 4...). 1 = a single Gaussian, as in glow; more adds a tighter, brighter "
-        "core around the highlights.",
+        "one before (radius / 2, radius / 4...). 1 = a single Gaussian; more adds a tighter, brighter core around "
+        "the highlights.",
     )
     persistence: float = param(
         0.5,
@@ -66,10 +66,19 @@ class BloomParams(EffectParams):
         "exact and slower.",
         advanced=True,
     )
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), "
-        "'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge).",
+        "'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge) "
+        "or 'constant' (constant_value, so the bloom fades toward the edge when it is 0).",
+        advanced=True,
+    )
+    constant_value: float = param(
+        0.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
         advanced=True,
     )
 
@@ -88,5 +97,7 @@ def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
     halo = np.zeros_like(bright)
     for octave, weight in enumerate(weights):
         sigma = params.radius / 2.0**octave
-        halo += float(weight) * gaussian_blur(bright, sigma, truncate=params.truncate, edge=params.edge)
+        halo += float(weight) * gaussian_blur(
+            bright, sigma, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
+        )
     return screen(rgb, params.amount * halo)

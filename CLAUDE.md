@@ -109,8 +109,8 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imageio.py` is the only place that knows file formats):
 
 ```python
-@effect(category="light", params=GlowParams)  # category is one of CATEGORIES
-def glow(rgb: np.ndarray, params: GlowParams, *, subject: np.ndarray | None = None) -> np.ndarray: ...
+@effect(category="light", params=BloomParams)  # category is one of CATEGORIES
+def bloom(rgb: np.ndarray, params: BloomParams, *, subject: np.ndarray | None = None) -> np.ndarray: ...
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
 and maximum. `subject` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,

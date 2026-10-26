@@ -24,7 +24,7 @@
 
 Styling by hand does not repeat. Styling in image code means arrays, loops and magic numbers nobody can read next month.
 bullterrier-image makes a look *data*: a short recipe, TOML or Python, listing effects and their values. 120+ effects ready.
-It finds the subject first: glow can hit the dog, glitch the background, blur can grow with depth. Edit a number, rerun: only
+It finds the subject first: bloom can hit the dog, glitch the background, blur can grow with depth. Edit a number, rerun: only
 that recipe redone. Same seed, same pixels. Look wrong? See the picture after every step.
 
 - **Recipes are data.** Look = list of effects, TOML or Python. Same recipe, any photo.
@@ -88,7 +88,7 @@ shift = 0.05                      # how far a strip may slide, as a share of the
 seed = 4                          # same seed, same result, every time
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
@@ -107,7 +107,7 @@ neon_glitch = Recipe(
         fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
         fx.fill("#000000", mask="background"),  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
-        fx.glow(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
+        fx.bloom(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
     ],
 )
 

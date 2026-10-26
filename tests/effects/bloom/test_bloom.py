@@ -110,3 +110,20 @@ def test_edge_sets_what_the_blur_sees_beyond_the_edge() -> None:
     reflected = registry.apply(NAME, lit_edge, radius=3.0, threshold=0.5, edge="reflect")
     assert wrapped[far_side][0] > 0.01
     assert reflected[far_side][0] == 0.0
+
+
+def test_edge_constant_lets_the_bloom_fade_toward_the_edge_and_reflect_does_not() -> None:
+    bright = flat(0.8)
+    reflected = registry.apply(NAME, bright, radius=4.0, octaves=1, edge="reflect")
+    np.testing.assert_allclose(reflected[0, 0], reflected[16, 16], atol=1e-6)  # an even picture stays even
+    dark_beyond = registry.apply(NAME, bright, radius=4.0, octaves=1, edge="constant", constant_value=0.0)
+    lit_beyond = registry.apply(NAME, bright, radius=4.0, octaves=1, edge="constant", constant_value=1.0)
+    assert dark_beyond[0, 0, 0] < dark_beyond[16, 16, 0] - 0.01
+    assert lit_beyond[0, 0, 0] > dark_beyond[0, 0, 0]
+
+
+def test_constant_value_is_the_highlight_assumed_beyond_the_edge() -> None:
+    """Beyond the edge the picture is a flat highlight of `constant_value`; far from the edge it does not matter."""
+    out_of_range = registry.apply(NAME, flat(0.0, 81), radius=2.0, octaves=1, edge="constant", constant_value=1.0)
+    np.testing.assert_allclose(out_of_range[40, 40], 0.0, atol=1e-6)  # 40 px in: 20 sigma from the edge
+    assert out_of_range[0, 0, 0] > 0.4  # in the corner, 3/4 of the blur's weight is beyond the edge

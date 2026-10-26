@@ -24,7 +24,8 @@ amount = 0.08
 size = 1.6
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = 30
 amount = 0.8
 threshold = 0.4
+octaves = 1

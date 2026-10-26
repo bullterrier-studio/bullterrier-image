@@ -95,7 +95,7 @@ def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(p
 def test_a_recipe_of_two_effects_is_not_a_combination(tmp_path):
     path = tmp_path / "two.toml"
     path.write_text(
-        'name = "two"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "glow"\n',
+        'name = "two"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "grain"\n[[step]]\neffect = "bloom"\n',
         encoding="utf-8",
     )
     assert not _is_a_combination(load_recipe(path))

@@ -43,13 +43,13 @@ CLASHING_PACKAGE = '''
 from bullterrier_image.plugin import EffectParams, effect
 
 
-class GlowParams(EffectParams):
+class BloomParams(EffectParams):
     """No settings."""
 
 
-@effect(category="light", params=GlowParams)
-def glow(rgb, params):
-    """Another glow."""
+@effect(category="light", params=BloomParams)
+def bloom(rgb, params):
+    """Another bloom."""
     return rgb
 '''
 
@@ -99,7 +99,7 @@ def test_an_installed_plugin_effect_is_listed_and_runs_from_toml_and_from_fx(tmp
         from_fx = render(grey, Recipe("tinted", steps=[fx.zz_tint("#0000ff", amount=0.25)]))
         json.dump({
             "listed": sorted(registry.categories()["colour"]),
-            "builtin_too": "glow" in registry.describe(),
+            "builtin_too": "bloom" in registry.describe(),
             "toml": [float(from_toml.min()), float(from_toml.max()), from_toml[0, 0].tolist()],
             "fx": from_fx[0, 0].tolist(),
         }, sys.stdout)
@@ -140,7 +140,7 @@ def test_a_broken_plugin_is_a_bullterrier_image_error_naming_it_and_bullterrier_
     assert "BT_IMAGE_PLUGINS" in report["everything"]["error"]
     assert "'everything'" in report["everything"]["error"]
     broken = report[""]["error"]
-    for named in ("zz_clash", "zz-clash", "glow", "BT_IMAGE_PLUGINS=builtin"):
+    for named in ("zz_clash", "zz-clash", "bloom", "BT_IMAGE_PLUGINS=builtin"):
         assert named in broken
-    assert "glow" in report["builtin"]["effects"]
+    assert "bloom" in report["builtin"]["effects"]
     assert "zz_clash" not in " ".join(report["builtin"]["effects"])

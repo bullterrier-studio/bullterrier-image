@@ -22,7 +22,8 @@ bands = 0
 split = 9
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = 28
 amount = 0.8
 threshold = 0.45
+octaves = 1

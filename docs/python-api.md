@@ -17,14 +17,14 @@ neon_glitch = Recipe(
         fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
         fx.fill("#000000", mask="background"),  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
-        fx.glow(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
+        fx.bloom(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
     ],
 )
 
 imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
 
-Step keys are keywords on every `fx` function: `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` = step `effect = "glow"`,
+Step keys are keywords on every `fx` function: `fx.bloom(radius=26, opacity=0.8, blend_mode="screen")` = step `effect = "bloom"`,
 `radius = 26`, `opacity = 0.8`, `blend_mode = "screen"`. `fx.glitch(spilt=8)` raises at once, lists valid parameters, same as
 TOML typo. Code-built recipes go straight to pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`.
 Runnable: [`examples/python_api.py`](../examples/python_api.py).
@@ -35,7 +35,7 @@ signatures, `help(fx.<effect>)`, `bt-image effects`, [docs/effects/](effects/REA
 
 ## Addresses
 
-Every number of recipe has address. Program driving a look (video tool mapping beat onto glow, frame after
+Every number of recipe has address. Program driving a look (video tool mapping beat onto bloom, frame after
 frame) reads numbers and sets them without rebuilding recipe:
 
 ```python
@@ -49,11 +49,11 @@ frame_look = look.with_values({"pulse.radius": 12 + 20 * kick, "pulse.exposure.e
 ```
 
 Every number of a recipe (not colour, choice, list, picture) has an address, so a program driving a look (video tool mapping
-a beat onto a glow, frame after frame) can read the numbers and set them without rebuilding the recipe.
+a beat onto a bloom, frame after frame) can read the numbers and set them without rebuilding the recipe.
 
-- A step's numbers start with its `name` (`name = "pulse"` on a `[[step]]`, `fx.glow(name="pulse")`: letters, digits,
-  underscores, one per step; address survives reordering). No name: the effect, `glow`, when recipe has one such step, else
-  effect and its number from 1, `glow#2`; an `each` step is `each`.
+- A step's numbers start with its `name` (`name = "pulse"` on a `[[step]]`, `fx.bloom(name="pulse")`: letters, digits,
+  underscores, one per step; address survives reordering). No name: the effect, `bloom`, when recipe has one such step, else
+  effect and its number from 1, `bloom#2`; an `each` step is `each`.
 - After the step: effect's numbers (`pulse.radius`), its `opacity`, `.start`, `.end`, `.levels` of a driven number
   (`pulse.radius.end`); for `each`: its `feather` and numbers of a look (`each.looks[0].radius`, counted from 0). Then
   `region.near.low` for region numbers, `frame.angle` for framing's.

@@ -174,7 +174,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   changes; hashing only `.py` files let an edited preset or font serve stale pictures.
 - **A step is written with the same keys in Python as in a recipe file.** `fx.<effect>(...)`
   takes `mask`, `opacity`, `blend_mode` and `preset` as keywords beside the effect's own parameters:
-  `fx.glow(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "glow"`, `radius = 26`,
+  `fx.bloom(radius=26, opacity=0.8, blend_mode="screen")` is the step `effect = "bloom"`, `radius = 26`,
   `opacity = 0.8`, `blend_mode = "screen"`. *Reason:* one name per concept across the recipe file, Python and the docs;
   `.where("background")` and `.blend(0.8)` were a second vocabulary for `mask` and `opacity`, and "blend" would have
   meant a method, an effect and a mode at once. The keys cannot clash with an effect's parameters because no
@@ -366,7 +366,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Every number has an address: `Recipe.parameters()` lists them, `Recipe.with_values()` sets them.** An address is
   `<step>.<number>`, `<step>.<number>.start|end|levels` for a driven number, `<step>.opacity`, `each.looks[0].<number>`
   for a look, `region.<name>.<number>` and `frame.<number>`; a step is its optional `name`, else its effect (`each` for an
-  `Each`) when the recipe has one such step, else the effect and its number from 1 (`glow#2`, which `sweep` already
+  `Each`) when the recipe has one such step, else the effect and its number from 1 (`bloom#2`, which `sweep` already
   wrote). `parameters()` gives each a `Parameter` (value, unit, minimum, maximum, doc, whole) from the number's own
   declaration; `with_values` returns a copy, re-validating only what changed. *Reason:* the video package maps a control
   signal onto a number within its limits, every frame, and must learn the numbers, units and ranges from image, not

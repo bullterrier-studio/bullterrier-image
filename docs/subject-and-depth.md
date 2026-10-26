@@ -54,7 +54,7 @@ format = 3
 kind = "given"
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 mask = "star"
 ```
 

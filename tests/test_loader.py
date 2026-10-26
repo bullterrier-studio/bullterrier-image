@@ -482,7 +482,7 @@ of = "depth"
 low = 0.5
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = { by = "near", start = 0, end = 30 }
 amount = { by = "near", start = 0.1, end = 0.8 }
 threshold = 0.6
@@ -495,7 +495,7 @@ def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_i
         regions={"near": Band(of="depth", low=0.5)},
         steps=[
             Step(
-                "glow",
+                "bloom",
                 {
                     "radius": Drive(by="near", start=0, end=30),
                     "amount": Drive(by="near", start=0.1, end=0.8),
@@ -511,7 +511,7 @@ def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_i
 def test_a_look_of_an_each_can_be_driven_in_a_recipe_file(tmp_path):
     text = (
         'format = 3\n[region.g]\nkind = "grid"\n[[step]]\neach = "g"\n'
-        'looks = [{ effect = "glow", radius = { by = "depth", start = 0, end = 9, levels = 3 } }, "none"]\n'
+        'looks = [{ effect = "bloom", radius = { by = "depth", start = 0, end = 9, levels = 3 } }, "none"]\n'
     )
     recipe = load_recipe(_write(tmp_path, text))
     (look,) = recipe.steps[0].runs
@@ -520,36 +520,37 @@ def test_a_look_of_an_each_can_be_driven_in_a_recipe_file(tmp_path):
 
 DRIVE_MISTAKES = {
     "a parameter the effect does not declare drivable": (
-        'effect = "glow"\nthreshold = { by = "depth", start = 0, end = 0.5 }',
-        r"step 1: effect 'glow': `threshold` cannot be driven.*drivable parameters: amount, radius",
+        'effect = "bloom"\nthreshold = { by = "depth", start = 0, end = 0.5 }',
+        r"step 1: effect 'bloom': `threshold` cannot be driven.*drivable parameters: amount, radius",
     ),
     "a whole number": (
         'effect = "halftone"\ncell = { by = "depth", start = 4, end = 12 }',
         r"step 1: effect 'halftone': `cell` cannot be driven.*whole number",
     ),
     "a drive out of the parameter's range": (
-        'effect = "glow"\nradius = { by = "depth", start = 0, end = 900 }',
-        r"step 1: effect 'glow': `radius`.*<= 500.*900",
+        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 900 }',
+        r"step 1: effect 'bloom': `radius`.*<= 500.*900",
     ),
     "a misspelt key": (
-        'effect = "glow"\nradius = { by = "depth", start = 0, end = 9, step = 2 }',
-        r"step 1: effect 'glow': `radius`: .*step",
+        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, step = 2 }',
+        r"step 1: effect 'bloom': `radius`: .*step",
     ),
     "a table with no end": (
-        'effect = "glow"\nradius = { by = "depth", start = 0 }',
-        r"step 1: effect 'glow': `radius`: .*end",
+        'effect = "bloom"\nradius = { by = "depth", start = 0 }',
+        r"step 1: effect 'bloom': `radius`: .*end",
     ),
     "a field that is no region": (
-        'effect = "glow"\nradius = { by = "gone", start = 0, end = 9 }',
+        'effect = "bloom"\nradius = { by = "gone", start = 0, end = 9 }',
         r"step 1: `by` names 'gone', which is no region; valid selections: subject, background, depth, light",
     ),
     "a field that is a partition": (
-        'effect = "glow"\nradius = { by = "g", start = 0, end = 9 }',
+        'effect = "bloom"\nradius = { by = "g", start = 0, end = 9 }',
         r"step 1: `by` names 'g', a partition, but it needs a selection",
     ),
     "two fields in one step": (
-        'effect = "glow"\nradius = { by = "depth", start = 0, end = 9 }\namount = { by = "light", start = 0, end = 1 }',
-        r"step 1: effect 'glow': the drives of one step must vary by one field, got 'depth' and 'light'",
+        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9 }\n'
+        'amount = { by = "light", start = 0, end = 1 }',
+        r"step 1: effect 'bloom': the drives of one step must vary by one field, got 'depth' and 'light'",
     ),
 }
 
@@ -563,7 +564,7 @@ def test_a_mistake_in_a_drive_names_the_file_the_step_the_parameter_and_the_prob
 
 @pytest.mark.parametrize("header", ["", "format = 1\n", "format = 2\n"], ids=["no format", "format 1", "format 2"])
 def test_a_drive_needs_format_3_and_a_file_of_an_earlier_one_says_so_naming_the_parameter(tmp_path, header):
-    text = header + '[[step]]\neffect = "glow"\nradius = { by = "depth", start = 0, end = 9 }\n'
+    text = header + '[[step]]\neffect = "bloom"\nradius = { by = "depth", start = 0, end = 9 }\n'
     with pytest.raises(
         RecipeError, match=r"^old\.toml: step 1: `radius` is a table with `by`, a drive, which needs `format = 3`"
     ):
@@ -573,7 +574,7 @@ def test_a_drive_needs_format_3_and_a_file_of_an_earlier_one_says_so_naming_the_
 def test_a_drive_in_a_look_of_an_earlier_format_is_refused_naming_the_look(tmp_path):
     text = (
         'format = 2\n[region.g]\nkind = "grid"\n[[step]]\neach = "g"\n'
-        'looks = ["none", { effect = "glow", radius = { by = "depth", start = 0, end = 9 } }]\n'
+        'looks = ["none", { effect = "bloom", radius = { by = "depth", start = 0, end = 9 } }]\n'
     )
     with pytest.raises(RecipeError, match=r"^old\.toml: step 1, look 2: `radius` is a table with `by`"):
         load_recipe(_write(tmp_path, text, "old.toml"))
@@ -586,7 +587,7 @@ format = 3
 kind = "grid"
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 name = "pulse"
 radius = 30
 

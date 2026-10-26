@@ -1,6 +1,12 @@
-# Highlights bleed into a soft halo with a bright core, on a dimmed picture so the light stands out.
+# Highlights bleed into a soft halo with a bright core, on a dimmed picture so the light stands out; the background
+# is black so the light spills onto it.
 name = "bloom"
 size = 480
+
+[[step]]
+effect = "fill"
+color = "#000000"
+mask = "background"
 
 [[step]]
 effect = "levels"

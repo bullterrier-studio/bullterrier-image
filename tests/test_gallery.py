@@ -224,7 +224,7 @@ def test_an_effect_that_sets_its_steps_opacity_says_so_under_its_parameter_table
 
     page = gallery.render_effects_pages()["light.md"]
     assert "A step of `faint_probe` has `opacity = 0.4` unless it sets its own." in page
-    assert "unless it sets its own" not in page[page.index("### `glow`") :].split("\n### ")[0]
+    assert "unless it sets its own" not in page[page.index("### `bloom`") :].split("\n### ")[0]
 
 
 class TunedParams(EffectParams):

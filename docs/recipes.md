@@ -28,7 +28,7 @@ shift = 0.05                      # how far a strip may slide, as a share of the
 seed = 4                          # same seed, same result, every time
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
@@ -46,7 +46,7 @@ step is a layer over picture below, as in image editor. Result combined by blend
 | `blend_mode` | `normal` (default), `multiply`, `screen`, `overlay`, `soft_light`, `difference`, `color` | How result meets picture below. W3C blend modes: `multiply` darkens, `screen` lightens, `overlay`/`soft_light` deepen contrast, `difference` subtracts, `color` takes hue and saturation, keeps brightness below. |
 | `preset` | preset's name | Start from effect's named parameter set: `preset = "sepia"` on `gradient_map`. Own parameters win. |
 
-No effect parameter shares these names, so key means same in every step, and in Python: `fx.glow(opacity=0.6, blend_mode="screen")`.
+No effect parameter shares these names, so key means same in every step, and in Python: `fx.bloom(opacity=0.6, blend_mode="screen")`.
 Gradient screened over photo = ordinary step with `blend_mode`. `blend` effect is for second picture of your own
 (`image = "grain.png"`).
 
@@ -220,7 +220,7 @@ effect = "clarity"
 mask = "front"                    # only what is near
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 mask = "dark_subject"             # only the shadows on the subject
 ```
 

@@ -20,7 +20,8 @@ color = "#000000"
 mask = "background"
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = 18
 amount = 0.3
 threshold = 0.6
+octaves = 1

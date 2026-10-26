@@ -168,7 +168,7 @@ def test_the_fx_signature_offers_partition_only_to_an_effect_that_takes_it(parti
 def test_a_step_describes_itself_briefly_for_labels():
     assert str(fx.fill("#000000", mask="background")) == "fill(color='#000000') on background"
     assert str(fx.grade(exposure=0.5, opacity=0.3)) == "grade(exposure=0.5) x0.3"
-    assert str(fx.glow(radius=26, blend_mode="screen")) == "glow(radius=26) screen"
+    assert str(fx.bloom(radius=26, blend_mode="screen")) == "bloom(radius=26) screen"
     assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
     assert len(fx.ascii(chars="xy" * 100).describe(width=30)) == 30
 
@@ -391,7 +391,7 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
             id="mask",
         ),
         pytest.param(
-            'effect = "glow"\nradius = 26\nopacity = 0.8', lambda: fx.glow(radius=26, opacity=0.8), id="opacity"
+            'effect = "bloom"\nradius = 26\nopacity = 0.8', lambda: fx.bloom(radius=26, opacity=0.8), id="opacity"
         ),
         pytest.param(
             'effect = "gradient"\nblend_mode = "screen"', lambda: fx.gradient(blend_mode="screen"), id="blend_mode"
@@ -422,7 +422,7 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
 
 
 def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject):
-    steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.glow(opacity=0.7, blend_mode="screen")]
+    steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.bloom(opacity=0.7, blend_mode="screen")]
     look = Recipe("t", size=64, steps=steps)
     np.testing.assert_array_equal(
         trace(photo, look, maps={"subject": subject})[-1].image, render(photo, look, maps={"subject": subject})

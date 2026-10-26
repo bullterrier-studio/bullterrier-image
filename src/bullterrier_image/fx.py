@@ -6,7 +6,7 @@
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
         fx.fill("#000000", mask="background"),                  # only where the photo's background is
         fx.glitch(split=12, bands=8, seed=4),
-        fx.glow(radius=26, amount=0.65, opacity=0.8),           # mixed in at 80%
+        fx.bloom(radius=26, amount=0.65, opacity=0.8),           # mixed in at 80%
         fx.gradient(blend_mode="screen", opacity=0.5),          # a gradient screened over the picture
     ])
     image = render(photo, look)

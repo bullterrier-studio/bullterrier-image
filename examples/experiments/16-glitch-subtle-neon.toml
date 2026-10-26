@@ -21,10 +21,11 @@ highlight = "#ff2bd6"
 amount = 0.4
 
 [[step]]
-effect = "glow"
+effect = "bloom"
 radius = 20
 amount = 0.25
 threshold = 0.6
+octaves = 1
 
 [[step]]
 effect = "grain"

@@ -381,5 +381,5 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
     assert done.returncode == 0, done.stderr
     seen = json.loads(done.stdout)
     assert len(seen) == 16
-    assert {"glow", "grade", "halftone"} <= set(seen[0])  # the real effects, loaded by the first query
+    assert {"bloom", "grade", "halftone"} <= set(seen[0])  # the real effects, loaded by the first query
     assert all(names == seen[0] for names in seen)

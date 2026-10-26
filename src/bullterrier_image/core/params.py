@@ -1,6 +1,6 @@
 """How an effect declares its parameters: a frozen Pydantic model whose every field is described, ranged and defaulted.
 
-    class GlowParams(EffectParams):
+    class BloomParams(EffectParams):
         \"\"\"Bloom around the bright parts of the picture.\"\"\"
 
         radius: float = param(24.0, unit="px", min=0, max=500, doc="Gaussian sigma of the halo. Larger = wider.")
@@ -244,7 +244,7 @@ def param(
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
-    """One sentence for a failed validation: `owner` (e.g. "effect 'glow'"; "" for none), then each problem with its
+    """One sentence for a failed validation: `owner` (e.g. "effect 'bloom'"; "" for none), then each problem with its
     field, the constraint and the value given. `valid` names the fields, listed when an unknown one was given."""
     problems = "; ".join(_problem(detail, sorted(valid)) for detail in error.errors())
     return f"{owner}: {problems}" if owner else problems
@@ -269,7 +269,7 @@ class ValidatedModel(BaseModel):
 
     @classmethod
     def parse(cls, values: Mapping[str, object], owner: str = "") -> Self:
-        """The model for `values` (field name -> value); RecipeError naming `owner` (e.g. "effect 'glow'"), each bad
+        """The model for `values` (field name -> value); RecipeError naming `owner` (e.g. "effect 'bloom'"), each bad
         field, the constraint and the value, and listing the fields when an unknown one was given."""
         try:
             return cls.model_validate(dict(values))

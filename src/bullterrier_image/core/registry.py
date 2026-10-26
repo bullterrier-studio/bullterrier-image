@@ -18,9 +18,9 @@ first query together wait for it and all see the whole table. After that, querie
 threads at once is safe. Registering is for import time: registering or unregistering while other threads query is not
 supported.
 
-An effect is written `def glow(rgb, params: GlowParams, *, subject=None) -> rgb` and registered with its parameter model
-(see `bullterrier_image.core.params`); the decorator returns a `ModelledEffect`, which validates its values through the
-model whichever way it is called.
+An effect is written `def bloom(rgb, params: BloomParams, *, subject=None) -> rgb` and registered with its parameter
+model (see `bullterrier_image.core.params`); the decorator returns a `ModelledEffect`, which validates its values
+through the model whichever way it is called.
 """
 
 import functools
@@ -45,7 +45,7 @@ from .presets import Preset
 # catalogue's index shows it). Every effect is in exactly one category. A dict, so no category lacks its description.
 CATEGORY_DESCRIPTIONS = {
     "colour": "Grades, gradient maps, tints and hue changes: they recolour the picture and leave its shapes alone.",
-    "light": "Glow, bloom and local contrast: they add or shape the light in the picture.",
+    "light": "Bloom and local contrast: they add or shape the light in the picture.",
     "texture": "Grain and other surface texture laid over the picture.",
     "stylised": "Looks that redraw the picture in a printing or drawing style, such as halftone.",
     "text": "Pictures redrawn as characters, such as ASCII art.",
@@ -86,8 +86,8 @@ class ModelledEffect[P: EffectParams]:
     """An effect registered with its parameter model: what `@effect(category=..., params=Model)` returns.
 
     Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
-    `glow(rgb)` (the defaults), `glow(rgb, radius=30)`, or `glow(rgb, GlowParams(radius=30))`. Giving both a model and
-    keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
+    `bloom(rgb)` (the defaults), `bloom(rgb, radius=30)`, or `bloom(rgb, BloomParams(radius=30))`. Giving both a model
+    and keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
     naming the effect, the field, the constraint and the value. Injected inputs (`subject`, `depth`) are passed by
     keyword in every form.
     """
@@ -163,7 +163,7 @@ _LOADING = _Loading()
 def effect[P: EffectParams](
     *, category: str, params: type[P], opacity: float = 1.0
 ) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
-    """Decorator: `@effect(category="light", params=GlowParams)` makes `glow(rgb, params, *, subject=None) -> rgb`
+    """Decorator: `@effect(category="light", params=BloomParams)` makes `bloom(rgb, params, *, subject=None) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives

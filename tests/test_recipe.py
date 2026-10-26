@@ -172,7 +172,7 @@ def test_a_mode_on_the_background_leaves_the_subject_untouched(photo, subject):
 def test_a_step_says_its_mode_and_by_default_it_is_normal():
     assert Step("grain").blend_mode == "normal"
     assert Step("grain", blend_mode="screen") != Step("grain")
-    assert Step("glow", blend_mode="screen", opacity=0.8).describe() == "glow() screen x0.8"
+    assert Step("bloom", blend_mode="screen", opacity=0.8).describe() == "bloom() screen x0.8"
 
 
 def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, subject, throwaway_effects):
