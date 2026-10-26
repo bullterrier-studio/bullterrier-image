@@ -3,7 +3,7 @@ name = "neon-pulse"
 size = 1024
 
 [[step]]
-effect = "clarity"          # bring out the fur and the face before the colours go on
+effect = "sharpen"          # bring out the fur and the face before the colours go on
 radius = 40
 amount = 0.6
 

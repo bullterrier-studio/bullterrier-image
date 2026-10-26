@@ -336,7 +336,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   below a kernel radius of 32 px, and from there an FFT convolution over the same edge extension, within 1e-5 of
   scipy (float32 rounding), whatever the sigma. Code that builds per-pixel geometry works a band of rows at a time.
   *Reason:* a radius at the top of its documented range must still render in seconds, and a direct convolution costs
-  in proportion to its kernel (clarity at 30 px spent 3 s per 12 MP photo in it). *Consequence:* a contract test holds
+  in proportion to its kernel (a 30 px sharpen spent 3 s per 12 MP photo in it). *Consequence:* a contract test holds
   every effect at its defaults on a 1 MP photo to 3 s of process CPU time (about ten times the slowest effect, so a
   shared CI runner, which is several times slower than a laptop, has room, while a ten-fold regression still fails;
   the effects themselves aim far lower) and 12 picture-sized buffers of memory (`tracemalloc`), with a known-bad effect

@@ -50,8 +50,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `clarity` ✓ | Local contrast. | `fx.clarity(radius=40)` |
-| `sharpen` ✓ | Unsharp mask. | `fx.sharpen(radius=2, amount=0.8)` |
+| `sharpen` ✓ | Unsharp mask; preset `clarity` is local contrast. | `fx.sharpen(radius=2, amount=0.8)` |
 | `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
 | `denoise` (deferred) | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
 | `lens_blur` aperture (planned) | `blades` on `lens_blur`: hexagonal or cat's-eye bokeh; 0 = a disc. | `fx.lens_blur(radius=12, highlights=4, blades=6)` |
@@ -211,7 +210,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
-`grain`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
+`grain`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`, `vibrance`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
 `hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
@@ -225,7 +224,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `clarity` on the near. | `fill` with `mask` = a `band` of `depth` region |
+| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | `fill` with `mask` = a `band` of `depth` region |
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
@@ -354,7 +353,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | --- | --- |
 | `fade` | `levels(output_black)` |
 | `invert` | a `levels` preset |
-| `clarity` | a `sharpen` preset |
 | `noise`, `film_grain` | `grain` (`shadows`, `highlights`, `color`, `distribution`) |
 | `black_and_white` | a `channel_mixer` preset |
 | `vibrance` | `grade` + `vibrance` |

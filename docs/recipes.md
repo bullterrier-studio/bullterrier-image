@@ -216,7 +216,8 @@ each = "tones"                    # highlights, midtones, shadows
 looks = ["none", { effect = "grade", saturation = 0.7 }, { effect = "grade", saturation = 0.4, exposure = 0.3 }]
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
+preset = "clarity"
 mask = "front"                    # only what is near
 
 [[step]]

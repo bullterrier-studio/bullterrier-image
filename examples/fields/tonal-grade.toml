@@ -25,5 +25,6 @@ feather = 0.004
 looks = ["none", "none", { effect = "levels", output_black = 0.12 }]
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
+preset = "clarity"
 amount = 0.5

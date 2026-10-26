@@ -14,4 +14,5 @@ effect = "grade"
 vibrance = 0.3
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
+preset = "clarity"

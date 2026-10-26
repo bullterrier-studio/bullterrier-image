@@ -2,10 +2,15 @@
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.steps import Step
 
 NAME = "sharpen"
+# A blur reaching 32 px or more is an FFT convolution within 1e-5 of scipy's filter (the promise of `gaussian_blur`);
+# the result is 2 x picture - blur, so the blur's error counts once; 2e-5 adds float32 headroom to that promise.
+WIDE_BLUR_VS_SCIPY = 2e-5
 
 
 def kernel_1d(sigma: float, truncate: float = 4.0) -> np.ndarray:
@@ -139,3 +144,29 @@ def test_a_strong_sharpen_overshoots_and_is_cut_off_at_black_and_white(right: fl
     out = registry.apply(NAME, side, amount=5.0, radius=2.0, threshold=0.0)
     assert out.min() == 0.0
     assert out.max() == 1.0
+
+
+@pytest.mark.parametrize("beyond", [0.0, 0.2, 0.5], ids=["black beyond", "dark grey beyond", "same grey beyond"])
+def test_a_constant_edge_blurs_in_the_given_brightness_beyond_the_picture(beyond: float) -> None:
+    """Mid-way down the left edge of a tall grey picture only the row direction sees past the edge: the blur there is
+    grey - (grey - beyond) x (the Gaussian weights at offsets left of the pixel), worked out from the weights."""
+    grey = np.full((61, 21, 3), 0.5, np.float32)
+    out = registry.apply(NAME, grey, radius=1.5, amount=1.0, threshold=0.0, edge="constant", constant_value=beyond)
+    blurred = 0.5 - (0.5 - beyond) * SIGMA_1_5[:CENTRE].sum()
+    assert out[30, 0, 0] == pytest.approx(0.5 + (0.5 - blurred), abs=2e-6)
+    np.testing.assert_allclose(out[10:51, 10], 0.5, atol=1e-6)  # the kernel reaches no edge from the middle
+
+
+def test_the_clarity_preset_is_local_contrast_against_a_wide_blur() -> None:
+    """Checked against scipy's Gaussian filter: picture + (picture - its 30 px blur), kept within 0..1."""
+    picture = np.random.default_rng(5).random((70, 90, 3), dtype=np.float32)
+    blurred = ndimage.gaussian_filter(picture, (30, 30, 0), mode="reflect")
+    expected = np.clip(2 * picture - blurred, 0, 1)
+    out = registry.apply(NAME, picture, **Step(NAME, preset="clarity").params)
+    np.testing.assert_allclose(out, expected, atol=WIDE_BLUR_VS_SCIPY)
+
+
+def test_a_parameter_given_beside_the_clarity_preset_wins() -> None:
+    picture = np.random.default_rng(6).random((40, 50, 3), dtype=np.float32)
+    off = Step(NAME, {"amount": 0.0}, preset="clarity").params
+    np.testing.assert_array_equal(registry.apply(NAME, picture, **off), picture)

@@ -89,7 +89,7 @@ FORBIDDEN = {
     ),
     "effect folder to effect folder": (
         "effects/grade/effect.py",
-        "import bullterrier_image.effects.clarity.effect",
+        "import bullterrier_image.effects.sharpen.effect",
         "bullterrier_image.effects.grade.effect",
         EFFECTS_APART,
     ),

@@ -3,7 +3,8 @@ name = "terminal"
 size = 768
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
+preset = "clarity"
 amount = 0.8
 
 [[step]]

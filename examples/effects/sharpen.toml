@@ -1,6 +1,11 @@
-# Crisp fur and whiskers; the threshold keeps the smooth fur on the cheeks from turning grainy.
+# Local contrast so features stand out (preset clarity), then crisp fur and whiskers; the threshold keeps the smooth fur
+# on the cheeks from turning grainy.
 name = "sharpen"
 size = 480
+
+[[step]]
+effect = "sharpen"
+preset = "clarity"
 
 [[step]]
 effect = "sharpen"

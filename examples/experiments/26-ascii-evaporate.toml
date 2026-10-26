@@ -7,7 +7,7 @@ effect = "grade"
 saturation = 1.25            # keeps skin warm; brightness comes from the ascii step's gamma, not from exposure
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
 radius = 60
 amount = 0.5
 

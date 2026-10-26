@@ -263,7 +263,7 @@ def _findings(path: Path) -> list[str]:
 
 def test_the_scan_covers_the_effect_packages_and_the_ops_modules():
     names = {_module_name(path) for path in SCANNED}
-    assert {"effects/grade/effect.py", "effects/clarity/effect.py", "ops/color.py", "ops/cells.py"} <= names
+    assert {"effects/grade/effect.py", "effects/sharpen/effect.py", "ops/color.py", "ops/cells.py"} <= names
 
 
 @pytest.mark.parametrize("path", SCANNED, ids=[_module_name(path) for path in SCANNED])

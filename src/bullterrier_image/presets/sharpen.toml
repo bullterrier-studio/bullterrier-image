@@ -1,0 +1,6 @@
+# Looks that are one sharpen step.
+
+[clarity]
+description = "Local contrast: features stand out against a wide (30 px) blur of their surroundings."
+radius = 30.0
+amount = 1.0

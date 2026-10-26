@@ -7,7 +7,7 @@ effect = "grade"
 saturation = 1.3
 
 [[step]]
-effect = "clarity"
+effect = "sharpen"
 radius = 50
 amount = 0.5
 

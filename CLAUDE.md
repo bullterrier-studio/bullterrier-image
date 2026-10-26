@@ -151,7 +151,7 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 ## Adding an effect
 
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
-defines the shape; `effects/grade/`, `effects/clarity/` are worked examples.
+defines the shape; `effects/grade/`, `effects/sharpen/` are worked examples.
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with one
    example field), `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. It passes the gate as written.
 2. **Fill in:** replace the example field with the effect's own and the body with the effect (docstring's first sentence is its

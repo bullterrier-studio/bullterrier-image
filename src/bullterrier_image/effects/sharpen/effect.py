@@ -46,10 +46,19 @@ class SharpenParams(EffectParams):
         "exact and slower.",
         advanced=True,
     )
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
+    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = param(
         "reflect",
         doc="What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' "
-        "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
+        "(mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), "
+        "'constant' (constant_value, so the border stands out from it).",
+        advanced=True,
+    )
+    constant_value: float = param(
+        0.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise.",
         advanced=True,
     )
 
@@ -59,9 +68,14 @@ def sharpen(rgb: np.ndarray, params: SharpenParams) -> np.ndarray:
     """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
 
     Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
-    kept within 0..1.
+    kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local
+    contrast, which exaggerates how each area differs from its surroundings so features stand out even when the
+    whole face sits in a narrow band of brightness. Put that before effects that turn tone into marks (ascii,
+    halftone), which are blind to small tonal differences.
     """
-    blurred = gaussian_blur(rgb, params.radius, truncate=params.truncate, edge=params.edge)
+    blurred = gaussian_blur(
+        rgb, params.radius, truncate=params.truncate, edge=params.edge, constant_value=params.constant_value
+    )
     detail = rgb - blurred
     detail *= np.abs(detail) >= params.threshold  # smaller differences count for nothing
     return np.clip(rgb + params.amount * detail, 0.0, 1.0).astype(np.float32)
