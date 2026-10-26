@@ -1,0 +1,10 @@
+# A low light from the left, cast on the depth's shapes: the dog's left side lit, its right side in shade.
+name = "relight"
+size = 480
+
+[[step]]
+effect = "relight"
+angle = 270
+elevation = 35
+height = 250
+opacity = 0.8
