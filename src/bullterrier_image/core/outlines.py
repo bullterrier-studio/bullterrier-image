@@ -62,10 +62,15 @@ class SvgShape:
     rule: FillRule
 
 
+def _too_far(what: str) -> RecipeError:
+    """The error for a coordinate that is not finite or reaches absurdly far outside the frame."""
+    return RecipeError(f"{what}: a coordinate is not finite or reaches too far outside the frame (over {_FAR:g} px)")
+
+
 def _checked(points: np.ndarray, what: str) -> np.ndarray:
     """`points` (px) if they are all finite and not absurdly far out, else RecipeError."""
     if not np.all(np.abs(points) <= _FAR):
-        raise RecipeError(f"{what}: a coordinate is not finite or reaches too far outside the frame (over {_FAR:g} px)")
+        raise _too_far(what)
     return points
 
 
@@ -91,6 +96,8 @@ def _outlines(segments: list, affine: np.ndarray, what: str) -> list[np.ndarray]
 
     def px(*points: object) -> np.ndarray:
         xy = np.array([[p.x, p.y] for p in points], float)  # type: ignore[attr-defined,type-var]
+        if not np.isfinite(xy).all():  # refused before the affine: infinity times its zeros is nan, and numpy's matmul
+            raise _too_far(what)  # warns about that on Linux and Windows (the suite turns warnings into errors)
         return _checked(xy @ affine[:, :2].T + affine[:, 2], what)
 
     outlines: list[list[np.ndarray]] = []
