@@ -10,14 +10,14 @@ The model contract (also what a local model file named by `BT_IMAGE_SUBJECT_MODE
 (1, 1, 1024, 1024) is the probability (0..1) that a pixel belongs to the subject.
 """
 
-from functools import lru_cache
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from PIL import Image
 
 from bullterrier_image import imageio
+
+from . import _onnx
 
 MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"
 MODEL_SHA256 = "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a"
@@ -36,25 +36,8 @@ def subject_probability(rgb: np.ndarray, model: Path) -> np.ndarray:
     model: the ONNX model file, which must follow the model contract in this module's docstring.
     Raises ImportError when onnxruntime is not installed.
     """
-    session = _session(_identity(model))
     square = imageio.to_pil(rgb).resize((_SIDE, _SIDE), Image.Resampling.BILINEAR)
     pixels = np.asarray(square, np.float32) / _EIGHT_BIT - _MEAN
     batch = pixels.transpose(2, 0, 1)[np.newaxis]  # (height, width, channel) -> (1, channel, height, width)
-    first_output = session.get_outputs()[0].name
-    (answer,) = session.run([first_output], {session.get_inputs()[0].name: batch})
+    answer = _onnx.first_output(model, batch)
     return np.clip(np.asarray(answer, np.float32).reshape(_SIDE, _SIDE), 0.0, 1.0)
-
-
-def _identity(model: Path) -> tuple[str, int, int]:
-    """The model file as a cache key: a file replaced on disk is loaded again."""
-    stat = model.stat()
-    return str(model.resolve()), stat.st_size, stat.st_mtime_ns
-
-
-@lru_cache(maxsize=2)
-def _session(identity: tuple[str, int, int]) -> Any:  # an onnxruntime.InferenceSession; loading takes a second
-    """The model's session, kept for the next call; `identity` (path, size, modification time) is the cache key."""
-    import onnxruntime
-
-    path, _, _ = identity
-    return onnxruntime.InferenceSession(path, providers=["CPUExecutionProvider"])
