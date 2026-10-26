@@ -12,11 +12,13 @@
     image = render(photo, look)
 
 Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
-(`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask`
-(a selection: "subject", "background", "depth" or a region), `opacity` (0..1), `blend_mode` (normal, multiply, screen,
-overlay, soft_light, difference, color), for an effect with presets `preset`, and for an effect that draws along the
-borders of a partition (`seams`) `partition`. A misspelt parameter or key fails when the step is made,
-not when the photo is rendered.
+(`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask` (a
+selection: "subject", "background", "depth", "light" or a region), `opacity` (0..1), `blend_mode` (normal, multiply,
+screen, overlay, soft_light, difference, color), `name` (a word that addresses the step's numbers, see
+`Recipe.parameters`), for an effect with presets `preset`, and for an effect that draws along the borders of a partition
+(`seams`) `partition`. A number the effect's documentation marks "(drivable)" also takes a `Drive`
+(`radius=Drive(by="far", start=0, end=12)`): it then varies across the picture by a field. A misspelt parameter or key
+fails when the step is made, not when the photo is rendered.
 
 `mask` may name a region the recipe declares (`Recipe(..., regions={"glass": Shards(...)})`); `fx` itself declares none,
 so by itself it knows only the built-in `subject` and `background`, and the recipe that holds the step checks the name.
@@ -64,11 +66,10 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     a Step.
 
     Values may be given by position, in the model's field order, or by keyword; the step keys (`mask`, `opacity`,
-    `blend_mode`, `preset`, `partition`) only by keyword. The Step checks them all, so a misspelt or out-of-range
-    value fails here
-    exactly as it would in a recipe file. `preset=` names one of the effect's presets (see `registry.presets`); the
-    values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path (read now, relative to
-    the current folder) or an array (float, height x width x 3 or 4).
+    `blend_mode`, `preset`, `partition`, `name`) only by keyword. The Step checks them all, so a misspelt or
+    out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the effect's presets (see
+    `registry.presets`); the values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path
+    (read now, relative to the current folder) or an array (float, height x width x 3 or 4).
     """
     fields = tuple(registry.parameters(name).model_fields)
 

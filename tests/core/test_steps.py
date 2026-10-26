@@ -19,7 +19,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Bands, Each, Given, Grid, Pick, Shards, Subject, render
+from bullterrier_image.recipe import Band, Bands, Each, Edge, Given, Grid, Pick, Shards, Subject, render
 
 
 class GainParams(EffectParams):
@@ -189,6 +189,54 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
         Step("paired_probe", {"low": Drive(by="near", start=0.0, end=0.9)})
 
 
+@pytest.mark.parametrize("levels", range(2, 17))
+@pytest.mark.parametrize(("start", "end"), [(0.2, 4.0), (4.0, 0.2), (0.0, 4.0), (4.0, 0.0), (0.32, 4.0)])
+def test_a_drive_from_one_end_of_the_range_to_the_other_is_valid_whatever_the_number_of_levels(
+    gain, start, end, levels
+):
+    assert Step("gain_probe", {"gain": Drive(by="near", start=start, end=end, levels=levels)}).drives
+
+
+def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_others_at_their_defaults(
+    throwaway_effects,
+):
+    class Ordered(EffectParams):
+        """Two drivable numbers that must stay ordered."""
+
+        low: float = param(0.1, unit="fraction", min=0, max=1, drivable=True, doc="The lower number.")
+        high: float = param(0.8, unit="fraction", min=0, max=1, drivable=True, doc="The upper number, at least `low`.")
+
+        @model_validator(mode="after")
+        def _ordered(self) -> "Ordered":
+            """`low` is at most `high`."""
+            if self.low > self.high:
+                raise ValueError(f"low {self.low} is above high {self.high}")
+            return self
+
+    @effect(category="light", params=Ordered)
+    def ordered_probe(rgb: np.ndarray, params: Ordered) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    both = {
+        "low": Drive(by="near", start=0.1, end=0.9, levels=3),
+        "high": Drive(by="near", start=0.2, end=1.0, levels=3),
+    }
+    assert Step("ordered_probe", both).drives.keys() == {"low", "high"}  # low 0.9 would be above the default high 0.8
+    crossing = {
+        "low": Drive(by="near", start=0.1, end=0.9, levels=3),
+        "high": Drive(by="near", start=0.5, end=0.6, levels=3),
+    }
+    with pytest.raises(RecipeError, match=r"ordered_probe.*low 0\.9.*above high 0\.6"):  # at the end the user wrote
+        Step("ordered_probe", crossing)
+
+
+def test_a_look_of_an_each_takes_no_name_because_nothing_could_reach_it_by_it(gain):
+    with pytest.raises(RecipeError, match=r"a look takes no `name`.*each\.looks\[0\]"):
+        Each("g", [Step("gain_probe", name="x"), "none"])
+    assert Each("g", [Step("gain_probe"), "none"], name="pieces").name == "pieces"
+
+
 def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway_effects):
     class Two(EffectParams):
         """Two drivable numbers."""
@@ -278,7 +326,7 @@ PULSE_ADDRESSES = [
     "pulse.gain", "pulse.offset", "pulse.taps", "pulse.opacity",
     "gain_probe#2.gain.start", "gain_probe#2.gain.end", "gain_probe#2.gain.levels",
     "gain_probe#2.offset", "gain_probe#2.taps", "gain_probe#2.opacity",
-    "each.feather", "each.opacity",
+    "each.feather", "each.opacity", "each.seed",
     "each.looks[0].gain", "each.looks[0].offset", "each.looks[0].taps", "each.looks[0].opacity",
     "region.near.low", "region.near.high", "region.near.feather",
 ]  # fmt: skip
@@ -374,7 +422,8 @@ def test_the_recipe_that_was_set_is_left_as_it_was_and_what_was_not_touched_is_s
     assert after is not pulse
     assert after.steps[1] is pulse.steps[1]  # a step that was not touched is the same object
     assert after.steps[2] is pulse.steps[2]
-    assert after.regions is pulse.regions or after.regions == pulse.regions
+    assert after.regions["near"] is pulse.regions["near"]  # nor is a region that was not touched
+    assert after.regions["g"] is pulse.regions["g"]
     assert (after.name, after.size, after.frame) == (pulse.name, pulse.size, pulse.frame)
 
 
@@ -430,6 +479,64 @@ BAD_ADDRESSES = {
 def test_an_address_or_value_that_is_wrong_is_refused_naming_the_address_and_what_is_valid(pulse, values, complaint):
     with pytest.raises(RecipeError, match=complaint):
         pulse.with_values(values)
+
+
+def test_a_step_that_has_a_name_can_still_be_reached_by_its_effect_when_it_is_the_only_one_of_it(gain):
+    named = Recipe("look", [Step("gain_probe", name="pulse"), Step("fill")], size=None)
+    assert named.with_values({"gain_probe.gain": 1.5}).parameters()["pulse.gain"].value == 1.5
+
+
+def test_two_addresses_that_reach_one_number_are_refused_naming_both(pulse):
+    with pytest.raises(RecipeError, match=r"'pulse\.gain' and 'gain_probe#1\.gain'.*same number"):
+        pulse.with_values({"pulse.gain": 1.0, "gain_probe#1.gain": 2.0})
+
+
+def test_a_region_address_without_a_number_says_what_it_needs(pulse):
+    with pytest.raises(RecipeError, match=r"'region\.near'.*region\.near\.number"):
+        pulse.with_values({"region.near": 0.5})
+
+
+def test_a_bad_value_blames_its_own_address_not_the_others_set_beside_it(pulse):
+    with pytest.raises(RecipeError) as raised:
+        pulse.with_values({"pulse.gain": 2.0, "pulse.offset": 9.0})
+    assert "'pulse.offset'" in str(raised.value)
+    assert "pulse.gain" not in str(raised.value)
+
+
+def test_a_rule_between_two_numbers_that_neither_breaks_alone_names_both_addresses(throwaway_effects):
+    class Pair(EffectParams):
+        """Two numbers that must stay ordered."""
+
+        low: float = param(0.2, unit="fraction", min=0, max=1, doc="The lower number.")
+        high: float = param(0.8, unit="fraction", min=0, max=1, doc="The upper number, at least `low`.")
+
+        @model_validator(mode="after")
+        def _ordered(self) -> "Pair":
+            """`low` is at most `high`."""
+            if self.low > self.high:
+                raise ValueError(f"low {self.low} is above high {self.high}")
+            return self
+
+    @effect(category="light", params=Pair)
+    def pair_probe(rgb: np.ndarray, params: Pair) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    recipe = Recipe("look", [Step("pair_probe")], size=None)
+    with pytest.raises(RecipeError, match=r"'pair_probe\.low', 'pair_probe\.high'.*low 0\.9 is above high 0\.1"):
+        recipe.with_values({"pair_probe.low": 0.9, "pair_probe.high": 0.1})
+
+
+def test_an_each_has_its_seed_as_a_number_and_it_is_a_whole_one(pulse):
+    seed = pulse.parameters()["each.seed"]
+    assert (seed.value, seed.unit, seed.minimum, seed.whole) == (0, "count", 0, True)
+    assert pulse.with_values({"each.seed": 7}).parameters()["each.seed"].value == 7
+
+
+def test_numbers_from_numpy_are_taken_as_the_python_numbers_they_hold(pulse):
+    after = pulse.with_values({"pulse.taps": np.float32(4.0), "pulse.gain": np.float32(0.5), "each.seed": np.int64(3)})
+    numbers = after.parameters()
+    assert (numbers["pulse.taps"].value, numbers["pulse.gain"].value, numbers["each.seed"].value) == (4, 0.5, 3)
 
 
 def test_an_effect_the_recipe_uses_twice_cannot_be_named_without_its_number(gain):
@@ -494,7 +601,6 @@ def test_a_step_named_describes_itself_with_its_name_and_an_each_too(gain):
 
 
 def test_a_step_name_is_a_step_key_so_fx_takes_it_and_no_effect_may_have_a_parameter_called_it(gain, throwaway_effects):
-    assert "name" in registry.STEP_KEYS
     assert fx.gain_probe(gain=2, name="pulse").name == "pulse"
 
     class Clash(EffectParams):
@@ -504,6 +610,65 @@ def test_a_step_name_is_a_step_key_so_fx_takes_it_and_no_effect_may_have_a_param
 
     with pytest.raises(ValueError, match=r"`name` is supplied by the recipe"):
         effect(category="light", params=Clash)(lambda rgb, params: rgb)
+
+
+def rich(**changed: float) -> Recipe:
+    """A recipe with every kind of thing around its numbers (masks, blend modes, a partition, an each with an
+    assignment and a seed, regions with tuples, presets and torn edges, a frame with a fill), with some numbers
+    written as given."""
+    return Recipe(
+        "rich",
+        [
+            Step(
+                "gain_probe",
+                {"gain": changed.get("gain", 2.0)},
+                mask="near",
+                opacity=0.5,
+                blend_mode="screen",
+                name="a",
+            ),
+            Step("seams", {"width": changed.get("width", 0.01), "color": "#ff0000"}, partition="s"),
+            Each(
+                "s",
+                [
+                    Step("gain_probe", {"offset": changed.get("offset", 0.1)}, blend_mode="multiply", opacity=0.9),
+                    "none",
+                ],
+                mask="near",
+                opacity=0.8,
+                blend_mode="overlay",
+                assign="random",
+                seed=7,
+                feather=changed.get("feather", 0.003),
+                name="p",
+            ),
+        ],
+        regions={
+            "s": Shards(preset="glass", count=int(changed.get("count", 24)), edge=Edge(style="torn", amount=0.02)),
+            "g": Grid(columns=[1, 2, 1], rows=3),
+            "near": Band(of="depth", low=changed.get("low", 0.4), feather=0.2),
+        },
+        frame=Framing(angle=changed.get("angle", 10), fill="#102030", anchor="top", aspect=1.5, margin=0.1),
+        size=256,
+    )
+
+
+RICH_CASES = {
+    "a number of a step": ("a.gain", 3.0, {"gain": 3.0}),
+    "a number of a step with a partition": ("seams.width", 0.02, {"width": 0.02}),
+    "the feather of an each": ("p.feather", 0.004, {"feather": 0.004}),
+    "a number of a look": ("p.looks[0].offset", 0.3, {"offset": 0.3}),
+    "a whole number of a region with a preset and a torn edge": ("region.s.count", 40, {"count": 40}),
+    "a number of a band": ("region.near.low", 0.1, {"low": 0.1}),
+    "a number of the frame": ("frame.angle", 20, {"angle": 20}),
+}
+
+
+@pytest.mark.parametrize(("address", "value", "written"), RICH_CASES.values(), ids=RICH_CASES.keys())
+def test_a_recipe_with_a_number_set_equals_the_recipe_written_with_it_so_nothing_around_it_is_lost(
+    gain, address, value, written
+):
+    assert rich().with_values({address: value}) == rich(**written)
 
 
 # --- the effect's own default opacity --------

@@ -7,13 +7,16 @@ Promises:
   effect, a misspelt or out-of-range parameter, a bad opacity or blend mode, or an empty recipe fails at once
   with a `RecipeError` (a `ValueError`; an unknown effect is an `UnknownEffectError`, also a `KeyError`) saying what is
   valid. A step's parameters are checked by its effect's own parameter model.
-- The regions a step names (`mask`, `partition`, `each`) are checked when the recipe is made, which alone knows the
-  regions it declares: a name that is no region, or is a region of the wrong kind, is a `RecipeError` naming the step
-  and listing the valid names.
+- The regions a step names (`mask`, `by`, `partition`, `each`) are checked when the recipe is made, which alone knows
+  the regions it declares: a name that is no region, or is a region of the wrong kind, is a `RecipeError` naming the
+  step and listing the valid names.
 - Steps and recipes are immutable values (frozen Pydantic models). A step keeps its parameters as they were written,
   so `describe` shows them that way; with a `preset` they are the preset's parameters under the ones given, which is
   all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
+- A number an effect declares drivable may be a `Drive` (see `params`): it is validated at every level when the step is
+  made. Every number of a recipe has an address (`Recipe.parameters`, `Recipe.parameter`), and `Recipe.with_values`
+  returns a copy with some set; a step's optional `name` addresses its numbers.
 
 Dependency direction: imports the effect registry, `framing`, `params`, `regions`, `ops.composite` (the blend modes'
 names) and `errors` only. The recipe-file reader
@@ -46,12 +49,12 @@ _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besi
 
 @dataclass(frozen=True)
 class Parameter:
-    """One number of a recipe, as `Recipe.parameters` lists it: its `value` now, its `unit` (`px`, `fraction`,
-    `count`...) and range (`minimum` and `maximum`, None where it has no bound), what it does (`doc`) and whether it
-    must be a whole number (`whole`: a count, a seed). The unit and range are those of the number's own declaration, so
-    a control that maps a signal onto it can scale to them and stay inside."""
+    """One number of a recipe, as `Recipe.parameters` lists it: its `value` now (None for an optional number the recipe
+    leaves unset, such as the framing's `aspect`), its `unit` (`px`, `fraction`, `count`...) and range, what it does
+    (`doc`) and whether it must be a whole number (`whole`: a count, a seed). The unit and range are those of the
+    number's own declaration, so a control that maps a signal onto it can scale to them and stay inside."""
 
-    value: float
+    value: float | None
     unit: str
     minimum: float | None
     maximum: float | None
@@ -257,6 +260,7 @@ class Each(_Layer):
         ge=0,
         le=2**32 - 1,
         strict=True,
+        json_schema_extra={"unit": "count"},
         description="Random seed of assign='random': the same seed always gives the same looks to the same pieces.",
     )
     feather: float = Field(
@@ -299,6 +303,15 @@ class Each(_Layer):
             name=name,
             **unknown,
         )
+
+    @field_validator("looks")
+    @classmethod
+    def _looks_take_no_name(cls, looks: tuple[Step | Literal["none"], ...]) -> tuple[Step | Literal["none"], ...]:
+        """A look is reached by its place, `each.looks[0]`, so a name on it would address nothing."""
+        for number, look in enumerate(looks):
+            if isinstance(look, Step) and look.name is not None:
+                raise ValueError(f"a look takes no `name`: its numbers are addressed by place, `each.looks[{number}]`")
+        return looks
 
     def assignment(self, pieces: int) -> list[int]:
         """The look (an index into `looks`) of each of `pieces` pieces, piece 0 first."""
@@ -361,10 +374,8 @@ def _check_drives(effect: str, params: Mapping[str, Any]) -> None:
         if len(kinds) > 1:
             shown = " and ".join(repr(kind) for kind in sorted(kinds, key=str))
             raise RecipeError(f"effect {effect!r}: the drives of one step must vary by one {what}, got {shown}")
-    for name, drive in drives.items():  # the ends as written first, so a bad one is named, not a level between
-        for value in (drive.start, drive.end):
-            model.validate({**fixed, name: value})
-    for level in range(next((d.levels for d in drives.values()), 0)):
+    levels = next((d.levels for d in drives.values()), 0)
+    for level in (*([0, levels - 1] if levels else []), *range(1, levels - 1)):  # the ends as written first
         model.validate({**fixed, **{name: drive.value(level) for name, drive in drives.items()}})
 
 
@@ -593,14 +604,18 @@ class Recipe(ValidatedModel):
         (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
         and a `.start` of a number that is not driven."""
         changes: dict[tuple, dict[str, Any]] = {}
-        where: dict[tuple, list[str]] = {}
+        where: dict[tuple, dict[str, str]] = {}  # the address that set each number
         cache: dict[tuple, dict[str, Parameter]] = {}
         for address, value in values.items():
             target, rest = self._reach(address, cache)
+            if isinstance(value, np.generic):
+                value = value.item()  # a number from numpy is the Python number it holds
             if self._numbers_of(target, cache)[rest].whole and isinstance(value, float) and value.is_integer():
                 value = int(value)
+            if rest in changes.get(target, {}):
+                raise RecipeError(f"{where[target][rest]!r} and {address!r} reach the same number: give it one value")
             changes.setdefault(target, {})[rest] = value
-            where.setdefault(target, []).append(address)
+            where.setdefault(target, {})[rest] = address
         steps, regions, frame = list(self.steps), dict(self.regions), self.frame
         for target, put in changes.items():
             try:
@@ -612,7 +627,10 @@ class Recipe(ValidatedModel):
                     case _:
                         frame = _set_numbers(frame, put)
             except RecipeError as error:
-                raise RecipeError(f"{', '.join(repr(address) for address in where[target])}: {error}") from None
+                blamed = [where[target][rest] for rest in put if _refuses(self, target, rest, put[rest])]
+                raise RecipeError(
+                    f"{', '.join(repr(address) for address in blamed or where[target].values())}: {error}"
+                ) from None
         return Recipe(self.name, steps, self.size, frame, regions)
 
     def _heads(self) -> list[str]:
@@ -640,6 +658,8 @@ class Recipe(ValidatedModel):
             target: tuple = ("frame",)
             rest, label = ".".join(parts[1:]), "'frame'"
         elif head == "region":
+            if len(parts) < 3:
+                raise RecipeError(f"{address!r}: a region's number is addressed `region.{parts[1]}.number`")
             name = ".".join(parts[1:-1])
             if name not in self.regions:
                 raise RecipeError(
@@ -648,7 +668,7 @@ class Recipe(ValidatedModel):
             target, rest, label = ("region", name), parts[-1], f"region {name!r}"
         else:
             target, rest, label = ("step", self._step_index(head, address)), ".".join(parts[1:]), repr(head)
-        numbers = cache.setdefault(target, self._numbers_of(target))
+        numbers = self._numbers_of(target, cache)
         if rest in numbers:
             return target, rest
         base, _, part = rest.rpartition(".")
@@ -674,6 +694,8 @@ class Recipe(ValidatedModel):
             if number.isdigit() and 1 <= int(number) <= len(same):
                 return same[int(number) - 1]
             raise RecipeError(f"{address!r}: no step {head!r}; the recipe has {len(same)} {kind!r} steps")
+        if len(same) == 1 and not number:
+            return same[0]  # the recipe's only step of that effect, though it has a name
         if len(same) > 1:
             numbered = ", ".join(f"{kind}#{n}.{address.partition('.')[2]}" for n in range(1, len(same) + 1))
             raise RecipeError(f"{address!r}: the recipe has {len(same)} {kind!r} steps; write one of {numbered}")
@@ -688,11 +710,14 @@ class Recipe(ValidatedModel):
             return cache[target]
         match target:
             case ("step", index):
-                return _step_numbers(self.steps[index])
+                found = _step_numbers(self.steps[index])
             case ("region", name):
-                return _numbers(self.regions[name])
+                found = _numbers(self.regions[name])
             case _:
-                return _numbers(self.frame)
+                found = _numbers(self.frame)
+        if cache is not None:
+            cache[target] = found
+        return found
 
 
 def _called(step: Step | Each) -> str:
@@ -710,11 +735,9 @@ def _numbers(model: EffectParams) -> dict[str, Parameter]:
     """The numbers of the parameter model `model` (an effect's, a region kind's or the framing), by field, at the values
     it holds: every field that has a range, so not a colour, a choice, a text or a list."""
     return {
-        doc.name: Parameter(
-            getattr(model, doc.name), doc.unit or "", doc.minimum, doc.maximum, doc.doc, doc.type == "whole number"
-        )
-        for doc in type(model).fields_doc()
-        if doc.minimum is not None
+        name: _number(getattr(model, name), info, whole=info.annotation is int)
+        for name, info in type(model).model_fields.items()
+        if bounds(info)[0] is not None
     }
 
 
@@ -725,6 +748,7 @@ def _step_numbers(step: Step | Each) -> dict[str, Parameter]:
         found = {
             "feather": _number(step.feather, Each.model_fields["feather"]),
             "opacity": _number(step.opacity, Each.model_fields["opacity"]),
+            "seed": _number(step.seed, Each.model_fields["seed"], whole=True),
         }
         for index, look in enumerate(step.looks):
             if isinstance(look, Step):
@@ -748,7 +772,7 @@ def _set_step(step: Step | Each, put: Mapping[str, Any]) -> Step | Each:
 
 
 def _set_each(each: Each, put: Mapping[str, Any]) -> Each:
-    """`each` with its `feather`, `opacity` and the numbers of its looks (`looks[0].gain`) set from `put`."""
+    """`each` with its `feather`, `opacity`, `seed` and the numbers of its looks (`looks[0].gain`) set from `put`."""
     own = {rest: value for rest, value in put.items() if not rest.startswith("looks[")}
     by_look: dict[int, dict[str, Any]] = {}
     for rest, value in put.items():
@@ -766,7 +790,7 @@ def _set_each(each: Each, put: Mapping[str, Any]) -> Each:
         opacity=own.get("opacity", each.opacity),
         blend_mode=each.blend_mode,
         assign=each.assign,
-        seed=each.seed,
+        seed=own.get("seed", each.seed),
         feather=own.get("feather", each.feather),
         name=each.name,
     )
@@ -800,3 +824,19 @@ def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
 def _set_numbers[M: EffectParams](model: M, put: Mapping[str, Any]) -> M:
     """`model` (a region kind or the framing) with the numbers `put` set; a new model, checked afresh."""
     return type(model)(**{**model.model_dump(), **put})
+
+
+def _refuses(recipe: Recipe, target: tuple, rest: str, value: Any) -> bool:
+    """Whether setting the one number `rest` of `target` (see `Recipe._reach`) to `value`, alone, is refused: how an
+    error that came from several numbers set together is blamed on the ones that cause it."""
+    try:
+        match target:
+            case ("step", index):
+                _set_step(recipe.steps[index], {rest: value})
+            case ("region", name):
+                _set_numbers(recipe.regions[name], {rest: value})
+            case _:
+                _set_numbers(recipe.frame, {rest: value})
+    except RecipeError:
+        return True
+    return False

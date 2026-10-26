@@ -117,7 +117,7 @@ and maximum. `subject` (subject cut-out, `(h, w)` 0..1) is an injected input: de
 `(h, w)` float32 0..1, 1 = nearest) and `partition` (piece labels of a region, `(h, w)` int32). Contract tests check all of this
 for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
-(`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`) or an injected input; registering one fails. An effect whose natural
+(`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`, `name`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.
 
 ## Parameters

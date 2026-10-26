@@ -633,6 +633,15 @@ def test_a_step_name_needs_format_3_and_a_file_of_an_earlier_one_says_so(tmp_pat
         load_recipe(_write(tmp_path, text, "old.toml"))
 
 
+def test_a_look_in_a_recipe_file_takes_no_name_naming_the_look(tmp_path):
+    text = (
+        'format = 3\n[region.g]\nkind = "grid"\n[[step]]\neach = "g"\n'
+        'looks = ["none", { effect = "grade", name = "warm" }]\n'
+    )
+    with pytest.raises(RecipeError, match=r"^bad\.toml: .*a look takes no `name`.*each\.looks\[1\]"):
+        load_recipe(_write(tmp_path, text, "bad.toml"))
+
+
 NEW_IN_FORMAT_2 = {
     "a region table": '[region.g]\nkind = "grid"\n' + STEP,
     "an each step": '[[step]]\neach = "subject"\nlooks = ["none"]\n',

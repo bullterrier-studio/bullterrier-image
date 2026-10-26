@@ -532,7 +532,7 @@ and where it is 1:
 ```toml
 format = 3
 
-[region.far]                      # 1 in the far part of the picture, fading in over the last tenth of the depth
+[region.far]                      # 1 where the depth is up to 0.5 (the far half), fading to 0 by 0.6
 kind = "band"
 of = "depth"
 low = 0
@@ -561,8 +561,9 @@ exactly the render at the middle value, a field between two levels is their mix.
 times the effect, and a value no pixel needs is not rendered (a field that is 0 everywhere costs one render). More
 levels is smoother where the field changes slowly; two levels mix the effect at `start` and at `end`.
 
-**Addresses.** Every number of a recipe has an address, so a program that drives a look (a video tool mapping a beat
-onto a glow, frame after frame) can read what the numbers are and set them without rebuilding the recipe:
+**Addresses.** Every number of a recipe (not a colour, a choice, a list or a picture) has an address, so a program that
+drives a look (a video tool mapping a beat onto a glow, frame after frame) can read what the numbers are and set them
+without rebuilding the recipe:
 
 ```python
 from bullterrier_image import load_recipe

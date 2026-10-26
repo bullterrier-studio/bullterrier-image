@@ -629,6 +629,18 @@ def test_a_drive_has_its_levels_evenly_spaced_from_start_to_end(start, end, leve
     assert [drive.value(level) for level in range(levels)] == pytest.approx(expected)
 
 
+@pytest.mark.parametrize("levels", range(2, 17))
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [(0.05, 0.0), (0.08, 1.0), (0.0, 1.0), (1.0, 0.0), (0.1, 0.1), (0.3, 0.7), (-1.0, 1.0), (0.2, 4.0), (4.0, 0.4)],
+)
+def test_a_drive_runs_exactly_from_its_start_to_its_end_and_never_outside_them(start, end, levels):
+    values = Drive(by="f", start=start, end=end, levels=levels).values()
+    assert values[0] == start
+    assert values[-1] == end  # not a float rounding of it: a parameter at its bound must stay valid
+    assert all(min(start, end) <= value <= max(start, end) for value in values)
+
+
 def test_a_drive_is_frozen_and_equal_to_another_of_the_same_values_and_says_what_it_is():
     drive = Drive(by="near", start=0, end=30)
     assert drive == Drive(by="near", start=0.0, end=30.0, levels=5)

@@ -494,16 +494,18 @@ class BrightenParams(EffectParams):
 
 @pytest.fixture
 def brighten(throwaway_effects):
-    """`brighten_probe`: clip(rgb x gain + bias). `calls` holds the (gain, bias) of every render, in order."""
-    calls: list[tuple[float, float]] = []
+    """`brighten_probe`: clip(rgb x gain + bias). The set it returns holds the gains it must never be asked to render: a
+    test that puts a gain in it shows that a render was skipped by the render finishing, not by counting calls."""
+    refused: set[float] = set()
 
     @effect(category="light", params=BrightenParams)
     def brighten_probe(rgb, params):
         """Multiplies by a gain and adds a bias."""
-        calls.append((params.gain, params.bias))
+        if any(params.gain == pytest.approx(gain) for gain in refused):
+            raise AssertionError(f"the effect was rendered at the gain {params.gain}, which nothing needed")
         return np.clip(rgb * params.gain + params.bias, 0, 1).astype(np.float32)
 
-    return calls
+    return refused
 
 
 def driven(by: str = "f", levels: int = 5, **drives: tuple[float, float]) -> Recipe:
@@ -550,29 +552,23 @@ def test_a_field_running_the_other_way_is_the_start_and_end_swapped(photo, brigh
 
 
 @pytest.mark.parametrize(
-    ("value", "levels_used"),
+    ("value", "not_needed"),
     [
-        pytest.param(0.0, [0.5], id="a field of 0 renders only the first level"),
-        pytest.param(0.5, [1.5], id="a field on a level renders only that level"),
-        pytest.param(0.3, [1.0, 1.5], id="a field between two levels renders those two"),
-        pytest.param(1.0, [2.5], id="a field of 1 renders only the last level"),
+        pytest.param(0.0, [1.0, 1.5, 2.0, 2.5], id="a field of 0 needs only the first level"),
+        pytest.param(0.5, [0.5, 1.0, 2.0, 2.5], id="a field on a level needs only that level"),
+        pytest.param(0.3, [0.5, 2.0, 2.5], id="a field between two levels needs those two"),
+        pytest.param(1.0, [0.5, 1.0, 1.5, 2.0], id="a field of 1 needs only the last level"),
     ],
 )
-def test_only_the_levels_some_pixel_needs_are_rendered(photo, brighten, value, levels_used):
-    runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, value)})
-    assert sorted(gain for gain, _ in brighten) == pytest.approx(levels_used)
-
-
-def test_a_field_that_spans_the_whole_range_renders_every_level_once(photo, brighten):
-    ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
-    runner.render(photo, driven(levels=7, gain=(0.5, 2.5)), maps={"f": ramp})
-    assert len(brighten) == 7
+def test_a_level_no_pixel_needs_is_never_rendered(photo, brighten, value, not_needed):
+    brighten.update(not_needed)  # the effect raises if asked for one of these: the render finishing is the proof
+    got = runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, value)})
+    assert got.shape == photo.shape
 
 
 def test_two_drives_of_one_step_move_together_along_the_same_field(photo, brighten):
     got = runner.render(photo, driven(levels=3, gain=(0.5, 1.5), bias=(0.0, 0.2)), maps={"f": field_of(photo, 0.5)})
     np.testing.assert_allclose(got, runner.render(photo, plain(gain=1.0, bias=0.1)), atol=1e-6, rtol=0)
-    assert brighten[-1] == pytest.approx((1.0, 0.1))
 
 
 def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten):
@@ -582,8 +578,8 @@ def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten)
         size=None,
         regions={"f": Given()},
     )
-    runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
-    assert brighten == [(2.5, 0.25)]
+    got = runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
+    np.testing.assert_allclose(got, runner.render(photo, plain(gain=2.5, bias=0.25)), atol=1e-6, rtol=0)
 
 
 def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, subject):

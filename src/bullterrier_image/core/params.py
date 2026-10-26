@@ -321,7 +321,10 @@ class Drive(ValidatedModel):
         self._init_checked("drive", **values)
 
     def value(self, level: int) -> float:
-        """The parameter's value at level `level` (0 is `start`, `levels - 1` is `end`)."""
+        """The parameter's value at level `level` (0 is `start`, `levels - 1` is exactly `end`: a parameter at one of
+        its bounds must not miss it by a float rounding)."""
+        if level == self.levels - 1:
+            return self.end
         return self.start + (self.end - self.start) * level / (self.levels - 1)
 
     def values(self) -> tuple[float, ...]:

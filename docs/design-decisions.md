@@ -351,7 +351,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   called it) and a name is a word that cannot start another address (`region`, `frame`, `each`), is unique in the recipe
   and is not an effect the recipe uses; a driven number is addressed by its ends, never by itself; a value out of range
   fails at once naming the address; `sweep` takes any address; looks count from 0 like pieces. Not addressable: a
-  colour, a choice, a list, a text, a picture, `size` and the names of regions (not numbers, or not a look's value).
+  colour, a choice, a list, a text, a picture, `size`, the names of regions, and the fields of a table inside a region (a
+  torn `edge`, a cut's `lines`); a look takes no name, so it is reached by its place.
 - **A field varies a parameter: `Drive(by, start, end, levels)`, rendered at levels and mixed.** A number an effect marks
   drivable (`param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
   `end` where it is 1. Effects do not change: the runner renders the effect at `levels` evenly spaced values and each pixel
@@ -393,7 +394,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   regions; the recipe that holds it does, and `fx` declares none, so by itself it knows the built-in two). `partition`
   names the region an effect with the injected input `partition` draws (int32 piece numbers; a selection is split into
   what it chooses and what it does not). `each` and `looks` make an `Each` step, a step type of its own: it has no
-  effect or parameters, only `each`, `looks`, `assign`, `seed` and `feather` (a share of the long side, so the same look
+  effect or parameters, only `each`, `looks`, `assign`, `seed`, `name` and `feather` (a share of the long side, so the same look
   comes out at any resolution; how softly the looks blend across a border, default 0.001 to smooth the pixels'
   stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
   apply to the blended looks. `partition`, `each` and `looks` are reserved like the other step keys, so no effect
