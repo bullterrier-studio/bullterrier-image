@@ -4,9 +4,9 @@ The module promises three things. `cell_size` says how big one character cell is
 picture. `glyph_atlas` gives the ink coverage of each distinct character of a palette, ordered from least to most ink,
 so a brightness maps straight to an atlas index. `paint` turns a grid of such indices back into a coverage picture.
 
-Every glyph is drawn with the one font in `FONT`, never a system font, so a look is the same on every machine. It is
-JetBrains Mono Regular (SIL OFL 1.1, `LICENSE-FONT`), monospaced, with Latin letters and the block elements (`█▓▒░▀▄`).
-A character it lacks (braille, for one) shows as its missing-glyph box.
+Every glyph is drawn with the one font in `FONT`, never a system font, so a look is the same on every platform
+(within float tolerance). It is JetBrains Mono Regular (SIL OFL 1.1, `LICENSE-FONT`), monospaced, with Latin letters
+and the block elements (`█▓▒░▀▄`). A character it lacks (braille, for one) shows as its missing-glyph box.
 """
 
 from functools import lru_cache

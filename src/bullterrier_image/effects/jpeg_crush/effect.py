@@ -27,8 +27,8 @@ def jpeg_crush(rgb: np.ndarray, params: JpegCrushParams) -> np.ndarray:
 
     The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction
     (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all
-    of it undone. There is no file and no byte: the result does not depend on any image library, so it is the same on
-    every machine. A picture whose sides are not multiples of 16 is extended by repeating its last row and column
+    of it undone. There is no file and no byte: the result does not depend on any image library, so it is alike on
+    every platform. A picture whose sides are not multiples of 16 is extended by repeating its last row and column
     and cropped back.
     """
     return decode(encode(rgb, quality=params.quality))

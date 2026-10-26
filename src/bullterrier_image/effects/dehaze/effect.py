@@ -110,7 +110,7 @@ def dehaze(rgb: np.ndarray, params: DehazeParams) -> np.ndarray:
     flat = dark.ravel()
     threshold = np.partition(flat, flat.size - count)[flat.size - count]
     # Pixels tied at the threshold are common (the patch minimum makes plateaus): the first in reading order fill the
-    # places left, so the choice, and with it the airlight, is the same on every machine.
+    # places left, so the choice, and with it the airlight, does not depend on how the sort orders ties.
     above = np.flatnonzero(flat > threshold)
     haziest = np.concatenate([above, np.flatnonzero(flat == threshold)[: count - above.size]])
     pixels = rgb.reshape(dark.size, rgb.shape[-1])[haziest]

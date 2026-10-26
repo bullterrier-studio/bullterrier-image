@@ -5,7 +5,7 @@ background (0), at the picture's own size; `subject_finder()` is the same as a `
 (`find_subject=`), named by its backend and model. Two backends can answer it:
 
 - `"onnx"`, the default everywhere: a portable model, IS-Net (general use, Apache-2.0), run by ONNX Runtime on macOS,
-  Linux and Windows, so a recipe cuts the same on every machine. The model (about 180 MB) is not part of the package:
+  Linux and Windows, so a recipe cuts alike on every platform. The model (about 180 MB) is not part of the package:
   the first use downloads it into the user's cache folder (`onnx_model_path()`), checks its SHA-256 and keeps it there;
   nothing is downloaded at import time. Offline, download the file by hand (the error says from where and to where) or
   set `BT_IMAGE_SUBJECT_MODEL` to a local copy, which is then used as it is and never downloaded.
@@ -37,7 +37,7 @@ from . import _isnet, _vision
 from .download import DownloadError, fetch, user_cache_dir
 
 SEGMENTERS = ("onnx", "vision")
-DEFAULT_SEGMENTER = "onnx"  # the one place that decides: the same cut on every machine
+DEFAULT_SEGMENTER = "onnx"  # the one place that decides: the portable model on every platform
 SEGMENTER_VARIABLE = "BT_IMAGE_SEGMENTER"
 MODEL_VARIABLE = "BT_IMAGE_SUBJECT_MODEL"
 _HALF = 0.5  # a pixel is the subject's when the model is at least this sure: the even split of a probability

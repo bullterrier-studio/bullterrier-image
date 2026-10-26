@@ -131,7 +131,7 @@ depend on the machine.
 
 | Backend | Where | Notes |
 |---|---|---|
-| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default everywhere, so a recipe cuts the same on every machine. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
+| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | The default everywhere, so a recipe cuts alike on every platform. People, pets and objects alike; a few seconds per photo on a laptop CPU. |
 | `vision`: Apple Vision subject segmentation | macOS | Only when asked (`--segmenter vision`, `BT_IMAGE_SEGMENTER=vision`). Built in: no download, runs on the Neural Engine. Its cut differs from the portable model's. |
 
 The portable model (178 MB) is not in the package. The first cut-out that needs it downloads it once into your cache
