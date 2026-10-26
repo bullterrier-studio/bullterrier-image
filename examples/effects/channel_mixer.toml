@@ -8,3 +8,18 @@ red_from_red = 0.6
 red_from_blue = 0.4
 blue_from_red = 0.4
 blue_from_blue = 0.6
+
+# Then a red filter on black and white film (0.9 : 0.4 : 0.1 as shares of the grey), laid over the swap: skin and
+# reds light, blues dark.
+[[step]]
+effect = "channel_mixer"
+opacity = 0.6
+red_from_red = 0.64285713
+red_from_green = 0.2857143
+red_from_blue = 0.071428575
+green_from_red = 0.64285713
+green_from_green = 0.2857143
+green_from_blue = 0.071428575
+blue_from_red = 0.64285713
+blue_from_green = 0.2857143
+blue_from_blue = 0.071428575

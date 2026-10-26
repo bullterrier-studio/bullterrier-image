@@ -1,9 +1,0 @@
-# Dramatic black and white: a red filter darkens the sky and lightens skin, like a red filter on film.
-name = "black_and_white"
-size = 480
-
-[[step]]
-effect = "black_and_white"
-red = 0.9
-green = 0.4
-blue = 0.1

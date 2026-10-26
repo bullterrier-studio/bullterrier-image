@@ -3,7 +3,8 @@ name = "newsprint"
 size = 768
 
 [[step]]
-effect = "black_and_white"
+effect = "channel_mixer"
+preset = "monochrome"
 
 [[step]]
 effect = "clarity"

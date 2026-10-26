@@ -37,7 +37,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
-| `black_and_white` ✓ | Mono conversion with filter weights. | `fx.black_and_white(red=0.6, green=0.3, blue=0.1)` |
+| `black_and_white` ✓ (a preset of `channel_mixer`) | Mono conversion; set the rows for a colour filter. | `fx.channel_mixer(preset="monochrome")` |
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
 | `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |
 | `cross_process` ✓ (a preset of `curves`) | Shifted curves per channel. | `fx.curves(preset="cross_process")` |
@@ -254,7 +254,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `background_blur` ✓ | Portrait-mode blur. A recipe step: `gaussian_blur` with `mask = "background"`. | `gaussian_blur(radius=24) with mask = "background"` |
 | `sticker` ✓ | White border and shadow: a die-cut sticker. A recipe: `outline` then `drop_shadow` (examples/recipes/sticker.toml). | `outline(width=14) + drop_shadow` |
 | `silhouette` ✓ | Flat colour subject. A recipe: `fill` masked to the subject, then to the background. | `fill(color="#000") mask = "subject"` |
-| `color_pop` ✓ | Subject in colour, background in grey. A recipe: `black_and_white` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `black_and_white mask = "background"` |
+| `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="monochrome")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "monochrome", mask = "background"` |
 | `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
 | `layered_cutouts` ✓ | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
