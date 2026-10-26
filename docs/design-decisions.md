@@ -198,11 +198,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the photo to a map; `render`, `trace` and `render_all` take `matte=` and `find_subject=`, `pipeline.run` takes
   `find_subject=`, and
   `finding.subject.subject_finder(segmenter=None)` returns the default, named by its backend and model. The default is
-  bound lazily, only when a recipe will ask for the subject. The pipeline's subject and crop caches are keyed by the
-  identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
+  bound lazily, only when a recipe will ask for the subject. The pipeline's subject, depth and crop caches are keyed by
+  the identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
   name (the partial-finder cache collision). *Consequence:* the crop-finder alias in regions is `BoxFinder`; the package
-  is `finding/` (`subject`, `download`) and the subject model's variable is `BT_IMAGE_SUBJECT_MODEL`. Planned, not built
-  yet: depth with the same keywords (`depth=`, `find_depth=`), `finding.depth.depth_finder()` and `BT_IMAGE_DEPTH_MODEL`.
+  is `finding/` (`subject`, `download`) and the subject model's variable is `BT_IMAGE_SUBJECT_MODEL`. Depth takes the
+  same keywords (`depth=`, `find_depth=`); planned, not built yet: `finding.depth.depth_finder()` and
+  `BT_IMAGE_DEPTH_MODEL`.
 
 ## Errors and I/O
 
@@ -228,13 +229,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
   input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
-- **Depth is injected like the subject** (decided, not built yet). An effect that needs distance (`depth_of_field`,
-  `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth
-  map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is `DepthNotFoundError` naming the step), and
-  the public API binds the default: Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0)
-  on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded like the portable subject model;
-  `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The model's inverse depth is
-  min-max scaled per photo (a flat photo gives zeros). Decided:
+- **Depth is injected like the subject** (built: the input, `depth=`, `find_depth=`, `--depth`, `load_depth`, framing
+  and the pipeline's cache; not built yet: the default model, the region kinds, the gallery's use of it). An effect that
+  needs distance (`depth_of_field`, `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1,
+  1 = nearest. The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
+  `DepthNotFoundError` naming the step), and the public API binds the default: Depth Anything V2 Small
+  (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded
+  like the portable subject model; `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The
+  model's inverse depth is min-max scaled per photo (a flat photo gives zeros). Decided:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
   - region kinds `Depth` (`kind = "depth"`, a selection: `near` 1.0, `far` 0.5, `feather` 0.1, all fractions of the depth

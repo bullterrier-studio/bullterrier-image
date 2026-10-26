@@ -56,8 +56,8 @@ Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, ru
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
-The runner is given the subject (a `matte` or a `find_subject` `Finder(identity, find)`); `bullterrier_image.recipe` binds
-`finding.subject.subject_finder()` when a recipe needs it.
+The runner is given each map: the subject (a `matte` or a `find_subject` `Finder(identity, find)`) and the depth (`depth`
+or `find_depth`); `bullterrier_image.recipe` binds `finding.subject.subject_finder()` when a recipe needs it.
 
 ## The rules
 

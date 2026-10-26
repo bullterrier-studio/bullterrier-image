@@ -3,8 +3,8 @@
 Stages, in order, for every photo:
 
     ingest    read the photo (orientation and colour profile applied, see `imageio`)
-    analyse   find the subject once per photo, if any recipe needs it; the result is cached on disk (so is what the
-              finder finds in each piece, for a recipe that finds the subject piece by piece)
+    analyse   find the subject and the depth once per photo, each if any recipe needs it; the results are cached on
+              disk (so is what the finder finds in each piece, for a recipe that finds the subject piece by piece)
     style     run each recipe on the photo
     check     automatic quality checks (see `checks`); problems become warnings in the report
     export    write every format and size
@@ -134,7 +134,8 @@ class Project:
 
     @property
     def cache(self) -> Path:
-        """The folder of remembered subject mattes, inside `output`, so a photo is analysed once across runs."""
+        """The folder of remembered maps (subject mattes, depth maps), inside `output`, so a photo is analysed once
+        across runs."""
         return self.output / ".cache"
 
 
@@ -231,6 +232,7 @@ def run(
     only: str | None = None,
     log: Callable[[str], None] = lambda message: None,
     find_subject: Finder | None = None,
+    find_depth: Finder | None = None,
 ) -> list[Item]:
     """Process every photo with every recipe and write the report; returns what happened to each pair.
 
@@ -249,6 +251,9 @@ def run(
     another identity (or delete `project.cache`). A damaged cache entry is found again, also with `force`. A recipe
     whose regions find the subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working
     picture, once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
+    `find_depth` finds the depth of a photo for the recipes that take it (no default yet: without one, such a recipe
+    fails naming its step), asked and remembered like `find_subject`. Each map is remembered under its own finder's
+    identity: changing one finder redoes only the recipes that use its map.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -276,24 +281,31 @@ def run(
         )
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
-    # the default finder is built only when a recipe needs the subject: a setting nobody uses cannot stop the project.
-    # What a remembered subject depends on besides the photo: the finder's identity, the subject-finding code (the edge
-    # clean-up is part of what is remembered) and the libraries.
-    finder, subject_key = None, ""
+    # the finder of each map ("matte", "depth") a recipe needs: the default subject finder is built only then, so a
+    # setting nobody uses cannot stop the project; there is no default depth finder yet
+    finders = {}
     if any(r.needs_matte or r.needs_finder for _, r in recipes):
-        finder = subject_finder() if find_subject is None else find_subject
-        subject_key = _fingerprint(finder.identity, _source_digest(Path(finding.__file__).parent), _library_versions())
+        finders["matte"] = subject_finder() if find_subject is None else find_subject
+    if any(r.needs_depth for _, r in recipes) and find_depth is not None:
+        finders["depth"] = find_depth
+    # What a remembered map depends on besides the photo: which map it is (one finder may find both), its finder's
+    # identity, the finding code (the subject's edge clean-up is part of what is remembered) and the libraries.
+    finding_code = _source_digest(Path(finding.__file__).parent)
+    found_by = {
+        name: _fingerprint(name, finder.identity, finding_code, _library_versions()) for name, finder in finders.items()
+    }
     items: list[Item] = []
     total = len(photos) * len(recipes)
     for photo in photos:
         photo_hash = hashlib.sha256(photo.read_bytes()).hexdigest()
-        state = _Photo(photo, _fingerprint(photo_hash, subject_key), project, finder)
+        state = _Photo(photo, photo_hash, project, finders, found_by)
         for path, recipe in recipes:
             label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
             recipe_text = repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8")
-            # a recipe that uses the subject is redone when another finder would find it; one that uses a picture is
-            # redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a file or an
-            # object (repr: no pixels)
+            # a recipe that uses a map is redone when another finder would find it, and only then; one that uses a
+            # picture is redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a
+            # file or an object (repr: no pixels)
+            uses = {"matte": recipe.needs_matte or recipe.needs_finder, "depth": recipe.needs_depth}
             parts = (
                 photo_hash,
                 recipe_text,
@@ -301,7 +313,7 @@ def run(
                 *_svg_digests(recipe),
                 settings,
                 code,
-                *((subject_key,) if recipe.needs_matte or recipe.needs_finder else ()),
+                *(key for name, key in found_by.items() if uses[name]),
             )
             fingerprint = _fingerprint(*parts)
             old = previous.get((photo.name, recipe.name))
@@ -368,16 +380,18 @@ def _write_record(
 
 @dataclass
 class _Photo:
-    """One photo while its recipes run: read and analysed once, on first use. `subject_key` names its remembered
-    subject: the photo's content and what finds the subject. `finder` is None when no recipe needs the subject."""
+    """One photo while its recipes run: read once, and each map found once, on first use. `digest` is the hash of its
+    file; `finders` has the finder of each map ("matte", "depth") its recipes need and `run` has one for, `found_by`
+    what each map depends on besides the photo (see `run`): together they name the photo's remembered maps."""
 
     path: Path
-    subject_key: str
+    digest: str
     project: Project
-    finder: Finder | None
+    finders: dict[str, Finder]
+    found_by: dict[str, str]
     _rgb: np.ndarray | None = field(default=None, repr=False)
-    _matte: np.ndarray | None = field(default=None, repr=False)
-    _matte_error: Exception | None = field(default=None, repr=False)
+    _maps: dict[str, np.ndarray] = field(default_factory=dict, repr=False)
+    _errors: dict[str, Exception] = field(default_factory=dict, repr=False)
 
     def rgb(self) -> np.ndarray:
         if self._rgb is None:
@@ -385,63 +399,77 @@ class _Photo:
         return self._rgb
 
     def matte(self) -> np.ndarray:
-        """The subject matte, from the on-disk cache when this photo has been analysed by the same finder before."""
-        if self._matte_error is not None:
-            raise self._matte_error
-        if self._matte is None:
-            cached = _inside(self.project.output, self.project.cache / f"{self.subject_key}.npz")
-            self._matte = _remembered(cached, self.rgb().shape[:2])
-            if self._matte is None:
+        """The subject matte (`run` gave a finder: a recipe needs the subject)."""
+        return self._remember("matte")
+
+    def depth(self) -> np.ndarray | None:
+        """The depth map; None when `run` has no depth finder, so the render says which step needs one."""
+        return self._remember("depth") if "depth" in self.finders else None
+
+    def _remember(self, name: str) -> np.ndarray:
+        """The map `name`, from the on-disk cache when its finder has found it in this photo before, else found and
+        remembered. The one place a map of the whole photo is found and kept. A failure is remembered too, so the
+        photo's other recipes fail without asking again."""
+        if name in self._errors:
+            raise self._errors[name]
+        if name not in self._maps:
+            key = _fingerprint(self.digest, self.found_by[name])
+            cached = _inside(self.project.output, self.project.cache / f"{key}.npz")
+            found = _remembered(cached, self.rgb().shape[:2])
+            if found is None:
                 try:
-                    # analyse (`run` gave a finder: a recipe needs the subject)
-                    self._matte = find_map("matte", self.finder, self.rgb())  # type: ignore[arg-type]  # see above
+                    found = _keep(cached, find_map(name, self.finders[name], self.rgb()))  # analyse
                 except Exception as error:  # remembered, so the photo's other recipes fail without asking again
-                    self._matte_error = error
+                    self._errors[name] = error
                     raise
-                packed = io.BytesIO()
-                np.savez_compressed(packed, matte=self._matte.astype(np.float16))
-                _write_atomically(cached, packed.getvalue())
-        return self._matte
+            self._maps[name] = found
+        return self._maps[name]
 
     def find_in_crop(self, crop: np.ndarray) -> np.ndarray:
         """The subject matte of `crop`, a part of one of this photo's working pictures (a recipe's `Subject` with `per`
         asks about each piece), from the on-disk cache when the same finder has been asked about the same pixels before:
         a repeat run asks the model nothing. A crop in which nothing stands out is remembered as an empty matte, so
         the finder is not asked again about it either. The key is the finder, the photo and the crop's pixels, whatever
-        recipe, framing or size made it; the answer is kept in 16 bits, so the first run and every later one see the
-        same matte."""
+        recipe, framing or size made it."""
         pixels = np.ascontiguousarray(crop)
-        key = _fingerprint(self.subject_key, str(pixels.shape), hashlib.sha256(pixels).hexdigest())
+        key = _fingerprint(self.digest, self.found_by["matte"], str(pixels.shape), hashlib.sha256(pixels).hexdigest())
         cached = _inside(self.project.output, self.project.cache / f"crop-{key}.npz")
         remembered = _remembered(cached, pixels.shape[:2])
         if remembered is not None:
             return remembered
         try:
-            matte = np.asarray(self.finder.find(pixels), np.float32)  # type: ignore[union-attr]  # a recipe needs it
+            matte = np.asarray(self.finders["matte"].find(pixels), np.float32)
         except SubjectNotFoundError:
             matte = np.zeros(pixels.shape[:2], np.float32)
-        packed = io.BytesIO()
-        np.savez_compressed(packed, matte=matte.astype(np.float16))
-        _write_atomically(cached, packed.getvalue())
-        return matte.astype(np.float16).astype(np.float32)
+        return _keep(cached, matte)
 
 
 def _remembered(cached: Path, shape: tuple[int, ...]) -> np.ndarray | None:
-    """The matte stored in `cached` if it is there, readable and of the photo's `shape`; None otherwise, and a
+    """The map `_keep` stored in `cached` if it is there, readable and of the photo's `shape`; None otherwise, and a
     damaged entry (cut short, not an archive, the wrong size) is deleted, so it is found again and replaced."""
     try:
         # opened here, not by np.load, which leaves its own file open when the archive is damaged; no pickles: a
         # planted file cannot run code
         with cached.open("rb") as file, np.load(file) as archive:
-            matte = archive["matte"]
+            layer = archive["map"]
     except FileNotFoundError:
         return None
     except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile):
-        matte = None
-    if matte is None or matte.shape != shape:
+        layer = None
+    if layer is None or layer.shape != shape:
         cached.unlink(missing_ok=True)
         return None
-    return matte.astype(np.float32)
+    return layer.astype(np.float32)
+
+
+def _keep(cached: Path, layer: np.ndarray) -> np.ndarray:
+    """Store the map `layer` in `cached` in 16 bits, whole or not at all, and return it as stored, so the run that
+    finds a map and every later one that reads it back see the same values. The one place a map is written."""
+    stored = layer.astype(np.float16)
+    packed = io.BytesIO()
+    np.savez_compressed(packed, map=stored)
+    _write_atomically(cached, packed.getvalue())
+    return stored.astype(np.float32)
 
 
 def _write_atomically(target: Path, data: bytes) -> None:
@@ -474,13 +502,14 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
     if recipe.needs_matte:
         matte = photo.matte()
         warnings += matte_warnings(matte, project.subject_share)
+    depth = photo.depth() if recipe.needs_depth else None
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
-    # the photo's own finder of pieces: its answers depend on the photo and the finder, as `subject_key` does
-    find = Finder(photo.subject_key, photo.find_in_crop) if recipe.needs_finder else None
-    stages = trace(photo.rgb(), recipe, matte=matte, find_subject=find) if project.steps else None
+    # the photo's own finder of pieces: its answers depend on the subject finder, as `found_by` says
+    find = Finder(photo.found_by["matte"], photo.find_in_crop) if recipe.needs_finder else None
+    stages = trace(photo.rgb(), recipe, matte=matte, depth=depth, find_subject=find) if project.steps else None
     # style (a trace ends in the render)
-    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte=matte, find_subject=find)
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte=matte, depth=depth, find_subject=find)
     warnings += still_warnings(image)  # check
     outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None

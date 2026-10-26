@@ -152,6 +152,12 @@ from bullterrier_image import Finder, render
 render(photo, look, find_subject=Finder("grounded-sam dog v1", partial(grounded, prompt="dog")))
 ```
 
+**Depth** is a second map, given like the subject: `--depth depth.png` (in Python `depth=imageio.load_depth("depth.png")`)
+takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
+`find_depth=Finder("my-depth v1", find)`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run` remembers each
+photo's depth by that identity, apart from its subject. No depth model is bundled yet: a recipe that takes depth needs
+`--depth` or `find_depth`, else it fails naming its step. The bundled model arrives with the depth effects.
+
 **Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
 the wheel), not a system font, so a look does not depend on the machine's fonts.
 
@@ -211,7 +217,7 @@ uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.t
 | Stage | What it does |
 | --- | --- |
 | **ingest** | Reads the photo, applying EXIF rotation and colour profile, into one internal format (float RGB). |
-| **analyse** | Finds the subject once per photo, only if a recipe needs it, and caches the result on disk by photo hash. |
+| **analyse** | Finds the subject and the depth once per photo, each only if a recipe needs it, and caches them on disk by photo hash and finder identity. |
 | **style** | Runs each recipe's steps in order. |
 | **check** | Flags a cut-out that covers an implausible share of the photo, and blank or blown-out results. |
 | **export** | Writes every format and size you asked for. |

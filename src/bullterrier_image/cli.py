@@ -98,7 +98,7 @@ def _parser() -> argparse.ArgumentParser:
         example="examples/photos/bullterrier.jpeg examples/recipes -o out",
     )
     _photo_and_recipes(p)
-    _subject_options(p)
+    _map_options(p)
     p.add_argument("-o", "--out", default="out", help="output folder (default: out)")
     p.add_argument("--format", default="png", choices=["png", "jpg", "webp"], help="image format (default: png)")
 
@@ -109,7 +109,7 @@ def _parser() -> argparse.ArgumentParser:
         example="examples/photos/bullterrier.jpeg examples/recipes -o out/sheet.png",
     )
     _photo_and_recipes(p)
-    _subject_options(p)
+    _map_options(p)
     p.add_argument("-o", "--out", default="out/sheet.png", help="output file (default: out/sheet.png)")
     p.add_argument("--columns", type=_positive_int, default=3, help="pictures per row (default: 3)")
 
@@ -131,7 +131,7 @@ def _parser() -> argparse.ArgumentParser:
         type=_span,
         help="the values to show, e.g. 0..20; a negative start goes after `--`: `... -o s.png -- -2..2`",
     )
-    _subject_options(p)
+    _map_options(p)
     p.add_argument("-o", "--out", default="out/sweep.png", help="output file (default: out/sweep.png)")
     p.add_argument("--count", type=int, default=5, help="how many values, 2 to 24, evenly spaced (default: 5)")
     p.add_argument("--columns", type=_positive_int, default=3, help="pictures per row (default: 3)")
@@ -146,7 +146,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--out", default="out/cutout.png", help="output file, a PNG (default: out/cutout.png)")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
-    _subject_options(p)
+    _matte_option(p)
+    _segmenter_option(p)
 
     p = command(
         "run",
@@ -172,7 +173,7 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("photo", help="the photo to run the recipe on")
     p.add_argument("recipe", help="the recipe .toml to look into")
     p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
-    _subject_options(p)
+    _map_options(p)
 
     p = command(
         "init",
@@ -239,14 +240,25 @@ def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
     p.add_argument("recipes", nargs="+", help="recipe .toml files, or folders of them")
 
 
-def _subject_options(p: argparse.ArgumentParser) -> None:
+def _map_options(p: argparse.ArgumentParser) -> None:
+    """The maps of the photo a command that renders recipes can be given, and what finds the subject otherwise."""
+    _matte_option(p)
+    p.add_argument(
+        "--depth",
+        metavar="PICTURE",
+        help="the photo's depth map, the photo's size: a greyscale picture (8 or 16 bits), white = nearest, "
+        "black = farthest; needed by a recipe that takes depth (no depth model is bundled yet)",
+    )
+    _segmenter_option(p)
+
+
+def _matte_option(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--matte",
         metavar="PICTURE",
         help="the subject's matte, the photo's size: a cut-out PNG (its transparency) or a black-and-white mask "
         "(white = subject); no model is used, except by a region that finds the subject piece by piece",
     )
-    _segmenter_option(p)
 
 
 def _segmenter_option(p: argparse.ArgumentParser) -> None:
@@ -269,14 +281,15 @@ def _segmenter(name: str) -> str:
     return name
 
 
-def _subject(args: argparse.Namespace) -> "tuple[np.ndarray | None, Finder | None]":
-    """The subject as the command line gives it: a matte file (--matte), and the finder --segmenter names (None: the
-    library's default, built only if a recipe asks for it)."""
+def _maps(args: argparse.Namespace) -> "tuple[np.ndarray | None, np.ndarray | None, Finder | None]":
+    """The maps as the command line gives them: a matte file (--matte), a depth file (--depth), and the finder
+    --segmenter names (None: the library's default, built only if a recipe asks for it)."""
     from . import imageio
     from .finding.subject import subject_finder
 
     matte = imageio.load_matte(args.matte) if args.matte else None
-    return matte, None if args.segmenter is None else subject_finder(args.segmenter)
+    depth = imageio.load_depth(args.depth) if args.depth else None
+    return matte, depth, None if args.segmenter is None else subject_finder(args.segmenter)
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
@@ -298,12 +311,13 @@ def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarra
 
 
 def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[np.ndarray]":
-    """The photo of `args` through each recipe, the subject (the --matte file, else found once) shared by them all."""
+    """The photo of `args` through each recipe, the subject (the --matte file, else found once) and the depth (the
+    --depth file) shared by them all."""
     from . import imageio
     from .recipe import render_all
 
-    matte, find = _subject(args)
-    return render_all(imageio.load(args.photo), recipes, matte=matte, find_subject=find)
+    matte, depth, find = _maps(args)
+    return render_all(imageio.load(args.photo), recipes, matte=matte, depth=depth, find_subject=find)
 
 
 def _render(args: argparse.Namespace) -> int:
@@ -408,8 +422,8 @@ def _steps(args: argparse.Namespace) -> int:
 
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
-    matte, find = _subject(args)
-    stages = trace(imageio.load(args.photo), recipe, matte=matte, find_subject=find)
+    matte, depth, find = _maps(args)
+    stages = trace(imageio.load(args.photo), recipe, matte=matte, depth=depth, find_subject=find)
     for stage in stages:
         _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))

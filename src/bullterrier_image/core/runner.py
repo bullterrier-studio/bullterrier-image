@@ -43,10 +43,9 @@ class Finder:
 
     `find` takes a photo, float32 (h, w, 3) in 0..1, and returns its map, float32 (h, w) in 0..1 (for the subject: its
     alpha, white = subject; for depth: 1 = nearest), or raises SubjectNotFoundError (DepthNotFoundError) when there is
-    nothing to find. `identity` is non-blank text
-    naming the function and whatever shapes its answers (model, version, options): two finders with one identity are
-    taken to answer alike, so a cache keyed by it (`pipeline.run`) reuses their answers. RecipeError, naming the field,
-    for a blank `identity` or a `find` that cannot be called.
+    nothing to find. `identity` is non-blank text naming the function and whatever shapes its answers (model, version,
+    options): two finders with one identity are taken to answer alike, so a cache keyed by it (`pipeline.run`) reuses
+    their answers. RecipeError, naming the field, for a blank `identity` or a `find` that cannot be called.
     """
 
     identity: str

@@ -167,9 +167,18 @@ def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_t
 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
-def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, depth_probe, given):
-    with pytest.raises(DepthNotFoundError, match=r"\(48, 64\).*\(96, 128\)"):
-        runner.render(photo, deep(), **given(RAMP[::2, ::2]))
+@pytest.mark.parametrize(
+    ("wrong", "size"),
+    [
+        pytest.param(RAMP[::2, ::2], r"\(48, 64\)", id="half the height and width"),
+        pytest.param(RAMP[..., None], r"\(96, 128, 1\)", id="the photo's height and width with a channel"),
+    ],
+)
+def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes(
+    photo, depth_probe, given, wrong, size
+):
+    with pytest.raises(DepthNotFoundError, match=size + r".*\(96, 128\)"):
+        runner.render(photo, deep(), **given(wrong))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())

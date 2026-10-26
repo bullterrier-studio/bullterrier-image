@@ -408,6 +408,44 @@ def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo
     assert (cut / "done" / "me" / "cut.jpg").read_bytes() != first
 
 
+# --- depth: --depth (bring your own map) -----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def deep(files, depth_probe):
+    """Adds deep.toml, a recipe at the photo's own size whose one step paints the depth map it takes, and depth.png, a
+    depth map for the photo: the left half farthest (black), the right half nearest (white), saved with an opaque
+    alpha channel as many editors do (the depth is the brightness, never the alpha)."""
+    (files / "deep.toml").write_text('name="deep"\nsize=128\n[[step]]\neffect="depth_probe"\n', encoding="utf-8")
+    halves = np.zeros((96, 128), np.uint8)
+    halves[:, 64:] = 255
+    Image.fromarray(np.dstack([halves] * 3 + [np.full_like(halves, 255)]), "RGBA").save(files / "depth.png")
+    return files
+
+
+def test_render_with_a_depth_file_gives_the_recipe_that_map(deep):
+    assert cli("render me.png deep.toml -o out --depth depth.png") == 0
+    out = imageio.load(deep / "out" / "me__deep.png")
+    assert out[:, :64].max() == 0.0  # farthest
+    assert out[:, 64:].min() == 1.0  # nearest
+
+
+# Every command that renders recipes, on a recipe that takes depth (needs the `deep` fixture).
+DEPTH_COMMANDS = {
+    "render": "render me.png deep.toml -o out",
+    "sheet": "sheet me.png deep.toml -o s.png",
+    "sweep": "sweep me.png deep.toml depth_probe.amount 0..1 --count 2 -o s.png",
+    "steps": "steps me.png deep.toml -o st",
+}
+
+
+@pytest.mark.parametrize("command", DEPTH_COMMANDS.values(), ids=DEPTH_COMMANDS.keys())
+def test_every_command_that_renders_a_recipe_takes_a_depth_file(deep, capsys, command):
+    assert cli(command) == 1  # no map and no depth model: the recipe cannot run
+    assert "needs depth" in capsys.readouterr().err
+    assert cli(f"{command} --depth depth.png") == 0
+
+
 # --- user mistakes are reported, not thrown at the user ------------------------------------------------------------
 
 # Commands a user can get wrong, each with a word the one error line must name. Every command differs from a working
@@ -421,6 +459,8 @@ MISTAKES = {
     "an unknown effect": ("render me.png unknown.toml -o out", "nope"),
     "a project file that does not exist": ("run gone.toml", "gone.toml"),
     "a matte that is not an image": ("cutout me.png -o out --matte notimage.png", "notimage"),
+    "a depth map of another size": ("render me.png recipes/a.toml -o out --depth small.png", "(40, 50)"),
+    "a depth map that does not exist": ("render me.png recipes/a.toml -o out --depth gone.png", "gone.png"),
     "a folder with no recipe in it": ("render me.png empty -o out", "empty"),
     "a sweep of an effect the recipe does not have": ("sweep me.png recipes/a.toml blur.radius 0..1 -o s.png", "blur"),
     "a sweep of a parameter the effect does not have": (
@@ -443,6 +483,7 @@ def mistakes(files):
     (files / "broken.toml").write_text("[[step]\neffect=", encoding="utf-8")
     (files / "unknown.toml").write_text('[[step]]\neffect="nope"\n', encoding="utf-8")
     (files / "empty").mkdir()
+    Image.new("L", (50, 40)).save(files / "small.png")
     (files / "cut.toml").write_text(f'name="cut"\nsize=64\n{CUT}', encoding="utf-8")  # needs the subject
     return files
 
