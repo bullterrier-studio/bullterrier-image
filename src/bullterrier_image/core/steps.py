@@ -217,12 +217,21 @@ class Step(_Layer):
         """The parameters that are plain values, as written (the rest are `drives`)."""
         return {name: value for name, value in self.params.items() if not isinstance(value, Drive)}
 
+    @property
+    def named_fields(self) -> dict[str, str]:
+        """The fields the effect works from, by the name of the parameter that names each, as written or by default
+        (`{"field": "light"}`); empty for an effect with no field parameter."""
+        return registry.get(self.effect).fields_named(self.params)
+
     def references(self) -> list[Reference]:
-        """The regions this step names, as `(key, name, kind)`: its mask, the field that drives it (`by`, a selection)
-        and the partition it draws."""
+        """The regions this step names, as `(key, name, kind)`: its mask, the field that drives it (`by`, a selection),
+        the fields its effect works from (`<effect>.<parameter>`, selections) and the partition it draws."""
         driving: list[Reference] = [("by", by, "selection") for by in dict.fromkeys(d.by for d in self.drives.values())]
+        working: list[Reference] = [
+            (f"{self.effect}.{parameter}", field, "selection") for parameter, field in self.named_fields.items()
+        ]
         drawn: list[Reference] = [] if self.partition is None else [("partition", self.partition, None)]
-        return [*super().references(), *driving, *drawn]
+        return [*super().references(), *driving, *working, *drawn]
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `fill(color='#000000') on background` or `bloom() screen x0.8` (the blend mode,

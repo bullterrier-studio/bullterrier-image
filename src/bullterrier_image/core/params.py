@@ -24,6 +24,9 @@ Promises:
   `Picture`, read-only RGBA pixels with a content digest; it is given a `Picture` or a colour (a flat picture), and
   must have a default such as `"#808080"`.
   Recipe files and `fx` turn a path or an array into a `Picture` before validation (see `loader`).
+- A `FieldName` field (a selection an effect works from: `depth`, `light`, a band of the recipe) holds the name of a
+  selection, as a step's `mask` and a `Drive`'s `by` do; the recipe checks the name, the runner builds the field and the
+  effect receives its array (see `registry`). It is not a number: it has no address and cannot be driven.
 - `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
@@ -43,7 +46,16 @@ from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_orig
 import annotated_types
 import numpy as np
 from PIL import ImageColor
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainValidator, ValidationError, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PlainValidator,
+    StringConstraints,
+    ValidationError,
+    WithJsonSchema,
+)
 from pydantic.fields import FieldInfo
 
 from bullterrier_image.errors import RecipeError
@@ -94,6 +106,11 @@ Color = Annotated[
 ]
 """A colour parameter: written '#rrggbb', '#rgb' or as three numbers 0..1; held as three floats 0..1 (red, green,
 blue): `np.asarray(color, np.float32)` is the colour as an array."""
+
+
+FieldName = Annotated[str, StringConstraints(min_length=1)]
+"""A parameter that names a field: the name of a selection (`depth`, `light`, `subject`, `background` or a region the
+recipe declares). The runner builds the named field; the effect receives it as an array under the parameter's name."""
 
 
 class Picture:
@@ -401,6 +418,12 @@ class EffectParams(ValidatedModel):
         hints = typing.get_type_hints(cls)
         return frozenset(name for name in cls.model_fields if hints[name] is Picture)
 
+    @classmethod
+    def field_name_fields(cls) -> tuple[str, ...]:
+        """The fields that name a field (`FieldName`), in declaration order: the effect receives the array of each."""
+        hints = typing.get_type_hints(cls, include_extras=True)
+        return tuple(name for name in cls.model_fields if hints[name] == FieldName)
+
     def scaled(self, factor: float) -> Self:
         """A copy with every pixel value (a field with the unit `px`) multiplied by `factor`: the same look at another
         size. A whole number is rounded. When shrinking (`factor` below 1) a value stops at the field's `min`, which
@@ -651,6 +674,8 @@ def _type_text(annotation: Any) -> str:
         return "colour"
     if annotation is Picture:
         return "picture"
+    if annotation == FieldName:
+        return "field name"
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _type_text(args[0])

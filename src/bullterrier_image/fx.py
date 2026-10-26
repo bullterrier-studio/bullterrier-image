@@ -21,7 +21,8 @@ screen, overlay, soft_light, difference, color), `name` (a word that addresses t
 fails when the step is made, not when the photo is rendered.
 
 `mask` may name a region the recipe declares (`Recipe(..., regions={"glass": Shards(...)})`); `fx` itself declares none,
-so by itself it knows only the built-in `subject` and `background`, and the recipe that holds the step checks the name.
+so by itself it knows only the built-in `subject` and `background`, and the recipe that holds the step checks the name,
+as it does for the `field` of an effect that works from one.
 A step that gives each piece of a region its own look is an `Each` (`bullterrier_image.Each`), not an effect.
 
 `fx.pyi` lets editors complete effect names and parameters. It is written from `stub_text()` by

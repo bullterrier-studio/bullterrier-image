@@ -21,6 +21,11 @@ supported.
 An effect is written `def bloom(rgb, params: BloomParams, *, subject=None) -> rgb` and registered with its parameter
 model (see `bullterrier_image.core.params`); the decorator returns a `ModelledEffect`, which validates its values
 through the model whichever way it is called.
+
+A parameter of the type `FieldName` names a field (a selection: `depth`, `light`, a region of the recipe). The effect
+takes the field's array, float32 (h, w) 0..1, as a keyword-only argument of the parameter's name, without a default:
+`def relight(rgb, params, *, field)`. A recipe's runner builds the named field and passes it; a direct call passes the
+array itself (`relight(rgb, field=array)`); the parameter's value, a name, is then not used.
 """
 
 import functools
@@ -35,7 +40,8 @@ from typing import Any
 
 import numpy as np
 
-from bullterrier_image.errors import BullterrierImageError, UnknownEffectError
+from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
+from bullterrier_image.ops.maps import map_problem
 
 from . import presets as preset_files
 from .params import EffectParams
@@ -89,7 +95,8 @@ class ModelledEffect[P: EffectParams]:
     `bloom(rgb)` (the defaults), `bloom(rgb, radius=30)`, or `bloom(rgb, BloomParams(radius=30))`. Giving both a model
     and keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
     naming the effect, the field, the constraint and the value. Injected inputs (`subject`, `depth`) are passed by
-    keyword in every form.
+    keyword in every form. So is the array of each field parameter (`FieldName`), required: float (h, w) of the
+    picture's size, 0..1, else a `MapNotFoundError` naming the parameter.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
@@ -111,7 +118,13 @@ class ModelledEffect[P: EffectParams]:
         functools.update_wrapper(self, function)
         self._function = function
         self.params_model, self.category, self.inputs, self.opacity = params_model, category, inputs, opacity
-        fields = [p.replace(kind=inspect.Parameter.KEYWORD_ONLY) for p in params_model.signature().parameters.values()]
+        named = params_model.field_name_fields()
+        fields = [
+            p.replace(kind=inspect.Parameter.KEYWORD_ONLY, annotation=np.ndarray, default=inspect.Parameter.empty)
+            if p.name in named
+            else p.replace(kind=inspect.Parameter.KEYWORD_ONLY)
+            for p in params_model.signature().parameters.values()
+        ]
         given = [p for p in inspect.signature(function).parameters.values() if p.name in inputs]
         self.__signature__ = inspect.Signature(
             [
@@ -126,6 +139,8 @@ class ModelledEffect[P: EffectParams]:
     def __call__(self, rgb: np.ndarray, params: P | None = None, /, **values: Any) -> np.ndarray:
         """Run the effect on `rgb` (float32 (h, w, 3) 0..1) with a model, keyword values, or the defaults."""
         given = {name: values.pop(name) for name in self.inputs if name in values}
+        for name in self.params_model.field_name_fields():
+            given[name] = self._field_array(name, rgb, values.pop(name, None))
         if params is None:
             params = self.validate(values)
         elif values:
@@ -133,6 +148,27 @@ class ModelledEffect[P: EffectParams]:
         elif not isinstance(params, self.params_model):
             raise TypeError(f"{self.__name__}() takes a {self.params_model.__name__}, not a {type(params).__name__}")
         return self._function(rgb, params, **given)
+
+    def _field_array(self, name: str, rgb: np.ndarray, array: object) -> np.ndarray:
+        """The array given for the field parameter `name`, as the float32 the effect receives; MapNotFoundError unless
+        it is a float array of the picture's (h, w) with finite values in 0..1 (the runner's fields always are)."""
+        where = f"{self.__name__}(): `{name}` is a field"
+        if not (isinstance(array, np.ndarray) and array.dtype.kind == "f"):
+            raise MapNotFoundError(
+                f"{where}: pass its array, float (h, w) 0..1, as {name}=array (a recipe names it; a call cannot), "
+                f"got {type(array).__name__}"
+            )
+        if array.shape != rgb.shape[:2]:
+            raise MapNotFoundError(f"{where}: its array is {array.shape} but the picture is {rgb.shape[:2]}")
+        if (problem := map_problem(array)) is not None:
+            raise MapNotFoundError(f"{where}: its array has {problem}")
+        return array.astype(np.float32, copy=False)
+
+    def fields_named(self, values: Mapping[str, object]) -> dict[str, str]:
+        """The field each field parameter names in `values` (parameter name -> value, already validated), else its
+        default: `{"field": "light"}`; empty for an effect with no field parameter."""
+        model = self.params_model
+        return {name: str(values.get(name, model.model_fields[name].default)) for name in model.field_name_fields()}
 
     def validate(self, values: Mapping[str, object]) -> P:
         """The model for `values` (parameter name -> value); RecipeError naming the effect and every problem."""
@@ -365,8 +401,16 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     positional = [p for p in every if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     if len(positional) != 2 or any(p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD) for p in every):
         raise ValueError(f"effect {name!r}: {shape}")
-    declared = []
+    fields = params.field_name_fields()
+    declared, taken = [], []
     for parameter in (p for p in every if p.kind is p.KEYWORD_ONLY):
+        if parameter.name in fields:
+            if parameter.default is not inspect.Parameter.empty:
+                raise ValueError(
+                    f"effect {name!r}: the field `{parameter.name}` takes no default: a recipe or a caller gives it"
+                )
+            taken.append(parameter.name)
+            continue
         if parameter.name not in INPUTS:
             raise ValueError(f"effect {name!r}: {parameter.name!r} is not an input ({', '.join(INPUTS)}); {shape}")
         if parameter.default is inspect.Parameter.empty:
@@ -374,6 +418,11 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
                 f"effect {name!r}: the input `{parameter.name}` needs a default (None), so that {name}(rgb) works"
             )
         declared.append(parameter.name)
+    if unused := [field for field in fields if field not in taken]:
+        raise ValueError(
+            f"effect {name!r}: the field parameter `{unused[0]}` names a field the effect must receive: add the "
+            f"keyword-only argument `{unused[0]}` after `params`"
+        )
     clash = sorted(set(params.model_fields) & {*INPUTS, *STEP_KEYS})
     if clash:
         raise ValueError(

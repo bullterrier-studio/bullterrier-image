@@ -4,6 +4,7 @@ Every effect here is the test's own (`throwaway_effects` removes it again), so n
 """
 
 import importlib
+import inspect
 import json
 import re
 import subprocess
@@ -16,8 +17,9 @@ import pytest
 from pydantic import BaseModel
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.errors import MapNotFoundError
 
 
 class GainParams(EffectParams):
@@ -129,6 +131,66 @@ def test_an_effect_function_of_the_wrong_shape_is_refused(signature, complaint, 
         effect(category="light", params=GainParams)(_probe_with(signature))
     assert complaint in str(raised.value)
     assert "shape_probe" not in registry.describe()
+
+
+class ShadeParams(EffectParams):
+    """A field and a gain: the probe with a field parameter."""
+
+    field: FieldName = param("depth", doc="The selection that darkens the picture.")
+    gain: float = param(1.0, unit="ratio", min=0, max=4, doc="Multiplies every value.")
+
+
+@pytest.mark.parametrize(
+    ("signature", "complaint"),
+    [
+        ("(rgb, params)", "keyword-only argument `field`"),
+        ("(rgb, params, *, field=None)", "no default"),
+        ("(rgb, params, *, subject=None)", "keyword-only argument `field`"),
+    ],
+    ids=["no argument", "a default", "another input instead"],
+)
+def test_a_field_parameter_needs_a_keyword_only_argument_of_its_name_without_a_default(
+    signature, complaint, throwaway_effects
+):
+    with pytest.raises(ValueError, match="shape_probe") as raised:
+        effect(category="light", params=ShadeParams)(_probe_with(signature))
+    assert complaint in str(raised.value)
+    assert "shape_probe" not in registry.describe()
+
+
+@pytest.fixture
+def shade(throwaway_effects):
+    @effect(category="light", params=ShadeParams)
+    def shade_probe(rgb, params, *, field):
+        """Darkens the picture by a field, then multiplies by a gain."""
+        return np.clip(rgb * (1 - field[..., None] / 2) * params.gain, 0, 1)  # float32 only if the field is
+
+    return shade_probe
+
+
+def test_a_direct_call_gives_the_field_as_an_array_whatever_its_float_type(shade):
+    field = np.full(GREY.shape[:2], 0.5)  # float64: the effect still gets a float32
+    out = shade(GREY, gain=2.0, field=field)
+    np.testing.assert_allclose(out, 0.25 * 0.75 * 2.0, atol=1e-7)
+    assert out.dtype == np.float32
+    assert inspect.signature(shade).parameters["field"].default is inspect.Parameter.empty
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        pytest.param(None, id="none given"),
+        pytest.param("light", id="a name: only a recipe can resolve it"),
+        pytest.param(np.zeros((4, 4), np.float32), id="not the picture's size"),
+        pytest.param(np.full((4, 5), 1.5, np.float32), id="above 1"),
+        pytest.param(np.full((4, 5), np.nan, np.float32), id="not finite"),
+        pytest.param(np.zeros((4, 5), np.int32), id="not a float array"),
+    ],
+)
+def test_a_direct_call_without_a_usable_field_array_is_a_map_not_found_error_naming_the_parameter(field, shade):
+    given = {} if field is None else {"field": field}
+    with pytest.raises(MapNotFoundError, match="`field`"):
+        shade(GREY, **given)
 
 
 @pytest.mark.parametrize("model", [dict, GainParams(), BaseModel], ids=["dict", "instance", "basemodel"])

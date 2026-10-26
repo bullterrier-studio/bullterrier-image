@@ -134,6 +134,9 @@ raising it does).
 - **Drivable:** `drivable=True` on a float lets a `Drive` vary it per pixel. Declare it only where the output changes
   smoothly with the value (a radius, an amount, an exposure), never for a whole number, choice, seed or colour; every
   drivable field is tested by `tests/effects/test_contract.py`.
+- **Field:** a `FieldName` parameter (`field: FieldName = param("depth", doc=...)`) names a selection (`depth`, `light`,
+  `subject`, a region), as `mask` and `Drive.by` do; not drivable, not a number. The effect takes the array as a keyword-only
+  argument of that name, no default: `def relight(rgb, params, *, field)`; the runner builds only the fields steps name.
 - **Cyclic:** `cyclic=True` on a degrees field whose value and the value 360 further give the same picture (a direction,
   a rotation, a hue): `min` to `max` is one turn and any real wraps into it. Not for elevations, leans, twists or amounts;
   the contract test checks the picture at `min` equals the picture at `max`.

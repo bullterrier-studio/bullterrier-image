@@ -269,6 +269,16 @@ saturation). Write the number as a table: `by` (field), values at field 0 (`star
   step costs up to `levels` times the effect; value no pixel needs is not rendered (field 0 everywhere = one render). More
   levels = smoother where field changes slowly; 2 levels = mix of effect at `start` and `end`.
 
+## Naming a field
+
+An effect may work from a field: its docs list a parameter of type `field name` (`field`). Write the name of a selection, as
+for `mask` and `by`: `depth`, `light`, `subject`, `background` or a region of the recipe. In a step: `field = "light"`; in
+Python: `field="light"`. Only the fields some step names are built (no depth model runs for `light`).
+
+Checked when the recipe is made: the name must be a selection. Not a number: no address, never driven. A step may name a
+field and drive another number; the field is built once and every level of the drive gets it. A map the field needs and
+nobody gave is a `MapNotFoundError` (`DepthNotFoundError`, `SubjectNotFoundError`).
+
 ## Framing and cut-outs
 
 `[frame]` table crops, turns, flips, pads photo and subject matte together before first step, then `size` scales it, and can

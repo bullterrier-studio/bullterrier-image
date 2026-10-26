@@ -376,6 +376,7 @@ def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions
     takes one, and the pieces of the step's partition. A step with driven parameters is run once for each level of
     its drives, and each pixel takes the two renders either side of its field value (see `_driven`)."""
     extra = {name: maps[name] for name in registry.inputs(step.effect) if name != "partition"}
+    extra |= {parameter: regions.selection(field).alpha for parameter, field in step.named_fields.items()}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
     drives = step.drives

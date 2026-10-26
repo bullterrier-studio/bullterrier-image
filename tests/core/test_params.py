@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bullterrier_image.core.params import Color, Drive, EffectParams, Picture, describe_error, param
+from bullterrier_image.core.params import Color, Drive, EffectParams, FieldName, Picture, describe_error, param
 from bullterrier_image.errors import RecipeError
 
 
@@ -250,6 +250,43 @@ def test_a_picture_is_documented_as_a_picture_and_called_with_the_forms_a_caller
 def test_a_picture_field_takes_no_unit_or_range_and_needs_a_default_colour(make):
     with pytest.raises(ValueError, match="Broken"):
         _declare(Picture, make())
+
+
+class Lit(EffectParams):
+    """A model with a field parameter and a plain text one."""
+
+    field: FieldName = param("light", doc="The selection the probe is lit by.")
+    label: str = param("lamp", doc="A name shown in labels.")
+
+
+def test_a_model_names_its_field_parameters_apart_from_plain_text():
+    assert Lit.field_name_fields() == ("field",)
+    assert Probe.field_name_fields() == ()
+
+
+def test_a_field_parameter_is_documented_as_a_field_name_and_called_with_text():
+    assert [doc.type for doc in Lit.fields_doc()] == ["field name", "text"]
+    assert "field: str = 'light'" in str(Lit.signature())
+
+
+@pytest.mark.parametrize("written", ["", 1, None], ids=["blank", "number", "none"])
+def test_a_field_parameter_takes_the_name_of_a_selection_only(written):
+    with pytest.raises(RecipeError, match="`field`"):
+        Lit.parse({"field": written})
+    assert Lit.parse({"field": "depth"}).field == "depth"
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        pytest.param(lambda: param("depth", unit="px", doc="d"), id="a unit"),
+        pytest.param(lambda: param("depth", min=0, max=1, doc="d"), id="a range"),
+        pytest.param(lambda: param("depth", drivable=True, doc="d"), id="drivable"),
+    ],
+)
+def test_a_field_parameter_takes_no_unit_range_or_drive_when_declared(make):
+    with pytest.raises(ValueError, match="Broken"):
+        _declare(FieldName, make())
 
 
 # --- the rules of a declaration, checked when the class is made ------------------------------------------------------
