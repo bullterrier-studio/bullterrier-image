@@ -63,7 +63,7 @@ def test_pixels_in_the_sharp_band_are_returned_exactly(
 def test_far_from_the_focus_the_picture_is_the_gaussian_at_radius(
     noise: np.ndarray, depth: float, radius: float, levels: int, edge: str
 ) -> None:
-    """Focus 0.8, band 0.15, feather 0.4: a depth of 0.275 or less is a full feather beyond the band. The oracle is
+    """Focus 0.8, band 0.15, feather 0.4: a depth of 0.325 or less is a full feather beyond the band. The oracle is
     scipy's Gaussian filter, whose edge rules carry the same names."""
     flat = np.full((HEIGHT, WIDTH), depth, np.float32)
     out = registry.apply(NAME, noise, depth=flat, radius=radius, levels=levels, edge=edge)
