@@ -193,7 +193,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | --- | --- | --- |
 | `glitch` ✓ | Channel split and sliding bands. | `fx.glitch(split=9, bands=8)` |
 | `rgb_split` ✓ | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
-| `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)` |
+| `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)`; with `hits`, damaged coefficients: smears and colour blocks, `fx.jpeg_crush(quality=20, hits=40, seed=2)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `signal_noise` ✓ | Static bands and dropouts. | `fx.signal_noise(bands=3, seed=1)` |
@@ -201,7 +201,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `prism` ✓ | Rainbow dispersion. | `fx.prism(amount=18)` |
 | `anaglyph` ✓ | Red/cyan 3D look. | `fx.anaglyph(shift=6)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
-| `byte_corrupt` ✓ | Damage a JPEG's stored coefficients, then decode: smears and colour blocks. | `fx.byte_corrupt(hits=40, seed=2)` |
 | `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |
 
 ## Atmosphere
@@ -369,7 +368,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | `fade` | `levels(output_black)` |
 | `invert` | a `levels` preset |
 | `clarity` | a `sharpen` preset |
-| `byte_corrupt` | `jpeg_crush` + `hits` |
 | `prism` | `chromatic_aberration` + `samples` |
 | `noise`, `film_grain` | `grain` (`shadows`, `highlights`, `color`, `distribution`) |
 | `black_and_white` | a `channel_mixer` preset |

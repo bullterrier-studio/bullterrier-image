@@ -489,7 +489,10 @@ def test_each_interpolation_reads_the_picture_its_own_way(name):
         assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"
 
 
-SEED_NEEDS = {"disperse": {"progress": 0.5}}  # at its default progress nothing has moved yet, whatever the seed
+SEED_NEEDS: dict[str, dict[str, float]] = {  # at their defaults nothing is random yet, whatever the seed
+    "disperse": {"progress": 0.5},
+    "jpeg_crush": {"hits": 40},
+}
 
 
 def _assert_the_seed_decides_the_picture(name: str, photo: np.ndarray) -> None:

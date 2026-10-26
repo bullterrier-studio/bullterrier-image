@@ -1,7 +1,14 @@
-# A photo crushed by JPEG: 8 px blocks, ringing round the edges and colour that bleeds past its outlines.
+# A photo crushed by JPEG: 8 px blocks, ringing round the edges and colour that bleeds past its outlines, then a few
+# damaged coefficients that leave streaks and patterned blocks.
 name = "jpeg_crush"
 size = 480
 
 [[step]]
 effect = "jpeg_crush"
 quality = 5
+
+[[step]]
+effect = "jpeg_crush"
+quality = 20
+hits = 60
+seed = 5
