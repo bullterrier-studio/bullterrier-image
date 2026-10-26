@@ -132,6 +132,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Consequence:* a draggable-point curve or a free-length LUT is a separate, later effect (`point_curve`, `lut`) with
   its own design; if a list parameter is ever added, any in-range list must be valid by construction (evenly spaced
   output heights, not x/y pairs that must increase), and the contract's limits test then handles list fields.
+- **`grain` is one effect for film grain and sensor noise: `amount` at mid-grey and a `balance` toward the shadows or
+  the highlights.** Flat grain is `balance` 0; `color` gives each channel its own noise; `distribution` picks the
+  noise. *Reason:* `grain`, `film_grain` and `noise` were one idea in three parameter sets; `amount` keeps its meaning
+  and the grain at brightness L is `amount` x (1 + `balance` x (2 L - 1)), so `film_grain(shadows=s, highlights=h)` is
+  `amount` (s + h) / 2, `balance` (h - s) / (h + s). *Consequence:* grey grain draws the stream of the old `grain` (and
+  of `noise(color=False)`, equal to 6e-8); colour grain draws that of `film_grain` (channel seed = `seed << 2 |
+  channel`), so colour `noise` keeps its distribution but not its random values.
 
 ## Recipes
 

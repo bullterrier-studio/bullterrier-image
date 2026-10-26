@@ -78,8 +78,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `grain` ✓ | Film grain that depends on brightness, grey or per channel. | `fx.grain(amount=0.065, balance=-0.54, color=True)` |
-| `noise` ✓ | Gaussian/uniform, colour or mono noise. | `fx.noise(amount=0.1, color=False)` |
+| `grain` ✓ | Film grain or sensor noise: Gaussian or uniform, heavier in the shadows or highlights, grey or per channel. | `fx.grain(amount=0.065, balance=-0.54, color=True)` |
 | `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
 | `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
 | `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, height=6)` |
@@ -215,7 +214,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
-`vibrance`, `grain`, `noise`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
+`vibrance`, `grain`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
 `hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 

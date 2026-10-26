@@ -161,6 +161,25 @@ def test_clumped_noise_has_unit_deviation_and_neighbours_correlated_by_its_size(
     assert neighbour_correlation(noise) == pytest.approx(neighbour_correlation_is, abs=0.015)
 
 
+@pytest.mark.parametrize("size", [1.0, 4.0], ids=["one pixel", "4 px specks"])
+@pytest.mark.parametrize("distribution", ["gaussian", "uniform"])
+def test_clumped_noise_has_zero_mean_and_unit_deviation_in_either_distribution(distribution: str, size: float) -> None:
+    noise = clumped_noise((300, 300), **{**CLUMPS, "size": size, "distribution": distribution})
+    assert noise.mean() == pytest.approx(0.0, abs=0.02)
+    assert noise.std() == pytest.approx(1.0, abs=0.02)
+
+
+def test_unclumped_uniform_noise_fills_its_range_evenly_and_gaussian_noise_does_not() -> None:
+    """A uniform distribution of unit deviation spans +-sqrt(3), evenly; a Gaussian's tail goes further."""
+    bound = math.sqrt(3)
+    uniform = clumped_noise((300, 300), **{**CLUMPS, "size": 1.0, "distribution": "uniform"})
+    assert np.abs(uniform).max() <= bound
+    assert np.abs(uniform).max() > 0.99 * bound
+    assert np.mean(np.abs(uniform) < bound / 2) == pytest.approx(0.5, abs=0.01)  # evenly: half within half the bound
+    gaussian = clumped_noise((300, 300), **{**CLUMPS, "size": 1.0, "distribution": "gaussian"})
+    assert np.abs(gaussian).max() > 2 * bound
+
+
 def test_clumped_noise_is_a_pure_function_of_its_arguments() -> None:
     np.testing.assert_array_equal(clumped_noise((40, 50), **CLUMPS), clumped_noise((40, 50), **CLUMPS))
     assert np.abs(clumped_noise((40, 50), **CLUMPS) - clumped_noise((40, 50), **{**CLUMPS, "seed": 4})).mean() > 0.1

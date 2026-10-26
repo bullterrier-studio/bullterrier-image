@@ -31,14 +31,16 @@ def test_the_same_seed_gives_the_same_grain_and_another_seed_other_grain(photo: 
 
 @pytest.mark.parametrize("balance", [-1.0, 0.0, 1.0])
 @pytest.mark.parametrize("color", [True, False])
+@pytest.mark.parametrize("distribution", ["gaussian", "uniform"])
 def test_an_amount_of_zero_leaves_the_picture_unchanged_at_any_balance(
-    balance: float, color: bool, photo: np.ndarray
+    distribution: str, balance: float, color: bool, photo: np.ndarray
 ) -> None:
-    out = registry.apply(NAME, photo, amount=0.0, balance=balance, color=color)
+    out = registry.apply(NAME, photo, amount=0.0, balance=balance, color=color, distribution=distribution)
     np.testing.assert_array_equal(out, photo)
     assert not np.shares_memory(out, photo)
 
 
+@pytest.mark.parametrize("distribution", ["gaussian", "uniform"])
 @pytest.mark.parametrize("color", [True, False])
 @pytest.mark.parametrize(
     ("balance", "brightness", "expected_std"),
@@ -53,11 +55,13 @@ def test_an_amount_of_zero_leaves_the_picture_unchanged_at_any_balance(
     ],
 )
 def test_the_grain_deviation_is_the_amount_at_mid_grey_and_follows_the_balance_across_brightness(
-    balance: float, brightness: float, expected_std: float, color: bool
+    balance: float, brightness: float, expected_std: float, color: bool, distribution: str
 ) -> None:
     """On a flat grey patch (a weak grain is never clipped at these levels). The values are worked out by hand from
     amount x (1 + balance x (2 x brightness - 1)) with an amount of 0.01."""
-    grain = added(patch((brightness,) * 3), amount=0.01, balance=balance, color=color, seed=1)
+    grain = added(
+        patch((brightness,) * 3), amount=0.01, balance=balance, color=color, distribution=distribution, seed=1
+    )
     assert grain.std() == pytest.approx(expected_std, rel=0.03)
     assert grain.mean() == pytest.approx(0.0, abs=0.0005)  # brightens and darkens alike
 
@@ -99,9 +103,11 @@ def test_size_above_one_pixel_clumps_the_grain_and_one_pixel_does_not() -> None:
     assert correlation(6.0) > correlation(3.0)
 
 
+@pytest.mark.parametrize("distribution", ["gaussian", "uniform"])
 @pytest.mark.parametrize("size", [1.0, 4.0])
-def test_clumping_keeps_the_standard_deviation(size: float) -> None:
-    assert added(patch((0.5,) * 3), amount=0.03, size=size, seed=5).std() == pytest.approx(0.03, rel=0.02)
+def test_clumping_keeps_the_standard_deviation(size: float, distribution: str) -> None:
+    grain = added(patch((0.5,) * 3), amount=0.03, size=size, distribution=distribution, seed=5)
+    assert grain.std() == pytest.approx(0.03, rel=0.02)
 
 
 def test_edge_and_truncate_decide_what_the_clumping_blur_sees_beyond_the_border() -> None:
@@ -114,6 +120,16 @@ def test_edge_and_truncate_decide_what_the_clumping_blur_sees_beyond_the_border(
     assert np.corrcoef(reflect_near[inner].ravel(), wrap_near[inner].ravel())[0, 1] > 1 - 1e-6  # out of reach
     assert np.corrcoef(reflect_far[inner].ravel(), wrap_far[inner].ravel())[0, 1] < 1 - 1e-6  # reached
     assert np.corrcoef(reflect_near[:, :2].ravel(), wrap_near[:, :2].ravel())[0, 1] < 0.99  # at the border
+
+
+def test_uniform_grain_stays_within_its_bound_and_gaussian_grain_does_not() -> None:
+    """A uniform distribution of standard deviation s spans +-sqrt(3) s, evenly; a Gaussian's tail goes further."""
+    bound = 0.03 * np.sqrt(3)
+    uniform = added(patch((0.5,) * 3), amount=0.03, distribution="uniform", seed=1)
+    assert np.abs(uniform).max() <= bound * 1.0001  # float32 rounding of the picture
+    assert np.abs(uniform).max() > 0.99 * bound  # and it fills the range
+    assert np.mean(np.abs(uniform) < bound / 2) == pytest.approx(0.5, abs=0.01)  # evenly: half within half the bound
+    assert np.abs(added(patch((0.5,) * 3), amount=0.03, distribution="gaussian", seed=1)).max() > 2 * bound * 0.9
 
 
 def test_the_result_is_clipped_to_the_picture_range() -> None:

@@ -47,6 +47,12 @@ class GrainParams(EffectParams):
         doc="True gives every channel its own grain (coloured speckle, like a high-ISO sensor); False adds the same "
         "grain to all three (brightness only, grey speckle).",
     )
+    distribution: Literal["gaussian", "uniform"] = param(
+        "gaussian",
+        doc="Where the noise values come from: 'gaussian' (bell curve: most values small, a few large) or 'uniform' "
+        "(every value up to a limit of about 1.7 x the deviation equally likely: an even, bounded speckle). Both have "
+        "the standard deviation set by `amount` and `balance`, and both are clumped by `size`.",
+    )
     seed: int = param(
         0,
         unit="count",
@@ -76,16 +82,24 @@ class GrainParams(EffectParams):
 def grain(rgb: np.ndarray, params: GrainParams) -> np.ndarray:
     """Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.
 
-    The noise is multiplied by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x
-    (1 + `balance` x (2 L - 1)). It is the same in all channels (grey grain) unless `color`, which gives
-    each channel its own. The result is clipped to 0..1; the same `seed` always gives the same grain.
+    The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied
+    by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It
+    is the same in all channels (grey grain) unless `color`, which gives each channel its own. The result is clipped
+    to 0..1; the same `seed` always gives the same grain.
     """
     deviation = params.amount * (1 + params.balance * (2 * luminance(rgb) - 1))
     # constant: two low bits of each channel's seed number the channel, so channels never share a pattern
     seeds = [(params.seed << 2) | channel for channel in range(rgb.shape[2])] if params.color else [params.seed]
     noise = np.stack(
         [
-            clumped_noise(rgb.shape[:2], size=params.size, seed=seed, truncate=params.truncate, edge=params.edge)
+            clumped_noise(
+                rgb.shape[:2],
+                size=params.size,
+                seed=seed,
+                truncate=params.truncate,
+                edge=params.edge,
+                distribution=params.distribution,
+            )
             for seed in seeds
         ],
         axis=-1,
