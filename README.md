@@ -165,7 +165,9 @@ below) runs [Depth Anything V2 Small](https://github.com/DepthAnything/Depth-Any
 on every platform. Its weights (99 MB, the fp32 ONNX export of `onnx-community/depth-anything-v2-small`) are not in the
 package: the first use downloads them into the same cache folder as the subject model and checks their SHA-256 against
 the one pinned in the code. Offline, point `BT_IMAGE_DEPTH_MODEL` at a copy, which is then used as it is and never
-downloaded. The result is relative depth, scaled per photo: the nearest pixel is 1, the farthest 0, a flat answer all 0.
+downloaded. The result is relative depth, scaled per photo: the nearest pixel is 1, the farthest 0, a flat answer all 0, so one
+value is not the same distance in two photos. To scale photos alike, take the unscaled answer, `inverse_depth(rgb)` (larger
+= nearer, on the model's own scale), scale it with one range of your own and hand it in as `maps={"depth": ...}`.
 Your own map replaces the model: `--map depth=depth.png` (in Python `maps={"depth": imageio.load_map("depth.png")}`)
 takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
 `finders={"depth": Finder("my-depth v1", find)}`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run`
@@ -771,7 +773,8 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   recipe.py                the public namespace: the core's recipe names, with the default finders bound (`finding`)
   imageio.py     adapters  file formats, EXIF and colour profiles; defines the one in-memory image type
   loader.py                load_recipe: reads a recipe file (TOML), and the pictures it names, through imageio
-  finding/                 finding.subject.subject_matte(rgb) -> alpha, finding.depth.depth_map(rgb) -> depth. Which model
+  finding/                 finding.subject.subject_matte(rgb) -> alpha, finding.depth.depth_map(rgb) -> depth (and
+                           inverse_depth(rgb), before the per-photo scaling). Which model
                            finds them (IS-Net and Depth Anything V2 on ONNX Runtime, downloaded on first use; or Apple
                            Vision for the subject, when asked) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML file per effect (data, not code)

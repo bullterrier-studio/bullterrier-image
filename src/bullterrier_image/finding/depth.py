@@ -2,8 +2,11 @@
 
 `depth_map(rgb)` answers it at the picture's own size, 1 = nearest, 0 = farthest; `depth_finder()` is the same as a
 `Finder` that the renderers take (`finders={"depth": ...}`), named by its model. The model is Depth Anything V2 Small
-(Apache-2.0) on ONNX Runtime, the same on macOS, Linux and Windows. It tells relative depth, not distance: the answer is
-scaled per photo, so the nearest pixel of every photo is 1 and the farthest 0.
+(Apache-2.0) on ONNX Runtime, the same on macOS, Linux and Windows. It tells relative depth, not distance, and the map
+is scaled per photo: the nearest pixel of every photo is 1 and the farthest 0, so one value is a different distance in
+every photo. `inverse_depth(rgb)` is the same answer before that scaling, on the model's own scale, which does not
+depend on the photo: scale several photos alike with one range of your own and hand the result in as
+`maps={"depth": ...}`.
 
 The model (about 99 MB) is not part of the package: the first use downloads it into the user's cache folder
 (`depth_model_path()`), checks its SHA-256 and keeps it there; nothing is downloaded at import time. Offline, download
@@ -35,8 +38,24 @@ _TRIED = "cannot find the depth with the depth model (Depth Anything V2 Small)"
 def depth_map(rgb: np.ndarray) -> np.ndarray:
     """Depth map (height, width, float32 0..1) of `rgb`, same size as `rgb`: 1 = nearest, 0 = farthest.
 
-    The model's answer, stretched to the photo's size, is scaled so its nearest pixel is 1 and its farthest 0; when it
-    tells nothing apart (every pixel equally far) the map is all 0.
+    `inverse_depth(rgb)` scaled so its nearest pixel is 1 and its farthest 0, per photo: the same value in two photos
+    is not the same distance. When the model tells nothing apart (every pixel equally far) the map is all 0.
+
+    Raises BackendUnavailableError like `inverse_depth`.
+    """
+    nearness = inverse_depth(rgb)
+    low = nearness.min()
+    span = nearness.max() - low  # in float32 as the values are, so the nearest pixel becomes exactly 1
+    # a span of 0 is a flat answer; NaN (a broken model) is no span to compare, so it passes on to the map's check
+    return (nearness - low) / span if span != 0 else np.zeros_like(nearness)
+
+
+def inverse_depth(rgb: np.ndarray) -> np.ndarray:
+    """The model's relative inverse depth of `rgb` (height, width, float32), same size as `rgb`: larger = nearer.
+
+    Not scaled to the photo: the values are on the model's own scale, so the same value in two photos is the same
+    nearness and photos can be scaled alike (subtract a shared low, divide by a shared span). Only the order and the
+    ratios of differences mean anything: it is neither a distance nor bounded.
 
     Raises BackendUnavailableError when the model cannot run here: `BT_IMAGE_DEPTH_MODEL` names no file, the download
     fails (the message says how to get the file by hand), or onnxruntime is not installed.
@@ -49,11 +68,7 @@ def depth_map(rgb: np.ndarray) -> np.ndarray:
     # an unusable model file: only a local one can be, as the standard one is verified when it is fetched
     except BackendUnavailableError as error:
         raise BackendUnavailableError(f"{_TRIED}: {error}; is {MODEL_VARIABLE} the right file?") from error
-    nearness = stretch(answer, *rgb.shape[:2])
-    low = nearness.min()
-    span = nearness.max() - low  # in float32 as the values are, so the nearest pixel becomes exactly 1
-    # a span of 0 is a flat answer; NaN (a broken model) is no span to compare, so it passes on to the map's check
-    return (nearness - low) / span if span != 0 else np.zeros_like(nearness)
+    return stretch(answer, *rgb.shape[:2])
 
 
 def depth_model_path() -> Path:

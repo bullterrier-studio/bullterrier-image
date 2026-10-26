@@ -13,7 +13,7 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image import BackendUnavailableError, Band, DepthNotFoundError, Recipe, Step, imageio, render
-from bullterrier_image.finding.depth import depth_finder, depth_map, depth_model_path
+from bullterrier_image.finding.depth import depth_finder, depth_map, depth_model_path, inverse_depth
 from bullterrier_image.ops.resample import resize
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
@@ -46,6 +46,43 @@ def test_the_depth_is_the_models_answer_at_the_photos_size_scaled_so_the_nearest
     expected = (red - red.min()) / (red.max() - red.min())
     # through the model's size and back: a straight ramp survives but at the left and right borders
     np.testing.assert_allclose(depth[:, 3:-3], expected[:, 3:-3], atol=0.02)
+
+
+def test_the_raw_depth_is_the_models_answer_at_the_photos_size_on_the_models_own_scale(depth_echo_model):
+    """The echo model answers with the red channel as it receives it, an affine function of it. A photo of one flat red
+    is answered by one number, and a redder photo by a larger one, whatever else is in the picture: the scale is the
+    model's, not the photo's, so photos can be compared (and scaled alike) by the caller."""
+    depth_echo_model(0)
+    answers = {red: inverse_depth(picture(np.full((60, 80), red, np.float32))) for red in (0.3, 0.5, 0.7)}
+    for answer in answers.values():
+        assert answer.shape == (60, 80)
+        assert answer.dtype == np.float32
+        assert answer.max() - answer.min() < 1e-4  # one flat answer
+    low, middle, high = (float(answers[red].mean()) for red in (0.3, 0.5, 0.7))
+    assert low < middle < high
+    assert middle == pytest.approx((low + high) / 2, abs=1e-4)  # 0.5 is half way between 0.3 and 0.7: affine
+
+
+def test_the_depth_is_the_raw_depth_scaled_to_0_1_over_the_photo(depth_echo_model):
+    """The same picture gives the same map whether the finder scales it or the caller scales the raw values."""
+    depth_echo_model(0)
+    photo = ramp()
+    raw = inverse_depth(photo)
+    by_the_caller = (raw - raw.min()) / (raw.max() - raw.min())
+    np.testing.assert_allclose(depth_map(photo), by_the_caller, atol=1e-6)
+
+
+def test_photos_scaled_by_one_shared_range_keep_their_depths_where_scaling_each_would_not(depth_echo_model):
+    """A dim and a bright photo, each with a little texture: scaled alike by the caller the bright one is nearer
+    everywhere; scaled one by one (`depth_map`) both fill 0..1."""
+    depth_echo_model(0)
+    texture = np.tile(np.linspace(0, 1, 80, dtype=np.float32), (60, 1))
+    dim, bright = picture(0.2 + 0.1 * texture), picture(0.6 + 0.1 * texture)
+    raws = [inverse_depth(dim), inverse_depth(bright)]
+    low, high = min(raw.min() for raw in raws), max(raw.max() for raw in raws)
+    shared_dim, shared_bright = ((raw - low) / (high - low) for raw in raws)
+    assert shared_dim.max() < shared_bright.min()
+    assert (depth_map(dim).max(), depth_map(bright).max()) == (1.0, 1.0)
 
 
 def test_the_bright_half_of_the_answer_is_near_and_the_dark_half_far(depth_echo_model):

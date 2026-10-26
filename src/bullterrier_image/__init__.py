@@ -44,7 +44,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         SubjectNotFoundError,
         UnknownEffectError,
     )
-    from .finding.depth import depth_finder, depth_map
+    from .finding.depth import depth_finder, depth_map, inverse_depth
     from .finding.subject import subject_finder, subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import (
@@ -90,7 +90,7 @@ _HOMES = {
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".core.params": ("Picture",),
-    ".finding.depth": ("depth_finder", "depth_map"),
+    ".finding.depth": ("depth_finder", "depth_map", "inverse_depth"),
     ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
@@ -171,6 +171,7 @@ __all__ = [
     "depth_map",
     "fx",
     "imageio",
+    "inverse_depth",
     "load_project",
     "load_recipe",
     "recipe",

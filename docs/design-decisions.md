@@ -266,8 +266,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `maps={"depth": ...}`) takes a map you already have (brightness, white = near). The model sees the photo bicubic-scaled to a short
   side of 518 px, both sides rounded to multiples of 14, as the original repository feeds it (the export's
   `preprocessor_config.json` scales by whichever side needs the least, which fits a photo under 518 px by its long
-  side); its inverse depth is stretched bilinear to the photo's size, then min-max scaled per photo (a flat answer gives
-  zeros). The input keeps the photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory;
+  side); its inverse depth (`inverse_depth`) is stretched bilinear to the photo's size, then `depth_map` min-max scales it per photo (a flat answer gives
+  zeros). *Reason for both:* the model's answer is relative, so a map scaled per photo is what every effect and region can
+  rely on (nearest = 1), but a caller that knows more (several photos of one scene, a known range) cannot scale them alike
+  from it; the unscaled answer is public for that, and the caller hands its own scaling in as `maps={"depth": ...}`. The input keeps the photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory;
   there is no cap. Further:
   - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
     `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
