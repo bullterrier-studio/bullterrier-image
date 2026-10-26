@@ -17,6 +17,7 @@ from .recipe import Recipe, Stage, Step
 _RGBA = 4  # the channels of a picture with transparency
 _CHECKER = 8  # px: the side of a square of the checkerboard that shows through transparency
 _LIGHT, _DARK = 0.8, 0.6  # the greys of the checkerboard, as in the boards image editors show
+_LABEL_SIZE, _LABEL_SMALLEST = 16, 10  # px: the label's type size, and the smallest it shrinks to before it is cut
 
 
 def _over_checkerboard(image: np.ndarray) -> np.ndarray:
@@ -30,21 +31,34 @@ def _over_checkerboard(image: np.ndarray) -> np.ndarray:
     return image[..., :3] * alpha + board * (1.0 - alpha)
 
 
+def _fitted_label(label: str, width: int) -> tuple[ImageFont.FreeTypeFont, str]:
+    """The font and the text that draw `label` inside `width` px: the label at the type size when it fits, else at the
+    largest smaller whole size that fits (down to the smallest), else cut at the smallest size and ended with `…`."""
+    for size in range(_LABEL_SIZE, _LABEL_SMALLEST - 1, -1):
+        font = ImageFont.truetype(glyphs.FONT, size)
+        if font.getlength(label) <= width:
+            return font, label
+    while label and font.getlength(f"{label}…") > width:
+        label = label[:-1]
+    return font, f"{label}…"
+
+
 def contact_sheet(tiles: list[tuple[str, np.ndarray]], columns: int = 3, tile: int = 480) -> np.ndarray:
-    """Lay out `(label, image)` pairs in a grid, each scaled to fit a `tile` px square, label underneath. An image with
-    transparency is laid over a checkerboard."""
+    """Lay out `(label, image)` pairs in a grid, each scaled to fit a `tile` px square, label underneath. A label wider
+    than the tile is set smaller, and cut with `…` if it still does not fit. An image with transparency is laid over a
+    checkerboard."""
     gap, label_h = 14, 30
     rows = -(-len(tiles) // columns)
     cols = min(columns, len(tiles))
     sheet = Image.new("RGB", (gap + cols * (tile + gap), gap + rows * (tile + label_h + gap)), "#242424")
     draw = ImageDraw.Draw(sheet)
-    font = ImageFont.truetype(glyphs.FONT, 16)
     for i, (label, image) in enumerate(tiles):
         x = gap + (i % columns) * (tile + gap)
         y = gap + (i // columns) * (tile + label_h + gap)
         small = imageio.to_pil(_over_checkerboard(resize(image, tile)))
         sheet.paste(small, (x + (tile - small.width) // 2, y + (tile - small.height) // 2))
-        draw.text((x, y + tile + 6), label, fill="#d8d8d8", font=font)
+        font, text = _fitted_label(label, tile)
+        draw.text((x, y + tile + 6), text, fill="#d8d8d8", font=font)
     return imageio.from_pil(sheet)
 
 

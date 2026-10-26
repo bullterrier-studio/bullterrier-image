@@ -122,6 +122,30 @@ def test_an_opaque_four_channel_picture_is_shown_as_its_colour_and_a_half_clear_
     )  # half the colour, half the board, to 8 bits
 
 
+# Each row: the labels of a three-column sheet of 120 px tiles. A label wider than a tile must not touch the gutters
+# beside its tile (the last tile's right gutter is the sheet's edge, where it would be cut off).
+LABELS = {
+    "short labels fit as they are": ["a=1", "b=2", "c=3"],
+    "a long label in the middle column": ["a=1", "split=9.50 bands=8", "c=3"],
+    "a long label in the last column": ["a=1", "b=2", "split=9.50 bands=8 seed=1234"],
+    "a label too long for any size": ["a=1", "b=2", "split=9.50 bands=8 seed=1234 " * 4],
+}
+
+
+@pytest.mark.parametrize("labels_", LABELS.values(), ids=LABELS.keys())
+def test_a_label_never_runs_past_its_tile_into_the_gutter(labels_):
+    tile = 120
+    picture = np.full((tile, tile, 3), 0.5, np.float32)
+    sheet = contact_sheet([(label, picture) for label in labels_], columns=3, tile=tile)
+    blank = contact_sheet([("", picture) for _ in labels_], columns=3, tile=tile)
+    gap = (sheet.shape[1] - 3 * tile) // 4  # the sheet is a gap, then three tiles each followed by a gap
+    ink = (sheet != blank).any(axis=(0, 2))  # per pixel column: does any label ink fall there
+    for column in range(3):
+        left = gap + column * (tile + gap)
+        assert ink[left : left + tile].any(), f"the label of tile {column} is missing"
+        assert not ink[left + tile : left + tile + gap].any(), f"the label of tile {column} runs into the gutter"
+
+
 def test_write_stages_names_each_stage_and_saves_one_with_transparency_as_png_and_the_others_as_jpg(photo, tmp_path):
     stages = [
         Stage("input", photo),
