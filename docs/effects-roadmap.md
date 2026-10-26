@@ -4,6 +4,9 @@ What bullterrier-image can do today and what could come next. **✓ marks what e
 parameter); everything else is a proposal. Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
 is `effect = "<effect>"` plus the same parameters.
 
+Only looks that read as made, not as a one-click photo filter, are proposed. Cut: oil paint, sketch, toon, comic,
+watercolor, woodcut, pop art, film emulation, pixel and brick novelties, novelty text looks and reveal wipes.
+
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
 `src/bullterrier_image/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
 recipes.
@@ -37,13 +40,11 @@ recipes.
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
 | `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |
 | `cross_process` ✓ (a preset of `curves`) | Shifted curves per channel. | `fx.curves(preset="cross_process")` |
-| `bleach_bypass` | Desaturated, high-contrast film look. | `fx.bleach_bypass(amount=0.6)` |
 | `teal_orange` ✓ (a preset of `split_tone`) | The blockbuster grade. | `fx.split_tone(preset="teal_orange", amount=0.4)` |
 | `thermal` ✓ (a preset of `gradient_map`) | Heat-camera false colour. | `fx.gradient_map(preset="thermal")` |
 | `infrared` ✓ (a preset of `channel_mixer`) | False-colour infrared (swapped channels, bright foliage). | `fx.channel_mixer(preset="infrared")` |
 | `xray` ✓ (a preset of `gradient_map`) | Inverted and blue (not edge-lit). | `fx.gradient_map(preset="xray")` |
 | `night_vision` ✓ (a preset of `gradient_map`) | Green phosphor (no noise or vignette: add `film_grain` and `vignette`). | `fx.gradient_map(preset="night_vision")` |
-| `film_stock` | Approximations of named stocks (portra, tri-x, velvia). | `fx.film_stock("portra")` |
 
 ## Light, focus and detail
 
@@ -87,7 +88,6 @@ recipes.
 | `bump_light` ✓ | Light a height map from a direction. | `fx.bump_light(angle=45, height=8)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
-| `border` | Solid or rounded border, drawn inside the picture's edge. | `fx.border(width=24, color="#fff", radius=12)` |
 | `crt` ✓ | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.15, shadow_mask=0.35)` |
 | `vhs` ✓ | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.06, bleed=5)` |
 | `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
@@ -104,10 +104,9 @@ belong to a layout package, not here.
 | `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=0.0016)` |
 | `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
+| `quadtree` | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap`, cell shape and a field that sets where cells stay small. | `fx.quadtree(threshold=0.02, min_cell=0.004, max_cell=0.25)` |
 | `dither` | Floyd-Steinberg, Atkinson, Bayer, blue-noise, to any palette. | `fx.dither(method="atkinson", palette=["#000","#fff"])` |
-| `pixelate` | Mosaic of flat cells. | `fx.pixelate(cell=12)` |
 | `edges` | Outlines by Sobel, Canny or difference of Gaussians. | `fx.edges(method="dog", width=2)` |
-| `oil_paint` | Kuwahara filter: flat painterly regions. | `fx.oil_paint(radius=6)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | `line_halftone` | Lines whose width carries tone. | `fx.line_halftone(spacing=8, angle=30)` |
 | `cmyk_halftone` | Four-ink halftone at screen angles. | `fx.cmyk_halftone(cell=9)` |
@@ -115,24 +114,7 @@ belong to a layout package, not here.
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
 | `voronoi_mosaic` | Stained-glass cells with leaded edges. | `fx.voronoi_mosaic(cells=800, edge="#000")` |
 | `low_poly` | Delaunay triangles, one colour each, or just their wireframe. | `fx.low_poly(points=1500, seed=1)` |
-| `painterly` | Oriented brush strokes. | `fx.painterly(stroke=14, seed=1)` |
-| `pointillism` | Dots of varying size and colour. | `fx.pointillism(size=7, jitter=0.4)` |
-| `led_wall` | Round LEDs in a grid, brightness by tone. | `fx.led_wall(cell=10)` |
-| `brick_mosaic` | Toy-brick tiles with studs. | `fx.brick_mosaic(cell=14, palette="lego")` |
-| `sketch` | Pencil drawing (dodge-blended inverted blur). | `fx.sketch(radius=14)` |
-| `line_art` | Clean ink lines on flat paper. | `fx.line_art(threshold=0.45)` |
-| `pixel_art` | Downsample, limited palette, optional outline. | `fx.pixel_art(cell=8, colors=16)` |
-| `toon` | Flat colour regions with ink edges. | `fx.toon(levels=5, edge=2)` |
-| `comic` | Toon plus halftone shading. | `fx.comic()` |
-| `watercolor` | Edge darkening, pigment pooling, paper. | `fx.watercolor(wetness=0.6)` |
-| `woodcut` | Few tones carved as line texture. | `fx.woodcut(levels=3)` |
 | `risograph` | Spot-colour layers, misregistration, grain. | `fx.risograph(inks=["#ff4d6d","#2b59ff"])` |
-| `screenprint` | N flat colour layers, slightly offset. | `fx.screenprint(layers=3)` |
-| `pop_art` | Quad grid of palette-swapped copies. | `fx.pop_art(palettes=4)` |
-| `blueprint` | White edges on blue with a grid. | `fx.blueprint()` |
-| `neon_edges` | Glowing outlines on black. | `fx.neon_edges(color="#00f0ff")` |
-| `paper_cutout` | Posterised layers with drop shadows. | `fx.paper_cutout(layers=5)` |
-| `photo_mosaic` | The photo built from other photos. | `fx.photo_mosaic(tiles="tiles/", cell=24)` |
 
 ## Computational and experimental
 
@@ -154,13 +136,8 @@ Looks made by running an algorithm on the picture rather than filtering it. The 
 | `ascii_edges` | Characters follow edge direction (`/ \ \| _`). | `fx.ascii_edges(cell=6)` |
 | `braille` | Unicode braille dots, 2x4 per character. | `fx.braille(cell=4)` |
 | `half_blocks` | Terminal-style `▀▄` pixel art. | `fx.half_blocks(cell=6)` |
-| `digital_rain` | Falling glyph columns over the picture. | `fx.digital_rain(density=0.3, seed=1)` |
 | `text_mosaic` | The photo built from the words of a supplied text. | `fx.text_mosaic(text=open("poem.txt").read())` |
 | `typographic_portrait` | Lines of text, weight carries tone. | `fx.typographic_portrait(text="...")` |
-| `barcode` | Vertical bars whose width carries tone. | `fx.barcode(bars=120)` |
-| `cross_stitch` | Grid of X stitches in the photo's colours. | `fx.cross_stitch(cell=8)` |
-| `segments` | Seven-segment digits. | `fx.segments(cell=10)` |
-| `binary` | ASCII with `0`/`1` only. | `fx.binary(cell=6)` |
 
 ## Distortion and geometry
 
@@ -282,7 +259,6 @@ Use the subject cut-out, so they target the subject or the background.
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `black_and_white` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `black_and_white mask = "background"` |
 | `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
-| `double_exposure` | Another picture blended inside the silhouette. | `fx.double_exposure(image="forest.jpg")` |
 | `layered_cutouts` ✓ | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
 | decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
@@ -323,7 +299,6 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `auto_enhance` | Sensible levels, white balance and vibrance in one step. | `fx.auto_enhance()` |
 | `avatar` ✓ (a recipe, [avatar.toml](../examples/transparent/avatar.toml)) | Square crop on the subject, optional circle: framing and transparency settings. | `aspect = 1.0`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
 | `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
@@ -343,12 +318,7 @@ no time of its own.
 | `assemble` | The reverse: pieces fly in and settle. | `fx.assemble(progress=0.5)` |
 | `dissolve` | Pixels vanish in noise order, with a burning edge. | `fx.dissolve(progress=0.5, edge="#ff7a2b")` |
 | `pixel_dissolve` | Dissolve into blocks. | `fx.pixel_dissolve(progress=0.5, cell=16)` |
-| `scan_reveal` | A bright line sweeps and reveals the effect. | `fx.scan_reveal(progress=0.5, angle=90)` |
-| `wipe` | Linear, iris or clock reveal. | `fx.wipe(kind="iris", progress=0.5)` |
 | `explode` | Pieces burst radially from a point. | `fx.explode(progress=0.5, center=[0.5,0.4])` |
-| `shatter_fall` | Pieces fall with gravity and spin. | `fx.shatter_fall(progress=0.5)` |
-| `melt_down` | Drips run down and pool. | `fx.melt_down(progress=0.5)` |
-| `paper_burn` | An ember front eats the picture. | `fx.paper_burn(progress=0.5)` |
 | `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=0.03, focus=0.5)` |
 
 Text appearing character by character is bullterrier-vector's (typesetting) animated by video; a caption here is an `svg` region + `fill`/`outline`.
@@ -362,7 +332,7 @@ control packages.
 What combining effects can give, once the pieces exist:
 
 - **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain, CRT glass
-- **Risograph poster**: levels, risograph inks, paper texture, border
+- **Risograph poster**: levels, risograph inks, paper texture
 - **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml)): green ASCII on a curved CRT screen with shadow mask, scanlines and glow
 - **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
 - **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `cmyk_halftone` exists; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
@@ -372,4 +342,4 @@ What combining effects can give, once the pieces exist:
 - **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph` and `border`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs `risograph`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
