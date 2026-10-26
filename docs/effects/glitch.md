@@ -7,13 +7,12 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/anaglyph.jpg" width="160" alt="anaglyph"> | `anaglyph` | Red from the brightness moved `shift` px left, green and blue from the brightness moved `shift` px right. | `shift=6.0` +1 advanced | [anaglyph.toml](../../examples/effects/anaglyph.toml) |
-| <img src="../gallery/byte_corrupt.jpg" width="160" alt="byte_corrupt"> | `byte_corrupt` | Damage `hits` quantised JPEG coefficients of the picture at random, then decode it. | `quality=20` `hits=40` `seed=0` +2 advanced | [byte_corrupt.toml](../../examples/effects/byte_corrupt.toml) |
 | <img src="../gallery/dead_pixels.jpg" width="160" alt="dead_pixels"> | `dead_pixels` | Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black. | `count=120` `size=4` `stuck=0.5` `color='#ffffff'` `seed=0` | [dead_pixels.toml](../../examples/effects/dead_pixels.toml) |
 | <img src="../gallery/echo.jpg" width="160" alt="echo"> | `echo` | Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`. | `copies=4` `dx=14.0` `dy=0.0` `fade=0.5` +1 advanced | [echo.toml](../../examples/effects/echo.toml) |
 | <img src="../gallery/glitch.jpg" width="160" alt="glitch"> | `glitch` | `bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed `split` px apart. | `split=10` `bands=7` `shift=0.06` `seed=0` `band_min_height=0.01` `band_max_height=0.06` | [glitch.toml](../../examples/effects/glitch.toml) |
 | <img src="../gallery/hologram.jpg" width="160" alt="hologram"> | `hologram` | Show the picture as light of `color`, outlined where its brightness changes, with scanlines and a flicker. | `color='#30e0ff'` `tint=0.85` `glow=5.0` `scanlines=0.35` `flicker=0.3` `phase=0.0` +5 advanced | [hologram.toml](../../examples/effects/hologram.toml) |
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
-| <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths, at `quality`, and return what it decodes to. | `quality=6` | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
+| <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
 | <img src="../gallery/prism.jpg" width="160" alt="prism"> | `prism` | Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum. | `amount=18.0` `samples=7` `x=0.5` `y=0.5` +2 advanced | [prism.toml](../../examples/effects/prism.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push the red and blue channels `amount` px apart along `angle`, leaving green where it is. | `angle=30.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
@@ -32,23 +31,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a moved view shows where it has left the picture's edge: 'nearest' repeats the view's edge pixels (a coloured smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the view (the edge line repeated once), 'mirror' mirrors it about the edge line. |
-
-</details>
-
-### `byte_corrupt`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `quality` | whole number | count | 1 to 100 | `20` | The JPEG quality the picture is stored at before it is damaged, 1 to 100, as in `jpeg_crush`: the quantisation step of every coefficient, so a lower quality makes each hit a larger jump in the picture. |
-| `hits` | whole number | count | 0 to 5000 | `40` | How many coefficients are damaged, 0 to 5000, each at a random place in a random 8 x 8 block of the brightness or one of the two colour planes; 0 gives the plain JPEG of `jpeg_crush`. Raising it spreads more damage over the picture. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the hits land and how large they are: the same seed always gives the same damage, any other a different one. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `dc_share` | number | fraction | 0 to 1 | `0.3` | The share of hits, 0 to 1, that land on a block's DC value (its average) rather than on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores each average as a difference from the block before, every later block of its row: a streak to the right edge. A detail hit only marks its own block with a pattern. |
-| `magnitude` | whole number | count | 1 to 100 | `8` | The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each hit adds or subtracts a whole number of steps between 1 and this. Raising it makes the damage louder. |
 
 </details>
 
@@ -132,7 +114,18 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `quality` | whole number | count | 1 to 100 | `6` | The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows 8 px blocks, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block. |
+| `quality` | whole number | count | 1 to 100 | `6` | The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows 8 px blocks, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a larger jump in the picture. |
+| `hits` | whole number | count | 0 to 5000 | `0` | How many coefficients are damaged after the compression, 0 to 5000, each at a random place in a random 8 x 8 block of the brightness or one of the two colour planes, as a corrupted file shows. 0 leaves the plain crushed picture, and then `seed`, `dc_share` and `magnitude` do nothing. Raising it spreads more damage over the picture. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the hits land and how large they are: the same seed always gives the same damage, any other a different one. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `dc_share` | number | fraction | 0 to 1 | `0.3` | The share of hits, 0 to 1, that land on a block's DC value (its average) rather than on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores each average as a difference from the block before, every later block of its row: a streak to the right edge. A detail hit only marks its own block with a pattern. |
+| `magnitude` | whole number | count | 1 to 100 | `8` | The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each hit adds or subtracts a whole number of steps between 1 and this. Raising it makes the damage louder. |
+
+</details>
 
 ### `ntsc`
 

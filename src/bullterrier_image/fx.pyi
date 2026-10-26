@@ -377,42 +377,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seam)."""
     ...
 
-def byte_corrupt(quality: int = 20, hits: int = 40, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Damage `hits` quantised JPEG coefficients of the picture at random, then decode it.
-
-The picture goes through the JPEG steps of `jpeg_crush` up to the quantised coefficients. Each hit then picks a
-block at random from all those of the brightness and the two colour planes, and a coefficient in it (the DC
-value with chance `dc_share`, otherwise one of the 63 others), and adds or subtracts between 1 and `magnitude`
-quantisation steps. A hit on a DC value also moves the DC value of every later block of its row in that plane,
-as a damaged difference does in the file. With no hits the result is exactly that of `jpeg_crush` at `quality`.
-
-Parameters
-----------
-quality : whole number, count, 1 to 100, default 20
-    The JPEG quality the picture is stored at before it is damaged, 1 to 100, as in
-    `jpeg_crush`: the quantisation step of every coefficient, so a lower quality makes
-    each hit a larger jump in the picture.
-hits : whole number, count, 0 to 5000, default 40
-    How many coefficients are damaged, 0 to 5000, each at a random place in a random 8 x
-    8 block of the brightness or one of the two colour planes; 0 gives the plain JPEG of
-    `jpeg_crush`. Raising it spreads more damage over the picture.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for where the hits land and how large they are: the same seed always
-    gives the same damage, any other a different one.
-
-Advanced parameters
--------------------
-dc_share : number, fraction, 0 to 1, default 0.3
-    The share of hits, 0 to 1, that land on a block's DC value (its average) rather than
-    on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores
-    each average as a difference from the block before, every later block of its row: a
-    streak to the right edge. A detail hit only marks its own block with a pattern.
-magnitude : whole number, count, 1 to 100, default 8
-    The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each
-    hit adds or subtracts a whole number of steps between 1 and this. Raising it makes
-    the damage louder."""
-    ...
-
 def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared'] | None = None) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
 
@@ -2290,8 +2254,8 @@ Parameters
 """
     ...
 
-def jpeg_crush(quality: int = 6, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Compress the picture with a JPEG codec written as maths, at `quality`, and return what it decodes to.
+def jpeg_crush(quality: int = 6, hits: int = 0, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it.
 
 The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction
 (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all
@@ -2299,13 +2263,40 @@ of it undone. There is no file and no byte: the result does not depend on any im
 every platform. A picture whose sides are not multiples of 16 is extended by repeating its last row and column
 and cropped back.
 
+Each hit picks a block at random from all those of the brightness and the two colour planes, and a coefficient in
+it (the DC value with chance `dc_share`, otherwise one of the 63 others), and adds or subtracts between 1 and
+`magnitude` quantisation steps before the decoding. A hit on a DC value also moves the DC value of every later
+block of its row in that plane, as a damaged difference does in the file.
+
 Parameters
 ----------
 quality : whole number, count, 1 to 100, default 6
     The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG
     Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows 8
     px blocks, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it
-    coarsens the quantisation of every 8 x 8 block."""
+    coarsens the quantisation of every 8 x 8 block, so each hit is also a larger jump in
+    the picture.
+hits : whole number, count, 0 to 5000, default 0
+    How many coefficients are damaged after the compression, 0 to 5000, each at a random
+    place in a random 8 x 8 block of the brightness or one of the two colour planes, as
+    a corrupted file shows. 0 leaves the plain crushed picture, and then `seed`,
+    `dc_share` and `magnitude` do nothing. Raising it spreads more damage over the
+    picture.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the hits land and how large they are: the same seed always
+    gives the same damage, any other a different one.
+
+Advanced parameters
+-------------------
+dc_share : number, fraction, 0 to 1, default 0.3
+    The share of hits, 0 to 1, that land on a block's DC value (its average) rather than
+    on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores
+    each average as a difference from the block before, every later block of its row: a
+    streak to the right edge. A detail hit only marks its own block with a pattern.
+magnitude : whole number, count, 1 to 100, default 8
+    The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each
+    hit adds or subtracts a whole number of steps between 1 and this. Raising it makes
+    the damage louder."""
     ...
 
 def kaleidoscope(segments: int = 6, angle: float = 0.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
