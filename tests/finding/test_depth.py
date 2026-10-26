@@ -4,7 +4,6 @@ The model is an external boundary: tests give it tiny ONNX models built here and
 the real model's input and output, whose answers follow from the documented model contract, so the expected maps are
 worked out by hand. The real model runs only when it is already in the cache; no test downloads it."""
 
-import hashlib
 import sys
 from pathlib import Path
 
@@ -259,21 +258,19 @@ def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatc
 
 # --- the real model, when it is in the cache --------------------------------------------------------------------------
 
-# the published SHA-256 of Depth Anything V2 Small's fp32 ONNX file (onnx-community): the model this test is about
-DEPTH_ANYTHING_SHA256 = "afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c"
-
 
 def test_the_real_model_puts_the_dog_nearer_than_the_window(monkeypatch):
     """The pinned model itself, when it has been downloaded before. The test never downloads: it uses the cached file
-    only if it is the right one, and through `BT_IMAGE_DEPTH_MODEL`, which is never fetched."""
+    only if it is the right one (the finder's identity is the pinned digest for the standard model, the file's digest
+    for a named one), and through `BT_IMAGE_DEPTH_MODEL`, which is never fetched."""
     monkeypatch.delenv("BT_IMAGE_DEPTH_MODEL")
+    pinned = depth_finder().identity
     cached = depth_model_path()
     if not cached.is_file():
         pytest.skip(f"the depth model is not in the cache ({cached}); a render that needs depth downloads it")
-    with cached.open("rb") as file:
-        if hashlib.file_digest(file, "sha256").hexdigest() != DEPTH_ANYTHING_SHA256:
-            pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
     monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(cached))
+    if depth_finder().identity != pinned:
+        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
     photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
     depth = depth_map(photo)
     height, width = depth.shape

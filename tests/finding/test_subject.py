@@ -5,7 +5,6 @@ conftest), whose answer follows from the documented model contract, so the expec
 Apple Vision runs for real where it exists (macOS). Expected values for `refine_edge` are worked out by hand: erosion
 by a disc on axis-aligned shapes, and the normal distribution for a blurred straight edge."""
 
-import hashlib
 import math
 import sys
 from pathlib import Path
@@ -241,28 +240,23 @@ def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatc
     assert onnx_model_path() == tmp_path / "mine.onnx"
 
 
-def sha256_of(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        while chunk := f.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-# the published SHA-256 of the IS-Net general-use ONNX file: the model this test is about
-ISNET_SHA256 = "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a"
-
-
-def test_the_real_model_finds_the_dog(monkeypatch):
-    """The pinned model itself, when it has been downloaded before. The test never downloads: it uses the cached file
-    only if it is the right one, and through `BT_IMAGE_SUBJECT_MODEL`, which is never fetched."""
+def use_the_cached_pinned_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point `BT_IMAGE_SUBJECT_MODEL`, which is never fetched, at the cached portable model, or skip when it is not
+    there or not the pinned file. Never downloads: the finder's identity is the pinned digest for the standard model,
+    the file's digest for a named one."""
     monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")
+    pinned = subject_finder("onnx").identity
     cached = onnx_model_path()
     if not cached.is_file():
         pytest.skip(f"the portable model is not in the cache ({cached}); `bt-image cutout` downloads it")
-    if sha256_of(cached) != ISNET_SHA256:
-        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(cached))
+    if subject_finder("onnx").identity != pinned:
+        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
+
+
+def test_the_real_model_finds_the_dog(monkeypatch):
+    """The pinned model itself, when it has been downloaded before (see `use_the_cached_pinned_model`)."""
+    use_the_cached_pinned_model(monkeypatch)
     photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
     alpha = subject_matte(photo, segmenter="onnx")
     height, width = alpha.shape
@@ -274,11 +268,7 @@ def test_the_real_model_finds_the_dog(monkeypatch):
 def test_the_real_model_finds_the_dog_cell_by_cell_with_the_defaults_and_nothing_in_the_plain_window(monkeypatch):
     """Grid first with the pinned model (skipped like the test above): the dog's head is found in the cells it lies in,
     with certainty, and the window top left, where the model has nothing to find, stays out."""
-    monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")
-    cached = onnx_model_path()
-    if not cached.is_file() or sha256_of(cached) != ISNET_SHA256:
-        pytest.skip("the pinned portable model is not in the cache; `bt-image cutout` downloads it")
-    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(cached))
+    use_the_cached_pinned_model(monkeypatch)
     photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
     height, width = photo.shape[:2]
 

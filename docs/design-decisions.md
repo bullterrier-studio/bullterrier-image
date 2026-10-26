@@ -264,11 +264,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   refactors; tests assert properties with tolerances, not exact pixels.
 - **External models are replaceable assets, not frozen.** A new subject or depth model changes outputs, and that is
   accepted; determinism holds for a given model. Updating one changes its URL, SHA-256 and size in its one module
-  (`finding/_isnet.py`, `finding/_depth_anything.py`) and the real-model test's pinned digest, which makes it skip until
-  updated; the cached copy with the old digest is replaced on next use, and the finder's identity is the model's
-  SHA-256, so the pipeline's cache finds every photo again on the next run. Tests
-  never pin a model's output: logic is tested with stand-in models, a test of a real model asserts coarse properties
-  only. *Reason:* better models keep appearing, and pulling one in should be cheap.
+  (`finding/_isnet.py`, `finding/_depth_anything.py`) and the real-model test skips until the cached file matches the
+  new pin; the cached copy with the old digest is replaced on next use, and the finder's identity is the model's
+  SHA-256, so the pipeline's cache finds every photo again on the next run. Tests never pin a model's output: logic is
+  tested with stand-in models, a test of a real model asserts coarse properties only. *Reason:* better models keep
+  appearing, and pulling one in should be cheap.
 
 ## Performance
 
