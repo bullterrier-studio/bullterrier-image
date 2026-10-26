@@ -89,9 +89,9 @@ _MOST = 1000  # the most columns, rows, or shares of a grid
 @dataclass(frozen=True, eq=False)
 class Partition:
     """Every pixel in exactly one piece. `labels` is int32 `(height, width)`: the piece of each pixel, numbered
-    0..`count`-1 in reading order (the module docstring defines it); every number occurs. `ids` maps an SVG id to the
-    numbers of the pieces of the shapes that have it (empty for a shape that is covered completely, and for every
-    kind but `Svg`). Read-only when made by `resolve`."""
+    0..`count`-1 in piece order (the module docstring: reading order, `DepthBands` nearest first); every number
+    occurs. `ids` maps an SVG id to the numbers of the pieces of the shapes that have it (empty for a shape that is
+    covered completely, and for every kind but `Svg`). Read-only when made by `resolve`."""
 
     labels: np.ndarray
     count: int
@@ -296,15 +296,16 @@ class Pick(_Model):
 
     of: str = param(
         "",
-        doc="The name of the partition (a `Grid` or `Shards` region) whose pieces are picked; it must be set.",
+        doc="The name of the partition (grid, shards, cuts, svg or depth_bands) whose pieces are picked; it must be "
+        "set.",
     )
     pieces: tuple[int | str, ...] = param(
         (0,),
         min_length=1,
-        doc="The pieces to choose, at least one: numbers counted from 0 in reading order (top to bottom, then left to "
-        "right) or, for an `Svg` partition, the `id` of a shape (text; every piece of every shape with that id). A "
-        "number the partition has no piece for chooses nothing, so a recipe also works on a picture too small to have "
-        "that many pieces; an id the file lacks is an error.",
+        doc="The pieces to choose, at least one: numbers counted from 0 in piece order (reading order; depth_bands "
+        "nearest first) or, for an `Svg` partition, the `id` of a shape (text; every piece of every shape with that "
+        "id). A number the partition has no piece for chooses nothing, so a recipe also works on a picture too small "
+        "to have that many pieces; an id the file lacks is an error.",
     )
 
     @field_validator("pieces")
@@ -459,9 +460,10 @@ class Subject(_Model):
 
     per: str | None = param(
         None,
-        doc="The name of a partition (a `Grid` or `Shards` region): the subject is found inside each of its pieces "
-        "separately and the finds are united, so small things a whole-picture search misses (a calf behind its "
-        "mother, a fox on a rock) are found. Not set = the subject of the whole picture, as the built-in 'subject'.",
+        doc="The name of a partition (grid, shards, cuts, svg or depth_bands): the subject is found inside each of "
+        "its pieces separately and the finds are united, so small things a whole-picture search misses (a calf "
+        "behind its mother, a fox on a rock) are found. Not set = the subject of the whole picture, as the built-in "
+        "'subject'.",
     )
     context: float = param(
         0.25,

@@ -50,7 +50,7 @@ class _Layer(ValidatedModel):
     mask: str | None = Field(
         None,
         description='Apply only where this selection says: the "subject" or the "background" of the photo, or the name '
-        "of a selection the recipe declares (a `Path` or a `Pick`); None: everywhere.",
+        "of a selection the recipe declares (path, pick, subject or depth); None: everywhere.",
     )
     opacity: float = Field(
         ge=0,
@@ -183,7 +183,7 @@ class Each(_Layer):
     """
 
     each: str = Field(
-        description="The name of the partition whose pieces get a look each (a grid, shards, cuts or svg region)."
+        description="The name of the partition whose pieces get a look each (grid, shards, cuts, svg or depth_bands)."
     )
     looks: tuple[Step | Literal["none"], ...] = Field(
         min_length=1,

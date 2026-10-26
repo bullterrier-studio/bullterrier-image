@@ -30,9 +30,10 @@ def seams(rgb: np.ndarray, params: SeamsParams, *, partition: np.ndarray | None 
     """Draw a solid line or band along every border between the pieces of a partition.
 
     The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
-    not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a grid, shards,
-    or a selection such as the subject (counted as two pieces, what it chooses and what it does not), which outlines
-    its hard edge. Without a partition (or with a single piece) there is no border and the picture is unchanged.
+    not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
+    (grid, shards, cuts, svg or depth_bands) or a selection such as the subject (counted as two pieces, what it chooses
+    and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
+    border and the picture is unchanged.
 
     `partition` is filled in by the recipe (never set it in a recipe file): int32 labels, one piece number per pixel.
     """
