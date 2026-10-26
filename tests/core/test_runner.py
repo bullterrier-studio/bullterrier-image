@@ -101,9 +101,16 @@ def test_the_finder_sees_the_photo_as_given_before_it_is_framed_or_scaled(photo,
     assert finder.seen == [(96, 128, 3)]  # not the 64 px square it is rendered as
 
 
-def test_a_finders_matte_of_another_size_than_the_photo_is_refused(photo, matte):
-    with pytest.raises(SubjectNotFoundError, match="matte is"):
-        runner.render(photo, MASKED, find_subject=Finder("stand-in", CountingFinder(matte[::2, ::2])))
+WITH_MATTE = {
+    "a given matte": lambda matte: {"matte": matte},
+    "a finder": lambda matte: {"find_subject": Finder("stand-in", CountingFinder(matte))},
+}
+
+
+@pytest.mark.parametrize("given", WITH_MATTE.values(), ids=WITH_MATTE.keys())
+def test_a_matte_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, matte, given):
+    with pytest.raises(SubjectNotFoundError, match=r"matte is \(48, 64\).*\(96, 128\)"):
+        runner.render(photo, MASKED, **given(matte[::2, ::2]))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -192,6 +199,38 @@ def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes
 ):
     with pytest.raises(DepthNotFoundError, match=size + r".*\(96, 128\)"):
         runner.render(photo, recipe(), **given(wrong))
+
+
+def spoilt(value: float) -> np.ndarray:
+    """`RAMP` (exactly 0 to exactly 1) with one pixel set to `value`."""
+    layer = RAMP.copy()
+    layer[5, 7] = value
+    return layer
+
+
+MAP_VALUES = [
+    pytest.param(RAMP, None, id="a ramp from exactly 0 to exactly 1 is fine"),
+    pytest.param(spoilt(np.nan), "not finite", id="nan is refused"),
+    pytest.param(spoilt(np.inf), "not finite", id="infinity is refused"),
+    pytest.param(spoilt(-0.3), r"below 0.*min -0\.3", id="a value below 0 is refused"),
+    pytest.param(spoilt(1.2), r"above 1.*max 1\.2", id="a value above 1 is refused"),
+]
+EITHER_MAP = {  # a recipe needing the map, how it is given or found, and its error
+    "the subject, given": (MASKED, WITH_MATTE["a given matte"], SubjectNotFoundError),
+    "the subject, found": (MASKED, WITH_MATTE["a finder"], SubjectNotFoundError),
+    "the depth, given": (FRONT, WITH_DEPTH["a given map"], DepthNotFoundError),
+    "the depth, found": (FRONT, WITH_DEPTH["a finder"], DepthNotFoundError),
+}
+
+
+@pytest.mark.parametrize(("layer", "complaint"), MAP_VALUES)
+@pytest.mark.parametrize(("recipe", "given", "error"), EITHER_MAP.values(), ids=EITHER_MAP.keys())
+def test_a_map_must_be_finite_and_within_0_and_1(photo, layer, complaint, recipe, given, error):
+    if complaint is None:
+        assert runner.render(photo, recipe, **given(layer)).shape == photo.shape
+        return
+    with pytest.raises(error, match=r"^(matte|depth) has .*" + complaint):
+        runner.render(photo, recipe, **given(layer))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())

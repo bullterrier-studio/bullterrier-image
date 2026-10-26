@@ -571,21 +571,6 @@ def test_regions_are_made_once_and_handed_out_read_only():
         regions.partition("glass").labels[0, 0] = 5
 
 
-WRONG_SIZE = lambda: np.ones((10, 10), np.float32)  # noqa: E731  (a map for another picture)
-MAPS = {
-    "the subject": (Shards(fit="subject"), {"subject": WRONG_SIZE}, SubjectNotFoundError),
-    "the depth of a selection": (Depth(), {"depth": WRONG_SIZE}, DepthNotFoundError),
-    "the depth of bands": (DepthBands(), {"depth": WRONG_SIZE}, DepthNotFoundError),
-}
-
-
-@pytest.mark.parametrize(("kind", "given", "error"), MAPS.values(), ids=MAPS.keys())
-def test_a_map_of_another_size_than_the_picture_is_refused_naming_both_sizes(kind, given, error):
-    regions = resolve({"s": kind}, (20, 30), **{"subject": None, **given})
-    with pytest.raises(error, match=r"\(10, 10\).*\(20, 30\)"):
-        regions["s"]
-
-
 @pytest.mark.parametrize(
     ("kind", "error", "complaint"),
     [

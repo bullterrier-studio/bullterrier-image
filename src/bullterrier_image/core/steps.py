@@ -192,7 +192,7 @@ class Each(_Layer):
     )
     assign: Literal["cycle", "random"] = Field(
         "cycle",
-        description="How pieces get looks: 'cycle' gives the pieces, in reading order, the looks in turn; 'random' "
+        description="How pieces get looks: 'cycle' gives the pieces, piece 0 first, the looks in turn; 'random' "
         "gives each piece a look drawn at random (the same `seed` always draws the same).",
     )
     seed: int = Field(
@@ -241,7 +241,7 @@ class Each(_Layer):
         )
 
     def assignment(self, pieces: int) -> list[int]:
-        """The look (an index into `looks`) of each of `pieces` pieces, in reading order."""
+        """The look (an index into `looks`) of each of `pieces` pieces, piece 0 first."""
         if self.assign == "cycle":
             return [piece % len(self.looks) for piece in range(pieces)]
         return np.random.default_rng(self.seed).integers(0, len(self.looks), pieces).tolist()

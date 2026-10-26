@@ -821,8 +821,8 @@ class Regions(Mapping[str, Partition | Selection]):
 
     def __getitem__(self, name: str) -> Partition | Selection:
         """The region `name`; KeyError when it is neither built in nor declared. SubjectNotFoundError when it needs
-        the subject and there is no finder, or the finder's matte is not the picture's size; DepthNotFoundError, naming
-        the region, likewise for the depth; RecipeError when its `fit` selection chooses nothing in this picture."""
+        the subject and there is no finder; DepthNotFoundError, naming the region, when it needs the depth and none was
+        given; RecipeError when its `fit` selection chooses nothing in this picture."""
         if name not in self._made:
             self._made[name] = self._make(name)
         return self._made[name]
@@ -863,7 +863,7 @@ class Regions(Mapping[str, Partition | Selection]):
         match name:
             case "subject":
                 missing = "a region needs the subject of the picture, but no subject finder was given"
-                return Selection(self._map(self._subject, SubjectNotFoundError, missing, "the subject finder's matte"))
+                return Selection(self._map(self._subject, SubjectNotFoundError, missing))
             case "background":
                 return Selection(_frozen(1 - self.selection("subject").alpha))
         kind = self._declared[name]
@@ -873,7 +873,7 @@ class Regions(Mapping[str, Partition | Selection]):
             return self._pick(name, kind)
         if isinstance(kind, Depth | DepthBands):
             missing = f"region {name!r} is made from the depth of the picture, but no depth was given"
-            return _by_depth(kind, self._map(self._depth, DepthNotFoundError, missing, "the depth map"))
+            return _by_depth(kind, self._map(self._depth, DepthNotFoundError, missing))
         box, chosen = self._frame(name, kind.fit)
         x, y = _coordinates(self._shape, kind.edge)
         try:
@@ -900,16 +900,12 @@ class Regions(Mapping[str, Partition | Selection]):
         given: Callable[[], np.ndarray] | None,
         error: type[SubjectNotFoundError | DepthNotFoundError],
         missing: str,
-        what: str,
     ) -> np.ndarray:
         """The map of the whole picture that `given` returns, read-only as float32 (a view: the giver's array is left
-        writable). `error` with `missing` when nothing gives it, or naming both sizes when it is not the picture's."""
+        writable); `error` with `missing` when nothing gives it."""
         if given is None:
             raise error(missing)
-        layer = np.asarray(given(), np.float32).view()
-        if layer.shape != self._shape:
-            raise error(f"{what} is {layer.shape}, not the picture's {self._shape}")
-        return _frozen(layer)
+        return _frozen(np.asarray(given(), np.float32).view())
 
     def _pick(self, name: str, kind: Pick) -> Selection:
         """The pixels of the pieces `kind` lists: a number as it is, an SVG id as the pieces of its shapes."""
@@ -1057,7 +1053,8 @@ def resolve(
     `subject` and `background`, built when asked for (`regions[name]`).
 
     `subject` finds the subject: a function returning its matte, float `(height, width)` in 0..1, called at most once
-    and only if a region needs it (this module never loads a picture or a model); None when there is no finder.
+    and only if a region needs it (this module never loads a picture or a model); None when there is no finder. The
+    caller passes maps of the picture's `(height, width)`, finite and within 0..1 (the runner checks them).
     `find` finds the subject inside a box of the picture (see `BoxFinder`), once for each piece of a `Subject` with
     `per`; None when there is none. `depth` gives the depth map, float `(height, width)` in 0..1 (1 = nearest), called
     once for each `Depth` or `DepthBands` made; None when there is none.

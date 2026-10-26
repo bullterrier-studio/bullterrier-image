@@ -283,9 +283,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Regions
 
 - **A recipe declares named regions; a region is a partition or a selection.** `[region.<name>]` with a `kind`. A
-  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in reading order: piece k comes before
-  piece k+1 when its first pixel comes earlier in the raster scan, left to right along each row, rows from the top; for a
-  grid that is row after row); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
+  *partition* gives every pixel to exactly one piece (pieces numbered 0..n-1 in piece order: reading order, `depth_bands`
+  nearest first; see "Piece numbers come from one rule"); a *selection* says how much each pixel is chosen (0..1). *Reason:* grids, cuts, shards, curves,
   SVG shapes and the subject are all "which pixels", so one idea serves them all and effects never learn about regions.
 - **Steps use regions by name, with one word per idea.** `mask` is where a step applies (on every step, any selection;
   `subject` and `background` are built in); `each` + `looks` gives each piece of a partition its own look; `partition`

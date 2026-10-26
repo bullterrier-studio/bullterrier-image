@@ -81,14 +81,15 @@ def render(
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 (h, w) with the
     photo's height and width, 0..1 (white = subject), or None. depth: how near each pixel is, float32 (h, w) likewise,
-    0..1 (1 = nearest), or None. find_subject: its `find` is called with the photo as given (before it is framed or
-    scaled) when the recipe needs the subject and no `matte` was given, and with the crop of the working picture of each
-    piece for a `Subject` region with `per` (see `Finder`). find_depth: its `find` is called once with the photo as
-    given when the recipe needs depth (`recipe.needs_depth`) and no `depth` was given. Raises SubjectNotFoundError when
-    the recipe needs the subject and neither was given, the finder returns None, the matte is not (h, w), a `per`
-    region has no finder or the finder's matte does not fit its crop, or the framing crops around a subject that is not
-    there; DepthNotFoundError, naming the step, when the recipe needs depth and neither was given, the finder returns
-    None, or the depth map is not (h, w).
+    0..1 (1 = nearest), or None. A map given or found must be finite and within 0..1. find_subject: its `find` is called
+    with the photo as given (before it is framed or scaled) when the recipe needs the subject and no `matte` was given,
+    and with the crop of the working picture of each piece for a `Subject` region with `per` (see `Finder`). find_depth:
+    its `find` is called once with the photo as given when the recipe needs depth (`recipe.needs_depth`) and no `depth`
+    was given. Raises SubjectNotFoundError when the recipe needs the subject and neither was given, the finder returns
+    None, the matte is not (h, w) or not within 0..1, a `per` region has no finder or the finder's matte does not fit
+    its crop, or the framing crops around a subject that is not there; DepthNotFoundError, naming the step, when the
+    recipe needs depth and neither was given, the finder returns None, or the depth map is not (h, w) or not within
+    0..1.
     """
     image, inputs, regions = _prepare(rgb, recipe, matte, depth, find_subject, find_depth)
     stages = _stages(image, recipe.steps, inputs, regions)
@@ -212,10 +213,15 @@ def _maps(
 
 
 def _checked(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
-    """`layer`, the map `name` of the photo `rgb`, once it is known to be the photo's (h, w): the one check of a map's
-    size, for a map given and a finder's answer alike."""
+    """`layer`, the map `name` of the photo `rgb`, once it is known to be the photo's (h, w), finite and within 0..1:
+    the one check of a map, for a map given and a finder's answer alike, where it enters."""
+    error = _MAPS[name][0]
     if layer.shape != rgb.shape[:2]:
-        raise _MAPS[name][0](f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
+        raise error(f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
+    finite, low, high = bool(np.isfinite(layer).all()), float(layer.min()), float(layer.max())
+    problem = "that are not finite" if not finite else "below 0" if low < 0 else "above 1" if high > 1 else None
+    if problem:
+        raise error(f"{name} has values {problem} (min {low:g}, max {high:g}): a map must be finite and within 0..1")
     return layer
 
 
@@ -229,10 +235,10 @@ def _missing(name: str, recipe: Recipe) -> SubjectNotFoundError | DepthNotFoundE
         )
     taking = [f"step {number} ({effect})" for number, effect in recipe.taking("depth")]
     regions = [
-        f"step {number} (its `{key}` {name!r}, a region made from depth)"
+        f"step {number} (its `{key}` {region!r}, a region made from depth)"
         for number, step in enumerate(recipe.steps, start=1)
-        for key, name, _ in step.references()
-        if needs_depth(recipe.regions, [name])
+        for key, region, _ in step.references()
+        if needs_depth(recipe.regions, [region])
     ]
     return DepthNotFoundError(
         f"recipe {recipe.name!r} needs depth for {', '.join(taking + regions)}: pass `depth` (float32 (h, w), 0..1, "

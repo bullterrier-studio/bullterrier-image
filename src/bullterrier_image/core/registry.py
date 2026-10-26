@@ -61,8 +61,9 @@ CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
 # What a recipe hands an effect besides the image and its parameters, by name: `matte`, the subject's silhouette,
 # float32 (h, w) 0..1; `depth`, how near each pixel is, float32 (h, w) 0..1, 1 = nearest; and `partition`, the pieces
-# of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in reading order. An effect
-# declares the ones it needs as keyword-only parameters after `params`, each with a default.
+# of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading order,
+# `depth_bands` nearest first). An effect declares the ones it needs as keyword-only parameters after `params`, each
+# with a default.
 INPUTS = ("matte", "depth", "partition")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
