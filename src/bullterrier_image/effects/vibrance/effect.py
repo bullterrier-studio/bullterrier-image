@@ -14,6 +14,7 @@ class VibranceParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1 raises a colour's "
         "saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys "
         "and fully saturated colours stay as they are; colours are never made duller.",

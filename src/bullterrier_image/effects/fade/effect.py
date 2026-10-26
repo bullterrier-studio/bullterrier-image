@@ -14,6 +14,7 @@ class FadeParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="How far black is lifted toward white (0..1): the darkest value the picture can reach. 0 = unchanged, "
         "0.1 = a gentle matte look, 1 = everything white. White stays white; raising it flattens the shadows.",
     )

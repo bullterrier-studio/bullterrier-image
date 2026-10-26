@@ -18,6 +18,7 @@ class GlowParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="Gaussian sigma of the halo in px at the recipe's size: larger spreads the light further and softer; 0 "
         "keeps the light on the bright parts themselves.",
     )
@@ -26,6 +27,7 @@ class GlowParams(EffectParams):
         unit="ratio",
         min=0,
         max=10,
+        drivable=True,
         doc="How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 "
         "it saturates to white sooner.",
     )

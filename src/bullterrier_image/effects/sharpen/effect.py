@@ -25,6 +25,7 @@ class SharpenParams(EffectParams):
         unit="ratio",
         min=0,
         max=5,
+        drivable=True,
         doc="How much of the detail is added back: 0 = off, 1 = the full difference from the blurred copy; above 1 "
         "edges overshoot and halos show.",
     )

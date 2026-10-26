@@ -17,6 +17,7 @@ class GaussianBlurParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is softer and spreads detail "
         "further; 0 leaves the picture unchanged.",
     )

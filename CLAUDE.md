@@ -131,6 +131,9 @@ raising it does).
   `'#rgb'`, or three numbers 0..1), lists of those.
 - **Basic and advanced:** `advanced=True` marks a field that tunes the technique rather than chooses the look; listed apart,
   still settable and validated. Aim at six or fewer basic fields.
+- **Drivable:** `drivable=True` on a float lets a `Drive` vary it per pixel. Declare it only where the output changes
+  smoothly with the value (a radius, an amount, an exposure), never for a whole number, choice, seed or colour; every
+  drivable field is tested by `tests/effects/test_contract.py`.
 - **State, not time:** a parameter that changes with a process is a state (`progress`, a share in `fraction`, a position in
   `cycles`), never a duration.
 

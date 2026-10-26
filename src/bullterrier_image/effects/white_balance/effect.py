@@ -15,6 +15,7 @@ class WhiteBalanceParams(EffectParams):
         unit="stops",
         min=-2,
         max=2,
+        drivable=True,
         doc="Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared "
         "evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools "
         "it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm "
@@ -25,6 +26,7 @@ class WhiteBalanceParams(EffectParams):
         unit="stops",
         min=-1,
         max=1,
+        drivable=True,
         doc="Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. "
         "Positive adds magenta (less green), negative adds green, 0 leaves the balance alone.",
     )

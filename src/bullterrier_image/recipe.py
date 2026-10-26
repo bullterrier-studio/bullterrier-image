@@ -18,6 +18,7 @@ import numpy as np
 
 from .core import registry, runner
 from .core.framing import Framing
+from .core.params import Drive
 from .core.regions import (
     Band,
     Bands,
@@ -48,6 +49,7 @@ __all__ = [
     "Combine",
     "Curve",
     "Cuts",
+    "Drive",
     "Each",
     "Edge",
     "Finder",

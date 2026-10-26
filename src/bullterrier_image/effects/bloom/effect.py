@@ -18,6 +18,7 @@ class BloomParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the light further; 0 keeps "
         "the light on the highlights themselves. Each further octave is half as wide.",
     )
@@ -34,6 +35,7 @@ class BloomParams(EffectParams):
         unit="ratio",
         min=0,
         max=10,
+        drivable=True,
         doc="How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 "
         "it saturates to white sooner.",
     )

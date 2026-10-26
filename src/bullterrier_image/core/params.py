@@ -207,6 +207,7 @@ class _Spec:
     min: float | None
     max: float | None
     advanced: bool
+    drivable: bool = False
     field_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -218,6 +219,7 @@ def param(
     min: float | None = None,  # noqa: A002  (the documented name of the range's lower bound)
     max: float | None = None,  # noqa: A002  (the documented name of the range's upper bound)
     advanced: bool = False,
+    drivable: bool = False,
     **field_kwargs: Any,
 ) -> Any:
     """Declare one field of an `EffectParams` model.
@@ -227,12 +229,13 @@ def param(
     `UNITS`, required for a number, not allowed otherwise. min, max: the documented range, both required and inclusive
     for a number; not allowed for anything else. advanced: the user would change it to tune the technique rather
     than to choose the look; it is listed after the basic fields (and left out of short listings) but is settable,
-    validated and in the schema like any other.
+    validated and in the schema like any other. drivable: a field (see `Drive`) may vary this decimal number pixel by
+    pixel; declare it only where the effect's output changes smoothly with the value. Only a float can be.
     field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
     The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
     """
-    return _Spec(default, doc, unit, min, max, advanced, field_kwargs)
+    return _Spec(default, doc, unit, min, max, advanced, drivable, field_kwargs)
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
@@ -275,6 +278,57 @@ class ValidatedModel(BaseModel):
             BaseModel.__init__(self, **values)
         except ValidationError as error:
             raise _invalid(error, owner, type(self).model_fields) from None
+
+
+class Drive(ValidatedModel):
+    """A parameter that varies across the picture: its value at a pixel is `start` where the field `by` is 0 and `end`
+    where it is 1, and in between along `levels` evenly spaced values.
+
+    The effect is rendered once at each of the `levels` values (so a driven step costs `levels` times the effect; a
+    value no pixel needs is not rendered) and each pixel takes the two renders either side of its field value, mixed
+    linearly. A field is a selection of the recipe or a built-in one (`depth`, `light`, `subject`...). Written in a
+    recipe file as the table `radius = { by = "near", start = 0, end = 30 }` and in Python as
+    `Drive(by="near", start=0, end=30)`; only a parameter its effect declares drivable takes one, and `start` and `end`
+    (so every value between) must lie in that parameter's range.
+    """
+
+    by: str = Field(
+        min_length=1,
+        description="The name of the field, a selection of the recipe or a built-in one (`depth`, `light`, `subject`, "
+        "`background`): the parameter is `start` where it is 0 and `end` where it is 1.",
+    )
+    start: float = Field(
+        strict=True, allow_inf_nan=False, description="The parameter's value where the field is 0, in its own unit."
+    )
+    end: float = Field(
+        strict=True, allow_inf_nan=False, description="The parameter's value where the field is 1, in its own unit."
+    )
+    levels: int = Field(
+        5,
+        ge=2,
+        le=16,
+        strict=True,
+        description="How many evenly spaced values between `start` and `end` the effect is rendered at (2 to 16); each "
+        "pixel mixes the two nearest. More is smoother and costs more renders; 2 mixes the effect at `start` and at "
+        "`end`.",
+    )
+
+    def __init__(self, /, **values: Any) -> None:
+        """Validate and make the drive from its keys (`by`, `start`, `end`, optionally `levels`); RecipeError naming
+        each missing or bad key and listing the keys when one is unknown."""
+        self._init_checked("drive", **values)
+
+    def value(self, level: int) -> float:
+        """The parameter's value at level `level` (0 is `start`, `levels - 1` is `end`)."""
+        return self.start + (self.end - self.start) * level / (self.levels - 1)
+
+    def values(self) -> tuple[float, ...]:
+        """The parameter's value at every level, `start` first."""
+        return tuple(self.value(level) for level in range(self.levels))
+
+    def describe(self) -> str:
+        """A short readable form, e.g. `by near 0..30`."""
+        return f"by {self.by} {self.start:g}..{self.end:g}"
 
 
 class FieldDoc(NamedTuple):
@@ -338,14 +392,24 @@ class EffectParams(ValidatedModel):
         return frozenset(name for name in cls.model_fields if hints[name] is Picture)
 
     @classmethod
+    def drivable_fields(cls) -> frozenset[str]:
+        """The fields a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
+        return frozenset(name for name, info in cls.model_fields.items() if _extra(info).get("drivable"))
+
+    @classmethod
     def signature(cls) -> inspect.Signature:
         """The fields as a call signature, in declaration order: each a positional-or-keyword parameter with its
-        default and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`)."""
+        default and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable
+        field as `float | Drive`)."""
         hints = typing.get_type_hints(cls, include_extras=True)
+        drivable = cls.drivable_fields()
         return inspect.Signature(
             [
                 inspect.Parameter(
-                    name, inspect.Parameter.POSITIONAL_OR_KEYWORD, default=info.default, annotation=_public(hints[name])
+                    name,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    default=info.default,
+                    annotation=_public(hints[name]) | Drive if name in drivable else _public(hints[name]),
                 )
                 for name, info in cls.model_fields.items()
             ]
@@ -357,10 +421,10 @@ class EffectParams(ValidatedModel):
         hints = typing.get_type_hints(cls, include_extras=True)
         docs = []
         for name, info in cls.model_fields.items():
-            extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+            extra = _extra(info)
             unit = extra.get("unit")
             minimum, maximum = _bounds(info.metadata)
-            text = _type_text(hints[name])
+            text = _type_text(hints[name]) + (" (drivable)" if extra.get("drivable") else "")
             docs.append(
                 FieldDoc(
                     name,
@@ -402,6 +466,11 @@ class EffectParams(ValidatedModel):
 _MISSING = object()
 
 
+def _extra(info: Any) -> dict[str, Any]:
+    """What `param` put in a field's JSON-schema extras (unit, advanced, drivable)."""
+    return info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+
+
 def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
     hints = typing.get_type_hints(model)
     return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})
@@ -437,6 +506,9 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             raise broken(f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}")
     elif spec.unit is not None or spec.min is not None or spec.max is not None:
         raise broken("only a number takes a unit, min and max")
+    if spec.drivable and _scalar(annotation) != {float}:
+        what = "a whole number" if _scalar(annotation) == {int} else "not a number"
+        raise broken(f"only a decimal number can be drivable, and this is {what}")
     typed: Any = annotation
     if numeric:
         constraints |= {"ge": spec.min, "le": spec.max}
@@ -449,7 +521,7 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
     made = Field(
         spec.default,
         description=spec.doc,
-        json_schema_extra={"unit": spec.unit, "advanced": spec.advanced},
+        json_schema_extra={"unit": spec.unit, "advanced": spec.advanced, "drivable": spec.drivable},
         **constraints,
         **spec.field_kwargs,
     )

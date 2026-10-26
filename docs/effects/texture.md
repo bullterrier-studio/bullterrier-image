@@ -122,7 +122,7 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.08` | Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is heavy. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.08` | Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is heavy. |
 | `size` | number | px | 0 to 50 | `1.0` | Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its standard deviation. Larger = coarser, softer grain. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same grain, another seed a different pattern. |
 
@@ -139,7 +139,7 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.06` | Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is visible, 0.2 is heavy. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.06` | Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is visible, 0.2 is heavy. |
 | `distribution` | one of 'gaussian', 'uniform' |  |  | `'gaussian'` | Where the noise values come from: 'gaussian' (bell curve: most values small, a few large) or 'uniform' (every value up to a limit of about 1.7 x `amount` equally likely: an even, bounded speckle). Both have the standard deviation `amount`. |
 | `color` | true or false |  |  | `True` | True gives every channel its own noise (coloured speckle); False adds the same noise to all three (brightness-only, grey speckle). |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same noise, another seed a different pattern. |

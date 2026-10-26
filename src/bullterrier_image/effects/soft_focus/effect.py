@@ -18,6 +18,7 @@ class SoftFocusParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier and softer; 0 blurs "
         "nothing, so the picture is only brightened by screening it with itself.",
     )

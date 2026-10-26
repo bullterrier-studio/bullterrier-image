@@ -25,6 +25,7 @@ class MotionBlurParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster "
         "motion; 0 leaves the picture unchanged.",
     )

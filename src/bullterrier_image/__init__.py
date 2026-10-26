@@ -53,6 +53,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Combine,
         Curve,
         Cuts,
+        Drive,
         Each,
         Edge,
         Finder,
@@ -92,9 +93,9 @@ _HOMES = {
     ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Band", "Bands", "Combine", "Cuts", "Curve", "Each", "Edge", "Finder", "Framing", "Given", "Grid", "Line",
-        "LinearGradient", "Path", "Pick", "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg",
-        "load_recipe", "render", "render_all", "trace",
+        "Band", "Bands", "Combine", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder", "Framing", "Given", "Grid",
+        "Line", "LinearGradient", "Path", "Pick", "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject",
+        "Svg", "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -136,6 +137,7 @@ __all__ = [
     "Curve",
     "Cuts",
     "DepthNotFoundError",
+    "Drive",
     "Each",
     "Edge",
     "Finder",

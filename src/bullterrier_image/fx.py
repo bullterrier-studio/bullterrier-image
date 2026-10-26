@@ -125,7 +125,7 @@ def stub_text() -> str:
         "",
         "import numpy",
         "",
-        "from .core.params import Picture",
+        "from .core.params import Drive, Picture",
         "from .recipe import Step",
         "",
     ]
@@ -133,6 +133,7 @@ def stub_text() -> str:
         # Python before 3.14 writes `X | None` of a Literal as Optional[X]; a stub is written the short way
         signature = re.sub(r"Optional\[(Literal\[[^\]]*\])\]", r"\1 | None", str(_signature(name)))
         signature = signature.replace("bullterrier_image.core.params.Picture", "Picture")
+        signature = signature.replace("bullterrier_image.core.params.Drive", "Drive")
         lines.append(f"def {name}{signature} -> Step:")
         doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")
         lines += [f'    """{doc}"""', "    ...", ""]

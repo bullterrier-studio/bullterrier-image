@@ -26,6 +26,7 @@ class HueShiftParams(EffectParams):
         unit="degrees",
         min=-360,
         max=360,
+        drivable=True,
         doc="The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged).",
     )
 

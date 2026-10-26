@@ -63,9 +63,9 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `radius` | number | px | 0 to 500 | `32.0` | Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the light further; 0 keeps the light on the highlights themselves. Each further octave is half as wide. |
+| `radius` | number (drivable) | px | 0 to 500 | `32.0` | Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the light further; 0 keeps the light on the highlights themselves. Each further octave is half as wide. |
 | `threshold` | number | fraction | 0 to 0.99 | `0.6` | The brightness (0..1, per channel) where the bloom starts: only values above it give light, rising to full at 1. Raising it limits the bloom to the brightest highlights. |
-| `amount` | number | ratio | 0 to 10 | `0.7` | How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 it saturates to white sooner. |
+| `amount` | number (drivable) | ratio | 0 to 10 | `0.7` | How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 it saturates to white sooner. |
 | `octaves` | whole number | count | 1 to 8 | `4` | How many scales the halo is built from: octave 1 has the sigma `radius`, each next one half of the one before (radius / 2, radius / 4...). 1 = a single Gaussian, as in glow; more adds a tighter, brighter core around the highlights. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weight each octave gets relative to the wider one before it (the weights are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave alone, 1 = every octave equally. Lower values give a softer, more diffuse bloom; higher values a tighter, more concentrated one. |
 
@@ -82,7 +82,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | px | 0 to 100 | `4.0` | How far red and blue are pulled apart, in pixels at the farthest corner of the picture: there the red is shifted this far outward from the centre and the blue this far inward, while green stays where it is. The shift grows in proportion to the distance from the centre, so it is half as much halfway out and nothing at the centre. A larger amount is wider fringes; 0 leaves the picture unchanged. A shift larger than the distance to the farthest corner is limited to it. |
+| `amount` | number (drivable) | px | 0 to 100 | `4.0` | How far red and blue are pulled apart, in pixels at the farthest corner of the picture: there the red is shifted this far outward from the centre and the blue this far inward, while green stays where it is. The shift grows in proportion to the distance from the centre, so it is half as much halfway out and nothing at the centre. A larger amount is wider fringes; 0 leaves the picture unchanged. A shift larger than the distance to the farthest corner is limited to it. |
 | `x` | number | fraction | 0 to 1 | `0.5` | The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
 | `y` | number | fraction | 0 to 1 | `0.5` | The centre's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
 
@@ -100,7 +100,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `radius` | number | px | 0 to 500 | `30.0` | Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the recipe's size. Larger compares bigger regions; 0 turns the effect off. |
-| `amount` | number | ratio | 0 to 5 | `1.0` | How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1 = doubled. |
+| `amount` | number (drivable) | ratio | 0 to 5 | `1.0` | How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1 = doubled. |
 
 <details><summary>Advanced parameters (3)</summary>
 
@@ -154,7 +154,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `radius` | number | px | 0 to 500 | `4.0` | The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is softer and spreads detail further; 0 leaves the picture unchanged. |
+| `radius` | number (drivable) | px | 0 to 500 | `4.0` | The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is softer and spreads detail further; 0 leaves the picture unchanged. |
 
 <details><summary>Advanced parameters (3)</summary>
 
@@ -170,8 +170,8 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `radius` | number | px | 0 to 500 | `24.0` | Gaussian sigma of the halo in px at the recipe's size: larger spreads the light further and softer; 0 keeps the light on the bright parts themselves. |
-| `amount` | number | ratio | 0 to 10 | `0.6` | How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 it saturates to white sooner. |
+| `radius` | number (drivable) | px | 0 to 500 | `24.0` | Gaussian sigma of the halo in px at the recipe's size: larger spreads the light further and softer; 0 keeps the light on the bright parts themselves. |
+| `amount` | number (drivable) | ratio | 0 to 10 | `0.6` | How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full brightness; above 1 it saturates to white sooner. |
 | `threshold` | number | fraction | 0 to 0.99 | `0.55` | The brightness (0..1, per channel) where the glow starts: only values above it light the halo, rising to full at 1. Raising it limits the glow to the brightest highlights. |
 
 <details><summary>Advanced parameters (3)</summary>
@@ -190,7 +190,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 | --- | --- | --- | --- | --- | --- |
 | `radius` | number | px | 0 to 500 | `30.0` | Gaussian sigma of the glow in px at the recipe's size: larger spreads the glow further from the highlights; 0 keeps it on the highlights themselves. |
 | `threshold` | number | fraction | 0 to 0.99 | `0.5` | The brightness (0..1) where the glow starts, judged on the brightest of a pixel's three channels: only values above it glow, rising to full at 1. Raising it limits the halation to the brightest highlights. |
-| `amount` | number | ratio | 0 to 10 | `1.8` | How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at full brightness; above 1 it saturates sooner. |
+| `amount` | number (drivable) | ratio | 0 to 10 | `1.8` | How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at full brightness; above 1 it saturates sooner. |
 | `color` | colour |  |  | `'#ff4a14'` | The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the red-orange of film's red-sensitive layer; white makes a neutral glow. |
 
 <details><summary>Advanced parameters (2)</summary>
@@ -291,7 +291,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `angle` | number | degrees | 0 to 360 | `0.0` | The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180) give the same blur. |
-| `length` | number | px | 0 to 500 | `24.0` | How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster motion; 0 leaves the picture unchanged. |
+| `length` | number (drivable) | px | 0 to 500 | `24.0` | How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster motion; 0 leaves the picture unchanged. |
 
 <details><summary>Advanced parameters (1)</summary>
 
@@ -359,7 +359,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `radius` | number | px | 0 to 100 | `2.0` | Gaussian sigma of the blurred copy in px at the recipe's size: small radii sharpen fine texture, large ones add local contrast around coarse edges; 0 leaves the picture unchanged. |
-| `amount` | number | ratio | 0 to 5 | `0.8` | How much of the detail is added back: 0 = off, 1 = the full difference from the blurred copy; above 1 edges overshoot and halos show. |
+| `amount` | number (drivable) | ratio | 0 to 5 | `0.8` | How much of the detail is added back: 0 = off, 1 = the full difference from the blurred copy; above 1 edges overshoot and halos show. |
 | `threshold` | number | fraction | 0 to 1 | `0.0` | The smallest difference (0..1, per channel) from the blurred copy that is sharpened: smaller differences are left alone, which keeps grain and smooth skin from being sharpened; 0 sharpens everything. |
 
 <details><summary>Advanced parameters (2)</summary>
@@ -375,7 +375,7 @@ A step of `ambient_occlusion` has `opacity = 0.6` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `radius` | number | px | 0 to 500 | `12.0` | Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier and softer; 0 blurs nothing, so the picture is only brightened by screening it with itself. |
+| `radius` | number (drivable) | px | 0 to 500 | `12.0` | Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier and softer; 0 blurs nothing, so the picture is only brightened by screening it with itself. |
 
 <details><summary>Advanced parameters (2)</summary>
 
@@ -441,7 +441,7 @@ A step of `soft_focus` has `opacity = 0.5` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.5` | How far the edges are mixed toward the colour where the vignette is fullest: 0 = off, 0.5 = halfway, 1 = the colour itself at the corners. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.5` | How far the edges are mixed toward the colour where the vignette is fullest: 0 = off, 0.5 = halfway, 1 = the colour itself at the corners. |
 | `radius` | number | fraction | 0 to 1 | `0.5` | Where the vignette starts, as a fraction of the distance from the centre to a corner: everything inside is untouched. Raising it clears more of the picture; 1 leaves even the corners alone. |
 | `feather` | number | fraction | 0 to 1 | `0.5` | How far beyond the radius the vignette takes to reach full strength, as a fraction of the distance from the centre to a corner (a smooth S-curve). 0 = a hard edge; raising it softens the transition. |
 | `roundness` | number | fraction | 0 to 1 | `1.0` | The shape of the vignette's contours: 1 = an ellipse that follows the picture's proportions, 0 = a rectangle, which darkens the middle of each edge as much as a corner; in between, a rounded rectangle. |

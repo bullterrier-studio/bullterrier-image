@@ -339,6 +339,23 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the old ones, is refused saying what to write; `light` is a built-in region name, so none may be declared with it.
   Left out until a recipe needs them: edges, saturation and colour distance as fields, `1 - x`, and a feathered gradient
   shape.
+- **A field varies a parameter: `Drive(by, start, end, levels)`, rendered at levels and mixed.** A number an effect marks
+  drivable (`param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
+  `end` where it is 1. Effects do not change: the runner renders the effect at `levels` evenly spaced values and each pixel
+  mixes the two renders either side of its field value (`ops/levels`, the rule `graded_blur` already used), a level no pixel
+  needs is not rendered, and the step's `mask`, `opacity` and `blend_mode` apply after as for any step. *Reason:* a mask only
+  cross-fades the original and the result, so it cannot make blur, grain or exposure itself grow with distance or
+  brightness; a per-pixel parameter inside every effect would change every effect and its tests, and the mix of renders is
+  exact at every level and a hand-checkable mix between. The cost is `levels` times the effect (2 to 16, default 5), so
+  it is a named, documented key and not a hidden constant. *Consequence:* only parameters whose result changes smoothly
+  with the value are opted in (24 so far; each is tested to equal the plain effect at a constant field and the hand mix
+  of two renders), whole numbers, choices, seeds and colours never are; `start` and `end` and every level between are
+  validated by the effect's own model when the step is made, so a driven value cannot leave its range; one step varies
+  by one field and one `levels`; the field is a `by` reference like `mask`, so the recipe checks it exists and is a
+  selection, and the maps it is made from are found like any other; a recipe file writes `{ by, start, end }`, needs
+  `format = 3`, and Python writes `Drive(by=..., start=..., end=...)` with the same keys (no `by()` helper: a second way
+  to write the same thing). Left for later: a parameter an effect receives as a per-pixel map (exact and one render, for
+  the effects where it matters, once the video benchmark says where), and driving a colour.
 - **Region kinds are a closed set in one module, with presets as data.** Not plugins: nobody else writes kinds, and a
   shared plugin registry would be speculative. Python writes regions with the kinds' own Pydantic models. *Revisit
   when* another package wants to add kinds.

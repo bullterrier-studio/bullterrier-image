@@ -25,15 +25,18 @@ never the recipe-file reader `loader`, so recipes built in Python run without it
 from collections import deque
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.composite import composite
+from bullterrier_image.ops.levels import level_weight
 from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
+from .params import Drive
 from .regions import (
     DERIVED,
     BoxFinder,
@@ -332,14 +335,46 @@ def _apply(before: np.ndarray, step: Step | Each, maps: dict[str, np.ndarray], r
 
 def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
     """The step's effect run on `before`, given the inputs it declares: the maps `_prepare` made for every step that
-    takes one, and the pieces of the step's partition."""
+    takes one, and the pieces of the step's partition. A step with driven parameters is run once for each level of
+    its drives, and each pixel takes the two renders either side of its field value (see `_driven`)."""
     extra = {name: maps[name] for name in registry.inputs(step.effect) if name != "partition"}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
-    result = registry.apply(step.effect, before, **step.params, **extra)
+    drives = step.drives
+    if not drives:
+        return _run(step.effect, before, step.params, extra)
+    return _driven(before, step, drives, regions.selection(next(iter(drives.values())).by).alpha, extra)
+
+
+def _run(effect: str, before: np.ndarray, params: Mapping[str, Any], extra: Mapping[str, np.ndarray]) -> np.ndarray:
+    """The effect `effect` run on `before` with `params` and its injected inputs `extra`; RuntimeError if it changed
+    the image's shape."""
+    result = registry.apply(effect, before, **params, **extra)
     if result.shape != before.shape:
-        raise RuntimeError(f"effect {step.effect!r} changed the image shape {before.shape} -> {result.shape}")
+        raise RuntimeError(f"effect {effect!r} changed the image shape {before.shape} -> {result.shape}")
     return result
+
+
+def _driven(
+    before: np.ndarray,
+    step: Step,
+    drives: Mapping[str, Drive],
+    field: np.ndarray,
+    extra: Mapping[str, np.ndarray],
+) -> np.ndarray:
+    """`step`'s effect with the parameters of `drives` varying by `field` (float32 `(height, width)`, 0..1): the effect
+    is rendered at each level of the drives (all of a step have the same number, validated with the step), and every
+    pixel mixes the renders of the two levels either side of `field` x (levels - 1), linearly (`ops.levels`). A level
+    no pixel is on or next to is never rendered, so the cost is at most the number of levels."""
+    levels = next(iter(drives.values())).levels
+    position = field * (levels - 1)
+    out = np.zeros_like(before)
+    for level in range(levels):
+        weight = level_weight(position, level)
+        if weight.max() > 0:
+            values = {**step.fixed, **{name: drive.value(level) for name, drive in drives.items()}}
+            out += weight[..., None] * _run(step.effect, before, values, extra)
+    return out  # within 0..1 as the renders are: the weights of a pixel add up to exactly 1 in float32
 
 
 def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:

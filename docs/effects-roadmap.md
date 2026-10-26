@@ -238,6 +238,15 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
 | `embers` ✓ | Rising sparks. | `fx.embers(count=120, seed=1)` |
 
+## Driving a number by a field
+
+Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
+varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
+radius of `gaussian_blur`, `soft_focus`, `glow`, `bloom`; `motion_blur`'s `length`; the amounts of `glow`, `bloom`,
+`halation`, `vibrance`, `fade`, `grain`, `noise`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
+`grade`'s `exposure`, `contrast`, `saturation`; `white_balance`'s `temperature` and `tint`; `hue_shift`'s `hue`; `fog`'s
+`density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
+
 ## Depth and light from geometry
 
 Effects and recipes that read the injected depth (`docs/design-decisions.md`, "Depth is injected like the subject") and,

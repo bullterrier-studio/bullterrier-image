@@ -47,7 +47,7 @@ A step of `floating_dust` has `opacity = 0.55` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `density` | number | fraction | 0 to 1 | `0.8` | How thick the fog is where it is thickest (the bottom of the frame, in the densest cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.8 = a heavy haze, 1 = the colour itself, hiding the picture. Fog also lowers contrast, since every pixel moves toward the same colour. |
+| `density` | number (drivable) | fraction | 0 to 1 | `0.8` | How thick the fog is where it is thickest (the bottom of the frame, in the densest cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.8 = a heavy haze, 1 = the colour itself, hiding the picture. Fog also lowers contrast, since every pixel moves toward the same colour. |
 | `color` | colour |  |  | `'#cfd8e3'` | The colour of the fog: '#rrggbb', '#rgb' or [r, g, b] 0..1. A pale blue-grey is a cool morning mist, white a thick cloud, a warm grey smog. |
 | `gradient` | number | fraction | 0 to 1 | `0.7` | How much thicker the fog is at the bottom of the frame than at the top, as a share of its density: the opacity falls in a straight line from the bottom row up, to 1 - gradient of its value at the top row. 0 = the same all the way up, 1 = no fog at the very top, as for mist lying on the ground. |
 | `patchiness` | number | fraction | 0 to 1 | `0.6` | How cloudy the fog is: 0 = an even veil, 1 = drifts with clear gaps, where the noise is lowest the fog thins to nothing. The cloud shapes come from fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`). |

@@ -64,6 +64,12 @@ Regions and `each` steps need `format = 2`; a file without `format`, or with `fo
 kinds `given` (a map handed in at render time), `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient` need
 `format = 3`.
 
+A number an effect declares drivable (its documentation says "(drivable)") may be a table instead of a value, which
+varies it across the picture by a field (format 3): `radius = { by = "near", start = 0, end = 30 }` is 0 where the field
+`by` (a selection region of the recipe, or the built-in `depth`, `light` or `subject`) is 0 and 30 where it is 1; the
+effect is rendered at `levels` evenly spaced values between (2 to 16, default 5) and each pixel mixes the two nearest.
+All the tables of one step name one `by` and one `levels`.
+
 A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
 it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
 three numbers):
@@ -121,12 +127,13 @@ from .core.steps import Each, Recipe, Step, safe_name
 __all__ = ["load_recipe", "with_pictures"]
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
-# format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`,
-# `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region
-# kinds `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, and a file of an earlier format
-# may not use them. It also replaced the kinds `depth` and `depth_bands` by `band` and `bands` and took the region name
-# `light`: the one place a file's meaning changed, so a file of any format that uses the old kinds is refused saying
-# what to write, and one that declares a region called `light` is refused as it is for `subject`.
+# format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`, `looks`
+# and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region kinds
+# `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, and a file of an earlier format may
+# not use them, nor a parameter driven by a field (a table with `by`). It also replaced the kinds `depth` and
+# `depth_bands` by `band` and `bands` and took the region name `light`: the one place a file's meaning changed, so a
+# file of any format that uses the old kinds is refused saying what to write, and one that declares a region called
+# `light` is refused as it is for `subject`.
 _FORMATS = (1, 2, 3)
 _NEW_IN_2 = ("each", "looks", "partition")
 _KINDS_NEW_IN_3 = ("given", "band", "bands", "combine", "linear_gradient", "radial_gradient")
@@ -256,6 +263,10 @@ def load_recipe(path: str | Path) -> Recipe:
     steps = []
     for i, entry in enumerate(entries, start=1):
         where = f"{path.name}: step {i}"
+        if raw.get("format", _FORMATS[0]) < 3 and (drive := _drive_in(entry)) is not None:
+            raise RecipeError(
+                f"{where}{drive[0]}: `{drive[1]}` is a table with `by`, a drive, which needs `format = 3`"
+            )
         try:
             steps.append(_step(entry, where, path.parent))
         except (RecipeError, ImageReadError) as error:
@@ -264,6 +275,19 @@ def load_recipe(path: str | Path) -> Recipe:
         return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame, regions)
     except RecipeError as error:
         raise _located(error, path.name) from None
+
+
+def _drive_in(entry: dict) -> tuple[str, str] | None:
+    """The first parameter of the step table `entry` (or of a look in its `looks`) that is a drive, a table with `by`,
+    as (where in the step, the parameter's name); None when there is none."""
+    for key, value in entry.items():
+        if isinstance(value, dict) and "by" in value:
+            return "", key
+    looks = entry.get("looks")
+    for number, look in enumerate(looks if isinstance(looks, list) else [], start=1):
+        if isinstance(look, dict) and (found := _drive_in(look)) is not None:
+            return f", look {number}", found[1]
+    return None
 
 
 def _regions(tables: object, file: str, folder: Path) -> dict[str, Kind]:

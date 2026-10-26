@@ -16,6 +16,7 @@ class NoiseParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is visible, 0.2 is heavy.",
     )
     distribution: Literal["gaussian", "uniform"] = param(

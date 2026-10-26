@@ -16,6 +16,7 @@ class FogParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="How thick the fog is where it is thickest (the bottom of the frame, in the densest cloud): the share of "
         "the fog colour mixed into the picture there. 0 = no fog, 0.8 = a heavy haze, 1 = the colour itself, "
         "hiding the picture. Fog also lowers contrast, since every pixel moves toward the same colour.",

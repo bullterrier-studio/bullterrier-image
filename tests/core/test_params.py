@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bullterrier_image.core.params import Color, EffectParams, Picture, describe_error, param
+from bullterrier_image.core.params import Color, Drive, EffectParams, Picture, describe_error, param
 from bullterrier_image.errors import RecipeError
 
 
@@ -527,3 +527,112 @@ def test_an_error_message_names_what_is_wrong(values, parts):
     message = describe_error(raised.value, "effect 'probe'", Probe.model_fields)
     for part in parts:
         assert part in message
+
+
+# --- drivable fields: a parameter a field may vary pixel by pixel ----------------------------------------------------
+
+
+class Drivable(EffectParams):
+    """A model with one field of each kind that matters to driving."""
+
+    radius: float = param(24.0, unit="px", min=0, max=500, drivable=True, doc="Size of the halo. Larger = wider.")
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of it. More = stronger.")
+    count: int = param(3, unit="count", min=1, max=9, doc="How many halos.")
+
+
+def test_a_model_names_its_drivable_fields():
+    assert Drivable.drivable_fields() == frozenset({"radius"})
+    assert Probe.drivable_fields() == frozenset()
+
+
+def test_a_drivable_field_is_written_float_or_drive_in_the_signature_and_the_others_as_they_were():
+    text = str(Drivable.signature())
+    assert "radius: float | bullterrier_image.core.params.Drive = 24.0" in text
+    assert "amount: float = 0.5" in text
+    assert "count: int = 3" in text
+
+
+def test_a_drivable_field_says_so_in_its_documentation_and_the_others_do_not():
+    text = Drivable.documentation()
+    assert re.search(r"radius : number \(drivable\), px, 0 to 500, default 24\.0", text)
+    assert "amount : number, fraction" in text
+    assert "drivable" not in text.split("amount :")[1]
+    assert [doc.type for doc in Drivable.fields_doc()] == ["number (drivable)", "number", "whole number"]
+
+
+def test_the_json_schema_marks_a_drivable_field():
+    properties = Drivable.model_json_schema()["properties"]
+    assert properties["radius"]["drivable"] is True
+    assert properties["amount"]["drivable"] is False
+
+
+@pytest.mark.parametrize(
+    ("annotation", "make", "complaint"),
+    [
+        (int, lambda: param(3, unit="count", min=1, max=9, drivable=True, doc="d"), "whole number"),
+        (str, lambda: param("a", drivable=True, doc="d"), "number"),
+        (bool, lambda: param(False, drivable=True, doc="d"), "number"),
+        (Color, lambda: param("#ff0000", drivable=True, doc="d"), "number"),
+        (Literal["a", "b"], lambda: param("a", drivable=True, doc="a, b"), "number"),
+    ],
+)
+def test_only_a_decimal_number_can_be_declared_drivable_naming_model_and_field(annotation, make, complaint):
+    with pytest.raises(ValueError, match="Broken") as raised:
+        _declare(annotation, make())
+    assert "`x`" in str(raised.value)
+    assert "drivable" in str(raised.value)
+    assert complaint in str(raised.value)
+
+
+DRIVES = {
+    "all four keys": ({"by": "near", "start": 0.0, "end": 30.0, "levels": 8}, None),
+    "levels left out": ({"by": "near", "start": 1, "end": 2}, None),
+    "a field running backwards": ({"by": "light", "start": 30, "end": 0}, None),
+    "levels 2": ({"by": "near", "start": 0, "end": 1, "levels": 2}, None),
+    "levels 16": ({"by": "near", "start": 0, "end": 1, "levels": 16}, None),
+    "levels 1": ({"by": "near", "start": 0, "end": 1, "levels": 1}, "levels"),
+    "levels 17": ({"by": "near", "start": 0, "end": 1, "levels": 17}, "levels"),
+    "levels a share": ({"by": "near", "start": 0, "end": 1, "levels": 2.5}, "levels"),
+    "no field named": ({"by": "", "start": 0, "end": 1}, "by"),
+    "a field that is no text": ({"by": 3, "start": 0, "end": 1}, "by"),
+    "a start that is not a number": ({"by": "near", "start": "0", "end": 1}, "start"),
+    "an end that is not finite": ({"by": "near", "start": 0, "end": float("inf")}, "end"),
+    "a nan": ({"by": "near", "start": float("nan"), "end": 1}, "start"),
+    "a misspelt key": ({"by": "near", "start": 0, "end": 1, "step": 3}, "step"),
+    "no end": ({"by": "near", "start": 0}, "end"),
+    "no field": ({"start": 0, "end": 1}, "by"),
+}
+
+
+@pytest.mark.parametrize(("values", "complaint"), DRIVES.values(), ids=DRIVES.keys())
+def test_a_drive_names_its_field_its_two_ends_and_how_many_levels_or_is_refused_naming_the_key(values, complaint):
+    if complaint is None:
+        assert Drive(**values).by == values["by"]
+        return
+    with pytest.raises(RecipeError, match=rf"^drive: .*{complaint}"):
+        Drive(**values)
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "levels", "expected"),
+    [
+        pytest.param(0, 30, 2, [0, 30], id="two levels are the two ends"),
+        pytest.param(0, 30, 4, [0, 10, 20, 30], id="evenly spaced between"),
+        pytest.param(30, 0, 4, [30, 20, 10, 0], id="running backwards"),
+        pytest.param(-1, 1, 5, [-1, -0.5, 0, 0.5, 1], id="across zero"),
+        pytest.param(2, 2, 3, [2, 2, 2], id="a start equal to the end"),
+    ],
+)
+def test_a_drive_has_its_levels_evenly_spaced_from_start_to_end(start, end, levels, expected):
+    drive = Drive(by="f", start=start, end=end, levels=levels)
+    assert drive.values() == pytest.approx(expected)
+    assert [drive.value(level) for level in range(levels)] == pytest.approx(expected)
+
+
+def test_a_drive_is_frozen_and_equal_to_another_of_the_same_values_and_says_what_it_is():
+    drive = Drive(by="near", start=0, end=30)
+    assert drive == Drive(by="near", start=0.0, end=30.0, levels=5)
+    assert drive != Drive(by="near", start=0, end=31)
+    with pytest.raises(ValueError, match="frozen"):
+        drive.start = 5  # type: ignore[misc]  # the point of the test
+    assert drive.describe() == "by near 0..30"

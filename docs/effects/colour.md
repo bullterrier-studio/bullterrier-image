@@ -128,16 +128,16 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.12` | How far black is lifted toward white (0..1): the darkest value the picture can reach. 0 = unchanged, 0.1 = a gentle matte look, 1 = everything white. White stays white; raising it flattens the shadows. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.12` | How far black is lifted toward white (0..1): the darkest value the picture can reach. 0 = unchanged, 0.1 = a gentle matte look, 1 = everything white. White stays white; raising it flattens the shadows. |
 
 ### `grade`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `exposure` | number | stops | -10 to 10 | `0.0` | Brightness in photographic stops: +1 doubles every value, -1 halves it. |
-| `contrast` | number | ratio | 0 to 5 | `1.0` | How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot. |
+| `exposure` | number (drivable) | stops | -10 to 10 | `0.0` | Brightness in photographic stops: +1 doubles every value, -1 halves it. |
+| `contrast` | number (drivable) | ratio | 0 to 5 | `1.0` | How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot. |
 | `pivot` | number | fraction | 0 to 1 | `0.5` | The brightness (0..1) that contrast leaves where it is; values above it brighten, below it darken. |
-| `saturation` | number | ratio | 0 to 5 | `1.0` | Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid. |
+| `saturation` | number (drivable) | ratio | 0 to 5 | `1.0` | Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid. |
 
 ### `gradient_map`
 
@@ -169,7 +169,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `hue` | number | degrees | -360 to 360 | `90.0` | The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged). |
+| `hue` | number (drivable) | degrees | -360 to 360 | `90.0` | The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged). |
 
 ### `invert`
 
@@ -257,11 +257,11 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.0` | How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they are; colours are never made duller. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.0` | How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they are; colours are never made duller. |
 
 ### `white_balance`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `temperature` | number | stops | -2 to 2 | `0.0` | Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm light. |
-| `tint` | number | stops | -1 to 1 | `0.0` | Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the balance alone. |
+| `temperature` | number (drivable) | stops | -2 to 2 | `0.0` | Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm light. |
+| `tint` | number (drivable) | stops | -1 to 1 | `0.0` | Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the balance alone. |

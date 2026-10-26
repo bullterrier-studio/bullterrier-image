@@ -25,6 +25,7 @@ class ClarityParams(EffectParams):
         unit="ratio",
         min=0,
         max=5,
+        drivable=True,
         doc="How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1 = doubled.",
     )
     truncate: float = param(

@@ -11,7 +11,7 @@ import pytest
 from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core import runner
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
@@ -479,6 +479,195 @@ def test_trace_shows_a_region_made_of_light_and_ends_in_the_render(photo):
 def test_nobody_can_hand_in_light_it_is_made_here(photo):
     with pytest.raises(RecipeError, match="`maps` names 'light'"):
         runner.render(photo, DARK, maps={"light": np.zeros(photo.shape[:2], np.float32)})
+
+
+# --- a driven parameter: a field varies it pixel by pixel ------------------------------------------------------------
+
+
+class BrightenParams(EffectParams):
+    """The probe that is driven: a gain and a bias, both smooth."""
+
+    gain: float = param(1.0, unit="ratio", min=0, max=4, drivable=True, doc="Multiplies every value.")
+    bias: float = param(0.0, unit="fraction", min=-1, max=1, drivable=True, doc="Added after the gain.")
+    steps: int = param(1, unit="count", min=1, max=9, doc="Not drivable: a whole number.")
+
+
+@pytest.fixture
+def brighten(throwaway_effects):
+    """`brighten_probe`: clip(rgb x gain + bias). `calls` holds the (gain, bias) of every render, in order."""
+    calls: list[tuple[float, float]] = []
+
+    @effect(category="light", params=BrightenParams)
+    def brighten_probe(rgb, params):
+        """Multiplies by a gain and adds a bias."""
+        calls.append((params.gain, params.bias))
+        return np.clip(rgb * params.gain + params.bias, 0, 1).astype(np.float32)
+
+    return calls
+
+
+def driven(by: str = "f", levels: int = 5, **drives: tuple[float, float]) -> Recipe:
+    """A recipe of one `brighten_probe` step whose parameters vary by the given map `f` (or a built-in field)."""
+    values = {name: Drive(by=by, start=start, end=end, levels=levels) for name, (start, end) in drives.items()}
+    return Recipe("driven", [Step("brighten_probe", values)], size=None, regions={"f": Given()})
+
+
+def plain(**values: float) -> Recipe:
+    return Recipe("plain", [Step("brighten_probe", values)], size=None)
+
+
+def field_of(photo: np.ndarray, value: float) -> np.ndarray:
+    return np.full(photo.shape[:2], value, np.float32)
+
+
+@pytest.mark.parametrize("level", range(5))
+def test_a_constant_field_gives_the_plain_effect_at_that_levels_value(photo, brighten, level):
+    # 0.5 + 2 x level / 4 by hand: the levels run 0.5, 1, 1.5, 2, 2.5
+    expected = runner.render(photo, plain(gain=0.5 + 2.0 * level / 4))
+    got = runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, level / 4)})
+    np.testing.assert_allclose(got, expected, atol=1e-6, rtol=0)
+
+
+def test_a_field_between_two_levels_mixes_their_renders_by_the_distance_to_each(photo, brighten):
+    # levels 0, 0.5, 1 of the gain; a field of 0.25 is half way from the first to the second
+    first, second = runner.render(photo, plain(gain=0.0)), runner.render(photo, plain(gain=2.0))
+    got = runner.render(photo, driven(levels=3, gain=(0.0, 4.0)), maps={"f": field_of(photo, 0.25)})
+    np.testing.assert_allclose(got, 0.5 * first + 0.5 * second, atol=1e-6, rtol=0)
+
+
+def test_with_two_levels_each_pixel_mixes_the_effect_at_start_and_at_end_by_its_field(photo, brighten):
+    ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    at_start, at_end = runner.render(photo, plain(gain=0.5)), runner.render(photo, plain(gain=3.0))
+    got = runner.render(photo, driven(levels=2, gain=(0.5, 3.0)), maps={"f": ramp})
+    np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_start + ramp[..., None] * at_end, atol=1e-6, rtol=0)
+
+
+def test_a_field_running_the_other_way_is_the_start_and_end_swapped(photo, brighten):
+    ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    forward = runner.render(photo, driven(gain=(0.5, 3.0)), maps={"f": ramp})
+    backward = runner.render(photo, driven(gain=(3.0, 0.5)), maps={"f": 1 - ramp})
+    np.testing.assert_allclose(backward, forward, atol=1e-6, rtol=0)
+
+
+@pytest.mark.parametrize(
+    ("value", "levels_used"),
+    [
+        pytest.param(0.0, [0.5], id="a field of 0 renders only the first level"),
+        pytest.param(0.5, [1.5], id="a field on a level renders only that level"),
+        pytest.param(0.3, [1.0, 1.5], id="a field between two levels renders those two"),
+        pytest.param(1.0, [2.5], id="a field of 1 renders only the last level"),
+    ],
+)
+def test_only_the_levels_some_pixel_needs_are_rendered(photo, brighten, value, levels_used):
+    runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, value)})
+    assert sorted(gain for gain, _ in brighten) == pytest.approx(levels_used)
+
+
+def test_a_field_that_spans_the_whole_range_renders_every_level_once(photo, brighten):
+    ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    runner.render(photo, driven(levels=7, gain=(0.5, 2.5)), maps={"f": ramp})
+    assert len(brighten) == 7
+
+
+def test_two_drives_of_one_step_move_together_along_the_same_field(photo, brighten):
+    got = runner.render(photo, driven(levels=3, gain=(0.5, 1.5), bias=(0.0, 0.2)), maps={"f": field_of(photo, 0.5)})
+    np.testing.assert_allclose(got, runner.render(photo, plain(gain=1.0, bias=0.1)), atol=1e-6, rtol=0)
+    assert brighten[-1] == pytest.approx((1.0, 0.1))
+
+
+def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten):
+    recipe = Recipe(
+        "mixed",
+        [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5), "bias": 0.25})],
+        size=None,
+        regions={"f": Given()},
+    )
+    runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
+    assert brighten == [(2.5, 0.25)]
+
+
+def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, subject):
+    both = Recipe(
+        "both",
+        [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5)}, mask="subject", opacity=0.5)],
+        size=None,
+        regions={"f": Given()},
+    )
+    got = runner.render(photo, both, maps={"f": field_of(photo, 1.0), "subject": subject})
+    brightened = runner.render(photo, plain(gain=2.5))
+    weight = (0.5 * subject)[..., None]  # opacity 0.5 where the subject is
+    np.testing.assert_allclose(got, photo * (1 - weight) + brightened * weight, atol=1e-6, rtol=0)
+
+
+def test_the_look_of_an_each_can_be_driven(photo, brighten):
+    recipe = Recipe(
+        "pieces",
+        [Each("g", [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5)}), "none"], feather=0)],
+        size=None,
+        regions={"g": Grid(columns=2), "f": Given()},
+    )
+    got = runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
+    brightened = runner.render(photo, plain(gain=2.5))
+    np.testing.assert_allclose(got[:, :64], brightened[:, :64], atol=1e-6)  # piece 0 has the driven look
+    np.testing.assert_array_equal(got[:, 64:], photo[:, 64:])  # piece 1 stays as it was
+
+
+def test_a_drive_by_the_depth_map_follows_the_depth(photo, brighten):
+    dim = photo * 0.4  # at most 0.4, so a gain up to 2 never clips: the render is then linear in the gain
+    depth = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    recipe = Recipe("by-depth", [Step("brighten_probe", {"gain": Drive(by="depth", start=0.0, end=2.0)})], size=None)
+    got = runner.render(dim, recipe, maps={"depth": depth})
+    # a mix of renders that are linear in the gain is the render at the mixed gain: gain 2 x depth, pixel by pixel
+    np.testing.assert_allclose(got, dim * (2.0 * depth)[..., None], atol=1e-6)
+
+
+def test_a_drive_by_a_band_of_the_depth_is_the_same_as_the_band_given_as_a_map(photo, brighten):
+    depth = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    banded = Recipe(
+        "banded",
+        [Step("brighten_probe", {"gain": Drive(by="near", start=0.5, end=2.5)})],
+        size=None,
+        regions={"near": Band(of="depth", low=0.6, high=1.0, feather=0.2)},
+    )
+    by_band = runner.render(photo, banded, maps={"depth": depth})
+    near = np.clip(1 - np.maximum(np.maximum(0.6 - depth, depth - 1.0), 0) / 0.2, 0, 1)  # by hand
+    np.testing.assert_allclose(by_band, runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": near}), atol=1e-6)
+
+
+def test_a_drive_by_light_follows_the_brightness_of_the_picture_the_steps_work_on(photo, brighten):
+    recipe = Recipe(
+        "by-light", [Step("brighten_probe", {"gain": Drive(by="light", start=0.0, end=1.0, levels=2)})], size=None
+    )
+    light = (photo @ LUMA)[..., None]
+    np.testing.assert_allclose(runner.render(photo, recipe), np.clip(photo * light, 0, 1), atol=1e-5)
+
+
+def test_a_driven_render_stays_within_0_and_1(photo, brighten):
+    field = np.random.default_rng(2).random(photo.shape[:2], dtype=np.float32)
+    got = runner.render(photo, driven(gain=(0.0, 4.0), bias=(-1.0, 1.0)), maps={"f": field})
+    assert got.min() >= 0
+    assert got.max() <= 1
+
+
+def test_the_mix_of_renders_that_are_all_white_is_white_not_a_hair_above_it(brighten):
+    # every level of this drive paints white; the float32 weights of two levels can add up to a hair over 1
+    white = np.ones((64, 64, 3), np.float32)
+    field = np.random.default_rng(3).random((64, 64), dtype=np.float32)
+    got = runner.render(white, driven(levels=16, gain=(2.0, 4.0)), maps={"f": field})
+    assert got.max() == 1.0
+    assert got.min() == 1.0
+
+
+def test_a_driven_step_is_traced_by_name_and_its_last_stage_is_the_render(photo, brighten):
+    recipe = driven(gain=(0.5, 2.5))
+    stages = runner.trace(photo, recipe, maps={"f": field_of(photo, 0.5)})
+    assert stages[-1].label == "1. brighten_probe(gain=by f 0.5..2.5)"
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, maps={"f": field_of(photo, 0.5)}))
+
+
+def test_a_drive_by_a_map_nobody_gave_is_refused_like_any_use_of_it(photo, brighten):
+    with pytest.raises(MapNotFoundError, match="'f'"):
+        runner.render(photo, driven(gain=(0.5, 2.5)))
 
 
 # --- framing: the photo and its subject are framed together, before the steps ------------------------------------

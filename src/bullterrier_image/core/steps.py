@@ -33,7 +33,7 @@ from bullterrier_image.ops.composite import BlendMode
 
 from . import registry
 from .framing import Framing
-from .params import ValidatedModel
+from .params import Drive, EffectParams, ValidatedModel
 from .regions import Kind, check, maps_used, needs, needs_finder
 from .regions import derived_maps as _derived_maps
 
@@ -112,7 +112,7 @@ class Step(_Layer):
         RecipeError listing the ones it has. opacity: None takes the effect's default (`registry.opacity`, declared with
         `@effect(opacity=...)`, usually 1); a number replaces it. partition: the region an effect that takes the input
         `partition` draws (required for it, refused for any other effect)."""
-        values = dict(params or {})
+        values = {name: _as_drive(effect, name, value) for name, value in (params or {}).items()}
         if preset is not None:
             found = registry.presets(effect)  # an unknown effect: UnknownEffectError listing them
             if preset not in found:
@@ -143,7 +143,7 @@ class Step(_Layer):
                 raise RecipeError(
                     f"`{name}` is a key of the step, not a parameter of {self.effect!r}: give it as {name}="
                 )
-        registry.get(self.effect).validate(self.params)  # an unknown effect: UnknownEffectError listing them
+        _check_drives(self.effect, self.params)  # an unknown effect: UnknownEffectError listing them
         takes = "partition" in registry.inputs(self.effect)
         if takes and self.partition is None:
             raise RecipeError(
@@ -158,10 +158,22 @@ class Step(_Layer):
         """The effect steps this step runs: itself."""
         return (self,)
 
+    @property
+    def drives(self) -> dict[str, Drive]:
+        """The parameters a field varies across the picture, by name; empty for a step of plain values."""
+        return {name: value for name, value in self.params.items() if isinstance(value, Drive)}
+
+    @property
+    def fixed(self) -> dict[str, Any]:
+        """The parameters that are plain values, as written (the rest are `drives`)."""
+        return {name: value for name, value in self.params.items() if not isinstance(value, Drive)}
+
     def references(self) -> list[Reference]:
-        """The regions this step names, as `(key, name, kind)`: its mask, and the partition it draws."""
+        """The regions this step names, as `(key, name, kind)`: its mask, the field that drives it (`by`, a selection)
+        and the partition it draws."""
+        driving: list[Reference] = [("by", by, "selection") for by in dict.fromkeys(d.by for d in self.drives.values())]
         drawn: list[Reference] = [] if self.partition is None else [("partition", self.partition, None)]
-        return [*super().references(), *drawn]
+        return [*super().references(), *driving, *drawn]
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `fill(color='#000000') on background` or `glow() screen x0.8` (the blend mode,
@@ -271,6 +283,63 @@ class Each(_Layer):
         return self.describe()
 
 
+def _as_drive(effect: str, name: str, value: Any) -> Any:
+    """`value`, or the `Drive` it writes when it is a table with a `by` (what a recipe file gives); RecipeError naming
+    the effect and the parameter when the table is not a drive."""
+    if not (isinstance(value, dict) and "by" in value):
+        return value
+    try:
+        return Drive(**value)
+    except RecipeError as error:
+        raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
+
+
+def _check_drives(effect: str, params: Mapping[str, Any]) -> None:
+    """RecipeError unless `params` (a step's values as written, some perhaps `Drive`s) are valid for `effect`: the
+    plain ones as its model says, each driven one a drivable parameter whose every level value (start and end, and the
+    steps between) is valid there, and all drives of the step varying one field in one number of levels."""
+    model = registry.get(effect)
+    fixed = {name: value for name, value in params.items() if not isinstance(value, Drive)}
+    drives = {name: value for name, value in params.items() if isinstance(value, Drive)}
+    model.validate(fixed)
+    fields = model.params_model
+    for name in drives:
+        if name not in fields.model_fields:
+            model.validate({name: 0})  # an unknown parameter: the model's own error, listing the valid ones
+        if name not in fields.drivable_fields():
+            raise RecipeError(_not_drivable(effect, name, fields))
+    for what, kinds in (
+        ("field", {d.by for d in drives.values()}),
+        ("number of levels", {d.levels for d in drives.values()}),
+    ):
+        if len(kinds) > 1:
+            shown = " and ".join(repr(kind) for kind in sorted(kinds, key=str))
+            raise RecipeError(f"effect {effect!r}: the drives of one step must vary by one {what}, got {shown}")
+    for name, drive in drives.items():  # the ends as written first, so a bad one is named, not a level between
+        for value in (drive.start, drive.end):
+            model.validate({**fixed, name: value})
+    for level in range(next((d.levels for d in drives.values()), 0)):
+        model.validate({**fixed, **{name: drive.value(level) for name, drive in drives.items()}})
+
+
+def _not_drivable(effect: str, name: str, fields: type[EffectParams]) -> str:
+    """Why the parameter `name` of `effect`, whose model is `fields`, cannot be driven, and which can."""
+    why = (
+        "it is a whole number"
+        if name in fields.whole_number_fields()
+        else "it is not a number"
+        if _kind(fields, name) != "number"
+        else "its effect does not declare it drivable"
+    )
+    names = ", ".join(sorted(fields.drivable_fields())) or "none"
+    return f"effect {effect!r}: `{name}` cannot be driven by a field ({why}); its drivable parameters: {names}"
+
+
+def _kind(fields: type[EffectParams], name: str) -> str:
+    """ "number" for a decimal number field, else the field's own type word."""
+    return next(doc.type for doc in fields.fields_doc() if doc.name == name).split(" (")[0]
+
+
 def _described(text: str, layer: _Layer, width: int) -> str:
     """`text` followed by what the layer adds (blend mode, mask, opacity), cut to `width` characters."""
     if layer.blend_mode != "normal":
@@ -283,7 +352,7 @@ def _described(text: str, layer: _Layer, width: int) -> str:
 
 
 def _short(value: object) -> str:
-    text = repr(value)
+    text = value.describe() if isinstance(value, Drive) else repr(value)
     return text if len(text) <= 18 else text[:15] + "..."
 
 

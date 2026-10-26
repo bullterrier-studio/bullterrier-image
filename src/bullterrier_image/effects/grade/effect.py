@@ -15,6 +15,7 @@ class GradeParams(EffectParams):
         unit="stops",
         min=-10,
         max=10,
+        drivable=True,
         doc="Brightness in photographic stops: +1 doubles every value, -1 halves it.",
     )
     contrast: float = param(
@@ -22,6 +23,7 @@ class GradeParams(EffectParams):
         unit="ratio",
         min=0,
         max=5,
+        drivable=True,
         doc="How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot.",
     )
     pivot: float = param(
@@ -36,6 +38,7 @@ class GradeParams(EffectParams):
         unit="ratio",
         min=0,
         max=5,
+        drivable=True,
         doc="Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid.",
     )
 

@@ -14,6 +14,7 @@ class VignetteParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="How far the edges are mixed toward the colour where the vignette is fullest: 0 = off, 0.5 = halfway, "
         "1 = the colour itself at the corners.",
     )

@@ -18,6 +18,7 @@ class ChromaticAberrationParams(EffectParams):
         unit="px",
         min=0,
         max=100,
+        drivable=True,
         doc="How far red and blue are pulled apart, in pixels at the farthest corner of the picture: there the red "
         "is shifted this far outward from the centre and the blue this far inward, while green stays where it is. "
         "The shift grows in proportion to the distance from the centre, so it is half as much halfway out and "

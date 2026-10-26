@@ -34,6 +34,7 @@ class HalationParams(EffectParams):
         unit="ratio",
         min=0,
         max=10,
+        drivable=True,
         doc="How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at full brightness; "
         "above 1 it saturates sooner.",
     )

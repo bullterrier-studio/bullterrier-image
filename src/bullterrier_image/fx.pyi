@@ -6,7 +6,7 @@ from typing import Literal
 
 import numpy
 
-from .core.params import Picture
+from .core.params import Drive, Picture
 from .recipe import Step
 
 def ambient_occlusion(radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
@@ -297,7 +297,7 @@ resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
     'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking."""
     ...
 
-def bloom(radius: float = 32.0, threshold: float = 0.6, amount: float = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
 
 The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
@@ -306,14 +306,14 @@ the colour of the light (each channel blooms on its own) and leaves black black.
 
 Parameters
 ----------
-radius : number, px, 0 to 500, default 32.0
+radius : number (drivable), px, 0 to 500, default 32.0
     Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the
     light further; 0 keeps the light on the highlights themselves. Each further octave
     is half as wide.
 threshold : number, fraction, 0 to 0.99, default 0.6
     The brightness (0..1, per channel) where the bloom starts: only values above it give
     light, rising to full at 1. Raising it limits the bloom to the brightest highlights.
-amount : number, ratio, 0 to 10, default 0.7
+amount : number (drivable), ratio, 0 to 10, default 0.7
     How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
     brightness; above 1 it saturates to white sooner.
 octaves : whole number, count, 1 to 8, default 4
@@ -455,7 +455,7 @@ Presets
 infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale."""
     ...
 
-def chromatic_aberration(amount: float = 4.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def chromatic_aberration(amount: float | Drive = 4.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Shift red outward and blue inward from the centre `x`, `y` by up to `amount` px, leaving green alone.
 
 Each pixel d px from the centre shows red read at d x (1 - amount / R) and blue at d x (1 + amount / R) on the
@@ -465,7 +465,7 @@ same ray, R the distance of the farthest corner, so the shift grows linearly fro
 
 Parameters
 ----------
-amount : number, px, 0 to 100, default 4.0
+amount : number (drivable), px, 0 to 100, default 4.0
     How far red and blue are pulled apart, in pixels at the farthest corner of the
     picture: there the red is shifted this far outward from the centre and the blue this
     far inward, while green stays where it is. The shift grows in proportion to the
@@ -492,7 +492,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def clarity(radius: float = 30.0, amount: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def clarity(radius: float = 30.0, amount: float | Drive = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when
 the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
 Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
@@ -502,7 +502,7 @@ Parameters
 radius : number, px, 0 to 500, default 30.0
     Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the
     recipe's size. Larger compares bigger regions; 0 turns the effect off.
-amount : number, ratio, 0 to 5, default 1.0
+amount : number (drivable), ratio, 0 to 5, default 1.0
     How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1
     = doubled.
 
@@ -996,7 +996,7 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     without a subject it also decides the figure's outline."""
     ...
 
-def displace(amount: float = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def displace(amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px.
 
 Each pixel shows the picture at its own place plus a move (rows, columns) from two fractal noise fields of the
@@ -1006,7 +1006,7 @@ that, so the `edge` rule only matters within `amount` px of the border.
 
 Parameters
 ----------
-amount : number, px, 0 to 500, default 12.0
+amount : number (drivable), px, 0 to 500, default 12.0
     The farthest any pixel's move is, in pixels: the moves are scaled so that the
     largest one, wherever the noise is strongest, is exactly this far. Raising it tears
     the picture up more; 0 leaves it unchanged.
@@ -1431,7 +1431,7 @@ windblown : The edges dissolve and everything is blown to the right, like dust i
 disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
-def fade(amount: float = 0.12, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def fade(amount: float | Drive = 0.12, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Lift the blacks by `amount` for a matte, faded-film look; whites stay where they are.
 
 Every channel is rescaled from 0..1 to `amount`..1, so black becomes a flat grey of `amount`, white is untouched
@@ -1439,7 +1439,7 @@ and the tones between keep their order. With `amount` 0 the picture is unchanged
 
 Parameters
 ----------
-amount : number, fraction, 0 to 1, default 0.12
+amount : number (drivable), fraction, 0 to 1, default 0.12
     How far black is lifted toward white (0..1): the darkest value the picture can
     reach. 0 = unchanged, 0.1 = a gentle matte look, 1 = everything white. White stays
     white; raising it flattens the shadows."""
@@ -1678,7 +1678,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def fog(density: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, patchiness: float = 0.6, scale: float = 150.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def fog(density: float | Drive = 0.8, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, patchiness: float = 0.6, scale: float = 150.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom.
 
 The opacity at a pixel is `density` x (1 - `gradient` x (1 - t)) x (1 - `patchiness` x (1 - c)), where t is how
@@ -1689,7 +1689,7 @@ picture + opacity x (color - picture), so the fog lowers contrast as well as tin
 
 Parameters
 ----------
-density : number, fraction, 0 to 1, default 0.8
+density : number (drivable), fraction, 0 to 1, default 0.8
     How thick the fog is where it is thickest (the bottom of the frame, in the densest
     cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.8 =
     a heavy haze, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
@@ -1778,14 +1778,14 @@ interior : colour, default '#000000'
     The colour of the points that never escape: the inside of the set."""
     ...
 
-def gaussian_blur(radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def gaussian_blur(radius: float | Drive = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Soften the picture with a Gaussian blur of standard deviation `radius` px.
 
 Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
 
 Parameters
 ----------
-radius : number, px, 0 to 500, default 4.0
+radius : number (drivable), px, 0 to 500, default 4.0
     The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is
     softer and spreads detail further; 0 leaves the picture unchanged.
 
@@ -1833,7 +1833,7 @@ band_max_height : number, fraction, 0 to 1, default 0.06
     gives taller strips."""
     ...
 
-def glow(radius: float = 24.0, amount: float = 0.6, threshold: float = 0.55, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def glow(radius: float | Drive = 24.0, amount: float | Drive = 0.6, threshold: float = 0.55, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Soft bloom around the bright parts: what is brighter than `threshold` is blurred by `radius` px and screened
 over the picture by `amount`.
 
@@ -1841,10 +1841,10 @@ Glow only ever brightens, and keeps the colour of the light: each channel glows 
 
 Parameters
 ----------
-radius : number, px, 0 to 500, default 24.0
+radius : number (drivable), px, 0 to 500, default 24.0
     Gaussian sigma of the halo in px at the recipe's size: larger spreads the light
     further and softer; 0 keeps the light on the bright parts themselves.
-amount : number, ratio, 0 to 10, default 0.6
+amount : number (drivable), ratio, 0 to 10, default 0.6
     How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
     brightness; above 1 it saturates to white sooner.
 threshold : number, fraction, 0 to 0.99, default 0.55
@@ -1867,22 +1867,22 @@ constant_value : number, fraction, 0 to 1, default 0.0
     otherwise."""
     ...
 
-def grade(exposure: float = 0.0, contrast: float = 1.0, pivot: float = 0.5, saturation: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`.
 
 The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation) and at the end.
 
 Parameters
 ----------
-exposure : number, stops, -10 to 10, default 0.0
+exposure : number (drivable), stops, -10 to 10, default 0.0
     Brightness in photographic stops: +1 doubles every value, -1 halves it.
-contrast : number, ratio, 0 to 5, default 1.0
+contrast : number (drivable), ratio, 0 to 5, default 1.0
     How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 =
     flat at the pivot.
 pivot : number, fraction, 0 to 1, default 0.5
     The brightness (0..1) that contrast leaves where it is; values above it brighten,
     below it darken.
-saturation : number, ratio, 0 to 5, default 1.0
+saturation : number (drivable), ratio, 0 to 5, default 1.0
     Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more
     vivid."""
     ...
@@ -1967,7 +1967,7 @@ night_vision : Green phosphor monochrome, as a night-vision scope shows it (no n
 xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
     ...
 
-def grain(amount: float = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def grain(amount: float | Drive = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px.
 
 The same noise is added to every channel, so the grain is monochrome; the result is clipped to 0..1. The same
@@ -1975,7 +1975,7 @@ The same noise is added to every channel, so the grain is monochrome; the result
 
 Parameters
 ----------
-amount : number, fraction, 0 to 1, default 0.08
+amount : number (drivable), fraction, 0 to 1, default 0.08
     Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is
     visible, 0.2 is heavy.
 size : number, px, 0 to 50, default 1.0
@@ -1998,7 +1998,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seamlessly)."""
     ...
 
-def halation(radius: float = 30.0, threshold: float = 0.5, amount: float = 1.8, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def halation(radius: float = 30.0, threshold: float = 0.5, amount: float | Drive = 1.8, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by
 `radius` px, tinted `color` and screened over the picture by `amount`.
 
@@ -2015,7 +2015,7 @@ threshold : number, fraction, 0 to 0.99, default 0.5
     The brightness (0..1) where the glow starts, judged on the brightest of a pixel's
     three channels: only values above it glow, rising to full at 1. Raising it limits
     the halation to the brightest highlights.
-amount : number, ratio, 0 to 10, default 1.8
+amount : number (drivable), ratio, 0 to 10, default 1.8
     How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at
     full brightness; above 1 it saturates sooner.
 color : colour, default '#ff4a14'
@@ -2172,7 +2172,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     brightness there makes an edge)."""
     ...
 
-def hue_shift(hue: float = 90.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def hue_shift(hue: float | Drive = 90.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme.
 
 Brightness is preserved (as `luminance` measures it), so the picture keeps its lighting while colours change,
@@ -2180,7 +2180,7 @@ except for very saturated colours whose rotated version cannot be displayed and 
 
 Parameters
 ----------
-hue : number, degrees, -360 to 360, default 90.0
+hue : number (drivable), degrees, -360 to 360, default 90.0
     The turn around the colour wheel: 120 sends red to green, 360 is a full turn
     (unchanged)."""
     ...
@@ -2799,7 +2799,7 @@ direction : one of 'left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to
     stays."""
     ...
 
-def motion_blur(angle: float = 0.0, length: float = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def motion_blur(angle: float = 0.0, length: float | Drive = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.
 
 Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay
@@ -2811,7 +2811,7 @@ angle : number, degrees, 0 to 360, default 0.0
     The direction of the motion, counter-clockwise as seen in the picture: 0 =
     horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180)
     give the same blur.
-length : number, px, 0 to 500, default 24.0
+length : number (drivable), px, 0 to 500, default 24.0
     How far the smear reaches along the line, end to end, in px at the recipe's size:
     larger is a faster motion; 0 leaves the picture unchanged.
 
@@ -2823,7 +2823,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def noise(amount: float = 0.06, distribution: Literal['gaussian', 'uniform'] = 'gaussian', color: bool = True, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def noise(amount: float | Drive = 0.06, distribution: Literal['gaussian', 'uniform'] = 'gaussian', color: bool = True, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Add noise of standard deviation `amount` (0.06 visible, 0.2 heavy) to every pixel, grey or per channel.
 
 Each pixel gets an independent value, Gaussian or uniform by `distribution` (zero mean, standard deviation
@@ -2832,7 +2832,7 @@ always gives the same noise.
 
 Parameters
 ----------
-amount : number, fraction, 0 to 1, default 0.06
+amount : number (drivable), fraction, 0 to 1, default 0.06
     Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is
     visible, 0.2 is heavy.
 distribution : one of 'gaussian', 'uniform', default 'gaussian'
@@ -3974,7 +3974,7 @@ edge_threshold : number, fraction, 0.001 to 1, default 0.1
     and more like a plain blur; lowering it follows ever smaller edges."""
     ...
 
-def sharpen(radius: float = 2.0, amount: float = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def sharpen(radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
 
 Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
@@ -3986,7 +3986,7 @@ radius : number, px, 0 to 100, default 2.0
     Gaussian sigma of the blurred copy in px at the recipe's size: small radii sharpen
     fine texture, large ones add local contrast around coarse edges; 0 leaves the
     picture unchanged.
-amount : number, ratio, 0 to 5, default 0.8
+amount : number (drivable), ratio, 0 to 5, default 0.8
     How much of the detail is added back: 0 = off, 1 = the full difference from the
     blurred copy; above 1 edges overshoot and halos show.
 threshold : number, fraction, 0 to 1, default 0.0
@@ -4266,7 +4266,7 @@ Step opacity
 0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this."""
     ...
 
-def soft_focus(radius: float = 12.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.5, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def soft_focus(radius: float | Drive = 12.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.5, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
 
 This is the Orton effect of film photography (a sharp and a blurred exposure of the same scene stacked). The
@@ -4275,7 +4275,7 @@ in less of it.
 
 Parameters
 ----------
-radius : number, px, 0 to 500, default 12.0
+radius : number (drivable), px, 0 to 500, default 12.0
     Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier
     and softer; 0 blurs nothing, so the picture is only brightened by screening it with
     itself.
@@ -4840,7 +4840,7 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
     their own fields."""
     ...
 
-def vibrance(amount: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def vibrance(amount: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Raise the saturation of muted colours more than that of vivid ones, never lowering anyone's.
 
 Works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation becomes
@@ -4850,14 +4850,14 @@ the input's (up to float rounding) and a grey, whose saturation is 0, is unchang
 
 Parameters
 ----------
-amount : number, fraction, 0 to 1, default 0.0
+amount : number (drivable), fraction, 0 to 1, default 0.0
     How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1
     raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36
     while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they
     are; colours are never made duller."""
     ...
 
-def vignette(amount: float = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def vignette(amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Fade the picture toward `color` from `radius` out to its corners, the centre untouched.
 
 A pixel's distance from the centre is 0 in the middle and 1 at a corner; the contours of equal distance are
@@ -4866,7 +4866,7 @@ toward `color`, rising over `feather` along a smoothstep to `amount`.
 
 Parameters
 ----------
-amount : number, fraction, 0 to 1, default 0.5
+amount : number (drivable), fraction, 0 to 1, default 0.5
     How far the edges are mixed toward the colour where the vignette is fullest: 0 =
     off, 0.5 = halfway, 1 = the colour itself at the corners.
 radius : number, fraction, 0 to 1, default 0.5
@@ -4915,7 +4915,7 @@ line_color : colour, default '#0a0014'
     The colour of the border lines."""
     ...
 
-def white_balance(temperature: float = 0.0, tint: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def white_balance(temperature: float | Drive = 0.0, tint: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light.
 
 This is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel is multiplied
@@ -4926,12 +4926,12 @@ of 1: no change.
 
 Parameters
 ----------
-temperature : number, stops, -2 to 2, default 0.0
+temperature : number (drivable), stops, -2 to 2, default 0.0
     Warm-cool shift in stops (-2..2): the difference in stops between the red and the
     blue gain, shared evenly (red up and blue down by half of it each). Positive warms
     the picture (more orange), negative cools it (more blue), 0 leaves the colour
     balance alone. Use a negative value to correct a picture shot under warm light.
-tint : number, stops, -1 to 1, default 0.0
+tint : number (drivable), stops, -1 to 1, default 0.0
     Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
     of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
     balance alone."""

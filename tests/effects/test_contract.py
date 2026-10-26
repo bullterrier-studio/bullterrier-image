@@ -4,16 +4,20 @@ categories, every parameter across its documented range, and a time and memory b
 import itertools
 import time
 import tracemalloc
+import typing
 from typing import Any, Literal
 
 import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image.core import registry
-from bullterrier_image.core.params import UNITS, EffectParams, param
+from bullterrier_image import fx
+from bullterrier_image.core import registry, runner
+from bullterrier_image.core.params import UNITS, Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Step
+from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.errors import RecipeError
+from bullterrier_image.recipe import Given
 
 ALL = sorted(registry.describe())
 
@@ -669,3 +673,89 @@ def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwawa
     problems = _over_budget("hungry_probe", megapixel_photo)
     assert len(problems) == 1
     assert "buffers of memory" in problems[0]
+
+
+# --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
+
+DRIVABLE = sorted((name, field) for name in ALL for field in registry.parameters(name).drivable_fields())
+
+
+def _range(name: str, field: str) -> tuple[float, float]:
+    """The documented (least, greatest) of the number `field` of the effect `name`."""
+    doc = next(doc for doc in registry.parameters(name).fields_doc() if doc.name == field)
+    assert doc.minimum is not None
+    assert doc.maximum is not None
+    return doc.minimum, doc.maximum
+
+
+def _driven_and_plain(name: str, field: str, levels: int, photo: np.ndarray):
+    """A recipe driving `field` of `name` by the given map `f`, from its least to its greatest value in `levels`, and
+    a function that makes the plain recipe at one value; the maps the effect takes are made as for the other tests."""
+    least, greatest = _range(name, field)
+    driven = Recipe(
+        "driven",
+        [Step(name, {field: Drive(by="f", start=least, end=greatest, levels=levels)})],
+        size=None,
+        regions={"f": Given()},
+    )
+
+    def plain(value: float) -> Recipe:
+        return Recipe("plain", [Step(name, {field: value})], size=None)
+
+    return driven, plain, _inputs(name, photo)
+
+
+def test_some_parameters_are_drivable():
+    assert len(DRIVABLE) >= 20  # the audited first set; each is tested below
+
+
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+def test_a_drivable_field_says_so_in_the_documentation_and_the_signature(name, field):
+    assert f"{field} : number (drivable)" in registry.documentation(name)
+    assert Drive in typing.get_args(registry.parameters(name).signature().parameters[field].annotation)
+
+
+@pytest.mark.parametrize("level", [0, 2, 4])
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+def test_a_constant_field_gives_the_plain_effect_at_that_levels_value(name, field, level, photo):
+    least, greatest = _range(name, field)
+    driven, plain, maps = _driven_and_plain(name, field, 5, photo)
+    expected = runner.render(photo, plain(least + (greatest - least) * level / 4), maps=maps)
+    got = runner.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
+    np.testing.assert_allclose(got, expected, atol=1e-6, rtol=0)
+
+
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+def test_two_levels_mix_the_effect_at_the_least_and_the_greatest_value_by_the_field(name, field, photo):
+    least, greatest = _range(name, field)
+    driven, plain, maps = _driven_and_plain(name, field, 2, photo)
+    ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
+    at_least, at_greatest = (runner.render(photo, plain(value), maps=maps) for value in (least, greatest))
+    got = runner.render(photo, driven, maps={**maps, "f": ramp})
+    np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_least + ramp[..., None] * at_greatest, atol=1e-6, rtol=0)
+
+
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+def test_a_drive_that_leaves_the_parameters_range_is_refused_naming_the_field(name, field):
+    least, greatest = _range(name, field)
+    for start, end in ((least - 1, greatest), (least, greatest + 1)):
+        with pytest.raises(RecipeError, match=rf"{name}.*`{field}`"):
+            Step(name, {field: Drive(by="f", start=start, end=end)})
+
+
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
+def test_fx_builds_a_driven_step_from_a_drive(name, field):
+    least, greatest = _range(name, field)
+    step = getattr(fx, name)(**{field: Drive(by="depth", start=least, end=greatest)})
+    assert step.drives == {field: Drive(by="depth", start=least, end=greatest)}
+
+
+@pytest.mark.parametrize("name", [name for name in ALL if name not in {n for n, _ in DRIVABLE}])
+def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_it_has(name):
+    fields = registry.parameters(name)
+    numbers = [
+        doc.name for doc in fields.fields_doc() if doc.minimum is not None and doc.name not in fields.drivable_fields()
+    ]
+    for field in numbers:
+        with pytest.raises(RecipeError, match=rf"{name}.*`{field}` cannot be driven"):
+            Step(name, {field: Drive(by="f", start=_range(name, field)[0], end=_range(name, field)[1])})

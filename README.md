@@ -524,6 +524,43 @@ effect = "glow"
 mask = "dark_subject"             # only the shadows on the subject
 ```
 
+**Driving a parameter.** A field can also vary a number across the picture. An effect's documentation marks the numbers
+it lets a field drive, `(drivable)`: the ones whose result changes smoothly with the value (a blur radius, an amount, an
+exposure, a saturation). Write the number as a table with `by`, the field, and the values it takes where the field is 0
+and where it is 1:
+
+```toml
+format = 3
+
+[region.far]                      # 1 in the far part of the picture, fading in over the last tenth of the depth
+kind = "band"
+of = "depth"
+low = 0
+high = 0.5
+feather = 0.1
+
+[[step]]
+effect = "gaussian_blur"
+radius = { by = "far", start = 0, end = 12 }     # sharp up close, blurred far away
+
+[[step]]
+effect = "grade"
+exposure = { by = "light", start = 0.4, end = 0, levels = 3 }   # lift the shadows, leave the highlights
+saturation = { by = "light", start = 1.2, end = 1, levels = 3 }    # and give them a little more colour
+```
+
+In Python, `fx.grade(exposure=Drive(by="light", start=0.4, end=0))` (`from bullterrier_image import Drive`). `start` and
+`end`, and so every value between, must lie in the number's range: a bad one fails when the step is made, naming the
+effect, the number and the value, and so does a number that is not drivable (a whole number, a choice, anything its
+effect does not declare). All the tables of one step name one `by` and one `levels`. The step still takes `mask`,
+`opacity` and `blend_mode`, and a look of an `Each` can be driven.
+
+**What a drive costs.** The effect is rendered at `levels` evenly spaced values between `start` and `end` (2 to 16, 5 by
+default) and each pixel mixes the two renders either side of its field value, linearly: a field of 0.5 with 5 levels is
+exactly the render at the middle value, a field between two levels is their mix. A driven step costs up to `levels`
+times the effect, and a value no pixel needs is not rendered (a field that is 0 everywhere costs one render). More
+levels is smoother where the field changes slowly; two levels mix the effect at `start` and at `end`.
+
 Version 2 of the file format named the depth kinds `depth` and `depth_bands`; they are `band` and `bands` with
 `of = "depth"` now (`far` is `low`, `near` is `high`), and a file that still uses them says so.
 

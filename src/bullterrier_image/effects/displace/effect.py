@@ -18,6 +18,7 @@ class DisplaceParams(EffectParams):
         unit="px",
         min=0,
         max=500,
+        drivable=True,
         doc="The farthest any pixel's move is, in pixels: the moves are scaled so that the largest one, wherever the "
         "noise is strongest, is exactly this far. Raising it tears the picture up more; 0 leaves it unchanged.",
     )

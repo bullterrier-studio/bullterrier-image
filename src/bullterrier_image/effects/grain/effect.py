@@ -17,6 +17,7 @@ class GrainParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        drivable=True,
         doc="Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is "
         "heavy.",
     )

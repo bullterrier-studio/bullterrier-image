@@ -4,14 +4,16 @@ validated, frozen models wherever they are made."""
 import inspect
 import tomllib
 from importlib.resources import files
+from typing import Literal
 
 import numpy as np
 import pytest
+from pydantic import model_validator
 
 from bullterrier_image import fx
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import EffectParams, Picture, param
+from bullterrier_image.core.params import Drive, EffectParams, Picture, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step
@@ -23,8 +25,12 @@ from bullterrier_image.recipe import Band, Bands, Each, Given, Grid, Pick, Shard
 class GainParams(EffectParams):
     """Gain of the probe."""
 
-    gain: float = param(1.0, unit="ratio", min=0, max=4, doc="Multiplies every value. Raising it brightens.")
+    gain: float = param(
+        1.0, unit="ratio", min=0, max=4, drivable=True, doc="Multiplies every value. Raising it brightens."
+    )
     offset: float = param(0.0, unit="fraction", min=-1, max=1, doc="Added after the gain.")
+    taps: int = param(1, unit="count", min=1, max=9, doc="How many times the gain is applied.")
+    mode: Literal["clip", "wrap"] = param("clip", doc="What happens past 1: 'clip' stops, 'wrap' starts again.")
 
 
 @pytest.fixture
@@ -43,7 +49,7 @@ def gain(throwaway_effects):
     ("values", "complaint"),
     [
         ({"gain": 9}, r"`gain`.*<= 4.*\b9\b"),  # the field, the limit and the value
-        ({"gian": 2}, r"`gian`.*gain, offset"),  # an unknown value lists the valid ones
+        ({"gian": 2}, r"`gian`.*gain, mode, offset, taps"),  # an unknown value lists the valid ones
         ({"gain": "2"}, r"`gain`.*number"),
         ({"gain": {"from": 0.0, "to": 1.0}}, r"`gain`.*number"),  # the table of an animated value, no longer a value
     ],
@@ -65,6 +71,188 @@ def test_a_value_out_of_range_in_a_recipe_file_names_the_file_step_field_and_val
     path.write_text("[[step]]\neffect = 'gain_probe'\ngain = 7.5\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"hot\.toml.*step 1.*gain_probe.*`gain`.*\b4\b.*7\.5"):
         load_recipe(path)
+
+
+# --- driven parameters: a field varies a parameter pixel by pixel ----------------------------------------------------
+
+NEAR = Band(of="depth")
+
+
+def drive(**keys) -> Drive:
+    return Drive(**{"by": "near", "start": 0.0, "end": 2.0, **keys})
+
+
+def test_a_step_takes_a_drive_for_a_drivable_parameter_and_keeps_it_as_written(gain):
+    step = Step("gain_probe", {"gain": drive(), "offset": 0.1})
+    assert step.params == {"gain": drive(), "offset": 0.1}
+    assert step.drives == {"gain": drive()}
+    assert step.fixed == {"offset": 0.1}
+    assert step.describe() == "gain_probe(gain=by near 0..2, offset=0.1)"
+
+
+def test_a_drive_written_as_a_table_is_the_drive_written_in_python(gain):
+    from_table = Step("gain_probe", {"gain": {"by": "near", "start": 0, "end": 2, "levels": 7}})
+    assert from_table == Step("gain_probe", {"gain": Drive(by="near", start=0, end=2, levels=7)})
+
+
+def test_a_step_with_no_drive_has_none(gain):
+    step = Step("gain_probe", {"gain": 2})
+    assert (step.drives, step.fixed) == ({}, {"gain": 2})
+
+
+DRIVEN_MISTAKES = {
+    "a parameter the effect does not declare drivable": (
+        {"offset": drive(end=0.5)},
+        r"gain_probe.*`offset` cannot be driven.*drivable parameters: gain",
+    ),
+    "a whole number": ({"taps": drive(end=5)}, r"gain_probe.*`taps` cannot be driven.*whole number.*gain"),
+    "a choice": ({"mode": drive(end=1)}, r"gain_probe.*`mode` cannot be driven.*not a number.*gain"),
+    "a parameter the effect does not have": ({"gian": drive()}, r"gain_probe.*`gian`.*gain, mode, offset, taps"),
+    "a start below the range": ({"gain": drive(start=-0.5)}, r"gain_probe.*`gain`.*>= 0.*-0\.5"),
+    "an end above the range": ({"gain": drive(end=9)}, r"gain_probe.*`gain`.*<= 4.*\b9\b"),
+    "a start and an end both out": ({"gain": drive(start=-1, end=9)}, r"gain_probe.*`gain`"),
+    "a table with a misspelt key": (
+        {"gain": {"by": "near", "start": 0, "end": 1, "step": 2}},
+        r"gain_probe.*`gain`.*step",
+    ),
+    "a table missing its end": ({"gain": {"by": "near", "start": 0}}, r"gain_probe.*`gain`.*end"),
+}
+
+
+@pytest.mark.parametrize(("values", "complaint"), DRIVEN_MISTAKES.values(), ids=DRIVEN_MISTAKES.keys())
+def test_a_drive_that_cannot_be_is_refused_naming_the_effect_the_parameter_and_why(gain, values, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        Step("gain_probe", values)
+
+
+def test_a_drivable_effect_with_none_to_offer_says_none_are_drivable(throwaway_effects):
+    class Plain(EffectParams):
+        """No drivable field."""
+
+        amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much.")
+
+    @effect(category="light", params=Plain)
+    def plain_probe(rgb: np.ndarray, params: Plain) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    with pytest.raises(RecipeError, match=r"`amount` cannot be driven.*drivable parameters: none"):
+        Step("plain_probe", {"amount": drive(end=1)})
+
+
+def test_every_value_a_drive_goes_through_is_checked_not_only_its_ends(throwaway_effects):
+    class Gapped(EffectParams):
+        """A number with a gap in the middle of its range."""
+
+        level: float = param(0.2, unit="fraction", min=0, max=1, drivable=True, doc="Anything but 0.45 to 0.55.")
+
+        @model_validator(mode="after")
+        def _outside_the_gap(self) -> "Gapped":
+            """`level` is not in the gap."""
+            if 0.45 < self.level < 0.55:
+                raise ValueError(f"level {self.level} is in the gap 0.45..0.55")
+            return self
+
+    @effect(category="light", params=Gapped)
+    def gapped_probe(rgb: np.ndarray, params: Gapped) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    assert Step("gapped_probe", {"level": Drive(by="near", start=0.0, end=0.4, levels=5)}).drives  # all clear of it
+    with pytest.raises(
+        RecipeError, match=r"gapped_probe.*level 0\.5 is in the gap"
+    ):  # both ends valid, a level between not
+        Step("gapped_probe", {"level": Drive(by="near", start=0.2, end=0.8, levels=5)})
+
+
+def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_the_end(throwaway_effects):
+    class Paired(EffectParams):
+        """Two numbers that must stay ordered."""
+
+        low: float = param(0.2, unit="fraction", min=0, max=1, drivable=True, doc="The lower number.")
+        high: float = param(0.8, unit="fraction", min=0, max=1, doc="The upper number, at least `low`.")
+
+        @model_validator(mode="after")
+        def _ordered(self) -> "Paired":
+            """`low` is at most `high`."""
+            if self.low > self.high:
+                raise ValueError(f"low {self.low} is above high {self.high}")
+            return self
+
+    @effect(category="light", params=Paired)
+    def paired_probe(rgb: np.ndarray, params: Paired) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    assert Step("paired_probe", {"low": Drive(by="near", start=0.0, end=0.8)}).drives
+    with pytest.raises(RecipeError, match=r"paired_probe.*low 0\.9.*above high 0\.8"):
+        Step("paired_probe", {"low": Drive(by="near", start=0.0, end=0.9)})
+
+
+def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway_effects):
+    class Two(EffectParams):
+        """Two drivable numbers."""
+
+        first: float = param(0.0, unit="fraction", min=0, max=1, drivable=True, doc="First.")
+        second: float = param(0.0, unit="fraction", min=0, max=1, drivable=True, doc="Second.")
+
+    @effect(category="light", params=Two)
+    def two_probe(rgb: np.ndarray, params: Two) -> np.ndarray:
+        """Nothing."""
+        return rgb
+
+    ok = Step("two_probe", {"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=1, end=0)})
+    assert ok.drives.keys() == {"first", "second"}
+    with pytest.raises(RecipeError, match=r"two_probe.*one field.*'light' and 'near'"):
+        Step("two_probe", {"first": Drive(by="near", start=0, end=1), "second": Drive(by="light", start=0, end=1)})
+    with pytest.raises(RecipeError, match=r"two_probe.*one number of levels.*5 and 8"):
+        Step(
+            "two_probe",
+            {"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=0, end=1, levels=8)},
+        )
+
+
+def test_a_step_names_the_field_that_drives_it_as_a_region_it_refers_to(gain):
+    step = Step("gain_probe", {"gain": drive()}, mask="subject")
+    assert step.references() == [("mask", "subject", "selection"), ("by", "near", "selection")]
+    assert Step("gain_probe", {"gain": 2}).references() == []
+
+
+def test_a_recipe_refuses_a_field_that_is_no_region_or_not_a_selection_naming_the_step_and_the_valid_ones(gain):
+    with pytest.raises(
+        RecipeError, match=r"step 1: `by` names 'near', which is no region; valid selections: subject, "
+    ):
+        Recipe("look", [Step("gain_probe", {"gain": drive()})], size=None)
+    with pytest.raises(RecipeError, match=r"step 1: `by` names 'panes', a partition, but it needs a selection"):
+        Recipe("look", [Step("gain_probe", {"gain": drive(by="panes")})], regions={"panes": Grid()}, size=None)
+    assert Recipe("look", [Step("gain_probe", {"gain": drive(by="near")})], regions={"near": NEAR}, size=None)
+
+
+def test_a_look_of_an_each_names_its_field_too(gain):
+    look = Step("gain_probe", {"gain": drive(by="near")})
+    with pytest.raises(RecipeError, match=r"step 1: `by` names 'near', which is no region"):
+        Recipe("look", [Each("g", [look, "none"])], regions={"g": Grid()}, size=None)
+
+
+MAPS_OF_A_DRIVE = {
+    "the depth": ("depth", {"depth"}),
+    "a band of the depth": ("near", {"depth"}),
+    "the subject": ("subject", {"subject"}),
+    "the light of the picture needs no map": ("light", set()),
+    "a given map": ("star", {"star"}),
+}
+
+
+@pytest.mark.parametrize(("by", "needed"), MAPS_OF_A_DRIVE.values(), ids=MAPS_OF_A_DRIVE.keys())
+def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed):
+    recipe = Recipe(
+        "look",
+        [Step("gain_probe", {"gain": drive(by=by)})],
+        regions={"near": NEAR, "star": Given()},
+        size=None,
+    )
+    assert recipe.maps_needed == frozenset(needed)
+    assert recipe.derived_maps == (frozenset({"light"}) if by == "light" else frozenset())
 
 
 # --- the effect's own default opacity --------------------------------------------------------------------------------
