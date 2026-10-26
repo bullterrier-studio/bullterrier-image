@@ -13,8 +13,8 @@ radius = 10
 mask = "background"
 
 [[step]]
-effect = "vibrance"
-amount = 0.4
+effect = "grade"
+vibrance = 0.4
 mask = "subject"
 
 [[step]]

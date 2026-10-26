@@ -1,7 +1,0 @@
-# Bring up the muted colours (the cushion, the greens) while leaving the already vivid ones alone.
-name = "vibrance"
-size = 480
-
-[[step]]
-effect = "vibrance"
-amount = 1.0

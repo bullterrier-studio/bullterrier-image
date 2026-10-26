@@ -10,8 +10,8 @@ margin = 0.15               # with a sixth of the subject's size around it
 transparent = "circle"      # the circle inscribed in the square; the rest is transparent
 
 [[step]]
-effect = "vibrance"
-amount = 0.3
+effect = "grade"
+vibrance = 0.3
 
 [[step]]
 effect = "clarity"

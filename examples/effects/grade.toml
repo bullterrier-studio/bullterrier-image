@@ -1,4 +1,4 @@
-# Brighter, punchier and more colourful: exposure, contrast and saturation.
+# Brighter, punchier and more colourful: exposure, contrast and saturation, then a lift for the muted colours.
 name = "grade"
 size = 480
 
@@ -6,4 +6,5 @@ size = 480
 effect = "grade"
 exposure = 0.3
 contrast = 1.25
-saturation = 1.4
+saturation = 1.2
+vibrance = 0.8

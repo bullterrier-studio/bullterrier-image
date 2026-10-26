@@ -18,7 +18,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `grade` ✓ | Exposure, contrast, saturation. | `fx.grade(exposure=0.3)` |
+| `grade` ✓ | Exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5)` |
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
 | `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
@@ -27,7 +27,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
 | `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
-| `vibrance` ✓ | Boost muted colours more than vivid ones. | `fx.vibrance(amount=0.5)` |
 | `selective_color` ✓ | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue=30, saturation=0.6)` |
 | `color_balance` ✓ | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights_red=0.05, highlights_blue=-0.05)` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
@@ -213,8 +212,8 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 Any number an effect marks `(drivable)` can vary across the picture by a field (`docs/design-decisions.md`, "A field
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
-`vibrance`, `grain`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
-`grade`'s `exposure`, `contrast`, `saturation`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
+`grain`, `clarity`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
+`grade`'s `exposure`, `contrast`, `saturation`, `vibrance`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
 `hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
