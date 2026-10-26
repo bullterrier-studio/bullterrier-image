@@ -81,9 +81,11 @@ def render(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> np.ndarray:
-    """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders."""
-    return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders))
+    """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders. `size` is the
+    longest side of the result in px: the recipe's pixel values are scaled from its own size to it."""
+    return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
 def trace(
@@ -92,9 +94,11 @@ def trace(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> list[Stage]:
-    """Every stage of a render: `bullterrier_image.core.runner.trace` with the default finders."""
-    return runner.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders))
+    """Every stage of a render: `bullterrier_image.core.runner.trace` with the default finders; `size` as for
+    `render`."""
+    return runner.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
 def render_all(
@@ -103,9 +107,11 @@ def render_all(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> list[np.ndarray]:
-    """Several recipes on one photo: `bullterrier_image.core.runner.render_all` with the default finders."""
-    return runner.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders))
+    """Several recipes on one photo: `bullterrier_image.core.runner.render_all` with the default finders. `size` as for
+    `render`."""
+    return runner.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size)
 
 
 def _finders(

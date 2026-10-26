@@ -720,3 +720,40 @@ def test_the_json_schema_marks_a_cyclic_field():
 def test_the_field_docs_say_which_fields_are_cyclic():
     assert {doc.name for doc in Turning.fields_doc() if doc.cyclic} == {"angle", "turns"}
     assert not any(doc.cyclic for doc in Probe.fields_doc())
+
+
+# --- pixel fields scale: one look at any size ----------------------------------------------------------------------
+
+
+class Sized(EffectParams):
+    """A model with pixel values of each kind (a decimal, a whole number, one that can be negative) and others."""
+
+    radius: float = param(24.0, unit="px", min=1, max=500, doc="Size of the halo. Larger = wider.")
+    cell: int = param(10, unit="px", min=3, max=64, doc="Cell width. Larger = coarser.")
+    shift: int = param(-10, unit="px", min=-500, max=500, doc="Sideways shift. Negative goes left.")
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of it.")
+    count: int = param(4, unit="count", min=1, max=9, doc="How many.")
+
+
+@pytest.mark.parametrize(
+    ("factor", "radius", "cell", "shift"),
+    [
+        pytest.param(1, 24.0, 10, -10, id="by 1 nothing changes"),
+        pytest.param(2, 48.0, 20, -20, id="doubled"),
+        pytest.param(0.5, 12.0, 5, -5, id="halved"),
+        pytest.param(0.1, 2.4, 3, -1, id="a tenth: a whole number is rounded, a minimum is a floor"),
+        pytest.param(0.01, 1.0, 3, 0, id="a hundredth: every floor, a negative reaches 0 and not its minimum"),
+        pytest.param(100, 2400.0, 1000, -1000, id="past the range: the range is in design pixels, no ceiling"),
+    ],
+)
+def test_pixel_fields_scale_by_the_factor_and_nothing_else_does(factor, radius, cell, shift):
+    scaled = Sized().scaled(factor)
+    assert (scaled.radius, scaled.cell, scaled.shift) == pytest.approx((radius, cell, shift))
+    assert isinstance(scaled.cell, int)
+    assert (scaled.amount, scaled.count) == (0.5, 4)  # a fraction and a count are not pixels
+
+
+def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
+    first = Sized()
+    assert first.scaled(2) is not first
+    assert first.radius == 24.0

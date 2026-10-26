@@ -310,7 +310,7 @@ A recipe is an ordered list of effects. Each `[[step]]` names an effect, and the
 
 ```toml
 name = "ember-glitch"
-size = 1024                       # longest side in px; effect sizes are relative to this
+size = 1024                       # longest side in px; the pixel values below (radius, cell...) are written for it
 
 [[step]]
 effect = "gradient_map"           # a fire palette
@@ -654,6 +654,12 @@ neon_glitch = Recipe(
 
 imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
+
+**One look at any size.** A recipe's pixel values (the numbers in `px`: a radius, a cell, a shift) are written for its
+`size`, or for the photo's own longest side when it has none. `render(photo, recipe, size=480)` (also `trace` and
+`render_all`) makes the picture 480 px on its longest side and multiplies every pixel value, including the ends of a driven
+number, by 480 over that size, so the look is the same at a draft size and at the full one, differing only in detail. A
+whole number is rounded, a value stops at its minimum when shrinking, and growing has no ceiling.
 
 A step is written with the same keys as in a recipe file: after the effect's own parameters, every `fx` function takes
 `mask`, `opacity`, `blend_mode` and (for an effect with presets) `preset` as keywords, so

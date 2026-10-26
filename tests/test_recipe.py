@@ -317,3 +317,18 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
     np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)
+
+
+@pytest.mark.parametrize(
+    "picture_of",
+    [
+        pytest.param(lambda photo, recipe, **k: facade.render(photo, recipe, **k), id="render"),
+        pytest.param(lambda photo, recipe, **k: facade.trace(photo, recipe, **k)[-1].image, id="trace"),
+        pytest.param(lambda photo, recipe, **k: facade.render_all(photo, [recipe], **k)[0], id="render_all"),
+    ],
+)
+def test_a_look_is_rendered_at_the_size_asked_with_its_pixel_values_scaled_to_it(photo, picture_of):
+    """The public renderers take `size`: a blur of 4 px designed for 64 px wide is 8 px at 128 (by hand)."""
+    designed = Recipe("blur", (Step("gaussian_blur", {"radius": 4.0}),), size=64)
+    by_hand = Recipe("blur", (Step("gaussian_blur", {"radius": 8.0}),), size=128)
+    np.testing.assert_array_equal(picture_of(photo, designed, size=128), picture_of(photo, by_hand))

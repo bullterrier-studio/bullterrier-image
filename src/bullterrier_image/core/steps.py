@@ -456,8 +456,9 @@ class Recipe(ValidatedModel):
         for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`,
         `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked here, and
         made for each picture only when a step uses them.
-    size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
-        None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
+    size: longest side of the working image in px, >= 1, or None to keep the photo's own size. The photo is framed
+        first (flip, turn, crop, borders) and then scaled. The recipe's pixel values (a radius, a cell) are written for
+        this size, or for the framed photo's longest side when None; `render(..., size=)` renders at another size.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo and its maps (the subject, the depth,
         any map handed in) together before the first step, and may cut the finished picture out (a circle, rounded
         corners, the subject) after the last, so the render has an alpha channel.

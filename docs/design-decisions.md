@@ -233,6 +233,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
   `BT_IMAGE_DEPTH_MODEL`.
 
+- **Pixel values are design pixels.** A recipe's numbers with the unit `px` are written for its `size` (for the framed
+  photo's own longest side when it has none), and `render(..., size=)` multiplies them by the ratio of the sizes, in the one
+  place a step's values reach its effect (`EffectParams.scaled`, from the parameter description: no per-effect code). A
+  whole number is rounded; a value shrinks no further than its field's `min` and grows without a ceiling, because a range
+  is in design pixels. *Reason:* the README promised a look that matches at any resolution, but with `size=None` a draft at
+  half size meant scaling every radius by hand, and with a size the output was always rescaled to it. *Consequence:* the
+  scaled values are not checked against the range (the model is copied, not rebuilt); regions and the framing hold no
+  pixel values (shares and angles), so only effects scale; noise and random placements keep their character at another
+  size, not their exact positions.
+
 ## Errors and I/O
 
 - **One error hierarchy.** Library code raises `BullterrierImageError` subclasses (`RecipeError`, `UnknownEffectError`,

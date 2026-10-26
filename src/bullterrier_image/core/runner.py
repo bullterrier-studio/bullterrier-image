@@ -15,8 +15,11 @@ declared but unused need nothing); the depth and a given map likewise. A region 
 per render, even when a `subject` map was given (a map of the whole photo does not answer for a part). It never loads
 a file or looks for a map on its own; `bullterrier_image.recipe` binds the default finders for users. The maps are
 found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
-move with the photo; the framed photo and maps are then scaled to the recipe's size. The recipe's regions are made once
-per render, for that scaled picture, and only as steps ask for them.
+move with the photo; the framed photo and maps are then scaled to the recipe's size, or to the `size` a render is asked
+for. A recipe's pixel values (the fields with the unit `px`) are written for its size, or for the framed photo's own
+longest side when it has none; a render at another `size` multiplies them by the ratio of the sizes
+(`EffectParams.scaled`), so the look is the same at any size. The recipe's regions are made once per render, for that
+scaled picture, and only as steps ask for them.
 
 Dependency direction: imports `steps`, `regions`, the effect registry and `ops` (to scale the photo and blend a step);
 never the recipe-file reader `loader`, so recipes built in Python run without it.
@@ -82,15 +85,16 @@ def render(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
-    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; its maps are
-    framed and scaled with it. Steps run in order, each on the previous step's output, which the step's result is laid
-    over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the selection its
-    `mask` names (the subject, the background or a region of the recipe), so only that changes. An `Each` step renders
-    each of its looks once over the whole picture and shows it through the pieces of its partition that have it,
-    blending the looks across the borders.
+    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `size`, else `recipe.size`;
+    its maps are framed and scaled with it. Steps run in order, each on the previous step's output, which the step's
+    result is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the
+    selection its `mask` names (the subject, the background or a region of the recipe), so only that changes. An
+    `Each` step renders each of its looks once over the whole picture and shows it through the pieces of its
+    partition that have it, blending the looks across the borders.
     Effects that declare a `subject` parameter (see `evaporate`) get the subject's silhouette automatically, and those
     that declare `depth` the depth map. After the last step a recipe whose framing is `transparent` is cut out: the
     result then has four channels, RGB and straight alpha (h, w, 4), instead of three.
@@ -106,17 +110,33 @@ def render(
     naming the map, when the recipe needs it and neither the map nor a finder was given, the finder returns None, the
     map is not (h, w) or not within 0..1; a `per` region has no `subject` finder or the finder's map does not fit its
     crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a subject that is not there.
+
+    size: the longest side of the result in px, 1 or more (the recipe's own size when None; RecipeError for anything
+    else). The recipe's pixel values are multiplied by `size` over the recipe's size (over the longest side of the
+    framed photo when the recipe has no size), so one recipe gives the same look at any size; a value stops at its
+    minimum when shrinking and has no ceiling when growing.
     """
+    _check_size(size)
     found = _maps(rgb, [recipe], maps, finders)
-    return _render(rgb, recipe, found, finders)
+    return _render(rgb, recipe, found, finders, size)
+
+
+def _check_size(size: int | None) -> None:
+    """RecipeError unless `size` is None or a whole number of pixels, 1 or more (a bool is not a number here)."""
+    if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size < 1):
+        raise RecipeError(f"size must be a whole number of pixels, 1 or more, or None, got {size!r}")
 
 
 def _render(
-    rgb: np.ndarray, recipe: Recipe, found: Mapping[str, np.ndarray], finders: Mapping[str, Finder] | None
+    rgb: np.ndarray,
+    recipe: Recipe,
+    found: Mapping[str, np.ndarray],
+    finders: Mapping[str, Finder] | None,
+    size: int | None,
 ) -> np.ndarray:
     """`render` once the maps are found (`_maps`)."""
-    image, maps, regions = _prepare(rgb, recipe, found, finders)
-    stages = _stages(image, recipe.steps, maps, regions)
+    image, maps, regions, scale = _prepare(rgb, recipe, found, finders, size)
+    stages = _stages(image, recipe.steps, maps, regions, scale)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     result = _last(stages)
     return recipe.frame.cut(result, maps.get("subject")) if recipe.frame.has_alpha else result
@@ -136,6 +156,7 @@ def trace(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> list[Stage]:
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
@@ -147,10 +168,11 @@ def trace(
     channels). The last stage is exactly what `render` returns, because both run the same code. Every stage stays in
     memory: one picture per step, plus the input and the maps.
 
-    rgb, recipe, maps, finders: as for `render`.
+    rgb, recipe, maps, finders, size: as for `render`.
     """
+    _check_size(size)
     found = _maps(rgb, [recipe], maps, finders)
-    rgb, scaled, regions = _prepare(rgb, recipe, found, finders)
+    rgb, scaled, regions, scale = _prepare(rgb, recipe, found, finders, size)
     stages = [Stage("input", rgb)]
     if "subject" in scaled:
         stages.append(Stage("subject matte (white = subject)", np.repeat(scaled["subject"][..., None], 3, axis=2)))
@@ -158,7 +180,7 @@ def trace(
         stages.append(Stage("depth (white = nearest)", np.repeat(scaled["depth"][..., None], 3, axis=2)))
     wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in step.references()))
     stages += [_region_stage(name, regions[name], rgb) for name in recipe.regions if name in wanted]
-    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, scaled, regions), start=1):
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, scaled, regions, scale), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
@@ -181,6 +203,7 @@ def render_all(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
 ) -> list[np.ndarray]:
     """Run several recipes on one photo; each map is found at most once, however many recipes need it.
 
@@ -188,10 +211,11 @@ def render_all(
     maps: the photo's maps by name, used by every recipe that needs them (see `render`), or None. finders: each `find`
     is called once with the photo as given when any recipe needs its map and the map was not handed in (the map's error
     if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
-    `render`. A name that is no map of any recipe is a RecipeError.
+    `render`. A name that is no map of any recipe is a RecipeError. size: as for `render`, for every recipe.
     """
+    _check_size(size)
     found = _maps(rgb, recipes, maps, finders)
-    return [_render(rgb, recipe, found, finders) for recipe in recipes]
+    return [_render(rgb, recipe, found, finders, size) for recipe in recipes]
 
 
 # What each map is, by name, for the messages about it; any other map is "the <name> map".
@@ -289,18 +313,26 @@ def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
 
 
 def _prepare(
-    rgb: np.ndarray, recipe: Recipe, found: Mapping[str, np.ndarray], finders: Mapping[str, Finder] | None
-) -> tuple[np.ndarray, dict[str, np.ndarray], Regions]:
-    """Frame the photo and the maps the recipe needs together, scale them all to the recipe's size and set up the
-    recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its maps by name
-    (those the recipe needs) and its regions."""
+    rgb: np.ndarray,
+    recipe: Recipe,
+    found: Mapping[str, np.ndarray],
+    finders: Mapping[str, Finder] | None,
+    size: int | None,
+) -> tuple[np.ndarray, dict[str, np.ndarray], Regions, float]:
+    """Frame the photo and the maps the recipe needs together, scale them all to `size` (else the recipe's size) and
+    set up the recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its
+    maps by name (those the recipe needs), its regions and the factor for the recipe's pixel values: the working
+    size over the size they are written for (the recipe's, else the framed photo's longest side)."""
     rgb, maps = recipe.frame.apply(rgb, {name: found[name] for name in sorted(recipe.maps_needed)})
-    if recipe.size:
-        rgb = resize(rgb, recipe.size)
-        maps = {name: resize(layer, recipe.size) for name, layer in maps.items()}
+    designed = recipe.size or max(rgb.shape[:2])
+    working = size or recipe.size
+    if working:
+        rgb = resize(rgb, working)
+        maps = {name: resize(layer, working) for name, layer in maps.items()}
     maps |= {name: DERIVED[name](rgb) for name in sorted(recipe.derived_maps)}  # made from the picture as it is worked
     find = _finder_in(rgb, (finders or {}).get("subject"))
-    return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find)
+    scale = working / designed if working else 1.0
+    return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find), scale
 
 
 def _finder_in(rgb: np.ndarray, find_subject: Finder | None) -> BoxFinder | None:
@@ -318,22 +350,28 @@ def _last(stages: Iterator[tuple[Step | Each, np.ndarray]]) -> np.ndarray:
 
 
 def _stages(
-    out: np.ndarray, steps: Sequence[Step | Each], maps: dict[str, np.ndarray], regions: Regions
+    out: np.ndarray, steps: Sequence[Step | Each], maps: dict[str, np.ndarray], regions: Regions, scale: float
 ) -> Iterator[tuple[Step | Each, np.ndarray]]:
-    """Run the steps in order, yielding each step with the image after it. The one place a step is applied."""
+    """Run the steps in order, yielding each step with the image after it. The one place a step is applied. `scale`
+    multiplies the pixel values of every effect (see `_prepare`)."""
     for step in steps:
-        out = _apply(out, step, maps, regions)
+        out = _apply(out, step, maps, regions, scale)
         yield step, out
 
 
-def _apply(before: np.ndarray, step: Step | Each, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _apply(
+    before: np.ndarray, step: Step | Each, maps: dict[str, np.ndarray], regions: Regions, scale: float
+) -> np.ndarray:
     """`before` with the step's result laid over it. A function of its own, like `_lay`, so that what a step needs on
     the way (the pieces' weights, a third of a picture or more) is freed before the next step runs."""
-    result = _each(before, step, maps, regions) if isinstance(step, Each) else _effect(before, step, maps, regions)
+    if isinstance(step, Each):
+        result = _each(before, step, maps, regions, scale)
+    else:
+        result = _effect(before, step, maps, regions, scale)
     return _lay(before, result, step, regions)
 
 
-def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions: Regions, scale: float) -> np.ndarray:
     """The step's effect run on `before`, given the inputs it declares: the maps `_prepare` made for every step that
     takes one, and the pieces of the step's partition. A step with driven parameters is run once for each level of
     its drives, and each pixel takes the two renders either side of its field value (see `_driven`)."""
@@ -342,14 +380,17 @@ def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions
         extra["partition"] = regions.pieces(step.partition).labels
     drives = step.drives
     if not drives:
-        return _run(step.effect, before, step.params, extra)
-    return _driven(before, step, drives, regions.selection(next(iter(drives.values())).by).alpha, extra)
+        return _run(step.effect, before, step.params, extra, scale)
+    return _driven(before, step, drives, regions.selection(next(iter(drives.values())).by).alpha, extra, scale)
 
 
-def _run(effect: str, before: np.ndarray, params: Mapping[str, Any], extra: Mapping[str, np.ndarray]) -> np.ndarray:
-    """The effect `effect` run on `before` with `params` and its injected inputs `extra`; RuntimeError if it changed
-    the image's shape."""
-    result = registry.apply(effect, before, **params, **extra)
+def _run(
+    effect: str, before: np.ndarray, params: Mapping[str, Any], extra: Mapping[str, np.ndarray], scale: float
+) -> np.ndarray:
+    """The effect `effect` run on `before` with `params` (their pixel values multiplied by `scale`) and its injected
+    inputs `extra`; RuntimeError if it changed the image's shape."""
+    function = registry.get(effect)
+    result = function(before, function.validate(params).scaled(scale), **extra)
     if result.shape != before.shape:
         raise RuntimeError(f"effect {effect!r} changed the image shape {before.shape} -> {result.shape}")
     return result
@@ -361,6 +402,7 @@ def _driven(
     drives: Mapping[str, Drive],
     field: np.ndarray,
     extra: Mapping[str, np.ndarray],
+    scale: float,
 ) -> np.ndarray:
     """`step`'s effect with the parameters of `drives` varying by `field` (float32 `(height, width)`, 0..1): the effect
     is rendered at each level of the drives (all of a step have the same number, validated with the step), and every
@@ -373,11 +415,11 @@ def _driven(
         weight = level_weight(position, level)
         if weight.max() > 0:
             values = {**step.fixed, **{name: drive.value(level) for name, drive in drives.items()}}
-            out += weight[..., None] * _run(step.effect, before, values, extra)
+            out += weight[..., None] * _run(step.effect, before, values, extra, scale)
     return out  # within 0..1 as the renders are: the weights of a pixel add up to exactly 1 in float32
 
 
-def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: Regions, scale: float) -> np.ndarray:
     """`before` with each piece of the step's partition replaced by its look: every look that has pieces is rendered
     once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
@@ -387,7 +429,7 @@ def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: 
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered
-            out += weight[..., None] * (_apply(before, look, maps, regions) - before)
+            out += weight[..., None] * (_apply(before, look, maps, regions, scale) - before)
     return np.clip(out, 0.0, 1.0, out=out)
 
 

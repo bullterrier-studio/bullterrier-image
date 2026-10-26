@@ -401,6 +401,21 @@ class EffectParams(ValidatedModel):
         hints = typing.get_type_hints(cls)
         return frozenset(name for name in cls.model_fields if hints[name] is Picture)
 
+    def scaled(self, factor: float) -> Self:
+        """A copy with every pixel value (a field with the unit `px`) multiplied by `factor`: the same look at another
+        size. A whole number is rounded. When shrinking (`factor` below 1) a value stops at the field's `min`, which
+        keeps a small picture valid (a cell of at least 3 pixels); growing has no ceiling, as a range is in design
+        pixels and the copy is not checked against it. Other units are unchanged."""
+        whole = self.whole_number_fields()
+        changes = {}
+        for name, info in type(self).model_fields.items():
+            if unit_of(info) != "px":
+                continue
+            value = getattr(self, name) * factor
+            value = round(value) if name in whole else value
+            changes[name] = max(bounds(info)[0], value) if factor < 1 else value
+        return self.model_copy(update=changes)
+
     @classmethod
     def drivable_fields(cls) -> frozenset[str]:
         """The fields a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
