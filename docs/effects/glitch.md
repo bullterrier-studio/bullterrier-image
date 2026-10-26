@@ -14,7 +14,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
-| <img src="../gallery/prism.jpg" width="160" alt="prism"> | `prism` | Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum. | `amount=18.0` `samples=7` `x=0.5` `y=0.5` +2 advanced | [prism.toml](../../examples/effects/prism.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push the red and blue channels `amount` px apart along `angle`, leaving green where it is. | `angle=30.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
 | <img src="../gallery/scan_roll.jpg" width="160" alt="scan_roll"> | `scan_roll` | Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does. | `axis='vertical'` `offset=0.2` +1 advanced | [scan_roll.toml](../../examples/effects/scan_roll.toml) |
 | <img src="../gallery/signal_noise.jpg" width="160" alt="signal_noise"> | `signal_noise` | Mix random grey static into `bands` full-width bands, then stamp `dropouts` short streaks of `color` on top. | `bands=3` `band_height=0.04` `static=0.7` `dropouts=12` `color='#ffffff'` `seed=0` +2 advanced | [signal_noise.toml](../../examples/effects/signal_noise.toml) |
@@ -141,24 +140,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | count | 0.5 to 10 | `4.0` | Where the smear's Gaussian is cut off, in sigmas, 0.5 to 10: the colour spreads over about this many sigmas on either side. Lower is faster and gives a slightly sharper tail. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What colour is smeared in from beyond the left and right edges: 'reflect' the picture mirrored (edge pixel repeated), 'nearest' its edge pixel repeated, 'mirror' mirrored about the edge pixel, 'wrap' the opposite side. |
-
-</details>
-
-### `prism`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `amount` | number | px | 0 to 100 | `18.0` | How far the reddest and the bluest copy are pulled apart, in px at the farthest corner of the picture, tuned for a picture about 480 px high: there the red copy is shifted half this far outward from the centre and the blue copy half this far inward, the copies between in steps. The shift grows in proportion to the distance from the centre, so it is half as much halfway out and nothing at the centre. A larger amount is a wider rainbow fringe on every edge; 0 leaves the picture unchanged. A shift larger than the distance to the farthest corner is limited to it. |
-| `samples` | whole number | count | 3 to 32 | `7` | How many copies make the spectrum, from red to blue in equal steps of scale: 3 gives a red, a green and a blue copy, as a lens's colour fringe does; more copies fill in yellow and cyan between them and turn the fringe into a smooth rainbow, but cost more time. Fewer copies than the amount needs show as separate ghosts. |
-| `x` | number | fraction | 0 to 1 | `0.5` | The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
-| `y` | number | fraction | 0 to 1 | `0.5` | The centre's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from a copy: 'nearest' takes the closest pixel (fastest, but the fringes step), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the copies see beyond the picture's edge (the bluer ones read from farther out than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
 

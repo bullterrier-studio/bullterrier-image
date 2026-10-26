@@ -419,23 +419,31 @@ Presets
 infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale."""
     ...
 
-def chromatic_aberration(amount: float | Drive = 4.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Shift red outward and blue inward from the centre `x`, `y` by up to `amount` px, leaving green alone.
+def chromatic_aberration(amount: float | Drive = 4.0, samples: int = 3, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['prism'] | None = None) -> Step:
+    """Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.
 
-Each pixel d px from the centre shows red read at d x (1 - amount / R) and blue at d x (1 + amount / R) on the
-same ray, R the distance of the farthest corner, so the shift grows linearly from nothing at the centre to
-`amount` px there; green is the picture itself. Each channel is read by `interpolation`; the result never leaves
-0..1.
+Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre
+read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red
+is shifted outward, blue inward, the middle copy stays). A channel of the result is the weighted average of that
+channel in the copies, the weights following the simple spectrum above (red from the red and yellow copies, green
+from yellow to cyan, blue from cyan and blue) and adding up to 1, so a flat picture and the centre are unchanged
+and the result never leaves 0..1. With 3 samples red is the red copy, green the picture itself and blue the blue
+copy. Each copy is read by `interpolation`.
 
 Parameters
 ----------
 amount : number (drivable), px, 0 to 100, default 4.0
     How far red and blue are pulled apart, in pixels at the farthest corner of the
-    picture: there the red is shifted this far outward from the centre and the blue this
-    far inward, while green stays where it is. The shift grows in proportion to the
-    distance from the centre, so it is half as much halfway out and nothing at the
-    centre. A larger amount is wider fringes; 0 leaves the picture unchanged. A shift
-    larger than the distance to the farthest corner is limited to it.
+    picture: there the red copy is shifted this far outward from the centre and the blue
+    copy this far inward, while the middle one stays where it is. The shift grows in
+    proportion to the distance from the centre, so it is half as much halfway out and
+    nothing at the centre. A larger amount is wider fringes; 0 leaves the picture
+    unchanged. A shift larger than the distance to the farthest corner is limited to it.
+samples : whole number, count, 3 to 32, default 3
+    How many copies make the spectrum, from red to blue in equal steps of scale: 3 gives
+    a red, a green and a blue copy, as a lens's colour fringe does; more copies fill in
+    yellow and cyan between them and turn the fringe into a smooth rainbow, but cost
+    more time. Fewer copies than the amount needs show as separate ghosts.
 x : number, fraction, 0 to 1, default 0.5
     The centre's horizontal position as a fraction of the way across the picture: 0 =
     the first pixel column, 0.5 = the middle, 1 = the last.
@@ -446,14 +454,18 @@ y : number, fraction, 0 to 1, default 0.5
 Advanced parameters
 -------------------
 interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How a point between pixels is read from a colour channel: 'nearest' takes the
-    closest pixel (fastest, but the fringes step), 'bilinear' blends the four pixels
-    around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the
-    neighbouring pixels (sharpest, a little slower, and may ring beside hard edges).
+    How a point between pixels is read from a copy: 'nearest' takes the closest pixel
+    (fastest, but the fringes step), 'bilinear' blends the four pixels around it
+    (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring
+    pixels (sharpest, a little slower, and may ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the blue sees beyond the picture's edge (it reads from farther out than it
-    shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
-    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    What the copies see beyond the picture's edge (the bluer ones read from farther out
+    than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+
+Presets
+-------
+prism : Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."""
     ...
 
 def clarity(radius: float = 30.0, amount: float | Drive = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3413,51 +3425,6 @@ levels : whole number, count, 2 to 256, default 256
     white included: 2 gives pure black or full intensity per channel (8 colours), 4
     gives 0, 1/3, 2/3 and 1. Lowering it flattens the tones into fewer, coarser bands;
     256 only rounds to the 8-bit levels of a JPEG or PNG."""
-    ...
-
-def prism(amount: float = 18.0, samples: int = 7, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.
-
-Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre
-read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / 2 / R, R the distance of the farthest corner
-(red is shifted outward, blue inward, the middle copy stays). A channel of the result is the weighted average of
-that channel in the copies, the weights following the simple spectrum above (red from the red and yellow copies,
-green from yellow to cyan, blue from cyan and blue) and adding up to 1, so a flat picture and the centre are
-unchanged and the result never leaves 0..1.
-
-Parameters
-----------
-amount : number, px, 0 to 100, default 18.0
-    How far the reddest and the bluest copy are pulled apart, in px at the farthest
-    corner of the picture, tuned for a picture about 480 px high: there the red copy is
-    shifted half this far outward from the centre and the blue copy half this far
-    inward, the copies between in steps. The shift grows in proportion to the distance
-    from the centre, so it is half as much halfway out and nothing at the centre. A
-    larger amount is a wider rainbow fringe on every edge; 0 leaves the picture
-    unchanged. A shift larger than the distance to the farthest corner is limited to it.
-samples : whole number, count, 3 to 32, default 7
-    How many copies make the spectrum, from red to blue in equal steps of scale: 3 gives
-    a red, a green and a blue copy, as a lens's colour fringe does; more copies fill in
-    yellow and cyan between them and turn the fringe into a smooth rainbow, but cost
-    more time. Fewer copies than the amount needs show as separate ghosts.
-x : number, fraction, 0 to 1, default 0.5
-    The centre's horizontal position as a fraction of the way across the picture: 0 =
-    the first pixel column, 0.5 = the middle, 1 = the last.
-y : number, fraction, 0 to 1, default 0.5
-    The centre's vertical position as a fraction of the way down the picture: 0 = the
-    first pixel row, 0.5 = the middle, 1 = the last.
-
-Advanced parameters
--------------------
-interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How a point between pixels is read from a copy: 'nearest' takes the closest pixel
-    (fastest, but the fringes step), 'bilinear' blends the four pixels around it
-    (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring
-    pixels (sharpest, a little slower, and may ring beside hard edges).
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the copies see beyond the picture's edge (the bluer ones read from farther out
-    than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
-    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 def quadtree(threshold: float = 0.06, max_cell: float = 0.125, min_cell: float = 0.01, gap: float = 0.002, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
