@@ -6,7 +6,6 @@
 
 <p align="center">
   <b>Photo effects pipeline you can script.</b><br>
-  Describe a look as short recipe. Run on one photo or a thousand.<br>
   ASCII art, glitch, halftone, neon grades, dispersing particles.
 </p>
 
@@ -21,9 +20,16 @@
   <img src="docs/images/banner.jpg" alt="One photo of a bull terrier turned into five styles: neon-pulse, glitch, ascii-colour, halftone-print and ember-glitch">
 </p>
 
+**A look you can write down, change with one number, and run on a thousand photos.**
+
+Styling by hand does not repeat. Styling in image code means arrays, loops and magic numbers nobody can read next month.
+bullterrier-image makes a look *data*: a short recipe, TOML or Python, listing effects and their values. 120+ effects ready.
+It finds the subject first: glow can hit the dog, glitch the background, blur can grow with depth. Edit a number, rerun: only
+that recipe redone. Same seed, same pixels. Look wrong? See the picture after every step.
+
 - **Recipes are data.** Look = list of effects, TOML or Python. Same recipe, any photo.
 - **Batch ready.** Many photos x many recipes, cached. One bad photo never stops the run. HTML report.
-- **Subject-aware.** Target subject or background apart.
+- **Subject- and depth-aware.** Aim an effect at subject, background, near or far.
 - **Fails early.** Typo fails at load, not halfway through batch.
 
 ## Install
