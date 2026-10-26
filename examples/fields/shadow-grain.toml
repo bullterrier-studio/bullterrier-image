@@ -1,0 +1,27 @@
+# Film grain that gathers in the shadows and leaves the highlights clean: the grain's amount is driven by a band of the
+# picture's own brightness, so there is no cut-out and no model, and the grain follows the light wherever it falls.
+# Needs recipe format 3.
+format = 3
+name = "shadow-grain"
+size = 1024
+
+[region.dark]                  # 1 in the darkest part of the picture, fading out toward the midtones
+kind = "band"
+of = "light"
+low = 0
+high = 0.25
+feather = 0.3
+
+[[step]]
+effect = "grade"
+contrast = 1.15
+
+[[step]]
+effect = "grain"
+name = "dust"
+amount = { by = "dark", start = 0, end = 0.35 }  # no grain in the light, a lot in the dark
+size = 1.6
+
+[[step]]
+effect = "vignette"
+amount = 0.25

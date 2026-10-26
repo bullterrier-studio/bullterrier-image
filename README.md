@@ -591,7 +591,8 @@ Version 2 of the file format named the depth kinds `depth` and `depth_bands`; th
 `of = "depth"` now (`far` is `low`, `near` is `high`), and a file that still uses them says so.
 
 Names and kinds are checked when the recipe is made. A region that is declared but no step uses costs nothing. Finished
-examples are in [`examples/regions/`](examples/regions/); [the pictures](docs/gallery/regions/README.md).
+examples are in [`examples/regions/`](examples/regions/) ([the pictures](docs/gallery/regions/README.md)) and, for fields,
+[`examples/fields/`](examples/fields/) ([the pictures](docs/gallery/fields/README.md)).
 
 **Framing and transparency.** A `[frame]` table crops, turns, flips and pads the photo and the subject matte together
 before the first step, then `size` scales it, and can cut the finished picture out after the last one. A crop follows the

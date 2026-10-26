@@ -1,0 +1,29 @@
+# A grade per tone: the picture's own brightness cut into three bands, the brightest first. The highlights go warm, the
+# midtones stay as they are and the shadows go cool and a little lifted. Needs recipe format 3.
+format = 3
+name = "tonal-grade"
+size = 1024
+
+[region.tones]                 # band 0 is the brightest third of the brightness range, band 2 the darkest
+kind = "bands"
+of = "light"
+count = 3
+
+[[step]]
+each = "tones"
+name = "tones"
+feather = 0.004                # a soft border between the tones, so no hard contour shows
+looks = [
+    { effect = "white_balance", temperature = 0.8 },
+    "none",
+    { effect = "white_balance", temperature = -0.8 },
+]
+
+[[step]]
+each = "tones"
+feather = 0.004
+looks = ["none", "none", { effect = "fade", amount = 0.12 }]
+
+[[step]]
+effect = "clarity"
+amount = 0.5

@@ -1,0 +1,27 @@
+# A miniature: the picture stays sharp along a band across the dog's face and blurs toward the top and the bottom, the blur
+# growing with the distance from the band. The blur is one step: its radius is driven by a field, the band of a gradient.
+# Needs recipe format 3.
+format = 3
+name = "tilt-shift"
+size = 1024
+
+[region.rise]                  # 0 at the bottom of the picture, 1 at the top
+kind = "linear_gradient"
+angle = 90
+
+[region.focus]                 # 1 across the middle band, fading to 0 over a third of the height either side of it
+kind = "band"
+of = "rise"
+low = 0.55
+high = 0.75
+feather = 0.33
+
+[[step]]
+effect = "gaussian_blur"
+name = "blur"
+radius = { by = "focus", start = 16, end = 0 }   # blurred where the field is 0, sharp where it is 1
+
+[[step]]
+effect = "grade"
+saturation = 1.25              # miniatures are a little too colourful
+contrast = 1.1

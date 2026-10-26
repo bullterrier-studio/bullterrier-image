@@ -56,6 +56,16 @@ def test_every_demo_recipe_combines_effects_and_renders(path, photo, subject):
     assert max(out.shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
+@pytest.mark.parametrize("path", sorted((EXAMPLES / "fields").glob("*.toml")), ids=lambda path: path.stem)
+def test_every_fields_example_needs_no_map_and_renders_to_something_other_than_the_photo(path, photo):
+    recipe = load_recipe(path)
+    assert recipe.name == path.stem
+    assert recipe.maps_needed == frozenset()  # made from a gradient or the picture's own light: no model, no cut-out
+    out = render(photo, recipe)
+    assert max(out.shape[:2]) == recipe.size
+    assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
+
+
 def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
     """A stand-in subject finder (the model is an external boundary): the disc in the middle of whatever it is shown."""
     height, width = view.shape[:2]
