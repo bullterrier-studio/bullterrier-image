@@ -253,7 +253,9 @@ UNREADABLE = [
 
 @pytest.mark.parametrize("make", UNREADABLE)
 @pytest.mark.parametrize(
-    "read", [imageio.load, imageio.load_matte, imageio.load_picture], ids=["load", "load_matte", "load_picture"]
+    "read",
+    [imageio.load, imageio.load_matte, imageio.load_depth, imageio.load_picture],
+    ids=["load", "load_matte", "load_depth", "load_picture"],
 )
 def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_it(tmp_path, read, make):
     path = tmp_path / "broken-photo.png"
@@ -405,3 +407,27 @@ def test_a_matte_file_gives_its_subject_share_per_pixel(tmp_path, picture, file,
     assert matte.shape == (20, 30)
     np.testing.assert_allclose(matte[:, : 15 - margin], left, atol=atol)
     np.testing.assert_allclose(matte[:, 15 + margin :], right, atol=atol)
+
+
+# --- bring your own depth map: imageio.load_depth ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("picture", "file", "left", "right"),
+    [
+        (Image.fromarray(halves(0, 102), "L"), PNG, 0.0, 0.4),  # 102 / 255
+        (Image.fromarray(halves(0, 102 * 257, np.uint16)), PNG, 0.0, 0.4),  # 26214 / 65535: the same depth in 16 bits
+        # a picture with transparency gives its brightness, never its alpha: grey 102 under alpha 255 and 0
+        (Image.fromarray(np.dstack([halves(0, 102)] * 3 + [halves(255, 0)]), "RGBA"), PNG, 0.0, 0.4),
+        (Image.fromarray(np.dstack([halves(0, 255)] * 3), "RGB"), JPEG, 0.0, 1.0),  # within a JPEG's rounding
+    ],
+    ids=["8-bit greyscale PNG", "16-bit greyscale PNG", "brightness of a transparent PNG", "black and white RGB JPEG"],
+)
+def test_a_depth_file_gives_its_brightness_per_pixel_white_nearest(tmp_path, picture, file, left, right):
+    name, margin, atol = file
+    picture.save(tmp_path / name, quality=100)  # (PNG has no quality setting and ignores it)
+    depth = imageio.load_depth(tmp_path / name)
+    assert depth.dtype == np.float32
+    assert depth.shape == (20, 30)
+    np.testing.assert_allclose(depth[:, : 15 - margin], left, atol=atol)
+    np.testing.assert_allclose(depth[:, 15 + margin :], right, atol=atol)

@@ -1,4 +1,5 @@
-"""Tests of `core/framing.py`: framing a photo and its subject matte together, and cutting the finished picture out.
+"""Tests of `core/framing.py`: framing a photo, its subject matte and its depth together, and cutting the finished
+picture out.
 
 The oracles are made by hand with numpy: flips, `rot90`, slices and `pad` composed in the documented order.
 """
@@ -13,10 +14,11 @@ BLUE = (0.0, 0.0, 1.0)
 
 
 @pytest.fixture
-def small() -> tuple[np.ndarray, np.ndarray]:
-    """A 4 rows by 6 columns photo and a matte, every pixel of both different."""
+def small() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A 4 rows by 6 columns photo, a matte and a depth map, every pixel of each different, and the depth unlike the
+    matte, so that one taking the other's place shows."""
     values = np.arange(24, dtype=np.float32).reshape(4, 6) / 24
-    return np.stack([values, 1 - values, values / 2], axis=2), (values + 0.01) / 1.1
+    return np.stack([values, 1 - values, values / 2], axis=2), (values + 0.01) / 1.1, 1 - values
 
 
 @pytest.mark.parametrize(
@@ -55,10 +57,11 @@ def test_good_values_make_a_framing(values):
 
 
 def test_the_default_framing_changes_nothing_and_returns_the_photo_itself(small):
-    photo, matte = small
-    framed_photo, framed_matte = Framing().apply(photo, matte)
+    photo, matte, depth = small
+    framed_photo, framed_matte, framed_depth = Framing().apply(photo, matte, depth)
     assert framed_photo is photo
     assert framed_matte is matte
+    assert framed_depth is depth
 
 
 @pytest.mark.parametrize(
@@ -75,16 +78,22 @@ def test_the_default_framing_changes_nothing_and_returns_the_photo_itself(small)
         pytest.param({"aspect": 3.0}, lambda a: a[1:3], id="a 3:1 crop in the middle"),
     ],
 )
-def test_the_photo_and_its_matte_are_framed_as_numpy_frames_them_by_hand(small, values, by_hand):
-    photo, matte = small
-    framed_photo, framed_matte = Framing(**values).apply(photo, matte)
+def test_the_photo_and_its_maps_are_framed_as_numpy_frames_them_by_hand(small, values, by_hand):
+    photo, matte, depth = small
+    framed_photo, framed_matte, framed_depth = Framing(**values).apply(photo, matte, depth)
     np.testing.assert_array_equal(framed_photo, by_hand(photo))
     np.testing.assert_array_equal(framed_matte, by_hand(matte))
+    np.testing.assert_array_equal(framed_depth, by_hand(depth))
+    alone, _, depth_alone = Framing(**values).apply(photo, depth=depth)  # the depth needs no matte beside it
+    np.testing.assert_array_equal(alone, by_hand(photo))
+    np.testing.assert_array_equal(depth_alone, by_hand(depth))
 
 
-def test_a_border_is_a_share_of_the_shorter_side_in_the_fill_and_is_background_in_the_matte(small):
-    photo, matte = small  # the shorter side is 4 px: 0.5 is 2 px, 0.25 is 1 px
-    framed_photo, framed_matte = Framing(pad_top=0.5, pad_left=0.25, fill="#0000ff").apply(photo, matte)
+def test_a_border_is_a_share_of_the_shorter_side_in_the_fill_and_is_background_and_farthest_in_the_maps(small):
+    photo, matte, depth = small  # the shorter side is 4 px: 0.5 is 2 px, 0.25 is 1 px
+    framed_photo, framed_matte, framed_depth = Framing(pad_top=0.5, pad_left=0.25, fill="#0000ff").apply(
+        photo, matte, depth
+    )
     assert framed_photo.shape == (6, 7, 3)
     np.testing.assert_array_equal(framed_photo[2:, 1:], photo)
     np.testing.assert_array_equal(framed_photo[:2], np.tile(np.array(BLUE, np.float32), (2, 7, 1)))
@@ -92,22 +101,27 @@ def test_a_border_is_a_share_of_the_shorter_side_in_the_fill_and_is_background_i
     np.testing.assert_array_equal(framed_matte[2:, 1:], matte)
     assert framed_matte[:2].max() == 0
     assert framed_matte[:, :1].max() == 0
+    np.testing.assert_array_equal(framed_depth[2:, 1:], depth)
+    assert framed_depth[:2].max() == 0
+    assert framed_depth[:, :1].max() == 0
 
 
 def test_the_steps_run_in_the_order_flip_turn_crop_pad(small):
-    photo, matte = small
+    photo, matte, depth = small
     framing = Framing(flip="x", angle=90, fit="expand", aspect=1.0, anchor="top", pad_bottom=0.5, fill="#0000ff")
-    framed_photo, framed_matte = framing.apply(photo, matte)
+    framed_photo, framed_matte, framed_depth = framing.apply(photo, matte, depth)
     turned = np.rot90(photo[:, ::-1])  # 6 rows by 4 columns
     cropped = turned[:4]  # a square at the top
     by_hand = np.concatenate([cropped, np.tile(np.array(BLUE, np.float32), (2, 4, 1))])  # half of 4 px below
     np.testing.assert_array_equal(framed_photo, by_hand)
     expected_matte = np.concatenate([np.rot90(matte[:, ::-1])[:4], np.zeros((2, 4), np.float32)])
     np.testing.assert_array_equal(framed_matte, expected_matte)
+    expected_depth = np.concatenate([np.rot90(depth[:, ::-1])[:4], np.zeros((2, 4), np.float32)])
+    np.testing.assert_array_equal(framed_depth, expected_depth)
 
 
 def test_a_turn_by_an_angle_carries_the_matte_with_the_photo(photo, matte):
-    framed_photo, framed_matte = Framing(angle=30, fit="expand").apply(photo, matte)
+    framed_photo, framed_matte, _ = Framing(angle=30, fit="expand").apply(photo, matte)
     assert framed_matte.shape == framed_photo.shape[:2]
     # the disc is turned about the middle of the photo, so it stays in the middle of the larger picture
     rows, columns = np.nonzero(framed_matte >= 0.5)
@@ -117,28 +131,35 @@ def test_a_turn_by_an_angle_carries_the_matte_with_the_photo(photo, matte):
     assert framed_matte.sum() == pytest.approx(matte.sum(), rel=0.02)
 
 
+def test_a_turn_that_expands_the_picture_leaves_its_corners_background_and_farthest(photo):
+    ones = np.ones(photo.shape[:2], np.float32)
+    _, framed_matte, framed_depth = Framing(angle=30, fit="expand").apply(photo, ones, ones)
+    for framed in (framed_matte, framed_depth):
+        assert (framed[0, 0], framed[0, -1], framed[-1, 0], framed[-1, -1]) == (0, 0, 0, 0)
+        assert framed[74, 79] == pytest.approx(1)  # the middle of the 148 by 159 picture is the photo's
+
+
 def test_a_turn_by_an_angle_crops_to_the_largest_rectangle_of_the_photos_aspect_unless_it_expands(photo):
     # 128 by 96 turned by 30 degrees: the scale is 1/((128/96) sin 30 + cos 30) = 0.6525, so 83 by 62 px
-    assert Framing(angle=30).apply(photo, None)[0].shape == (62, 83, 3)
+    assert Framing(angle=30).apply(photo)[0].shape == (62, 83, 3)
     # expanded: 128 cos 30 + 96 sin 30 = 158.9 columns, 128 sin 30 + 96 cos 30 = 147.1 rows
-    assert Framing(angle=30, fit="expand").apply(photo, None)[0].shape == (148, 159, 3)
+    assert Framing(angle=30, fit="expand").apply(photo)[0].shape == (148, 159, 3)
 
 
-def test_framing_without_a_matte_frames_the_photo_alone(small):
-    photo, _ = small
-    framed_photo, framed_matte = Framing(aspect=1.0, flip="y").apply(photo, None)
+def test_framing_without_maps_frames_the_photo_alone(small):
+    photo, _, _ = small
+    framed_photo, framed_matte, framed_depth = Framing(aspect=1.0, flip="y").apply(photo)
     np.testing.assert_array_equal(framed_photo, photo[::-1, 1:5])
-    assert framed_matte is None
+    assert (framed_matte, framed_depth) == (None, None)
 
 
 def test_framing_never_modifies_its_inputs_or_returns_a_view_of_them(small):
-    photo, matte = small
-    before = photo.copy(), matte.copy()
-    framed_photo, framed_matte = Framing(flip="x", aspect=1.0).apply(photo, matte)
-    np.testing.assert_array_equal(photo, before[0])
-    np.testing.assert_array_equal(matte, before[1])
-    assert not np.shares_memory(framed_photo, photo)
-    assert not np.shares_memory(framed_matte, matte)
+    inputs = small
+    before = [array.copy() for array in inputs]
+    framed = Framing(flip="x", aspect=1.0).apply(*inputs)
+    for given, kept, out in zip(inputs, before, framed, strict=True):
+        np.testing.assert_array_equal(given, kept)
+        assert not np.shares_memory(out, given)
 
 
 # --- a crop around the subject --------------------------------------------------------------------------------------
@@ -147,7 +168,7 @@ def test_framing_never_modifies_its_inputs_or_returns_a_view_of_them(small):
 def test_a_crop_around_the_subject_holds_it_with_the_margin_all_round(photo, matte):
     # the disc's pixels at one half or more are 59 rows by 59 columns (radius 29.5 about the pixel (48, 64)): a tenth of
     # 59 is 6 px of margin, so the square crop is 71 px with the subject 6 px from every edge
-    framed_photo, framed_matte = Framing(anchor="subject", aspect=1.0, margin=0.1).apply(photo, matte)
+    framed_photo, framed_matte, _ = Framing(anchor="subject", aspect=1.0, margin=0.1).apply(photo, matte)
     assert framed_photo.shape[:2] == (71, 71)
     rows, columns = np.nonzero(framed_matte >= 0.5)
     assert (rows.min(), columns.min(), 70 - rows.max(), 70 - columns.max()) == (6, 6, 6, 6)
@@ -156,7 +177,7 @@ def test_a_crop_around_the_subject_holds_it_with_the_margin_all_round(photo, mat
 
 
 def test_a_crop_around_the_subject_without_an_aspect_is_its_box(photo, matte):
-    framed_photo, framed_matte = Framing(anchor="subject").apply(photo, matte)
+    framed_photo, framed_matte, _ = Framing(anchor="subject").apply(photo, matte)
     assert framed_photo.shape[:2] == (59, 59)
     np.testing.assert_array_equal(framed_photo, photo[19:78, 35:94])
     assert framed_matte.max() == 1.0
@@ -165,6 +186,15 @@ def test_a_crop_around_the_subject_without_an_aspect_is_its_box(photo, matte):
 def test_a_crop_around_a_subject_that_is_not_there_is_an_error(photo):
     with pytest.raises(SubjectNotFoundError, match="no subject"):
         Framing(anchor="subject", aspect=1.0).apply(photo, np.zeros(photo.shape[:2], np.float32))
+
+
+def test_a_crop_around_the_subject_follows_the_matte_never_the_depth(photo, matte):
+    nearest_top_left = np.zeros(photo.shape[:2], np.float32)
+    nearest_top_left[:10, :10] = 1
+    framed_photo, _, _ = Framing(anchor="subject").apply(photo, matte, nearest_top_left)
+    np.testing.assert_array_equal(framed_photo, photo[19:78, 35:94])
+    with pytest.raises(SubjectNotFoundError, match="matte"):
+        Framing(anchor="subject").apply(photo, depth=nearest_top_left)
 
 
 # --- the cut --------------------------------------------------------------------------------------------------------

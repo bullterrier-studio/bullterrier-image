@@ -60,10 +60,10 @@ CATEGORY_DESCRIPTIONS = {
 CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
 # What a recipe hands an effect besides the image and its parameters, by name: `matte`, the subject's silhouette,
-# float32 (h, w) 0..1, and `partition`, the pieces of the region the step names with its `partition` key, int32 (h, w)
-# numbered 0..n-1 in reading order. An effect declares the ones it needs as keyword-only parameters after `params`,
-# each with a default.
-INPUTS = ("matte", "partition")
+# float32 (h, w) 0..1; `depth`, how near each pixel is, float32 (h, w) 0..1, 1 = nearest; and `partition`, the pieces
+# of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in reading order. An effect
+# declares the ones it needs as keyword-only parameters after `params`, each with a default.
+INPUTS = ("matte", "depth", "partition")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
@@ -82,8 +82,8 @@ class ModelledEffect[P: EffectParams]:
     Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
     `glow(rgb)` (the defaults), `glow(rgb, radius=30)`, or `glow(rgb, GlowParams(radius=30))`. Giving both a model and
     keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
-    naming the effect, the field, the constraint and the value. Injected inputs (`matte`) are passed by keyword in every
-    form.
+    naming the effect, the field, the constraint and the value. Injected inputs (`matte`, `depth`) are passed by keyword
+    in every form.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module

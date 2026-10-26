@@ -181,6 +181,27 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
     assert Recipe("look", steps, frame=frame).needs_matte is needs_matte
 
 
+@pytest.mark.parametrize(
+    ("steps", "needs"),
+    [
+        pytest.param(lambda: [Step("depth_probe")], (False, True), id="a step whose effect takes depth"),
+        pytest.param(
+            lambda: [Each("g", [Step("grade"), Step("depth_probe")])], (False, True), id="a look whose effect takes it"
+        ),
+        pytest.param(
+            lambda: [Step("grade", mask="subject"), Each("g", [Step("evaporate"), "none"])],
+            (True, False),
+            id="steps and looks on the subject need no depth",
+        ),
+        pytest.param(lambda: [Step("depth_probe", mask="subject")], (True, True), id="a step that needs both"),
+        pytest.param(lambda: [Each("g", [Step("grade"), "none"])], (False, False), id="neither"),
+    ],
+)
+def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_takes_it(depth_probe, steps, needs):
+    recipe = Recipe("look", steps(), regions={"g": Grid()})
+    assert (recipe.needs_matte, recipe.needs_depth) == needs
+
+
 def test_the_recipe_objects_are_frozen():
     with pytest.raises(ValueError, match="frozen"):
         Step("grade").opacity = 0.5  # type: ignore[misc]  # the point of the test

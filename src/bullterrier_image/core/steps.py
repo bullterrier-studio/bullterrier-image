@@ -152,11 +152,6 @@ class Step(_Layer):
         return self
 
     @property
-    def wants_matte(self) -> bool:
-        """True for an effect that takes the subject's silhouette: it declares the input `matte`."""
-        return "matte" in registry.inputs(self.effect)
-
-    @property
     def runs(self) -> tuple["Step", ...]:
         """The effect steps this step runs: itself."""
         return (self,)
@@ -256,11 +251,6 @@ class Each(_Layer):
         """The effect steps this step runs: its looks, but the "none" ones."""
         return tuple(look for look in self.looks if isinstance(look, Step))
 
-    @property
-    def wants_matte(self) -> bool:
-        """True if a look takes the subject's silhouette."""
-        return any(look.wants_matte for look in self.runs)
-
     def references(self) -> list[Reference]:
         """The regions this step names, as `(key, name, kind)`: its mask, its partition, and its looks' regions."""
         return [
@@ -334,9 +324,9 @@ class Recipe(ValidatedModel):
         here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
-    frame: a `Framing` (default: none): flips, turns, crops and pads the photo and the subject matte together before the
-        first step, and may cut the finished picture out (a circle, rounded corners, the subject) after the last, so the
-        render has an alpha channel.
+    frame: a `Framing` (default: none): flips, turns, crops and pads the photo, the subject matte and the depth map
+        together before the first step, and may cut the finished picture out (a circle, rounded corners, the subject)
+        after the last, so the render has an alpha channel.
     """
 
     name: str = Field(
@@ -398,11 +388,22 @@ class Recipe(ValidatedModel):
         """True if a step takes the matte, or a region a step uses is made from the subject (the subject or background
         itself, or a region laid over it), or the framing crops around the subject or keeps only it: rendering must
         find the subject first (the slow part). Regions that are declared but not used need nothing."""
-        return (
-            self.frame.needs_matte
-            or any(step.wants_matte for step in self.steps)
-            or needs_subject(self.regions, self._names_used())
-        )
+        return self.frame.needs_matte or bool(self.taking("matte")) or needs_subject(self.regions, self._names_used())
+
+    @property
+    def needs_depth(self) -> bool:
+        """True if a step's effect, or a look's, takes the depth map: rendering must be given it or a depth finder."""
+        return bool(self.taking("depth"))
+
+    def taking(self, name: str) -> list[tuple[int, str]]:
+        """The steps whose effect, or the effect of one of whose looks, takes the injected input `name` (one of
+        `registry.INPUTS`), as (step number counted from 1, effect), in order."""
+        return [
+            (number, run.effect)
+            for number, step in enumerate(self.steps, start=1)
+            for run in step.runs
+            if name in registry.inputs(run.effect)
+        ]
 
     @property
     def needs_finder(self) -> bool:

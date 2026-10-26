@@ -75,7 +75,7 @@ def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_
     """`depth` is the name of an injected input, so no effect field may carry it."""
     (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{new}=0.5\n')).steps
     assert step.runs[0].params == {new: 0.5}
-    with pytest.raises(RecipeError, match=rf"step 1.*{effect_name}.*`{old}` is not a parameter"):
+    with pytest.raises(RecipeError, match=rf"step 1.*`{old}` is supplied by the recipe"):
         load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{old}=0.5\n', "old.toml"))
 
 

@@ -75,9 +75,10 @@ The runner is given the subject (a `matte` or a `find_subject` `Finder(identity,
    within float tolerance. `numpy.random.default_rng(seed)`; no global random state.
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
-   (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`,
-   `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong; each also inherits
-   the matching builtin. A broken effect definition (caught at import) is a programming error: plain `ValueError`/`TypeError`.
+   (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `DepthNotFoundError`, `BackendUnavailableError`,
+   `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
+   each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
+   `ValueError`/`TypeError`.
 
 ## Standards
 
@@ -111,8 +112,9 @@ An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imagei
 def glow(rgb: np.ndarray, params: GlowParams, *, matte: np.ndarray | None = None) -> np.ndarray: ...
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
-and maximum. `matte` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so is `partition` (piece labels
-of a region, `(h, w)` int32). Contract tests check all of this for every effect.
+and maximum. `matte` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,
+`(h, w)` float32 0..1, 1 = nearest) and `partition` (piece labels of a region, `(h, w)` int32). Contract tests check all of this
+for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
 (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.

@@ -122,15 +122,23 @@ def test_an_opaque_four_channel_picture_is_shown_as_its_colour_and_a_half_clear_
     )  # half the colour, half the board, to 8 bits
 
 
-def test_write_stages_saves_a_stage_with_transparency_as_png_and_the_others_as_jpg(photo, tmp_path):
+def test_write_stages_names_each_stage_and_saves_one_with_transparency_as_png_and_the_others_as_jpg(photo, tmp_path):
     stages = [
         Stage("input", photo),
+        Stage("subject matte (white = subject)", photo),
+        Stage("depth (white = nearest)", photo),
         Stage("1. transparent('circle')", np.dstack([photo, np.ones((96, 128), np.float32)])),
     ]
     sheet = write_stages(stages, tmp_path)
-    assert sorted(path.name for path in tmp_path.iterdir()) == ["00-input.jpg", "01-transparent.png", "_sheet.jpg"]
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "00-input.jpg",
+        "01-matte.jpg",
+        "02-depth.jpg",
+        "03-transparent.png",
+        "_sheet.jpg",
+    ]
     assert sheet == tmp_path / "_sheet.jpg"
-    with Image.open(tmp_path / "01-transparent.png") as saved:
+    with Image.open(tmp_path / "03-transparent.png") as saved:
         assert saved.mode == "RGBA"
 
 

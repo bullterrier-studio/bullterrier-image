@@ -138,6 +138,19 @@ def partition_probe(throwaway_effects):
 
 
 @pytest.fixture
+def depth_probe(throwaway_effects):
+    """Registers `depth_probe`, an effect that takes the injected input `depth` (float32 (h, w), 1 = nearest): it
+    returns the depth as a grey picture, so its output shows the depth map it was given."""
+
+    def depth_probe(rgb: np.ndarray, params: ProbeParams, *, depth: np.ndarray | None = None) -> np.ndarray:
+        """Paints each pixel with its depth."""
+        assert depth is not None
+        return np.repeat(depth[..., None], 3, axis=2)
+
+    return effect(category="utilities", params=ProbeParams)(depth_probe)
+
+
+@pytest.fixture
 def throwaway_effects():
     """Lets a test register effects of its own: whatever it registered is removed again afterwards, even if the test
     fails, so no other test ever sees it."""

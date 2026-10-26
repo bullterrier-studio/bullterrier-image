@@ -8,7 +8,7 @@ from contextlib import nullcontext
 import numpy as np
 import pytest
 
-from bullterrier_image import RecipeError, SubjectNotFoundError
+from bullterrier_image import DepthNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core import runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, param
@@ -112,6 +112,109 @@ def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     broken = Finder("stand-in", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
     with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
         run(photo, MASKED, find_subject=broken)
+
+
+# --- depth: a second map, given or found like the subject ------------------------------------------------------------
+
+RAMP = np.arange(96 * 128, dtype=np.float32).reshape(96, 128) / (96 * 128 - 1)  # every pixel different: a move shows
+WITH_DEPTH = {
+    "a given map": lambda depth: {"depth": depth},
+    "a finder": lambda depth: {"find_depth": Finder("stand-in depth", CountingFinder(depth))},
+}
+
+
+def deep(**keys) -> Recipe:
+    """A recipe of one step of `depth_probe`, which paints the depth map it is given (needs the `depth_probe`)."""
+    return Recipe("deep", [Step("depth_probe")], **{"size": None, **keys})
+
+
+@pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
+def test_an_effect_that_takes_depth_is_given_the_depth_map(photo, depth_probe, given):
+    np.testing.assert_array_equal(runner.render(photo, deep(), **given(RAMP))[..., 0], RAMP)
+
+
+@pytest.mark.parametrize(
+    "run",
+    [*RUNS.values(), lambda photo, recipe, **k: runner.render_all(photo, [recipe, PLAIN, recipe], **k)],
+    ids=[*RUNS.keys(), "render_all of two recipes that need it"],
+)
+def test_the_depth_finder_is_asked_once_with_the_photo_as_given(run, photo, depth_probe):
+    finder = CountingFinder(RAMP)
+    run(photo, deep(size=64, frame=Framing(aspect=1.0)), find_depth=Finder("stand-in depth", finder))
+    assert finder.seen == [(96, 128, 3)]
+
+
+def test_the_depth_finder_is_not_asked_when_nothing_needs_depth(photo, matte, depth_probe):
+    finder = CountingFinder(RAMP)
+    asked = Finder("stand-in depth", finder)
+    runner.render(photo, PLAIN, find_depth=asked)
+    runner.trace(photo, MASKED, matte=matte, find_depth=asked)
+    runner.render_all(photo, [PLAIN, MASKED], matte=matte, find_depth=asked)
+    runner.render(photo, deep(), depth=RAMP, find_depth=asked)
+    assert finder.seen == []
+
+
+@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
+def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_the_step_and_both_ways(
+    run, photo, depth_probe
+):
+    with pytest.raises(DepthNotFoundError, match="step 1") as raised:
+        run(photo, deep())
+    message = str(raised.value)
+    assert "depth_probe" in message
+    assert "`depth`" in message
+    assert "`find_depth`" in message
+
+
+@pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
+def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, depth_probe, given):
+    with pytest.raises(DepthNotFoundError, match=r"\(48, 64\).*\(96, 128\)"):
+        runner.render(photo, deep(), **given(RAMP[::2, ::2]))
+
+
+@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
+def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, depth_probe):
+    broken = Finder("stand-in depth", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
+    with pytest.raises(DepthNotFoundError, match="`find_depth` returned None"):
+        run(photo, deep(), find_depth=broken)
+
+
+@pytest.mark.parametrize(
+    ("keys", "by_hand"),
+    [
+        pytest.param({"frame": Framing(flip="x")}, lambda a: a[:, ::-1], id="a flip"),
+        pytest.param({"frame": Framing(aspect=1.0)}, lambda a: a[:, 16:112], id="a square crop"),
+        pytest.param({"frame": Framing(angle=90, fit="expand")}, np.rot90, id="a quarter turn"),
+        pytest.param(
+            {"frame": Framing(pad_top=0.5)},
+            lambda a: np.concatenate([np.zeros((48, 128), np.float32), a]),
+            id="a border is farthest",
+        ),
+        pytest.param({"size": 64}, lambda a: resize(a, 64), id="the size"),
+    ],
+)
+def test_the_depth_map_is_framed_and_scaled_with_the_photo(photo, depth_probe, keys, by_hand):
+    np.testing.assert_array_equal(runner.render(photo, deep(**keys), depth=RAMP)[..., 0], by_hand(RAMP))
+
+
+def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, depth_probe):
+    out = runner.render(photo, deep(frame=Framing(angle=30, fit="expand")), depth=np.ones((96, 128), np.float32))
+    assert out.shape == (148, 159, 3)
+    assert (out[0, 0, 0], out[0, -1, 0], out[-1, 0, 0], out[-1, -1, 0]) == (0, 0, 0, 0)
+    assert out[74, 79, 0] == pytest.approx(1)
+
+
+def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, matte, depth_probe):
+    recipe = deep(frame=Framing(transparent="background"))
+    stages = runner.trace(photo, recipe, matte=matte, depth=RAMP)
+    assert [stage.label for stage in stages[:3]] == [
+        "input",
+        "subject matte (white = subject)",
+        "depth (white = nearest)",
+    ]
+    np.testing.assert_array_equal(stages[2].image, np.repeat(RAMP[..., None], 3, axis=2))
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, matte=matte, depth=RAMP))
+    assert "depth" not in " ".join(stage.label for stage in runner.trace(photo, MASKED, matte=matte, depth=RAMP))
 
 
 # --- framing: the photo and its matte are framed together, before the steps -------------------------------------------

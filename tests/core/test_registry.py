@@ -139,7 +139,7 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
 
 
 @pytest.mark.parametrize(
-    "name", ["matte", "partition", "effect", "mask", "opacity", "blend_mode", "preset", "each", "looks"]
+    "name", ["matte", "depth", "partition", "effect", "mask", "opacity", "blend_mode", "preset", "each", "looks"]
 )
 def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
     field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")

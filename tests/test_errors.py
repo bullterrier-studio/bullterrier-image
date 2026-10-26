@@ -9,6 +9,7 @@ import pytest
 from bullterrier_image import (
     BackendUnavailableError,
     BullterrierImageError,
+    DepthNotFoundError,
     ImageReadError,
     NonFiniteImageError,
     ProjectError,
@@ -66,6 +67,7 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
         (UnknownEffectError, KeyError),
         (UnknownEffectError, RecipeError),
         (SubjectNotFoundError, RuntimeError),
+        (DepthNotFoundError, RuntimeError),
         (BackendUnavailableError, NotImplementedError),
         (ImageReadError, OSError),
         (NonFiniteImageError, ValueError),

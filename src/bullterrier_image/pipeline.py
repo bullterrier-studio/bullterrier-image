@@ -56,7 +56,7 @@ from .checks import matte_warnings, still_warnings
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
 from .core.regions import Svg
-from .core.runner import Finder, subject_from
+from .core.runner import Finder, find_map
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .finding.subject import subject_finder
 from .ops.resample import resize
@@ -394,7 +394,7 @@ class _Photo:
             if self._matte is None:
                 try:
                     # analyse (`run` gave a finder: a recipe needs the subject)
-                    self._matte = subject_from(self.finder, self.rgb())  # type: ignore[arg-type]  # see above
+                    self._matte = find_map("matte", self.finder, self.rgb())  # type: ignore[arg-type]  # see above
                 except Exception as error:  # remembered, so the photo's other recipes fail without asking again
                     self._matte_error = error
                     raise

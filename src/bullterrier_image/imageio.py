@@ -17,7 +17,7 @@ from PIL import Image, ImageCms, ImageOps
 
 from bullterrier_image.errors import BackendUnavailableError, ImageReadError, NonFiniteImageError
 
-__all__ = ["from_pil", "load", "load_matte", "load_picture", "save", "to_pil"]
+__all__ = ["from_pil", "load", "load_depth", "load_matte", "load_picture", "save", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 # littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
@@ -54,11 +54,28 @@ def load_matte(path: str | Path) -> np.ndarray:
     rule and ImageReadError are as in `load`, so the matte lines up with the photo it was made for.
     """
     with _picture(path) as img:
-        if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants, or "I" from older Pillow)
-            return np.clip(np.asarray(img, np.float32) / _SIXTEEN_BIT, 0.0, 1.0)
-        if img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info:
+        if not img.mode.startswith("I") and (img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info):
             return np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
-        return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
+        return _brightness(img)
+
+
+def load_depth(path: str | Path) -> np.ndarray:
+    """Read a depth map someone already has: float32 (height, width), 1 = nearest, 0 = farthest.
+
+    Gives the picture's brightness (white = near), never its alpha. 8- and 16-bit files keep their full range, so the
+    same depth saved in either reads the same; EXIF rotation, the first-frame rule and ImageReadError are as in `load`,
+    so the map lines up with the photo it was made for.
+    """
+    with _picture(path) as img:
+        return _brightness(img)
+
+
+def _brightness(img: Image.Image) -> np.ndarray:
+    """The picture's brightness, float32 (height, width) 0..1: 16-bit greyscale over 65535, anything else as 8-bit
+    greyscale over 255."""
+    if img.mode.startswith("I"):  # 16-bit greyscale ("I;16" and its variants, or "I" from older Pillow)
+        return np.clip(np.asarray(img, np.float32) / _SIXTEEN_BIT, 0.0, 1.0)
+    return np.asarray(img.convert("L"), np.float32) / _EIGHT_BIT
 
 
 def load_picture(path: str | Path) -> np.ndarray:

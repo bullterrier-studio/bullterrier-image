@@ -1,30 +1,31 @@
 """How a recipe frames the photo before its steps run and cuts the picture out after them: the `Framing` model.
 
 A `Framing` is a recipe's geometry, declared like an effect's parameters (every field has a unit, a range and a
-description: `Framing.documentation()` lists them). The runner applies it to the photo and the subject matte
-together: `apply` before the first step, in one fixed order (flip, rotate, crop, pad; the recipe's `size` follows),
+description: `Framing.documentation()` lists them). The runner applies it to the photo, the subject matte and the depth
+map together: `apply` before the first step, in one fixed order (flip, rotate, crop, pad; the recipe's `size` follows),
 `cut` after the last one (a circle, rounded corners, or the subject as the picture's only opaque part). Effects never
 see any of it: they keep working on a three-channel picture of any size.
 
 Promises: the default `Framing()` changes nothing; every value is checked when the framing is made, a `RecipeError`
 naming the field and the value wherever it came from (a `[frame]` table, Python); the same photo, matte and framing
-always give the same pixels; the photo and the matte are never modified; all lengths are shares of the picture, so the
+always give the same pixels; the photo and its maps are never modified; all lengths are shares of the picture, so the
 same look comes out at any resolution.
 
-Dependency direction: imports `params` and `ops` only.
+Dependency direction: imports `params`, `ops` and `errors` only.
 """
 
 from typing import Any, Literal, overload
 
 import numpy as np
 
+from bullterrier_image.errors import SubjectNotFoundError
 from bullterrier_image.ops import frame
 
 from .params import Color, EffectParams, param
 
 __all__ = ["Framing"]
 
-_MATTE = 3  # the position of the subject matte among the channels it travels with
+_MATTE = 3  # the position of the subject matte, when given, among the channels it travels with (the depth is after it)
 
 
 class Framing(EffectParams):
@@ -133,23 +134,40 @@ class Framing(EffectParams):
         return self.transparent != "none"
 
     @overload
-    def apply(self, rgb: np.ndarray, matte: np.ndarray) -> tuple[np.ndarray, np.ndarray]: ...
+    def apply(
+        self, rgb: np.ndarray, matte: np.ndarray, depth: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
     @overload
-    def apply(self, rgb: np.ndarray, matte: None) -> tuple[np.ndarray, None]: ...
+    def apply(self, rgb: np.ndarray, matte: np.ndarray, depth: None = None) -> tuple[np.ndarray, np.ndarray, None]: ...
 
-    def apply(self, rgb: np.ndarray, matte: np.ndarray | None) -> tuple[np.ndarray, np.ndarray | None]:
-        """The photo `rgb` (rows, columns, 3) and its subject `matte` (rows, columns, or None) framed together: flipped,
-        turned, cropped, padded, in that order, the matte moving exactly as the photo does (a turn or a border leaves
-        0, background, where the picture is not). New arrays when anything changes, the inputs themselves when
-        nothing does; the inputs are never modified. `matte` is needed when `anchor` is 'subject'; SubjectNotFoundError
-        when it has no subject to crop around."""
+    @overload
+    def apply(
+        self, rgb: np.ndarray, matte: None = None, *, depth: np.ndarray
+    ) -> tuple[np.ndarray, None, np.ndarray]: ...
+
+    @overload
+    def apply(
+        self, rgb: np.ndarray, matte: np.ndarray | None = None, depth: np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]: ...
+
+    def apply(
+        self, rgb: np.ndarray, matte: np.ndarray | None = None, depth: np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+        """The photo `rgb` (rows, columns, 3), its subject `matte` and its `depth` (each rows, columns, or None) framed
+        together: flipped, turned, cropped, padded, in that order, each map moving exactly as the photo does (a turn or
+        a border leaves 0 where the picture is not: background, farthest). New arrays when anything changes, the
+        inputs themselves when nothing does; the inputs are never modified. A crop around the subject follows the
+        matte alone, never the depth; SubjectNotFoundError when it has no `matte` or no subject to crop around."""
         cropping = self.aspect is not None or self.anchor == "subject"
         padding = (self.pad_top, self.pad_right, self.pad_bottom, self.pad_left)
         if self.flip == "none" and not (self.angle or cropping or any(padding)):
-            return rgb, matte
-        stack = rgb if matte is None else np.concatenate([rgb, matte[..., None]], axis=2)  # the matte rides along
-        fill = (*self.fill, 0.0)[: stack.shape[2]]
+            return rgb, matte, depth
+        if self.anchor == "subject" and matte is None:
+            raise SubjectNotFoundError("a crop around the subject (`anchor` 'subject') needs the subject's matte")
+        maps = [layer[..., None] for layer in (matte, depth) if layer is not None]
+        stack = np.concatenate([rgb, *maps], axis=2) if maps else rgb  # the maps ride along, the matte first
+        fill = (*self.fill, 0.0, 0.0)[: stack.shape[2]]
         stack = frame.flip(stack, x=self.flip in ("x", "both"), y=self.flip in ("y", "both"))
         if self.angle:
             stack = frame.rotate(stack, self.angle, fit=self.fit, fill=fill, resample=self.resample)
@@ -159,8 +177,9 @@ class Framing(EffectParams):
             short = min(stack.shape[:2])
             top, right, bottom, left = (round(share * short) for share in padding)
             stack = frame.pad(stack, top=top, right=right, bottom=bottom, left=left, fill=fill)
+        layers = (np.array(stack[..., channel], order="C") for channel in range(_MATTE, stack.shape[2]))
         framed = np.array(stack[..., :_MATTE], order="C")
-        return framed, None if matte is None else np.array(stack[..., _MATTE], order="C")
+        return framed, None if matte is None else next(layers), None if depth is None else next(layers)
 
     def cut(self, rgb: np.ndarray, matte: np.ndarray | None) -> np.ndarray:
         """`rgb` (rows, columns, 3) as a new RGBA picture (rows, columns, 4, straight alpha) cut out as `transparent`

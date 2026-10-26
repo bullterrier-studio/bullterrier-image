@@ -230,7 +230,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject** (decided, not built yet). An effect that needs distance (`depth_of_field`,
   `parallax`, the depth regions) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest. The runner is given a depth
-  map or a `Finder` for one, and the public API binds the default: Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0)
+  map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is `DepthNotFoundError` naming the step), and
+  the public API binds the default: Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0)
   on ONNX Runtime, pinned to a commit and checked against a SHA-256, downloaded like the portable subject model;
   `--depth` (or `depth=`) takes a map you already have (brightness, white = near). The model's inverse depth is
   min-max scaled per photo (a flat photo gives zeros). Decided:

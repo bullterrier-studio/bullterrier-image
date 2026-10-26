@@ -129,8 +129,10 @@ def write_stages(stages: list[Stage], folder: str | Path, quality: int = 92) -> 
 
 
 def _stage_name(label: str) -> str:
-    """A file-name-friendly name for a stage label: 'input', 'matte', or the step's effect."""
+    """A file-name-friendly name for a stage label: 'input', 'matte', 'depth', or the step's effect."""
     if label.startswith("subject matte"):
         return "matte"
+    if label.startswith("depth ("):
+        return "depth"
     found = re.match(r"\d+\. (\w+)", label)
     return found.group(1) if found else re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")

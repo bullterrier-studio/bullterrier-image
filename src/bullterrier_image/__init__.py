@@ -35,6 +35,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .errors import (
         BackendUnavailableError,
         BullterrierImageError,
+        DepthNotFoundError,
         ImageReadError,
         NonFiniteImageError,
         ProjectError,
@@ -75,7 +76,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "ImageReadError", "NonFiniteImageError",
+        "BackendUnavailableError", "DepthNotFoundError", "ImageReadError", "NonFiniteImageError",
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".core.params": ("Picture",),
@@ -121,6 +122,7 @@ __all__ = [
     "BullterrierImageError",
     "Curve",
     "Cuts",
+    "DepthNotFoundError",
     "Each",
     "Edge",
     "Finder",

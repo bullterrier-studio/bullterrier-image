@@ -7,7 +7,8 @@ regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`) its steps n
 the subject is found. `render`, `trace` and `render_all` take the same arguments as the core's, but when a recipe will
 ask for the subject (it needs the subject and no `matte` is given, or it finds the subject piece by piece) and no
 `find_subject` is given, they find it with `bullterrier_image.finding.subject.subject_finder()`, built only then (so a
-recipe that needs no subject never depends on the segmenter settings).
+recipe that needs no subject never depends on the segmenter settings). Depth has no default finder: a recipe that needs
+it is given `depth` or `find_depth`.
 """
 
 import numpy as np
@@ -49,10 +50,13 @@ def render(
     recipe: Recipe,
     *,
     matte: np.ndarray | None = None,
+    depth: np.ndarray | None = None,
     find_subject: Finder | None = None,
+    find_depth: Finder | None = None,
 ) -> np.ndarray:
     """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default subject finder."""
-    return runner.render(rgb, recipe, matte=matte, find_subject=_finder(find_subject, matte, [recipe]))
+    find = _finder(find_subject, matte, [recipe])
+    return runner.render(rgb, recipe, matte=matte, depth=depth, find_subject=find, find_depth=find_depth)
 
 
 def trace(
@@ -60,10 +64,13 @@ def trace(
     recipe: Recipe,
     *,
     matte: np.ndarray | None = None,
+    depth: np.ndarray | None = None,
     find_subject: Finder | None = None,
+    find_depth: Finder | None = None,
 ) -> list[Stage]:
     """Every stage of a render: `bullterrier_image.core.runner.trace` with the default subject finder."""
-    return runner.trace(rgb, recipe, matte=matte, find_subject=_finder(find_subject, matte, [recipe]))
+    find = _finder(find_subject, matte, [recipe])
+    return runner.trace(rgb, recipe, matte=matte, depth=depth, find_subject=find, find_depth=find_depth)
 
 
 def render_all(
@@ -71,10 +78,13 @@ def render_all(
     recipes: list[Recipe],
     *,
     matte: np.ndarray | None = None,
+    depth: np.ndarray | None = None,
     find_subject: Finder | None = None,
+    find_depth: Finder | None = None,
 ) -> list[np.ndarray]:
     """Several recipes on one photo: `bullterrier_image.core.runner.render_all` with the default subject finder."""
-    return runner.render_all(rgb, recipes, matte=matte, find_subject=_finder(find_subject, matte, recipes))
+    find = _finder(find_subject, matte, recipes)
+    return runner.render_all(rgb, recipes, matte=matte, depth=depth, find_subject=find, find_depth=find_depth)
 
 
 def _finder(find_subject: Finder | None, matte: np.ndarray | None, recipes: list[Recipe]) -> Finder | None:
