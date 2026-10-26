@@ -254,7 +254,8 @@ def _segmenter_option(p: argparse.ArgumentParser) -> None:
         "--segmenter",
         type=_segmenter,
         help="what finds the subject: onnx (a portable model, downloaded on first use) or vision (Apple Vision, "
-        "macOS only, never chosen unless asked); default: $BT_IMAGE_SEGMENTER, else onnx",
+        "macOS only, never chosen unless asked); default: $BT_IMAGE_SEGMENTER, else onnx. A segmenter named here is "
+        "checked at once, even for a look that needs no subject",
     )
 
 

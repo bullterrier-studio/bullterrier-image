@@ -42,7 +42,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         SubjectNotFoundError,
         UnknownEffectError,
     )
-    from .finding.subject import subject_matte
+    from .finding.subject import subject_finder, subject_matte
     from .pipeline import Project, load_project, run
     from .recipe import (
         Curve,
@@ -79,7 +79,7 @@ _HOMES = {
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".core.params": ("Picture",),
-    ".finding.subject": ("subject_matte",),
+    ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
         "Cuts", "Curve", "Each", "Edge", "Finder", "Framing", "Grid", "Line", "Path", "Pick", "Recipe", "Shards",
@@ -152,6 +152,7 @@ __all__ = [
     "render",
     "render_all",
     "run",
+    "subject_finder",
     "subject_matte",
     "trace",
 ]  # fmt: skip

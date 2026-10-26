@@ -77,12 +77,12 @@ def render(
     alpha (h, w, 4), instead of three.
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 with the photo's
-    height and width, 0..1 (white = subject), or None. find_subject: called with the photo as given (before it is
-    framed or scaled) when the recipe needs the subject and no `matte` was given, and with the crop of the working
-    picture of each piece for a `Subject` region with `per` (see `Finder`). Raises SubjectNotFoundError when the
-    recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's size, a `per`
-    region has no finder or the finder's matte does not fit its crop, or the framing crops around a subject that is
-    not there.
+    height and width, 0..1 (white = subject), or None. find_subject: its `find` is called with the photo as given
+    (before it is framed or scaled) when the recipe needs the subject and no `matte` was given, and with the crop of
+    the working picture of each piece for a `Subject` region with `per` (see `Finder`). Raises SubjectNotFoundError
+    when the recipe needs the subject and neither was given, the finder returns None, the matte is not the photo's
+    size, a `per` region has no finder or the finder's matte does not fit its crop, or the framing crops around a
+    subject that is not there.
     """
     image, matte, regions = _prepare(rgb, recipe, matte, find_subject)
     stages = _stages(image, recipe.steps, matte, regions)
@@ -151,9 +151,9 @@ def render_all(
     """Run several recipes on one photo; the subject is found at most once, however many recipes need it.
 
     rgb: the photo (see `render`). recipes: the recipes to run; the results come back in the same order, one still each.
-    matte: the subject's alpha, used by every recipe (see `render`), or None. find_subject: called once with the photo
-    as given when any recipe needs the subject and no `matte` was given (SubjectNotFoundError if it is needed and
-    missing), and about the pieces of a `Subject` with `per` as for `render`.
+    matte: the subject's alpha, used by every recipe (see `render`), or None. find_subject: its `find` is called once
+    with the photo as given when any recipe needs the subject and no `matte` was given (SubjectNotFoundError if it is
+    needed and missing), and about the pieces of a `Subject` with `per` as for `render`.
     """
     masked = next((recipe for recipe in recipes if recipe.needs_matte), None)
     if matte is None and masked is not None:

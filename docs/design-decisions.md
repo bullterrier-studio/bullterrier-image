@@ -195,7 +195,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
   through public parameters instead of patching.
 - **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a non-blank string and a function from
-  the photo to a map; `render`, `trace`, `render_all` and `pipeline.run` take `matte=` and `find_subject=`, and
+  the photo to a map; `render`, `trace` and `render_all` take `matte=` and `find_subject=`, `pipeline.run` takes
+  `find_subject=`, and
   `finding.subject.subject_finder(segmenter=None)` returns the default, named by its backend and model. The default is
   bound lazily, only when a recipe will ask for the subject. The pipeline's subject and crop caches are keyed by the
   identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable

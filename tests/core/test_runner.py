@@ -39,6 +39,7 @@ class CountingFinder:
         pytest.param("stand-in v1", np.mean, nullcontext(), id="a named function is a finder"),
         pytest.param("", np.mean, pytest.raises(RecipeError, match="identity"), id="no identity is refused"),
         pytest.param(" \t", np.mean, pytest.raises(RecipeError, match="identity"), id="a blank identity is refused"),
+        pytest.param(None, np.mean, pytest.raises(RecipeError, match="identity"), id="an identity not text is refused"),
         pytest.param(
             "stand-in v1", 3, pytest.raises(RecipeError, match="find must"), id="a find not callable is refused"
         ),

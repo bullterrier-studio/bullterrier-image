@@ -354,14 +354,11 @@ def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(fold
     project = load_project(folder / "bt-image.toml")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     assert recipes_redone(run(project, find_subject=subject_finder("onnx"))) == ["cut1", "cut2", "grainy", "warm"]
-    assert (
-        recipes_redone(run(project, find_subject=subject_finder("onnx"))) == []
-    )  # same segmenter and model: everything is up to date
+    again = recipes_redone(run(project, find_subject=subject_finder("onnx")))
+    assert again == []  # same segmenter and model: everything is up to date
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))  # another model finds other subjects
-    assert recipes_redone(run(project, find_subject=subject_finder("onnx"))) == [
-        "cut1",
-        "cut2",
-    ]  # only what uses the subject is redone
+    redone = recipes_redone(run(project, find_subject=subject_finder("onnx")))
+    assert redone == ["cut1", "cut2"]  # only what uses the subject is redone
 
 
 def test_the_segmenter_chosen_by_the_environment_is_part_of_what_is_remembered(folder, echo_model, monkeypatch):
