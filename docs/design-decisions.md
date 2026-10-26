@@ -139,6 +139,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `amount` (s + h) / 2, `balance` (h - s) / (h + s). *Consequence:* grey grain draws the stream of the old `grain` (and
   of `noise(color=False)`, equal to 6e-8); colour grain draws that of `film_grain` (channel seed = `seed << 2 |
   channel`), so colour `noise` keeps its distribution but not its random values.
+- **A parameter may name a field.** `field: FieldName = param("depth", doc=...)` holds the name of a selection, written
+  as `mask` and `Drive.by` are: `depth`, `light`, `subject`, `background` or a region of the recipe (`field = "light"`,
+  `fx.relight(field="light")`). The step checks the name when it is made, as it checks `by`: it exists and is a
+  selection. The runner builds only the fields some step names (no depth model runs for `field = "light"`) and hands
+  the effect the resolved float32 `(h, w)` array 0..1 as the keyword-only argument of the parameter's name
+  (`def relight(rgb, params, *, field)`); a direct call passes that array (`registry.apply("relight", rgb, field=arr)`).
+  A field is not a number: no address, not drivable. A step may have a field and a `Drive` on another parameter: the
+  field is resolved once and every level of the drive gets the same array; the drive keeps its own `by`. Effects declare
+  a field only for what picks where or how much they work; the maps `subject` and `depth` stay inputs until the effects
+  that take them move onto this. *Reason:* what an effect works from (depth, light, a band) is a choice of the look, so
+  it is data in the recipe, not a second effect per source or an input only code can pick. *Consequence:* registering
+  an effect fails unless each `FieldName` parameter has a keyword-only argument of its name; a map a field needs and
+  nobody gave is the usual `MapNotFoundError`.
 
 ## Recipes
 
