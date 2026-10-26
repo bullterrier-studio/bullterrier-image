@@ -40,9 +40,11 @@ class Framing(EffectParams):
     angle: float = param(
         0.0,
         unit="degrees",
-        min=-360,
-        max=360,
-        doc="Turn the photo about its centre, counter-clockwise when positive (-360 to 360). A quarter turn moves "
+        min=-180,
+        max=180,
+        cyclic=True,
+        doc="Turn the photo about its centre, counter-clockwise when positive (-180 to 180; any other angle is the "
+        "same turn inside that range, 270 is -90). A quarter turn moves "
         "every pixel exactly; any other angle resamples the picture.",
     )
     fit: Literal["crop", "expand"] = param(

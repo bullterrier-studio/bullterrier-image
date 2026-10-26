@@ -910,8 +910,12 @@ BAD_VALUES = {
     "one selection combined": (Combine, {"of": ("depth",)}, "of"),
     "an operation that is not offered": (Combine, {"op": "xor"}, "op"),
     "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^combine: .*op"),
-    "an angle past a full turn": (LinearGradient, {"angle": 361}, "angle"),
-    "a gradient named by its kind as a recipe writes it": (LinearGradient, {"angle": 361}, "^linear_gradient: .*angle"),
+    "an angle that is not a number": (LinearGradient, {"angle": "up"}, "angle"),
+    "a gradient named by its kind as a recipe writes it": (
+        LinearGradient,
+        {"angle": "up"},
+        "^linear_gradient: .*angle",
+    ),
     "a centre off the picture": (RadialGradient, {"x": 1.1}, "x"),
     "a radius of nothing": (RadialGradient, {"radius": 0}, "radius"),
     "a radius past 2": (RadialGradient, {"radius": 2.5}, "radius"),
@@ -1874,3 +1878,15 @@ def test_a_tilt_is_a_band_of_a_gradient_and_a_vignette_is_a_gradient_beyond_a_ra
     )
     # the rows' centres rise 0.95 (top) to 0.05 (bottom) in steps of 0.1: only 0.55 and 0.45 lie in 0.4..0.6
     np.testing.assert_array_equal(regions.selection("middle").alpha[:, 0], [0, 0, 0, 0, 1, 1, 0, 0, 0, 0])
+
+
+@pytest.mark.parametrize(
+    ("written", "stored"),
+    [
+        pytest.param(360, 360, id="a whole turn"),
+        pytest.param(450, 90, id="a quarter past a turn"),
+        pytest.param(-90, 270, id="a quarter back"),
+    ],
+)
+def test_a_gradient_angle_past_its_turn_is_the_same_direction_inside_it(written, stored):
+    assert LinearGradient(angle=written).angle == stored

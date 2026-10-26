@@ -36,7 +36,7 @@ import re
 import textwrap
 import types
 import typing
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_origin
 
@@ -209,6 +209,7 @@ class _Spec:
     max: float | None
     advanced: bool
     drivable: bool = False
+    cyclic: bool = False
     field_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -221,6 +222,7 @@ def param(
     max: float | None = None,  # noqa: A002  (the documented name of the range's upper bound)
     advanced: bool = False,
     drivable: bool = False,
+    cyclic: bool = False,
     **field_kwargs: Any,
 ) -> Any:
     """Declare one field of an `EffectParams` model.
@@ -232,11 +234,13 @@ def param(
     than to choose the look; it is listed after the basic fields (and left out of short listings) but is settable,
     validated and in the schema like any other. drivable: a field (see `Drive`) may vary this decimal number pixel by
     pixel; declare it only where the effect's output changes smoothly with the value. Only a float can be.
-    field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
+    cyclic: an angle in degrees whose value and the value a turn (360) further mean the same picture; `min` to `max`
+    must be exactly one turn, and a value outside it is stored as the same direction inside it (a value inside, the
+    bounds included, is kept). field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
     The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
     """
-    return _Spec(default, doc, unit, min, max, advanced, drivable, field_kwargs)
+    return _Spec(default, doc, unit, min, max, advanced, drivable, cyclic, field_kwargs)
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
@@ -290,7 +294,7 @@ class Drive(ValidatedModel):
     linearly. A field is a selection of the recipe or a built-in one (`depth`, `light`, `subject`...). Written in a
     recipe file as the table `radius = { by = "near", start = 0, end = 30 }` and in Python as
     `Drive(by="near", start=0, end=30)`; only a parameter its effect declares drivable takes one, and `start` and `end`
-    (so every value between) must lie in that parameter's range.
+    (so every value between) must lie in that parameter's range; a cyclic parameter takes any angle.
     """
 
     by: str = Field(
@@ -347,6 +351,7 @@ class FieldDoc(NamedTuple):
     default: Any
     doc: str
     advanced: bool
+    cyclic: bool  # an angle that wraps: `minimum` to `maximum` is one turn and any real value is accepted
 
     @property
     def range(self) -> str:
@@ -429,6 +434,7 @@ class EffectParams(ValidatedModel):
             extra = _extra(info)
             minimum, maximum = bounds(info)
             text = _type_text(hints[name]) + (" (drivable)" if extra.get("drivable") else "")
+            text += " (cyclic)" if cyclic_of(info) else ""
             docs.append(
                 FieldDoc(
                     name,
@@ -439,6 +445,7 @@ class EffectParams(ValidatedModel):
                     info.default,
                     info.description or "",
                     bool(extra["advanced"]),
+                    cyclic_of(info),
                 )
             )
         return tuple(docs)
@@ -468,10 +475,25 @@ class EffectParams(ValidatedModel):
 
 
 _MISSING = object()
+_TURN = 360  # constant: a full turn, in degrees
+
+
+def _into_turn(low: float) -> Callable[[Any], Any]:
+    """A validator that moves a real number outside `low` to `low + 360` into that turn by whole turns and passes
+    anything else (a bool, text, nan, infinity) on for the field's own strict check to refuse."""
+
+    def wrap(value: Any) -> Any:
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+            return value
+        if low <= value <= low + _TURN:
+            return value
+        return low + (value - low) % _TURN
+
+    return wrap
 
 
 def _extra(info: Any) -> dict[str, Any]:
-    """What `param` put in a field's JSON-schema extras (unit, advanced, drivable)."""
+    """What `param` put in a field's JSON-schema extras (unit, advanced, drivable, cyclic)."""
     return info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
 
 
@@ -482,9 +504,29 @@ def unit_of(info: FieldInfo) -> str | None:
     return unit if isinstance(unit, str) else None
 
 
+def cyclic_of(info: FieldInfo) -> bool:
+    """Whether the field `info` (a pydantic `FieldInfo`) was declared `cyclic=True` by `param`."""
+    return bool(_extra(info).get("cyclic"))
+
+
 def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
     hints = typing.get_type_hints(model)
     return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})
+
+
+def _range_problem(spec: _Spec) -> str | None:
+    """What is wrong with the unit, range, default and cyclic flag of a number's declaration, or None if nothing."""
+    if spec.unit not in UNITS:
+        return f"a number needs a unit from {UNITS}, got {spec.unit!r}"
+    if spec.min is None or spec.max is None:
+        return "a number needs both min and max (its documented range)"
+    if spec.min > spec.max:
+        return f"min {spec.min} is above max {spec.max}"
+    if spec.default is not None and not (_is_number(spec.default) and spec.min <= spec.default <= spec.max):
+        return f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}"
+    if spec.cyclic and (spec.unit != "degrees" or spec.max - spec.min != _TURN):
+        return f"a cyclic field is in degrees, min to max one turn ({_TURN}), not {spec.min} to {spec.max}"
+    return None
 
 
 def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]:
@@ -507,14 +549,10 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
     # strict for every kind of value; a choice (Literal) is matched exactly anyway, and pydantic refuses `strict` on it
     constraints: dict[str, Any] = {} if _choices(annotation) else {"strict": True}
     if numeric:
-        if spec.unit not in UNITS:
-            raise broken(f"a number needs a unit from {UNITS}, got {spec.unit!r}")
-        if spec.min is None or spec.max is None:
-            raise broken("a number needs both min and max (its documented range)")
-        if spec.min > spec.max:
-            raise broken(f"min {spec.min} is above max {spec.max}")
-        if spec.default is not None and not (_is_number(spec.default) and spec.min <= spec.default <= spec.max):
-            raise broken(f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}")
+        if problem := _range_problem(spec):
+            raise broken(problem)
+    elif spec.cyclic:
+        raise broken("only a number in degrees can be cyclic")
     elif spec.unit is not None or spec.min is not None or spec.max is not None:
         raise broken("only a number takes a unit, min and max")
     if spec.drivable and _scalar(annotation) != {float}:
@@ -525,6 +563,8 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
         constraints |= {"ge": spec.min, "le": spec.max}
         if float in _scalar(annotation):
             constraints["allow_inf_nan"] = False  # so a nan is reported as such, not as out of range
+        if spec.cyclic:
+            typed = Annotated[annotation, BeforeValidator(_into_turn(constraints["ge"]))]
     elif get_origin(annotation) is tuple:
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
     elif annotation is Picture:
@@ -532,7 +572,12 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
     made = Field(
         spec.default,
         description=spec.doc,
-        json_schema_extra={"unit": spec.unit, "advanced": spec.advanced, "drivable": spec.drivable},
+        json_schema_extra={
+            "unit": spec.unit,
+            "advanced": spec.advanced,
+            "drivable": spec.drivable,
+            "cyclic": spec.cyclic,
+        },
         **constraints,
         **spec.field_kwargs,
     )

@@ -550,7 +550,7 @@ saturation = { by = "light", start = 1.2, end = 1, levels = 3 }    # and give th
 ```
 
 In Python, `fx.grade(exposure=Drive(by="light", start=0.4, end=0))` (`from bullterrier_image import Drive`). `start` and
-`end`, and so every value between, must lie in the number's range: a bad one fails when the step is made, naming the
+`end`, and so every value between, must lie in the number's range (a cyclic angle takes any): a bad one fails when the step is made, naming the
 effect, the number and the value, and so does a number that is not drivable (a whole number, a choice, anything its
 effect does not declare). All the tables of one step name one `by` and one `levels`. The step still takes `mask`,
 `opacity` and `blend_mode`, and a look of an `Each` can be driven.
@@ -582,9 +582,11 @@ the step: the effect's numbers (`pulse.radius`), its `opacity`, the `.start`, `.
 (`pulse.radius.end`), and for an `each` step its `feather` and the numbers of a look (`each.looks[0].radius`, counted
 from 0 as the pieces are). Then `region.near.low` for the numbers of a region and `frame.angle` for the framing's.
 `parameters()` lists them in the order of the recipe, each a `Parameter` with its `value` (the default where the recipe
-does not write it), `unit`, `minimum` and `maximum`, what it does (`doc`) and whether it must be a whole number.
+does not write it), `unit`, `minimum` and `maximum`, what it does (`doc`), whether it must be a whole number and whether
+it is `cyclic`.
 `with_values` returns a new recipe (the original is untouched, and every step, region and frame it does not change is
-shared with the copy), checks each value against the number's range as any recipe does, and refuses an address the
+shared with the copy), checks each value against the number's range as any recipe does (a cyclic angle takes any real and
+stores the same direction inside its turn), and refuses an address the
 recipe does not have, naming it and listing the valid ones and the nearest. A whole number may be written `3.0`. `bt-image
 sweep` takes the same addresses.
 
@@ -666,6 +668,10 @@ range and a default; validation, `fx` signatures, `help(fx.<effect>)`, `bt-image
 field, the limit and the value. Writing an effect follows the same pattern: `uv run poe new-effect <name>
 --category <category>` starts one from the template, and [`effects/grade/effect.py`](src/bullterrier_image/effects/grade/effect.py)
 is a worked example.
+
+An angle in degrees whose value and the value 360 further give the same picture (a direction, a rotation, a hue) is `(cyclic)`
+in the documentation: its range is one turn, and any real number is accepted and means the same direction inside it
+(270 on -180..180 is -90). Other angles (an elevation, a lean) keep their range and refuse what is outside.
 
 Importing `bullterrier_image` is quick: the effects load the first time one is asked for, once, under a lock, so threads can
 render at the same time; register effects at import time only.

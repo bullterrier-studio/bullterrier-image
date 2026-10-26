@@ -589,9 +589,10 @@ class LinearGradient(_Model):
     angle: float = param(
         90.0,
         unit="degrees",
-        min=-360,
+        min=0,
         max=360,
-        doc="The direction in which the value rises, counter-clockwise from the right (-360 to 360): 0 rises to the "
+        cyclic=True,
+        doc="The direction in which the value rises, counter-clockwise from the right (0 to 360): 0 rises to the "
         "right, 90 upward, 180 to the left, 270 downward. The value is a share of the picture's extent along that "
         "direction, so the far corners are 0 and 1 at any aspect ratio.",
     )

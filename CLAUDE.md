@@ -134,6 +134,9 @@ raising it does).
 - **Drivable:** `drivable=True` on a float lets a `Drive` vary it per pixel. Declare it only where the output changes
   smoothly with the value (a radius, an amount, an exposure), never for a whole number, choice, seed or colour; every
   drivable field is tested by `tests/effects/test_contract.py`.
+- **Cyclic:** `cyclic=True` on a degrees field whose value and the value 360 further give the same picture (a direction,
+  a rotation, a hue): `min` to `max` is one turn and any real wraps into it. Not for elevations, leans, twists or amounts;
+  the contract test checks the picture at `min` equals the picture at `max`.
 - **State, not time:** a parameter that changes with a process is a state (`progress`, a share in `fraction`, a position in
   `cycles`), never a duration.
 

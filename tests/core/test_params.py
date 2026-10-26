@@ -278,6 +278,10 @@ def _declare(annotation, field):
         (float, lambda: 1.0, "param"),  # a plain default: no description, no range
         (tuple[str, ...], lambda: param(("a",), min=0, max=1, doc="d"), "min"),
         (bool, lambda: param(False, unit="count", doc="d"), "unit"),
+        (float, lambda: param(1.0, unit="px", min=0, max=360, cyclic=True, doc="d"), "degrees"),
+        (float, lambda: param(1.0, unit="degrees", min=0, max=180, cyclic=True, doc="d"), "one turn"),
+        (float, lambda: param(1.0, unit="degrees", min=-360, max=360, cyclic=True, doc="d"), "one turn"),
+        (str, lambda: param("a", cyclic=True, doc="d"), "degrees"),
     ],
 )
 def test_a_badly_declared_field_fails_when_the_class_is_made_naming_model_and_field(annotation, make, complaint):
@@ -648,3 +652,71 @@ def test_a_drive_is_frozen_and_equal_to_another_of_the_same_values_and_says_what
     with pytest.raises(ValueError, match="frozen"):
         drive.start = 5  # type: ignore[misc]  # the point of the test
     assert drive.describe() == "by near 0..30"
+
+
+# --- cyclic fields: an angle that wraps ------------------------------------------------------------------------------
+
+
+class Turning(EffectParams):
+    """A model with a direction (cyclic, one turn from -180), a twist (not cyclic) and a whole-degree angle."""
+
+    angle: float = param(45.0, unit="degrees", min=-180, max=180, cyclic=True, doc="Direction. -180 to 180.")
+    twist: float = param(0.0, unit="degrees", min=-720, max=720, doc="How far it winds. -720 to 720.")
+    turns: int = param(0, unit="degrees", min=0, max=360, cyclic=True, doc="Whole-degree direction. 0 to 360.")
+
+
+@pytest.mark.parametrize(
+    ("written", "stored"),
+    [
+        pytest.param(180, 180, id="the top of the turn stays the top"),
+        pytest.param(-180, -180, id="the bottom of the turn stays the bottom"),
+        pytest.param(90, 90, id="inside the turn"),
+        pytest.param(190, -170, id="just past the top wraps to the bottom"),
+        pytest.param(-190, 170, id="just past the bottom wraps to the top"),
+        pytest.param(725, 5, id="two turns and a bit"),
+        pytest.param(-1_000_005, 75, id="far below"),  # -1_000_005 + 2778 * 360,
+    ],
+)
+def test_a_cyclic_field_takes_any_real_and_stores_the_same_direction_inside_its_turn(written, stored):
+    assert Turning(angle=written).angle == pytest.approx(stored)
+
+
+@pytest.mark.parametrize(
+    ("values", "field"),
+    [
+        pytest.param({"angle": float("nan")}, "angle", id="nan"),
+        pytest.param({"angle": float("inf")}, "angle", id="infinity"),
+        pytest.param({"angle": "90"}, "angle", id="a string"),
+        pytest.param({"angle": True}, "angle", id="a bool"),
+        pytest.param({"twist": 721}, "twist", id="a field that is not cyclic keeps its range"),
+        pytest.param({"turns": 1.5}, "turns", id="a fraction for a whole number"),
+    ],
+)
+def test_a_cyclic_field_still_refuses_what_is_no_real_number_and_others_keep_their_range(values, field):
+    with pytest.raises(ValidationError) as raised:
+        Turning(**values)
+    assert field in str(raised.value)
+
+
+def test_a_cyclic_whole_number_field_stays_whole():
+    assert Turning(turns=725).turns == 5
+    assert isinstance(Turning(turns=725).turns, int)
+
+
+def test_the_documentation_says_a_field_is_cyclic_and_keeps_its_turn_as_the_range():
+    docs = {doc.name: doc for doc in Turning.fields_doc()}
+    assert docs["angle"].type == "number (cyclic)"
+    assert (docs["angle"].minimum, docs["angle"].maximum) == (-180, 180)
+    assert docs["twist"].type == "number"
+    assert re.search(r"angle : number \(cyclic\), degrees, -180 to 180, default 45\.0", Turning.documentation())
+
+
+def test_the_json_schema_marks_a_cyclic_field():
+    properties = Turning.model_json_schema()["properties"]
+    assert properties["angle"]["cyclic"] is True
+    assert properties["twist"]["cyclic"] is False
+
+
+def test_the_field_docs_say_which_fields_are_cyclic():
+    assert {doc.name for doc in Turning.fields_doc() if doc.cyclic} == {"angle", "turns"}
+    assert not any(doc.cyclic for doc in Probe.fields_doc())

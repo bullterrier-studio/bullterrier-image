@@ -96,6 +96,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   fields first, then an "Advanced parameters" section (`help`, `fx.pyi`), a count in `bt-image effects` (`--advanced` or
   naming the effect shows all) and a collapsed block in the catalogue. Every field stays settable, validated, in
   declaration order in the signature and in the JSON schema (`"advanced"`). No tiers, no classification by name.
+- **An angle that wraps says so: `cyclic=True`.** A degrees field whose value and the value a turn further mean the same
+  picture (a direction, a rotation, a hue) is declared with `min` to `max` exactly 360 and takes any real number; a value
+  outside is stored as the same direction inside (270 on -180..180 is -90; the bounds themselves are kept). Other angles
+  (an elevation, a lean, a twist whose strength falls off with distance, a shift scaled by a weight) stay bounded and
+  refuse what is out of range. *Reason:* ranges were 0..360, +-180 and +-360 by habit, and a caller that animates an
+  angle could not tell from the description whether 370 wraps or is refused; one flag in the description lets it wrap by
+  the flag, with no per-effect knowledge. *Consequence:* the documentation says `(cyclic)` and the schema `"cyclic"`;
+  a contract test holds each flagged field to the property that makes it cyclic (the picture at `min` is the picture at
+  `max`), which catches a field flagged by mistake (`selective_color.hue_shift` scales with a weight: not cyclic). A
+  `Drive` of a cyclic field may run past the turn. A half-turn symmetry (a line, a square grid) is not a turn: the field is
+  still one full turn wide.
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
   `intensity` or `factor`. *Reason:* users bring vocabulary from Photoshop, Lightroom and shader literature.
   *Consequence:* a shared vocabulary table and a contract test flag discouraged names.

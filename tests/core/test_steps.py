@@ -349,6 +349,17 @@ def test_a_number_is_listed_with_its_value_unit_range_and_what_it_does(pulse):
     assert (taps.value, taps.unit, taps.minimum, taps.maximum, taps.whole) == (3, "count", 1, 9, True)
 
 
+def test_an_angle_that_wraps_is_listed_as_cyclic_with_the_turn_as_its_range_and_other_numbers_are_not(pulse):
+    angle = pulse.parameters()["frame.angle"]
+    assert (angle.cyclic, angle.unit, angle.minimum, angle.maximum) == (True, "degrees", -180, 180)
+    assert not pulse.parameters()["pulse.gain"].cyclic
+    assert not pulse.parameters()["frame.aspect"].cyclic
+
+
+def test_a_cyclic_number_set_past_its_turn_is_the_same_direction_inside_it(pulse):
+    assert pulse.with_values({"frame.angle": 725}).parameters()["frame.angle"].value == 5  # 725 - 2 * 360
+
+
 def test_a_number_nobody_wrote_is_listed_at_its_default_and_one_that_was_written_at_what_was_written(pulse):
     listed = pulse.parameters()
     assert (listed["pulse.offset"].value, listed["pulse.gain"].value) == (0.0, 2.0)
@@ -468,7 +479,7 @@ BAD_ADDRESSES = {
     "levels of one": ({"gain_probe#2.gain.levels": 1}, r"levels"),
     "a whole number that is not": ({"pulse.taps": 2.5}, r"taps"),
     "an opacity past 1": ({"pulse.opacity": 1.5}, r"opacity"),
-    "a frame number out of range": ({"frame.angle": 400}, r"angle"),
+    "a frame angle that is not a number": ({"frame.angle": "tilted"}, r"angle"),
     "a region number out of range": ({"region.near.low": 1.5}, r"low"),
     "a value that is not a number": ({"pulse.gain": "high"}, r"gain"),
     "no dot at all": ({"pulse": 1.0}, r"'pulse'.*an address"),

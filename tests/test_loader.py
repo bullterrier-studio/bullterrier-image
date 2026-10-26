@@ -707,9 +707,9 @@ REGION_MISTAKES = {
         '[region.c]\nkind = "combine"\nop = "xor"\nof = ["depth", "subject"]\n',
         r"region 'c'.*`op`.*xor",
     ),
-    "a gradient with an angle past a turn": (
-        '[region.g]\nkind = "linear_gradient"\nangle = 400\n',
-        r"region 'g'.*`angle`.*400",
+    "a gradient with an angle that is not a number": (
+        '[region.g]\nkind = "linear_gradient"\nangle = "up"\n',
+        r"region 'g'.*`angle`.*up",
     ),
     "a radial gradient with a radius of nothing": (
         '[region.g]\nkind = "radial_gradient"\nradius = 0\n',

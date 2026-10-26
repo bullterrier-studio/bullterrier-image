@@ -39,7 +39,7 @@ from bullterrier_image.ops.composite import BlendMode
 
 from . import registry
 from .framing import Framing
-from .params import Drive, EffectParams, ValidatedModel, bounds, unit_of
+from .params import Drive, EffectParams, ValidatedModel, bounds, cyclic_of, unit_of
 from .regions import Kind, check, maps_used, needs, needs_finder
 from .regions import derived_maps as _derived_maps
 
@@ -51,8 +51,9 @@ _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besi
 class Parameter:
     """One number of a recipe, as `Recipe.parameters` lists it: its `value` now (None for an optional number the recipe
     leaves unset, such as the framing's `aspect`), its `unit` (`px`, `fraction`, `count`...) and range, what it does
-    (`doc`) and whether it must be a whole number (`whole`: a count, a seed). The unit and range are those of the
-    number's own declaration, so a control that maps a signal onto it can scale to them and stay inside."""
+    (`doc`), whether it must be a whole number (`whole`: a count, a seed) and whether it wraps (`cyclic`: an angle
+    whose range is one turn and that takes any value, wrapped into it). The unit and range are those of the number's
+    own declaration, so a control that maps a signal onto it can scale to them and stay inside, or wrap if cyclic."""
 
     value: float | None
     unit: str
@@ -60,6 +61,7 @@ class Parameter:
     maximum: float | None
     doc: str
     whole: bool = False
+    cyclic: bool = False
 
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
@@ -600,7 +602,8 @@ class Recipe(ValidatedModel):
         `parameters`, or reaches the same number as one: a step by its effect (`gain.radius`) when the recipe has one,
         or by effect and number (`gain#1.radius`, counted from 1 among the steps of that effect). A whole-number value
         may be written as a float (`3.0`). Every changed step, region and frame is checked afresh, so a value out of
-        its range is refused naming the address, the number and the range; so is an address the recipe does not have
+        its range is refused naming the address, the number and the range (a cyclic angle takes any real);
+        so is an address the recipe does not have
         (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
         and a `.start` of a number that is not driven."""
         changes: dict[tuple, dict[str, Any]] = {}
@@ -728,7 +731,7 @@ def _called(step: Step | Each) -> str:
 def _number(value: float, info: FieldInfo, *, whole: bool = False) -> Parameter:
     """The `Parameter` of the number of value `value` that the field `info` declares."""
     low, high = bounds(info)
-    return Parameter(value, unit_of(info) or "", low, high, info.description or "", whole)
+    return Parameter(value, unit_of(info) or "", low, high, info.description or "", whole, cyclic_of(info))
 
 
 def _numbers(model: EffectParams) -> dict[str, Parameter]:

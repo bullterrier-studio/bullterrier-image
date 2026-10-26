@@ -27,7 +27,7 @@ def small() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     [
         pytest.param({"aspect": 0}, "aspect", id="an aspect of 0"),
         pytest.param({"aspect": 11}, "aspect", id="an aspect past 10"),
-        pytest.param({"angle": 361}, "angle", id="an angle past a full turn"),
+        pytest.param({"angle": "tilted"}, "angle", id="an angle that is not a number"),
         pytest.param({"flip": "diagonal"}, "flip", id="a flip that is not offered"),
         pytest.param({"anchor": "middle"}, "anchor", id="an anchor that is not offered"),
         pytest.param({"pad_left": -0.1}, "pad_left", id="a negative border"),
@@ -245,3 +245,15 @@ def test_rounded_corners_are_clear_at_the_corners_and_opaque_in_the_middle_of_ea
 def test_a_framing_that_does_not_cut_has_nothing_to_cut(small):
     with pytest.raises(ValueError, match="not `transparent`"):
         Framing().cut(small[0], None)
+
+
+@pytest.mark.parametrize(
+    ("written", "stored"),
+    [
+        pytest.param(180, 180, id="the half turn"),
+        pytest.param(270, -90, id="past the half turn"),
+        pytest.param(-450, -90, id="a turn and a quarter back"),
+    ],
+)
+def test_an_angle_past_the_half_turn_is_the_same_turn_inside_it(written, stored):
+    assert Framing(angle=written).angle == stored
