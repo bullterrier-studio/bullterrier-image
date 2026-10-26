@@ -1474,20 +1474,6 @@ windblown : The edges dissolve and everything is blown to the right, like dust i
 disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
-def fade(amount: float | Drive = 0.12, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Lift the blacks by `amount` for a matte, faded-film look; whites stay where they are.
-
-Every channel is rescaled from 0..1 to `amount`..1, so black becomes a flat grey of `amount`, white is untouched
-and the tones between keep their order. With `amount` 0 the picture is unchanged.
-
-Parameters
-----------
-amount : number (drivable), fraction, 0 to 1, default 0.12
-    How far black is lifted toward white (0..1): the darkest value the picture can
-    reach. 0 = unchanged, 0.1 = a gentle matte look, 1 = everything white. White stays
-    white; raising it flattens the shadows."""
-    ...
-
 def fill(color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the whole picture with one colour. Masked to the background, this is 'remove the background'.
 
@@ -2255,17 +2241,6 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
     (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
     ...
 
-def invert(*, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Turn the picture into its negative: every red, green and blue value v becomes 1 - v.
-
-Black becomes white, white black, mid grey stays mid grey and each colour becomes its complement, so a warm
-picture turns cool. Doing it twice gives back the original picture.
-
-Parameters
-----------
-"""
-    ...
-
 def jpeg_crush(quality: int = 6, hits: int = 0, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it.
 
@@ -2606,7 +2581,7 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
     column)."""
     ...
 
-def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float = 0.0, output_white: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float | Drive = 0.0, output_white: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['invert'] | None = None) -> Step:
     """Remap tones with an input black point, white point and midtone `gamma`, then an output range.
 
 Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
@@ -2625,11 +2600,16 @@ gamma : number, ratio, 0.1 to 10, default 1.0
     The midtone gamma: 1 = linear, above 1 brightens the midtones, below 1 darkens them;
     black and white stay where they are (output = input ** (1 / gamma), as in
     Photoshop).
-output_black : number, fraction, 0 to 1, default 0.0
+output_black : number (drivable), fraction, 0 to 1, default 0.0
     The darkest value that can be output (0..1): raising it lifts the blacks to a matte
-    grey. Above `output_white` the tones are reversed.
+    grey, the faded-film look (0.1 = gentle, 1 = everything white). Above `output_white`
+    the tones are reversed.
 output_white : number, fraction, 0 to 1, default 1.0
-    The brightest value that can be output (0..1): lowering it dims the whites."""
+    The brightest value that can be output (0..1): lowering it dims the whites.
+
+Presets
+-------
+invert : The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement."""
     ...
 
 def light_leak(color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 0.25, angle: float = 0.0, blobs: int = 3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
