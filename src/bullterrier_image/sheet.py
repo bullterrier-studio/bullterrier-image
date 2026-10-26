@@ -69,7 +69,7 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
     an effect the recipe has twice, `pulse.gain` for a step called `pulse`, `pulse.gain.end` for the end of a drive,
     `region.near.low`, `frame.angle`. The value replaces whatever the recipe has there. A whole-number parameter takes
     the values rounded to the nearest whole number, each once. count: 2 to 24. A value outside the number's range is
-    refused as in any recipe, naming it, never clamped.
+    refused as in any recipe, naming it, never clamped; a cyclic angle takes any value and wraps it into its turn.
 
     Raises RecipeError for a target the recipe does not have (naming what it does have), a count outside 2 to 24, a
     start equal to the end, or a value outside the range.

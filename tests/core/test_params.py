@@ -698,6 +698,19 @@ def test_a_cyclic_field_still_refuses_what_is_no_real_number_and_others_keep_the
     assert field in str(raised.value)
 
 
+@pytest.mark.parametrize(
+    ("written", "stored"),
+    [
+        pytest.param(np.float32(400), 40, id="a float32"),
+        pytest.param(np.float64(-190), 170, id="a float64"),
+        pytest.param(np.int64(725), 5, id="an int64"),
+        pytest.param(np.float32(90), 90, id="a float32 inside the turn"),
+    ],
+)
+def test_a_cyclic_field_takes_a_numpy_number_as_it_takes_a_python_one(written, stored):
+    assert Turning(angle=written).angle == pytest.approx(stored)
+
+
 def test_a_cyclic_whole_number_field_stays_whole():
     assert Turning(turns=725).turns == 5
     assert isinstance(Turning(turns=725).turns, int)

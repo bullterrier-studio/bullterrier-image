@@ -100,12 +100,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   picture (a direction, a rotation, a hue) is declared with `min` to `max` exactly 360 and takes any real number; a value
   outside is stored as the same direction inside (270 on -180..180 is -90; the bounds themselves are kept). Other angles
   (an elevation, a lean, a twist whose strength falls off with distance, a shift scaled by a weight) stay bounded and
-  refuse what is out of range. *Reason:* ranges were 0..360, +-180 and +-360 by habit, and a caller that animates an
-  angle could not tell from the description whether 370 wraps or is refused; one flag in the description lets it wrap by
+  refuse what is out of range. *Reason:* ranges were 0..360, +-180 and +-360 by habit, and a caller that sets an
+  angle by a rule could not tell from the description whether 370 wraps or is refused; one flag in the description lets it wrap by
   the flag, with no per-effect knowledge. *Consequence:* the documentation says `(cyclic)` and the schema `"cyclic"`;
   a contract test holds each flagged field to the property that makes it cyclic (the picture at `min` is the picture at
   `max`), which catches a field flagged by mistake (`selective_color.hue_shift` scales with a weight: not cyclic). A
-  `Drive` of a cyclic field may run past the turn. A half-turn symmetry (a line, a square grid) is not a turn: the field is
+  `Drive` of a cyclic field may run past the turn. The JSON schema keeps the turn as `minimum` and `maximum`
+  beside `"cyclic"`, so a generic schema validator refuses a value the model wraps. A half-turn symmetry (a line, a square grid) is not a turn: the field is
   still one full turn wide.
 - **Names are the field's own terms** (radius, sigma, amount, threshold, gamma, exposure, seed...), never `strength`,
   `intensity` or `factor`. *Reason:* users bring vocabulary from Photoshop, Lightroom and shader literature.
