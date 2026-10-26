@@ -161,6 +161,9 @@ def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
         return _isnet.subject_probability(rgb, model)
     except ImportError as error:
         raise BackendUnavailableError(f"{tried}: it needs onnxruntime (pip install onnxruntime): {error}") from error
+    # an unusable model file: only a local one can be, as the standard one is verified when it is fetched
+    except BackendUnavailableError as error:
+        raise BackendUnavailableError(f"{tried}: {error}; is {MODEL_VARIABLE} the right file?") from error
 
 
 def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:

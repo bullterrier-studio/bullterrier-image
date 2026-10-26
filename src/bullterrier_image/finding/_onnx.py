@@ -9,15 +9,23 @@ from typing import Any
 
 import numpy as np
 
+from bullterrier_image.errors import BackendUnavailableError
+
 
 def first_output(model: Path, batch: np.ndarray) -> Any:  # an array of the model's own shape and type
     """The first output of the ONNX model file `model` given `batch` as its first input.
 
-    Raises ImportError when onnxruntime is not installed.
+    Raises ImportError when onnxruntime is not installed, and BackendUnavailableError naming `model` when onnxruntime
+    cannot use it: not an ONNX model, or one whose input does not take `batch` (another size, rank or type).
     """
-    session = _session(_identity(model))
-    first = session.get_outputs()[0].name
-    (answer,) = session.run([first], {session.get_inputs()[0].name: batch})
+    from onnxruntime.capi import onnxruntime_pybind11_state as state  # onnxruntime's own errors, all since 1.17
+
+    try:
+        session = _session(_identity(model))
+        first = session.get_outputs()[0].name
+        (answer,) = session.run([first], {session.get_inputs()[0].name: batch})
+    except (state.Fail, state.InvalidArgument, state.InvalidGraph, state.InvalidProtobuf, state.NoSuchFile) as error:
+        raise BackendUnavailableError(f"onnxruntime cannot use the model file {model} ({error})") from error
     return answer
 
 

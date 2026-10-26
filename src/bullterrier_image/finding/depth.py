@@ -45,6 +45,9 @@ def depth_map(rgb: np.ndarray) -> np.ndarray:
         answer = _depth_anything.inverse_depth(rgb, model)
     except ImportError as error:
         raise BackendUnavailableError(f"{_TRIED}: it needs onnxruntime (pip install onnxruntime): {error}") from error
+    # an unusable model file: only a local one can be, as the standard one is verified when it is fetched
+    except BackendUnavailableError as error:
+        raise BackendUnavailableError(f"{_TRIED}: {error}; is {MODEL_VARIABLE} the right file?") from error
     nearness = stretch(answer, *rgb.shape[:2])
     low = nearness.min()
     span = nearness.max() - low  # in float32 as the values are, so the nearest pixel becomes exactly 1
