@@ -20,6 +20,7 @@ from bullterrier_image.recipe import (
     DepthBands,
     Edge,
     Finder,
+    Given,
     Grid,
     Line,
     Pick,
@@ -71,10 +72,25 @@ def test_a_file_name_that_leaves_no_usable_name_asks_for_a_name_or_a_new_file_na
         load_recipe(_write(tmp_path, STEP, file))
 
 
-def test_a_recipe_without_a_format_or_with_format_1_or_2_loads(tmp_path):
+def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].runs[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
     assert load_recipe(_write(tmp_path, "format = 2\nname = 'c'\n" + STEP, "c.toml")).name == "c"
+    assert load_recipe(_write(tmp_path, "format = 3\nname = 'd'\n" + STEP, "d.toml")).name == "d"
+
+
+GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'fill'\nmask = 'star'\n"
+
+
+def test_a_given_region_loads_in_format_3_as_the_recipe_written_in_python(tmp_path):
+    loaded = load_recipe(_write(tmp_path, "format = 3\nname = 'g'\nsize = 64\n" + GIVEN))
+    assert loaded == Recipe("g", [Step("fill", mask="star")], size=64, regions={"star": Given()})
+    assert loaded.maps_needed == frozenset({"star"})
+
+
+def test_a_given_region_in_format_2_is_refused_naming_the_region_and_format_3(tmp_path):
+    with pytest.raises(RecipeError, match=r"^look\.toml: region 'star': `kind` 'given' needs `format = 3`"):
+        load_recipe(_write(tmp_path, "format = 2\nsize = 64\n" + GIVEN))
 
 
 def test_a_format_1_file_means_the_same_in_format_2(tmp_path):
@@ -86,7 +102,7 @@ def test_a_format_1_file_means_the_same_in_format_2(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("written", "value"), [("3", "3"), ("0", "0"), ("'1'", "'1'"), ("1.0", "1.0"), ("true", "True"), ("'2'", "'2'")]
+    ("written", "value"), [("4", "4"), ("0", "0"), ("'1'", "'1'"), ("1.0", "1.0"), ("true", "True"), ("'2'", "'2'")]
 )
 def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_release_reads(tmp_path, written, value):
     path = _write(tmp_path, f"format = {written}\n" + STEP, "future.toml")
@@ -94,7 +110,7 @@ def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_relea
         load_recipe(path)
     message = str(raised.value)
     assert value in message
-    assert re.search(r"reads\D*\b1\b.*\b2\b", message)  # the formats this release reads
+    assert re.search(r"reads\D*\b1\b.*\b2\b.*\b3\b", message)  # the formats this release reads
 
 
 # A broken file: each is refused with a RecipeError that starts with the file's name and says what is wrong.
@@ -323,14 +339,14 @@ def test_a_format_2_file_with_regions_and_an_each_step_loads_as_the_recipe_writt
     assert load_recipe(_write(tmp_path, REGIONS_FILE)) == REGIONS_RECIPE
 
 
-def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, matte):
+def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, subject):
     from bullterrier_image.core.runner import render
 
     loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
     finder = lambda crop: np.where(crop[..., 0] > 0.5, 1.0, 0.0).astype(np.float32)  # noqa: E731  (a stand-in model)
     np.testing.assert_array_equal(
-        render(photo, loaded, matte=matte, find_subject=Finder("stand-in", finder)),
-        render(photo, REGIONS_RECIPE, matte=matte, find_subject=Finder("stand-in", finder)),
+        render(photo, loaded, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)}),
+        render(photo, REGIONS_RECIPE, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)}),
     )
 
 
@@ -368,7 +384,7 @@ def test_depth_regions_load_as_the_recipe_written_in_python(tmp_path):
         ],
     )
     assert load_recipe(_write(tmp_path, DEPTH_FILE)) == written
-    assert written.needs_depth
+    assert "depth" in written.maps_needed
 
 
 SHAPES_FILE = """
@@ -411,7 +427,7 @@ SHAPES_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
 
 
 def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_svg_is_found_beside_the_file(
-    tmp_path, photo, matte
+    tmp_path, photo, subject
 ):
     from bullterrier_image.core.runner import render
 
@@ -437,7 +453,9 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
         ],
     )
     assert loaded == written
-    np.testing.assert_array_equal(render(photo, loaded, matte=matte), render(photo, written, matte=matte))
+    np.testing.assert_array_equal(
+        render(photo, loaded, maps={"subject": subject}), render(photo, written, maps={"subject": subject})
+    )
 
 
 def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):

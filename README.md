@@ -140,14 +140,14 @@ folder (`~/Library/Caches/bt-image` on macOS, `$XDG_CACHE_HOME/bt-image` or else
 is blocked, download the file the error message names by hand and save it where it says, or point `BT_IMAGE_SUBJECT_MODEL` at a
 copy (`BT_IMAGE_SUBJECT_MODEL=/models/isnet-general-use.onnx`), which is then used as it is and never downloaded.
 
-Choose the backend with `--segmenter onnx|vision` (in Python `find_subject=subject_finder("vision")`, from
+Choose the backend with `--segmenter onnx|vision` (in Python `finders={"subject": subject_finder("vision")}`, from
 `bullterrier_image.finding.subject`), or for every run
 with `BT_IMAGE_SEGMENTER=vision`; the option wins over the variable. No model is needed at all if you have the subject's
-matte already: `--matte cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject) of
-the photo's size, and in Python every renderer takes `matte=imageio.load_matte("cutout.png")`. Subject finding lives
+matte already: `--map subject=cutout.png` takes a transparent PNG (its alpha) or a black-and-white mask (white = subject)
+of the photo's size, and in Python every renderer takes `maps={"subject": imageio.load_map("cutout.png")}`. Subject finding lives
 in [`finding/`](src/bullterrier_image/finding), so a further backend is added there without touching the rest. On Python versions
 newer than 3.14 ONNX Runtime has no release yet, so bullterrier-image installs without it there: the `onnx` backend then says
-it is missing, and `--matte` (or, on macOS, `--segmenter vision`) still works.
+it is missing, and `--map subject=FILE` (or, on macOS, `--segmenter vision`) still works.
 
 **Your own finder** is a `Finder`: a function from the photo (float32 `(h, w, 3)`, 0..1) to its matte (`(h, w)`, 0..1),
 and an identity that names its answers. `bt-image run` remembers subjects by the identity, so change it whenever the
@@ -157,7 +157,7 @@ answers could change (another model, prompt or option):
 from functools import partial
 from bullterrier_image import Finder, render
 
-render(photo, look, find_subject=Finder("grounded-sam dog v1", partial(grounded, prompt="dog")))
+render(photo, look, finders={"subject": Finder("grounded-sam dog v1", partial(grounded, prompt="dog"))})
 ```
 
 **Depth** is a second map, found like the subject. A recipe that takes depth (an effect, or a depth region, see Regions
@@ -166,10 +166,37 @@ on every platform. Its weights (99 MB, the fp32 ONNX export of `onnx-community/d
 package: the first use downloads them into the same cache folder as the subject model and checks their SHA-256 against
 the one pinned in the code. Offline, point `BT_IMAGE_DEPTH_MODEL` at a copy, which is then used as it is and never
 downloaded. The result is relative depth, scaled per photo: the nearest pixel is 1, the farthest 0, a flat answer all 0.
-Your own map replaces the model: `--depth depth.png` (in Python `depth=imageio.load_depth("depth.png")`) takes a
-greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
-`find_depth=Finder("my-depth v1", find)`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run` remembers each
-photo's depth by that identity, apart from its subject.
+Your own map replaces the model: `--map depth=depth.png` (in Python `maps={"depth": imageio.load_map("depth.png")}`)
+takes a greyscale picture of the photo's size, 8 or 16 bits, white = nearest, black = farthest. A finder of your own is
+`finders={"depth": Finder("my-depth v1", find)}`, its `find` returning `(h, w)` 0..1, 1 = nearest; `pipeline.run`
+remembers each photo's depth by that identity, apart from its subject.
+
+**Maps of your own.** The subject and the depth are two of the photo's *maps*: one value per pixel, 0..1, the photo's
+size, each known by a name. A recipe can name a map of its own with a `given` region (`format = 3`) and use it like any
+selection (`mask = "star"`); whoever renders it hands the map in by that name, as a picture (`--map star=star.png`; a
+picture with transparency gives its alpha, any other its brightness) or an array, or names a `Finder` that finds it:
+
+```toml
+format = 3
+
+[region.star]
+kind = "given"
+
+[[step]]
+effect = "glow"
+mask = "star"
+```
+
+```python
+render(photo, look, maps={"star": star_alpha})  # an array of the photo's size, float32 0..1
+render(photo, look, finders={"star": Finder("star v1", find)})  # or found once per photo
+```
+
+A map moves with the photo through the recipe's framing (flip, turn, crop, border: a border is 0 in every map), so it
+only has to match the photo as it was given. A name that no recipe declares (`maps={"strar": ...}`) is refused, listing
+the names there are; a recipe that uses a map nobody gave is refused naming the map (`MapNotFoundError`; for the subject
+and the depth, `SubjectNotFoundError` and `DepthNotFoundError`). A project (`bt-image run`) holds no maps of its own, so a
+recipe with a `given` region needs `finders=` in `bullterrier_image.run`.
 
 **Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with a bundled monospaced font (JetBrains Mono, SIL OFL 1.1; licence in
 the wheel), not a system font, so a look does not depend on the machine's fonts.
@@ -327,10 +354,10 @@ which it fits to the photo and blends by its own transparency.
 **Regions.** A recipe says *where* a step goes by naming regions. With `format = 2`, `[region.NAME]` declares one by its
 `kind`: a `grid` (any number of columns and rows, equal or in shares), `shards` (irregular pieces like broken glass or
 stone, with presets `glass`, `torn`, `stone` and `mosaic`), `cuts` (straight and curved lines across the picture), `svg`
-(the shapes of an SVG file), a `path` (everything inside a closed SVG path), a `pick` of some pieces of a partition, or a
-`subject`. Grids, shards, cuts and svg are *partitions*: every pixel is in one piece, and the pieces are numbered from 0
-in reading order (`bt-image steps` draws them numbered). A `path`, a `pick`, a `subject` and the built-in `background`
-are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole picture, and
+(the shapes of an SVG file), a `path` (everything inside a closed SVG path), a `pick` of some pieces of a partition, a
+`subject`, or a `given` map (see [Maps of your own](#platforms)). Grids, shards, cuts and svg are *partitions*: every pixel
+is in one piece, and the pieces are numbered from 0 in reading order (`bt-image steps` draws them numbered). A `path`, a
+`pick`, a `subject`, a `given` map and the built-in `subject`, `background` and `depth` are *selections*. `fit = "subject"` lays a kind over the subject instead of the whole picture, and
 `edge = { style = "torn" }` tears its borders. A step uses regions by name: `mask` limits it to a selection, `each` +
 `looks` gives every piece of a partition its own look (each look is rendered once over the whole picture, so the cost is
 the number of looks, not pieces), and `partition` names the partition the `seams` effect draws lines along:
@@ -434,7 +461,7 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 ```
 
 `bt-image run` remembers what the finder found in each cell (by the finder, the photo and the cell's pixels), so a
-repeat run asks the model nothing. A `--matte` file does not stand in for the finder here (a cell is a part of the
+repeat run asks the model nothing. A `subject` map you hand in does not stand in for the finder here (a cell is a part of the
 picture): the segmenter still finds the subject in each cell.
 
 **By distance.** Two kinds read the depth map (1 = nearest, 0 = farthest; the recipe then needs
@@ -490,7 +517,7 @@ fails before anything is rendered.
 **`bt-image cutout` or `transparent = "background"`?** Both cut the subject out; they are for different jobs.
 `bt-image cutout photo.jpg -o dog.png` makes a cut-out *file*: the photo at its own size with the subject's alpha, after
 an optional clean-up of the edge (`--shrink` pulls it in, `--feather` softens it), with no recipe. Make one when the
-cut-out is an input you will reuse and want to check once: the `--matte` of a later run (`matte=` in Python), so the
+cut-out is an input you will reuse and want to check once: the `--map subject=` of a later run (`maps={"subject": ...}` in Python), so the
 subject is not found again, or a picture parameter such as `overlay`'s `image` (`examples/assets/bullterrier-cutout.png`
 is one). `transparent = "background"` in a recipe's `[frame]` ends a *look*: the finished picture, at the recipe's size and
 after every step, cut out around the subject, as a sticker or an avatar is.

@@ -13,9 +13,9 @@
 
 Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
 (`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask`
-(a selection: "subject", "background" or a region), `opacity` (0..1), `blend_mode` (normal, multiply, screen, overlay,
-soft_light, difference, color), for an effect with presets `preset`, and for an effect that draws along the borders of
-a partition (`seams`) `partition`. A misspelt parameter or key fails when the step is made,
+(a selection: "subject", "background", "depth" or a region), `opacity` (0..1), `blend_mode` (normal, multiply, screen,
+overlay, soft_light, difference, color), for an effect with presets `preset`, and for an effect that draws along the
+borders of a partition (`seams`) `partition`. A misspelt parameter or key fails when the step is made,
 not when the photo is rendered.
 
 `mask` may name a region the recipe declares (`Recipe(..., regions={"glass": Shards(...)})`); `fx` itself declares none,

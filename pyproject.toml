@@ -37,7 +37,7 @@ dependencies = [
     "annotated-types>=0.4.0",
     "numpy>=1.26.4",
     # the portable subject finder. No release has Python 3.15 wheels yet: there bullterrier-image installs without it, and the
-    # portable backend says onnxruntime is missing (Apple Vision and --matte still work)
+    # portable backend says onnxruntime is missing (Apple Vision and --map subject=FILE still work)
     "onnxruntime>=1.17.0 ; python_version < '3.15'",
     "pillow>=11.1.0",
     "pydantic>=2.7.1",

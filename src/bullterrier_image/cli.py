@@ -146,7 +146,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--out", default="out/cutout.png", help="output file, a PNG (default: out/cutout.png)")
     p.add_argument("--shrink", type=float, default=None, help="pull the cut edge in by this many px")
     p.add_argument("--feather", type=float, default=None, help="soften the cut edge by this many px")
-    _matte_option(p)
+    _map_option(
+        p,
+        "an existing subject map, the photo's size, instead of finding it, to refine: subject=cutout.png (a cut-out "
+        "PNG, its transparency, or a black-and-white mask, white = subject); cutout takes no other map",
+    )
     _segmenter_option(p)
 
     p = command(
@@ -242,23 +246,29 @@ def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
 
 def _map_options(p: argparse.ArgumentParser) -> None:
     """The maps of the photo a command that renders recipes can be given, and what finds the subject otherwise."""
-    _matte_option(p)
-    p.add_argument(
-        "--depth",
-        metavar="PICTURE",
-        help="the photo's depth map, the photo's size: a greyscale picture (8 or 16 bits), white = nearest, "
-        "black = farthest, used instead of the depth model (Depth Anything V2 Small, downloaded on first use)",
-    )
+    _map_option(p)
     _segmenter_option(p)
 
 
-def _matte_option(p: argparse.ArgumentParser) -> None:
-    p.add_argument(
-        "--matte",
-        metavar="PICTURE",
-        help="the subject's matte, the photo's size: a cut-out PNG (its transparency) or a black-and-white mask "
-        "(white = subject); no model is used, except by a region that finds the subject piece by piece",
-    )
+def _map_spec(text: str) -> tuple[str, str]:
+    """An argparse type: `NAME=PICTURE`, a map of the photo by its name and the picture that holds it."""
+    name, equals, path = text.partition("=")
+    if not (equals and name and path):
+        raise argparse.ArgumentTypeError(f"expected NAME=PICTURE, for example subject=cutout.png; got {text!r}")
+    return name, path
+
+
+_RENDER_MAP_HELP = (
+    "a map of the photo, the photo's size, instead of finding it: subject=cutout.png (a cut-out PNG, its "
+    "transparency, or a black-and-white mask, white = subject; no model is used, except by a region that finds the "
+    "subject piece by piece), depth=depth.png (greyscale, 8 or 16 bits, white = nearest, instead of the depth "
+    "model), or the name of a `given` region of the recipe (a picture with transparency gives its alpha, any other "
+    "its brightness); repeat for each map"
+)
+
+
+def _map_option(p: argparse.ArgumentParser, help: str = _RENDER_MAP_HELP) -> None:  # noqa: A002  (argparse's own name)
+    p.add_argument("--map", dest="maps", action="append", default=[], type=_map_spec, metavar="NAME=PICTURE", help=help)
 
 
 def _segmenter_option(p: argparse.ArgumentParser) -> None:
@@ -281,15 +291,19 @@ def _segmenter(name: str) -> str:
     return name
 
 
-def _maps(args: argparse.Namespace) -> "tuple[np.ndarray | None, np.ndarray | None, Finder | None]":
-    """The maps as the command line gives them: a matte file (--matte), a depth file (--depth), and the finder
-    --segmenter names (None: the library's default, built only if a recipe asks for it)."""
+def _maps(args: argparse.Namespace) -> "tuple[dict[str, np.ndarray], dict[str, Finder]]":
+    """The maps as the command line gives them: each `--map NAME=PICTURE` read, and the finder --segmenter names for
+    the subject (none: the library's default, built only if a recipe asks for it)."""
     from . import imageio
+    from .errors import RecipeError
     from .finding.subject import subject_finder
 
-    matte = imageio.load_matte(args.matte) if args.matte else None
-    depth = imageio.load_depth(args.depth) if args.depth else None
-    return matte, depth, None if args.segmenter is None else subject_finder(args.segmenter)
+    maps: dict[str, np.ndarray] = {}
+    for name, path in args.maps:
+        if name in maps:
+            raise RecipeError(f"--map {name} is given twice")
+        maps[name] = imageio.load_map(path)
+    return maps, {} if args.segmenter is None else {"subject": subject_finder(args.segmenter)}
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
@@ -311,13 +325,12 @@ def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarra
 
 
 def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[np.ndarray]":
-    """The photo of `args` through each recipe, the subject (the --matte file, else found once) and the depth (the
-    --depth file, else found once) shared by them all."""
+    """The photo of `args` through each recipe, each map (the --map file, else found once) shared by them all."""
     from . import imageio
     from .recipe import render_all
 
-    matte, depth, find = _maps(args)
-    return render_all(imageio.load(args.photo), recipes, matte=matte, depth=depth, find_subject=find)
+    maps, finders = _maps(args)
+    return render_all(imageio.load(args.photo), recipes, maps=maps, finders=finders)
 
 
 def _render(args: argparse.Namespace) -> int:
@@ -367,17 +380,20 @@ def _cutout(args: argparse.Namespace) -> int:
     import numpy as np
 
     from . import imageio
-    from .errors import SubjectNotFoundError
+    from .errors import RecipeError, SubjectNotFoundError
     from .finding.subject import refine_edge, subject_matte
 
     photo = imageio.load(args.photo)
-    matte = imageio.load_matte(args.matte) if args.matte else None
+    maps, _ = _maps(args)
+    if other := sorted(set(maps) - {"subject"}):
+        raise RecipeError(f"cutout takes only --map subject=PICTURE, not {other[0]!r}")
+    matte = maps.get("subject")
     if matte is None:
         options = {k: v for k, v in (("shrink", args.shrink), ("feather", args.feather)) if v is not None}
         alpha = subject_matte(photo, segmenter=args.segmenter, **options)
     elif matte.shape != photo.shape[:2]:
         (mh, mw), (ph, pw) = matte.shape, photo.shape[:2]
-        raise SubjectNotFoundError(f"the matte is {mw}x{mh} px but the photo is {pw}x{ph}")
+        raise SubjectNotFoundError(f"the subject map is {mw}x{mh} px but the photo is {pw}x{ph}")
     else:  # a matte given is used as it is, unless an edge clean-up is asked for
         alpha = refine_edge(matte, args.shrink or 0.0, args.feather or 0.0)
     target = Path(args.out)
@@ -402,7 +418,7 @@ def _run(args: argparse.Namespace) -> int:
         dry_run=args.dry_run,
         only=args.only,
         log=lambda message: _progress(args, message),
-        find_subject=None if args.segmenter is None else subject_finder(args.segmenter),
+        finders={} if args.segmenter is None else {"subject": subject_finder(args.segmenter)},
     )
     failed = [i for i in items if i.status == "failed"]
     flagged = [i for i in items if i.warnings]
@@ -422,8 +438,8 @@ def _steps(args: argparse.Namespace) -> int:
 
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
-    matte, depth, find = _maps(args)
-    stages = trace(imageio.load(args.photo), recipe, matte=matte, depth=depth, find_subject=find)
+    maps, finders = _maps(args)
+    stages = trace(imageio.load(args.photo), recipe, maps=maps, finders=finders)
     for stage in stages:
         _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))

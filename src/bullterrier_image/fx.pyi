@@ -844,7 +844,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated) or 'wrap' (the opposite edge)."""
     ...
 
-def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
@@ -855,7 +855,7 @@ When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `ji
 figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
 makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
 
 Parameters
 ----------
@@ -984,16 +984,16 @@ edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'refle
     the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
     'constant' (open space, as if nothing were there, which blurs the outline toward the
     border).
-matte_threshold : number, fraction, 0 to 1, default 0.5
-    With a matte: how much of a piece, 0 to 1, the matte must cover on average for the
-    piece to belong to the figure that `outline` and `hover` work from; 0.5 = more than
-    half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored
-    without a matte.
+subject_threshold : number, fraction, 0 to 1, default 0.5
+    With a subject: how much of a piece, 0 to 1, the subject must cover on average for
+    the piece to belong to the figure that `outline` and `hover` work from; 0.5 = more
+    than half. Lowering it takes in more of a soft edge (hair, fur), raising it less.
+    Ignored without a subject.
 background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never flies and is drawn black
     once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces;
-    without a matte it also decides the figure's outline."""
+    without a subject it also decides the figure's outline."""
     ...
 
 def displace(amount: float = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
@@ -1051,7 +1051,7 @@ The shadow is the subject's silhouette moved and blurred, laid over the backgrou
 it replaces the picture, where its blurred edge thins out it shows less. The subject itself is never changed, and
 the shadow only ever shows where the subject is not.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
 no subject and so no shadow: the picture comes back unchanged.
 
 Parameters
@@ -1321,7 +1321,7 @@ bins : whole number, count, 2 to 256, default 256
     brightnesses), 256 matches 8-bit pictures."""
     ...
 
-def evaporate(cell: int = 5, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
+def evaporate(cell: int = 5, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
 The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
@@ -1334,9 +1334,9 @@ sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pu
 leaving the picture are gone. With `outline` and `outward` at 0 pieces only move up, so everything more than one
 character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
 "the edge of the figure". Dark parts of the picture (eyes, shadows) are then still part of the figure. Without
-a matte the lit pieces are used, with enclosed dark gaps filled in.
+a subject the lit pieces are used, with enclosed dark gaps filled in.
 
 Parameters
 ----------
@@ -1413,16 +1413,16 @@ edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'refle
     the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
     'constant' (open space, as if nothing were there, which blurs the outline toward the
     border).
-matte_threshold : number, fraction, 0 to 1, default 0.5
-    With a matte: how much of a piece, 0 to 1, the matte must cover on average for the
-    piece to belong to the figure that `outline` sheds from; 0.5 = more than half.
+subject_threshold : number, fraction, 0 to 1, default 0.5
+    With a subject: how much of a piece, 0 to 1, the subject must cover on average for
+    the piece to belong to the figure that `outline` sheds from; 0.5 = more than half.
     Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored
-    without a matte.
+    without a subject.
 background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never drifts (it simply vanishes
-    if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also
-    decides the figure's outline.
+    if it detaches). Raising it leaves dim, noisy pieces behind; without a subject it
+    also decides the figure's outline.
 
 Presets
 -------
@@ -2291,7 +2291,7 @@ def layered_cutouts(layers: int = 4, offset: float = 14.0, angle: float = 45.0, 
 The layers run in colour from `color` (nearest the subject) to `end_color` (farthest); a nearer layer lies in
 front of the ones beyond it, and the subject on top of all of them, so the subject itself is never changed.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
 no subject and so no layers: the picture comes back unchanged.
 
 Parameters
@@ -2705,7 +2705,7 @@ The shadow is every copy of the silhouette moved along the ray, one per pixel of
 by `fade`; it is laid behind the subject in `color`, replacing the picture where it is full (at the subject), so
 the subject itself is never changed.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
 no subject and so no shadow: the picture comes back unchanged.
 
 Parameters
@@ -2926,14 +2926,14 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     mirrored about the edge pixel, 'wrap' the opposite side."""
     ...
 
-def outline(width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, matte_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def outline(width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px.
 
 The stroke follows the edge of the subject on the side `position` says; 'outside' leaves the subject's own pixels
-exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the matte
+exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the subject
 is soft the stroke lies behind the subject. The edge is antialiased over one pixel.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
 no subject to outline and the picture is returned unchanged.
 
 Parameters
@@ -2954,8 +2954,8 @@ glow : number, px, 0 to 200, default 0.0
 
 Advanced parameters
 -------------------
-matte_threshold : number, fraction, 0 to 1, default 0.5
-    The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is
+subject_threshold : number, fraction, 0 to 1, default 0.5
+    The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is
     outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
     (hair, fur), raising it less."""
     ...
@@ -3592,7 +3592,7 @@ The floor line is the bottom of the subject; the reflection is `height` of the s
 `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
 at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
 when nothing in it counts as the subject (see `threshold`), there is no floor line and so no reflection: the
 picture comes back unchanged.
 
@@ -3613,10 +3613,10 @@ blur : number, px, 0 to 100, default 2.0
 Advanced parameters
 -------------------
 threshold : number, fraction, 0 to 1, default 0.5
-    How much of a matte row, 0 to 1, must be subject for the row to count as part of it
-    when its lowest and highest rows are found: 0.5 = a pixel of at least half. Lowering
-    it counts faint fringes, so the floor line moves down and the subject's height
-    grows.
+    How much of a subject row, 0 to 1, must be subject for the row to count as part of
+    it when its lowest and highest rows are found: 0.5 = a pixel of at least half.
+    Lowering it counts faint fringes, so the floor line moves down and the subject's
+    height grows.
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
     Larger is more exact and slower.
@@ -3705,7 +3705,7 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     'mirror' mirrors it about the edge line."""
     ...
 
-def rim_light(angle: float = 40.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def rim_light(angle: float = 40.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`.
 
 Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
@@ -3713,8 +3713,8 @@ direction of `angle` (head-on = full, side-on = none, away = none), and the ligh
 It is screened over the picture, so it only ever brightens, and never reaches the background or the subject's
 interior beyond `width`. The picture's own border is no edge.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
-with a matte that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+with a subject that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
 
 Parameters
 ----------
@@ -3749,8 +3749,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored,
     border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
     border pixel repeated) or 'wrap' (the opposite border).
-matte_threshold : number, fraction, 0 to 1, default 0.5
-    The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is
+subject_threshold : number, fraction, 0 to 1, default 0.5
+    The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is
     lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
     fur), raising it less."""
     ...
@@ -4377,14 +4377,14 @@ Presets
 teal_orange : The blockbuster grade: teal in the shadows, orange in the highlights."""
     ...
 
-def spotlight(amount: float = 0.8, falloff: float = 0.8, radius: float = 200.0, feather: float = 10.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', matte_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
+def spotlight(amount: float = 0.8, falloff: float = 0.8, radius: float = 200.0, feather: float = 10.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:
     """Light the subject and darken the rest: the further from the silhouette, the more the picture goes to `color`.
 
 Darkness is `amount` x (distance / `radius`)^`falloff` (full from `radius` px out), times the share of the
 surroundings that `feather` leaves unlit, so a feathered spotlight bleeds light softly past the silhouette. The
-subject itself is never touched. With a matte that covers nothing, everything is the rest and is darkened fully.
+subject itself is never touched. With a subject that covers nothing, everything is the rest and is darkened fully.
 
-`matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
 no subject to light and the picture is returned unchanged.
 
 Parameters
@@ -4418,10 +4418,10 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the `feather` blur sees beyond the picture's border: 'reflect' (mirrored,
     border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
     border pixel repeated) or 'wrap' (the opposite border).
-matte_threshold : number, fraction, 0 to 1, default 0.5
-    The matte value, 0 to 1, from which a pixel belongs to the subject that stays lit:
-    0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur),
-    raising it less."""
+subject_threshold : number, fraction, 0 to 1, default 0.5
+    The subject's value, 0 to 1, from which a pixel belongs to the subject that stays
+    lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
+    fur), raising it less."""
     ...
 
 def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal') -> Step:

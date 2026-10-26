@@ -11,7 +11,7 @@ def _lit(height=120, width=160):
     return np.ones((height, width, 3), np.float32)
 
 
-# a picture of whole piece rows: a partial last row counts its padding as outside the matte, and would be an edge
+# a picture of whole piece rows: a partial last row counts its padding as outside the subject, and would be an edge
 WHOLE_ROWS = 15 * cell_size(5)[1]
 
 
@@ -246,9 +246,9 @@ def test_disperse_stays_within_0_to_1_whatever_the_settings(draw):
     """Any mix of in-range values, at a random moment: finite, same shape, 0..1 (the glow and the shimmer brighten)."""
     rng = np.random.default_rng(draw)
     picture = np.clip(rng.random((30, 44, 3), dtype=np.float32) * 1.6, 0, 1).astype(np.float32)  # mostly white
-    matte = np.zeros((30, 44), np.float32)
-    matte[8:, 10:34] = 1.0
-    out = registry.apply("disperse", picture, matte=matte, **_random_settings(rng))
+    subject = np.zeros((30, 44), np.float32)
+    subject[8:, 10:34] = 1.0
+    out = registry.apply("disperse", picture, subject=subject, **_random_settings(rng))
     assert out.shape == picture.shape
     assert np.isfinite(out).all()
     assert out.min() >= 0.0
@@ -493,25 +493,25 @@ def test_disperse_outline_depth_is_how_deep_closeness_to_the_edge_decides_the_or
 
 def test_disperse_takes_its_edge_from_the_matte_when_given():
     img = np.ones((WHOLE_ROWS, 200, 3), np.float32)  # everything is lit...
-    matte = np.zeros((WHOLE_ROWS, 200), np.float32)
-    matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
+    subject = np.zeros((WHOLE_ROWS, 200), np.float32)
+    subject[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
     kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
-    with_matte = registry.apply("disperse", img, matte=matte, **kwargs)
+    with_matte = registry.apply("disperse", img, subject=subject, **kwargs)
     without = registry.apply("disperse", img, **kwargs)
     outside = (slice(150, None), slice(20, 60))
     assert with_matte[outside].max() == 0.0  # outside the silhouette is all edge: it has gone by half-way
-    assert without[outside].mean() > 0.8  # with no matte only the picture's borders are edges, so most of it stays
+    assert without[outside].mean() > 0.8  # with no subject only the picture's borders are edges, so most of it stays
     assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure waits its turn
 
 
-def test_disperse_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
+def test_disperse_subject_threshold_is_how_much_of_a_piece_the_subject_must_cover():
     img = np.ones((WHOLE_ROWS, 200, 3), np.float32)
-    matte = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint matte everywhere,
-    matte[:, 80:120] = 1.0  # and a solid column
+    subject = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint subject everywhere,
+    subject[:, 80:120] = 1.0  # and a solid column
     kwargs = {"progress": 0.5, "top": 0, "outline": 1.0, "sweep": 0, "seed": 1}
     outside = (slice(150, None), slice(20, 60))
-    assert registry.apply("disperse", img, matte=matte, **kwargs)[outside].max() == 0.0  # 0.4 < 0.5: edge, gone
-    kept = registry.apply("disperse", img, matte=matte, matte_threshold=0.3, **kwargs)[outside]
+    assert registry.apply("disperse", img, subject=subject, **kwargs)[outside].max() == 0.0  # 0.4 < 0.5: edge, gone
+    kept = registry.apply("disperse", img, subject=subject, subject_threshold=0.3, **kwargs)[outside]
     assert kept.mean() > 0.8  # 0.4 > 0.3: figure, far from its edge (only the picture's borders), so most stays
 
 

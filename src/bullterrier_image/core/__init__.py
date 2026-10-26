@@ -5,7 +5,7 @@
     types       the forms a colour may be written in
     vocabulary  parameter names effects must not use, and what to use instead
     steps       `Step` and `Recipe`: the data model of a look and its validation
-    runner      running a recipe on a photo; the subject is given to it (a matte or a `find_subject` `Finder`)
+    runner      running a recipe on a photo; its maps are given to it (by name, as arrays or as `Finder`s)
 
 `core` imports only `ops` from the rest of bullterrier_image (import-linter enforces it), so it stays small and stable
 while effects, adapters and the app change around it. Its names are imported from their modules

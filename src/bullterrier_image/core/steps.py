@@ -34,7 +34,7 @@ from bullterrier_image.ops.composite import BlendMode
 from . import registry
 from .framing import Framing
 from .params import ValidatedModel
-from .regions import Kind, check, needs, needs_depth, needs_finder, needs_subject
+from .regions import Kind, check, maps_used, needs, needs_finder
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
 Reference = tuple[str, str, Literal["partition", "selection"] | None]
@@ -49,8 +49,8 @@ class _Layer(ValidatedModel):
 
     mask: str | None = Field(
         None,
-        description='Apply only where this selection says: the "subject" or the "background" of the photo, or the name '
-        "of a selection the recipe declares (path, pick, subject or depth); None: everywhere.",
+        description='Apply only where this selection says: the "subject", "background" or "depth" of the photo, or the '
+        "name of a selection the recipe declares (path, pick, subject, depth or given); None: everywhere.",
     )
     opacity: float = Field(
         ge=0,
@@ -324,9 +324,9 @@ class Recipe(ValidatedModel):
         `bullterrier_image.core.regions`). They are checked here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1 (effect sizes such as cell or radius are relative to it), or
         None to keep the photo's own size. The photo is framed first (flip, turn, crop, borders) and then scaled.
-    frame: a `Framing` (default: none): flips, turns, crops and pads the photo, the subject matte and the depth map
-        together before the first step, and may cut the finished picture out (a circle, rounded corners, the subject)
-        after the last, so the render has an alpha channel.
+    frame: a `Framing` (default: none): flips, turns, crops and pads the photo and its maps (the subject, the depth,
+        any map handed in) together before the first step, and may cut the finished picture out (a circle, rounded
+        corners, the subject) after the last, so the render has an alpha channel.
     """
 
     name: str = Field(
@@ -384,17 +384,16 @@ class Recipe(ValidatedModel):
         return self
 
     @property
-    def needs_matte(self) -> bool:
-        """True if a step takes the matte, or a region a step uses is made from the subject (the subject or background
-        itself, or a region laid over it), or the framing crops around the subject or keeps only it: rendering must
-        find the subject first (the slow part). Regions that are declared but not used need nothing."""
-        return self.frame.needs_matte or bool(self.taking("matte")) or needs_subject(self.regions, self._names_used())
-
-    @property
-    def needs_depth(self) -> bool:
-        """True if a step's effect, or a look's, takes the depth map, or a region a step uses is made from it (a `Depth`
-        or `DepthBands`, or a region laid over or picked from one): rendering must be given it or a depth finder."""
-        return bool(self.taking("depth")) or needs_depth(self.regions, self._names_used())
+    def maps_needed(self) -> frozenset[str]:
+        """The names of the maps of the photo that rendering must be given or find: `subject` when a step's effect takes
+        it, the framing crops around it or keeps only it, or a region a step uses is made from it (the built-in
+        `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (an effect
+        that takes it, a `Depth`, a `DepthBands`, the built-in `depth`); and the name of every `Given` region a step
+        uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map
+        (see `needs_finder`)."""
+        taken = {name for name in registry.MAP_INPUTS if self.taking(name)}
+        framed = {"subject"} if self.frame.needs_subject else set()
+        return frozenset(taken | framed | maps_used(self.regions, self._names_used()))
 
     def taking(self, name: str) -> list[tuple[int, str]]:
         """The steps whose effect, or the effect of one of whose looks, takes the injected input `name` (one of
@@ -410,7 +409,7 @@ class Recipe(ValidatedModel):
     def needs_finder(self) -> bool:
         """True if a region a step uses finds the subject piece by piece (a `Subject` with `per`): rendering must be
         given a subject finder, whatever else it is given, because it is asked about parts of the working picture, which
-        no matte of the whole photo answers."""
+        no map of the whole photo answers."""
         return needs_finder(self.regions, self._names_used())
 
     def _names_used(self) -> list[str]:

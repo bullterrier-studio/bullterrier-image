@@ -68,33 +68,33 @@ class SpotlightParams(EffectParams):
         "border).",
         advanced=True,
     )
-    matte_threshold: float = param(
+    subject_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="The matte value, 0 to 1, from which a pixel belongs to the subject that stays lit: 0.5 = more than half "
-        "covered. Lowering it takes in more of a soft edge (hair, fur), raising it less.",
+        doc="The subject's value, 0 to 1, from which a pixel belongs to the subject that stays lit: 0.5 = more than "
+        "half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=SpotlightParams)
-def spotlight(rgb: np.ndarray, params: SpotlightParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def spotlight(rgb: np.ndarray, params: SpotlightParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """Light the subject and darken the rest: the further from the silhouette, the more the picture goes to `color`.
 
     Darkness is `amount` x (distance / `radius`)^`falloff` (full from `radius` px out), times the share of the
     surroundings that `feather` leaves unlit, so a feathered spotlight bleeds light softly past the silhouette. The
-    subject itself is never touched. With a matte that covers nothing, everything is the rest and is darkened fully.
+    subject itself is never touched. With a subject that covers nothing, everything is the rest and is darkened fully.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject to light and the picture is returned unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
     p = params
-    outside = np.maximum(signed_distance(matte >= p.matte_threshold), 0.0)  # px from the subject; 0 on and in it
-    spill = gaussian_blur(matte, p.feather, truncate=p.truncate, edge=p.edge)  # the light that reaches past the edge
+    outside = np.maximum(signed_distance(subject >= p.subject_threshold), 0.0)  # px from the subject; 0 on and in it
+    spill = gaussian_blur(subject, p.feather, truncate=p.truncate, edge=p.edge)  # the light that reaches past the edge
     darkness = p.amount * np.clip(outside / p.radius, 0.0, 1.0) ** p.falloff * (1.0 - spill)
     tint = np.asarray(p.color, np.float32)
     return (rgb + (tint - rgb) * darkness[..., None]).astype(np.float32)

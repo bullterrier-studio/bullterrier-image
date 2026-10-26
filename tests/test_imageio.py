@@ -254,8 +254,8 @@ UNREADABLE = [
 @pytest.mark.parametrize("make", UNREADABLE)
 @pytest.mark.parametrize(
     "read",
-    [imageio.load, imageio.load_matte, imageio.load_depth, imageio.load_picture],
-    ids=["load", "load_matte", "load_depth", "load_picture"],
+    [imageio.load, imageio.load_map, imageio.load_picture],
+    ids=["load", "load_map", "load_picture"],
 )
 def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_it(tmp_path, read, make):
     path = tmp_path / "broken-photo.png"
@@ -274,8 +274,8 @@ def test_a_decompression_bomb_is_refused_with_image_read_error(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize("name", ["cut.png", "cut.webp"])
-def test_save_of_four_channels_writes_the_last_as_transparency(photo, matte, tmp_path, name):
-    imageio.save(np.dstack([photo, matte]), tmp_path / name, quality=100)
+def test_save_of_four_channels_writes_the_last_as_transparency(photo, subject, tmp_path, name):
+    imageio.save(np.dstack([photo, subject]), tmp_path / name, quality=100)
     with Image.open(tmp_path / name) as img:
         assert img.mode == "RGBA"
         alpha = np.asarray(img)[..., 3]
@@ -284,9 +284,9 @@ def test_save_of_four_channels_writes_the_last_as_transparency(photo, matte, tmp
 
 
 @pytest.mark.parametrize("name", ["cut.jpg", "cut.jpeg", "CUT.JPG"])
-def test_a_picture_with_transparency_cannot_be_saved_as_a_jpeg(photo, matte, tmp_path, name):
+def test_a_picture_with_transparency_cannot_be_saved_as_a_jpeg(photo, subject, tmp_path, name):
     with pytest.raises(BackendUnavailableError, match="transparen"):
-        imageio.save(np.dstack([photo, matte]), tmp_path / name)
+        imageio.save(np.dstack([photo, subject]), tmp_path / name)
     assert not (tmp_path / name).exists()
     imageio.save(photo, tmp_path / name)  # known good: the same picture without its alpha
     assert (tmp_path / name).exists()
@@ -298,8 +298,8 @@ GPS_INFO = 0x8825  # the EXIF tag pointing to the GPS block (EXIF 2.32)
 
 
 @pytest.mark.parametrize("name", ["a.jpg", "a.png", "a.webp", "cut.png"])
-def test_a_saved_still_says_it_is_srgb_with_a_small_embedded_profile(photo, matte, tmp_path, name):
-    imageio.save(np.dstack([photo, matte]) if name.startswith("cut") else photo, tmp_path / name)
+def test_a_saved_still_says_it_is_srgb_with_a_small_embedded_profile(photo, subject, tmp_path, name):
+    imageio.save(np.dstack([photo, subject]) if name.startswith("cut") else photo, tmp_path / name)
     with Image.open(tmp_path / name) as img:
         profile = img.info["icc_profile"]
     assert "sRGB" in ImageCms.getProfileDescription(ImageCms.ImageCmsProfile(io.BytesIO(profile)))
@@ -374,7 +374,7 @@ def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp
     assert not (tmp_path / "odd.png").exists()
 
 
-# --- bring your own matte: imageio.load_matte ----------------------------------------------------------------------
+# --- bring your own map: imageio.load_map ---------------------------------------------------------------------------
 
 
 def halves(low, high, dtype=np.uint8) -> np.ndarray:
@@ -393,53 +393,38 @@ PNG, JPEG, TIFF = ("m.png", 0, 1e-6), ("m.jpg", 5, 0.02), ("m.tif", 0, 1e-6)  # 
     [
         # a transparent PNG gives its alpha channel, whatever its colours: 51 / 255 and 255 / 255
         (Image.fromarray(np.dstack([np.full((20, 30, 3), 200, np.uint8), halves(51, 255)]), "RGBA"), PNG, 0.2, 1.0),
-        (Image.fromarray(halves(0, 102), "L"), PNG, 0.0, 0.4),  # a greyscale PNG gives its grey levels
+        # a drawing's silhouette: opaque inside, clear outside, over colours that would read as brightness 0.8
+        (Image.fromarray(np.dstack([np.full((20, 30, 3), 204, np.uint8), halves(0, 255)]), "RGBA"), PNG, 0.0, 1.0),
+        # an editor's depth map saved with an opaque alpha channel gives its brightness: grey 0 and 102 under alpha 255
+        (Image.fromarray(np.dstack([halves(0, 102)] * 3 + [np.full((20, 30), 255, np.uint8)]), "RGBA"), PNG, 0.0, 0.4),
+        (Image.fromarray(halves(0, 102), "L"), PNG, 0.0, 0.4),  # a greyscale PNG gives its grey levels: 102 / 255
         (Image.fromarray(halves(0, 16384, np.uint16)), PNG, 0.0, 16384 / 65535),  # 16 bits keep their full range
+        # the same map saved in 16 bits reads as the same value: 26214 / 65535 is 102 / 255
+        (Image.fromarray(halves(0, 102 * 257, np.uint16)), PNG, 0.0, 0.4),
         # a black and white RGB picture gives its brightness (a JPEG: within its rounding, away from the edge)
         (Image.fromarray(np.dstack([halves(0, 255)] * 3), "RGB"), JPEG, 0.0, 1.0),
-    ],
-    ids=["alpha of a transparent PNG", "greyscale PNG", "16-bit greyscale PNG", "black and white RGB JPEG"],
-)
-def test_a_matte_file_gives_its_subject_share_per_pixel(tmp_path, picture, file, left, right):
-    name, margin, atol = file
-    picture.save(tmp_path / name, quality=100)  # (PNG has no quality setting and ignores it)
-    matte = imageio.load_matte(tmp_path / name)
-    assert matte.dtype == np.float32
-    assert matte.shape == (20, 30)
-    np.testing.assert_allclose(matte[:, : 15 - margin], left, atol=atol)
-    np.testing.assert_allclose(matte[:, 15 + margin :], right, atol=atol)
-
-
-# --- bring your own depth map: imageio.load_depth ------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("picture", "file", "left", "right"),
-    [
-        (Image.fromarray(halves(0, 102), "L"), PNG, 0.0, 0.4),  # 102 / 255
-        (Image.fromarray(halves(0, 102 * 257, np.uint16)), PNG, 0.0, 0.4),  # 26214 / 65535: the same depth in 16 bits
-        # a picture with transparency gives its brightness, never its alpha: grey 102 under alpha 255 and 0
-        (Image.fromarray(np.dstack([halves(0, 102)] * 3 + [halves(255, 0)]), "RGBA"), PNG, 0.0, 0.4),
-        (Image.fromarray(np.dstack([halves(0, 255)] * 3), "RGB"), JPEG, 0.0, 1.0),  # within a JPEG's rounding
         # 32-bit integer levels within the 16-bit range read as 16 bits
         (Image.fromarray(halves(0, 102 * 257, np.int32), "I"), TIFF, 0.0, 0.4),
     ],
     ids=[
-        "8-bit greyscale PNG",
+        "alpha of a transparent PNG",
+        "alpha of a drawing, whatever its colours",
+        "brightness of a PNG whose alpha is opaque everywhere",
+        "greyscale PNG",
         "16-bit greyscale PNG",
-        "brightness of a transparent PNG",
+        "the same map in 16 bits",
         "black and white RGB JPEG",
         "32-bit integer TIFF of 16-bit levels",
     ],
 )
-def test_a_depth_file_gives_its_brightness_per_pixel_white_nearest(tmp_path, picture, file, left, right):
+def test_a_map_file_gives_its_value_per_pixel(tmp_path, picture, file, left, right):
     name, margin, atol = file
     picture.save(tmp_path / name, quality=100)  # (PNG and TIFF have no quality setting and ignore it)
-    depth = imageio.load_depth(tmp_path / name)
-    assert depth.dtype == np.float32
-    assert depth.shape == (20, 30)
-    np.testing.assert_allclose(depth[:, : 15 - margin], left, atol=atol)
-    np.testing.assert_allclose(depth[:, 15 + margin :], right, atol=atol)
+    layer = imageio.load_map(tmp_path / name)
+    assert layer.dtype == np.float32
+    assert layer.shape == (20, 30)
+    np.testing.assert_allclose(layer[:, : 15 - margin], left, atol=atol)
+    np.testing.assert_allclose(layer[:, 15 + margin :], right, atol=atol)
 
 
 @pytest.mark.parametrize(
@@ -450,8 +435,7 @@ def test_a_depth_file_gives_its_brightness_per_pixel_white_nearest(tmp_path, pic
         pytest.param(Image.fromarray(halves(-5, 100, np.int32), "I"), "'I'", id="negative integer levels"),
     ],
 )
-@pytest.mark.parametrize("read", [imageio.load_matte, imageio.load_depth], ids=["load_matte", "load_depth"])
-def test_a_map_file_whose_levels_do_not_map_to_0_to_1_is_refused_naming_its_mode(tmp_path, read, picture, mode):
+def test_a_map_file_whose_levels_do_not_map_to_0_to_1_is_refused_naming_its_mode(tmp_path, picture, mode):
     picture.save(tmp_path / "map.tif")
     with pytest.raises(ImageReadError, match=rf"map\.tif.*{mode}"):
-        read(tmp_path / "map.tif")
+        imageio.load_map(tmp_path / "map.tif")

@@ -9,7 +9,6 @@ a property of the result.
 import contextlib
 import math
 import tracemalloc
-from collections.abc import Callable
 from itertools import pairwise
 from pathlib import Path as File
 
@@ -17,7 +16,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image import DepthNotFoundError, RecipeError, SubjectNotFoundError
+from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core.regions import (
     BoxFinder,
     Curve,
@@ -25,6 +24,7 @@ from bullterrier_image.core.regions import (
     Depth,
     DepthBands,
     Edge,
+    Given,
     Grid,
     Kind,
     Line,
@@ -39,10 +39,9 @@ from bullterrier_image.core.regions import (
     as_partition,
     check,
     look_weights,
+    maps_used,
     needs,
-    needs_depth,
     needs_finder,
-    needs_subject,
     resolve,
     used,
 )
@@ -65,22 +64,22 @@ def disc(shape: Shape) -> np.ndarray:
     return (np.hypot(x - width / 2, y - height / 2) <= 0.3 * max(shape)).astype(np.float32)
 
 
-def finder(shape: Shape) -> Callable[[], np.ndarray]:
-    """A subject finder for a picture of `shape`, standing in for the model (an external boundary)."""
-    return lambda: disc(shape)
+def finder(shape: Shape) -> np.ndarray:
+    """The subject map of a picture of `shape`, standing in for what the model finds (an external boundary)."""
+    return disc(shape)
 
 
-def ramp(shape: Shape) -> Callable[[], np.ndarray]:
+def ramp(shape: Shape) -> np.ndarray:
     """A depth map for a picture of `shape` (the depth model's stand-in): nearest at the top left, farthest at the
     bottom right, falling evenly along both sides, so every kind of picture holds near and far pixels."""
     height, width = shape
     y, x = np.mgrid[0:height, 0:width] + 0.5
-    return lambda: (1 - (y / height + x / width) / 2).astype(np.float32)
+    return (1 - (y / height + x / width) / 2).astype(np.float32)
 
 
-def down(depths: list[float], width: int = 3) -> Callable[[], np.ndarray]:
+def down(depths: list[float], width: int = 3) -> np.ndarray:
     """A depth map whose rows hold `depths`, top to bottom, the same across each row."""
-    return lambda: np.tile(np.asarray(depths, np.float32)[:, None], (1, width))
+    return np.tile(np.asarray(depths, np.float32)[:, None], (1, width))
 
 
 def true_boundary(shape: Shape) -> BoxFinder:
@@ -167,12 +166,12 @@ def assert_a_region(region: Partition | Selection, shape: Shape, nearest_first: 
 def numbering(kind: Kind, shape: Shape) -> np.ndarray | None:
     """What `assert_a_region` checks the pieces of `kind` over a picture of `shape` are numbered by: the depth for
     `DepthBands` (nearest first), None (reading order) for every other kind."""
-    return ramp(shape)() if isinstance(kind, DepthBands) else None
+    return ramp(shape) if isinstance(kind, DepthBands) else None
 
 
 def labels_of(regions: dict, name: str, shape: Shape) -> np.ndarray:
     """The pieces of the partition `name` of `regions` over a picture of `shape`."""
-    return resolve(regions, shape, subject=finder(shape), find=true_boundary(shape)).partition(name).labels
+    return resolve(regions, shape, maps={"subject": finder(shape)}, find=true_boundary(shape)).partition(name).labels
 
 
 def same_pieces(labels: np.ndarray, other: np.ndarray) -> np.ndarray:
@@ -191,8 +190,12 @@ def same_pieces(labels: np.ndarray, other: np.ndarray) -> np.ndarray:
 @pytest.mark.parametrize("size", ODD_SIZES, ids=lambda s: f"{s[0]}x{s[1]}")
 @pytest.mark.parametrize("name", list(declared()))
 def test_every_kind_gives_a_partition_or_selection_at_any_size_and_the_same_one_every_time(name, size):
-    first = resolve(declared(), size, subject=finder(size), find=true_boundary(size), depth=ramp(size))[name]
-    again = resolve(declared(), size, subject=finder(size), find=true_boundary(size), depth=ramp(size))[name]
+    first = resolve(declared(), size, maps={"subject": finder(size), "depth": ramp(size)}, find=true_boundary(size))[
+        name
+    ]
+    again = resolve(declared(), size, maps={"subject": finder(size), "depth": ramp(size)}, find=true_boundary(size))[
+        name
+    ]
     assert_a_region(first, size, numbering(declared()[name], size))
     match first, again:
         case Partition(), Partition():
@@ -239,7 +242,9 @@ AT_THE_LIMITS: dict[str, Kind] = {
 @pytest.mark.parametrize("name", AT_THE_LIMITS)
 def test_every_field_works_at_its_minimum_and_maximum(name, size):
     regions = {"panes": Grid(columns=3, rows=2), "it": AT_THE_LIMITS[name]}
-    resolved = resolve(regions, size, subject=finder(size), find=true_boundary(size), depth=ramp(size))["it"]
+    resolved = resolve(regions, size, maps={"subject": finder(size), "depth": ramp(size)}, find=true_boundary(size))[
+        "it"
+    ]
     assert_a_region(resolved, size, numbering(AT_THE_LIMITS[name], size))
 
 
@@ -254,7 +259,7 @@ def test_pieces_are_numbered_in_reading_order_so_a_looks_list_is_predictable():
 
 def test_a_selection_of_a_picture_with_fewer_pieces_than_picked_selects_what_exists():
     """The same recipe must work on a thumbnail, where a 3 x 2 grid of a 1 x 1 picture has only one piece."""
-    regions = resolve({"g": Grid(columns=3, rows=2), "p": Pick(of="g", pieces=[0, 5])}, (1, 1), subject=None)
+    regions = resolve({"g": Grid(columns=3, rows=2), "p": Pick(of="g", pieces=[0, 5])}, (1, 1), maps={})
     assert regions.selection("p").alpha.tolist() == [[1.0]]
 
 
@@ -355,7 +360,7 @@ def test_a_grid_with_fit_is_laid_over_the_selections_box_and_its_outer_pieces_ru
     shape = (20, 30)
     box = np.zeros(shape, np.float32)
     box[5:15, 8:22] = 1  # rows 5..14, columns 8..21: x from 8 to 22, y from 5 to 15
-    regions = resolve({"g": Grid(columns=[1, 3], rows=2, fit="subject")}, shape, subject=lambda: box)
+    regions = resolve({"g": Grid(columns=[1, 3], rows=2, fit="subject")}, shape, maps={"subject": box})
     want = grid_oracle(shape, [1, 3], [1, 1], (8, 5, 22, 15))
     np.testing.assert_array_equal(regions.partition("g").labels, want)
     assert want[0, 0] != want[19, 29]  # the oracle's own corners differ: the pieces beyond the box are not lost
@@ -414,7 +419,7 @@ def test_every_seed_lies_inside_a_thin_selection_the_lattice_mostly_misses(count
     line = np.zeros(shape, np.float32)
     for row in range(80):
         line[row, int(row * 1.45)] = 1
-    labels = resolve({"s": Shards(count=count, fit="subject")}, shape, subject=lambda: line).partition("s").labels
+    labels = resolve({"s": Shards(count=count, fit="subject")}, shape, maps={"subject": line}).partition("s").labels
     assert set(np.unique(labels[line > 0])) == set(range(count))
 
 
@@ -426,7 +431,7 @@ def test_zero_jitter_cuts_a_selection_into_an_even_honeycomb_whatever_the_box_ho
     chosen = disc(shape)
     chosen[-5:, -5:] = 1
     labels = (
-        resolve({"s": Shards(count=30, jitter=0, fit="subject")}, shape, subject=lambda: chosen).partition("s").labels
+        resolve({"s": Shards(count=30, jitter=0, fit="subject")}, shape, maps={"subject": chosen}).partition("s").labels
     )
     areas = np.bincount(labels.ravel())
     whole = [piece for piece in range(len(areas)) if (chosen[labels == piece] > 0.5).all()]
@@ -441,7 +446,7 @@ def test_the_frame_of_a_soft_selection_is_where_it_chooses_more_than_half():
     matte[3:17, 4:26] = 0.3  # a faint halo: not chosen
     matte[5:15, 8:22] = 0.7  # the fringe of the subject: chosen
     matte[7:12, 12:18] = 1
-    regions = resolve({"g": Grid(columns=[1, 3], rows=1, fit="subject")}, shape, subject=lambda: matte)
+    regions = resolve({"g": Grid(columns=[1, 3], rows=1, fit="subject")}, shape, maps={"subject": matte})
     want = grid_oracle(shape, [1, 3], [1], (8, 5, 22, 15))
     np.testing.assert_array_equal(regions.partition("g").labels, want)
 
@@ -530,43 +535,29 @@ def test_a_different_edge_seed_tears_differently():
 
 def test_pick_selects_exactly_the_pixels_of_the_pieces_listed():
     shape = (20, 30)
-    regions = resolve({"g": Grid(columns=3, rows=2), "p": Pick(of="g", pieces=[1, 4])}, shape, subject=None)
+    regions = resolve({"g": Grid(columns=3, rows=2), "p": Pick(of="g", pieces=[1, 4])}, shape, maps={})
     labels = regions.partition("g").labels
     np.testing.assert_array_equal(regions.selection("p").alpha, np.isin(labels, [1, 4]).astype(np.float32))
     assert regions.selection("p").alpha.sum() == 2 * 10 * 10
 
 
-def test_the_subject_is_the_finders_matte_and_the_background_is_what_is_left():
+def test_the_subject_is_the_given_map_and_the_background_is_what_is_left():
     shape = (96, 128)
-    regions = resolve({}, shape, subject=finder(shape))
+    regions = resolve({}, shape, maps={"subject": finder(shape)})
     np.testing.assert_array_equal(regions.selection("subject").alpha, disc(shape))
     np.testing.assert_allclose(regions.selection("background").alpha, 1 - disc(shape), atol=1e-7)
-    assert set(regions) == {"subject", "background"}
+    assert set(regions) == {"subject", "background", "depth"}
 
 
-def test_the_finder_runs_only_if_a_region_needs_the_subject_and_then_once():
-    calls = []
-
-    def counting() -> np.ndarray:
-        calls.append(1)
-        return disc((20, 30))
-
-    regions = resolve(
-        {"g": Grid(columns=2), "s": Shards(count=3, fit="subject"), "t": Shards(count=4, fit="background")},
-        (20, 30),
-        subject=counting,
-    )
-    assert "s" in regions
+def test_asking_whether_a_region_exists_makes_nothing_and_needs_no_map():
+    regions = resolve({"g": Grid(columns=2), "s": Shards(count=3, fit="subject")}, (20, 30), maps={})
+    assert "s" in regions  # made from a map nobody gave: asking whether it exists must not make it
     assert "subject" in regions
     assert "nope" not in regions
-    regions["g"]
-    assert calls == []  # neither asking whether a region exists nor making a grid needed the subject
-    regions["s"], regions["t"], regions["subject"], regions["background"]
-    assert calls == [1]
 
 
 def test_regions_are_made_once_and_handed_out_read_only():
-    regions = resolve(declared(), (20, 30), subject=finder((20, 30)))
+    regions = resolve(declared(), (20, 30), maps={"subject": finder((20, 30))})
     assert regions["glass"] is regions["glass"]
     with pytest.raises(ValueError, match="read-only"):
         regions.partition("glass").labels[0, 0] = 5
@@ -581,20 +572,20 @@ def test_regions_are_made_once_and_handed_out_read_only():
     ],
 )
 def test_a_region_made_from_a_map_says_so_when_there_is_none(kind, error, complaint):
-    regions = resolve({"s": kind, "g": Grid()}, (20, 30), subject=None)
+    regions = resolve({"s": kind, "g": Grid()}, (20, 30), maps={})
     regions["g"]
     with pytest.raises(error, match=complaint):
         regions["s"]
 
 
 def test_laying_a_kind_over_a_selection_that_chooses_nothing_is_refused_naming_the_region():
-    regions = resolve({"s": Shards(fit="subject")}, (20, 30), subject=lambda: np.zeros((20, 30), np.float32))
+    regions = resolve({"s": Shards(fit="subject")}, (20, 30), maps={"subject": np.zeros((20, 30), np.float32)})
     with pytest.raises(RecipeError, match=r"'s'.*subject.*nothing"):
         regions["s"]
 
 
 def test_asking_for_a_region_as_the_wrong_kind_is_refused_naming_it():
-    regions = resolve({"g": Grid(columns=2), "p": Pick(of="g", pieces=[0])}, (20, 30), subject=None)
+    regions = resolve({"g": Grid(columns=2), "p": Pick(of="g", pieces=[0])}, (20, 30), maps={})
     with pytest.raises(RecipeError, match=r"'g'.*partition.*selection"):
         regions.selection("g")
     with pytest.raises(RecipeError, match=r"'p'.*selection.*partition"):
@@ -636,12 +627,12 @@ BAD_DECLARATIONS = {
 @pytest.mark.parametrize(("regions", "complaint"), BAD_DECLARATIONS.values(), ids=BAD_DECLARATIONS.keys())
 def test_a_declaration_that_refers_wrongly_is_refused_naming_the_region_and_what_is_valid(regions, complaint):
     with pytest.raises(RecipeError, match=complaint):
-        resolve(regions, (20, 30), subject=None)
+        resolve(regions, (20, 30), maps={})
 
 
 def test_the_references_are_checked_even_for_regions_no_step_will_ask_for():
     with pytest.raises(RecipeError, match="unused"):
-        resolve({"g": Grid(), "unused": Pick(of="missing")}, (20, 30), subject=None)
+        resolve({"g": Grid(), "unused": Pick(of="missing")}, (20, 30), maps={})
 
 
 NEEDS = {
@@ -717,7 +708,7 @@ def test_regions_need_the_subject_when_they_are_made_from_it_however_indirectly(
         "over_found": Shards(fit="subject_per_grid"),
     }
     check(regions)
-    assert needs_subject(regions, names) is expected
+    assert ("subject" in maps_used(regions, names)) is expected
 
 
 USED = {
@@ -746,8 +737,66 @@ def test_the_regions_used_are_those_named_and_those_they_are_made_from(names, ex
     assert used(regions, names) == expected
 
 
+MAPS_USED = {
+    "nothing asked": ([], set()),
+    "a grid": (["grid"], set()),
+    "the subject itself": (["subject"], {"subject"}),
+    "the background is made from the subject": (["background"], {"subject"}),
+    "the built-in depth": (["depth"], {"depth"}),
+    "a depth selection": (["near"], {"depth"}),
+    "depth bands": (["bands"], {"depth"}),
+    "a given map, by the region's own name": (["star"], {"star"}),
+    "a grid laid over a given map": (["over_star"], {"star"}),
+    "a pick of a grid laid over the subject, and a depth selection": (
+        ["grid_on_subject", "near"],
+        {"subject", "depth"},
+    ),
+    "the subject found piece by piece needs a finder, not a map": (["subject_per_grid"], set()),
+    "two given maps": (["star", "moon"], {"star", "moon"}),
+}
+
+
+@pytest.mark.parametrize(("names", "expected"), MAPS_USED.values(), ids=MAPS_USED.keys())
+def test_the_maps_a_region_reads_are_those_it_is_made_from_however_indirectly(names, expected):
+    regions = {**declared(), "star": Given(), "moon": Given(), "over_star": Grid(fit="star")}
+    check(regions)
+    assert maps_used(regions, names) == expected
+
+
+def test_a_given_map_is_a_selection_under_the_regions_own_name_and_is_read_only():
+    star = np.linspace(0, 1, 12, dtype=np.float32).reshape(3, 4)
+    regions = resolve({"star": Given()}, (3, 4), maps={"star": star})
+    np.testing.assert_array_equal(regions.selection("star").alpha, star)
+    assert not regions.selection("star").alpha.flags.writeable
+    assert star.flags.writeable  # the caller's own array is left as it was
+
+
+def test_the_built_in_depth_region_is_the_depth_map():
+    regions = resolve({}, (4, 3), maps={"depth": down([1.0, 0.7, 0.3, 0.0])})
+    np.testing.assert_array_equal(regions.selection("depth").alpha, down([1.0, 0.7, 0.3, 0.0]))
+
+
+@pytest.mark.parametrize(
+    ("name", "error", "complaint"),
+    [
+        pytest.param("star", MapNotFoundError, "'star'", id="a given map, naming the region"),
+        pytest.param("depth", DepthNotFoundError, "depth", id="the built-in depth"),
+        pytest.param("subject", SubjectNotFoundError, "subject", id="the built-in subject"),
+    ],
+)
+def test_a_region_that_is_a_map_says_so_when_it_was_not_given(name, error, complaint):
+    regions = resolve({"star": Given()}, (4, 3), maps={})
+    with pytest.raises(error, match=complaint):
+        regions[name]
+
+
+def test_a_given_region_cannot_take_the_name_of_a_built_in_map():
+    with pytest.raises(RecipeError, match=r"'depth'.*built-in"):
+        check({"depth": Given()})
+
+
 def test_a_selection_asked_for_as_pieces_is_split_and_a_partition_is_kept():
-    regions = resolve({"g": Grid(columns=2)}, (4, 6), subject=finder((4, 6)))
+    regions = resolve({"g": Grid(columns=2)}, (4, 6), maps={"subject": finder((4, 6))})
     assert regions.pieces("g") is regions.partition("g")
     split = regions.pieces("subject")
     assert split.count == 2
@@ -772,7 +821,7 @@ NEEDS_DEPTH = {
 def test_regions_need_the_depth_when_they_are_made_from_it_however_indirectly(names, expected):
     regions = {**declared(), "over_pick_of_near": Shards(fit="pick_of_grid_on_near")}
     check(regions)
-    assert needs_depth(regions, names) is expected
+    assert ("depth" in maps_used(regions, names)) is expected
 
 
 # ---- the models ----------------------------------------------------------------------------------------------------
@@ -885,7 +934,7 @@ def test_every_field_is_documented_with_its_unit_and_range(model):
 )
 def test_the_weights_of_all_looks_sum_to_one_everywhere_and_stay_between_0_and_1(assignment, feather):
     shape = (37, 61)
-    partition = resolve({"g": Grid(columns=2, rows=2)}, shape, subject=None).partition("g")
+    partition = resolve({"g": Grid(columns=2, rows=2)}, shape, maps={}).partition("g")
     weights = look_weights(partition, assignment * 2, 3, feather=feather)
     assert weights.shape == (3, *shape)
     assert weights.dtype == np.float32
@@ -896,7 +945,7 @@ def test_the_weights_of_all_looks_sum_to_one_everywhere_and_stay_between_0_and_1
 
 def test_without_feather_each_look_has_the_pixels_of_its_pieces_and_nothing_else():
     shape = (20, 30)
-    partition = resolve({"g": Grid(columns=3, rows=2)}, shape, subject=None).partition("g")
+    partition = resolve({"g": Grid(columns=3, rows=2)}, shape, maps={}).partition("g")
     assignment = [2, 0, 2, 1, 1, 0]
     weights = look_weights(partition, assignment, 3, feather=0)
     for look in range(3):
@@ -906,7 +955,7 @@ def test_without_feather_each_look_has_the_pixels_of_its_pieces_and_nothing_else
 
 def test_feather_softens_a_border_over_a_few_pixels_and_leaves_the_middle_of_a_piece_alone():
     shape = (40, 128)
-    partition = resolve({"g": Grid(columns=2)}, shape, subject=None).partition("g")
+    partition = resolve({"g": Grid(columns=2)}, shape, maps={}).partition("g")
     weights = look_weights(partition, [0, 1], 2, feather=2)
     row = weights[0, 20]
     # the border is at x = 64: the two pixels beside it share the look about equally, the first slightly more
@@ -920,7 +969,7 @@ def test_feather_softens_a_border_over_a_few_pixels_and_leaves_the_middle_of_a_p
 
 
 def test_a_look_no_piece_has_gets_no_weight():
-    partition = resolve({"g": Grid(columns=2)}, (10, 20), subject=None).partition("g")
+    partition = resolve({"g": Grid(columns=2)}, (10, 20), maps={}).partition("g")
     weights = look_weights(partition, [0, 2], 4, feather=1)
     assert weights[1].max() == 0
     assert weights[3].max() == 0
@@ -931,7 +980,7 @@ def test_weights_for_a_4k_picture_need_little_more_memory_than_the_weights_thems
     supersampling). Budget: the maps plus 3 picture-sized buffers of working space (measured: the pieces' look map and
     one blur's output, 2)."""
     shape = (2160, 3840)
-    partition = resolve({"g": Grid(columns=3, rows=2)}, shape, subject=None).partition("g")
+    partition = resolve({"g": Grid(columns=3, rows=2)}, shape, maps={}).partition("g")
     buffer = shape[0] * shape[1] * 4
     tracemalloc.start()
     try:
@@ -962,7 +1011,7 @@ def test_making_the_pieces_of_a_1_mp_picture_needs_a_bounded_amount_of_memory(ki
     room for another platform, never for a blow-up."""
     shape = (866, 1155)
     buffer = shape[0] * shape[1] * 4
-    regions = resolve({"k": kind}, shape, subject=None)
+    regions = resolve({"k": kind}, shape, maps={})
     tracemalloc.start()
     try:
         regions["k"]
@@ -995,7 +1044,7 @@ def size_of(box: tuple[int, int, int, int]) -> tuple[int, int]:
 def found(find: BoxFinder, shape: Shape = (20, 30), per: Kind | None = None, **fields: object) -> np.ndarray:
     """The alpha of `Subject(per="panes", **fields)` over `shape`: a 2 x 2 grid (or `per`) found in by `find`."""
     regions = resolve(
-        {"panes": per or Grid(columns=2, rows=2), "it": Subject(per="panes", **fields)}, shape, subject=None, find=find
+        {"panes": per or Grid(columns=2, rows=2), "it": Subject(per="panes", **fields)}, shape, maps={}, find=find
     )
     return regions.selection("it").alpha
 
@@ -1013,7 +1062,7 @@ def test_a_finder_that_knows_the_true_boundary_is_united_into_that_boundary_what
 def test_without_per_the_subject_is_the_built_in_subject_and_the_finder_of_pieces_is_not_asked():
     shape = (20, 30)
     asked = Recorder(true_boundary(shape))
-    regions = resolve({"it": Subject(threshold=1, context=1)}, shape, subject=finder(shape), find=asked)
+    regions = resolve({"it": Subject(threshold=1, context=1)}, shape, maps={"subject": finder(shape)}, find=asked)
     np.testing.assert_array_equal(regions.selection("it").alpha, regions.selection("subject").alpha)
     assert asked.boxes == []
 
@@ -1021,7 +1070,7 @@ def test_without_per_the_subject_is_the_built_in_subject_and_the_finder_of_piece
 def test_the_finder_is_asked_once_about_the_box_of_each_piece_however_often_the_region_is_asked_for():
     asked = Recorder(true_boundary((20, 30)))
     regions = resolve(
-        {"panes": Grid(columns=2, rows=2), "it": Subject(per="panes", context=0)}, (20, 30), subject=None, find=asked
+        {"panes": Grid(columns=2, rows=2), "it": Subject(per="panes", context=0)}, (20, 30), maps={}, find=asked
     )
     regions["it"], regions["it"]
     # (left, top, right, bottom): each piece is 15 px wide and 10 high
@@ -1119,7 +1168,7 @@ def test_a_piece_finders_answer_must_fit_its_view_and_be_finite_and_within_0_and
 
 
 def test_a_subject_found_piece_by_piece_says_so_when_there_is_no_finder_for_pieces():
-    regions = resolve({"panes": Grid(), "it": Subject(per="panes")}, (20, 30), subject=finder((20, 30)))
+    regions = resolve({"panes": Grid(), "it": Subject(per="panes")}, (20, 30), maps={"subject": finder((20, 30))})
     with pytest.raises(SubjectNotFoundError, match=r"'it'.*panes"):
         regions["it"]
 
@@ -1129,7 +1178,7 @@ def test_shards_can_be_laid_over_the_subject_found_piece_by_piece():
     regions = resolve(
         {"panes": Grid(columns=2, rows=2), "it": Subject(per="panes", context=0), "cut": Shards(count=5, fit="it")},
         shape,
-        subject=None,
+        maps={},
         find=true_boundary(shape),
     )
     cut = regions.partition("cut")
@@ -1253,8 +1302,9 @@ def test_a_curve_and_a_line_together_make_the_pieces_of_both():
 # ---- path ----------------------------------------------------------------------------------------------------------
 
 
-def alpha_of(kind: Kind, shape: Shape, subject: Callable | None = None) -> np.ndarray:
-    return resolve({"p": kind}, shape, subject=subject).selection("p").alpha
+def alpha_of(kind: Kind, shape: Shape, subject: np.ndarray | None = None) -> np.ndarray:
+    maps = {} if subject is None else {"subject": subject}
+    return resolve({"p": kind}, shape, maps=maps).selection("p").alpha
 
 
 def test_a_pixel_aligned_rectangle_path_chooses_exactly_its_pixels():
@@ -1318,7 +1368,7 @@ def test_a_path_laid_over_the_subject_takes_its_coordinates_from_the_subjects_bo
 )
 def test_a_torn_edge_of_no_amount_is_the_straight_drawing_exactly(kind):
     torn = kind.model_copy(update={"edge": Edge(style="torn", amount=0)})
-    plain, bent = (resolve({"k": k}, (60, 80), subject=None)["k"] for k in (kind, torn))
+    plain, bent = (resolve({"k": k}, (60, 80), maps={})["k"] for k in (kind, torn))
     match plain, bent:
         case Selection(), Selection():
             np.testing.assert_allclose(bent.alpha, plain.alpha, atol=1e-6)
@@ -1383,7 +1433,7 @@ RING_AND_DISC = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"
 def svg_regions(tmp_path: File, text: str = RING_AND_DISC, **fields: object) -> Regions:
     path = tmp_path / "shapes.svg"
     path.write_text(text, encoding="utf-8")
-    return resolve({"s": Svg(file=str(path), **fields)}, (100, 100), subject=None)
+    return resolve({"s": Svg(file=str(path), **fields)}, (100, 100), maps={})
 
 
 def test_every_shape_is_a_piece_later_shapes_lie_on_top_and_a_hole_shows_what_is_beneath_or_the_outside(tmp_path):
@@ -1424,7 +1474,7 @@ def test_pick_chooses_pieces_by_svg_id_or_number_and_a_shape_of_many_pieces_by_a
     path = tmp_path / "s.svg"
     path.write_text(RING_AND_DISC, encoding="utf-8")
     declared_: dict[str, Kind] = {"s": Svg(file=str(path)), "p": Pick(of="s", pieces=["ring", 0])}
-    regions = resolve(declared_, (100, 100), subject=None)
+    regions = resolve(declared_, (100, 100), maps={})
     labels = regions.partition("s").labels
     ids = regions.partition("s").ids
     np.testing.assert_array_equal(regions.selection("p").alpha, np.isin(labels, [ids["ring"][0], 0]).astype(np.float32))
@@ -1438,13 +1488,13 @@ def test_pick_chooses_pieces_by_svg_id_or_number_and_a_shape_of_many_pieces_by_a
 def test_picking_an_id_the_file_does_not_have_is_refused_listing_the_ids_it_has(tmp_path, pieces, complaint):
     path = tmp_path / "s.svg"
     path.write_text(RING_AND_DISC, encoding="utf-8")
-    regions = resolve({"s": Svg(file=str(path)), "p": Pick(of="s", pieces=pieces)}, (100, 100), subject=None)
+    regions = resolve({"s": Svg(file=str(path)), "p": Pick(of="s", pieces=pieces)}, (100, 100), maps={})
     with pytest.raises(RecipeError, match=complaint):
         regions["p"]
 
 
 def test_picking_an_id_of_a_partition_that_has_no_ids_is_refused():
-    regions = resolve({"g": Grid(columns=2), "p": Pick(of="g", pieces=["left"])}, (10, 10), subject=None)
+    regions = resolve({"g": Grid(columns=2), "p": Pick(of="g", pieces=["left"])}, (10, 10), maps={})
     with pytest.raises(RecipeError, match=r"'left'.*no ids"):
         regions["p"]
 
@@ -1458,11 +1508,11 @@ def test_the_svg_is_placed_in_the_frame_by_its_view_box_and_follows_fit(tmp_path
 
 
 def test_an_svg_that_cannot_be_read_is_refused_naming_the_region_and_file(tmp_path):
-    regions = resolve({"s": Svg(file=str(tmp_path / "missing.svg"))}, (10, 10), subject=None)
+    regions = resolve({"s": Svg(file=str(tmp_path / "missing.svg"))}, (10, 10), maps={})
     with pytest.raises(RecipeError, match=r"missing\.svg"):
         regions["s"]
     with pytest.raises(RecipeError, match="not set"):
-        resolve({"s": Svg()}, (10, 10), subject=None)["s"]
+        resolve({"s": Svg()}, (10, 10), maps={})["s"]
 
 
 def test_the_limits_on_an_svg_are_fields_and_fail_naming_the_limit(tmp_path):
@@ -1482,7 +1532,7 @@ def test_the_svg_limits_work_at_their_minimum_and_maximum(tmp_path, fields):
 
 
 def test_svg_leaves_the_region_a_partition_with_a_piece_for_each_shape_of_a_real_file():
-    regions = resolve({"m": Svg(file=MOSAIC)}, (240, 360), subject=None)
+    regions = resolve({"m": Svg(file=MOSAIC)}, (240, 360), maps={})
     partition = regions.partition("m")
     assert set(partition.ids) == {
         "hill",
@@ -1525,7 +1575,7 @@ DEPTH_SELECTIONS = {
 
 @pytest.mark.parametrize(("kind", "chosen"), DEPTH_SELECTIONS.values(), ids=DEPTH_SELECTIONS.keys())
 def test_a_depth_selection_chooses_from_far_to_near_and_fades_linearly_over_the_feather_beyond(kind, chosen):
-    alpha = resolve({"d": kind}, (len(DEPTHS), 3), subject=None, depth=down(DEPTHS)).selection("d").alpha
+    alpha = resolve({"d": kind}, (len(DEPTHS), 3), maps={"depth": down(DEPTHS)}).selection("d").alpha
     np.testing.assert_allclose(alpha, np.tile(np.asarray(chosen, np.float32)[:, None], (1, 3)), atol=1e-6)
 
 
@@ -1554,13 +1604,13 @@ DEPTH_BANDS = {
 @pytest.mark.parametrize(("count", "depths", "pieces"), DEPTH_BANDS.values(), ids=DEPTH_BANDS.keys())
 def test_depth_bands_cut_the_depth_scale_into_equal_ranges_numbered_nearest_first(count, depths, pieces):
     shape = (len(depths), 3)
-    partition = resolve({"b": DepthBands(count=count)}, shape, subject=None, depth=down(depths)).partition("b")
+    partition = resolve({"b": DepthBands(count=count)}, shape, maps={"depth": down(depths)}).partition("b")
     np.testing.assert_array_equal(partition.labels, np.tile(np.asarray(pieces, np.int32)[:, None], (1, 3)))
     assert partition.count == max(pieces) + 1
-    assert_a_region(partition, shape, down(depths)())
+    assert_a_region(partition, shape, down(depths))
 
 
 def test_a_pick_of_band_0_selects_the_nearest_band():
     depths = [0.2, 0.9, 0.5, 0.8]
-    regions = resolve({"b": DepthBands(count=3), "front": Pick(of="b")}, (4, 3), subject=None, depth=down(depths))
+    regions = resolve({"b": DepthBands(count=3), "front": Pick(of="b")}, (4, 3), maps={"depth": down(depths)})
     np.testing.assert_array_equal(regions.selection("front").alpha[:, 0], [0, 1, 0, 1])

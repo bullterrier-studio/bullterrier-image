@@ -109,7 +109,7 @@ def test_effect_queries_live_only_in_the_registry(name):
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
-        (lambda: Step("evaporate", {"matte": 1}), "matte"),
+        (lambda: Step("evaporate", {"subject": 1}), "subject"),
         (lambda: Step("grain", {"opacity": 0.5}), "`opacity` is a key of the step"),
     ],
 )
@@ -191,8 +191,8 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
     signature = inspect.signature(fx.glitch)
-    assert list(signature.parameters)[:3] == ["split", "bands", "shift"]  # no image parameter, no matte
-    assert "matte" not in inspect.signature(fx.evaporate).parameters
+    assert list(signature.parameters)[:3] == ["split", "bands", "shift"]  # no image parameter, no subject
+    assert "subject" not in inspect.signature(fx.evaporate).parameters
     assert "slide sideways" in str(fx.glitch.__doc__)
     assert fx.glitch.__name__ == "glitch"
     assert {"ascii", "glitch", "disperse"} <= set(dir(fx))
@@ -214,7 +214,7 @@ class LanternParams(EffectParams):
 
 @pytest.fixture
 def lantern(throwaway_effects):
-    def lantern_probe(rgb: np.ndarray, params: LanternParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+    def lantern_probe(rgb: np.ndarray, params: LanternParams, *, subject: np.ndarray | None = None) -> np.ndarray:
         """Hangs a lantern over the picture. Then more words."""
         return rgb
 
@@ -234,7 +234,14 @@ def test_help_on_a_modelled_effects_builder_shows_every_parameters_description(l
 
 def test_a_modelled_effects_builder_has_the_models_signature_then_the_step_keys(lantern):
     signature = inspect.signature(fx.lantern_probe)
-    assert list(signature.parameters) == ["radius", "style", "tint", "mask", "opacity", "blend_mode"]  # no image, matte
+    assert list(signature.parameters) == [
+        "radius",
+        "style",
+        "tint",
+        "mask",
+        "opacity",
+        "blend_mode",
+    ]  # no image, subject
     assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00", None, 1.0, "normal"]
     assert "tint: str | list[float] | tuple[float, float, float]" in str(signature)
     keyword_only = [p.name for p in signature.parameters.values() if p.kind is inspect.Parameter.KEYWORD_ONLY]
@@ -412,16 +419,20 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     assert not np.array_equal(stages[3].image, stages[2].image)
 
 
-def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, matte):
+def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject):
     steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.glow(opacity=0.7, blend_mode="screen")]
     look = Recipe("t", size=64, steps=steps)
-    np.testing.assert_array_equal(trace(photo, look, matte=matte)[-1].image, render(photo, look, matte=matte))
+    np.testing.assert_array_equal(
+        trace(photo, look, maps={"subject": subject})[-1].image, render(photo, look, maps={"subject": subject})
+    )
 
 
-def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, matte):
-    stages = trace(photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), matte=matte)
+def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, subject):
+    stages = trace(
+        photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), maps={"subject": subject}
+    )
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
-    np.testing.assert_allclose(stages[1].image[..., 0], matte)  # white where the subject is
+    np.testing.assert_allclose(stages[1].image[..., 0], subject)  # white where the subject is
     assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe("t", [fx.grain()], size=None)))
 
 

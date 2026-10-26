@@ -1,6 +1,6 @@
-"""What tests in every folder share: the small test picture and matte, the effect-registry helpers, stand-ins for the
-subject and depth models, the files git tracks, a copy of the project to inject one fault into, and the environment
-`uv run` gives a command. Helpers used by one folder live in that folder's conftest.py."""
+"""What tests in every folder share: the small test picture and subject map, the effect-registry helpers, stand-ins for
+the subject and depth models, the files git tracks, a copy of the project to inject one fault into, and the
+environment `uv run` gives a command. Helpers used by one folder live in that folder's conftest.py."""
 
 import os
 import shutil
@@ -170,7 +170,7 @@ def photo() -> np.ndarray:
 
 
 @pytest.fixture
-def matte() -> np.ndarray:
+def subject() -> np.ndarray:
     """A disc in the middle of the 96x128 picture: 1 inside, 0 outside, soft edge."""
     y, x = np.mgrid[0:96, 0:128].astype(np.float32)
     return np.clip(30 - np.hypot(x - 64, y - 48), 0, 1).astype(np.float32)

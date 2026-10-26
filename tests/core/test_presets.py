@@ -40,7 +40,7 @@ BAD = {
     "a description that is no text": ("[warm]\ndescription = 3\n", "description"),
     "a misspelt parameter": ('[warm]\ndescription = "x"\nshadow_clp = 0.1\n', "shadow_clp"),
     "a value out of range": ('[warm]\ndescription = "x"\nshadow_clip = 0.9\n', "shadow_clip.*0.9"),
-    "the subject matte, which a recipe supplies": ('[warm]\ndescription = "x"\nmatte = 1\n', "matte"),
+    "the subject map, which a recipe supplies": ('[warm]\ndescription = "x"\nsubject = 1\n', "subject"),
 }
 
 

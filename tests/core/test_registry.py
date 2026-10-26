@@ -85,20 +85,20 @@ def test_the_wrapper_keeps_the_name_and_documentation_and_tells_its_model_catego
     assert "gain_probe" in registry.categories()["light"]
 
 
-def test_an_effect_that_declares_the_matte_gets_it_and_says_so(throwaway_effects):
-    def matte_probe(rgb: np.ndarray, params: GainParams, *, matte: np.ndarray | None = None) -> np.ndarray:
-        """Darkens where the matte is."""
-        return rgb if matte is None else (rgb * (1 - matte[..., None])).astype(np.float32)
+def test_an_effect_that_declares_the_subject_gets_it_and_says_so(throwaway_effects):
+    def subject_probe(rgb: np.ndarray, params: GainParams, *, subject: np.ndarray | None = None) -> np.ndarray:
+        """Darkens where the subject is."""
+        return rgb if subject is None else (rgb * (1 - subject[..., None])).astype(np.float32)
 
-    probe = effect(category="subject", params=GainParams)(matte_probe)
-    matte = np.zeros((4, 5), np.float32)
-    matte[:, :2] = 1
-    out = probe(GREY, gain=2.0, matte=matte)  # parameters and the matte together
+    probe = effect(category="subject", params=GainParams)(subject_probe)
+    subject = np.zeros((4, 5), np.float32)
+    subject[:, :2] = 1
+    out = probe(GREY, gain=2.0, subject=subject)  # parameters and the subject together
     np.testing.assert_array_equal(out[:, :2], 0.0)
     np.testing.assert_array_equal(out[:, 2:], 0.25)
-    assert probe.inputs == ("matte",)
-    assert registry.inputs("matte_probe") == ("matte",)
-    np.testing.assert_array_equal(probe(GREY), GREY)  # without a matte the effect decides what to do
+    assert probe.inputs == ("subject",)
+    assert registry.inputs("subject_probe") == ("subject",)
+    np.testing.assert_array_equal(probe(GREY), GREY)  # without a subject the effect decides what to do
 
 
 # --- registration rules: each raises and registers nothing -----------------------------------------------------------
@@ -118,9 +118,9 @@ def _probe_with(signature: str):
         ("(rgb, params, extra)", "shape_probe(rgb, params"),
         ("(rgb, params, *more)", "shape_probe(rgb, params"),
         ("(rgb, params, **more)", "shape_probe(rgb, params"),
-        ("(rgb, params, matte=None)", "keyword-only"),
+        ("(rgb, params, subject=None)", "keyword-only"),
         ("(rgb, params, *, glow=None)", "'glow'"),
-        ("(rgb, params, *, matte)", "default"),
+        ("(rgb, params, *, subject)", "default"),
     ],
     ids=["no-params", "extra-positional", "args", "kwargs", "positional-input", "unknown-input", "input-no-default"],
 )
@@ -139,7 +139,7 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
 
 
 @pytest.mark.parametrize(
-    "name", ["matte", "depth", "partition", "effect", "mask", "opacity", "blend_mode", "preset", "each", "looks"]
+    "name", ["subject", "depth", "partition", "effect", "mask", "opacity", "blend_mode", "preset", "each", "looks"]
 )
 def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
     field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")
@@ -147,7 +147,7 @@ def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwawa
         "ClashParams", (EffectParams,), {"__doc__": "Claims a name.", "__annotations__": {name: float}, name: field}
     )
 
-    def clash_probe(rgb, params, *, matte=None):
+    def clash_probe(rgb, params, *, subject=None):
         return rgb
 
     with pytest.raises(ValueError, match=rf"clash_probe.*`{name}`"):

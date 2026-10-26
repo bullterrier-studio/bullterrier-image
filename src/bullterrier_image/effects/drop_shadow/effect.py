@@ -61,18 +61,18 @@ class DropShadowParams(EffectParams):
 
 
 @effect(category="subject", params=DropShadowParams, opacity=0.6)
-def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`.
 
     The shadow is the subject's silhouette moved and blurred, laid over the background in `color`: where it is full
     it replaces the picture, where its blurred edge thins out it shows less. The subject itself is never changed, and
     the shadow only ever shows where the subject is not.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no shadow: the picture comes back unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
-    cast = shift(matte, params.dy, params.dx, edge=params.edge)
+    cast = shift(subject, params.dy, params.dx, edge=params.edge)
     cast = gaussian_blur(cast, params.blur, truncate=params.truncate, edge=params.edge)
-    return put_behind(rgb, matte, cast, np.asarray(params.color, np.float32))
+    return put_behind(rgb, subject, cast, np.asarray(params.color, np.float32))

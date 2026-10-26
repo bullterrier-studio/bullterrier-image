@@ -329,14 +329,14 @@ class DisperseParams(EffectParams):
         "the outline toward the border).",
         advanced=True,
     )
-    matte_threshold: float = param(
+    subject_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
+        doc="With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to "
         "the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a "
-        "soft edge (hair, fur), raising it less. Ignored without a matte.",
+        "soft edge (hair, fur), raising it less. Ignored without a subject.",
         advanced=True,
     )
     background_threshold: float = param(
@@ -346,13 +346,13 @@ class DisperseParams(EffectParams):
         max=1,
         doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
         "background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has "
-        "begun. Raising it drops dim, noisy pieces; without a matte it also decides the figure's outline.",
+        "begun. Raising it drops dim, noisy pieces; without a subject it also decides the figure's outline.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=DisperseParams)
-def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
     The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
@@ -363,7 +363,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
     makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
     """
     p = params
     height, width = rgb.shape[:2]
@@ -373,7 +373,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, matte: np.ndarray | Non
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
     present = cells.lit(pieces, threshold=p.background_threshold)
-    figure = cells.figure(present, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
+    figure = cells.figure(present, subject, cell_w, cell_h, height, width, threshold=p.subject_threshold)
     edges = distance.edge_distance(
         figure,
         sampling=(cell_h, cell_w),

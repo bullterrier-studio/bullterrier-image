@@ -2,7 +2,7 @@
 
 One question, one answer: `subject_matte(rgb)` returns how much each pixel belongs to the subject (1) or to the
 background (0), at the picture's own size; `subject_finder()` is the same as a `Finder` that the renderers take
-(`find_subject=`), named by its backend and model. Two backends can answer it:
+(`finders={"subject": ...}`), named by its backend and model. Two backends can answer it:
 
 - `"onnx"`, the default everywhere: a portable model, IS-Net (general use, Apache-2.0), run by ONNX Runtime on macOS,
   Linux and Windows, so a recipe cuts alike on every platform. The model (about 180 MB) is not part of the package:
@@ -16,8 +16,9 @@ background (0), at the picture's own size; `subject_finder()` is the same as a `
 The backend is chosen by, in order: the `segmenter` argument; the `BT_IMAGE_SEGMENTER` environment variable (`onnx` or
 `vision`); otherwise the portable model, on every platform.
 
-No model at all is needed when the caller already has the subject's matte: every renderer takes `matte=` (load a
-black-and-white or transparent PNG with `imageio.load_matte`, or pass `--matte` on the command line).
+No model at all is needed when the caller already has the subject's matte: every renderer takes it as
+`maps={"subject": ...}` (load a black-and-white or transparent PNG with `imageio.load_map`, or pass
+`--map subject=cutout.png` on the command line).
 """
 
 import functools
@@ -126,7 +127,8 @@ def _require_vision(why: str) -> None:
     if reason is not None:
         raise BackendUnavailableError(
             f"cannot find the subject with Apple Vision, chosen by {why}: {reason}. Choose the portable model "
-            f"instead (segmenter 'onnx', or {SEGMENTER_VARIABLE}=onnx), or give the subject's matte yourself (--matte)"
+            f"instead (segmenter 'onnx', or {SEGMENTER_VARIABLE}=onnx), or give the subject map yourself "
+            "(--map subject=FILE)"
         )
 
 
@@ -154,8 +156,8 @@ def _onnx_mask(rgb: np.ndarray, why: str) -> np.ndarray:
             fetch(_isnet.MODEL_URL, _isnet.MODEL_SHA256, model, size=_isnet.MODEL_SIZE)
         except DownloadError as error:
             raise BackendUnavailableError(
-                f"{tried}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the subject's matte yourself "
-                "(--matte)"
+                f"{tried}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the subject map yourself "
+                "(--map subject=FILE)"
             ) from error
     try:
         return _isnet.subject_probability(rgb, model)

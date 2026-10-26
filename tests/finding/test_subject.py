@@ -232,7 +232,7 @@ def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, 
     with pytest.raises(BackendUnavailableError, match="by hand") as caught:
         subject_matte(ramp(), segmenter="onnx")
     assert "BT_IMAGE_SUBJECT_MODEL" in str(caught.value)
-    assert "--matte" in str(caught.value)
+    assert "--map subject=" in str(caught.value)
 
 
 def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
@@ -277,7 +277,7 @@ def test_the_real_model_finds_the_dog_cell_by_cell_with_the_defaults_and_nothing
         return subject_matte(photo[top:bottom, left:right], segmenter="onnx")
 
     regions = resolve(
-        {"cells": Grid(columns=2, rows=2), "found": Subject(per="cells")}, (height, width), subject=None, find=find
+        {"cells": Grid(columns=2, rows=2), "found": Subject(per="cells")}, (height, width), maps={}, find=find
     )
     alpha = regions.selection("found").alpha
     assert alpha[height // 4, width * 9 // 20] > 0.9  # the head, left of the middle

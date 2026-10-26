@@ -65,16 +65,16 @@ class LayeredCutoutsParams(EffectParams):
 
 
 @effect(category="subject", params=LayeredCutoutsParams)
-def layered_cutouts(rgb: np.ndarray, params: LayeredCutoutsParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def layered_cutouts(rgb: np.ndarray, params: LayeredCutoutsParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """Copies of the subject's silhouette stacked behind it, each `offset` px farther along `angle`, like cut paper.
 
     The layers run in colour from `color` (nearest the subject) to `end_color` (farthest); a nearer layer lies in
     front of the ones beyond it, and the subject on top of all of them, so the subject itself is never changed.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no layers: the picture comes back unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
     heading = np.radians(params.angle)
     step = params.offset * np.array([np.sin(heading), np.cos(heading)])  # (down, right) as seen in the picture
@@ -85,6 +85,6 @@ def layered_cutouts(rgb: np.ndarray, params: LayeredCutoutsParams, *, matte: np.
     colors = near + (far - near) * along[:, None]
     behind = rgb  # what lies behind the subject: the picture with the layers laid over it, the farthest first
     for number in range(params.layers, 0, -1):
-        cover = params.layer_opacity * shift(matte, *(step * number), edge=params.edge)
+        cover = params.layer_opacity * shift(subject, *(step * number), edge=params.edge)
         behind = behind + cover[..., None] * (colors[number - 1] - behind)
-    return put_behind(rgb, matte, 1, behind)  # constant: the layers' own opacity is already in `behind`
+    return put_behind(rgb, subject, 1, behind)  # constant: the layers' own opacity is already in `behind`

@@ -14,6 +14,7 @@ __all__ = [
     "BullterrierImageError",
     "DepthNotFoundError",
     "ImageReadError",
+    "MapNotFoundError",
     "NonFiniteImageError",
     "ProjectError",
     "RecipeError",
@@ -49,13 +50,19 @@ class UnknownEffectError(RecipeError, KeyError):
         return str(self.args[0]) if self.args else ""
 
 
-class SubjectNotFoundError(BullterrierImageError, RuntimeError):
-    """The subject of a photo was needed (a masked step, an effect that takes the matte) but could not be found or
-    used: no `matte` and no finder given, a finder that found nothing, or a matte of another size than the photo."""
+class MapNotFoundError(BullterrierImageError, RuntimeError):
+    """A map of the photo (see `bullterrier_image.core.registry.MAP_INPUTS`: the subject, the depth, or one a recipe
+    declares with a `given` region) is needed but not given, not found, or not usable: no map and no finder given for
+    its name, a finder that found nothing, a map of another size than the photo, or values outside 0..1."""
 
 
-class DepthNotFoundError(BullterrierImageError, RuntimeError):
-    """A depth map is needed but not given, not found, or not usable: no `depth` and no finder given, a finder that
+class SubjectNotFoundError(MapNotFoundError):
+    """The subject of a photo was needed (a masked step, an effect that takes the subject) but could not be found or
+    used: no `subject` map and no finder given, a finder that found nothing, or a map of another size than the photo."""
+
+
+class DepthNotFoundError(MapNotFoundError):
+    """A depth map is needed but not given, not found, or not usable: no `depth` map and no finder given, a finder that
     found nothing, or a map of another size than the photo."""
 
 

@@ -6,7 +6,7 @@ import pytest
 from bullterrier_image.core import registry
 from bullterrier_image.ops.glyphs import cell_size
 
-# a picture of whole piece rows: a partial last row counts its padding as outside the matte, and would be an edge
+# a picture of whole piece rows: a partial last row counts its padding as outside the subject, and would be an edge
 WHOLE_ROWS = 15 * cell_size(5)[1]
 
 
@@ -94,32 +94,32 @@ def test_evaporate_without_edge_or_outward_ignores_the_outline():
 
 
 def _figure_with_a_dark_gap():
-    """A lit rectangle with a black 'eye' inside it, and the matte of the whole rectangle."""
+    """A lit rectangle with a black 'eye' inside it, and the subject of the whole rectangle."""
     img = _block()
     img[110:130, 90:110] = 0.0
-    matte = np.zeros((200, 200), np.float32)
-    matte[60:, 60:140] = 1.0
-    return img, matte
+    subject = np.zeros((200, 200), np.float32)
+    subject[60:, 60:140] = 1.0
+    return img, subject
 
 
 def test_evaporate_does_not_treat_dark_parts_of_the_figure_as_its_edge():
-    img, matte = _figure_with_a_dark_gap()
+    img, subject = _figure_with_a_dark_gap()
     kwargs = {"cell": 5, "start": 0, "outline": 0.1, "outward": 0.5, "seed": 1}
-    for given in (matte, None):  # with the real silhouette, and with the fallback that fills enclosed gaps
-        out = registry.apply("evaporate", img, matte=given, **kwargs)
+    for given in (subject, None):  # with the real silhouette, and with the fallback that fills enclosed gaps
+        out = registry.apply("evaporate", img, subject=given, **kwargs)
         assert out[100:140, 80:120][img[100:140, 80:120] > 0].min() == 1.0  # lit pieces around the gap survive
 
 
 def test_evaporate_takes_its_edge_from_the_matte_when_given():
     img = np.ones((WHOLE_ROWS, 200, 3), np.float32)  # everything is lit...
-    matte = np.zeros((WHOLE_ROWS, 200), np.float32)
-    matte[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
+    subject = np.zeros((WHOLE_ROWS, 200), np.float32)
+    subject[:, 80:120] = 1.0  # ...but the figure is only a thin column; the rest counts as background
     kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
-    with_matte = registry.apply("evaporate", img, matte=matte, **kwargs)
+    with_matte = registry.apply("evaporate", img, subject=subject, **kwargs)
     without = registry.apply("evaporate", img, **kwargs)
     assert with_matte[150:, 20:60].mean() < 1.0  # outside the silhouette: sheds
     assert with_matte[150:, 95:105].min() == 1.0  # the middle of the figure is further than `outline`
-    assert without[150:, 20:60].min() == 1.0  # with no matte there is no such outline (only the picture borders)
+    assert without[150:, 20:60].min() == 1.0  # with no subject there is no such outline (only the picture borders)
 
 
 def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift():
@@ -131,14 +131,14 @@ def test_evaporate_background_threshold_is_how_bright_a_piece_must_be_to_drift()
     assert above.max() == 0.0  # no brighter than the threshold: background, nothing drifts
 
 
-def test_evaporate_matte_threshold_is_how_much_of_a_piece_the_matte_must_cover():
+def test_evaporate_subject_threshold_is_how_much_of_a_piece_the_subject_must_cover():
     img = np.ones((WHOLE_ROWS, 200, 3), np.float32)
-    matte = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint matte everywhere,
-    matte[:, 80:120] = 1.0  # and a solid column
+    subject = np.full((WHOLE_ROWS, 200), 0.4, np.float32)  # a faint subject everywhere,
+    subject[:, 80:120] = 1.0  # and a solid column
     kwargs = {"cell": 5, "start": 0, "outline": 0.05, "seed": 1}
     outside = (slice(150, None), slice(20, 60))  # more than `outline` (10 px) from the picture's borders
-    assert registry.apply("evaporate", img, matte=matte, **kwargs)[outside].mean() < 1.0  # 0.4 < 0.5: not figure
-    assert registry.apply("evaporate", img, matte=matte, matte_threshold=0.3, **kwargs)[outside].min() == 1.0
+    assert registry.apply("evaporate", img, subject=subject, **kwargs)[outside].mean() < 1.0  # 0.4 < 0.5: not figure
+    assert registry.apply("evaporate", img, subject=subject, subject_threshold=0.3, **kwargs)[outside].min() == 1.0
 
 
 def test_evaporate_wind_pushes_the_pieces_sideways():

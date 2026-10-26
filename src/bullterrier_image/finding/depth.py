@@ -1,17 +1,18 @@
 """Finding the depth of a picture: how near each pixel is.
 
 `depth_map(rgb)` answers it at the picture's own size, 1 = nearest, 0 = farthest; `depth_finder()` is the same as a
-`Finder` that the renderers take (`find_depth=`), named by its model. The model is Depth Anything V2 Small (Apache-2.0)
-on ONNX Runtime, the same on macOS, Linux and Windows. It tells relative depth, not distance: the answer is scaled per
-photo, so the nearest pixel of every photo is 1 and the farthest 0.
+`Finder` that the renderers take (`finders={"depth": ...}`), named by its model. The model is Depth Anything V2 Small
+(Apache-2.0) on ONNX Runtime, the same on macOS, Linux and Windows. It tells relative depth, not distance: the answer is
+scaled per photo, so the nearest pixel of every photo is 1 and the farthest 0.
 
 The model (about 99 MB) is not part of the package: the first use downloads it into the user's cache folder
 (`depth_model_path()`), checks its SHA-256 and keeps it there; nothing is downloaded at import time. Offline, download
 the file by hand (the error says from where and to where) or set `BT_IMAGE_DEPTH_MODEL` to a local copy, which is then
 used as it is and never downloaded.
 
-No model at all is needed when the caller already has a depth map: every renderer takes `depth=` (load a greyscale
-picture, white = nearest, with `imageio.load_depth`, or pass `--depth` on the command line).
+No model at all is needed when the caller already has a depth map: every renderer takes it as `maps={"depth": ...}`
+(load a greyscale picture, white = nearest, with `imageio.load_map`, or pass `--map depth=depth.png` on the command
+line).
 """
 
 import hashlib
@@ -100,5 +101,6 @@ def _model() -> Path:
         return fetch(_depth_anything.MODEL_URL, _depth_anything.MODEL_SHA256, model, size=_depth_anything.MODEL_SIZE)
     except DownloadError as error:
         raise BackendUnavailableError(
-            f"{_TRIED}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the depth map yourself (--depth)"
+            f"{_TRIED}: {error}. Or set {MODEL_VARIABLE} to a local copy, or give the depth map yourself "
+            "(--map depth=FILE)"
         ) from error

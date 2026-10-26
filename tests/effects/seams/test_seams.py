@@ -130,12 +130,12 @@ def test_a_step_draws_the_borders_of_the_region_it_names():
     np.testing.assert_array_equal(out[:, 65:], photo[:, 65:])
 
 
-def test_a_selection_counts_as_a_partition_of_two_pieces_so_a_hard_edge_gets_a_line(matte):
+def test_a_selection_counts_as_a_partition_of_two_pieces_so_a_hard_edge_gets_a_line(subject):
     photo = np.random.default_rng(1).random((96, 128, 3), dtype=np.float32)
     step = Step(NAME, {"width": 2 / 128, "color": "#ff0000"}, partition="subject")
-    out = render(photo, Recipe("outline", [step], size=None), matte=matte)
+    out = render(photo, Recipe("outline", [step], size=None), maps={"subject": subject})
     painted = (out != photo).any(axis=2)
-    inside = matte > 0.5
+    inside = subject > 0.5
     edge = inside ^ np.roll(inside, 1, axis=0) | inside ^ np.roll(inside, 1, axis=1)
     assert painted[edge].all()  # every pixel beside the disc's edge
     assert not painted[48, 64]  # the middle of the disc

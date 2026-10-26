@@ -225,12 +225,12 @@ def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that
     (cut / "masked.toml").write_text(
         'name="masked"\nsize=128\n[[step]]\neffect="glitch"\nmask="subject"\nbands=3\nseed=5\n', encoding="utf-8"
     )
-    assert cli("sweep me.png masked.toml glitch.split --count 3 --matte matte.png -o s.png -- -6..6") == 0
+    assert cli("sweep me.png masked.toml glitch.split --count 3 --map subject=matte.png -o s.png -- -6..6") == 0
     photo = imageio.load(cut / "me.png")
     tiles = []
     for split in (-6, 0, 6):
         look = Recipe("masked", [Step("glitch", {"split": split, "bands": 3, "seed": 5}, mask="subject")], size=128)
-        tiles.append((f"split={split}", render(photo, look, matte=imageio.load_matte(cut / "matte.png"))))
+        tiles.append((f"split={split}", render(photo, look, maps={"subject": imageio.load_map(cut / "matte.png")})))
     imageio.save(contact_sheet(tiles), cut / "expected.png")
     np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))
 
@@ -311,11 +311,11 @@ def test_steps_saves_the_cut_as_a_png_and_the_steps_before_it_as_jpg(avatar):
     ]
 
 
-# --- the subject: --matte (bring your own) and --segmenter (which model finds it) -----------------------------------
+# --- the subject: --map subject=PICTURE (bring your own) and --segmenter (which model finds it) ---------------------
 
 
 def test_render_with_a_matte_file_keeps_exactly_the_subject_it_marks(cut):
-    assert cli("render me.png cut.toml -o out --matte matte.png") == 0
+    assert cli("render me.png cut.toml -o out --map subject=matte.png") == 0
     out = imageio.load(cut / "out" / "me__cut.png")
     assert out[:, :64].max() == 0.0  # background: filled black
     np.testing.assert_allclose(out[:, 64:], imageio.load(cut / "me.png")[:, 64:])  # subject: untouched
@@ -352,14 +352,16 @@ def test_a_matte_file_is_the_whole_subject_and_the_segmenter_still_finds_it_in_e
         "BT_IMAGE_SUBJECT_MODEL", str(echo_model(0))
     )  # the portable backend answers with the red channel
     (cut / "per.toml").write_text(PER_CELL, encoding="utf-8")
-    assert cli("render me.png per.toml -o out --matte matte.png") == 0
-    photo, matte = imageio.load(cut / "me.png"), imageio.load_matte(cut / "matte.png")
-    expected = render(photo, load_recipe(cut / "per.toml"), matte=matte, find_subject=subject_finder())
+    assert cli("render me.png per.toml -o out --map subject=matte.png") == 0
+    photo, matte = imageio.load(cut / "me.png"), imageio.load_map(cut / "matte.png")
+    expected = render(
+        photo, load_recipe(cut / "per.toml"), maps={"subject": matte}, finders={"subject": subject_finder()}
+    )
     np.testing.assert_allclose(imageio.load(cut / "out" / "me__per.png"), expected, atol=0.5 / 255)
 
 
 def test_cutout_with_a_matte_file_uses_it_as_the_transparency(cut):
-    assert cli("cutout me.png -o c.png --matte matte.png") == 0
+    assert cli("cutout me.png -o c.png --map subject=matte.png") == 0
     with Image.open(cut / "c.png") as img:
         alpha = np.asarray(img)[..., 3]
     assert alpha[:, :64].max() == 0
@@ -369,12 +371,12 @@ def test_cutout_with_a_matte_file_uses_it_as_the_transparency(cut):
 @pytest.mark.parametrize("command", ["render me.png cut.toml", "cutout me.png"])
 def test_a_matte_file_of_another_size_is_refused(cut, capsys, command):
     Image.new("L", (50, 40), 255).save(cut / "small.png")
-    assert cli(f"{command} -o x --matte small.png") == 1
-    assert "matte" in capsys.readouterr().err
+    assert cli(f"{command} -o x --map subject=small.png") == 1
+    assert "subject" in capsys.readouterr().err
 
 
 def test_steps_takes_a_matte_file_too(cut):
-    assert cli("steps me.png cut.toml -o st --matte matte.png") == 0
+    assert cli("steps me.png cut.toml -o st --map subject=matte.png") == 0
     assert any((cut / "st").iterdir())
 
 
@@ -385,7 +387,7 @@ def test_the_segmenter_option_wins_over_the_environment(cut, echo_model, monkeyp
     )  # the portable backend answers with the red channel
     assert cli("render me.png cut.toml -o out --segmenter onnx") == 0
     photo = imageio.load(cut / "me.png")
-    expected = render(photo, load_recipe(cut / "cut.toml"), matte=subject_matte(photo, segmenter="onnx"))
+    expected = render(photo, load_recipe(cut / "cut.toml"), maps={"subject": subject_matte(photo, segmenter="onnx")})
     np.testing.assert_allclose(imageio.load(cut / "out" / "me__cut.png"), expected, atol=0.5 / 255)
     (cut / "bt-image.toml").write_text(PROJECT, encoding="utf-8")
     assert cli("run bt-image.toml --segmenter onnx") == 0  # and in a project run
@@ -409,7 +411,7 @@ def test_run_finds_the_subjects_again_when_the_segmenter_model_changes(cut, echo
     assert (cut / "done" / "me" / "cut.jpg").read_bytes() != first
 
 
-# --- depth: --depth (bring your own map) -----------------------------------------------------------------------------
+# --- depth: --map depth=PICTURE (bring your own map) -----------------------------------------------------------------
 
 
 @pytest.fixture
@@ -425,7 +427,7 @@ def deep(files, depth_probe):
 
 
 def test_render_with_a_depth_file_gives_the_recipe_that_map(deep):
-    assert cli("render me.png deep.toml -o out --depth depth.png") == 0
+    assert cli("render me.png deep.toml -o out --map depth=depth.png") == 0
     out = imageio.load(deep / "out" / "me__deep.png")
     assert out[:, :64].max() == 0.0  # farthest
     assert out[:, 64:].min() == 1.0  # nearest
@@ -444,7 +446,7 @@ DEPTH_COMMANDS = {
 def test_every_command_that_renders_a_recipe_takes_a_depth_file(deep, capsys, command):
     assert cli(command) == 1  # no map, and the suite's BT_IMAGE_DEPTH_MODEL names no file: the recipe cannot run
     assert "BT_IMAGE_DEPTH_MODEL" in capsys.readouterr().err
-    assert cli(f"{command} --depth depth.png") == 0
+    assert cli(f"{command} --map depth=depth.png") == 0
 
 
 def test_without_a_depth_file_the_depth_model_finds_the_depth(deep, depth_echo_model):
@@ -453,6 +455,58 @@ def test_without_a_depth_file_the_depth_model_finds_the_depth(deep, depth_echo_m
     painted = imageio.load(deep / "out" / "me__deep.png")[..., 0]  # depth_probe paints the depth it is given
     expected = depth_map(imageio.load(deep / "me.png"))
     assert np.abs(painted - expected).max() <= 1 / 255  # 8-bit rounding only
+
+
+# --- a map of the recipe's own: --map NAME=PICTURE ------------------------------------------------------------------
+
+
+@pytest.fixture
+def star(files):
+    """Adds star.toml, a recipe that blacks out where its own map, `star`, is, at the photo's own size, and star.png, a
+    map for the photo: white on the left half, black on the right."""
+    (files / "star.toml").write_text(
+        'format=3\nname="star"\nsize=128\n[region.star]\nkind="given"\n'
+        '[[step]]\neffect="fill"\ncolor="#000000"\nmask="star"\n',
+        encoding="utf-8",
+    )
+    halves = np.zeros((96, 128), np.uint8)
+    halves[:, :64] = 255
+    Image.fromarray(halves, "L").save(files / "star.png")
+    return files
+
+
+def test_render_with_a_map_file_of_the_recipes_own_gives_the_recipe_that_map(star):
+    assert cli("render me.png star.toml -o out --map star=star.png") == 0
+    out = imageio.load(star / "out" / "me__star.png")
+    assert out[:, :64].max() == 0.0  # black where the map is white
+    np.testing.assert_array_equal(out[:, 64:], imageio.load(star / "me.png")[:, 64:])  # untouched elsewhere
+
+
+def test_a_recipe_that_uses_a_map_nobody_gave_is_refused_naming_it(star, capsys):
+    assert cli("render me.png star.toml -o out") == 1
+    assert "'star'" in capsys.readouterr().err
+
+
+MAP_MISTAKES = {
+    "a name that is no map of the recipe": ("render me.png star.toml -o out --map strar=star.png", "strar"),
+    "the same map twice": ("render me.png star.toml -o out --map star=star.png --map star=star.png", "twice"),
+    "a map file that does not exist": ("render me.png star.toml -o out --map star=gone.png", "gone.png"),
+    "a cutout given a map that is not the subject": ("cutout me.png -o c.png --map star=star.png", "star"),
+}
+
+
+@pytest.mark.parametrize(("command", "named"), MAP_MISTAKES.values(), ids=MAP_MISTAKES.keys())
+def test_a_mistake_in_a_map_option_ends_in_one_error_line_naming_it(star, capsys, command, named):
+    assert cli(command) == 1
+    assert named in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("option", ["star", "=star.png", "star="])
+def test_a_map_option_that_is_not_a_name_and_a_file_is_a_usage_error(star, capsys, option):
+    with pytest.raises(SystemExit) as raised:
+        cli(f"render me.png star.toml -o out --map {option}")
+    assert raised.value.code == 2
+    assert "NAME=PICTURE" in capsys.readouterr().err
 
 
 # --- user mistakes are reported, not thrown at the user ------------------------------------------------------------
@@ -467,9 +521,9 @@ MISTAKES = {
     "a recipe with a syntax error": ("render me.png broken.toml -o out", "broken.toml"),
     "an unknown effect": ("render me.png unknown.toml -o out", "nope"),
     "a project file that does not exist": ("run gone.toml", "gone.toml"),
-    "a matte that is not an image": ("cutout me.png -o out --matte notimage.png", "notimage"),
-    "a depth map of another size": ("render me.png recipes/a.toml -o out --depth small.png", "(40, 50)"),
-    "a depth map that does not exist": ("render me.png recipes/a.toml -o out --depth gone.png", "gone.png"),
+    "a matte that is not an image": ("cutout me.png -o out --map subject=notimage.png", "notimage"),
+    "a depth map of another size": ("render me.png recipes/a.toml -o out --map depth=small.png", "(40, 50)"),
+    "a depth map that does not exist": ("render me.png recipes/a.toml -o out --map depth=gone.png", "gone.png"),
     "a folder with no recipe in it": ("render me.png empty -o out", "empty"),
     "a sweep of an effect the recipe does not have": ("sweep me.png recipes/a.toml blur.radius 0..1 -o s.png", "blur"),
     "a sweep of a parameter the effect does not have": (

@@ -18,6 +18,8 @@ from pathlib import Path
 from string import Template
 from typing import NamedTuple
 
+import numpy as np
+
 from . import fx, imageio
 from .core import registry
 from .errors import ProjectError
@@ -32,6 +34,8 @@ CHECKOUT = (
 
 _SIDE = 480  # px, longest side of a gallery picture
 _QUALITY = 82  # JPEG: small files, and these are thumbnails
+# how each map an example recipe may need is found, by name: the real models, run once on the demo photo
+_FINDERS = {"subject": subject_matte, "depth": depth_map}
 _INDEX = "README.md"  # the catalogue's index page: GitHub shows it when the folder is opened
 
 
@@ -83,15 +87,13 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
     todo = [name for name in names if force or not effect_files(name, checkout=checkout).picture.exists()]
     if not todo:
         return []
-    photo, matte, depth = imageio.load(_layout(checkout).photo), None, None
+    photo, maps = imageio.load(_layout(checkout).photo), dict[str, np.ndarray]()
     for name in todo:
         files = effect_files(name, checkout=checkout)
         recipe = load_recipe(files.example)
-        if recipe.needs_matte and matte is None:
-            matte = subject_matte(photo)  # once for all the recipes that need it
-        if recipe.needs_depth and depth is None:
-            depth = depth_map(photo)  # likewise
-        picture = render(photo, recipe, matte=matte, depth=depth)
+        for needed in recipe.maps_needed - maps.keys():
+            maps[needed] = _FINDERS[needed](photo)  # once for all the recipes that need it
+        picture = render(photo, recipe, maps=maps)
         files.picture.parent.mkdir(parents=True, exist_ok=True)
         imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo
@@ -300,7 +302,7 @@ def _category_page(category: str, names: list[str]) -> str:
 
 
 def _row(name: str) -> str:
-    # what a recipe sets: the parameters, not the image or `matte`, which the recipe supplies
+    # what a recipe sets: the parameters, not the image or `subject`, which the recipe supplies
     docs = registry.parameters(name).fields_doc()
     shown = [f"`{doc.name}={doc.default!r}`" for doc in docs if not doc.advanced]
     if hidden := sum(doc.advanced for doc in docs):

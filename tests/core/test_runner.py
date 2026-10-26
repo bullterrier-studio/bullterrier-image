@@ -1,4 +1,4 @@
-"""Tests of `core/runner.py`: the runner is given the subject (a matte, or a `Finder` that finds it); it never looks
+"""Tests of `core/runner.py`: the runner is given the subject (a subject, or a `Finder` that finds it); it never looks
 for the subject itself."""
 
 import math
@@ -8,29 +8,29 @@ from contextlib import nullcontext
 import numpy as np
 import pytest
 
-from bullterrier_image import DepthNotFoundError, RecipeError, SubjectNotFoundError
+from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.core import runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Depth, DepthBands, Finder, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Depth, DepthBands, Finder, Given, Grid, Pick, Shards, Subject
 
 MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
 
 
 class CountingFinder:
-    """A stand-in subject finder: records the photos it was asked about and returns a fixed matte."""
+    """A stand-in subject finder: records the photos it was asked about and returns a fixed subject."""
 
-    def __init__(self, matte: np.ndarray):
-        self.matte = matte
+    def __init__(self, subject: np.ndarray):
+        self.subject = subject
         self.seen: list[tuple[int, ...]] = []
 
     def __call__(self, rgb: np.ndarray) -> np.ndarray:
         self.seen.append(rgb.shape)
-        return self.matte
+        return self.subject
 
 
 @pytest.mark.parametrize(
@@ -58,75 +58,75 @@ RUNS = {
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
-def test_a_masked_recipe_without_a_matte_or_a_finder_is_refused_naming_both_ways(run, photo):
+def test_a_masked_recipe_without_the_subject_map_or_a_finder_is_refused_naming_both_ways(run, photo):
     with pytest.raises(SubjectNotFoundError, match="needs the subject") as raised:
         run(photo, MASKED)
     message = str(raised.value)  # names the recipe and both ways to give the subject
     assert f"'{MASKED.name}'" in message
-    assert "`matte`" in message
-    assert "`find_subject`" in message
+    assert "maps={'subject'" in message
+    assert "finders={'subject'" in message
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
-def test_the_finder_is_called_exactly_once_per_render(run, photo, matte):
-    finder = CountingFinder(matte)
-    run(photo, MASKED, find_subject=Finder("stand-in", finder))
+def test_the_finder_is_called_exactly_once_per_render(run, photo, subject):
+    finder = CountingFinder(subject)
+    run(photo, MASKED, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.seen) == 1  # once for a render, a trace, or all the recipes of render_all
 
 
-def test_render_all_asks_once_however_many_recipes_need_the_subject(photo, matte):
-    finder = CountingFinder(matte)
-    assert len(runner.render_all(photo, [MASKED, PLAIN, MASKED], find_subject=Finder("stand-in", finder))) == 3
+def test_render_all_asks_once_however_many_recipes_need_the_subject(photo, subject):
+    finder = CountingFinder(subject)
+    assert len(runner.render_all(photo, [MASKED, PLAIN, MASKED], finders={"subject": Finder("stand-in", finder)})) == 3
     assert len(finder.seen) == 1
 
 
-def test_the_finder_is_not_called_when_nothing_needs_the_subject_or_the_matte_is_given(photo, matte):
-    finder = CountingFinder(matte)
-    runner.render(photo, PLAIN, find_subject=Finder("stand-in", finder))
-    runner.render_all(photo, [PLAIN, PLAIN], find_subject=Finder("stand-in", finder))
-    runner.render(photo, MASKED, matte=matte, find_subject=Finder("stand-in", finder))
+def test_the_finder_is_not_called_when_nothing_needs_the_subject_or_the_matte_is_given(photo, subject):
+    finder = CountingFinder(subject)
+    runner.render(photo, PLAIN, finders={"subject": Finder("stand-in", finder)})
+    runner.render_all(photo, [PLAIN, PLAIN], finders={"subject": Finder("stand-in", finder)})
+    runner.render(photo, MASKED, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)})
     assert finder.seen == []
 
 
-def test_the_finders_matte_is_the_one_the_recipe_uses(photo, matte):
-    found = runner.render(photo, MASKED, find_subject=Finder("stand-in", CountingFinder(matte)))
-    np.testing.assert_array_equal(found, runner.render(photo, MASKED, matte=matte))
-    assert not np.array_equal(found, runner.render(photo, MASKED, matte=1.0 - matte))
+def test_the_finders_matte_is_the_one_the_recipe_uses(photo, subject):
+    found = runner.render(photo, MASKED, finders={"subject": Finder("stand-in", CountingFinder(subject))})
+    np.testing.assert_array_equal(found, runner.render(photo, MASKED, maps={"subject": subject}))
+    assert not np.array_equal(found, runner.render(photo, MASKED, maps={"subject": 1.0 - subject}))
 
 
-def test_the_finder_sees_the_photo_as_given_before_it_is_framed_or_scaled(photo, matte):
-    finder = CountingFinder(matte)
+def test_the_finder_sees_the_photo_as_given_before_it_is_framed_or_scaled(photo, subject):
+    finder = CountingFinder(subject)
     small = Recipe("small", MASKED.steps, size=64, frame=Framing(aspect=1.0))
-    assert runner.render(photo, small, find_subject=Finder("stand-in", finder)).shape == (64, 64, 3)
+    assert runner.render(photo, small, finders={"subject": Finder("stand-in", finder)}).shape == (64, 64, 3)
     assert finder.seen == [(96, 128, 3)]  # not the 64 px square it is rendered as
 
 
-WITH_MATTE = {
-    "a given matte": lambda matte: {"matte": matte},
-    "a finder": lambda matte: {"find_subject": Finder("stand-in", CountingFinder(matte))},
+WITH_SUBJECT = {
+    "a given map": lambda subject: {"maps": {"subject": subject}},
+    "a finder": lambda subject: {"finders": {"subject": Finder("stand-in", CountingFinder(subject))}},
 }
 
 
-@pytest.mark.parametrize("given", WITH_MATTE.values(), ids=WITH_MATTE.keys())
-def test_a_matte_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, matte, given):
-    with pytest.raises(SubjectNotFoundError, match=r"matte is \(48, 64\).*\(96, 128\)"):
-        runner.render(photo, MASKED, **given(matte[::2, ::2]))
+@pytest.mark.parametrize("given", WITH_SUBJECT.values(), ids=WITH_SUBJECT.keys())
+def test_a_matte_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, subject, given):
+    with pytest.raises(SubjectNotFoundError, match=r"subject is \(48, 64\).*\(96, 128\)"):
+        runner.render(photo, MASKED, **given(subject[::2, ::2]))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     """A finder returning None (instead of raising) would otherwise make `trace` drop the subject stage silently."""
     broken = Finder("stand-in", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
-    with pytest.raises(SubjectNotFoundError, match="`find_subject` returned None"):
-        run(photo, MASKED, find_subject=broken)
+    with pytest.raises(SubjectNotFoundError, match="finder of 'subject' returned None"):
+        run(photo, MASKED, finders={"subject": broken})
 
 
 # --- depth: a second map, given or found like the subject ------------------------------------------------------------
 
 RAMP = np.arange(96 * 128, dtype=np.float32).reshape(96, 128) / (96 * 128 - 1)  # every pixel different: a move shows
 WITH_DEPTH = {
-    "a given map": lambda depth: {"depth": depth},
-    "a finder": lambda depth: {"find_depth": Finder("stand-in depth", CountingFinder(depth))},
+    "a given map": lambda depth: {"maps": {"depth": depth}},
+    "a finder": lambda depth: {"finders": {"depth": Finder("stand-in depth", CountingFinder(depth))}},
 }
 
 
@@ -158,17 +158,17 @@ def test_an_effect_that_takes_depth_is_given_the_depth_map(photo, depth_probe, g
 )
 def test_the_depth_finder_is_asked_once_with_the_photo_as_given(run, photo, depth_probe):
     finder = CountingFinder(RAMP)
-    run(photo, deep(size=64, frame=Framing(aspect=1.0)), find_depth=Finder("stand-in depth", finder))
+    run(photo, deep(size=64, frame=Framing(aspect=1.0)), finders={"depth": Finder("stand-in depth", finder)})
     assert finder.seen == [(96, 128, 3)]
 
 
-def test_the_depth_finder_is_not_asked_when_nothing_needs_depth(photo, matte, depth_probe):
+def test_the_depth_finder_is_not_asked_when_nothing_needs_depth(photo, subject, depth_probe):
     finder = CountingFinder(RAMP)
     asked = Finder("stand-in depth", finder)
-    runner.render(photo, PLAIN, find_depth=asked)
-    runner.trace(photo, MASKED, matte=matte, find_depth=asked)
-    runner.render_all(photo, [PLAIN, MASKED], matte=matte, find_depth=asked)
-    runner.render(photo, deep(), depth=RAMP, find_depth=asked)
+    runner.render(photo, PLAIN, finders={"depth": asked})
+    runner.trace(photo, MASKED, maps={"subject": subject}, finders={"depth": asked})
+    runner.render_all(photo, [PLAIN, MASKED], maps={"subject": subject}, finders={"depth": asked})
+    runner.render(photo, deep(), maps={"depth": RAMP}, finders={"depth": asked})
     assert finder.seen == []
 
 
@@ -181,8 +181,8 @@ def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_t
         run(photo, recipe())
     message = str(raised.value)
     assert named in message
-    assert "`depth`" in message
-    assert "`find_depth`" in message
+    assert "maps={'depth'" in message
+    assert "finders={'depth'" in message
 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
@@ -216,8 +216,8 @@ MAP_VALUES = [
     pytest.param(spoilt(1.2), r"above 1.*max 1\.2", id="a value above 1 is refused"),
 ]
 EITHER_MAP = {  # a recipe needing the map, how it is given or found, and its error
-    "the subject, given": (MASKED, WITH_MATTE["a given matte"], SubjectNotFoundError),
-    "the subject, found": (MASKED, WITH_MATTE["a finder"], SubjectNotFoundError),
+    "the subject, given": (MASKED, WITH_SUBJECT["a given map"], SubjectNotFoundError),
+    "the subject, found": (MASKED, WITH_SUBJECT["a finder"], SubjectNotFoundError),
     "the depth, given": (FRONT, WITH_DEPTH["a given map"], DepthNotFoundError),
     "the depth, found": (FRONT, WITH_DEPTH["a finder"], DepthNotFoundError),
 }
@@ -229,15 +229,15 @@ def test_a_map_must_be_finite_and_within_0_and_1(photo, layer, complaint, recipe
     if complaint is None:
         assert runner.render(photo, recipe, **given(layer)).shape == photo.shape
         return
-    with pytest.raises(error, match=r"^(matte|depth) has .*" + complaint):
+    with pytest.raises(error, match=r"^(subject|depth) has .*" + complaint):
         runner.render(photo, recipe, **given(layer))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
 def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, depth_probe):
     broken = Finder("stand-in depth", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
-    with pytest.raises(DepthNotFoundError, match="`find_depth` returned None"):
-        run(photo, deep(), find_depth=broken)
+    with pytest.raises(DepthNotFoundError, match="finder of 'depth' returned None"):
+        run(photo, deep(), finders={"depth": broken})
 
 
 @pytest.mark.parametrize(
@@ -255,11 +255,13 @@ def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, dep
     ],
 )
 def test_the_depth_map_is_framed_and_scaled_with_the_photo(photo, depth_probe, keys, by_hand):
-    np.testing.assert_array_equal(runner.render(photo, deep(**keys), depth=RAMP)[..., 0], by_hand(RAMP))
+    np.testing.assert_array_equal(runner.render(photo, deep(**keys), maps={"depth": RAMP})[..., 0], by_hand(RAMP))
 
 
 def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, depth_probe):
-    out = runner.render(photo, deep(frame=Framing(angle=30, fit="expand")), depth=np.ones((96, 128), np.float32))
+    out = runner.render(
+        photo, deep(frame=Framing(angle=30, fit="expand")), maps={"depth": np.ones((96, 128), np.float32)}
+    )
     assert out.shape == (148, 159, 3)
     assert (out[0, 0, 0], out[0, -1, 0], out[-1, 0, 0], out[-1, -1, 0]) == (0, 0, 0, 0)
     assert out[74, 79, 0] == pytest.approx(1)
@@ -267,25 +269,133 @@ def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, dept
 
 def test_a_recipe_whose_only_need_for_depth_is_a_region_asks_the_finder_and_traces_the_depth(photo):
     finder = CountingFinder(DOWN)
-    stages = runner.trace(photo, FRONT, find_depth=Finder("stand-in depth", finder))
+    stages = runner.trace(photo, FRONT, finders={"depth": Finder("stand-in depth", finder)})
     assert finder.seen == [(96, 128, 3)]
     assert "depth (white = nearest)" in [stage.label for stage in stages]
 
 
-def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, matte, depth_probe):
+def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, subject, depth_probe):
     recipe = deep(frame=Framing(transparent="background"))
-    stages = runner.trace(photo, recipe, matte=matte, depth=RAMP)
+    stages = runner.trace(photo, recipe, maps={"subject": subject, "depth": RAMP})
     assert [stage.label for stage in stages[:3]] == [
         "input",
         "subject matte (white = subject)",
         "depth (white = nearest)",
     ]
     np.testing.assert_array_equal(stages[2].image, np.repeat(RAMP[..., None], 3, axis=2))
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, matte=matte, depth=RAMP))
-    assert "depth" not in " ".join(stage.label for stage in runner.trace(photo, MASKED, matte=matte, depth=RAMP))
+    np.testing.assert_array_equal(
+        stages[-1].image, runner.render(photo, recipe, maps={"subject": subject, "depth": RAMP})
+    )
+    assert "depth" not in " ".join(
+        stage.label for stage in runner.trace(photo, MASKED, maps={"subject": subject, "depth": RAMP})
+    )
 
 
-# --- framing: the photo and its matte are framed together, before the steps -------------------------------------------
+# --- a given map: any name a recipe declares, handed in or found like the subject and the depth -----------------------
+
+STAR_RED = Recipe(  # paints red where the `star` map is
+    "star-red", [Step("fill", {"color": "#ff0000"}, mask="star")], size=None, regions={"star": Given()}
+)
+# a hard-edged star-like mask, off-centre and asymmetric, so that a flip, a crop or a turn that missed it shows
+STAR = np.zeros((96, 128), np.float32)
+STAR[10:40, 20:50] = 1.0
+STAR[60:70, 90:100] = 1.0
+PAINTED = {"fill": np.array((1.0, 0.0, 0.0), np.float32)}
+
+
+def red_where(star: np.ndarray, photo: np.ndarray) -> np.ndarray:
+    """`photo` with red painted where the hard-edged map `star` is 1: the oracle for `STAR_RED`."""
+    return np.where(star[..., None] == 1, PAINTED["fill"], photo)
+
+
+@pytest.mark.parametrize(
+    "given",
+    [
+        pytest.param(lambda star: {"maps": {"star": star}}, id="a given map"),
+        pytest.param(lambda star: {"finders": {"star": Finder("stand-in star", CountingFinder(star))}}, id="a finder"),
+    ],
+)
+def test_a_given_map_limits_a_step_to_where_it_is(photo, given):
+    np.testing.assert_array_equal(runner.render(photo, STAR_RED, **given(STAR)), red_where(STAR, photo))
+
+
+@pytest.mark.parametrize(
+    ("frame", "by_hand"),
+    [
+        pytest.param(Framing(flip="x"), lambda a: a[:, ::-1], id="a flip"),
+        pytest.param(Framing(aspect=1.0), lambda a: a[:, 16:112], id="a square crop"),
+        pytest.param(Framing(angle=90, fit="expand"), np.rot90, id="a quarter turn"),
+    ],
+)
+def test_a_given_map_moves_with_the_photo_through_the_framing(photo, frame, by_hand):
+    framed = Recipe("framed", STAR_RED.steps, size=None, frame=frame, regions=STAR_RED.regions)
+    np.testing.assert_array_equal(
+        runner.render(photo, framed, maps={"star": STAR}), red_where(by_hand(STAR), by_hand(photo))
+    )
+
+
+def test_a_given_map_is_scaled_with_the_photo_to_the_recipes_size(photo):
+    scaled = Recipe("scaled", STAR_RED.steps, size=64, regions=STAR_RED.regions)
+    expected = runner.render(resize(photo, 64), STAR_RED, maps={"star": resize(STAR, 64)})
+    np.testing.assert_array_equal(runner.render(photo, scaled, maps={"star": STAR}), expected)
+
+
+@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
+def test_a_recipe_that_uses_a_given_map_that_nobody_gave_is_refused_naming_the_map_and_both_ways(run, photo):
+    with pytest.raises(MapNotFoundError, match="'star'") as raised:
+        run(photo, STAR_RED)
+    message = str(raised.value)
+    assert f"'{STAR_RED.name}'" in message
+    assert "maps={'star'" in message
+    assert "finders={'star'" in message
+
+
+def test_a_given_map_that_no_step_uses_is_not_needed(photo):
+    unused = Recipe("unused", PLAIN.steps, size=None, regions={"star": Given()})
+    np.testing.assert_array_equal(runner.render(photo, unused), runner.render(photo, PLAIN))
+
+
+@pytest.mark.parametrize("keyword", ["maps", "finders"])
+@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
+def test_a_name_that_is_no_map_of_the_recipe_is_refused_listing_the_maps_it_has(run, photo, keyword):
+    value = STAR if keyword == "maps" else Finder("stand-in", CountingFinder(STAR))
+    with pytest.raises(RecipeError, match=rf"`{keyword}` names 'strar', which is no map") as raised:
+        run(photo, STAR_RED, **{keyword: {"strar": value}})
+    assert all(name in str(raised.value) for name in ("subject", "depth", "star"))
+
+
+def test_a_map_of_the_wrong_size_is_refused_naming_it_even_when_no_step_uses_it(photo):
+    with pytest.raises(MapNotFoundError, match=r"star is \(48, 64\).*\(96, 128\)"):
+        runner.render(photo, STAR_RED, maps={"star": STAR[::2, ::2]})
+    with pytest.raises(DepthNotFoundError, match=r"depth is \(48, 64\).*\(96, 128\)"):
+        runner.render(photo, PLAIN, maps={"depth": RAMP[::2, ::2]})
+
+
+def test_a_given_maps_values_must_be_finite_and_within_0_and_1(photo):
+    with pytest.raises(MapNotFoundError, match=r"^star has .*above 1"):
+        runner.render(photo, STAR_RED, maps={"star": STAR * 1.5})
+
+
+def test_a_finder_of_a_given_map_is_asked_once_with_the_photo_as_given_however_many_recipes_use_the_map(photo):
+    finder = CountingFinder(STAR)
+    small = Recipe("small", STAR_RED.steps, size=64, frame=Framing(aspect=1.0), regions=STAR_RED.regions)
+    runner.render_all(photo, [small, PLAIN, STAR_RED], finders={"star": Finder("stand-in star", finder)})
+    assert finder.seen == [(96, 128, 3)]
+
+
+def test_a_finder_of_a_map_that_answers_none_is_an_error_naming_the_map(photo):
+    broken = Finder("stand-in star", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
+    with pytest.raises(MapNotFoundError, match="finder of 'star' returned None"):
+        runner.render(photo, STAR_RED, finders={"star": broken})
+
+
+@pytest.mark.parametrize("recipe", [MASKED, FRONT], ids=["subject", "depth"])
+def test_a_missing_subject_or_depth_is_caught_as_a_map_error(photo, recipe):
+    with pytest.raises(MapNotFoundError):
+        runner.render(photo, recipe)
+
+
+# --- framing: the photo and its subject are framed together, before the steps ------------------------------------
 
 
 def test_a_recipe_without_framing_runs_its_steps_on_the_photo_scaled_to_its_size(photo):
@@ -304,14 +414,15 @@ def test_a_recipe_without_framing_runs_its_steps_on_the_photo_scaled_to_its_size
     ],
 )
 def test_the_steps_run_on_the_framed_photo_and_a_masked_step_still_finds_the_subject_where_it_moved(
-    photo, matte, frame, by_hand
+    photo, subject, frame, by_hand
 ):
     framed = Recipe("framed", MASKED.steps, size=None, frame=frame)
-    expected = runner.render(by_hand(photo), MASKED, matte=by_hand(matte))  # background black, by hand
-    np.testing.assert_array_equal(runner.render(photo, framed, matte=matte), expected)
+    expected = runner.render(by_hand(photo), MASKED, maps={"subject": by_hand(subject)})  # background black, by hand
+    np.testing.assert_array_equal(runner.render(photo, framed, maps={"subject": subject}), expected)
     assert (expected == 0).any()
     assert np.array_equal(
-        runner.render(photo, framed, matte=matte)[by_hand(matte) == 1], by_hand(photo)[by_hand(matte) == 1]
+        runner.render(photo, framed, maps={"subject": subject})[by_hand(subject) == 1],
+        by_hand(photo)[by_hand(subject) == 1],
     )
 
 
@@ -321,11 +432,11 @@ def test_framing_comes_before_the_size(photo):
     np.testing.assert_array_equal(runner.render(photo, framed), by_hand)
 
 
-def test_a_crop_around_the_subject_uses_the_matte_that_the_finder_found_on_the_whole_photo(photo, matte):
+def test_a_crop_around_the_subject_uses_the_matte_that_the_finder_found_on_the_whole_photo(photo, subject):
     framed = Recipe("framed", PLAIN.steps, size=None, frame=Framing(anchor="subject", aspect=1.0, margin=0.1))
     for result in (
-        runner.render(photo, framed, matte=matte),
-        runner.render(photo, framed, find_subject=Finder("stand-in", CountingFinder(matte))),
+        runner.render(photo, framed, maps={"subject": subject}),
+        runner.render(photo, framed, finders={"subject": Finder("stand-in", CountingFinder(subject))}),
     ):
         np.testing.assert_array_equal(result, runner.render(photo[13:84, 29:100], PLAIN))  # the disc and 6 px each way
 
@@ -336,18 +447,18 @@ def test_a_subject_crop_needs_the_subject_even_when_no_step_does(photo):
         runner.render(photo, framed)
 
 
-def test_trace_shows_the_framed_photo_and_matte_and_ends_in_the_render(photo, matte):
+def test_trace_shows_the_framed_photo_and_matte_and_ends_in_the_render(photo, subject):
     framed = Recipe("framed", MASKED.steps, size=None, frame=Framing(aspect=1.0))
-    stages = runner.trace(photo, framed, matte=matte)
+    stages = runner.trace(photo, framed, maps={"subject": subject})
     np.testing.assert_array_equal(stages[0].image, photo[:, 16:112])
-    np.testing.assert_array_equal(stages[1].image[..., 0], matte[:, 16:112])
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, framed, matte=matte))
+    np.testing.assert_array_equal(stages[1].image[..., 0], subject[:, 16:112])
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, framed, maps={"subject": subject}))
 
 
-def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, matte):
-    finder = CountingFinder(matte)
+def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, subject):
+    finder = CountingFinder(subject)
     framed = Recipe("framed", PLAIN.steps, size=None, frame=Framing(anchor="subject"))
-    results = runner.render_all(photo, [PLAIN, framed], find_subject=Finder("stand-in", finder))
+    results = runner.render_all(photo, [PLAIN, framed], finders={"subject": Finder("stand-in", finder)})
     assert [r.shape[:2] for r in results] == [(96, 128), (59, 59)]
     assert len(finder.seen) == 1
 
@@ -366,10 +477,10 @@ def test_a_circle_cut_gives_four_channels_the_steps_result_and_the_inscribed_cir
     assert (out[..., 3][distance > 49] == 0).all()
 
 
-def test_the_alpha_of_a_background_cut_is_the_subject_matte_that_moved_with_the_photo(photo, matte):
+def test_the_alpha_of_a_background_cut_is_the_subject_matte_that_moved_with_the_photo(photo, subject):
     recipe = Recipe("cut", PLAIN.steps, size=None, frame=Framing(transparent="background", flip="x", aspect=1.0))
-    out = runner.render(photo, recipe, matte=matte)
-    np.testing.assert_array_equal(out[..., 3], matte[:, ::-1][:, 16:112])
+    out = runner.render(photo, recipe, maps={"subject": subject})
+    np.testing.assert_array_equal(out[..., 3], subject[:, ::-1][:, 16:112])
     np.testing.assert_array_equal(out[..., :3], runner.render(photo[:, ::-1][:, 16:112], PLAIN))
 
 
@@ -380,11 +491,11 @@ def test_the_alpha_of_rounded_corners_is_clear_in_the_corners_and_opaque_in_the_
     assert [alpha[0, 64], alpha[-1, 64], alpha[48, 0], alpha[48, -1]] == [1, 1, 1, 1]
 
 
-def test_the_cut_is_made_at_the_recipes_size_after_the_steps(photo, matte):
+def test_the_cut_is_made_at_the_recipes_size_after_the_steps(photo, subject):
     recipe = Recipe("cut", PLAIN.steps, size=64, frame=Framing(transparent="background"))
-    out = runner.render(photo, recipe, matte=matte)
+    out = runner.render(photo, recipe, maps={"subject": subject})
     assert out.shape == (48, 64, 4)
-    np.testing.assert_array_equal(out[..., 3], resize(matte, 64))
+    np.testing.assert_array_equal(out[..., 3], resize(subject, 64))
 
 
 def test_a_cut_around_the_subject_needs_the_subject_even_when_no_step_does(photo):
@@ -393,12 +504,12 @@ def test_a_cut_around_the_subject_needs_the_subject_even_when_no_step_does(photo
         runner.render(photo, recipe)
 
 
-def test_trace_adds_the_cut_as_its_last_stage_and_it_is_what_render_returns(photo, matte):
+def test_trace_adds_the_cut_as_its_last_stage_and_it_is_what_render_returns(photo, subject):
     recipe = Recipe("cut", MASKED.steps, size=None, frame=Framing(transparent="circle"))
-    stages = runner.trace(photo, recipe, matte=matte)
-    assert [stage.image.shape[2] for stage in stages] == [3, 3, 3, 4]  # input, matte, the step, the cut
+    stages = runner.trace(photo, recipe, maps={"subject": subject})
+    assert [stage.image.shape[2] for stage in stages] == [3, 3, 3, 4]  # input, subject, the step, the cut
     assert stages[-1].label == "2. transparent('circle')"
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, matte=matte))
+    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, maps={"subject": subject}))
     np.testing.assert_array_equal(stages[-1].image[..., :3], stages[-2].image)
 
 
@@ -420,13 +531,14 @@ class ScratchParams(EffectParams):
 SCRATCH_COPIES = 4  # each scratch step holds this many pictures, plus its output, at its peak
 
 
-def peak_pictures(photo: np.ndarray, recipe: Recipe, matte: np.ndarray | None = None) -> float:
-    """The most memory `render` had allocated at once (beyond the photo and matte, which the caller holds), in pictures
-    of the working size."""
-    picture = runner.render(photo, recipe, matte=matte).nbytes  # also warms up: one-time allocations stay out
+def peak_pictures(photo: np.ndarray, recipe: Recipe, subject: np.ndarray | None = None) -> float:
+    """The most memory `render` had allocated at once (beyond the photo and subject, which the caller holds), in
+    pictures of the working size."""
+    maps = {} if subject is None else {"subject": subject}
+    picture = runner.render(photo, recipe, maps=maps).nbytes  # also warms up: one-time allocations stay out
     tracemalloc.start()
     try:
-        runner.render(photo, recipe, matte=matte)
+        runner.render(photo, recipe, maps=maps)
         return tracemalloc.get_traced_memory()[1] / picture
     finally:
         tracemalloc.stop()
@@ -460,26 +572,26 @@ SUBJECT[50:150, 80:250] = 1.0
 
 
 @pytest.mark.parametrize(
-    ("mask", "matte", "kept"),
+    ("mask", "subject", "kept"),
     [
         (None, None, 0.0),
-        ("subject", SUBJECT, 1 / 3),  # the scaled matte, one channel: a third of a picture, needed by every step
+        ("subject", SUBJECT, 1 / 3),  # the scaled subject, one channel: a third of a picture, needed by every step
         ("background", SUBJECT, 2 / 3),  # and the background selection made from it, kept for the steps that mask
     ],
     ids=["plain", "subject", "background"],
 )
-def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_output(memory_probes, mask, matte, kept):
+def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_output(memory_probes, mask, subject, kept):
     """A step's input is released once the next step has run, and neither the scaled photo nor a masked step's blend
     weights are kept for the rest of the chain: the peak is the busiest step's scratch, output and input (and the
-    scaled matte), whatever the number of steps."""
+    scaled subject), whatever the number of steps."""
     steps = tuple(Step("scratch_probe", {"copies": SCRATCH_COPIES}, mask) for _ in range(6))
     bound = (
         SCRATCH_COPIES + 1 + 1 + kept + 0.25
     )  # scratch, output, input, the selections, a quarter picture for small things
-    assert peak_pictures(PHOTO, Recipe("chain", steps, size=320), matte) <= bound
+    assert peak_pictures(PHOTO, Recipe("chain", steps, size=320), subject) <= bound
     # known-bad: the same gauge sees a picture that something keeps alive
     leaky = (*steps[:3], Step("hoarding_probe", {}, mask), *steps[3:])
-    assert peak_pictures(PHOTO, Recipe("leaky", leaky, size=320), matte) > bound
+    assert peak_pictures(PHOTO, Recipe("leaky", leaky, size=320), subject) > bound
 
 
 # --- regions: `each` gives every piece of a partition its look; `mask` limits a step to a selection -----------------
@@ -497,7 +609,7 @@ def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo
     recipe = Recipe("by-distance", [looks], size=None, regions={"bands": DepthBands(count=3)})
     by_hand = np.empty((96, 128, 3), np.float32)
     by_hand[:32], by_hand[32:64], by_hand[64:] = RGB[RED], RGB[GREEN], RGB[BLUE]  # nearer than 2/3, than 1/3, the rest
-    np.testing.assert_allclose(runner.render(photo, recipe, depth=DOWN), by_hand, atol=1e-6)
+    np.testing.assert_allclose(runner.render(photo, recipe, maps={"depth": DOWN}), by_hand, atol=1e-6)
 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
@@ -616,9 +728,9 @@ def test_a_step_masked_by_a_region_changes_only_the_pixels_the_region_chooses(ph
     np.testing.assert_array_equal(out[48:], photo[48:])
 
 
-def test_a_mask_can_name_a_region_made_from_the_subject(photo, matte):
+def test_a_mask_can_name_a_region_made_from_the_subject(photo, subject):
     regions = {"around": Shards(count=6, fit="subject"), "piece": Pick(of="around", pieces=[0])}
-    out = run(photo, [fill(RED, mask="piece")], regions, matte=matte)
+    out = run(photo, [fill(RED, mask="piece")], regions, maps={"subject": subject})
     changed = (out != photo).any(axis=2)
     assert changed.any()
     assert not changed.all()  # one shard of six
@@ -686,35 +798,35 @@ def test_regions_are_made_for_the_working_picture_after_framing_and_scaling(phot
 # --- regions and the subject: found at most once, and only when a region in use needs it ------------------------------
 
 
-def test_a_declared_region_nobody_uses_costs_nothing_and_does_not_look_for_the_subject(photo, matte):
-    finder = CountingFinder(matte)
+def test_a_declared_region_nobody_uses_costs_nothing_and_does_not_look_for_the_subject(photo, subject):
+    finder = CountingFinder(subject)
     unused = {"glass": Shards(fit="subject"), "head": Pick(of="glass")}
     out = run(
         photo,
         [fill(RED, mask="head")] if False else [Step("grade", {"exposure": 0.5})],
         unused,
-        find_subject=Finder("stand-in", finder),
+        finders={"subject": Finder("stand-in", finder)},
     )
     assert finder.seen == []
     np.testing.assert_array_equal(out, run(photo, [Step("grade", {"exposure": 0.5})], {}))
 
 
-def test_a_region_in_use_asks_for_the_subject_once_however_many_steps_use_it(photo, matte):
-    finder = CountingFinder(matte)
+def test_a_region_in_use_asks_for_the_subject_once_however_many_steps_use_it(photo, subject):
+    finder = CountingFinder(subject)
     regions = {"glass": Shards(count=5, fit="subject"), "head": Pick(of="glass", pieces=[0])}
     steps = [fill(RED, mask="head"), Each("glass", [fill(GREEN), "none"]), fill(BLUE, mask="subject")]
-    run(photo, steps, regions, find_subject=Finder("stand-in", finder))
+    run(photo, steps, regions, finders={"subject": Finder("stand-in", finder)})
     assert finder.seen == [(96, 128, 3)]  # the photo as given
 
 
-def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_working_picture(photo, matte):
+def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_working_picture(photo, subject):
     recipe = Recipe(
         "scaled",
         [Each("sides", [fill(RED), fill(GREEN)], feather=0)],
         size=64,
         regions={"sides": Grid(columns=2, rows=1, fit="subject")},
     )
-    out = runner.render(photo, recipe, find_subject=Finder("stand-in", CountingFinder(matte)))
+    out = runner.render(photo, recipe, finders={"subject": Finder("stand-in", CountingFinder(subject))})
     assert out.shape == (48, 64, 3)
     middle = 32  # the disc is in the middle of the picture, so its box is cut in half there
     assert (out[:, :middle] == RGB[RED]).all()
@@ -740,9 +852,9 @@ def test_an_effect_that_takes_a_partition_gets_the_pieces_numbered_in_reading_or
             assert out[y, x, 0] * 255 == pytest.approx(want), (x, y)
 
 
-def test_a_selection_is_given_to_an_effect_as_a_partition_of_two_pieces(photo, matte, partition_probe):
-    out = run(photo, [Step("partition_probe", partition="subject")], {}, matte=matte)
-    np.testing.assert_allclose(out[..., 0] * 255, matte > 0.5)  # outside the subject first: it holds the first pixel
+def test_a_selection_is_given_to_an_effect_as_a_partition_of_two_pieces(photo, subject, partition_probe):
+    out = run(photo, [Step("partition_probe", partition="subject")], {}, maps={"subject": subject})
+    np.testing.assert_allclose(out[..., 0] * 255, subject > 0.5)  # outside the subject first: it holds the first pixel
 
 
 # --- trace: the regions a recipe uses, with the pieces numbered ----------------------------------------------------
@@ -839,9 +951,9 @@ class PieceFinder:
 
     def __call__(self, rgb: np.ndarray) -> np.ndarray:
         self.crops.append(rgb.copy())
-        matte = np.zeros(rgb.shape[:2], np.float32)
-        matte[2:6, 2:6] = 1
-        return matte
+        subject = np.zeros(rgb.shape[:2], np.float32)
+        subject[2:6, 2:6] = 1
+        return subject
 
 
 GRID_FIRST = Recipe(
@@ -864,7 +976,7 @@ def test_the_finder_is_asked_about_the_crop_of_each_piece_of_the_working_picture
     run_it, photo
 ):
     finder = PieceFinder()
-    out = run_it(photo, GRID_FIRST, find_subject=Finder("stand-in", finder))
+    out = run_it(photo, GRID_FIRST, finders={"subject": Finder("stand-in", finder)})
     working = resize(photo, 64)  # 48 x 64: four pieces of 24 x 32
     assert sorted(crop.tobytes() for crop in finder.crops) == sorted(
         working[y : y + 24, x : x + 32].tobytes() for y in (0, 24) for x in (0, 32)
@@ -876,11 +988,11 @@ def test_the_finder_is_asked_about_the_crop_of_each_piece_of_the_working_picture
     np.testing.assert_array_equal(out, expected)
 
 
-def test_a_matte_of_the_whole_photo_does_not_stand_in_for_the_finder_of_pieces(photo, matte):
+def test_a_matte_of_the_whole_photo_does_not_stand_in_for_the_finder_of_pieces(photo, subject):
     with pytest.raises(SubjectNotFoundError, match=r"'found'.*cells"):
-        runner.render(photo, GRID_FIRST, matte=matte)
+        runner.render(photo, GRID_FIRST, maps={"subject": subject})
     finder = PieceFinder()
-    runner.render(photo, GRID_FIRST, matte=matte, find_subject=Finder("stand-in", finder))
+    runner.render(photo, GRID_FIRST, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)})
     assert [crop.shape for crop in finder.crops] == [(24, 32, 3)] * 4  # the pieces, never the whole photo
 
 
@@ -894,5 +1006,5 @@ def test_a_subject_found_piece_by_piece_that_no_step_uses_asks_nobody():
     finder = PieceFinder()
     photo = np.zeros((20, 30, 3), np.float32)
     recipe = Recipe("unused", [Step("grade", {"exposure": 0.5})], size=None, regions=GRID_FIRST.regions)
-    runner.render(photo, recipe, find_subject=Finder("stand-in", finder))
+    runner.render(photo, recipe, finders={"subject": Finder("stand-in", finder)})
     assert finder.crops == []

@@ -3,7 +3,7 @@
 Promises: every error is a `RecipeError` that starts with the file's name, then names the step and the offending key
 (a TOML syntax error keeps its line and column); nothing is read except that one file. The format (UTF-8 TOML):
 
-    format = 2                     # optional: the recipe format version; this release reads 1 (the default) and 2
+    format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
 
@@ -25,7 +25,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     [[step]]
     effect = "fill"
     color = "#000000"
-    mask = "background"            # "subject", "background" or a region that is a selection: apply only there
+    mask = "background"            # "subject", "background", "depth" or a region that is a selection: apply only there
     opacity = 0.3                  # optional, 0..1: mix the effect in partway (default 1 = fully)
 
     [[step]]
@@ -41,14 +41,15 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `grid` (`columns`, `rows`), `shards`
 (`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `cuts` (`lines`: tables `{x, y, angle}` or `{path}`), `path`
 (`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids), `subject` (`per`,
-`context`, `threshold`), `depth` (`near`, `far`, `feather`) or `depth_bands` (`count`), the fields of `Grid`, `Shards`,
-`Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth` and `DepthBands`; `fit` lays a grid, shards, cuts, path or svg over a
-selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid,
-shards, cuts, svg or depth_bands) cuts the picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`,
-a `depth` or the built-in `subject` and `background`) chooses pixels; a `subject` with `per` finds the subject inside
-each piece of a partition; `depth` and `depth_bands` read the depth map (bands are numbered nearest first). Steps name
-regions: `mask` (a selection) limits a step to it, and `partition` names the partition an effect such as `seams` draws.
-A step with `each` (a partition) and `looks` gives every piece its own look:
+`context`, `threshold`), `depth` (`near`, `far`, `feather`), `depth_bands` (`count`) or `given` (no fields; format 3),
+the fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Depth`, `DepthBands` and `Given`; `fit` lays
+a grid, shards, cuts, path or svg over a selection and `edge` is a table (`style`, `amount`, `scale`, `seed`) that tears
+the borders. A *partition* (a grid, shards, cuts, svg or depth_bands) cuts the picture into numbered pieces, a
+*selection* (a `path`, a `pick`, a `subject`, a `depth`, a `given` map or the built-in `subject`, `background` and
+`depth`) chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition; `depth` and
+`depth_bands` read the depth map (bands are numbered nearest first). Steps name regions: `mask` (a selection) limits a
+step to it, and `partition` names the partition an effect such as `seams` draws. A step with `each` (a partition) and
+`looks` gives every piece its own look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -57,7 +58,8 @@ A step with `each` (a partition) and `looks` gives every piece its own look:
     feather = 0.001                # soft borders between pieces, a share of the long side
     mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
 
-Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them.
+Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them. A region
+of `kind = "given"` (a map handed in at render time) needs `format = 3`.
 
 A parameter that is a picture (a texture, a logo; the effect's documentation says which, and an effect with one calls
 it `image`) is written as a path, relative to the recipe file's folder, or as a colour (a string starting with `#`, or
@@ -72,7 +74,7 @@ file, the step, the parameter and the path.
 
 The `[frame]` table holds the fields of `Framing` (`Framing.documentation()` lists them with their units and ranges):
 `flip`, `angle` (with `fit` and `resample`), `aspect` (with `anchor` and `margin`), `pad_top`, `pad_right`, `pad_bottom`
-and `pad_left` (with `fill`), applied to the photo and the subject matte in that order, before the first step and
+and `pad_left` (with `fill`), applied to the photo and the subject map in that order, before the first step and
 before `size`; and `transparent` (with `corner_radius`), applied after the last step. The transparency lives in the
 table with the geometry because it is the same model, `Recipe(..., frame=Framing(...))` in Python: one place says how a
 recipe's picture is framed and cut. Any other top-level key is refused, so a misspelt `size` or `format` is not
@@ -95,7 +97,7 @@ from . import imageio
 from .core import registry
 from .core.framing import Framing
 from .core.params import Picture
-from .core.regions import Cuts, Depth, DepthBands, Grid, Kind, Pick, Shards, Subject, Svg
+from .core.regions import Cuts, Depth, DepthBands, Given, Grid, Kind, Pick, Shards, Subject, Svg
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step, safe_name
 
@@ -103,9 +105,11 @@ __all__ = ["load_recipe", "with_pictures"]
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`,
-# `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes.
-_FORMATS = (1, 2)
+# `looks` and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region
+# kind `given`, and a file of an earlier format may not use it.
+_FORMATS = (1, 2, 3)
 _NEW_IN_2 = ("each", "looks", "partition")
+_KINDS_NEW_IN_3 = ("given",)
 # the top-level keys of a recipe file, each as it is written (a table or a list of tables in brackets), in the order the
 # error for an unknown one lists them
 _KEYS = {
@@ -127,6 +131,7 @@ _KINDS: dict[str, type[Kind]] = {
     "subject": Subject,
     "depth": Depth,
     "depth_bands": DepthBands,
+    "given": Given,
 }
 
 
@@ -213,6 +218,12 @@ def load_recipe(path: str | Path) -> Recipe:
         raise RecipeError(
             f"{path.name}: regions, `each`, `looks` and `partition` need `format = 2` at the top of the file"
         )
+    if raw.get("format", _FORMATS[0]) < 3 and isinstance(tables, dict):
+        for name, table in tables.items():
+            if isinstance(table, dict) and table.get("kind") in _KINDS_NEW_IN_3:
+                raise RecipeError(
+                    f"{path.name}: region {name!r}: `kind` {table['kind']!r} needs `format = 3` at the top of the file"
+                )
     regions = _regions(tables, path.name, path.parent)
     steps = []
     for i, entry in enumerate(entries, start=1):

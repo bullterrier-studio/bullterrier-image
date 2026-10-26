@@ -37,6 +37,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         BullterrierImageError,
         DepthNotFoundError,
         ImageReadError,
+        MapNotFoundError,
         NonFiniteImageError,
         ProjectError,
         RecipeError,
@@ -55,6 +56,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Edge,
         Finder,
         Framing,
+        Given,
         Grid,
         Line,
         Path,
@@ -79,7 +81,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "DepthNotFoundError", "ImageReadError", "NonFiniteImageError",
+        "BackendUnavailableError", "DepthNotFoundError", "ImageReadError", "MapNotFoundError", "NonFiniteImageError",
         "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
     ".core.params": ("Picture",),
@@ -87,8 +89,8 @@ _HOMES = {
     ".finding.subject": ("subject_finder", "subject_matte"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Cuts", "Curve", "Depth", "DepthBands", "Each", "Edge", "Finder", "Framing", "Grid", "Line", "Path", "Pick",
-        "Recipe", "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
+        "Cuts", "Curve", "Depth", "DepthBands", "Each", "Edge", "Finder", "Framing", "Given", "Grid", "Line", "Path",
+        "Pick", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -133,9 +135,11 @@ __all__ = [
     "Edge",
     "Finder",
     "Framing",
+    "Given",
     "Grid",
     "ImageReadError",
     "Line",
+    "MapNotFoundError",
     "NonFiniteImageError",
     "Path",
     "Pick",

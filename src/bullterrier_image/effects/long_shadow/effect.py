@@ -54,17 +54,17 @@ class LongShadowParams(EffectParams):
 
 
 @effect(category="subject", params=LongShadowParams, opacity=0.5)
-def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it.
 
     The shadow is every copy of the silhouette moved along the ray, one per pixel of travel, the farther ones fainter
     by `fade`; it is laid behind the subject in `color`, replacing the picture where it is full (at the subject), so
     the subject itself is never changed.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no shadow: the picture comes back unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
     heading = np.radians(params.angle)
     direction = np.array([np.sin(heading), np.cos(heading)])  # (down, right) as seen in the picture
@@ -74,7 +74,7 @@ def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray 
     # The union of the copies is built by doubling: after each round `cast` holds the union of `held` copies, so a
     # round that moves it by `held` copies and keeps the larger value doubles `held`; the fade is a straight ramp
     # (`fade` over `length` px), so the loss over `held` copies is the same wherever those copies start.
-    cast, held = matte, 1  # constant: copy 0 is the silhouette itself, so one copy is held to begin with
+    cast, held = subject, 1  # constant: copy 0 is the silhouette itself, so one copy is held to begin with
     while held < copies:
         moved = min(held, copies - held)  # the last round moves by what is still missing
         fainter = shift(cast, *(per_pixel * moved), edge=params.edge) - float(
@@ -82,4 +82,4 @@ def long_shadow(rgb: np.ndarray, params: LongShadowParams, *, matte: np.ndarray 
         )
         cast = np.maximum(cast, fainter)
         held += moved
-    return put_behind(rgb, matte, cast, np.asarray(params.color, np.float32))
+    return put_behind(rgb, subject, cast, np.asarray(params.color, np.float32))

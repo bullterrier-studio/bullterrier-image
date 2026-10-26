@@ -34,16 +34,15 @@ The contract: an effect is a pure function of a float32 RGB image `(h, w, 3)` in
 a new image of the same shape, deterministic (randomness from a `seed` field), never modifying its input. Every
 parameter is a `param` field with a description; a number also has a unit (px, fraction, degrees...; an unknown one is
 refused naming the valid ones) and an inclusive range holding its default. `category` is one of `CATEGORIES`. Mistakes
-in a definition raise when the module is imported. An effect that needs the subject's silhouette declares
-`*, matte: np.ndarray | None = None` (float32 (h, w), 0..1, 1 = subject); one that needs how near each pixel is declares
-`*, depth: np.ndarray | None = None` (float32 (h, w), 0..1, 1 = nearest); one that draws along the borders of a
-partition declares
+in a definition raise when the module is imported. An effect that needs the subject's silhouette declares `*, subject:
+np.ndarray | None = None` (float32 (h, w), 0..1, 1 = subject); one that needs how near each pixel is declares `*, depth:
+np.ndarray | None = None` (float32 (h, w), 0..1, 1 = nearest); one that draws along the borders of a partition declares
 `*, partition: np.ndarray | None = None` (int32 piece numbers, one per pixel, 0..n-1 in piece order: reading order,
-`depth_bands` nearest first; a step names the region with its `partition` key). An effect meant to be mixed in
-partway declares the opacity its steps have by default, `@effect(category=..., params=..., opacity=0.7)` (0..1, default
-1); a step's own `opacity` replaces it. No
-parameter may be named like an input (`matte`, `depth`, `partition`) or a key of the step (`effect`, `mask`, `opacity`,
-`blend_mode`, `preset`, `partition`, `each`, `looks`). Names must be unique across every installed package.
+`depth_bands` nearest first; a step names the region with its `partition` key). An effect meant to be mixed in partway
+declares the opacity its steps have by default, `@effect(category=..., params=..., opacity=0.7)` (0..1, default 1); a
+step's own `opacity` replaces it. No parameter may be named like an input (`subject`, `depth`, `partition`) or a key of
+the step (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`). Names must be unique
+across every installed package.
 """
 
 from .core.params import Color, EffectParams, Picture, param

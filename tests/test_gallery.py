@@ -168,7 +168,7 @@ class RowParams(EffectParams):
 
 def test_an_effects_row_has_its_picture_summary_parameters_and_recipe(fresh_registry):
     @effect(category="light", params=RowParams)
-    def row_probe(rgb, params, *, matte=None):
+    def row_probe(rgb, params, *, subject=None):
         """Softly probes the bright parts. Then says more."""
         return rgb
 

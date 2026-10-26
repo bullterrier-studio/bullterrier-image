@@ -14,9 +14,9 @@ def grey(size: int = 32) -> np.ndarray:
 
 
 def one_pixel(row: int = 10, col: int = 12, size: int = 32) -> np.ndarray:
-    matte = np.zeros((size, size), np.float32)
-    matte[row, col] = 1.0
-    return matte
+    subject = np.zeros((size, size), np.float32)
+    subject[row, col] = 1.0
+    return subject
 
 
 @pytest.mark.parametrize(
@@ -31,17 +31,17 @@ def one_pixel(row: int = 10, col: int = 12, size: int = 32) -> np.ndarray:
 def test_the_shadow_lands_dx_dy_away_and_nowhere_else(dx: float, dy: float, lands_at: list[tuple[int, int]]) -> None:
     """With no blur and a black shadow, a shadow pixel is `picture x (1 - coverage)`; the coverage of
     a pixel moved by a whole number of pixels is 1 there, and of one moved by half a pixel is 1/2 on two pixels."""
-    out = registry.apply(NAME, grey(), matte=one_pixel(), dx=dx, dy=dy, blur=0.0)
+    out = registry.apply(NAME, grey(), subject=one_pixel(), dx=dx, dy=dy, blur=0.0)
     expected = grey()
     for row, col in lands_at:
         expected[row, col] = GREY * (1 - 1 / len(lands_at))
     np.testing.assert_allclose(out, expected, atol=1e-6)
 
 
-def test_the_subject_is_never_changed(photo: np.ndarray, matte: np.ndarray) -> None:
+def test_the_subject_is_never_changed(photo: np.ndarray, subject: np.ndarray) -> None:
     for kwargs in ({}, {"dx": 3, "dy": -2, "blur": 5.0}, {"dx": 0, "dy": 0, "color": "#ff0000"}):
-        out = registry.apply(NAME, photo, matte=matte, **kwargs)
-        np.testing.assert_array_equal(out[matte == 1], photo[matte == 1])
+        out = registry.apply(NAME, photo, subject=subject, **kwargs)
+        np.testing.assert_array_equal(out[subject == 1], photo[subject == 1])
 
 
 @pytest.mark.parametrize(
@@ -52,7 +52,7 @@ def test_the_subject_is_never_changed(photo: np.ndarray, matte: np.ndarray) -> N
     ],
 )
 def test_where_the_shadow_is_full_it_replaces_the_picture_with_its_colour(kwargs: dict, expected: list[float]) -> None:
-    out = registry.apply(NAME, grey(), matte=one_pixel(), dx=3, dy=3, blur=0.0, **kwargs)
+    out = registry.apply(NAME, grey(), subject=one_pixel(), dx=3, dy=3, blur=0.0, **kwargs)
     np.testing.assert_allclose(out[13, 15], expected, atol=1e-6)
 
 
@@ -60,7 +60,7 @@ def test_blur_spreads_the_shadow_as_a_gaussian_of_that_sigma_and_keeps_its_amoun
     """Over a flat picture a black shadow removes `GREY x coverage`; the coverage of one pixel blurred by sigma is the
     2-D Gaussian, which peaks at 1 / (2 pi sigma^2) and sums to 1."""
     sigma = 2.0
-    out = registry.apply(NAME, grey(64), matte=one_pixel(30, 30, 64), dx=6, dy=6, blur=sigma)
+    out = registry.apply(NAME, grey(64), subject=one_pixel(30, 30, 64), dx=6, dy=6, blur=sigma)
     removed = GREY - out[..., 0]
     assert removed[36, 36] == pytest.approx(GREY / (2 * np.pi * sigma**2), abs=1e-4)
     assert removed[36, 36 + 2] == pytest.approx(GREY * np.exp(-4 / (2 * sigma**2)) / (2 * np.pi * sigma**2), abs=1e-4)
@@ -70,9 +70,9 @@ def test_blur_spreads_the_shadow_as_a_gaussian_of_that_sigma_and_keeps_its_amoun
 def test_a_subject_cut_by_the_border_casts_its_shadow_without_a_gap() -> None:
     """The subject fills the two left columns, so it goes on beyond the border: its shadow, moved right, starts
     where the subject ends."""
-    matte = np.zeros((8, 8), np.float32)
-    matte[:, :2] = 1.0
-    out = registry.apply(NAME, grey(8), matte=matte, dx=5, dy=0, blur=0.0)
+    subject = np.zeros((8, 8), np.float32)
+    subject[:, :2] = 1.0
+    out = registry.apply(NAME, grey(8), subject=subject, dx=5, dy=0, blur=0.0)
     np.testing.assert_allclose(out[:, 2:7], 0.0, atol=1e-6)
     np.testing.assert_allclose(out[:, 7:], GREY, atol=1e-6)
 

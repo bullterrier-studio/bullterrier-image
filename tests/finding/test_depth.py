@@ -241,7 +241,7 @@ def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, 
     with pytest.raises(BackendUnavailableError, match="by hand") as caught:
         depth_map(ramp())
     assert "BT_IMAGE_DEPTH_MODEL" in str(caught.value)
-    assert "--depth" in str(caught.value)
+    assert "--map depth=" in str(caught.value)
 
 
 def test_without_onnxruntime_the_depth_model_is_unavailable_saying_what_to_install(depth_echo_model, monkeypatch):

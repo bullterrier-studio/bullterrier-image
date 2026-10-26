@@ -17,7 +17,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   can be written in parallel without conflicts. *Consequence:* an effect is new files named for it (its package, tests,
   example recipe, gallery picture) and nothing else; `poe new-effect` writes them from `effects/_template/`, and
   `gallery.effect_files(name)` is the one place that knows where they live.
-- **Effects are pure functions in packages.** `effect(rgb, params, *, matte=None) -> rgb` on float32 RGB `(h, w, 3)` in
+- **Effects are pure functions in packages.** `effect(rgb, params, *, subject=None) -> rgb` on float32 RGB `(h, w, 3)` in
   0..1, deterministic, never modifying its input, one package per effect holding code only; its tests mirror `src/`
   (`tests/effects/<name>/`), its example and picture live outside the package. *Reason:* a pure function is trivially
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
@@ -170,7 +170,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   kept; `fx.pyi` shows the step keys in every signature, so an editor completes them.
 - **Size changes frame the photo before the steps; transparency is cut after them.** A recipe's framing (`Framing`,
   `bullterrier_image.core.framing`: `[frame]` in a recipe file, `Recipe(..., frame=Framing(...))` in Python) is applied
-  by the runner to the photo and the subject matte together, before the first step, in one fixed order: `flip` (none, x,
+  by the runner to the photo and its maps (the subject, the depth, any map handed in) together, before the first step, in one fixed order: `flip` (none, x,
   y, both), `angle` (counter-clockwise degrees, with `fit` crop or expand and a `resample` filter), the crop (`aspect`
   as width over height, put at an `anchor`: center, top, bottom, left, right, or the subject with a `margin` around
   it), the `pad_top`, `pad_right`, `pad_bottom` and `pad_left` borders (shares of the picture's shorter side, in
@@ -191,19 +191,36 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   one; a frame that needs a canvas larger than the photo (polaroid, film strip) belongs to a layout package; a border
   drawn inside the picture's edge is an ordinary effect. The transparency keys live in `[frame]` with the geometry,
   because they are the same model and one place says how a recipe's picture is framed and cut.
-- **The subject is injected.** The runner is given a `matte` or a `find_subject` `Finder`; `bullterrier_image.recipe` binds the
-  default. *Reason:* the engine stays testable without a segmentation model. *Consequence:* tests inject stand-ins
-  through public parameters instead of patching.
-- **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a non-blank string and a function from
-  the photo to a map; `render`, `trace` and `render_all` take `matte=` and `find_subject=`, `pipeline.run` takes
-  `find_subject=`, and
-  `finding.subject.subject_finder(segmenter=None)` returns the default, named by its backend and model. The default is
-  bound lazily, only when a recipe will ask for the subject. The pipeline's subject, depth and crop caches are keyed by
-  the identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
+- **Maps of the photo are injected by name.** A map is one value per pixel, 0..1, the photo's size, known by a name:
+  `subject`, `depth`, or the name of a `given` region the recipe declares (`format = 3`). `render`, `trace` and
+  `render_all` take `maps={name: array}` and `finders={name: Finder}`; `pipeline.run` takes `finders=`;
+  `bullterrier_image.recipe` binds the default `subject` and `depth` finders, lazily, only when a recipe will ask. An
+  effect takes a map by the same name (`subject`, `depth`); a region of kind `given` makes any other map usable as a
+  selection (`mask = "star"`). *Reason:* the engine stays testable without a model, and the package serves a video tool
+  that hands in maps of its own every frame (a drawing's silhouette from vector, a motion map from several frames) which
+  image can neither make nor know in advance; one route for every map, not a keyword per map (`matte=`, `depth=`, then
+  whatever comes next). A name no recipe declares is a `RecipeError` listing the names there are, so a misspelt map
+  fails instead of being ignored. *Consequence:* `matte=`, `depth=`, `find_subject=`, `find_depth=`, `--matte`,
+  `--depth`, `load_matte`, `load_depth` and the effect input `matte` are gone, with no alias before 1.0 (`--map
+  NAME=PICTURE`, `imageio.load_map`, `subject`); the five effects' `matte_threshold` is `subject_threshold`; the `depth`
+  region name is built in beside `subject` and `background`, so a `given` region cannot take it; `MapNotFoundError` is
+  the base of `SubjectNotFoundError` and `DepthNotFoundError`; a project (`bt-image run`) holds no maps of its own, so a
+  recipe with a `given` region needs a finder of that name. A map handed in is framed with the photo in one stack
+  (`Framing.apply`), so its geometry is the photo's and every map pads with 0.
+- **One reader for map files: transparency gives the alpha, anything else the brightness.** `imageio.load_map` replaces
+  `load_matte` (alpha) and `load_depth` (brightness only). *Reason:* a cut-out PNG and a drawing carry the map in their
+  alpha, a greyscale or black-and-white picture in its levels, and a depth map an editor saved with an opaque alpha
+  channel must still read as brightness, so alpha counts only when some pixel is not fully opaque. *Consequence:* a
+  depth map with real transparency now gives its alpha (save it without), and a cut-out whose subject covers the whole
+  frame reads as brightness (it is no cut-out).
+- **A finder carries its identity: `Finder(identity, find)`.** A frozen dataclass of a non-blank string and a function
+  from the photo to a map; `finders={name: Finder}` names it for each map.
+  `finding.subject.subject_finder(segmenter=None)` returns the default subject finder, named by its backend and model,
+  and `finding.depth.depth_finder()` the depth's. The pipeline's subject, depth and crop caches are keyed by the
+  identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
   name (the partial-finder cache collision). *Consequence:* the crop-finder alias in regions is `BoxFinder`; the package
   is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
-  `BT_IMAGE_DEPTH_MODEL`. Depth takes the same keywords (`depth=`, `find_depth=`); `finding.depth.depth_finder()` is
-  its default, bound the same lazy way.
+  `BT_IMAGE_DEPTH_MODEL`.
 
 ## Errors and I/O
 
@@ -218,8 +235,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Finding the subject and depth
 
 - **Two backends behind one function**, `subject_matte(rgb)`: IS-Net on ONNX Runtime, the default on every platform, and
-  Apple Vision on macOS, used only when asked (`segmenter="vision"`, `BT_IMAGE_SEGMENTER=vision`); `--matte` (or `matte=`)
-  skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
+  Apple Vision on macOS, used only when asked (`segmenter="vision"`, `BT_IMAGE_SEGMENTER=vision`); `--map subject=FILE` (or
+  `maps={"subject": ...}`) skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
   asks for the platform's own; neither makes the core depend on it. *Consequence:* `subject_finder()`'s identity by default
   is the portable model's (the cache keys of subjects remembered under Vision change once, so they are found again). The portable model (about 180 MB) is downloaded on first use into the
   user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_SUBJECT_MODEL` points at a local
@@ -227,15 +244,15 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
-  input of `--matte`, of `matte=` and of picture parameters (a logo, the example assets), so it is made once, checked
+  input of `--map subject=`, of `maps=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
 - **Depth is injected like the subject.** An effect that needs distance (`depth_of_field`, `parallax`, `relight`,
   `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; the depth regions read it too.
-  The runner is given a depth map or a `Finder` for one (`depth=`, `find_depth=`; neither, when needed, is
+  The runner is given a depth map or a `Finder` for one (`maps={"depth": ...}`, `finders={"depth": ...}`; neither, when needed, is
   `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default:
   Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against
-  a SHA-256, downloaded like the portable subject model (`BT_IMAGE_DEPTH_MODEL` for a local copy); `--depth` (or
-  `depth=`) takes a map you already have (brightness, white = near). The model sees the photo bicubic-scaled to a short
+  a SHA-256, downloaded like the portable subject model (`BT_IMAGE_DEPTH_MODEL` for a local copy); `--map depth=FILE` (or
+  `maps={"depth": ...}`) takes a map you already have (brightness, white = near). The model sees the photo bicubic-scaled to a short
   side of 518 px, both sides rounded to multiples of 14, as the original repository feeds it (the export's
   `preprocessor_config.json` scales by whichever side needs the least, which fits a photo under 518 px by its long
   side); its inverse depth is stretched bilinear to the photo's size, then min-max scaled per photo (a flat answer gives
@@ -248,7 +265,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     `count` equal ranges, 3 by default, 1 to 100); `depth-haze` and `depth-grade` are recipes over them
     (`examples/recipes/`), not effects;
   - framing pads the depth map with 0 (farthest), like the matte;
-  - `imageio.load_depth(path)` reads a map you already have; no depth found is `DepthNotFoundError` (a
+  - `imageio.load_map(path)` reads a map you already have; no depth found is `DepthNotFoundError` (a
     `BullterrierImageError` and a `RuntimeError`); the gallery runs the real model, like the matte.
   *Reason:* the matte's shape keeps the engine testable without a model and lets a phone's own depth map or a better model
   replace the default without touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is
@@ -345,7 +362,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Grid first is a `Subject` kind with `per`: one finder call per piece, the finds united.** The finder sees the
   piece's box grown by `context` (0.25 of the piece's size on each side, clipped to the picture) and only the piece's own
   pixels count, so a subject cut by a border is seen whole yet belongs to the piece it lies in. The finder is the injected
-  one (portable IS-Net by default), asked about crops of the *working* picture, so a `matte` of the whole photo never
+  one (portable IS-Net by default), asked about crops of the *working* picture, so a `subject` map of the whole photo never
   stands in for it. Without `per` it is the built-in `subject`. *Reason:* a search of the whole picture misses small
   things beside big ones (the calf, the fox on its rock, the peak), and the model, made to find a subject in every crop,
   invents faint ones in plain pieces.

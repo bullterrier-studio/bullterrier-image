@@ -294,15 +294,30 @@ def deep_recipes(folder) -> list[str]:
     return ["deep1", "deep2"]
 
 
+def star_recipes(folder) -> list[str]:
+    """Two recipes that use a map of their own, `star`, declared as a `given` region; returns their names."""
+    for name in ("star1", "star2"):
+        (folder / "recipes" / f"{name}.toml").write_text(
+            f'format = 3\nname = "{name}"\nsize = 64\n[region.star]\nkind = "given"\n'
+            '[[step]]\neffect = "fill"\nmask = "star"\n',
+            encoding="utf-8",
+        )
+    return ["star1", "star2"]
+
+
 # Each map a recipe can need: `run` given a finder of it, and what writes the project's two recipes that need it.
 MAPS = {
     "the subject": (
-        lambda project, finder, **options: run(project, find_subject=finder, **options),
+        lambda project, finder, **options: run(project, finders={"subject": finder}, **options),
         masked_recipes,
     ),
     "the depth": (
-        lambda project, finder, **options: run(project, find_depth=finder, **options),
+        lambda project, finder, **options: run(project, finders={"depth": finder}, **options),
         deep_recipes,
+    ),
+    "a map of the recipe's own": (
+        lambda project, finder, **options: run(project, finders={"star": finder}, **options),
+        star_recipes,
     ),
 }
 
@@ -354,12 +369,25 @@ def test_a_damaged_remembered_map_is_found_again_even_when_forcing(folder, depth
     assert len(finder.seen) == 4  # and what was found again is remembered
 
 
+def test_a_recipe_that_uses_a_map_no_finder_was_given_for_is_refused_at_once_naming_the_recipe_and_the_map(folder):
+    star_recipes(folder)
+    with pytest.raises(ProjectError, match=r"'star1'.*map 'star'.*finders="):
+        run(load_project(folder / "bt-image.toml"))
+    assert not (folder / "out").exists()  # refused before anything was made
+
+
+def test_a_finder_named_for_no_map_of_the_recipes_is_refused_listing_the_maps(folder):
+    star_recipes(folder)
+    with pytest.raises(ProjectError, match=r"`finders` names 'strar'.*depth, star, subject"):
+        run(load_project(folder / "bt-image.toml"), finders={"strar": Finder("stand-in", StandInFinder())})
+
+
 def test_the_depth_a_finder_finds_is_the_map_the_recipe_takes(folder, depth_probe):
     (folder / "recipes" / "deep.toml").write_text(  # at the photo's own size: the map is not scaled
         'name = "deep"\nsize = 128\n[[step]]\neffect = "depth_probe"\n', encoding="utf-8"
     )
     write_project(folder, '[export]\nformats = ["png"]\n')
-    run(load_project(folder / "bt-image.toml"), find_depth=Finder("stand-in", StandInFinder(radius=30)))
+    run(load_project(folder / "bt-image.toml"), finders={"depth": Finder("stand-in", StandInFinder(radius=30))})
     painted = imageio.load(folder / "out" / "a" / "deep.png")[..., 0]  # depth_probe paints the depth it is given
     np.testing.assert_array_equal(painted, disc_matte())  # the 128x96 photo's disc: 1 inside, 0 outside
 
@@ -380,8 +408,8 @@ def test_changing_one_finder_redoes_only_the_recipes_that_use_its_map(folder, de
     masked_recipes(folder)
     deep_recipes(folder)
     project = load_project(folder / "bt-image.toml")
-    run(project, find_subject=WIDE, find_depth=WIDE)
-    assert recipes_redone(run(project, find_subject=subject, find_depth=depth)) == redone
+    run(project, finders={"subject": WIDE, "depth": WIDE})
+    assert recipes_redone(run(project, finders={"subject": subject, "depth": depth})) == redone
 
 
 def test_a_subject_and_a_depth_found_by_finders_of_one_identity_are_remembered_apart(folder, depth_probe):
@@ -390,9 +418,9 @@ def test_a_subject_and_a_depth_found_by_finders_of_one_identity_are_remembered_a
     project = load_project(folder / "bt-image.toml")
     subject, depth = StandInFinder(radius=30), StandInFinder(radius=10)
     find_subject, find_depth = Finder("one model", subject), Finder("one model", depth)
-    assert {i.status for i in run(project, find_subject=find_subject, find_depth=find_depth)} == {"done"}
+    assert {i.status for i in run(project, finders={"subject": find_subject, "depth": find_depth})} == {"done"}
     assert (len(subject.seen), len(depth.seen)) == (2, 2)  # each asked once per photo: neither reads the other's map
-    run(project, force=True, find_subject=find_subject, find_depth=find_depth)
+    run(project, force=True, finders={"subject": find_subject, "depth": find_depth})
     assert (len(subject.seen), len(depth.seen)) == (2, 2)  # and each remembered under its own name
 
 
@@ -408,10 +436,10 @@ SECOND_FINDERS = {
 def test_a_finder_is_known_by_its_identity(folder, identity, redone, changed):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
-    run(project, find_subject=Finder("wide disc", partial(finds_a_disc, radius=30)))
+    run(project, finders={"subject": Finder("wide disc", partial(finds_a_disc, radius=30))})
     picture = folder / "out" / "a" / "cut1.png"
     before = picture.read_bytes()
-    items = run(project, find_subject=Finder(identity, partial(finds_a_disc, radius=3)))
+    items = run(project, finders={"subject": Finder(identity, partial(finds_a_disc, radius=3))})
     assert recipes_redone(items) == redone
     assert (picture.read_bytes() != before) is changed  # the narrow disc's cut-out, or the remembered wide one
 
@@ -420,11 +448,16 @@ def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(fold
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
-    assert recipes_redone(run(project, find_subject=subject_finder("onnx"))) == ["cut1", "cut2", "grainy", "warm"]
-    again = recipes_redone(run(project, find_subject=subject_finder("onnx")))
+    assert recipes_redone(run(project, finders={"subject": subject_finder("onnx")})) == [
+        "cut1",
+        "cut2",
+        "grainy",
+        "warm",
+    ]
+    again = recipes_redone(run(project, finders={"subject": subject_finder("onnx")}))
     assert again == []  # same segmenter and model: everything is up to date
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(1)))  # another model finds other subjects
-    redone = recipes_redone(run(project, find_subject=subject_finder("onnx")))
+    redone = recipes_redone(run(project, finders={"subject": subject_finder("onnx")}))
     assert redone == ["cut1", "cut2"]  # only what uses the subject is redone
 
 
@@ -455,8 +488,8 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
             raise KeyboardInterrupt  # Ctrl-C
 
     with pytest.raises(KeyboardInterrupt):
-        run(project, find_subject=Finder("stand-in", finder), log=interrupted_at_the_second_photo)
-    items = run(project, find_subject=Finder("stand-in", finder))
+        run(project, finders={"subject": Finder("stand-in", finder)}, log=interrupted_at_the_second_photo)
+    items = run(project, finders={"subject": Finder("stand-in", finder)})
     assert sorted((i.photo, i.recipe, i.status) for i in items) == [
         ("a.png", "cut1", "skipped"), ("a.png", "cut2", "skipped"), ("a.png", "grainy", "skipped"),
         ("a.png", "warm", "skipped"), ("b.png", "cut1", "skipped"), ("b.png", "cut2", "done"),
@@ -507,7 +540,7 @@ def test_a_depth_map_of_another_size_fails_the_recipes_that_take_it_naming_both_
         return np.zeros((48, 64), np.float32)
 
     project = load_project(folder / "bt-image.toml")
-    by = by_pair(run(project, find_depth=Finder("half size", finds_half_the_photo)))
+    by = by_pair(run(project, finders={"depth": Finder("half size", finds_half_the_photo)}))
     for recipe in ("deep1", "deep2"):
         assert by[("a.png", recipe)].status == "failed"
         assert "(48, 64)" in str(by[("a.png", recipe)].error)
@@ -531,7 +564,7 @@ def test_a_map_the_cache_cannot_keep_fails_only_its_pair_and_is_found_again_for_
         project.cache.chmod(0o700)
 
     found = Finder("stand-in", finder)
-    by = by_pair(run(project, only="a.png", find_subject=found, log=repaired_after_the_first_pair))
+    by = by_pair(run(project, only="a.png", finders={"subject": found}, log=repaired_after_the_first_pair))
     assert by[("a.png", "cut1")].status == "failed"
     assert "PermissionError" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "cut2")].status == "done"  # a disk failure is not the map's: the next pair finds it again
@@ -544,15 +577,17 @@ def test_a_finder_that_returns_nothing_fails_the_recipes_that_need_the_subject_a
     def finds_nothing(rgb):
         return None  # a broken finder, typed loosely on purpose: the point of the test
 
-    by = by_pair(run(load_project(folder / "bt-image.toml"), find_subject=Finder("stand-in", finds_nothing)))
+    by = by_pair(run(load_project(folder / "bt-image.toml"), finders={"subject": Finder("stand-in", finds_nothing)}))
     assert by[("a.png", "cut1")].status == "failed"
-    assert "`find_subject` returned None" in str(by[("a.png", "cut1")].error)
+    assert "finder of 'subject' returned None" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "grainy")].status == "done"
 
 
 def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(folder):
     masked_recipes(folder)
-    items = run(load_project(folder / "bt-image.toml"), find_subject=Finder("stand-in", StandInFinder(radius=3)))
+    items = run(
+        load_project(folder / "bt-image.toml"), finders={"subject": Finder("stand-in", StandInFinder(radius=3))}
+    )
     cut = [i for i in items if i.recipe == "cut1"]
     assert {i.status for i in cut} == {"done"}
     assert all("covers only" in i.warnings[0] for i in cut)
@@ -734,7 +769,7 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     assert (tmp_path / "new" / "photos").is_dir()
     imageio.save(photo, tmp_path / "new" / "photos" / "one.jpg")
     finder = StandInFinder()  # cutout-black needs the subject; the stand-in keeps the model out of the test
-    items = run(load_project(target), find_subject=Finder("stand-in", finder))
+    items = run(load_project(target), finders={"subject": Finder("stand-in", finder)})
     assert sorted((i.recipe, i.status) for i in items) == [("cutout-black", "done"), ("glitch", "done")]
     assert len(finder.seen) == 1
     with pytest.raises(FileExistsError):
@@ -836,11 +871,11 @@ def grid_first_project(folder) -> Project:
 def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_not_asked_again(folder):
     project = grid_first_project(folder)
     finder = PieceFinder()
-    run(project, only="a.png", find_subject=Finder("stand-in", finder))
+    run(project, only="a.png", finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4  # one for each piece of the picture, at the recipe's size
     assert {crop.shape for crop in finder.crops} == {(24, 32, 3)}
     first = (folder / "out" / "a" / "grid-first.png").read_bytes()
-    run(project, only="a.png", force=True, find_subject=Finder("stand-in", finder))
+    run(project, only="a.png", force=True, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4  # the repeat render reads what was found
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first  # and comes out the same picture
 
@@ -848,9 +883,9 @@ def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_no
 def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
     project = grid_first_project(folder)
     finder = PieceFinder(empty=(1, 3))
-    run(project, only="a.png", find_subject=Finder("stand-in", finder))
+    run(project, only="a.png", finders={"subject": Finder("stand-in", finder)})
     first = (folder / "out" / "a" / "grid-first.png").read_bytes()
-    run(project, only="a.png", force=True, find_subject=Finder("stand-in", finder))
+    run(project, only="a.png", force=True, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4
     assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
 
@@ -863,23 +898,23 @@ def test_a_piece_finder_that_answers_values_that_are_not_finite_fails_the_recipe
         asked.append(rgb.shape)
         return np.full(rgb.shape[:2], np.nan, np.float32)
 
-    by = by_pair(run(project, only="a.png", find_subject=Finder("stand-in", answers_nan)))
+    by = by_pair(run(project, only="a.png", finders={"subject": Finder("stand-in", answers_nan)}))
     assert by[("a.png", "grid-first")].status == "failed"
     assert "not finite" in str(by[("a.png", "grid-first")].error)
     assert list(project.cache.glob("crop-*")) == []  # a bad answer is never remembered
-    run(project, only="a.png", force=True, find_subject=Finder("stand-in", answers_nan))
+    run(project, only="a.png", force=True, finders={"subject": Finder("stand-in", answers_nan)})
     assert len(asked) == 2  # so the next run asks again
 
 
 def test_another_photo_and_a_recipe_that_cuts_other_pieces_ask_about_their_own_crops(folder):
     project = grid_first_project(folder)
     finder = PieceFinder()
-    run(project, find_subject=Finder("stand-in", finder))
+    run(project, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 8  # a.png and b.png (the photo flipped) have other pixels in their pieces
     (folder / "recipes" / "grid-first.toml").write_text(
         GRID_FIRST_RECIPE.replace("columns = 2", "columns = 3"), encoding="utf-8"
     )
-    run(project, only="a.png", find_subject=Finder("stand-in", finder))
+    run(project, only="a.png", finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 8 + 6  # other pieces of the same photo: other crops, asked about once each
 
 
@@ -891,11 +926,11 @@ def finds_a_square(rgb, start, stop):
 
 def test_a_finder_of_another_identity_finds_the_pieces_again(folder):
     project = grid_first_project(folder)
-    run(project, only="a.png", find_subject=Finder("square 2..8", partial(finds_a_square, start=2, stop=8)))
+    run(project, only="a.png", finders={"subject": Finder("square 2..8", partial(finds_a_square, start=2, stop=8))})
     picture = folder / "out" / "a" / "grid-first.png"
     before = picture.read_bytes()
     another = Finder("square 4..9", partial(finds_a_square, start=4, stop=9))
-    by_recipe = {i.recipe: i.status for i in run(project, only="a.png", find_subject=another)}
+    by_recipe = {i.recipe: i.status for i in run(project, only="a.png", finders={"subject": another})}
     assert by_recipe["grid-first"] == "done"  # a recipe that uses what the finder finds is redone
     assert by_recipe["grainy"] == "skipped"
     assert picture.read_bytes() != before  # the other finder's squares, not the remembered ones

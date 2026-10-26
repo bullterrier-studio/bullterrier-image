@@ -34,6 +34,6 @@ def $name(
 
     An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of the same
     shape and range out, the same for the same values, the input never modified. Add a keyword-only
-    `matte: np.ndarray | None = None` after `params` only if it needs the subject's cut-out.
+    `subject: np.ndarray | None = None` after `params` only if it needs the subject's cut-out.
     """
     return (rgb * (1 - params.amount) + (1 - rgb) * params.amount).astype(np.float32)

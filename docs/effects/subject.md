@@ -63,8 +63,8 @@ Effects that work on the cut-out subject, apart from its background.
 | `normal_smoothing` | number | count | 0 to 10 | `1.0` | Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it makes neighbouring pieces fly in more similar directions; 0 uses the raw outline. |
 | `normal_truncate` | number | ratio | 1 to 10 | `4.0` | Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0. |
 | `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs the outline toward the border). |
-| `matte_threshold` | number | fraction | 0 to 1 | `0.5` | With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a matte. |
-| `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces; without a matte it also decides the figure's outline. |
+| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a subject. |
+| `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces; without a subject it also decides the figure's outline. |
 
 </details>
 
@@ -117,8 +117,8 @@ A step of `drop_shadow` has `opacity = 0.6` unless it sets its own.
 | `normal_smoothing` | number | count | 0 to 10 | `1.0` | Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it makes neighbouring pieces fly in more similar directions; 0 uses the raw outline. |
 | `normal_truncate` | number | ratio | 1 to 10 | `4.0` | Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0. |
 | `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs the outline toward the border). |
-| `matte_threshold` | number | fraction | 0 to 1 | `0.5` | With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a matte. |
-| `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, noisy pieces behind; without a matte it also decides the figure's outline. |
+| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a subject. |
+| `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, noisy pieces behind; without a subject it also decides the figure's outline. |
 
 </details>
 
@@ -187,7 +187,7 @@ A step of `long_shadow` has `opacity = 0.5` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `matte_threshold` | number | fraction | 0 to 1 | `0.5` | The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
+| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
 
 </details>
 
@@ -203,7 +203,7 @@ A step of `long_shadow` has `opacity = 0.5` unless it sets its own.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `threshold` | number | fraction | 0 to 1 | `0.5` | How much of a matte row, 0 to 1, must be subject for the row to count as part of it when its lowest and highest rows are found: 0.5 = a pixel of at least half. Lowering it counts faint fringes, so the floor line moves down and the subject's height grows. |
+| `threshold` | number | fraction | 0 to 1 | `0.5` | How much of a subject row, 0 to 1, must be subject for the row to count as part of it when its lowest and highest rows are found: 0.5 = a pixel of at least half. Lowering it counts faint fringes, so the floor line moves down and the subject's height grows. |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px. Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge, and beyond the floor line, where the reflection is mirrored: 'reflect' (mirrored, edge pixel repeated, which continues the mirror image), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
 
@@ -228,7 +228,7 @@ A step of `reflection` has `opacity = 0.6` unless it sets its own.
 | `smoothing` | number | px | 0 to 50 | `2.0` | Gaussian sigma, in px, with which the silhouette is smoothed before the edge's direction is read: raising it evens out the jaggedness of a pixel edge (fur), at the cost of detail in small features. 0 uses the raw edge. |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the `smoothing` blur is cut off, in sigmas: it reaches truncate x smoothing px. Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the border pixel repeated) or 'wrap' (the opposite border). |
-| `matte_threshold` | number | fraction | 0 to 1 | `0.5` | The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
+| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
 
 </details>
 
@@ -248,6 +248,6 @@ A step of `reflection` has `opacity = 0.6` unless it sets its own.
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the `feather` blur is cut off, in sigmas: it reaches truncate x feather px. Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `feather` blur sees beyond the picture's border: 'reflect' (mirrored, border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the border pixel repeated) or 'wrap' (the opposite border). |
-| `matte_threshold` | number | fraction | 0 to 1 | `0.5` | The matte value, 0 to 1, from which a pixel belongs to the subject that stays lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
+| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | The subject's value, 0 to 1, from which a pixel belongs to the subject that stays lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
 
 </details>

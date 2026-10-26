@@ -5,15 +5,16 @@ Promises: the input photo is never modified; the same photo, recipe and maps alw
 last stage is exactly what `render` returns, because both run the same code; an effect that changes the image shape is
 an error; `render` keeps alive only the image the next step needs, so a render's memory peak is its busiest step's
 own (that step's input, scratch and output) plus the scaled maps, whatever the number of steps, while `trace` keeps
-every stage. The runner is given everything it uses: the photo, the subject either as a `matte` or as a `find_subject`
-`Finder`, and the depth either as a `depth` map or as a `find_depth` `Finder`. It asks each finder at most once per
-render (once per photo in `render_all`) and only if the recipe needs its map: the subject for a step on it, an effect
-that takes it, or a region in use that is made from it (regions declared but unused need nothing); the depth likewise,
-for an effect that takes it or a region in use made from it (`Depth`, `DepthBands`). A region that finds the subject
-piece by piece (`Subject` with `per`) asks `find_subject` about the crop of the working picture of each piece, once per
-piece per render, even when a `matte` was given (a matte of the whole photo does not answer for a part). It never loads
-a file or looks for a map on its own; `bullterrier_image.recipe` binds the default finders for users. The maps
-are found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
+every stage. The runner is given everything it uses: the photo and its maps by name (`maps`: float32 (h, w), 0..1, one
+value per pixel of the photo), each either handed in or found by a `Finder` of that name (`finders`). The names are
+`subject` (the subject's alpha), `depth` (how near, 1 = nearest) and the name of every `Given` region a recipe declares.
+It asks each finder at most once per render (once per photo in `render_all`) and only if the recipe needs its map
+(`Recipe.maps_needed`): the subject for a step on it, an effect that takes it, or a region in use made from it (regions
+declared but unused need nothing); the depth and a given map likewise. A region that finds the subject piece by piece
+(`Subject` with `per`) asks the `subject` finder about the crop of the working picture of each piece, once per piece
+per render, even when a `subject` map was given (a map of the whole photo does not answer for a part). It never loads
+a file or looks for a map on its own; `bullterrier_image.recipe` binds the default finders for users. The maps are
+found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
 move with the photo; the framed photo and maps are then scaled to the recipe's size. The recipe's regions are made once
 per render, for that scaled picture, and only as steps ask for them.
 
@@ -22,18 +23,30 @@ never the recipe-file reader `loader`, so recipes built in Python run without it
 """
 
 from collections import deque
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
-from bullterrier_image.errors import DepthNotFoundError, RecipeError, SubjectNotFoundError
+from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.composite import composite
 from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .regions import BoxFinder, Partition, Regions, Selection, check_map, look_weights, needs_depth, resolve, used
+from .regions import (
+    BoxFinder,
+    Given,
+    Partition,
+    Regions,
+    Selection,
+    check_map,
+    look_weights,
+    map_error,
+    maps_used,
+    resolve,
+    used,
+)
 from .steps import Each, Recipe, Step
 
 
@@ -42,10 +55,11 @@ class Finder:
     """A function that finds a map in a photo, and the name of its answers: `identity` changes exactly when they could.
 
     `find` takes a photo, float32 (h, w, 3) in 0..1, and returns its map, float32 (h, w) in 0..1 (for the subject: its
-    alpha, white = subject; for depth: 1 = nearest), or raises SubjectNotFoundError (DepthNotFoundError) when there is
-    nothing to find. `identity` is non-blank text naming the function and whatever shapes its answers (model, version,
-    options): two finders with one identity are taken to answer alike, so a cache keyed by it (`pipeline.run`) reuses
-    their answers. RecipeError, naming the field, for a blank `identity` or a `find` that cannot be called.
+    alpha, white = subject; for depth: 1 = nearest), or raises the map's error (`SubjectNotFoundError`,
+    `DepthNotFoundError`, else `MapNotFoundError`) when there is nothing to find. `identity` is non-blank text naming
+    the function and whatever shapes its answers (model, version, options): two finders with one identity are taken to
+    answer alike, so a cache keyed by it (`pipeline.run`) reuses their answers. RecipeError, naming the field, for a
+    blank `identity` or a `find` that cannot be called.
     """
 
     identity: str
@@ -62,40 +76,46 @@ def render(
     rgb: np.ndarray,
     recipe: Recipe,
     *,
-    matte: np.ndarray | None = None,
-    depth: np.ndarray | None = None,
-    find_subject: Finder | None = None,
-    find_depth: Finder | None = None,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
-    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; the subject
-    matte and the depth map are framed and scaled with it. Steps run in order, each on the previous step's output, which
-    the step's result is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step,
-    through the selection its `mask` names (the subject, the background or a region of the recipe), so only that
-    changes. An `Each` step renders each of its looks once over the whole picture and shows it through the pieces of its
-    partition that have it, blending the looks across the borders.
-    Effects that declare a `matte` parameter (see `evaporate`) get the subject's silhouette automatically, and those
+    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `recipe.size`; its maps are
+    framed and scaled with it. Steps run in order, each on the previous step's output, which the step's result is laid
+    over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked step, through the selection its
+    `mask` names (the subject, the background or a region of the recipe), so only that changes. An `Each` step renders
+    each of its looks once over the whole picture and shows it through the pieces of its partition that have it,
+    blending the looks across the borders.
+    Effects that declare a `subject` parameter (see `evaporate`) get the subject's silhouette automatically, and those
     that declare `depth` the depth map. After the last step a recipe whose framing is `transparent` is cut out: the
     result then has four channels, RGB and straight alpha (h, w, 4), instead of three.
 
-    rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. matte: the subject's alpha, float32 (h, w) with the
-    photo's height and width, 0..1 (white = subject), or None. depth: how near each pixel is, float32 (h, w) likewise,
-    0..1 (1 = nearest), or None. A map given or found must be finite and within 0..1. find_subject: its `find` is called
-    with the photo as given (before it is framed or scaled) when the recipe needs the subject and no `matte` was given,
-    and with the crop of the working picture of each piece for a `Subject` region with `per` (see `Finder`). find_depth:
-    its `find` is called once with the photo as given when the recipe needs depth (`recipe.needs_depth`) and no `depth`
-    was given. Raises SubjectNotFoundError when the recipe needs the subject and neither was given, the finder returns
-    None, the matte is not (h, w) or not within 0..1, a `per` region has no finder or the finder's matte does not fit
-    its crop or is not within 0..1, or the framing crops around a subject that is not there; DepthNotFoundError,
-    naming the step, when the recipe needs depth and neither was given, the finder returns None, or the depth map is
-    not (h, w) or not within 0..1.
+    rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. maps: the photo's maps by name, each float32 (h, w)
+    with the photo's height and width, 0..1: `subject` (white = subject), `depth` (1 = nearest), and one for each
+    `Given` region the recipe declares, under that region's name; None for none. A map given or found must be finite
+    and within 0..1. finders: a `Finder` by map name, called with the photo as given (before it is framed or scaled)
+    once, when the recipe needs that map (`recipe.maps_needed`) and it was not handed in; the `subject` finder is also
+    called with the crop of the working picture of each piece for a `Subject` region with `per` (see `Finder`).
+    Raises RecipeError for a name in `maps` or `finders` that is no map of the recipe (naming the ones it has);
+    the map's error (SubjectNotFoundError for the subject, DepthNotFoundError for the depth, else MapNotFoundError),
+    naming the map, when the recipe needs it and neither the map nor a finder was given, the finder returns None, the
+    map is not (h, w) or not within 0..1; a `per` region has no `subject` finder or the finder's map does not fit its
+    crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a subject that is not there.
     """
-    image, inputs, regions = _prepare(rgb, recipe, matte, depth, find_subject, find_depth)
-    stages = _stages(image, recipe.steps, inputs, regions)
+    found = _maps(rgb, [recipe], maps, finders)
+    return _render(rgb, recipe, found, finders)
+
+
+def _render(
+    rgb: np.ndarray, recipe: Recipe, found: Mapping[str, np.ndarray], finders: Mapping[str, Finder] | None
+) -> np.ndarray:
+    """`render` once the maps are found (`_maps`)."""
+    image, maps, regions = _prepare(rgb, recipe, found, finders)
+    stages = _stages(image, recipe.steps, maps, regions)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     result = _last(stages)
-    return recipe.frame.cut(result, inputs.get("matte")) if recipe.frame.has_alpha else result
+    return recipe.frame.cut(result, maps.get("subject")) if recipe.frame.has_alpha else result
 
 
 @dataclass(frozen=True)
@@ -110,36 +130,35 @@ def trace(
     rgb: np.ndarray,
     recipe: Recipe,
     *,
-    matte: np.ndarray | None = None,
-    depth: np.ndarray | None = None,
-    find_subject: Finder | None = None,
-    find_depth: Finder | None = None,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
 ) -> list[Stage]:
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
     The stages are the photo as the recipe receives it (framed and scaled), the subject matte if the recipe uses one
     (white = subject), the depth map if it uses one (white = nearest), each region of the recipe that its steps use, in
-    the order declared (a selection in white where it chooses; a partition as the dimmed photo with its borders and the
-    number of each piece, which is what `Pick` and `Each` count by), the image after each step, in order, and, when the
-    recipe's framing cuts the picture out, that cut (an RGBA picture, four channels). The last stage is exactly what
-    `render` returns, because both run the same code. Every stage stays in memory: one picture per step, plus the input
-    and the maps.
+    the order declared (a selection in white where it chooses, which shows a `Given` map too; a partition as the dimmed
+    photo with its borders and the number of each piece, which is what `Pick` and `Each` count by), the image after
+    each step, in order, and, when the recipe's framing cuts the picture out, that cut (an RGBA picture, four
+    channels). The last stage is exactly what `render` returns, because both run the same code. Every stage stays in
+    memory: one picture per step, plus the input and the maps.
 
-    rgb, recipe, matte, depth, find_subject, find_depth: as for `render`.
+    rgb, recipe, maps, finders: as for `render`.
     """
-    rgb, inputs, regions = _prepare(rgb, recipe, matte, depth, find_subject, find_depth)
+    found = _maps(rgb, [recipe], maps, finders)
+    rgb, scaled, regions = _prepare(rgb, recipe, found, finders)
     stages = [Stage("input", rgb)]
-    if recipe.needs_matte:
-        stages.append(Stage("subject matte (white = subject)", np.repeat(inputs["matte"][..., None], 3, axis=2)))
-    if recipe.needs_depth:
-        stages.append(Stage("depth (white = nearest)", np.repeat(inputs["depth"][..., None], 3, axis=2)))
+    if "subject" in scaled:
+        stages.append(Stage("subject matte (white = subject)", np.repeat(scaled["subject"][..., None], 3, axis=2)))
+    if "depth" in scaled:
+        stages.append(Stage("depth (white = nearest)", np.repeat(scaled["depth"][..., None], 3, axis=2)))
     wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in step.references()))
     stages += [_region_stage(name, regions[name], rgb) for name in recipe.regions if name in wanted]
-    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, inputs, regions), start=1):
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, scaled, regions), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
-        stages.append(Stage(label, recipe.frame.cut(stages[-1].image, inputs.get("matte"))))
+        stages.append(Stage(label, recipe.frame.cut(stages[-1].image, scaled.get("subject"))))
     return stages
 
 
@@ -156,128 +175,127 @@ def render_all(
     rgb: np.ndarray,
     recipes: list[Recipe],
     *,
-    matte: np.ndarray | None = None,
-    depth: np.ndarray | None = None,
-    find_subject: Finder | None = None,
-    find_depth: Finder | None = None,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
 ) -> list[np.ndarray]:
-    """Run several recipes on one photo; the subject and the depth are each found at most once, however many recipes
-    need them.
+    """Run several recipes on one photo; each map is found at most once, however many recipes need it.
 
     rgb: the photo (see `render`). recipes: the recipes to run; the results come back in the same order, one still each.
-    matte, depth: the subject's alpha and the depth map, used by every recipe (see `render`), or None. find_subject,
-    find_depth: each `find` is called once with the photo as given when any recipe needs its map and the map was not
-    given (SubjectNotFoundError or DepthNotFoundError if it is needed and missing); `find_subject` is also asked about
-    the pieces of a `Subject` with `per` as for `render`.
+    maps: the photo's maps by name, used by every recipe that needs them (see `render`), or None. finders: each `find`
+    is called once with the photo as given when any recipe needs its map and the map was not handed in (the map's error
+    if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
+    `render`. A name that is no map of any recipe is a RecipeError.
     """
-    maps = _maps(rgb, recipes, matte, depth, find_subject, find_depth)
-    matte, depth = maps.get("matte"), maps.get("depth")
-    return [
-        render(rgb, recipe, matte=matte, depth=depth, find_subject=find_subject, find_depth=find_depth)
-        for recipe in recipes
-    ]
+    found = _maps(rgb, recipes, maps, finders)
+    return [_render(rgb, recipe, found, finders) for recipe in recipes]
 
 
-# What the runner tells about each map of the photo, by input name: the error when it is missing or unusable, what it
-# is, and the keyword of its finder.
-_MAPS: dict[str, tuple[type[SubjectNotFoundError | DepthNotFoundError], str, str]] = {
-    "matte": (SubjectNotFoundError, "subject's alpha", "find_subject"),
-    "depth": (DepthNotFoundError, "depth map (1 = nearest)", "find_depth"),
-}
+# What each map is, by name, for the messages about it; any other map is "the <name> map".
+_WHAT = {"subject": "subject's alpha", "depth": "depth map (1 = nearest)"}
 
 
 def _maps(
     rgb: np.ndarray,
     recipes: Sequence[Recipe],
-    matte: np.ndarray | None,
-    depth: np.ndarray | None,
-    find_subject: Finder | None,
-    find_depth: Finder | None,
+    maps: Mapping[str, np.ndarray] | None,
+    finders: Mapping[str, Finder] | None,
 ) -> dict[str, np.ndarray]:
-    """The maps of the photo `rgb` that `recipes` need or that were given, by input name: each the one given, else
-    found once by its finder when a recipe needs it (an error naming that recipe when there is no finder either), and
-    checked to be the photo's (h, w). The subject and the depth alike."""
-    wanted = {
-        "matte": (matte, find_subject, [recipe for recipe in recipes if recipe.needs_matte]),
-        "depth": (depth, find_depth, [recipe for recipe in recipes if recipe.needs_depth]),
+    """The maps of the photo `rgb` that `recipes` need, by name: each the one handed in, else found once by its finder
+    (an error naming that recipe when there is no finder either), and checked to be the photo's (h, w), finite and
+    within 0..1. A name that is no map of any recipe (the built-in `subject` and `depth`, or a `Given` region of one) is
+    a RecipeError listing the names there are."""
+    maps, finders = dict(maps or {}), dict(finders or {})
+    known = known_maps(recipes)
+    for what, names in (("maps", maps), ("finders", finders)):
+        if unknown := sorted(set(names) - known):
+            raise RecipeError(
+                f"`{what}` names {unknown[0]!r}, which is no map of the recipe; its maps: {', '.join(sorted(known))} "
+                '(`subject` and `depth` are built in; any other is a region with `kind = "given"`)'
+            )
+    found = {}
+    for name in sorted({name for recipe in recipes for name in recipe.maps_needed}):
+        if name in maps:
+            found[name] = _checked(name, maps[name], rgb)
+        elif name in finders:
+            found[name] = find_map(name, finders[name], rgb)
+        else:
+            raise _missing(name, next(recipe for recipe in recipes if name in recipe.maps_needed))
+    for name in maps.keys() - found.keys():  # handed in but unused: still held to the rule, so a wrong map shows up
+        _checked(name, maps[name], rgb)
+    return found
+
+
+def known_maps(recipes: Sequence[Recipe]) -> set[str]:
+    """The names of the maps `recipes` can be given: the built-in `subject` and `depth`, and every `Given` region of
+    any of them."""
+    return {
+        *registry.MAP_INPUTS,
+        *(name for recipe in recipes for name, kind in recipe.regions.items() if isinstance(kind, Given)),
     }
-    maps = {}
-    for name, (layer, finder, needing) in wanted.items():
-        if layer is not None:
-            maps[name] = _checked(name, layer, rgb)
-        elif needing:
-            if finder is None:
-                raise _missing(name, needing[0])
-            maps[name] = find_map(name, finder, rgb)
-    return maps
 
 
 def _checked(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     """`layer`, the map `name` of the photo `rgb`, once it is known to be the photo's (h, w), finite and within 0..1:
     the one check of a map of the whole photo, for a map given and a finder's answer alike, where it enters."""
-    error = _MAPS[name][0]
+    error = map_error(name)
     if layer.shape != rgb.shape[:2]:
         raise error(f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
     return check_map(name, layer, error)
 
 
-def _missing(name: str, recipe: Recipe) -> SubjectNotFoundError | DepthNotFoundError:
-    """The error for a map `recipe` needs that neither it nor a finder was given for."""
-    if name == "matte":
+def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
+    """The error for the map `name` that `recipe` needs and neither it nor a finder was given for."""
+    if name == "subject":
         return SubjectNotFoundError(
             f"recipe {recipe.name!r} uses the subject (a mask, a region made from it, or an effect that takes it), so "
-            "it needs the subject: pass `matte` (the subject's alpha) "
-            "or `find_subject` (a Finder, e.g. bullterrier_image.finding.subject.subject_finder())"
+            "it needs the subject: pass `maps={'subject': alpha}` (the subject's alpha) "
+            "or `finders={'subject': Finder}` (e.g. bullterrier_image.finding.subject.subject_finder())"
         )
-    taking = [f"step {number} ({effect})" for number, effect in recipe.taking("depth")]
-    regions = [
-        f"step {number} (its `{key}` {region!r}, a region made from depth)"
-        for number, step in enumerate(recipe.steps, start=1)
-        for key, region, _ in step.references()
-        if needs_depth(recipe.regions, [region])
-    ]
-    return DepthNotFoundError(
-        f"recipe {recipe.name!r} needs depth for {', '.join(taking + regions)}: pass `depth` (float32 (h, w), 0..1, "
-        "1 = nearest, e.g. from bullterrier_image.imageio.load_depth) or `find_depth` (a Finder)"
+    if name == "depth":
+        taking = [f"step {number} ({effect})" for number, effect in recipe.taking("depth")]
+        regions = [
+            f"step {number} (its `{key}` {region!r}, a region made from depth)"
+            for number, step in enumerate(recipe.steps, start=1)
+            for key, region, _ in step.references()
+            if "depth" in maps_used(recipe.regions, [region])
+        ]
+        return DepthNotFoundError(
+            f"recipe {recipe.name!r} needs depth for {', '.join(taking + regions)}: pass `maps={{'depth': depth}}` "
+            "(float32 (h, w), 0..1, 1 = nearest, e.g. from bullterrier_image.imageio.load_map) or "
+            "`finders={'depth': Finder}`"
+        )
+    return MapNotFoundError(
+        f'recipe {recipe.name!r} uses the map {name!r} (a region with `kind = "given"`), so it needs it: pass '
+        f"`maps={{{name!r}: values}}` (float32 (h, w), 0..1, the photo's size) or `finders={{{name!r}: Finder}}`"
     )
 
 
 def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
-    """Ask `finder` for the map `name` ("matte" or "depth") of the photo `rgb` and return it. The one place a finder of
-    a whole photo is called and its answer checked (the runner and the pipeline both use it): SubjectNotFoundError
-    (for the matte) or DepthNotFoundError (for depth) if it returned None, since a finder must answer or raise, and
-    carrying on would drop the map without a word, or a map that is not the photo's (h, w), naming both sizes."""
-    error, what, keyword = _MAPS[name]
+    """Ask `finder` for the map `name` ("subject", "depth" or a given map's name) of the photo `rgb` and return it. The
+    one place a finder of a whole photo is called and its answer checked (the runner and the pipeline both use it): the
+    map's error (`map_error`) if it returned None, since a finder must answer or raise, and carrying on would drop the
+    map without a word, or a map that is not the photo's (h, w), naming both sizes."""
     answer = finder.find(rgb)
     if answer is None:
-        raise error(
-            f"`{keyword}` returned None: it must return the {what} (float32, the photo's height and width, 0..1) or "
-            "raise when it finds none"
+        raise map_error(name)(
+            f"the finder of {name!r} returned None: it must return the {_WHAT.get(name, f'{name} map')} (float32, the "
+            "photo's height and width, 0..1) or raise when it finds none"
         )
     return _checked(name, answer, rgb)
 
 
 def _prepare(
-    rgb: np.ndarray,
-    recipe: Recipe,
-    matte: np.ndarray | None,
-    depth: np.ndarray | None,
-    find_subject: Finder | None,
-    find_depth: Finder | None,
+    rgb: np.ndarray, recipe: Recipe, found: Mapping[str, np.ndarray], finders: Mapping[str, Finder] | None
 ) -> tuple[np.ndarray, dict[str, np.ndarray], Regions]:
-    """Find the maps the recipe needs, then frame the photo and its maps together, scale them all to the recipe's size
-    and set up the recipe's regions for that picture. The one place the photo is framed. Returns the working picture,
-    its maps by input name (those needed or given) and its regions."""
-    maps = _maps(rgb, [recipe], matte, depth, find_subject, find_depth)
-    rgb, matte, depth = recipe.frame.apply(rgb, maps.get("matte"), maps.get("depth"))
-    inputs = {name: layer for name, layer in (("matte", matte), ("depth", depth)) if layer is not None}
+    """Frame the photo and the maps the recipe needs together, scale them all to the recipe's size and set up the
+    recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its maps by name
+    (those the recipe needs) and its regions."""
+    rgb, maps = recipe.frame.apply(rgb, {name: found[name] for name in sorted(recipe.maps_needed)})
     if recipe.size:
         rgb = resize(rgb, recipe.size)
-        inputs = {name: resize(layer, recipe.size) for name, layer in inputs.items()}
-    subject = None if matte is None else (lambda: inputs["matte"])  # the maps of the working picture, for a region
-    depth_map = None if depth is None else (lambda: inputs["depth"])
-    find = _finder_in(rgb, find_subject)
-    return rgb, inputs, resolve(recipe.regions, rgb.shape[:2], subject=subject, find=find, depth=depth_map)
+        maps = {name: resize(layer, recipe.size) for name, layer in maps.items()}
+    find = _finder_in(rgb, (finders or {}).get("subject"))
+    return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find)
 
 
 def _finder_in(rgb: np.ndarray, find_subject: Finder | None) -> BoxFinder | None:
@@ -295,25 +313,25 @@ def _last(stages: Iterator[tuple[Step | Each, np.ndarray]]) -> np.ndarray:
 
 
 def _stages(
-    out: np.ndarray, steps: Sequence[Step | Each], inputs: dict[str, np.ndarray], regions: Regions
+    out: np.ndarray, steps: Sequence[Step | Each], maps: dict[str, np.ndarray], regions: Regions
 ) -> Iterator[tuple[Step | Each, np.ndarray]]:
     """Run the steps in order, yielding each step with the image after it. The one place a step is applied."""
     for step in steps:
-        out = _apply(out, step, inputs, regions)
+        out = _apply(out, step, maps, regions)
         yield step, out
 
 
-def _apply(before: np.ndarray, step: Step | Each, inputs: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _apply(before: np.ndarray, step: Step | Each, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
     """`before` with the step's result laid over it. A function of its own, like `_lay`, so that what a step needs on
     the way (the pieces' weights, a third of a picture or more) is freed before the next step runs."""
-    result = _each(before, step, inputs, regions) if isinstance(step, Each) else _effect(before, step, inputs, regions)
+    result = _each(before, step, maps, regions) if isinstance(step, Each) else _effect(before, step, maps, regions)
     return _lay(before, result, step, regions)
 
 
-def _effect(before: np.ndarray, step: Step, inputs: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
     """The step's effect run on `before`, given the inputs it declares: the maps `_prepare` made for every step that
     takes one, and the pieces of the step's partition."""
-    extra = {name: inputs[name] for name in registry.inputs(step.effect) if name != "partition"}
+    extra = {name: maps[name] for name in registry.inputs(step.effect) if name != "partition"}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
     result = registry.apply(step.effect, before, **step.params, **extra)
@@ -322,7 +340,7 @@ def _effect(before: np.ndarray, step: Step, inputs: dict[str, np.ndarray], regio
     return result
 
 
-def _each(before: np.ndarray, step: Each, inputs: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
+def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: Regions) -> np.ndarray:
     """`before` with each piece of the step's partition replaced by its look: every look that has pieces is rendered
     once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
@@ -332,7 +350,7 @@ def _each(before: np.ndarray, step: Each, inputs: dict[str, np.ndarray], regions
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered
-            out += weight[..., None] * (_apply(before, look, inputs, regions) - before)
+            out += weight[..., None] * (_apply(before, look, maps, regions) - before)
     return np.clip(out, 0.0, 1.0, out=out)
 
 

@@ -56,8 +56,9 @@ Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, ru
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
-The runner is given each map: the subject (a `matte` or a `find_subject` `Finder(identity, find)`) and the depth (`depth`
-or `find_depth`); `bullterrier_image.recipe` binds `finding.subject.subject_finder()` when a recipe needs it.
+The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
+(`finders={"subject": ...}`). `subject` and `depth` are built in; any other is a recipe's `given` region.
+`bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
 ## The rules
 
@@ -75,8 +76,8 @@ or `find_depth`); `bullterrier_image.recipe` binds `finding.subject.subject_find
    platforms equal within float tolerance. `numpy.random.default_rng(seed)`; no global random state.
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
-   (`RecipeError`, `UnknownEffectError`, `SubjectNotFoundError`, `DepthNotFoundError`, `BackendUnavailableError`,
-   `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
+   (`RecipeError`, `UnknownEffectError`, `MapNotFoundError` with `SubjectNotFoundError` and `DepthNotFoundError`,
+   `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
    each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
    `ValueError`/`TypeError`.
 
@@ -109,10 +110,10 @@ An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imagei
 
 ```python
 @effect(category="light", params=GlowParams)  # category is one of CATEGORIES
-def glow(rgb: np.ndarray, params: GlowParams, *, matte: np.ndarray | None = None) -> np.ndarray: ...
+def glow(rgb: np.ndarray, params: GlowParams, *, subject: np.ndarray | None = None) -> np.ndarray: ...
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
-and maximum. `matte` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,
+and maximum. `subject` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,
 `(h, w)` float32 0..1, 1 = nearest) and `partition` (piece labels of a region, `(h, w)` int32). Contract tests check all of this
 for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
@@ -212,7 +213,7 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   worth a public name; otherwise test it through the behaviour it serves.
 - Never monkeypatch or mock our own code; never assert call counts or order on it. Substitute only true external boundaries
   (subject-finding model, clock, network, filesystem via `tmp_path`), preferably by injecting through a public parameter
-  (`find_subject=Finder("stand-in", ...)`).
+  (`finders={"subject": Finder("stand-in", ...)}`).
 - No source or AST inspection in behaviour tests (architecture tests are the exception; their docstring says so).
 - Assert observable outputs only: returned arrays (as properties), files written, exceptions raised. For errors, the type plus a
   short substring naming the argument or value, never the whole sentence.
@@ -221,7 +222,7 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   naive reference in the test, not by forcing a private switch.
 
 When a test reaches inside (`tests/test_suite_rules.py` fails on private imports and on patching `bullterrier_image`):
-- Inject through a public parameter (`pipeline.run(find_subject=...)`, `gallery.write_docs(checkout=...)`) and count the calls of
+- Inject through a public parameter (`pipeline.run(finders=...)`, `gallery.write_docs(checkout=...)`) and count the calls of
   your stand-in.
 - Promote a private name worth testing deliberately (public name, docstring), as `finding.subject.refine_edge` was; else delete the test.
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
@@ -231,7 +232,7 @@ Writing a test file (model: `src/bullterrier_image/effects/_template/test_effect
 - **Parametrise by default:** cases differing by literals are one table (`pytest.param(..., id=...)` or a dict) with good and
   bad rows together; the id states the rule.
 - **A new test file only for a new module**, at the mirror path (`tests/ops/test_blur.py` for `ops/blur.py`).
-- **Shared helpers are fixtures in the nearest `conftest.py`**: `tests/conftest.py` (`photo`, `matte`, registry helpers,
+- **Shared helpers are fixtures in the nearest `conftest.py`**: `tests/conftest.py` (`photo`, `subject`, registry helpers,
   `echo_model`, `tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). A helper one file uses
   stays there.
 - **DAMP, not DRY:** each case and its expectation are visible; helpers build input or name an assertion, never hide what is

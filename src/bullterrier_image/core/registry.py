@@ -18,7 +18,7 @@ first query together wait for it and all see the whole table. After that, querie
 threads at once is safe. Registering is for import time: registering or unregistering while other threads query is not
 supported.
 
-An effect is written `def glow(rgb, params: GlowParams, *, matte=None) -> rgb` and registered with its parameter model
+An effect is written `def glow(rgb, params: GlowParams, *, subject=None) -> rgb` and registered with its parameter model
 (see `bullterrier_image.core.params`); the decorator returns a `ModelledEffect`, which validates its values through the
 model whichever way it is called.
 """
@@ -59,12 +59,16 @@ CATEGORY_DESCRIPTIONS = {
 }
 CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
-# What a recipe hands an effect besides the image and its parameters, by name: `matte`, the subject's silhouette,
-# float32 (h, w) 0..1; `depth`, how near each pixel is, float32 (h, w) 0..1, 1 = nearest; and `partition`, the pieces
-# of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading order,
-# `depth_bands` nearest first). An effect declares the ones it needs as keyword-only parameters after `params`, each
-# with a default.
-INPUTS = ("matte", "depth", "partition")
+# The maps of a photo an effect can take, by name: `subject`, the subject's silhouette, float32 (h, w) 0..1; `depth`,
+# how near each pixel is, float32 (h, w) 0..1, 1 = nearest. A map has the same name wherever it is handed in (`maps=`,
+# `finders=`, `--map`), named by a region (`mask = "subject"`) and taken by an effect.
+MAP_INPUTS = ("subject", "depth")
+
+# What a recipe hands an effect besides the image and its parameters, by name: the maps above and `partition`, the
+# pieces of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading
+# order, `depth_bands` nearest first). An effect declares the ones it needs as keyword-only parameters after `params`,
+# each with a default.
+INPUTS = (*MAP_INPUTS, "partition")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
@@ -83,8 +87,8 @@ class ModelledEffect[P: EffectParams]:
     Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
     `glow(rgb)` (the defaults), `glow(rgb, radius=30)`, or `glow(rgb, GlowParams(radius=30))`. Giving both a model and
     keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
-    naming the effect, the field, the constraint and the value. Injected inputs (`matte`, `depth`) are passed by keyword
-    in every form.
+    naming the effect, the field, the constraint and the value. Injected inputs (`subject`, `depth`) are passed by
+    keyword in every form.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
@@ -158,7 +162,7 @@ _LOADING = _Loading()
 def effect[P: EffectParams](
     *, category: str, params: type[P], opacity: float = 1.0
 ) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
-    """Decorator: `@effect(category="light", params=GlowParams)` makes `glow(rgb, params, *, matte=None) -> rgb`
+    """Decorator: `@effect(category="light", params=GlowParams)` makes `glow(rgb, params, *, subject=None) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
@@ -225,7 +229,8 @@ def opacity(name: str) -> float:
 
 
 def inputs(name: str) -> tuple[str, ...]:
-    """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("matte",) (KeyError like `get`)."""
+    """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("subject",) (KeyError like
+    `get`)."""
     return get(name).inputs
 
 
@@ -352,7 +357,8 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     if not (isinstance(params, type) and issubclass(params, EffectParams)):
         raise ValueError(f"effect {name!r}: params must be an EffectParams subclass, got {params!r}")
     shape = (
-        f"write it as {name}(rgb, params, *, matte=None): the image, the model, then keyword-only inputs from {INPUTS}"
+        f"write it as {name}(rgb, params, *, subject=None): the image, the model, then keyword-only inputs from "
+        f"{INPUTS}"
     )
     every = list(inspect.signature(fn).parameters.values())
     positional = [p for p in every if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]

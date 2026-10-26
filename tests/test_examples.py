@@ -34,7 +34,7 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects
     recipes = [load_recipe(f) for f in files]
     assert len({r.name for r in recipes}) == len(recipes)
-    assert any(r.needs_matte for r in recipes)
+    assert any("subject" in r.maps_needed for r in recipes)
 
 
 def _is_a_combination(recipe: Recipe) -> bool:
@@ -49,10 +49,10 @@ def a_floor_rising_away(photo: np.ndarray) -> np.ndarray:
 
 
 @pytest.mark.parametrize("path", sorted((EXAMPLES / "recipes").glob("*.toml")), ids=lambda path: path.stem)
-def test_every_demo_recipe_combines_effects_and_renders(path, photo, matte):
+def test_every_demo_recipe_combines_effects_and_renders(path, photo, subject):
     recipe = load_recipe(path)
     assert _is_a_combination(recipe), f"{path.name} uses fewer than three different effects"
-    out = render(photo, recipe, matte=matte, depth=a_floor_rising_away(photo))
+    out = render(photo, recipe, maps={"subject": subject, "depth": a_floor_rising_away(photo)})
     assert max(out.shape[:2]) == recipe.size  # rendered at the recipe's size
 
 
@@ -64,18 +64,20 @@ def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
 
 
 @pytest.mark.parametrize("path", sorted((EXAMPLES / "regions").glob("*.toml")), ids=lambda path: path.stem)
-def test_every_regions_example_declares_regions_and_renders_to_something_other_than_the_photo(path, photo, matte):
+def test_every_regions_example_declares_regions_and_renders_to_something_other_than_the_photo(path, photo, subject):
     recipe = load_recipe(path)
     assert recipe.name == path.stem
     assert recipe.regions
-    out = render(photo, recipe, matte=matte, find_subject=Finder("stand-in", a_disc_in_every_view))
+    out = render(
+        photo, recipe, maps={"subject": subject}, finders={"subject": Finder("stand-in", a_disc_in_every_view)}
+    )
     assert max(out.shape[:2]) == recipe.size
     assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
 
 
-def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, matte):
+def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, subject):
     recipe = load_recipe(EXAMPLES / "transparent" / "avatar.toml")
-    out = render(photo, recipe, matte=matte)
+    out = render(photo, recipe, maps={"subject": subject})
     assert out.shape == (512, 512, 4)  # the recipe's size, as a square
     assert (out[0, 0, 3], out[256, 256, 3]) == (0, 1)  # clear in the corner, opaque in the middle
 

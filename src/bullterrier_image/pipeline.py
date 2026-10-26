@@ -40,7 +40,7 @@ import tempfile
 import time
 import tomllib
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime
 from importlib import metadata
@@ -53,15 +53,14 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import finding, imageio
 from .checks import matte_warnings, still_warnings
+from .core import registry
 from .core.outlines import svg_bytes
 from .core.params import Picture, describe_error
 from .core.regions import Svg, map_problem
-from .core.runner import Finder, find_map
+from .core.runner import Finder, find_map, known_maps
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
-from .finding.depth import depth_finder
-from .finding.subject import subject_finder
 from .ops.resample import resize
-from .recipe import Recipe, load_recipe, render, trace
+from .recipe import Recipe, default_finder, load_recipe, render, trace
 from .sheet import write_stages
 
 _PROJECT_FILE = "bt-image.toml"
@@ -232,8 +231,7 @@ def run(
     dry_run: bool = False,
     only: str | None = None,
     log: Callable[[str], None] = lambda message: None,
-    find_subject: Finder | None = None,
-    find_depth: Finder | None = None,
+    finders: Mapping[str, Finder] | None = None,
 ) -> list[Item]:
     """Process every photo with every recipe and write the report; returns what happened to each pair.
 
@@ -242,20 +240,20 @@ def run(
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
     (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
     (a framing with `transparent`) exported to jpg, raise ProjectError.
-    `find_subject` finds the subject of a photo for the recipes that need it; None means
-    `bullterrier_image.finding.subject.subject_finder()` (the segmenter the environment chooses, else the portable
-    model), built only when a recipe needs the subject (BackendUnavailableError at once if it cannot run). It is asked
-    at most once per photo, and never again for a photo whose subject is remembered in the project's cache from an
-    earlier run by a finder of the same `identity`; if it raises, the recipes of that photo that need the subject fail,
-    and the rest run. A finder is known by its `identity` alone: another identity finds the subjects again and redoes
-    the recipes that use them, the same identity reuses what is remembered, so give a finder whose answers could differ
-    another identity (or delete `project.cache`). A damaged cache entry is found again, also with `force`. A recipe
-    whose regions find the subject piece by piece (`Subject` with `per`) asks it about each crop of the recipe's working
-    picture, once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop.
-    `find_depth` finds the depth of a photo for the recipes that need it; None means
-    `bullterrier_image.finding.depth.depth_finder()` (the depth model), built only when a recipe needs depth
-    (BackendUnavailableError at once if it cannot run), asked and remembered like `find_subject`. Each map is
-    remembered under its own finder's identity: changing one finder redoes only the recipes that use its map.
+    `finders` has a `Finder` by map name, finding that map of a photo for the recipes that need it. The `subject` one,
+    when none is given, is `bullterrier_image.finding.subject.subject_finder()` (the segmenter the environment chooses,
+    else the portable model) and the `depth` one `bullterrier_image.finding.depth.depth_finder()` (the depth model),
+    each built only when a recipe needs its map (BackendUnavailableError at once if it cannot run). A map is asked at
+    most once per photo, and never again for a photo whose map is remembered in the project's cache from an earlier run
+    by a finder of the same `identity`; if it raises, the recipes of that photo that need it fail, and the rest run. A
+    finder is known by its `identity` alone: another identity finds the maps again and redoes the recipes that use them,
+    the same identity reuses what is remembered, so give a finder whose answers could differ another identity (or delete
+    `project.cache`). A damaged cache entry is found again, also with `force`. A recipe whose regions find the subject
+    piece by piece (`Subject` with `per`) asks the `subject` finder about each crop of the recipe's working picture,
+    once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop. Each map is
+    remembered under its own finder's identity: changing one finder redoes only the recipes that use its map. A project
+    holds no maps of its own, so a recipe that uses a `Given` map needs a finder of that name (ProjectError otherwise,
+    naming the recipe and the map), and a finder named for no map of the recipes is a ProjectError too.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
     recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
@@ -283,13 +281,9 @@ def run(
         )
     )
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
-    # the finder of each map ("matte", "depth") a recipe needs: each default is built only then, so a setting nobody
-    # uses cannot stop the project
-    finders = {}
-    if any(r.needs_matte or r.needs_finder for _, r in recipes):
-        finders["matte"] = subject_finder() if find_subject is None else find_subject
-    if any(r.needs_depth for _, r in recipes):
-        finders["depth"] = depth_finder() if find_depth is None else find_depth
+    # the finder of each map a recipe needs: each default is built only then, so a setting nobody uses cannot stop the
+    # project
+    finders = _finders_of(dict(finders or {}), [recipe for _, recipe in recipes])
     # What a remembered map depends on besides the photo: which map it is (one finder may find both), its finder's
     # identity, the finding code (the subject's edge clean-up is part of what is remembered) and the libraries.
     finding_code = _source_digest(Path(finding.__file__).parent)
@@ -307,7 +301,9 @@ def run(
             # a recipe that uses a map is redone when another finder would find it, and only then; one that uses a
             # picture is redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a
             # file or an object (repr: no pixels)
-            uses = {"matte": recipe.needs_matte or recipe.needs_finder, "depth": recipe.needs_depth}
+            uses = {
+                name: name in recipe.maps_needed or (name == "subject" and recipe.needs_finder) for name in found_by
+            }
             parts = (
                 photo_hash,
                 recipe_text,
@@ -380,10 +376,32 @@ def _write_record(
     return record
 
 
+def _finders_of(given: dict[str, Finder], recipes: list[Recipe]) -> dict[str, Finder]:
+    """The finder of every map `recipes` need: the one given, else the default for the subject and the depth, built only
+    when a recipe needs it. ProjectError for a finder named for no map of the recipes (the built-in `subject` and
+    `depth`, or a `Given` region of one), and for a recipe that needs a map that has no finder."""
+    known = known_maps(recipes)
+    if unknown := sorted(set(given) - known):
+        raise ProjectError(
+            f"`finders` names {unknown[0]!r}, which is no map of the recipes; their maps: {', '.join(sorted(known))}"
+        )
+    finders = dict(given)
+    for recipe in recipes:
+        for name in sorted(recipe.maps_needed | ({"subject"} if recipe.needs_finder else set())):
+            if name not in finders:
+                if name not in registry.MAP_INPUTS:
+                    raise ProjectError(
+                        f"recipe {recipe.name!r} uses the map {name!r} (a `given` region), which a project cannot hand "
+                        f"in: pass `finders={{{name!r}: Finder(...)}}`, or render the recipe with `maps=`"
+                    )
+                finders[name] = default_finder(name)
+    return finders
+
+
 @dataclass
 class _Photo:
     """One photo while its recipes run: read once, and each map found once, on first use. `digest` is the hash of its
-    file; `finders` has the finder of each map ("matte", "depth") its recipes need, `found_by` what each map depends on
+    file; `finders` has the finder of each map its recipes need, `found_by` what each map depends on
     besides the photo (see `run`): together they name the photo's remembered maps."""
 
     path: Path
@@ -400,15 +418,7 @@ class _Photo:
             self._rgb = imageio.load(self.path)  # ingest
         return self._rgb
 
-    def matte(self) -> np.ndarray:
-        """The subject matte (`run` gave a finder: a recipe needs the subject)."""
-        return self._remember("matte")
-
-    def depth(self) -> np.ndarray:
-        """The depth map (`run` gave a finder: a recipe needs depth)."""
-        return self._remember("depth")
-
-    def _remember(self, name: str) -> np.ndarray:
+    def map(self, name: str) -> np.ndarray:
         """The map `name`, from the on-disk cache when its finder has found it in this photo before, else found
         (checked to fit the photo) and remembered. The one place a map of the whole photo is found and kept. A failed
         search is remembered too, so the photo's other recipes fail without asking again."""
@@ -436,13 +446,13 @@ class _Photo:
         returned as it is, for the runner to refuse, and never remembered. The key is the finder, the photo and the
         crop's pixels, whatever recipe, framing or size made it."""
         pixels = np.ascontiguousarray(crop)
-        key = _fingerprint(self.digest, self.found_by["matte"], str(pixels.shape), hashlib.sha256(pixels).hexdigest())
+        key = _fingerprint(self.digest, self.found_by["subject"], str(pixels.shape), hashlib.sha256(pixels).hexdigest())
         cached = _inside(self.project.output, self.project.cache / f"crop-{key}.npz")
         remembered = _remembered(cached, pixels.shape[:2])
         if remembered is not None:
             return remembered
         try:
-            matte = np.asarray(self.finders["matte"].find(pixels), np.float32)
+            matte = np.asarray(self.finders["subject"].find(pixels), np.float32)
         except SubjectNotFoundError:
             matte = np.zeros(pixels.shape[:2], np.float32)
         # not raised here: the runner reads SubjectNotFoundError from a finder as "nothing in this piece"
@@ -503,18 +513,16 @@ def _write_text(target: Path, text: str) -> None:
 
 def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) -> Item:
     warnings: list[str] = []
-    matte = None
-    if recipe.needs_matte:
-        matte = photo.matte()
-        warnings += matte_warnings(matte, project.subject_share)
-    depth = photo.depth() if recipe.needs_depth else None
+    maps = {name: photo.map(name) for name in sorted(recipe.maps_needed)}
+    if "subject" in maps:
+        warnings += matte_warnings(maps["subject"], project.subject_share)
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
     # the photo's own finder of pieces: its answers depend on the subject finder, as `found_by` says
-    find = Finder(photo.found_by["matte"], photo.find_in_crop) if recipe.needs_finder else None
-    stages = trace(photo.rgb(), recipe, matte=matte, depth=depth, find_subject=find) if project.steps else None
+    pieces = {"subject": Finder(photo.found_by["subject"], photo.find_in_crop)} if recipe.needs_finder else None
+    stages = trace(photo.rgb(), recipe, maps=maps, finders=pieces) if project.steps else None
     # style (a trace ends in the render)
-    image = stages[-1].image if stages else render(photo.rgb(), recipe, matte=matte, depth=depth, find_subject=find)
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, maps=maps, finders=pieces)
     warnings += still_warnings(image)  # check
     outputs = _export_still(project, image, recipe.name, folder)  # export
     sheet = None

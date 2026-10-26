@@ -5,9 +5,9 @@
     stops = ["#1a0f08", "#f4e4c1"]           # the other keys are the effect's parameters
 
 `read` returns the presets of an effect or region kind by name, each checked by its own parameter model exactly as a
-recipe's step is (a misspelt or out-of-range key, or `matte`, which a recipe supplies itself, is a `RecipeError` naming
-the preset). A file is read and checked once, the first time it is asked for. Without a file there are no presets.
-The folder is a parameter only so that a test can read a throwaway one.
+recipe's step is (a misspelt or out-of-range key, or `subject`, which a recipe supplies itself, is a `RecipeError`
+naming the preset). A file is read and checked once, the first time it is asked for. Without a file there are no
+presets. The folder is a parameter only so that a test can read a throwaway one.
 
 Dependency direction: imports `params` and `errors` only; the registry and `steps` build on it.
 """

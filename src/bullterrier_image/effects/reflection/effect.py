@@ -42,7 +42,7 @@ class ReflectionParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="How much of a matte row, 0 to 1, must be subject for the row to count as part of it when its lowest and "
+        doc="How much of a subject row, 0 to 1, must be subject for the row to count as part of it when its lowest and "
         "highest rows are found: 0.5 = a pixel of at least half. Lowering it counts faint fringes, so the floor "
         "line moves down and the subject's height grows.",
         advanced=True,
@@ -66,20 +66,20 @@ class ReflectionParams(EffectParams):
 
 
 @effect(category="subject", params=ReflectionParams, opacity=0.6)
-def reflection(rgb: np.ndarray, params: ReflectionParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def reflection(rgb: np.ndarray, params: ReflectionParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth.
 
     The floor line is the bottom of the subject; the reflection is `height` of the subject's height deep, blurred by
     `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
     at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
     when nothing in it counts as the subject (see `threshold`), there is no floor line and so no reflection: the
     picture comes back unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
-    subject_rows = np.flatnonzero(matte.max(axis=1) >= params.threshold)
+    subject_rows = np.flatnonzero(subject.max(axis=1) >= params.threshold)
     if subject_rows.size == 0:
         return rgb.copy()
     floor = subject_rows[-1] + 1  # the first row below the subject

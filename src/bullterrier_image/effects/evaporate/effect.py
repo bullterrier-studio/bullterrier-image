@@ -177,14 +177,14 @@ class EvaporateParams(EffectParams):
         "the outline toward the border).",
         advanced=True,
     )
-    matte_threshold: float = param(
+    subject_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="With a matte: how much of a piece, 0 to 1, the matte must cover on average for the piece to belong to "
+        doc="With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to "
         "the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge "
-        "(hair, fur), raising it less. Ignored without a matte.",
+        "(hair, fur), raising it less. Ignored without a subject.",
         advanced=True,
     )
     background_threshold: float = param(
@@ -194,13 +194,13 @@ class EvaporateParams(EffectParams):
         max=1,
         doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
         "background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, "
-        "noisy pieces behind; without a matte it also decides the figure's outline.",
+        "noisy pieces behind; without a subject it also decides the figure's outline.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=EvaporateParams)
-def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def evaporate(rgb: np.ndarray, params: EvaporateParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """Dissolve the picture into pieces that float away, thin out and fade.
 
     The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
@@ -213,9 +213,9 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     leaving the picture are gone. With `outline` and `outward` at 0 pieces only move up, so everything more than one
     character row below `start` is untouched. The same `seed` always gives the same dissolve.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
     "the edge of the figure". Dark parts of the picture (eyes, shadows) are then still part of the figure. Without
-    a matte the lit pieces are used, with enclosed dark gaps filled in.
+    a subject the lit pieces are used, with enclosed dark gaps filled in.
     """
     p = params
     height, width = rgb.shape[:2]
@@ -233,7 +233,7 @@ def evaporate(rgb: np.ndarray, params: EvaporateParams, *, matte: np.ndarray | N
     strength = np.broadcast_to(
         (t * t * (3.0 - 2.0 * t))[:, None], (rows, cols)
     )  # constant: smoothstep polynomial 3t^2 - 2t^3
-    figure = cells.figure(lit, matte, cell_w, cell_h, height, width, threshold=p.matte_threshold)
+    figure = cells.figure(lit, subject, cell_w, cell_h, height, width, threshold=p.subject_threshold)
     edges = distance.edge_distance(
         figure,
         sampling=(cell_h, cell_w),

@@ -76,19 +76,19 @@ class RimLightParams(EffectParams):
         "border).",
         advanced=True,
     )
-    matte_threshold: float = param(
+    subject_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is lit: 0.5 = more than "
+        doc="The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is lit: 0.5 = more than "
         "half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=RimLightParams)
-def rim_light(rgb: np.ndarray, params: RimLightParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def rim_light(rgb: np.ndarray, params: RimLightParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`.
 
     Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
@@ -96,14 +96,14 @@ def rim_light(rgb: np.ndarray, params: RimLightParams, *, matte: np.ndarray | No
     It is screened over the picture, so it only ever brightens, and never reaches the background or the subject's
     interior beyond `width`. The picture's own border is no edge.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
-    with a matte that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
+    with a subject that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
     p = params
-    subject = matte >= p.matte_threshold
-    signed = signed_distance(subject)  # > 0 outside the subject, < 0 inside it, infinite without an edge
+    inside = subject >= p.subject_threshold
+    signed = signed_distance(inside)  # > 0 outside the subject, < 0 inside it, infinite without an edge
     if not np.isfinite(signed).all():
         return rgb.copy()
     # The outward direction of the edge is the way the smoothed distance grows.
@@ -115,6 +115,6 @@ def rim_light(rgb: np.ndarray, params: RimLightParams, *, matte: np.ndarray | No
     facing = np.maximum((grad_x * np.cos(toward_light) - grad_y * np.sin(toward_light)) / length, 0.0)
     depth = -signed  # px from the edge into the subject; 1 on its outermost pixels
     band = np.clip(1.0 - (depth - 1.0) / p.width, 0.0, 1.0) ** p.falloff
-    light = p.amount * facing * np.where(subject, band * matte, 0.0)
+    light = p.amount * facing * np.where(inside, band * subject, 0.0)
     tint = np.asarray(p.color, np.float32)
     return screen(rgb, light[..., None] * tint)

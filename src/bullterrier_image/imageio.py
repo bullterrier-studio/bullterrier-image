@@ -17,7 +17,7 @@ from PIL import Image, ImageCms, ImageOps
 
 from bullterrier_image.errors import BackendUnavailableError, ImageReadError, NonFiniteImageError
 
-__all__ = ["from_pil", "load", "load_depth", "load_matte", "load_picture", "save", "to_pil"]
+__all__ = ["from_pil", "load", "load_map", "load_picture", "save", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 # littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
@@ -46,29 +46,23 @@ def load(path: str | Path) -> np.ndarray:
         return from_pil(img)
 
 
-def load_matte(path: str | Path) -> np.ndarray:
-    """Read a subject matte someone already has: float32 (height, width), 1 = subject, 0 = background.
+def load_map(path: str | Path) -> np.ndarray:
+    """Read a map of a photo someone already has (its subject, its depth, a drawing's silhouette): float32 (height,
+    width), 0..1, one value per pixel of the photo it was made for.
 
-    A picture with transparency (a cut-out PNG) gives its alpha channel; any other gives its brightness, so a
-    black-and-white mask works as it is. 8- and 16-bit files keep their full range; float levels, or integers beyond
-    16 bits, are ImageReadError naming the mode. EXIF rotation, the first-frame rule and ImageReadError are as in
-    `load`, so the matte lines up with the photo it was made for.
+    A picture with transparency (a cut-out PNG, a drawing: some pixel not fully opaque) gives its alpha channel; any
+    other gives its brightness, so a black-and-white mask or a greyscale depth map (white = subject, white = nearest)
+    works as it is, and so does one an editor saved with an opaque alpha channel (so a cut-out whose subject fills the
+    whole frame reads as brightness: the cut-out of a subject that covers everything is no cut-out). 8- and 16-bit files
+    keep their full range, so the same map saved in either reads the same; float levels, or integers beyond 16 bits, are
+    ImageReadError naming the mode. EXIF rotation, the first-frame rule and ImageReadError are as in `load`, so the map
+    lines up with the photo it was made for.
     """
     with _picture(path) as img:
         if not img.mode.startswith("I") and (img.mode in {"RGBA", "LA", "PA"} or "transparency" in img.info):
-            return np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
-        return _brightness(img)
-
-
-def load_depth(path: str | Path) -> np.ndarray:
-    """Read a depth map someone already has: float32 (height, width), 1 = nearest, 0 = farthest.
-
-    Gives the picture's brightness (white = near), never its alpha. 8- and 16-bit files keep their full range, so the
-    same depth saved in either reads the same; float levels, or integers beyond 16 bits, are ImageReadError naming the
-    mode. EXIF rotation, the first-frame rule and ImageReadError are as in `load`, so the map lines up with the photo it
-    was made for.
-    """
-    with _picture(path) as img:
+            alpha = np.asarray(img.convert("RGBA"), np.float32)[..., _ALPHA] / _EIGHT_BIT
+            if alpha.min() < 1:
+                return alpha
         return _brightness(img)
 
 

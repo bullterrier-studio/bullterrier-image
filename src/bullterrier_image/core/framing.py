@@ -1,20 +1,21 @@
 """How a recipe frames the photo before its steps run and cuts the picture out after them: the `Framing` model.
 
 A `Framing` is a recipe's geometry, declared like an effect's parameters (every field has a unit, a range and a
-description: `Framing.documentation()` lists them). The runner applies it to the photo, the subject matte and the depth
-map together: `apply` before the first step, in one fixed order (flip, rotate, crop, pad; the recipe's `size` follows),
-`cut` after the last one (a circle, rounded corners, or the subject as the picture's only opaque part). Effects never
-see any of it: they keep working on a three-channel picture of any size.
+description: `Framing.documentation()` lists them). The runner applies it to the photo and its maps (the subject, the
+depth, any map handed in) together: `apply` before the first step, in one fixed order (flip, rotate, crop, pad; the
+recipe's `size` follows), `cut` after the last one (a circle, rounded corners, or the subject as the picture's only
+opaque part). Effects never see any of it: they keep working on a three-channel picture of any size.
 
 Promises: the default `Framing()` changes nothing; every value is checked when the framing is made, a `RecipeError`
-naming the field and the value wherever it came from (a `[frame]` table, Python); the same photo, matte and framing
+naming the field and the value wherever it came from (a `[frame]` table, Python); the same photo, maps and framing
 always give the same pixels; the photo and its maps are never modified; all lengths are shares of the picture, so the
 same look comes out at any resolution.
 
 Dependency direction: imports `params`, `ops` and `errors` only.
 """
 
-from typing import Any, Literal, overload
+from collections.abc import Mapping
+from typing import Any, Literal
 
 import numpy as np
 
@@ -25,7 +26,7 @@ from .params import Color, EffectParams, param
 
 __all__ = ["Framing"]
 
-_MATTE = 3  # the position of the subject matte, when given, among the channels it travels with (the depth is after it)
+_CHANNELS = 3  # the colour channels of a photo; the maps travel after them
 
 
 class Framing(EffectParams):
@@ -106,7 +107,7 @@ class Framing(EffectParams):
     transparent: Literal["none", "background", "circle", "rounded"] = param(
         "none",
         doc="Cut the finished picture out, so it has an alpha channel (a PNG or WebP, not a JPEG): 'none' keeps it "
-        "opaque, 'background' makes the subject's matte the alpha (needs the subject), 'circle' keeps the circle "
+        "opaque, 'background' makes the subject map the alpha (needs the subject), 'circle' keeps the circle "
         "inscribed in the picture, 'rounded' rounds its corners by `corner_radius`.",
     )
     corner_radius: float = param(
@@ -124,7 +125,7 @@ class Framing(EffectParams):
         self._init_checked("", **values)
 
     @property
-    def needs_matte(self) -> bool:
+    def needs_subject(self) -> bool:
         """True when the framing uses the subject: a crop around it or a cut that keeps only it."""
         return self.anchor == "subject" or self.transparent == "background"
 
@@ -133,73 +134,53 @@ class Framing(EffectParams):
         """True when `cut` gives the picture an alpha channel."""
         return self.transparent != "none"
 
-    @overload
-    def apply(
-        self, rgb: np.ndarray, matte: np.ndarray, depth: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
-
-    @overload
-    def apply(self, rgb: np.ndarray, matte: np.ndarray, depth: None = None) -> tuple[np.ndarray, np.ndarray, None]: ...
-
-    @overload
-    def apply(
-        self, rgb: np.ndarray, matte: None = None, *, depth: np.ndarray
-    ) -> tuple[np.ndarray, None, np.ndarray]: ...
-
-    @overload
-    def apply(
-        self, rgb: np.ndarray, matte: np.ndarray | None = None, depth: np.ndarray | None = None
-    ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]: ...
-
-    def apply(
-        self, rgb: np.ndarray, matte: np.ndarray | None = None, depth: np.ndarray | None = None
-    ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
-        """The photo `rgb` (rows, columns, 3), its subject `matte` and its `depth` (each rows, columns, or None) framed
-        together: flipped, turned, cropped, padded, in that order, each map moving exactly as the photo does (a turn or
-        a border leaves 0 where the picture is not: background, farthest). New arrays when anything changes, the
-        inputs themselves when nothing does; the inputs are never modified. A crop around the subject follows the
-        matte alone, never the depth; SubjectNotFoundError when it has no `matte` or no subject to crop around."""
+    def apply(self, rgb: np.ndarray, maps: Mapping[str, np.ndarray]) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+        """The photo `rgb` (rows, columns, 3) and its `maps` (name -> rows, columns) framed together: flipped, turned,
+        cropped, padded, in that order, each map moving exactly as the photo does (a turn or a border leaves 0 where the
+        picture is not: background, farthest, none). New arrays when anything changes, the inputs themselves when
+        nothing does; the inputs are never modified. A crop around the subject follows the `subject` map alone, never
+        another; SubjectNotFoundError when it has no `subject` map or no subject to crop around."""
         cropping = self.aspect is not None or self.anchor == "subject"
         padding = (self.pad_top, self.pad_right, self.pad_bottom, self.pad_left)
         if self.flip == "none" and not (self.angle or cropping or any(padding)):
-            return rgb, matte, depth
-        if self.anchor == "subject" and matte is None:
-            raise SubjectNotFoundError("a crop around the subject (`anchor` 'subject') needs the subject's matte")
-        maps = [layer[..., None] for layer in (matte, depth) if layer is not None]
-        stack = np.concatenate([rgb, *maps], axis=2) if maps else rgb  # the maps ride along, the matte first
-        fill = (*self.fill, 0.0, 0.0)[: stack.shape[2]]
+            return rgb, dict(maps)
+        if self.anchor == "subject" and "subject" not in maps:
+            raise SubjectNotFoundError("a crop around the subject (`anchor` 'subject') needs the subject map")
+        names = list(maps)
+        layers = [maps[name][..., None] for name in names]
+        stack = np.concatenate([rgb, *layers], axis=2) if layers else rgb  # the maps ride along, in the order given
+        fill = (*self.fill, *([0.0] * len(names)))
         stack = frame.flip(stack, x=self.flip in ("x", "both"), y=self.flip in ("y", "both"))
         if self.angle:
             stack = frame.rotate(stack, self.angle, fit=self.fit, fill=fill, resample=self.resample)
         if cropping:
-            stack = self._crop(stack)
+            stack = self._crop(stack, _CHANNELS + names.index("subject") if "subject" in maps else None)
         if any(padding):
             short = min(stack.shape[:2])
             top, right, bottom, left = (round(share * short) for share in padding)
             stack = frame.pad(stack, top=top, right=right, bottom=bottom, left=left, fill=fill)
-        layers = (np.array(stack[..., channel], order="C") for channel in range(_MATTE, stack.shape[2]))
-        framed = np.array(stack[..., :_MATTE], order="C")
-        return framed, None if matte is None else next(layers), None if depth is None else next(layers)
+        framed = np.array(stack[..., :_CHANNELS], order="C")
+        return framed, {name: np.array(stack[..., _CHANNELS + number], order="C") for number, name in enumerate(names)}
 
-    def cut(self, rgb: np.ndarray, matte: np.ndarray | None) -> np.ndarray:
+    def cut(self, rgb: np.ndarray, subject: np.ndarray | None) -> np.ndarray:
         """`rgb` (rows, columns, 3) as a new RGBA picture (rows, columns, 4, straight alpha) cut out as `transparent`
-        says; `matte` (the subject, the picture's size) is needed for 'background'. Only for a framing with
+        says; `subject` (the subject map, the picture's size) is needed for 'background'. Only for a framing with
         `has_alpha`."""
         shape = rgb.shape[:2]
         match self.transparent:
             case "background":
-                alpha = matte
+                alpha = subject
             case "circle":
                 alpha = frame.circle_alpha(shape)
             case "rounded":
                 alpha = frame.rounded_alpha(shape, self.corner_radius * min(shape))
             case _:
                 raise ValueError("a framing that is not `transparent` has nothing to cut")
-        return np.concatenate([rgb, alpha[..., None]], axis=2)  # type: ignore[index]  # 'background' was given its matte
+        return np.concatenate([rgb, alpha[..., None]], axis=2)  # type: ignore[index]  # 'background' was given the subject
 
-    def _crop(self, stack: np.ndarray) -> np.ndarray:
+    def _crop(self, stack: np.ndarray, subject_channel: int | None) -> np.ndarray:
         shape = stack.shape[:2]
         if self.anchor == "subject":
-            box = frame.subject_box(stack[..., _MATTE], self.margin)
+            box = frame.subject_box(stack[..., subject_channel], self.margin)
             return frame.crop_around(shape, box, self.aspect).of(stack)
         return frame.crop_box(shape, self.aspect, self.anchor).of(stack)  # type: ignore[arg-type]  # `aspect` is set

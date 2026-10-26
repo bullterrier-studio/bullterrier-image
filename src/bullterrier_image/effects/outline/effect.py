@@ -36,32 +36,32 @@ class OutlineParams(EffectParams):
         doc="How far a soft halo of the same colour reaches beyond the stroke, in px; it fades smoothly from the "
         "stroke to nothing. Raising it spreads the halo (a large value makes an aura). 0 = no halo.",
     )
-    matte_threshold: float = param(
+    subject_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="The matte value, 0 to 1, from which a pixel belongs to the subject whose edge is outlined: 0.5 = more "
+        doc="The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is outlined: 0.5 = more "
         "than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=OutlineParams)
-def outline(rgb: np.ndarray, params: OutlineParams, *, matte: np.ndarray | None = None) -> np.ndarray:
+def outline(rgb: np.ndarray, params: OutlineParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px.
 
     The stroke follows the edge of the subject on the side `position` says; 'outside' leaves the subject's own pixels
-    exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the matte
+    exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the subject
     is soft the stroke lies behind the subject. The edge is antialiased over one pixel.
 
-    `matte` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
+    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject to outline and the picture is returned unchanged.
     """
-    if matte is None:
+    if subject is None:
         return rgb.copy()
     p = params
-    signed = signed_distance(matte >= p.matte_threshold)  # > 0 outside the subject, < 0 inside it
+    signed = signed_distance(subject >= p.subject_threshold)  # > 0 outside the subject, < 0 inside it
     outer_share = (p.position == "outside") + (p.position == "center") / 2  # the share of the stroke beyond the edge
     reach_out = p.width * outer_share  # px of stroke beyond the edge
     reach_in = p.width - reach_out  # and the rest of it inside
@@ -74,6 +74,6 @@ def outline(rgb: np.ndarray, params: OutlineParams, *, matte: np.ndarray | None 
         halo = np.clip(1.0 - beyond / p.glow, 0.0, 1.0) ** 2  # constant: quadratic fade, no visible edge at `glow`
         covered = np.maximum(stroke_out, halo)
     # Outside the subject the stroke lies behind it, so a soft edge shows the stroke only where the subject is absent.
-    alpha = np.where(signed > 0, covered * (1.0 - matte), stroke_in)
+    alpha = np.where(signed > 0, covered * (1.0 - subject), stroke_in)
     tint = np.asarray(p.color, np.float32)
     return (rgb + (tint - rgb) * alpha[..., None]).astype(np.float32)
