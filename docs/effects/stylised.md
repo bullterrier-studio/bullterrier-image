@@ -12,7 +12,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=0.125` `min_cell=0.01` `gap=0.002` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=0.004` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
-| <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights. | `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
+| <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the smoothed `field` crosses `levels` evenly spaced heights. | `field='light'` `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
 
 ### `dither`
 
@@ -119,12 +119,13 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `levels` | whole number | count | 2 to 64 | `8` | How many bands the brightness range 0..1 is cut into; there is a contour line at each of the levels - 1 heights between them. 2 = a single line at middle grey, 8 = a clear contour map, 14 = a busy one, 64 = a dense engraving. |
-| `thickness` | number | px | 0.5 to 20 | `1.5` | How wide the lines are, in pixels across the line however steep the slope of brightness there; tuned for a picture about 480 px high. Edges are anti-aliased, so fractions of a pixel show as partial strength. |
+| `field` | field name |  |  | `'light'` | What the contours follow: 'light' (the picture's own brightness, a plain contour map), 'depth' (how near things are, a LiDAR look), 'subject', 'background' or a region of the recipe. Its range 0..1 is cut into `levels` bands. |
+| `levels` | whole number | count | 2 to 64 | `8` | How many bands the field's range 0..1 is cut into; there is a contour line at each of the levels - 1 heights between them. 2 = a single line at the middle of the range, 8 = a clear contour map, 14 = a busy one, 64 = a dense engraving. |
+| `thickness` | number | px | 0.5 to 20 | `1.5` | How wide the lines are, in pixels across the line however steep the field's slope there; tuned for a picture about 480 px high. Edges are anti-aliased, so fractions of a pixel show as partial strength. |
 | `line` | colour |  |  | `'#ffffff'` | The colour of the contour lines: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `fill` | one of 'none', 'bands' |  |  | `'none'` | What lies between the lines: 'none' (the photo itself, with the lines drawn over it) or 'bands' (the photo is replaced by flat colour, each band coloured from `colors` by its height, like a hypsometric map). |
-| `colors` | list of colours |  |  | `('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` | The colours of the bands for fill 'bands', from the lowest band (darkest brightness) to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'. |
-| `smoothing` | number | px | 0 to 50 | `5.0` | Sigma in pixels of the Gaussian blur the brightness gets before the contours are found, so that grain and fine texture do not break the lines into specks; tuned for a picture about 480 px high. 0 = the brightness as it is, raising it gives smoother, simpler contours. |
+| `colors` | list of colours |  |  | `('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` | The colours of the bands for fill 'bands', from the lowest band (the field near 0) to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'. |
+| `smoothing` | number | px | 0 to 50 | `5.0` | Sigma in pixels of the Gaussian blur the field gets before the contours are found, so that grain and fine texture do not break the lines into specks; tuned for a picture about 480 px high. 0 = the field as it is, raising it gives smoother, simpler contours. |
 
 <details><summary>Advanced parameters (2)</summary>
 

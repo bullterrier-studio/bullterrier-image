@@ -4485,27 +4485,31 @@ edge_threshold : number, stops, 0.01 to 8, default 0.5
     base smoother and more like a plain blur."""
     ...
 
-def topographic(levels: int = 8, thickness: float = 1.5, line: str | list[float] | tuple[float, float, float] = '#ffffff', fill: Literal['none', 'bands'] = 'none', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea'), smoothing: float = 5.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Draw contour lines where the picture's smoothed brightness crosses `levels` evenly spaced heights.
+def topographic(field: str = 'light', levels: int = 8, thickness: float = 1.5, line: str | list[float] | tuple[float, float, float] = '#ffffff', fill: Literal['none', 'bands'] = 'none', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea'), smoothing: float = 5.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Draw contour lines where the smoothed `field` crosses `levels` evenly spaced heights.
 
-Brightness is the Rec. 709 luminance, blurred by `smoothing` px, scaled to h = luminance x `levels`; the contours
-are h = 1, 2, ..., `levels` - 1. A pixel's distance to the nearest contour in px is |h - k| divided by the slope
-of h there (central differences, halved on the outermost rows and columns, which have one neighbour: lines come
-out thinner there), so a line is `thickness` px wide however steep or shallow the brightness runs; a pixel at
-distance d is covered by clip(`thickness` / 2 + 1/2 - d, 0, 1) of the `line` colour. Where the brightness does
+The field (`light` is the Rec. 709 luminance) is blurred by `smoothing` px and scaled to h = field x `levels`; the
+contours are h = 1, 2, ..., `levels` - 1. A pixel's distance to the nearest contour in px is |h - k| divided by
+the slope of h there (central differences, halved on the outermost rows and columns, which have one neighbour:
+lines come out thinner there), so a line is `thickness` px wide however steep or shallow the field runs; a pixel at
+distance d is covered by clip(`thickness` / 2 + 1/2 - d, 0, 1) of the `line` colour. Where the field does
 not vary there is no contour. With fill 'bands' the photo is first replaced by the colour of its band
-floor(h) (the last band for white) taken from `colors`.
+floor(h) (the last band for 1) taken from `colors`.
 
 Parameters
 ----------
+field : field name, default 'light'
+    What the contours follow: 'light' (the picture's own brightness, a plain contour
+    map), 'depth' (how near things are, a LiDAR look), 'subject', 'background' or a
+    region of the recipe. Its range 0..1 is cut into `levels` bands.
 levels : whole number, count, 2 to 64, default 8
-    How many bands the brightness range 0..1 is cut into; there is a contour line at
-    each of the levels - 1 heights between them. 2 = a single line at middle grey, 8 = a
-    clear contour map, 14 = a busy one, 64 = a dense engraving.
+    How many bands the field's range 0..1 is cut into; there is a contour line at each
+    of the levels - 1 heights between them. 2 = a single line at the middle of the
+    range, 8 = a clear contour map, 14 = a busy one, 64 = a dense engraving.
 thickness : number, px, 0.5 to 20, default 1.5
-    How wide the lines are, in pixels across the line however steep the slope of
-    brightness there; tuned for a picture about 480 px high. Edges are anti-aliased, so
-    fractions of a pixel show as partial strength.
+    How wide the lines are, in pixels across the line however steep the field's slope
+    there; tuned for a picture about 480 px high. Edges are anti-aliased, so fractions
+    of a pixel show as partial strength.
 line : colour, default '#ffffff'
     The colour of the contour lines: '#rrggbb', '#rgb' or [r, g, b] 0..1.
 fill : one of 'none', 'bands', default 'none'
@@ -4513,12 +4517,12 @@ fill : one of 'none', 'bands', default 'none'
     or 'bands' (the photo is replaced by flat colour, each band coloured from `colors`
     by its height, like a hypsometric map).
 colors : list of colours, default ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')
-    The colours of the bands for fill 'bands', from the lowest band (darkest brightness)
+    The colours of the bands for fill 'bands', from the lowest band (the field near 0)
     to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'.
 smoothing : number, px, 0 to 50, default 5.0
-    Sigma in pixels of the Gaussian blur the brightness gets before the contours are
-    found, so that grain and fine texture do not break the lines into specks; tuned for
-    a picture about 480 px high. 0 = the brightness as it is, raising it gives smoother,
+    Sigma in pixels of the Gaussian blur the field gets before the contours are found,
+    so that grain and fine texture do not break the lines into specks; tuned for a
+    picture about 480 px high. 0 = the field as it is, raising it gives smoother,
     simpler contours.
 
 Advanced parameters
