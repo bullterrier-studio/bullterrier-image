@@ -151,8 +151,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `mirror` ✓ (`kaleidoscope` with 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
 | `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
 | `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
-| `shear` ✓ | Skew with edge fill. | `fx.shear(x=0.2)` |
-| `perspective` ✓ | Corner-pin to a quad. | `fx.perspective(vertical=0.3, rotate=-3, scale=0.2)` |
+| `perspective` ✓ | Keystone, skew, turn and zoom. | `fx.perspective(vertical=0.3, shear_x=0.2, rotate=-3, scale=0.2)` |
 | `pixel_sort` ✓ | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", low=0.25, high=0.75)` |
 | `melt` ✓ | Brightness-driven drips running down. | `fx.melt(amount=40, seed=1)` |
 | `flow_warp` ✓ | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
@@ -362,7 +361,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | `black_and_white` | a `channel_mixer` preset |
 | `vibrance` | `grade` + `vibrance` |
 | `mirror` | `kaleidoscope(segments=1)` |
-| `shear` | `perspective` + `shear_x`, `shear_y` |
 | `anaglyph` | `rgb_split` + `pair` |
 | `plasma` | `noise_field(kind="sine")` + `warp` |
 

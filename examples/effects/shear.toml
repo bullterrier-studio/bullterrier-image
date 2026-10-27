@@ -1,8 +1,0 @@
-# A slanted, italicised picture: rows slide sideways about the centre, the corners filled by mirroring.
-name = "shear"
-size = 480
-
-[[step]]
-effect = "shear"
-x = 0.25
-y = -0.06

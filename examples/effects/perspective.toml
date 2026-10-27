@@ -1,4 +1,4 @@
-# Shot from low down: the top narrows a little, the picture is turned a touch and zoomed to hide most of the margin.
+# Shot from low down: the top narrows a little, the picture is slanted, turned a touch and zoomed to hide most of the margin.
 name = "perspective"
 size = 480
 
@@ -6,6 +6,7 @@ size = 480
 effect = "perspective"
 vertical = 0.2
 horizontal = 0.08
+shear_x = 0.1
 rotate = -3
 scale = 0.3
 edge = "nearest"
