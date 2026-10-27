@@ -12,7 +12,7 @@ from bullterrier_image.ops import glyphs
 
 ROOT = Path(__file__).parent.parent
 RESULTS = ROOT / "examples" / "output" / "bullterrier"
-LOOKS = ["neon-pulse", "glitch", "ascii-colour", "halftone-print", "ember-glitch"]
+LOOKS = ["neon-pulse", "glitch-noir", "ascii-colour", "halftone-print", "ember-glitch"]
 TILE_HEIGHT, GAP, MARGIN, LABEL = 620, 18, 36, 44
 BACKGROUND, TEXT, MUTED = (13, 14, 18), (232, 234, 240), (130, 135, 148)
 
@@ -49,7 +49,7 @@ def main() -> None:
         canvas.paste(picture, (x, y))
         draw.text((x, y + TILE_HEIGHT + 12), name, fill=TEXT, font=font)
         x += picture.width + GAP
-    draw.text((width - MARGIN, height - 28), "one photo, five recipes, under 30 lines each", MUTED, small, anchor="ra")
+    draw.text((width - MARGIN, height - 28), "one photo, five recipes", MUTED, small, anchor="ra")
     out = ROOT / "docs" / "images" / "banner.jpg"
     canvas.save(out, quality=90, subsampling=0)
     print(out, canvas.size, f"{out.stat().st_size // 1024} KB")
