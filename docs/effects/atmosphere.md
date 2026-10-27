@@ -9,7 +9,6 @@ Weather and air: fog, haze, rain and the like.
 | <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom. | `amount=0.77` `color='#cfd8e3'` `gradient=0.7` `coverage=0.93` `scale=150.0` `seed=0` +9 advanced | [fog.toml](../../examples/effects/fog.toml) |
 | <img src="../gallery/lens_drops.jpg" width="160" alt="lens_drops"> | `lens_drops` | Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`. | `count=14` `radius=24.0` `size_variation=0.5` `refraction=1.5` `blur=1.5` `highlight=0.0` `seed=0` +3 advanced | [lens_drops.toml](../../examples/effects/lens_drops.toml) |
 | <img src="../gallery/particles.jpg" width="160" alt="particles"> | `particles` | Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`. | `density=1.0` `size=6.0` `length=0.0` `angle=90.0` `softness=0.5` `color='#ffffff'` `seed=0` +3 advanced | [particles.toml](../../examples/effects/particles.toml) |
-| <img src="../gallery/sparkle.jpg" width="160" alt="sparkle"> | `sparkle` | Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each. | `count=60` `threshold=0.75` `size=10.0` `size_variation=0.5` `rays=2.0` `thickness=1.0` `seed=0` | [sparkle.toml](../../examples/effects/sparkle.toml) |
 
 ### `fog`
 
@@ -99,15 +98,3 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `rain` | Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint. |
 | `snow` | Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter. |
 | `stars` | Small crisp stars of several sizes and brightnesses. Put a dark `fill` step before it for a night sky. |
-
-### `sparkle`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `count` | whole number | count | 0 to 2000 | `60` | How many sparkles: at most this many, each on a different pixel brighter than `threshold` (fewer when the picture has fewer such pixels). 0 = none (the picture unchanged). |
-| `threshold` | number | fraction | 0 to 1 | `0.75` | How bright a pixel must be to get a sparkle: its brightness (Rec. 709 luminance, 0..1) must be above this. Raising it keeps the sparkles to the brightest highlights; 1 = none, nothing is brighter than white. |
-| `size` | number | px | 1 to 100 | `10.0` | The diameter in px of the biggest sparkles' soft dot; the smallest are narrower by `size_variation`. Tuned for a picture about 480 px high. Larger = bigger glints. |
-| `size_variation` | number | fraction | 0 to 1 | `0.5` | How much the sparkles differ in size and brightness: each has a random scale from 1 - size_variation to 1 times `size` and full brightness. 0 = every sparkle alike, 1 = from the biggest down to nothing. |
-| `rays` | number | ratio | 0 to 10 | `2.0` | How long the four rays of the cross are, as a multiple of the sparkle's dot diameter: each ray runs this far from the middle, straight left, right, up and down, `thickness` wide. 0 = a soft dot only, no rays. |
-| `thickness` | number | px | 0 to 10 | `1.0` | The width in px of each ray (with a soft one-pixel edge). 1 = a hairline, larger = bolder rays. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same sparkles on the same picture, another seed others. |

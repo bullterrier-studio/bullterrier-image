@@ -23,7 +23,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`. | `field='depth'` `angle=225.0` `elevation=45.0` `height=200.0` `blur=2.0` `saturation=1.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
-| <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `limit=1.0` `amount=0.8` `angle=0.0` `color='#ffffff'` | [starburst.toml](../../examples/effects/starburst.toml) |
+| <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `amount=0.8` `angle=0.0` `density=1.0` `color='#ffffff'` +3 advanced | [starburst.toml](../../examples/effects/starburst.toml) |
 | <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
 | <img src="../gallery/vignette.jpg" width="160" alt="vignette"> | `vignette` | Fade the picture toward `color` from `radius` out to its corners, the centre untouched. | `amount=0.5` `radius=0.5` `feather=0.5` `roundness=1.0` `color='#000000'` | [vignette.toml](../../examples/effects/vignette.toml) |
 
@@ -353,10 +353,26 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `rays` | whole number | count | 1 to 32 | `4` | How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a six-pointed star, 1 = a single comet tail. Raising it makes a denser star. |
 | `length` | number | fraction | 0.001 to 1 | `0.1` | How far each spike reaches, as a fraction of the picture's diagonal: it fades linearly from the point to nothing at this distance. Raising it makes longer, fainter-tipped spikes. |
 | `threshold` | number | fraction | 0 to 0.99 | `0.95` | The brightness (0..1, per channel) where a spike starts: only values above it make light, rising to full at 1. Raising it limits the spikes to the brightest points. Every pixel above it sends out spikes, so at a low threshold a large bright area (a window, a sky, white fur) floods the picture with light: raise the threshold, or cap the number of points with `limit`. |
-| `limit` | number | fraction | 0 to 1 | `1.0` | The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to keep a low `threshold` from flooding large bright areas. |
 | `amount` | number | ratio | 0 to 10 | `0.8` | How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as bright as the point that makes it, at the point; above 1 it saturates to white sooner. |
 | `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X. |
+| `density` | number | fraction | 0 to 1 | `1.0` | The share of the bright points that send out spikes, picked at random (the same ones for the same `seed`; raising it only adds points): 1 = all of them, 0.01 = one in a hundred, scattered over the bright areas, 0 = none. Lower it to turn a bright area into separate glints. |
 | `color` | colour |  |  | `'#ffffff'` | The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that makes them. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `limit` | number | fraction | 0 to 1 | `1.0` | The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to keep a low `threshold` from flooding large bright areas. |
+| `variation` | number | fraction | 0 to 1 | `0.0` | How much the points differ in brightness, and so in how far their spikes show: each one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1 = from full down to nothing. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for `density` and `variation`: the same seed picks the same points of the same picture, another seed others. |
+
+</details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `sparkle` | Scattered glitter: small white four-pointed glints on a random few of the bright points, of varied brightness. |
 
 ### `tone_map`
 

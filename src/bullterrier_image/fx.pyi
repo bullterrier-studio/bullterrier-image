@@ -3731,43 +3731,6 @@ threshold : number, fraction, 0 to 1, default 0.5
     black); 1 changes nothing."""
     ...
 
-def sparkle(count: int = 60, threshold: float = 0.75, size: float = 10.0, size_variation: float = 0.5, rays: float = 2.0, thickness: float = 1.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Screen sparkles over `count` random pixels brighter than `threshold`: a soft dot with four rays each.
-
-A sparkle has a random scale s from 1 - `size_variation` to 1: its dot is `size` x s wide (soft: full brightness
-inside half its radius, fading to nothing at one and a half), its rays are `rays` x `size` x s long, and it is
-s bright (solid white at 1), so the small ones are fainter too. Sparkles are screened over the picture, so they only
-lighten it; the same `seed` on the same picture always gives the same sparkles.
-
-Parameters
-----------
-count : whole number, count, 0 to 2000, default 60
-    How many sparkles: at most this many, each on a different pixel brighter than
-    `threshold` (fewer when the picture has fewer such pixels). 0 = none (the picture
-    unchanged).
-threshold : number, fraction, 0 to 1, default 0.75
-    How bright a pixel must be to get a sparkle: its brightness (Rec. 709 luminance,
-    0..1) must be above this. Raising it keeps the sparkles to the brightest highlights;
-    1 = none, nothing is brighter than white.
-size : number, px, 1 to 100, default 10.0
-    The diameter in px of the biggest sparkles' soft dot; the smallest are narrower by
-    `size_variation`. Tuned for a picture about 480 px high. Larger = bigger glints.
-size_variation : number, fraction, 0 to 1, default 0.5
-    How much the sparkles differ in size and brightness: each has a random scale from 1
-    - size_variation to 1 times `size` and full brightness. 0 = every sparkle alike, 1 =
-    from the biggest down to nothing.
-rays : number, ratio, 0 to 10, default 2.0
-    How long the four rays of the cross are, as a multiple of the sparkle's dot
-    diameter: each ray runs this far from the middle, straight left, right, up and down,
-    `thickness` wide. 0 = a soft dot only, no rays.
-thickness : number, px, 0 to 10, default 1.0
-    The width in px of each ray (with a soft one-pixel edge). 1 = a hairline, larger =
-    bolder rays.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always puts the same sparkles on the same picture,
-    another seed others."""
-    ...
-
 def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange'] | None = None) -> Step:
     """Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness.
 
@@ -3846,14 +3809,17 @@ subject_threshold : number, fraction, 0 to 1, default 0.5
     fur), raising it less."""
     ...
 
-def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, density: float = 1.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
     """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-screened over the picture by `amount`. `limit` caps how many pixels count as bright.
+screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density` picks a random
+share of them, `variation` dims each by a random amount (both from `seed`).
 
 Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
-picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
-inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays
-black.
+picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by
+0 or 1 (`density`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the
+picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from
+points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black
+stays black.
 
 Parameters
 ----------
@@ -3870,12 +3836,6 @@ threshold : number, fraction, 0 to 0.99, default 0.95
     Every pixel above it sends out spikes, so at a low threshold a large bright area (a
     window, a sky, white fur) floods the picture with light: raise the threshold, or cap
     the number of points with `limit`.
-limit : number, fraction, 0 to 1, default 1.0
-    The most pixels that send out spikes, as a share of all the picture's pixels, the
-    brightest first: the threshold is raised just enough to keep to it (never above
-    0.99, so a picture with more than this share of near-white pixels still lights
-    those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to
-    keep a low `threshold` from flooding large bright areas.
 amount : number, ratio, 0 to 10, default 0.8
     How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
     bright as the point that makes it, at the point; above 1 it saturates to white
@@ -3884,9 +3844,34 @@ angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction of the first spike, counterclockwise as seen on the picture: 0 = to
     the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45
     turns the cross into an X.
+density : number, fraction, 0 to 1, default 1.0
+    The share of the bright points that send out spikes, picked at random (the same ones
+    for the same `seed`; raising it only adds points): 1 = all of them, 0.01 = one in a
+    hundred, scattered over the bright areas, 0 = none. Lower it to turn a bright area
+    into separate glints.
 color : colour, default '#ffffff'
     The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
-    of the light that makes them."""
+    of the light that makes them.
+
+Advanced parameters
+-------------------
+limit : number, fraction, 0 to 1, default 1.0
+    The most pixels that send out spikes, as a share of all the picture's pixels, the
+    brightest first: the threshold is raised just enough to keep to it (never above
+    0.99, so a picture with more than this share of near-white pixels still lights
+    those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to
+    keep a low `threshold` from flooding large bright areas.
+variation : number, fraction, 0 to 1, default 0.0
+    How much the points differ in brightness, and so in how far their spikes show: each
+    one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
+    = from full down to nothing.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for `density` and `variation`: the same seed picks the same points of
+    the same picture, another seed others.
+
+Presets
+-------
+sparkle : Scattered glitter: small white four-pointed glints on a random few of the bright points, of varied brightness."""
     ...
 
 def stretch(axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 0.15, side: Literal['both', 'after', 'before'] = 'both', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
