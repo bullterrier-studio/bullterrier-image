@@ -11,7 +11,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
-| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` | [grade.toml](../../examples/effects/grade.toml) |
+| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/hue_shift.jpg" width="160" alt="hue_shift"> | `hue_shift` | Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme. | `hue=90.0` | [hue_shift.toml](../../examples/effects/hue_shift.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
@@ -20,7 +20,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/solarize.jpg" width="160" alt="solarize"> | `solarize` | Invert every red, green and blue value that is above `threshold` and leave the others as they are. | `threshold=0.5` | [solarize.toml](../../examples/effects/solarize.toml) |
 | <img src="../gallery/split_tone.jpg" width="160" alt="split_tone"> | `split_tone` | Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness. | `shadow='#3a1bff'` `highlight='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=0.5` `black_fade=0.1` | [split_tone.toml](../../examples/effects/split_tone.toml) |
 | <img src="../gallery/threshold.jpg" width="160" alt="threshold"> | `threshold` | Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere. | `level=0.5` `dark='#000000'` `light='#ffffff'` | [threshold.toml](../../examples/effects/threshold.toml) |
-| <img src="../gallery/vibrance.jpg" width="160" alt="vibrance"> | `vibrance` | Raise the saturation of muted colours more than that of vivid ones, never lowering anyone's. | `amount=0.0` | [vibrance.toml](../../examples/effects/vibrance.toml) |
 | <img src="../gallery/white_balance.jpg" width="160" alt="white_balance"> | `white_balance` | Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light. | `temperature=0.0` `tint=0.0` | [white_balance.toml](../../examples/effects/white_balance.toml) |
 
 ### `auto_levels`
@@ -121,6 +120,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `contrast` | number (drivable) | ratio | 0 to 5 | `1.0` | How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot. |
 | `pivot` | number | fraction | 0 to 1 | `0.5` | The brightness (0..1) that contrast leaves where it is; values above it brighten, below it darken. |
 | `saturation` | number (drivable) | ratio | 0 to 5 | `1.0` | Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid. |
+| `vibrance` | number (drivable) | fraction | 0 to 1 | `0.0` | How far muted colours are pushed toward full saturation (0..1), after `saturation`: 0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they are; colours are never made duller. |
 
 ### `gradient_map`
 
@@ -217,12 +217,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `level` | number | fraction | 0 to 1 | `0.5` | Brightness (Rec. 709 luminance, 0 = black, 1 = white) at which the picture is split: pixels at or above it are painted `light`, the rest `dark`. Raising it turns more of the picture dark; 0 makes all of it light. |
 | `dark` | colour |  |  | `'#000000'` | Colour of the pixels darker than `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `light` | colour |  |  | `'#ffffff'` | Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-
-### `vibrance`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `amount` | number (drivable) | fraction | 0 to 1 | `0.0` | How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they are; colours are never made duller. |
 
 ### `white_balance`
 

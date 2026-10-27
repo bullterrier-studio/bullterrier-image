@@ -1822,10 +1822,16 @@ band_max_height : number, fraction, 0 to 1, default 0.06
     gives taller strips."""
     ...
 
-def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`.
+def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`.
 
-The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation) and at the end.
+The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the
+saturation (before the vibrance) and at the end.
+
+`vibrance` works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation
+becomes s + vibrance * s * (1 - s), which never exceeds 1. The strongest channel (HSV value) is kept and every
+other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey,
+whose saturation is 0, is unchanged.
 
 Parameters
 ----------
@@ -1839,7 +1845,12 @@ pivot : number, fraction, 0 to 1, default 0.5
     below it darken.
 saturation : number (drivable), ratio, 0 to 5, default 1.0
     Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more
-    vivid."""
+    vivid.
+vibrance : number (drivable), fraction, 0 to 1, default 0.0
+    How far muted colours are pushed toward full saturation (0..1), after `saturation`:
+    0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour
+    at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated
+    colours stay as they are; colours are never made duller."""
     ...
 
 def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -4676,23 +4687,6 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
     'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about
     the edge pixel. For the noise and wobble the rules act on the rows and columns of
     their own fields."""
-    ...
-
-def vibrance(amount: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Raise the saturation of muted colours more than that of vivid ones, never lowering anyone's.
-
-Works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation becomes
-s + amount * s * (1 - s), which never exceeds 1, so the result stays inside 0..1 without clipping. The strongest
-channel (HSV value) is kept and every other channel moves away from it by the same factor, so the hue is exactly
-the input's (up to float rounding) and a grey, whose saturation is 0, is unchanged.
-
-Parameters
-----------
-amount : number (drivable), fraction, 0 to 1, default 0.0
-    How far muted colours are pushed toward full saturation (0..1): 0 changes nothing, 1
-    raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36
-    while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they
-    are; colours are never made duller."""
     ...
 
 def vignette(amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
