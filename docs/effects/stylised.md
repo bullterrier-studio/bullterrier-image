@@ -6,7 +6,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as a pattern of dots of `cell` size. | `method='floyd_steinberg'` `palette='photo'` `colors=8` `cell=0.0005` `pattern=1.0` +5 advanced | [dither.toml](../../examples/effects/dither.toml) |
+| <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize` and `threshold`. | `method='floyd_steinberg'` `palette='photo'` `colors=8` `cell=0.0005` `pattern=1.0` +5 advanced | [dither.toml](../../examples/effects/dither.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` +3 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=0.125` `min_cell=0.01` `gap=0.002` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
@@ -35,6 +35,13 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the choice of sample dots and starting colours when `palette` is 'photo': the same seed always gives the same picture, another seed may find slightly different colours. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `posterize` | Posterize: the picture in 6 flat colours found in it, a poster with bands where the tones were. Set `colors` for more or fewer. |
+| `threshold` | Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks. |
 
 ### `halftone`
 

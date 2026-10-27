@@ -818,8 +818,9 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Redraw the picture in a few colours, its tones kept as a pattern of dots of `cell` size.
+def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold'] | None = None) -> Step:
+    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither,
+1-bit black and white, retro palettes, and the presets `posterize` and `threshold`.
 
 The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
 afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours
@@ -882,7 +883,12 @@ sample : whole number, count, 1 to 1000000, default 10000
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed for the choice of sample dots and starting colours when `palette` is
     'photo': the same seed always gives the same picture, another seed may find slightly
-    different colours."""
+    different colours.
+
+Presets
+-------
+posterize : Posterize: the picture in 6 flat colours found in it, a poster with bands where the tones were. Set `colors` for more or fewer.
+threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks."""
     ...
 
 def drop_shadow(copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow'] | None = None) -> Step:
@@ -2962,21 +2968,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     'wrap' (the opposite edge)."""
     ...
 
-def posterize(levels: int = 256, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one.
-
-The levels run from 0 to 1 in steps of 1 / (levels - 1), so black and white are always kept. Doing it twice
-changes nothing more.
-
-Parameters
-----------
-levels : whole number, count, 2 to 256, default 256
-    Number of evenly spaced tone levels kept in each of red, green and blue, black and
-    white included: 2 gives pure black or full intensity per channel (8 colours), 4
-    gives 0, 1/3, 2/3 and 1. Lowering it flattens the tones into fewer, coarser bands;
-    256 only rounds to the 8-bit levels of a JPEG or PNG."""
-    ...
-
 def quadtree(threshold: float = 0.06, max_cell: float = 0.125, min_cell: float = 0.01, gap: float = 0.002, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges.
 
@@ -3836,23 +3827,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     in from outside): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
     about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite
     edge)."""
-    ...
-
-def threshold(level: float = 0.5, dark: str | list[float] | tuple[float, float, float] = '#000000', light: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere.
-
-Brightness is Rec. 709 luminance, so a pure green is far brighter than a pure blue, as the eye sees them.
-
-Parameters
-----------
-level : number, fraction, 0 to 1, default 0.5
-    Brightness (Rec. 709 luminance, 0 = black, 1 = white) at which the picture is split:
-    pixels at or above it are painted `light`, the rest `dark`. Raising it turns more of
-    the picture dark; 0 makes all of it light.
-dark : colour, default '#000000'
-    Colour of the pixels darker than `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-light : colour, default '#ffffff'
-    Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
 def tile(columns: int = 3, rows: int = 3, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

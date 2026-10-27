@@ -14,9 +14,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
-| <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
-| <img src="../gallery/threshold.jpg" width="160" alt="threshold"> | `threshold` | Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere. | `level=0.5` `dark='#000000'` `light='#ffffff'` | [threshold.toml](../../examples/effects/threshold.toml) |
 | <img src="../gallery/white_balance.jpg" width="160" alt="white_balance"> | `white_balance` | Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light. | `temperature=0.0` `tint=0.0` | [white_balance.toml](../../examples/effects/white_balance.toml) |
 
 ### `auto_levels`
@@ -167,12 +165,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- |
 | `invert` | The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement. |
 
-### `posterize`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `levels` | whole number | count | 2 to 256 | `256` | Number of evenly spaced tone levels kept in each of red, green and blue, black and white included: 2 gives pure black or full intensity per channel (8 colours), 4 gives 0, 1/3, 2/3 and 1. Lowering it flattens the tones into fewer, coarser bands; 256 only rounds to the 8-bit levels of a JPEG or PNG. |
-
 ### `selective_color`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -189,14 +181,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `hue_shift` | Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay. |
-
-### `threshold`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `level` | number | fraction | 0 to 1 | `0.5` | Brightness (Rec. 709 luminance, 0 = black, 1 = white) at which the picture is split: pixels at or above it are painted `light`, the rest `dark`. Raising it turns more of the picture dark; 0 makes all of it light. |
-| `dark` | colour |  |  | `'#000000'` | Colour of the pixels darker than `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-| `light` | colour |  |  | `'#ffffff'` | Colour of the pixels at or above `level`: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 
 ### `white_balance`
 
