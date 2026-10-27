@@ -86,13 +86,13 @@ mask = "background"               # "subject", "background" or a region: apply o
 effect = "slice_shift"
 preset = "glitch"
 bands = 10
-amount = 51.2                     # how far a strip may slide, in px (design pixels: a picture 480 px long)
+amount = 24                       # how far a strip may slide, in px (design pixels: a picture 480 px long)
 seed = 4                          # same seed, same result, every time
 
 [[step]]
 effect = "rgb_split"              # red right, blue left, wrapping
 angle = 0
-amount = 10
+amount = 4.7
 edge = "wrap"
 
 [[step]]
@@ -115,8 +115,8 @@ neon_glitch = Recipe(
         fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
         fx.gradient(colors=["#000000"], mask="background"),  # only where the photo's background is
         fx.slice_shift(preset="glitch", bands=8, seed=4),
-        fx.rgb_split(angle=0, amount=12, edge="wrap"),
-        fx.bloom(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
+        fx.rgb_split(angle=0, amount=5.6, edge="wrap"),
+        fx.bloom(radius=12.2, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
     ],
 )
 

@@ -17,16 +17,16 @@ neon_glitch = Recipe(
         fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
         fx.gradient(colors=["#000000"], mask="background"),  # only where the photo's background is
         fx.slice_shift(preset="glitch", bands=8, seed=4),
-        fx.rgb_split(angle=0, amount=12, edge="wrap"),
-        fx.bloom(radius=26, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
+        fx.rgb_split(angle=0, amount=5.6, edge="wrap"),
+        fx.bloom(radius=12.2, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
     ],
 )
 
 imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
 
-Step keys are keywords on every `fx` function: `fx.bloom(radius=26, opacity=0.8, blend_mode="screen")` = step `effect = "bloom"`,
-`radius = 26`, `opacity = 0.8`, `blend_mode = "screen"`. `fx.rgb_split(amnt=8)` raises at once, lists valid parameters, same as
+Step keys are keywords on every `fx` function: `fx.bloom(radius=12.2, opacity=0.8, blend_mode="screen")` = step `effect = "bloom"`,
+`radius = 12.2`, `opacity = 0.8`, `blend_mode = "screen"`. `fx.rgb_split(amnt=8)` raises at once, lists valid parameters, same as
 TOML typo. Code-built recipes go straight to pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`.
 Runnable: [`examples/python_api.py`](../examples/python_api.py).
 

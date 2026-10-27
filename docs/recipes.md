@@ -24,13 +24,13 @@ mask = "background"               # "subject", "background" or a region: apply o
 effect = "slice_shift"
 preset = "glitch"
 bands = 10
-amount = 51.2                     # how far a strip may slide, in px (design pixels, see `size` below)
+amount = 24                       # how far a strip may slide, in px (design pixels, see below)
 seed = 4                          # same seed, same result, every time
 
 [[step]]
 effect = "rgb_split"              # red right, blue left, wrapping
 angle = 0
-amount = 10
+amount = 4.7
 edge = "wrap"
 
 [[step]]

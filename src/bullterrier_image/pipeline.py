@@ -703,19 +703,19 @@ size = 1600
 effect = "slice_shift"
 preset = "glitch"
 bands = 8
-amount = 0.05
+amount = 0.015
 seed = 4
 
 [[step]]
 effect = "rgb_split"
 angle = 0
-amount = 9
+amount = 2.7
 edge = "wrap"
 
 [[step]]
 effect = "grain"
 amount = 0.07
-size = 1.6
+size = 0.48
 """,
     "cutout-black.toml": """# Just the subject, on pure black (the portable model finds it; downloaded on first use).
 name = "cutout-black"
