@@ -100,7 +100,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Preset | Description |
 | --- | --- |
-| `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. |
+| `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones. |
 | `layered_cutouts` | Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple. |
 
 ### `outline`

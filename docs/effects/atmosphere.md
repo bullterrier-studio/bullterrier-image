@@ -41,7 +41,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Preset | Description |
 | --- | --- |
-| `smoke` | Plumes of smoke or steam: clear air between soft-edged columns that rise from the bottom edge and curl. |
+| `smoke` | Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke. |
 
 ### `lens_drops`
 

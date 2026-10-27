@@ -979,7 +979,7 @@ Step opacity
 
 Presets
 -------
-long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px.
+long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones.
 layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."""
     ...
 
@@ -1442,7 +1442,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 Presets
 -------
-smoke : Plumes of smoke or steam: clear air between soft-edged columns that rise from the bottom edge and curl."""
+smoke : Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke."""
     ...
 
 def fractal(kind: Literal['mandelbrot', 'julia'] = 'julia', zoom: float = 1.0, x: float = 0.0, y: float = 0.0, c_real: float = -0.8, c_imag: float = 0.156, iterations: int = 64, period: float = 24.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), interior: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
