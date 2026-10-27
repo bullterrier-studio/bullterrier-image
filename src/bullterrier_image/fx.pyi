@@ -2455,9 +2455,11 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 def noise_field(kind: Literal['value', 'perlin', 'worley', 'sine'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 0.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['plasma'] | None = None) -> Step:
-    """Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`.
+    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine),
+coloured through `colors`.
 
-A generated background: the input is used only for its height and width, its content is ignored. The noise is
+A generated background: the input is used only for its height and width, its content is ignored. Followed by
+`shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is
 standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
 distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
 noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
@@ -3531,8 +3533,8 @@ clarity : Local contrast: features stand out against a wide (30 px) blur of thei
     ...
 
 def shatter(pieces: int = 24, shape: Literal['voronoi', 'triangles'] = 'voronoi', detail: float = 0.0, fill: float = 0.0, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px
-lines between them.
+    """Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its
+mean colour (stained glass, low-poly), and draw `gap` px lines between them.
 
 The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
 or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to
@@ -4078,33 +4080,4 @@ roundness : number, fraction, 0 to 1, default 1.0
 color : colour, default '#000000'
     The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
     white lightens."""
-    ...
-
-def voronoi_cells(cells: int = 80, seed: int = 0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347'), shade: float = 0.35, line_width: float = 1.5, line_color: str | list[float] | tuple[float, float, float] = '#0a0014', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders.
-
-A generated background: the input is used only for its height and width, its content is ignored. Every pixel
-belongs to the cell of its nearest site; a cell's colour is a random point on `colors`, darkened toward its
-border by `shade`, and the border lines are drawn in `line_color`.
-
-Parameters
-----------
-cells : whole number, count, 4 to 2000, default 80
-    How many cells (random points, the sites) the picture is divided into. More =
-    smaller cells; the average cell is the picture's area divided by this.
-seed : whole number, count, 0 to 2147483647, default 0
-    Seeds the random positions and colours: the same seed gives the same cells.
-colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')
-    The colour ramp, evenly spaced; at least two. Each cell takes the colour at its own
-    random position along it, so a longer list gives more variety.
-shade : number, fraction, 0 to 1, default 0.35
-    How much each cell darkens away from its site: 0 = flat colour, 1 = black on the
-    cell's border. The darkening is the distance to the site over the distance to the
-    site plus the distance to the border, so it grows steadily from the site to the
-    border and gives every cell a dome look.
-line_width : number, px, 0 to 32, default 1.5
-    The width of the border lines between cells in px, with anti-aliased edges; 0 = no
-    borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high.
-line_color : colour, default '#0a0014'
-    The colour of the border lines."""
     ...

@@ -10,9 +10,8 @@ Generated or replaced backgrounds behind the subject.
 | <img src="../gallery/flow_lines.jpg" width="160" alt="flow_lines"> | `flow_lines` | Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow. | `density=0.002` `length=120` `thickness=1.5` `scale=120.0` `octaves=2` `twist=180.0` `seed=0` `line='#ffd84a'` `background='#12002b'` +3 advanced | [flow_lines.toml](../../examples/effects/flow_lines.toml) |
 | <img src="../gallery/fractal.jpg" width="160" alt="fractal"> | `fractal` | Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes. | `kind='julia'` `zoom=1.0` `x=0.0` `y=0.0` `c_real=-0.8` `c_imag=0.156` `iterations=64` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [fractal.toml](../../examples/effects/fractal.toml) |
 | <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep. | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
-| <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `warp=0.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
+| <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `warp=0.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
-| <img src="../gallery/voronoi_cells.jpg" width="160" alt="voronoi_cells"> | `voronoi_cells` | Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders. | `cells=80` `seed=0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` `shade=0.35` `line_width=1.5` `line_color='#0a0014'` | [voronoi_cells.toml](../../examples/effects/voronoi_cells.toml) |
 
 ### `aurora`
 
@@ -129,14 +128,3 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `thickness` | number | fraction | 0 to 1 | `0.2` | Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and 'dots'. |
 | `radius` | number | fraction | 0 to 0.75 | `0.3` | Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes', 'checks' and 'grid'. |
 | `feather` | number | px | 0 to 32 | `1.0` | The width of the soft edge in px, centred on the shape's border and blended linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes. |
-
-### `voronoi_cells`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `cells` | whole number | count | 4 to 2000 | `80` | How many cells (random points, the sites) the picture is divided into. More = smaller cells; the average cell is the picture's area divided by this. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Seeds the random positions and colours: the same seed gives the same cells. |
-| `colors` | list of colours |  |  | `('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` | The colour ramp, evenly spaced; at least two. Each cell takes the colour at its own random position along it, so a longer list gives more variety. |
-| `shade` | number | fraction | 0 to 1 | `0.35` | How much each cell darkens away from its site: 0 = flat colour, 1 = black on the cell's border. The darkening is the distance to the site over the distance to the site plus the distance to the border, so it grows steadily from the site to the border and gives every cell a dome look. |
-| `line_width` | number | px | 0 to 32 | `1.5` | The width of the border lines between cells in px, with anti-aliased edges; 0 = no borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high. |
-| `line_color` | colour |  |  | `'#0a0014'` | The colour of the border lines. |
