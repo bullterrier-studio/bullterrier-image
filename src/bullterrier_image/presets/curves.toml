@@ -13,3 +13,8 @@ green_highlights = 0.82
 blue_shadows = 0.36
 blue_midtones = 0.45
 blue_highlights = 0.62
+
+[solarize]
+description = "Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."
+highlights = 0.25
+white = 0.0

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.recipe import Step
 
 NAME = "curves"
 ANCHORS = (0.0, 0.25, 0.5, 0.75, 1.0)  # where the five master points sit on the input axis, as documented
@@ -116,3 +117,23 @@ def test_a_curve_that_rises_and_falls_never_bulges_past_its_neighbouring_points(
         low, high = sorted(heights[left : left + 2])
         assert out[inside].min() >= low - 1e-6, MASTER_NAMES[left]  # an ordinary cubic through them would overshoot
         assert out[inside].max() <= high + 1e-6, MASTER_NAMES[left]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(0.0, 0.0, id="black stays black"),
+        pytest.param(0.25, 0.25, id="the shadows are untouched"),
+        pytest.param(0.5, 0.5, id="the curve peaks at the middle"),
+        pytest.param(0.75, 0.25, id="the highlights fold back to the shadows' height"),
+        pytest.param(1.0, 0.0, id="white goes to black"),
+    ],
+)
+def test_the_solarize_preset_folds_the_highlights_back_down_at_its_points(value: float, expected: float) -> None:
+    step = Step(NAME, preset="solarize")
+    np.testing.assert_allclose(registry.apply(NAME, grey(value), **step.params), expected, atol=1e-6)
+
+
+def test_the_solarize_preset_never_rises_above_the_middle_grey(photo: np.ndarray) -> None:
+    out = registry.apply(NAME, photo, **Step(NAME, preset="solarize").params)
+    assert out.max() <= 0.5 + 1e-6  # the master curve peaks at 0.5, whatever the picture

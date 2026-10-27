@@ -23,7 +23,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
 | `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
 | `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
-| `curves` ✓ | Tone curve through control points. | `fx.curves(shadows=0.18, highlights=0.82)` |
+| `curves` ✓ | Tone curve through control points; preset `solarize` folds the highlights back dark. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
 | `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
@@ -32,7 +32,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
 | `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
-| `solarize` ✓ | Invert above a threshold. | `fx.solarize(threshold=0.5)` |
 | `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
