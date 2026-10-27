@@ -12,7 +12,6 @@ Generated or replaced backgrounds behind the subject.
 | <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep. | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
 | <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `warp=0.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
-| <img src="../gallery/starfield.jpg" width="160" alt="starfield"> | `starfield` | A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input. | `count=600` `size=3.0` `depth_range=0.7` `color='#dfe8ff'` `sky='#04060f'` `seed=0` | [starfield.toml](../../examples/effects/starfield.toml) |
 | <img src="../gallery/voronoi_cells.jpg" width="160" alt="voronoi_cells"> | `voronoi_cells` | Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders. | `cells=80` `seed=0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` `shade=0.35` `line_width=1.5` `line_color='#0a0014'` | [voronoi_cells.toml](../../examples/effects/voronoi_cells.toml) |
 
 ### `aurora`
@@ -130,17 +129,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `thickness` | number | fraction | 0 to 1 | `0.2` | Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and 'dots'. |
 | `radius` | number | fraction | 0 to 0.75 | `0.3` | Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes', 'checks' and 'grid'. |
 | `feather` | number | px | 0 to 32 | `1.0` | The width of the soft edge in px, centred on the shape's border and blended linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes. |
-
-### `starfield`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `count` | whole number | count | 0 to 20000 | `600` | How many stars there are, whatever the size of the picture (a number, not a density). 0 = an empty sky, 600 a clear night. |
-| `size` | number | px | 1 to 50 | `3.0` | The diameter in px of the nearest, biggest stars (the others are smaller by their depth). Tuned for a picture about 480 px high. Larger = bigger stars. |
-| `depth_range` | number | fraction | 0 to 1 | `0.7` | The depth range of the stars, how far apart they are in distance, which spreads their size and brightness: a star is between 1 - `depth_range` and 1 times the full size and brightness. 0 = every star alike, 1 = from the nearest down to specks too small to see. |
-| `color` | colour |  |  | `'#dfe8ff'` | The colour of the stars' light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a cold white. Stars are screened over the sky, so they only lighten it. |
-| `sky` | colour |  |  | `'#04060f'` | The colour of the sky between the stars: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a blue-black night. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same stars in the same places, another seed others. |
 
 ### `voronoi_cells`
 
