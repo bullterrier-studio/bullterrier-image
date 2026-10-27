@@ -406,55 +406,55 @@ Presets
 prism : Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."""
     ...
 
-def color_balance(shadows_red: float = 0.0, shadows_green: float = 0.0, shadows_blue: float = 0.0, midtones_red: float = 0.0, midtones_green: float = 0.0, midtones_blue: float = 0.0, highlights_red: float = 0.0, highlights_green: float = 0.0, highlights_blue: float = 0.0, preserve_luminosity: bool = True, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Shift red, green and blue separately in the shadows, the midtones and the highlights.
+def color_balance(shadows: str | list[float] | tuple[float, float, float] = '#3a1bff', midtones: str | list[float] | tuple[float, float, float] = '#808080', highlights: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float | Drive = 0.3, balance: float | Drive = 0.5, softness: float = 1.0, preserve_luminosity: bool = True, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange', 'split_tone', 'color_balance'] | None = None) -> Step:
+    """Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading.
 
-A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. Its weights are shadows 1 - s(2L), midtones
-s(2L) - s(2L - 1) and highlights s(2L - 1), where s is the smoothstep 3x^2 - 2x^3 of its argument held to 0..1:
-black is all shadows, mid grey all midtones, white all highlights, the three always add up to 1 and change
-smoothly. Each channel moves by the sum, over the three tones, of the weight times that tone's shift for the
-channel; the result is held to 0..1. With `preserve_luminosity` the luma the shifts changed is then restored
-by adding the same amount to every channel (before the hold to 0..1).
+A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. The shadow/midtone and midtone/highlight
+hand-overs are centred on `balance` / 2 and (1 + `balance`) / 2, each `softness` / 2 wide, and run along
+the smoothstep s(x) = 3x^2 - 2x^3 of their argument held to 0..1. Its weights are shadows 1 - lower, midtones
+lower - upper and highlights upper, so black is all shadows, mid grey (at the defaults) all midtones, white
+all highlights, and the three always add up to 1. Each channel moves by `amount` times the sum, over the three
+ranges, of the weight times (the range's colour - 0.5); the result is held to 0..1. With `preserve_luminosity`
+the luma the pushes changed is then restored by adding the same amount to every channel (before the hold).
 
 Parameters
 ----------
-shadows_red : number, fraction, -1 to 1, default 0.0
-    Shift of the red channel in the darkest tones, in 0..1 picture units at full weight
-    (pure black): +0.1 adds a tenth of the range, -0.1 removes it (towards cyan). 0 =
-    off.
-shadows_green : number, fraction, -1 to 1, default 0.0
-    Shift of the green channel in the darkest tones, at full weight (pure black):
-    positive adds green, negative removes it (towards magenta). 0 = off.
-shadows_blue : number, fraction, -1 to 1, default 0.0
-    Shift of the blue channel in the darkest tones, at full weight (pure black):
-    positive adds blue, negative removes it (towards yellow). 0 = off.
-midtones_red : number, fraction, -1 to 1, default 0.0
-    Shift of the red channel in the middle tones, at full weight (mid grey): positive
-    adds red, negative removes it (towards cyan). 0 = off.
-midtones_green : number, fraction, -1 to 1, default 0.0
-    Shift of the green channel in the middle tones, at full weight (mid grey): positive
-    adds green, negative removes it (towards magenta). 0 = off.
-midtones_blue : number, fraction, -1 to 1, default 0.0
-    Shift of the blue channel in the middle tones, at full weight (mid grey): positive
-    adds blue, negative removes it (towards yellow). 0 = off.
-highlights_red : number, fraction, -1 to 1, default 0.0
-    Shift of the red channel in the brightest tones, at full weight (pure white):
-    positive adds red, negative removes it (towards cyan). 0 = off.
-highlights_green : number, fraction, -1 to 1, default 0.0
-    Shift of the green channel in the brightest tones, at full weight (pure white):
-    positive adds green, negative removes it (towards magenta). 0 = off.
-highlights_blue : number, fraction, -1 to 1, default 0.0
-    Shift of the blue channel in the brightest tones, at full weight (pure white):
-    positive adds blue, negative removes it (towards yellow). 0 = off.
+shadows : colour, default '#3a1bff'
+    The colour the dark parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone; a lighter or darker colour than that also
+    lightens or darkens them unless `preserve_luminosity` is on.
+midtones : colour, default '#808080'
+    The colour the middle tones are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone.
+highlights : colour, default '#ff2bd6'
+    The colour the bright parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone.
+amount : number (drivable), fraction, 0 to 1, default 0.3
+    How far each range is pushed toward its colour: 0 = off, 0.2 a hint, 0.6 strong, 1
+    moves a range by the full distance from mid grey to its colour.
+balance : number (drivable), fraction, 0 to 1, default 0.5
+    Where the three ranges sit on the brightness scale (0..1): 0.5 splits it evenly,
+    shadows below a quarter and highlights above three quarters. Raising it lets the
+    shadows reach higher up and shrinks the highlights; lowering it does the reverse.
+softness : number, fraction, 0.01 to 1, default 1.0
+    How far neighbouring ranges overlap (0.01..1): 1 blends each into the next over half
+    the brightness scale, with no pure midtones except at the centre; smaller makes
+    sharper hand-overs and a wider band of pure midtones.
 
 Advanced parameters
 -------------------
 preserve_luminosity : true or false, default True
-    Keep each pixel's Rec. 709 luma while shifting colours: on, the brightness the
-    shifts add or remove is taken off or put back on all three channels, so only the
-    colour changes (Photoshop's 'Preserve Luminosity'); off, the shifts also lighten or
-    darken. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping
-    allows."""
+    Keep each pixel's Rec. 709 luma while pushing colours: on, the brightness a push
+    adds or removes is taken off or put back on all three channels, so only the colour
+    changes (Photoshop's 'Preserve Luminosity'); off, a push toward a lighter or darker
+    colour also lightens or darkens. Where a channel reaches 0 or 1 the luma is only
+    kept as far as the clipping allows.
+
+Presets
+-------
+teal_orange : The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between.
+split_tone : Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones.
+color_balance : A starting point for colour balancing: cool shadows, untouched midtones, warm highlights."""
     ...
 
 def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
@@ -3696,37 +3696,6 @@ band_max_height : number, fraction, 0 to 1, default 0.06
 Presets
 -------
 glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
-    ...
-
-def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange'] | None = None) -> Step:
-    """Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness.
-
-The subtle way to get a neon or cinematic cast: skin tones and detail stay, the colour shifts toward the tints.
-`amount` 0..1 (0.2 is a hint, 0.6 is strong), `balance` = the brightness where one tint hands over to the other.
-Pure black stays black (a tint fades in up to `black_fade` brightness), so a black background is not coloured.
-Near pure white a tint would clip, so those few pixels shift slightly in brightness.
-
-Parameters
-----------
-shadow : colour, default '#3a1bff'
-    The tint of the dark parts: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-highlight : colour, default '#ff2bd6'
-    The tint of the bright parts: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-amount : number, fraction, 0 to 1, default 0.3
-    How strongly the tints are added: 0 = off, 0.2 a hint, 0.6 strong.
-balance : number, fraction, 0 to 1, default 0.5
-    The brightness (0..1) where the shadow tint hands over to the highlight tint.
-    Raising it tints more of the picture with the shadow colour.
-softness : number, fraction, 0.01 to 1, default 0.5
-    Width of the brightness band (0.01..1), centred on balance, over which one tint
-    blends into the other. Smaller makes a sharper hand-over.
-black_fade : number, fraction, 0.001 to 1, default 0.1
-    The brightness (0.001..1) up to which the tints fade in from nothing, so pure black
-    stays black. Larger keeps more of the shadows untinted.
-
-Presets
--------
-teal_orange : The blockbuster grade: teal in the shadows, orange in the highlights."""
     ...
 
 def spotlight(amount: float = 0.8, falloff: float = 0.8, radius: float = 200.0, feather: float = 10.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

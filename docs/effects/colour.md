@@ -8,7 +8,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
 | <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
-| <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
+| <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading. | `shadows='#3a1bff'` `midtones='#808080'` `highlights='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=1.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
@@ -16,7 +16,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
 | <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
-| <img src="../gallery/split_tone.jpg" width="160" alt="split_tone"> | `split_tone` | Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness. | `shadow='#3a1bff'` `highlight='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=0.5` `black_fade=0.1` | [split_tone.toml](../../examples/effects/split_tone.toml) |
 | <img src="../gallery/threshold.jpg" width="160" alt="threshold"> | `threshold` | Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere. | `level=0.5` `dark='#000000'` `light='#ffffff'` | [threshold.toml](../../examples/effects/threshold.toml) |
 | <img src="../gallery/white_balance.jpg" width="160" alt="white_balance"> | `white_balance` | Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light. | `temperature=0.0` `tint=0.0` | [white_balance.toml](../../examples/effects/white_balance.toml) |
 
@@ -52,23 +51,28 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `shadows_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the darkest tones, in 0..1 picture units at full weight (pure black): +0.1 adds a tenth of the range, -0.1 removes it (towards cyan). 0 = off. |
-| `shadows_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the darkest tones, at full weight (pure black): positive adds green, negative removes it (towards magenta). 0 = off. |
-| `shadows_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the darkest tones, at full weight (pure black): positive adds blue, negative removes it (towards yellow). 0 = off. |
-| `midtones_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the middle tones, at full weight (mid grey): positive adds red, negative removes it (towards cyan). 0 = off. |
-| `midtones_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the middle tones, at full weight (mid grey): positive adds green, negative removes it (towards magenta). 0 = off. |
-| `midtones_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the middle tones, at full weight (mid grey): positive adds blue, negative removes it (towards yellow). 0 = off. |
-| `highlights_red` | number | fraction | -1 to 1 | `0.0` | Shift of the red channel in the brightest tones, at full weight (pure white): positive adds red, negative removes it (towards cyan). 0 = off. |
-| `highlights_green` | number | fraction | -1 to 1 | `0.0` | Shift of the green channel in the brightest tones, at full weight (pure white): positive adds green, negative removes it (towards magenta). 0 = off. |
-| `highlights_blue` | number | fraction | -1 to 1 | `0.0` | Shift of the blue channel in the brightest tones, at full weight (pure white): positive adds blue, negative removes it (towards yellow). 0 = off. |
+| `shadows` | colour |  |  | `'#3a1bff'` | The colour the dark parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1. Mid grey '#808080' leaves them alone; a lighter or darker colour than that also lightens or darkens them unless `preserve_luminosity` is on. |
+| `midtones` | colour |  |  | `'#808080'` | The colour the middle tones are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1. Mid grey '#808080' leaves them alone. |
+| `highlights` | colour |  |  | `'#ff2bd6'` | The colour the bright parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1. Mid grey '#808080' leaves them alone. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.3` | How far each range is pushed toward its colour: 0 = off, 0.2 a hint, 0.6 strong, 1 moves a range by the full distance from mid grey to its colour. |
+| `balance` | number (drivable) | fraction | 0 to 1 | `0.5` | Where the three ranges sit on the brightness scale (0..1): 0.5 splits it evenly, shadows below a quarter and highlights above three quarters. Raising it lets the shadows reach higher up and shrinks the highlights; lowering it does the reverse. |
+| `softness` | number | fraction | 0.01 to 1 | `1.0` | How far neighbouring ranges overlap (0.01..1): 1 blends each into the next over half the brightness scale, with no pure midtones except at the centre; smaller makes sharper hand-overs and a wider band of pure midtones. |
 
 <details><summary>Advanced parameters (1)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `preserve_luminosity` | true or false |  |  | `True` | Keep each pixel's Rec. 709 luma while shifting colours: on, the brightness the shifts add or remove is taken off or put back on all three channels, so only the colour changes (Photoshop's 'Preserve Luminosity'); off, the shifts also lighten or darken. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping allows. |
+| `preserve_luminosity` | true or false |  |  | `True` | Keep each pixel's Rec. 709 luma while pushing colours: on, the brightness a push adds or removes is taken off or put back on all three channels, so only the colour changes (Photoshop's 'Preserve Luminosity'); off, a push toward a lighter or darker colour also lightens or darkens. Where a channel reaches 0 or 1 the luma is only kept as far as the clipping allows. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `teal_orange` | The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between. |
+| `split_tone` | Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones. |
+| `color_balance` | A starting point for colour balancing: cool shadows, untouched midtones, warm highlights. |
 
 ### `curves`
 
@@ -185,23 +189,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `hue_shift` | Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay. |
-
-### `split_tone`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `shadow` | colour |  |  | `'#3a1bff'` | The tint of the dark parts: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-| `highlight` | colour |  |  | `'#ff2bd6'` | The tint of the bright parts: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-| `amount` | number | fraction | 0 to 1 | `0.3` | How strongly the tints are added: 0 = off, 0.2 a hint, 0.6 strong. |
-| `balance` | number | fraction | 0 to 1 | `0.5` | The brightness (0..1) where the shadow tint hands over to the highlight tint. Raising it tints more of the picture with the shadow colour. |
-| `softness` | number | fraction | 0.01 to 1 | `0.5` | Width of the brightness band (0.01..1), centred on balance, over which one tint blends into the other. Smaller makes a sharper hand-over. |
-| `black_fade` | number | fraction | 0.001 to 1 | `0.1` | The brightness (0.001..1) up to which the tints fade in from nothing, so pure black stays black. Larger keeps more of the shadows untinted. |
-
-Presets (`preset="name"` in a recipe step or `fx`):
-
-| Preset | Description |
-| --- | --- |
-| `teal_orange` | The blockbuster grade: teal in the shadows, orange in the highlights. |
 
 ### `threshold`
 
