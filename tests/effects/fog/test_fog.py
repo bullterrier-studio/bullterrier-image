@@ -101,12 +101,15 @@ def test_a_floor_keeps_a_veil_over_the_gaps_that_a_floor_of_0_opens() -> None:
 def test_the_smoke_preset_has_clear_air_between_plumes_that_reach_the_amount() -> None:
     opacity = plumes({})
     assert (opacity == 0).mean() > 0.4
-    assert opacity.max() == pytest.approx(0.5, abs=1e-3)
+    assert opacity.max() == pytest.approx(SMOKE["amount"], abs=0.01)
 
 
-def test_the_smoke_preset_has_no_gradient() -> None:
-    """With the floor raised to 1 the preset's opacity is its amount in every row, from top to bottom."""
-    np.testing.assert_allclose(plumes({"floor": 1.0}), 0.5, atol=1e-6)
+def test_the_smoke_preset_is_thickest_at_the_bottom_and_thinner_toward_the_top() -> None:
+    """With the floor raised to 1 the cloud shape drops out and only the row-by-row gradient is left."""
+    rows = plumes({"floor": 1.0}).mean(axis=1)
+    assert rows[0] < 0.5 * rows[-1]
+    assert rows[-1] == pytest.approx(SMOKE["amount"], abs=0.01)
+    assert (np.diff(rows) > 0).all()
 
 
 @pytest.mark.parametrize("coverage", [0.25, 0.5, 0.8])
@@ -132,7 +135,19 @@ def test_the_extremes_of_coverage_are_a_clear_picture_and_cloud_everywhere(cover
 def test_feather_is_the_share_of_the_picture_on_the_soft_edge_of_the_cloud(feather: float) -> None:
     """Opacity rises from the floor to `amount` across the `feather` share of pixels just above the coverage cut, so
     that share of the picture is neither at the floor nor at full opacity; the rest is at one or the other."""
-    opacity = plumes({"coverage": 0.5, "feather": feather, "scale": 4.0, "turbulence": 0.0, "rise": 1.0, "seed": 2})
+    opacity = plumes(
+        {
+            "amount": 0.5,
+            "gradient": 0.0,
+            "floor": 0.0,
+            "coverage": 0.5,
+            "feather": feather,
+            "scale": 4.0,
+            "turbulence": 0.0,
+            "rise": 1.0,
+            "seed": 2,
+        }
+    )
     soft = ((opacity > 1e-6) & (opacity < 0.5 - 1e-6)).mean()
     assert soft == pytest.approx(feather, abs=0.05)
     assert opacity.max() == pytest.approx(0.5, abs=1e-4)
@@ -147,6 +162,8 @@ def test_the_soft_edge_follows_a_smoothstep_curve_from_the_floor_to_the_amount(f
     opacity = plumes(
         {
             "amount": amount,
+            "gradient": 0.0,
+            "octaves": 4,
             "coverage": 0.5,
             "feather": 0.3,
             "floor": floor,

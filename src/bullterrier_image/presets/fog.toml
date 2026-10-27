@@ -1,13 +1,14 @@
 # Looks that are one fog step.
 
 [smoke]
-description = "Plumes of smoke or steam: clear air between soft-edged columns that rise from the bottom edge and curl."
-amount = 0.5
+description = "Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke."
+amount = 0.75
 color = "#e6e6e6"
-gradient = 0
-coverage = 0.45
-feather = 0.25
+gradient = 0.8
+coverage = 0.5
+feather = 0.5
 floor = 0
-scale = 100
-rise = 2
-turbulence = 30
+scale = 60
+rise = 4
+turbulence = 40
+octaves = 2
