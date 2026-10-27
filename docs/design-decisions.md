@@ -321,7 +321,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   pixel values (shares and angles), so only effects scale; noise and random placements keep their character at another
   size, not their exact positions. An effect whose light depends on how many pixels cover a design area (`starburst`
   with every bright pixel radiating) reads `EffectParams.size_ratio` (working px per design px) and gives each pixel
-  its share, so the total stays the same.
+  its share, so the total stays the same. Lengths in `px` are written for a picture whose long side is the design size, so
+  a portrait photo gets the same values as a landscape one: a reach follows the long side, never the width or the height.
 
 - **Marks: a count or a density.** A few marks (`dead_pixels.count`, `lens_drops.count`, `scratches`, `pieces`, `bands`)
   are a `count`: it reads naturally, and the marks' sizes are `px`, so the same count covers the same share at any size.
