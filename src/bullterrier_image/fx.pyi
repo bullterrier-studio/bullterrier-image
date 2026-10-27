@@ -242,11 +242,10 @@ scale : number, ratio, 0.01 to 2, default 1.0
     The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5
     half as wide and tall. With 'width' it is the picture's width as a share of the
     photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo.
-margin : number, fraction, 0 to 0.45, default 0.0
-    Space kept clear around the fitted picture, as a share of the photo's long side, 0
-    to 0.45 (never more than leaves a pixel of the shorter side). Raising it shrinks
-    what 'cover', 'contain' and 'stretch' fill and moves a smaller picture at an edge or
-    corner inward.
+margin : number, px, 0 to 216, default 0.0
+    Space kept clear around the fitted picture on every side, 0 to 216 px (never more
+    than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain'
+    and 'stretch' fill and moves a smaller picture at an edge or corner inward.
 
 Advanced parameters
 -------------------
@@ -2599,8 +2598,8 @@ fibre : number, fraction, 0 to 1, default 0.3
     same as 'paper'). Ignored for 'paper'."""
     ...
 
-def parallax(angle: float = 0.0, amount: float = 0.02, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera
+def parallax(angle: float = 0.0, amount: float = 9.6, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera
 move would.
 
 Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
@@ -2614,10 +2613,10 @@ angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction the nearest layers move, in degrees clockwise from pointing right, as
     seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move
     the opposite way.
-amount : number, fraction, 0 to 0.1, default 0.02
-    How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a
-    fraction of the picture's long side: a layer moves amount x (its depth - focus) of
-    it. Raising it exaggerates the shift; 0 leaves the picture unchanged.
+amount : number, px, 0 to 48, default 9.6
+    How far the nearest layer (depth 1) moves when the focus is the farthest depth, 0 to
+    48 px: a layer moves amount x (its depth - focus) px. Raising it exaggerates the
+    shift; 0 leaves the picture unchanged.
 focus : number, fraction, 0 to 1, default 0.5
     The depth that stays still, as a fraction of the picture's depth range: 1 = the
     nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the
