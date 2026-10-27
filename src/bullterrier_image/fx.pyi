@@ -3032,13 +3032,15 @@ feather : number, px, 0 to 32, default 1.0
     linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
     ...
 
-def perspective(vertical: float = 0.25, horizontal: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, turn it, zoom it.
+def perspective(vertical: float = 0.25, horizontal: float = 0.0, shear_x: float = 0.0, shear_y: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, skew, turn and zoom it.
 
 The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the
 vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the
-horizontal one, then `rotate` degrees clockwise, then `scale`. With all four at 0 the picture is returned
-unchanged. The output beyond the vanishing line reads from outside the picture, so `edge` says what it shows.
+horizontal one, then the skew (rows slide sideways by `shear_x` px per row, then columns down by `shear_y` px per
+column, so the area never changes), then `rotate` degrees clockwise, then `scale`. With all six at 0 the picture is
+returned unchanged. The output beyond the vanishing line reads from outside the picture, so `edge` says what it
+shows.
 
 Parameters
 ----------
@@ -3055,15 +3057,27 @@ horizontal : number, fraction, -0.9 to 0.9, default 0.0
     side the far side (the right edge shortens to 1 - horizontal of the left edge),
     negative makes the left side the far side; 0 = none. Applied after the vertical
     keystone.
+shear_x : number, ratio, -2 to 2, default 0.0
+    The horizontal skew, after the keystones, as a slope in columns per row: each row
+    slides sideways by this many pixels for every pixel it lies below the centre (and
+    the other way above it), so a vertical line leans into a line of this slope. 0 =
+    none, 0.2 = a lean of about 11 degrees, 1 = 45 degrees, positive slides the lower
+    half right and the upper half left, negative the other way. Applied before
+    `shear_y`.
+shear_y : number, ratio, -2 to 2, default 0.0
+    The vertical skew, after `shear_x`, as a slope in rows per column: each column
+    slides down by this many pixels for every pixel it lies right of the centre (and up
+    on the left of it), so a horizontal line tilts into a line of this slope. 0 = none,
+    positive tilts the right side down, negative the right side up.
 rotate : number (cyclic), degrees, -180 to 180, default 0.0
-    How far the picture is turned about its centre, after the keystones, in degrees:
-    positive turns clockwise, negative counter-clockwise; 0 = none. The corners it
-    uncovers are filled by `edge`.
+    How far the picture is turned about its centre, after the keystones and skews, in
+    degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners
+    it uncovers are filled by `edge`.
 scale : number, fraction, -0.9 to 4, default 0.0
-    How much the picture is enlarged about its centre, after the keystones and the turn,
-    as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half the
-    size (the empty margin is filled by `edge`). Enlarging it hides the corners that the
-    keystone and turn uncover.
+    How much the picture is enlarged about its centre, after the keystones, skews and
+    turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half
+    the size (the empty margin is filled by `edge`). Enlarging it hides the corners that
+    the keystone and turn uncover.
 
 Advanced parameters
 -------------------
@@ -3074,7 +3088,7 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
     ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What fills the margins the keystone, turn and zoom uncover around the picture:
+    What fills the margins the keystone, skew, turn and zoom uncover around the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge)."""
     ...
@@ -3939,43 +3953,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     sides counts as an edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
     (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the
     opposite edge)."""
-    ...
-
-def shear(x: float = 0.2, y: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Skew the picture about its centre: slide rows sideways by `x` px per row, then columns down by `y` px per column.
-
-A pixel d rows below the centre moves x x d columns right, and then a pixel c columns right of the centre (counted
-after that move) moves y x c rows down; the centre pixel stays, and so does the centre row under `x` alone and the
-centre column under `y` alone. Points between pixels are read by `interpolation`.
-
-Parameters
-----------
-x : number, ratio, -2 to 2, default 0.2
-    The horizontal skew as a slope, in columns per row: each row slides sideways by this
-    many pixels for every pixel it lies below the centre (and the other way above it),
-    so a vertical line leans into a line of this slope. 0 = no skew, 0.2 = a lean of
-    about 11 degrees, 1 = 45 degrees, positive slides the lower half right and the upper
-    half left, negative the other way.
-y : number, ratio, -2 to 2, default 0.0
-    The vertical skew as a slope, in rows per column: each column slides down by this
-    many pixels for every pixel it lies right of the centre (and up on the left of it),
-    so a horizontal line tilts into a line of this slope. 0 = no skew, positive tilts
-    the right side down, negative the right side up. With both skews, `x` is applied
-    first, then `y`, so the picture's area never changes.
-
-Advanced parameters
--------------------
-interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How a point between pixels is read from the picture: 'nearest' takes the closest
-    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What fills the corners the skew uncovers, where it slides the picture away and shows
-    what lies beyond its edge: 'reflect' (mirrored, edge pixel repeated), 'mirror'
-    (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks),
-    'wrap' (the opposite edge)."""
     ...
 
 def signal_noise(bands: int = 3, band_height: float = 0.04, static: float = 0.7, dropouts: int = 12, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, dropout_length: float = 0.12, dropout_height: int = 2, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

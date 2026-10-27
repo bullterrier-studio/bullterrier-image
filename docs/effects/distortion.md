@@ -15,14 +15,13 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
 | <img src="../gallery/parallax.jpg" width="160" alt="parallax"> | `parallax` | Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera move would. | `angle=0.0` `amount=0.02` `focus=0.5` +2 advanced | [parallax.toml](../../examples/effects/parallax.toml) |
-| <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, turn it, zoom it. | `vertical=0.25` `horizontal=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
+| <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, skew, turn and zoom it. | `vertical=0.25` `horizontal=0.0` `shear_x=0.0` `shear_y=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
 | <img src="../gallery/pinch_bulge.jpg" width="160" alt="pinch_bulge"> | `pinch_bulge` | Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`. | `amount=0.5` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [pinch_bulge.toml](../../examples/effects/pinch_bulge.toml) |
 | <img src="../gallery/pixel_sort.jpg" width="160" alt="pixel_sort"> | `pixel_sort` | Sort every run of pixels whose key lies between `low` and `high` along the rows (or columns) by that key. | `by='brightness'` `low=0.25` `high=0.75` `axis='horizontal'` `order='ascending'` | [pixel_sort.toml](../../examples/effects/pixel_sort.toml) |
 | <img src="../gallery/polar.jpg" width="160" alt="polar"> | `polar` | Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from'). | `mode='to'` `x=0.5` `y=0.5` +2 advanced | [polar.toml](../../examples/effects/polar.toml) |
 | <img src="../gallery/ripple.jpg" width="160" alt="ripple"> | `ripple` | Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`. | `wavelength=40.0` `amplitude=6.0` `phase=0.0` `angle=0.0` +2 advanced | [ripple.toml](../../examples/effects/ripple.toml) |
 | <img src="../gallery/scatter.jpg" width="160" alt="scatter"> | `scatter` | Replace every pixel by one picked at random from within `radius` px of it. | `radius=4` `seed=0` +1 advanced | [scatter.toml](../../examples/effects/scatter.toml) |
 | <img src="../gallery/shatter.jpg" width="160" alt="shatter"> | `shatter` | Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px lines between them. | `pieces=24` `shape='voronoi'` `detail=0.0` `fill=0.0` `offset=10.0` `angle=5.0` `gap=0.0` `color='#000000'` `seed=0` +2 advanced | [shatter.toml](../../examples/effects/shatter.toml) |
-| <img src="../gallery/shear.jpg" width="160" alt="shear"> | `shear` | Skew the picture about its centre: slide rows sideways by `x` px per row, then columns down by `y` px per column. | `x=0.2` `y=0.0` +2 advanced | [shear.toml](../../examples/effects/shear.toml) |
 | <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance. | `slices=30` `amount=0.05` `seed=0` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
 | <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
 | <img src="../gallery/swirl.jpg" width="160" alt="swirl"> | `swirl` | Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`. | `angle=90.0` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [swirl.toml](../../examples/effects/swirl.toml) |
@@ -195,15 +194,17 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `vertical` | number | fraction | -0.9 to 0.9 | `0.25` | The vertical keystone: the fraction by which the far edge shrinks while the near one keeps its width, straight lines staying straight, as when a camera tilts back to shoot a tall building. Positive makes the top the far side (the top edge narrows to 1 - vertical of the bottom edge), negative makes the bottom the far side; 0 = none. Raising it makes a steeper converging; it stops short of 1, where the far edge would shrink to a point. |
 | `horizontal` | number | fraction | -0.9 to 0.9 | `0.0` | The horizontal keystone: the fraction by which the far edge shrinks while the near one keeps its height, as when a camera turns to the side. Positive makes the right side the far side (the right edge shortens to 1 - horizontal of the left edge), negative makes the left side the far side; 0 = none. Applied after the vertical keystone. |
-| `rotate` | number (cyclic) | degrees | -180 to 180 | `0.0` | How far the picture is turned about its centre, after the keystones, in degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners it uncovers are filled by `edge`. |
-| `scale` | number | fraction | -0.9 to 4 | `0.0` | How much the picture is enlarged about its centre, after the keystones and the turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half the size (the empty margin is filled by `edge`). Enlarging it hides the corners that the keystone and turn uncover. |
+| `shear_x` | number | ratio | -2 to 2 | `0.0` | The horizontal skew, after the keystones, as a slope in columns per row: each row slides sideways by this many pixels for every pixel it lies below the centre (and the other way above it), so a vertical line leans into a line of this slope. 0 = none, 0.2 = a lean of about 11 degrees, 1 = 45 degrees, positive slides the lower half right and the upper half left, negative the other way. Applied before `shear_y`. |
+| `shear_y` | number | ratio | -2 to 2 | `0.0` | The vertical skew, after `shear_x`, as a slope in rows per column: each column slides down by this many pixels for every pixel it lies right of the centre (and up on the left of it), so a horizontal line tilts into a line of this slope. 0 = none, positive tilts the right side down, negative the right side up. |
+| `rotate` | number (cyclic) | degrees | -180 to 180 | `0.0` | How far the picture is turned about its centre, after the keystones and skews, in degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners it uncovers are filled by `edge`. |
+| `scale` | number | fraction | -0.9 to 4 | `0.0` | How much the picture is enlarged about its centre, after the keystones, skews and turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half the size (the empty margin is filled by `edge`). Enlarging it hides the corners that the keystone and turn uncover. |
 
 <details><summary>Advanced parameters (2)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What fills the margins the keystone, turn and zoom uncover around the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What fills the margins the keystone, skew, turn and zoom uncover around the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge). |
 
 </details>
 
@@ -305,22 +306,6 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but turned pieces turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What lies beyond the picture's edge, for a moved piece that reads from there and for the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite sides counts as an edge): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
-
-</details>
-
-### `shear`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `x` | number | ratio | -2 to 2 | `0.2` | The horizontal skew as a slope, in columns per row: each row slides sideways by this many pixels for every pixel it lies below the centre (and the other way above it), so a vertical line leans into a line of this slope. 0 = no skew, 0.2 = a lean of about 11 degrees, 1 = 45 degrees, positive slides the lower half right and the upper half left, negative the other way. |
-| `y` | number | ratio | -2 to 2 | `0.0` | The vertical skew as a slope, in rows per column: each column slides down by this many pixels for every pixel it lies right of the centre (and up on the left of it), so a horizontal line tilts into a line of this slope. 0 = no skew, positive tilts the right side down, negative the right side up. With both skews, `x` is applied first, then `y`, so the picture's area never changes. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What fills the corners the skew uncovers, where it slides the picture away and shows what lies beyond its edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge). |
 
 </details>
 
