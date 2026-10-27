@@ -121,6 +121,29 @@ def test_the_smallest_cell_is_never_smaller_than_asked_even_on_an_odd_picture() 
     assert widths.max() <= 20
 
 
+@pytest.mark.parametrize(
+    ("shape", "max_cell", "min_cell"),
+    [
+        pytest.param((64, 64), 32, 4, id="halves exact"),
+        pytest.param((95, 95), 48, 24, id="cells of 47 and 48 px, smallest 24"),
+        pytest.param((37, 53), 20, 5, id="odd sides"),
+        pytest.param((100, 71), 30, 7, id="cells of 23 and 24 px, smallest 7"),
+    ],
+)
+def test_a_cell_splits_exactly_when_both_its_sides_are_twice_the_smallest_or_more(
+    shape: tuple[int, int], max_cell: int, min_cell: int
+) -> None:
+    """Noise at threshold 0 is uneven everywhere, so every cell that may split has: no leaf is smaller than
+    `min_cell` (halves of at least that), and none has both sides twice `min_cell` or more (it would have split)."""
+    noise = np.random.default_rng(21).random((*shape, 3), dtype=np.float32)
+    found = leaves(noise, threshold=0.0, max_cell=max_cell, min_cell=min_cell)
+    heights = found.box[:, 1] - found.box[:, 0]
+    widths = found.box[:, 3] - found.box[:, 2]
+    assert heights.min() >= min_cell
+    assert widths.min() >= min_cell
+    assert (np.minimum(heights, widths) < 2 * min_cell).all()
+
+
 def test_the_picture_is_not_modified() -> None:
     rgb = np.random.default_rng(17).random((40, 40, 3), dtype=np.float32)
     before = rgb.copy()

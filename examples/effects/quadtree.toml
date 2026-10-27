@@ -6,6 +6,6 @@ size = 480
 effect = "quadtree"
 threshold = 0.09
 max_cell = 96
-min_cell = 5.75
+min_cell = 6
 gap = 1.5
 gap_color = "#0b0b10"

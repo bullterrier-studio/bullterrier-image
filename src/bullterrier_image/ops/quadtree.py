@@ -41,6 +41,13 @@ def _edges(length: int, count: int) -> np.ndarray:
     return np.arange(count + 1, dtype=np.int64) * length // count
 
 
+def _halves_fit(length: int, count: int, smallest: int) -> np.ndarray:
+    """For each of the `count` blocks of `_edges(length, count)`, whether both its halves (the blocks of `_edges(length,
+    2 * count)` inside it) are at least `smallest` px: a block of 2 x `smallest` px or more."""
+    halves = np.diff(_edges(length, 2 * count))
+    return np.minimum(halves[0::2], halves[1::2]) >= smallest
+
+
 def _block_sums(table: np.ndarray, rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
     """The sum of the summed `table`'s values over every block between the edges `rows` and `cols`, (blocks down, blocks
     across, 3)."""
@@ -53,9 +60,10 @@ def leaves(rgb: np.ndarray, *, threshold: float, max_cell: int, min_cell: int) -
 
     The first cut is a grid of cells at most `max_cell` px on a side (the picture split evenly, so sides differ by a
     pixel at most). A cell splits into four halves when the spread of colour inside it, the largest of the three
-    channels' standard deviations, is above `threshold`, and its halves are still at least `min_cell` px on a side;
-    the halves are tested the same way. `max_cell` and `min_cell` are whole px, 1 or more, `min_cell` not above
-    `max_cell`. A picture smaller than a cell is one leaf. The picture is not modified.
+    channels' standard deviations, is above `threshold`, and its halves are still at least `min_cell` px on a side (the
+    cell is at least twice `min_cell` wide and high, each cell judged by its own size); the halves are tested the same
+    way. `max_cell` and `min_cell` are whole px, 1 or more, `min_cell` not above `max_cell`.
+    A picture smaller than a cell is one leaf. The picture is not modified.
     """
     height, width = rgb.shape[:2]
     # Spreads come from sums of squares, which lose the small differences when the values are large against them (a
@@ -69,11 +77,12 @@ def leaves(rgb: np.ndarray, *, threshold: float, max_cell: int, min_cell: int) -
     active = np.ones((down, across), bool)  # the cells that exist: their parent split
     while active.any():
         rows, cols = _edges(height, down), _edges(width, across)
-        area = (np.diff(rows)[:, None] * np.diff(cols)[None, :])[..., None]
+        # A cell of one px does not split, but its four "halves" are listed (two of them empty); nothing reads those.
+        area = np.maximum(np.diff(rows)[:, None] * np.diff(cols)[None, :], 1)[..., None]
         mean = _block_sums(sums, rows, cols) / area  # relative to `centre`
         variance = _block_sums(squares, rows, cols) / area - mean**2
         spread = np.sqrt(np.maximum(variance, 0.0).max(axis=-1))
-        halves_fit = min(height // (2 * down), width // (2 * across)) >= min_cell
+        halves_fit = _halves_fit(height, down, min_cell)[:, None] & _halves_fit(width, across, min_cell)[None, :]
         split = active & (spread > threshold) & halves_fit
         leaf = active & ~split
         found = np.argwhere(leaf)  # (n, 2): the leaf cells' row and column, in reading order
