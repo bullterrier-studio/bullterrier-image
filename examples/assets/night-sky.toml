@@ -6,6 +6,10 @@ size = 768
 [[step]]
 effect = "aurora"
 colors = ["#2bff9a", "#7a2cff"]
+height = 210                      # explicit: the defaults (336, 40, 200, 10 px) as they came out at 768, so this
+waviness = 25                     # recipe still makes the committed night-sky.jpg
+scale = 125
+ray_width = 6.25
 
 [[step]]
 effect = "gradient"
@@ -15,5 +19,6 @@ opacity = 0.6
 [[step]]
 effect = "particles"
 preset = "starfield"
-density = 1.9
+density = 4.864
+size = 1.875                      # the starfield preset's 3 px, as at 768
 opacity = 0.6
