@@ -1371,7 +1371,9 @@ def test_a_size_that_is_not_a_whole_number_of_pixels_is_refused_naming_it(photo,
         pytest.param(Step("gaussian_blur", {"radius": 6.0}), id="a blur"),
         pytest.param(Step("bloom", {"radius": 24.0}), id="a bloom"),
         pytest.param(Step("sharpen", {"radius": 30.0}), id="a local contrast"),
-        pytest.param(Step("drop_shadow", {"dx": 12.0, "dy": 18.0, "blur": 24.0}), id="a shadow offset and blurred"),
+        pytest.param(
+            Step("drop_shadow", {"offset": 22.0, "angle": 56.0, "blur": 24.0}), id="a shadow offset and blurred"
+        ),
         pytest.param(Step("pixel_grid", {"cell": 4}), id="a grid of whole pixels"),
     ],
 )

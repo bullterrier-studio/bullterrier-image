@@ -77,6 +77,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   basic layout engine is pinned: its optional Raqm engine keeps fractional advances where the basic one rounds, which
   moves a glyph a pixel. *Consequence:* the licence is `MIT AND OFL-1.1` with the OFL text at the repository root
   (`LICENSE-FONT`); a `Font` value type arrives only on request.
+- **`drop_shadow` stacks copies; `long_shadow` stays apart.** `drop_shadow` lays `copies` offset copies of the silhouette
+  over each other, each at `copy_opacity`, from `color` to `end_color` (one copy is a shadow, a stack is cut paper).
+  `long_shadow` is one solid extrusion: the maximum over a copy per pixel, with a subtractive fade. *Reason:* stacked
+  copies compound where they overlap and a soft edge compounds across the stack, so the two pictures differ by up to
+  0.85 even with the same colour (measured at 320 px); no one engine gives both, and the extrusion's log-time doubling
+  does not carry a colour ramp.
 
 ## Parameters
 
@@ -203,7 +209,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   opacity is given, an explicit value replaces it, and `fx.pyi`, `help(fx.<effect>)`, `bt-image effects` and the
   catalogue show it, so every bare default looks as it did and `opacity` still means one thing; a strength that is not
   a plain mix keeps a name of its own
-  (`layered_cutouts`' `layer_opacity`, whose overlapping copies compound); never add an effect parameter that only mixes
+  (`drop_shadow`'s `copy_opacity`, whose overlapping copies compound); never add an effect parameter that only mixes
   the effect's result with the picture. The blend-mode formulas live in one `ops` module that the runner and the
   `blend` effect share; `blend` keeps its own `mode` because a step's result is an opaque picture, and only the effect
   knows the transparency of the picture it places. A colour wash (`gradient_overlay`) is a `gradient` step with a

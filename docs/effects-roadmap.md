@@ -231,7 +231,7 @@ Use the subject cut-out, so they target the subject or the background.
 | --- | --- | --- |
 | `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000", mask="background")` |
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
-| `drop_shadow` ✓ | Soft shadow behind the subject. | `fx.drop_shadow(dx=12, dy=18, blur=24)` |
+| `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. | `fx.long_shadow(angle=45, length=300)` |
 | `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
 | `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
@@ -242,7 +242,6 @@ Use the subject cut-out, so they target the subject or the background.
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="monochrome")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "monochrome", mask = "background"` |
 | `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
-| `layered_cutouts` ✓ | Offset copies of the silhouette for depth. | `fx.layered_cutouts(layers=4)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
 | decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
 
@@ -352,7 +351,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | Goes | Into |
 | --- | --- |
 | `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
-| `drop_shadow`, `layered_cutouts`, `long_shadow` | one silhouette-copies effect |
+| `layered_cutouts` | `drop_shadow` + `copies`, `end_color`, `copy_opacity` (`long_shadow` stays: one solid extrusion) |
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
 | `sparkle` | `starburst` + `count`, `dot` |
 | `fog`, `smoke` | one, with presets |

@@ -1,15 +1,25 @@
-# The subject on a flat backdrop with a soft shadow falling to the lower right.
+# The subject on a pale backdrop: five paper-like layers stacked behind it, and one soft shadow under the stack.
 name = "drop_shadow"
 size = 480
 
 [[step]]
 effect = "fill"
-color = "#c9d6d9"
-mask = "background"           # a plain backdrop, so the shadow shows
+color = "#f3ead8"
+mask = "background"           # a plain backdrop, so the copies show
 
 [[step]]
 effect = "drop_shadow"
-dx = 26
-dy = 32
-blur = 12
-opacity = 0.51                # the shadow covers 51% of the backdrop where it is full
+copies = 5                    # a stack of layers, from orange to purple
+offset = 15
+angle = 45
+blur = 0
+color = "#ff8a5b"
+end_color = "#3b1f6b"
+opacity = 1.0                 # the layers are opaque paper
+
+[[step]]
+effect = "drop_shadow"        # one soft copy, laid behind the stack
+offset = 80
+angle = 45
+blur = 18
+opacity = 0.35                # the shadow covers 35% of what lies behind it where it is full
