@@ -15,13 +15,14 @@ class RimLightParams(EffectParams):
     """The settings of `rim_light`: where the light comes from, its colour, and how deep and strong the rim is."""
 
     angle: float = param(
-        40.0,
+        320.0,
         unit="degrees",
-        min=-180,
-        max=180,
+        min=0,
+        max=360,
         cyclic=True,
-        doc="The direction the light comes from, counter-clockwise from the right: 0 = from the right, 90 = from "
-        "above, 180 or -180 = from the left, -90 = from below. Only edges whose outward direction faces it are lit.",
+        doc="The direction the light comes from, in degrees clockwise from pointing right, as seen on screen: 0 = "
+        "from the right, 90 = from below, 180 = from the left, 270 = from above. Only edges whose outward direction "
+        "faces it are lit.",
     )
     color: Color = param(
         "#ff9a4d",
@@ -112,8 +113,8 @@ def rim_light(rgb: np.ndarray, params: RimLightParams, *, subject: np.ndarray | 
     grad_y, grad_x = np.gradient(smooth)
     length = np.maximum(np.hypot(grad_x, grad_y), 1e-6)  # constant: guards a flat field (no direction, no light)
     toward_light = np.radians(p.angle)
-    # x runs right and y down, so a light above the picture has a negative y.
-    facing = np.maximum((grad_x * np.cos(toward_light) - grad_y * np.sin(toward_light)) / length, 0.0)
+    # x runs right and y down, so a clockwise angle turns from x toward y.
+    facing = np.maximum((grad_x * np.cos(toward_light) + grad_y * np.sin(toward_light)) / length, 0.0)
     depth = -signed  # px from the edge into the subject; 1 on its outermost pixels
     band = np.clip(1.0 - (depth - 1.0) / p.width, 0.0, 1.0) ** p.falloff
     light = p.amount * facing * np.where(inside, band * subject, 0.0)

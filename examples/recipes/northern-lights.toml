@@ -30,7 +30,7 @@ mask = "subject"
 
 [[step]]
 effect = "rim_light"
-angle = 60
+angle = 300
 color = "#7fffd4"
 width = 16
 amount = 1.5

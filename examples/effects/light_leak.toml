@@ -5,7 +5,7 @@ size = 480
 [[step]]
 effect = "light_leak"
 color = "#ff7a2e"
-angle = 20
+angle = 340
 size = 180
 blobs = 4
 seed = 3

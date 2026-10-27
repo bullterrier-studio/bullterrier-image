@@ -9,7 +9,7 @@ contrast = 1.1
 
 [[step]]
 effect = "rim_light"
-angle = 40
+angle = 320
 color = "#ff9a4d"
 width = 20
 amount = 2.5

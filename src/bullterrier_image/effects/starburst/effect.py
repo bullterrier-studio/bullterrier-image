@@ -66,8 +66,8 @@ class StarburstParams(EffectParams):
         min=0,
         max=360,
         cyclic=True,
-        doc="The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. "
-        "The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
+        doc="The direction of the first spike, in degrees clockwise from pointing right, as seen on screen: 0 = to the "
+        "right, 90 = down. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
     )
     density: float = param(
         1.0,
@@ -118,13 +118,13 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     if params.amount == 0 or params.limit == 0:
         return rgb.copy()
     half = int(np.ceil(params.length))  # the spike fades to nothing at `length` px
-    # offsets (row, column) from the point, row growing downward and the angle counterclockwise on the picture
+    # offsets (row, column) from the point, row growing downward and the angle clockwise on the picture
     down, right = np.mgrid[-half : half + 1, -half : half + 1].astype(np.float64)
     kernel = np.zeros(down.shape)
     for spike in range(params.rays):
         theta = np.radians(params.angle) + 2 * np.pi * spike / params.rays
-        along = right * np.cos(theta) - down * np.sin(theta)  # px out along the spike's direction
-        across = np.abs(right * np.sin(theta) + down * np.cos(theta))  # px sideways from its line
+        along = right * np.cos(theta) + down * np.sin(theta)  # px out along the spike's direction
+        across = np.abs(down * np.cos(theta) - right * np.sin(theta))  # px sideways from its line
         thin = np.clip(1.0 - across, 0.0, 1.0)  # a line one px wide, soft at its sides
         fade = np.clip(1.0 - along / params.length, 0.0, 1.0) * (along >= 0)
         kernel = np.maximum(kernel, thin * fade)

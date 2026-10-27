@@ -221,7 +221,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
 | `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. A preset of `drop_shadow`. | `fx.drop_shadow(preset="long_shadow", angle=45)` |
-| `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
+| `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=320, color="#ff9a4d")` |
 | `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
 | `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `gradient` (one colour = flat fill) or any other effect. | `gradient with mask = "background"` |
 | `background_blur` ✓ | Portrait-mode blur. A recipe step: `gaussian_blur` with `mask = "background"`. | `gaussian_blur(radius=24) with mask = "background"` |

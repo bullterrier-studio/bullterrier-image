@@ -39,8 +39,9 @@ class LightLeakParams(EffectParams):
         min=0,
         max=360,
         cyclic=True,
-        doc="The side the light comes in from, as the direction from the picture's centre, counterclockwise as seen "
-        "on it: 0 = the right edge, 90 = the top, 180 = the left, 270 = the bottom; in between, the corner.",
+        doc="The side the light comes in from, as the direction from the picture's centre, in degrees clockwise from "
+        "pointing right, as seen on screen: 0 = the right edge, 90 = the bottom, 180 = the left, 270 = the top; in "
+        "between, the corner.",
     )
     blobs: int = param(
         3,
@@ -74,7 +75,7 @@ def light_leak(rgb: np.ndarray, params: LightLeakParams) -> np.ndarray:
     if params.amount == 0:
         return rgb.copy()
     height, width = rgb.shape[:2]
-    theta = np.radians(params.angle)
+    theta = -np.radians(params.angle)  # the maths below turns counterclockwise on the picture, `angle` clockwise
     cos, sin = float(np.cos(theta)), float(np.sin(theta))  # Python floats, so the maps below stay float32
     down, right = np.mgrid[0:height, 0:width].astype(np.float32)
     right -= (width - 1) / 2

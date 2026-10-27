@@ -49,11 +49,11 @@ def test_a_matte_without_an_edge_lights_nothing(fill, photo):
     ("angle", "lit_sides"),
     [
         (0, {"right"}),
-        (90, {"top"}),
+        (270, {"top"}),
         (180, {"left"}),
-        (-90, {"bottom"}),
+        (90, {"bottom"}),
     ],
-    ids=["from the right", "from above", "from the left", "from below"],
+    ids=["from the right, 0", "from above, 270", "from the left, 180", "from below, 90"],
 )
 def test_only_the_side_facing_the_light_is_lit(angle, lit_sides):
     out = registry.apply(NAME, grey(), subject=block(), angle=angle, width=3, falloff=1, color=WHITE)
@@ -64,8 +64,8 @@ def test_only_the_side_facing_the_light_is_lit(angle, lit_sides):
 
 
 def test_a_diagonal_light_lights_two_sides_by_the_cosine_of_the_angle_to_their_normal():
-    """From the upper right (45 degrees) the top and right normals are 45 degrees off the light: cos 45 = 0.7071."""
-    out = registry.apply(NAME, grey(), subject=block(), angle=45, width=3, falloff=1, color=WHITE)
+    """From the upper right (315 degrees) the top and right normals are 45 degrees off the light: cos 45 = 0.7071."""
+    out = registry.apply(NAME, grey(), subject=block(), angle=315, width=3, falloff=1, color=WHITE)
     assert lit_at(out, 10, 20) == pytest.approx(0.7071, abs=0.02)
     assert lit_at(out, 20, 29) == pytest.approx(0.7071, abs=0.02)
     assert lit_at(out, 20, 10) == pytest.approx(0.0, abs=0.02)
@@ -87,7 +87,7 @@ def test_the_light_fades_across_the_band_of_width_px_inside_the_edge(falloff, ex
 
 def test_outside_the_subject_stays_dark(subject):
     photo = np.full((96, 128, 3), BASE, np.float32)
-    out = registry.apply(NAME, photo, subject=subject, angle=30, width=8, amount=3.0)
+    out = registry.apply(NAME, photo, subject=subject, angle=330, width=8, amount=3.0)
     np.testing.assert_array_equal(out[subject == 0], photo[subject == 0])
     assert (out != photo).any()
 
@@ -105,7 +105,7 @@ def test_the_picture_border_is_not_an_edge():
     subject[10:30, 10:] = 1.0
     out = registry.apply(NAME, grey(), subject=subject, angle=0, width=3, color=WHITE)
     assert lit_at(out, 20, 39) == pytest.approx(0.0, abs=0.02)
-    out_top = registry.apply(NAME, grey(), subject=subject, angle=90, width=3, color=WHITE)
+    out_top = registry.apply(NAME, grey(), subject=subject, angle=270, width=3, color=WHITE)
     assert lit_at(out_top, 10, 25) == pytest.approx(1.0, abs=0.02)  # its real top edge is
 
 
@@ -144,16 +144,16 @@ def test_subject_threshold_is_the_subject_value_from_which_a_pixel_belongs_to_th
     ids=["smoothed edge direction is steady", "raw edge direction jumps about"],
 )
 def test_smoothing_steadies_the_direction_along_a_staircase_edge(smoothing, steady):
-    """The subject is below the line y = 20 + x/3, whose outward normal (0.316, -0.949) is the direction of a light
-    at atan2(0.949, 0.316) = 71.57 degrees, so every pixel of the edge should be lit head-on. The pixel staircase the
-    line is drawn with gives raw normals that vary a lot from step to step."""
+    """The subject is below the line y = 20 + x/3, whose outward normal (0.316, -0.949) points up, 71.57
+    degrees counterclockwise from the right: a light at 288.43 degrees clockwise, so every pixel of the edge should be
+    lit head-on. The pixel staircase the line is drawn with gives raw normals that vary a lot from step to step."""
     y, x = np.mgrid[0:60, 0:60]
     subject = y > 20 + x / 3
     above = np.zeros_like(subject)
     above[1:] = subject[:-1]  # the pixel above is the subject
     edge = subject & ~above & (x > 15) & (x < 45)  # the staircase's top pixels, away from the picture's borders
     out = registry.apply(
-        NAME, grey(60), subject=subject.astype(np.float32), angle=71.57, width=1, color=WHITE, smoothing=smoothing
+        NAME, grey(60), subject=subject.astype(np.float32), angle=288.43, width=1, color=WHITE, smoothing=smoothing
     )
     lit = 1.0 - (1.0 - out[..., 0]) / (1.0 - BASE)
     assert (np.abs(lit[edge] - 1.0).max() < 0.01) == steady

@@ -16,11 +16,11 @@ def leak(**settings: object) -> np.ndarray:
 
 
 def centroid_along(light: np.ndarray, angle: float) -> float:
-    """How far the light's centre of mass lies from the picture's centre toward `angle` degrees (counterclockwise as
-    seen on the picture, 0 = right), in px: the brute-force weighted mean of every pixel's offset."""
+    """How far the light's centre of mass lies from the picture's centre toward `angle` degrees (clockwise as
+    seen on the picture, 0 = right, 90 = down), in px: the brute-force weighted mean of every pixel's offset."""
     rows, cols = np.mgrid[0:HEIGHT, 0:WIDTH].astype(np.float64)
-    right, up = cols - (WIDTH - 1) / 2, (HEIGHT - 1) / 2 - rows
-    toward = right * np.cos(np.radians(angle)) + up * np.sin(np.radians(angle))
+    right, down = cols - (WIDTH - 1) / 2, rows - (HEIGHT - 1) / 2
+    toward = right * np.cos(np.radians(angle)) + down * np.sin(np.radians(angle))
     return float((light * toward).sum() / light.sum())
 
 
@@ -108,9 +108,9 @@ def one_patch(seed: int, angle: float = 0.0) -> dict[str, float]:
     it is, the area above half its peak, and the spread of that area along the side over across it."""
     light = leak(blobs=1, size=30.0, amount=0.5, angle=angle, seed=seed)  # below 1: no flat top to the patch
     rows, cols = np.mgrid[0:HEIGHT, 0:WIDTH].astype(np.float64)
-    right, up = cols - (WIDTH - 1) / 2, (HEIGHT - 1) / 2 - rows
-    toward = right * np.cos(np.radians(angle)) + up * np.sin(np.radians(angle))
-    along = up * np.cos(np.radians(angle)) - right * np.sin(np.radians(angle))
+    right, down = cols - (WIDTH - 1) / 2, rows - (HEIGHT - 1) / 2
+    toward = right * np.cos(np.radians(angle)) + down * np.sin(np.radians(angle))
+    along = right * np.sin(np.radians(angle)) - down * np.cos(np.radians(angle))
     row, col = np.unravel_index(light.argmax(), light.shape)
     half = light > light.max() / 2
     return {

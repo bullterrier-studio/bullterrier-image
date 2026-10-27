@@ -20,8 +20,8 @@ class ParallaxParams(EffectParams):
         min=0,
         max=360,
         cyclic=True,
-        doc="The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, "
-        "180 = left. Layers farther than the focus move the opposite way.",
+        doc="The direction the nearest layers move, in degrees clockwise from pointing right, as seen on screen: 0 = "
+        "right, 90 = down, 180 = left. Layers farther than the focus move the opposite way.",
     )
     amount: float = param(
         0.02,
@@ -80,6 +80,6 @@ def parallax(rgb: np.ndarray, params: ParallaxParams, *, depth: np.ndarray | Non
     nearest = ndimage.maximum_filter(depth, size=2 * radius + 1, mode=params.edge)
     shift = reach * (nearest - params.focus)  # at the depth's own precision: a depth equal to the focus moves 0 px
     angle = np.radians(params.angle)
-    rows = np.arange(height)[:, None] + shift * np.sin(angle)  # rows count down: a move up reads from below
+    rows = np.arange(height)[:, None] - shift * np.sin(angle)  # rows count down: a move down reads from above
     cols = np.arange(width)[None, :] - shift * np.cos(angle)
     return remap(rgb, rows, cols, interpolation=params.interpolation, edge=params.edge)

@@ -44,12 +44,12 @@ def test_a_picture_with_nothing_to_shift_is_returned_exactly(settings: dict[str,
     ("height", "width", "depth", "focus", "angle", "down", "right"),
     [
         pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 0.0, 0, 4, id="nearer than the focus, angle 0: right by 8 x 0.5"),
-        pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 90.0, -4, 0, id="angle 90: up, columns untouched"),
+        pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 90.0, 4, 0, id="angle 90: down, columns untouched"),
         pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 180.0, 0, -4, id="angle 180: left, the opposite of 0"),
-        pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 270.0, 4, 0, id="angle 270: down"),
+        pytest.param(HEIGHT, WIDTH, 1.0, 0.5, 270.0, -4, 0, id="angle 270: up"),
         pytest.param(HEIGHT, WIDTH, 0.75, 0.5, 0.0, 0, 2, id="a quarter from the focus: 8 x 0.25"),
         pytest.param(HEIGHT, WIDTH, 0.0, 0.5, 0.0, 0, -4, id="farther than the focus: against the angle"),
-        pytest.param(HEIGHT, WIDTH, 0.25, 1.0, 90.0, 6, 0, id="0.75 behind the focus, angle 90: down by 6"),
+        pytest.param(HEIGHT, WIDTH, 0.25, 1.0, 90.0, -6, 0, id="0.75 behind the focus, angle 90: up by 6, against it"),
         pytest.param(WIDTH, 64, 1.0, 0.5, 0.0, 0, 4, id="portrait: the long side is the height"),
     ],
 )
@@ -57,7 +57,7 @@ def test_a_picture_with_nothing_to_shift_is_returned_exactly(settings: dict[str,
 def test_a_single_plane_is_translated_by_its_distance_from_the_focus(
     height: int, width: int, depth: float, focus: float, angle: float, down: int, right: int, interpolation: str
 ) -> None:
-    """The shift is amount x long side x (depth - focus) px along `angle` (0 = right, 90 = up); the expected picture
+    """The shift is amount x long side x (depth - focus) px along `angle` (0 = right, 90 = down); the expected picture
     is the input rolled by that many whole px, compared away from the borders, where the edge rule decides."""
     picture = noise(height, width)
     out = registry.apply(
@@ -86,7 +86,7 @@ def test_layers_either_side_of_the_focus_move_opposite_ways() -> None:
 
 @pytest.mark.parametrize(
     ("angle", "down", "right"),
-    [pytest.param(0.0, 0, 8, id="angle 0: right by 8"), pytest.param(90.0, -8, 0, id="angle 90: up by 8")],
+    [pytest.param(0.0, 0, 8, id="angle 0: right by 8"), pytest.param(90.0, 8, 0, id="angle 90: down by 8")],
 )
 def test_a_near_object_moves_whole_over_a_still_background(angle: float, down: int, right: int) -> None:
     """A bright 16 px square at depth 1 on a dark background at the focus, 0: the square moves 8 px and lands whole,

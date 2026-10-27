@@ -18,10 +18,10 @@ def point(value: float = 1.0, row: int = MIDDLE, col: int = MIDDLE, size: tuple[
 
 
 def polar(shape: tuple[int, int], row: int, col: int) -> tuple[np.ndarray, np.ndarray]:
-    """Distance in px and direction in degrees (0 = right, 90 = up, as seen on the picture) of every pixel from
-    (`row`, `col`)."""
+    """Distance in px and direction in degrees (clockwise from right, 90 = down, as seen on the picture) of every
+    pixel from (`row`, `col`)."""
     rows, cols = np.mgrid[0 : shape[0], 0 : shape[1]].astype(np.float64)
-    return np.hypot(rows - row, cols - col), np.degrees(np.arctan2(row - rows, cols - col)) % 360
+    return np.hypot(rows - row, cols - col), np.degrees(np.arctan2(rows - row, cols - col)) % 360
 
 
 def spikes_around(out: np.ndarray, radius: float, *, floor: float = 0.05) -> list[float]:
@@ -44,8 +44,18 @@ def spikes_around(out: np.ndarray, radius: float, *, floor: float = 0.05) -> lis
 
 @pytest.mark.parametrize(
     ("rays", "angle"),
-    [(1, 0.0), (2, 0.0), (3, 90.0), (4, 0.0), (4, 45.0), (5, 20.0), (6, 30.0), (8, 0.0)],
-    ids=["one spike", "a line", "a triangle pointing up", "a cross", "a diagonal cross", "five", "six", "eight"],
+    [(1, 0.0), (1, 90.0), (2, 0.0), (3, 270.0), (4, 0.0), (4, 45.0), (5, 20.0), (6, 30.0), (8, 0.0)],
+    ids=[
+        "one spike right",
+        "one spike down",
+        "a line",
+        "a triangle pointing up",
+        "a cross",
+        "a diagonal cross",
+        "five",
+        "six",
+        "eight",
+    ],
 )
 def test_a_bright_point_gains_exactly_rays_spikes_pointing_from_angle(rays: int, angle: float) -> None:
     out = registry.apply(NAME, point(), rays=rays, angle=angle, length=57.0, amount=1.0, threshold=0.5)
