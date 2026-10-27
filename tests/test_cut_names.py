@@ -72,7 +72,7 @@ def test_a_name_that_was_never_an_effect_points_nowhere():
     with pytest.raises(AttributeError) as raised:
         fx.nonsense_xyz  # noqa: B018  (the lookup itself is what must raise)
     assert "is a " not in str(raised.value).split("available:")[0]
-    assert "see " not in str(raised.value).split("available:")[0]
+    assert "summary of" not in str(raised.value).split("available:")[0]
 
 
 def test_the_anaglyph_look_is_loadable_by_name_and_is_named_by_the_error():

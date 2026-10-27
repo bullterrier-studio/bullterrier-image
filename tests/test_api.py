@@ -196,7 +196,9 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
     [
         pytest.param("glitch", r"'glitch' is a preset.*effect = \"slice_shift\", preset = \"glitch\"", id="a-preset"),
         pytest.param("temperature", r"'temperature' is a parameter of grade", id="a-parameter"),
-        pytest.param("depth_of_field", r"'depth_of_field': see focus_blur", id="a-word-of-a-summary"),
+        pytest.param(
+            "depth_of_field", r"'depth_of_field' is named in the summary of focus_blur", id="a-word-of-a-summary"
+        ),
     ],
 )
 def test_fx_says_where_a_name_that_is_no_effect_lives(name, says):

@@ -212,14 +212,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe, no `load_look` beside it; a look is a recipe, so it passes the same validation and the same tests, and it is
   data, so a look is added without touching code. *Consequence:* `examples/recipes/` keeps the demonstrations that are
   not looks; a look is not a preset (one effect) and not an effect (one picture in, one out, with parameters).
-- **A name that is no effect says where it lives.** `registry.get` is the one place an effect name is looked up, so
-  recipes, `fx`, the command line and the gallery give the same answer: if the name is a preset it names the effect
-  (`'glitch' is a preset: effect = "slice_shift", preset = "glitch"`), if it is a look it says how to load it, then (in this
-  order) a parameter of that name (`'vibrance' is a parameter of grade`), effects whose summary mentions the name with
-  underscores read as spaces (`'depth_of_field': see focus_blur`), otherwise the close matches among effects, presets and
-  looks. *Reason:* a cut effect lives on as a preset, a look, a parameter or a word in the survivor's summary (no
-  aliases), and a person or a model that remembers the old name must be able to reach it from the error. The answer is
-  read from the shipped presets, looks, parameters and summaries, never from a table of old names.
+- **A name that is no effect says where it lives, every place.** `registry.get` is the one place an effect name is looked
+  up, so recipes, `fx`, the command line and the gallery give the same answer. The message lists everything the name is:
+  each preset (`effect = "slice_shift", preset = "glitch"`), a look (how to render it, and its own `description`), a
+  parameter (`'vibrance' is a parameter of grade`), and each effect whose summary mentions it with underscores read as
+  spaces, quoting the whole summary sentence (`'depth_of_field'` in `focus_blur`'s). Only a name that is none of these
+  gets the close matches among effects, presets and looks. *Reason:* a cut effect lives on as a preset, a look, a
+  parameter or a word in the survivor's summary (no aliases), and a name can be several (`glitch` is a preset and a
+  look); a person or a model that remembers the old name must reach all of them from the error, and a cut summary hides
+  what it says. The answer is read from the shipped presets, looks, parameters and summaries, never from a table of old
+  names.
 - **Every step can be limited and blended: `mask`, `opacity` and `blend_mode` belong to the step, not to the effect.**
   `mask` (`subject` or `background`), `opacity` (0 to 1) and `blend_mode` (normal, multiply, screen, overlay,
   soft_light, difference, color) are applied by the runner after any effect, so a gradient can

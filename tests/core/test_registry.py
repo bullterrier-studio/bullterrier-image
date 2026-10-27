@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from pydantic import BaseModel
 
-from bullterrier_image.core import registry
+from bullterrier_image.core import looks, registry
 from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.errors import MapNotFoundError, UnknownEffectError
@@ -459,8 +459,12 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
         pytest.param("vibrance", ["is a parameter of grade"], id="a-parameter-names-its-effect"),
         pytest.param("temperature", ["is a parameter of grade"], id="a-parameter-of-one-effect"),
         pytest.param("radius", ["is a parameter of", "gaussian_blur", "more"], id="a-parameter-of-many-lists-some"),
-        pytest.param("depth_of_field", ["see focus_blur", "depth of field"], id="a-summary-mention-with-underscores"),
-        pytest.param("Tilt-Shift", ["see focus_blur", "tilt-shift"], id="a-summary-mention-ignores-case-and-hyphens"),
+        pytest.param(
+            "depth_of_field", ["summary of focus_blur", "depth of field"], id="a-summary-mention-with-underscores"
+        ),
+        pytest.param(
+            "Tilt-Shift", ["summary of focus_blur", "tilt-shift"], id="a-summary-mention-ignores-case-and-hyphens"
+        ),
         pytest.param("glich", ["did you mean", "glitch", "slice_shift"], id="a-misspelt-preset-offers-the-close-match"),
         pytest.param("gradient_mapp", ["did you mean", "gradient_map"], id="a-misspelt-effect-offers-the-close-match"),
     ],
@@ -474,18 +478,45 @@ def test_an_unknown_effect_name_says_where_the_name_lives(name, says):
         assert text in message
 
 
-def test_a_parameter_is_preferred_to_a_summary_mention_and_a_preset_to_a_parameter():
-    with pytest.raises(UnknownEffectError, match="is a parameter of") as raised:
-        registry.get("saturation")  # grade's summary names it too
-    assert "see " not in str(raised.value)
-    with pytest.raises(UnknownEffectError, match="is a preset") as raised:
-        registry.get("sepia")
-    assert "parameter" not in str(raised.value)
+@pytest.mark.parametrize(
+    ("name", "says", "absent"),
+    [
+        pytest.param(
+            "glitch",
+            ['a preset (effect = "slice_shift", preset = "glitch")', "a look (`bt-image render PHOTO glitch`"],
+            ["parameter"],
+            id="a-preset-and-a-look-are-both-named",
+        ),
+        pytest.param(
+            "saturation",
+            ["a parameter of", "named in the summary of grade: "],
+            ["a preset", "a look"],
+            id="a-parameter-and-a-summary-mention-are-both-named",
+        ),
+        pytest.param("sepia", ['preset = "sepia"'], ["a look", "a parameter", "the summary of"], id="only-a-preset"),
+    ],
+)
+def test_a_name_that_is_several_things_lists_all_of_them_and_nothing_else(name, says, absent):
+    with pytest.raises(UnknownEffectError) as raised:
+        registry.get(name)
+    message = str(raised.value)
+    for text in says:
+        assert text in message
+    for text in absent:
+        assert text not in message
 
 
-def test_a_name_that_is_both_a_preset_and_a_look_names_both():
-    with pytest.raises(UnknownEffectError, match=r'preset = "anaglyph".*look.*load_recipe\("anaglyph"\)'):
-        registry.get("anaglyph")
+def test_a_look_is_named_with_its_own_description():
+    with pytest.raises(UnknownEffectError) as raised:
+        registry.get("glitch")
+    assert looks.read()["glitch"].description in str(raised.value)
+
+
+def test_a_summary_mention_quotes_the_whole_first_sentence_of_the_summary():
+    with pytest.raises(UnknownEffectError) as raised:
+        registry.get("depth_of_field")
+    assert registry.summary("focus_blur") in str(raised.value)
+    assert len(registry.summary("focus_blur")) > 90  # longer than any cut would keep
 
 
 def test_a_name_that_is_nothing_gets_no_location_and_no_close_match():

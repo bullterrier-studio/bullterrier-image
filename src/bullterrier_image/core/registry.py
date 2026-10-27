@@ -85,10 +85,9 @@ INPUTS = (*MAP_INPUTS, "partition")
 # No effect parameter may take one of these names (nor an input's), so a key means the same in every step.
 STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset", "partition", "each", "looks", "name")
 
+_LISTED = 5  # how many effects an unknown-name message names at most, for each thing the name can be
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
 # never followed by a space; "e.g." and "i.e." are, so they are skipped.
-_LISTED = 5  # how many effects an unknown-name message names at most
-_CONTEXT = 30  # characters of a summary shown each side of the name it mentions
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")
 
 
@@ -229,9 +228,9 @@ def unregister(name: str) -> None:
 
 def get(name: str) -> ModelledEffect:
     """The effect called `name`. UnknownEffectError (a KeyError) if there is none: its message says where the name
-    lives when it is a preset ("'glitch' is a preset: effect = "slice_shift", preset = "glitch"") or a built-in look,
-    else offers the close matches among effects, presets and looks, then lists the effects. Recipes, `fx`, the
-    command line and the gallery all name effects through here, so they all give this message."""
+    lives: every way the name is a preset, a built-in look (with its description), a parameter, or a phrase in an
+    effect's summary (quoted whole); else it offers the close matches among effects, presets and looks. Recipes, `fx`,
+    the command line and the gallery all name effects through here, so they all give this message."""
     _load_effect_packages()
     try:
         return _EFFECTS[name]
@@ -240,30 +239,29 @@ def get(name: str) -> ModelledEffect:
 
 
 def _not_an_effect(name: str) -> str:
-    """Why `name` is no effect, first match winning: it is a preset or a built-in look, a parameter of some effects,
-    or named in the summary of some effects; else the close matches among effects, presets and looks."""
+    """Why `name` is no effect: everything it is, listed together (a preset of some effects, a built-in look, a
+    parameter of some effects, a phrase in the summary of some effects), or else the close matches among effects,
+    presets and looks."""
     homes = {effect: sorted(presets(effect)) for effect in _EFFECTS}  # effect -> its preset names
     looks = look_files.read()
-    where = [f'a preset: effect = "{effect}", preset = "{name}"' for effect, names in homes.items() if name in names]
+    meanings = [
+        f'a preset (effect = "{effect}", preset = "{name}")' for effect, names in homes.items() if name in names
+    ]
     if name in looks:
-        where.append(
-            f"a look, a recipe of several steps: {looks[name].description} "
-            f'Load it by name: load_recipe("{name}"), or `bt-image render PHOTO {name}`'
-        )
-    if where:
-        return f"{name!r} is {'; or '.join(where)}"
+        meanings.append(f'a look (`bt-image render PHOTO {name}`, load_recipe("{name}")): {looks[name].description}')
     owners = sorted(
         (effect for effect, fn in _EFFECTS.items() if name in fn.params_model.model_fields),
         key=lambda effect: (len(_EFFECTS[effect].params_model.model_fields), effect),  # the narrowest effect first
     )
     if owners:
-        more = f" and {len(owners) - _LISTED} more" if len(owners) > _LISTED else ""
-        return f"{name!r} is a parameter of {', '.join(owners[:_LISTED])}{more}"
+        meanings.append(f"a parameter of {_some(owners)}")
     words = re.findall(r"[a-z0-9]+", name.lower())
-    mentions = [(effect, hit) for effect in _EFFECTS if (hit := _mention(summary(effect), words))]
-    if mentions:
-        seen = "; ".join(f"{effect} (summary: {hit})" for effect, hit in mentions[:_LISTED])
-        return f"{name!r}: see {seen}"
+    mentions = [effect for effect in _EFFECTS if _mentions(summary(effect), words)]
+    meanings.extend(f"named in the summary of {effect}: {summary(effect)}" for effect in mentions[:_LISTED])
+    if len(mentions) > _LISTED:
+        meanings.append(f"named in the summary of {len(mentions) - _LISTED} more")
+    if meanings:
+        return f"{name!r} is {'; and '.join(meanings)}"
     names = {**dict.fromkeys(_EFFECTS, "effect"), **dict.fromkeys(looks, "look")}
     for effect, preset_names in homes.items():
         names.update((preset, f"preset of {effect}") for preset in preset_names)
@@ -272,17 +270,16 @@ def _not_an_effect(name: str) -> str:
     return f"unknown effect {name!r}{hint}; available: {', '.join(sorted(_EFFECTS))}"
 
 
-def _mention(text: str, words: list[str]) -> str:
-    """The stretch of `text` around the first place where it has all of `words` in a row (case, hyphens and other
-    punctuation between words ignored), with `...` where it is cut; "" if it has no such place."""
-    found = list(re.finditer(r"[A-Za-z0-9]+", text))
-    for i in range(len(found) - len(words) + 1):
-        if [m.group().lower() for m in found[i : i + len(words)]] == words:
-            start = text.rfind(" ", 0, max(0, found[i].start() - _CONTEXT)) + 1  # cut between words
-            end = text.find(" ", found[i + len(words) - 1].end() + _CONTEXT)
-            end = len(text) if end < 0 else end
-            return f"{'...' if start else ''}{text[start:end]}{'...' if end < len(text) else ''}"
-    return ""
+def _some(effects: list[str]) -> str:
+    """The first `_LISTED` of `effects`, comma-separated, with how many more there are."""
+    more = f" and {len(effects) - _LISTED} more" if len(effects) > _LISTED else ""
+    return f"{', '.join(effects[:_LISTED])}{more}"
+
+
+def _mentions(text: str, words: list[str]) -> bool:
+    """Whether `text` has all of `words` in a row (case, hyphens and other punctuation between words ignored)."""
+    found = [m.group().lower() for m in re.finditer(r"[A-Za-z0-9]+", text)]
+    return any(found[i : i + len(words)] == words for i in range(len(found) - len(words) + 1))
 
 
 def all_effects() -> dict[str, ModelledEffect]:

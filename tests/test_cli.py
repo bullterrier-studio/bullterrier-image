@@ -749,7 +749,7 @@ def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
     [
         pytest.param("glitch", 'effect = "slice_shift", preset = "glitch"', id="a-preset"),
         pytest.param("vibrance", "'vibrance' is a parameter of grade", id="a-parameter"),
-        pytest.param("depth_of_field", "see focus_blur", id="a-word-of-a-summary"),
+        pytest.param("depth_of_field", "named in the summary of focus_blur", id="a-word-of-a-summary"),
     ],
 )
 def test_effects_naming_something_that_is_no_effect_says_where_it_lives(name, says, capsys):
