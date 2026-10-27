@@ -11,12 +11,12 @@ mask = "background"
 
 [[step]]
 effect = "outline"
-width = 14
+width = 8.75
 color = "#ffffff"
 
 [[step]]
 effect = "drop_shadow"
-offset = 18.867962           # hypot(10, 16)
+offset = 11.7925           # hypot(10, 16)
 angle = 57.994617            # atan2(16, 10)
-blur = 18
+blur = 11.25
 opacity = 0.3                  # the shadow covers 30% of the gradient where it is full

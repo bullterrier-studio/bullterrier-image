@@ -8,12 +8,12 @@ saturation = 1.3
 
 [[step]]
 effect = "sharpen"
-radius = 50
+radius = 23.4375
 amount = 0.5
 
 [[step]]
 effect = "ascii"
-cell = 6
+cell = 3
 chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
 gamma = 0.5
 photo = 0.35               # a faint copy of the photo behind the letters: thin text alone tops out at ~27% brightness

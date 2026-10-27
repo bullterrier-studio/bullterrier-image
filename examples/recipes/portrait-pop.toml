@@ -9,7 +9,7 @@ mask = "background"
 
 [[step]]
 effect = "gaussian_blur"
-radius = 10
+radius = 6.25
 mask = "background"
 
 [[step]]

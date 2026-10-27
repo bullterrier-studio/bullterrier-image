@@ -11,18 +11,18 @@ mask = "background"
 effect = "slice_shift"
 preset = "glitch"
 bands = 9
-amount = 51.2
-band_min_height = 10.24
-band_max_height = 61.44
+amount = 24.0
+band_min_height = 4.8
+band_max_height = 28.8
 seed = 11
 
 [[step]]
 effect = "rgb_split"
 angle = 0
-amount = 9
+amount = 4.2188
 edge = "wrap"
 
 [[step]]
 effect = "grain"
 amount = 0.06
-size = 1.6
+size = 0.75

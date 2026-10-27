@@ -16,7 +16,7 @@ opacity = 0.4
 [[step]]
 effect = "particles"
 preset = "starfield"
-density = 1.484
+density = 3.799
 mask = "background"
 opacity = 0.4
 
@@ -32,12 +32,12 @@ mask = "subject"
 effect = "rim_light"
 angle = 300
 color = "#7fffd4"
-width = 16
+width = 10
 amount = 1.5
 
 [[step]]
 effect = "bloom"
-radius = 20
+radius = 12.5
 amount = 0.5
 threshold = 0.7
 

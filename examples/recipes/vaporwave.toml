@@ -12,7 +12,7 @@ mask = "background"
 [[step]]
 effect = "pattern"
 kind = "grid"
-cell = 48
+cell = 30
 foreground = "#fffb96"
 background = "#000000"            # black: screen leaves the gradient as it is between the lines
 thickness = 0.1
@@ -29,4 +29,4 @@ opacity = 0.6
 [[step]]
 effect = "rgb_split"
 angle = 0
-amount = 6
+amount = 3.75

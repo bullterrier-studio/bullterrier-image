@@ -9,7 +9,7 @@ amount = 0.8
 
 [[step]]
 effect = "ascii"
-cell = 6
+cell = 4
 ink = "#4dff7c"
 paper = "#00140a"
 photo = 0.45
@@ -24,13 +24,13 @@ border = "#000000"
 [[step]]
 effect = "bloom"
 octaves = 1
-radius = 10
+radius = 6.25
 threshold = 0.55
 amount = 0.5
 
 [[step]]
 effect = "scanlines"
-spacing = 4
+spacing = 2.5
 softness = 1
 darkness = 0.25
 

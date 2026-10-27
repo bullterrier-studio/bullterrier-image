@@ -32,6 +32,6 @@ opacity = 0.5
 
 [[step]]
 effect = "sharpen"
-radius = 20
+radius = 12.5
 amount = 0.4
 mask = "near"

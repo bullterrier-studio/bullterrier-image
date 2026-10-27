@@ -17,7 +17,7 @@ gamma = 0.7
 
 [[step]]
 effect = "halftone"
-cell = 5
+cell = 3
 angle = 45
 ink = "#141414"
 paper = "#f2ead8"
@@ -28,7 +28,7 @@ amount = 0.1
 
 [[step]]
 effect = "torn_edge"
-width = 18
+width = 11.25
 roughness = 0.4
 fill = "#e9e2d0"
 seed = 2

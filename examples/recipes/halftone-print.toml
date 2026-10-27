@@ -4,12 +4,12 @@ size = 1024
 
 [[step]]
 effect = "sharpen"
-radius = 40
+radius = 18.75
 amount = 0.5
 
 [[step]]
 effect = "halftone"
-cell = 10
+cell = 5
 angle = 45
 ink = "#fff1de"
 

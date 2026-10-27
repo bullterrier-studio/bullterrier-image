@@ -30,4 +30,4 @@ looks = [
 
 [[step]]
 each = "bands"
-looks = ["none", "none", "none", { effect = "gaussian_blur", radius = 3 }]
+looks = ["none", "none", "none", { effect = "gaussian_blur", radius = 1.875 }]

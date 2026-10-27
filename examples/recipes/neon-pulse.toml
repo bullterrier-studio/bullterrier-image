@@ -4,7 +4,7 @@ size = 1024
 
 [[step]]
 effect = "sharpen"          # bring out the fur and the face before the colours go on
-radius = 40
+radius = 18.75
 amount = 0.6
 
 [[step]]
@@ -19,12 +19,12 @@ mask = "background"         # only the subject stays
 [[step]]
 effect = "rgb_split"
 angle = 0
-amount = 9
+amount = 4.2188
 edge = "wrap"
 
 [[step]]
 effect = "bloom"
-radius = 28
+radius = 13.125
 amount = 0.8
 threshold = 0.45
 octaves = 1

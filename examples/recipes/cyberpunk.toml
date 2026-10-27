@@ -11,16 +11,16 @@ amount = 0.45
 
 [[step]]
 effect = "chromatic_aberration"
-amount = 6
+amount = 3.75
 
 [[step]]
 effect = "scanlines"
-spacing = 3
+spacing = 1.875
 darkness = 0.25
 
 [[step]]
 effect = "bloom"
-radius = 24
+radius = 15
 amount = 0.6
 threshold = 0.6
 
@@ -28,7 +28,7 @@ threshold = 0.6
 effect = "particles"
 preset = "rain"
 angle = 78
-length = 40
+length = 25
 opacity = 0.35
 color = "#9fd8ff"
 seed = 3
