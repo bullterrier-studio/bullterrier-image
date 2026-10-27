@@ -1,0 +1,8 @@
+# Canny edges of the photo in cyan, screened over it so only the edges light up.
+name = "edges"
+size = 480
+
+[[step]]
+effect = "edges"
+color = "#40e0ff"
+blend_mode = "screen"

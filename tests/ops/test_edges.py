@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.ops.convolve import Edge
-from bullterrier_image.ops.edges import edge_strength
+from bullterrier_image.ops.edges import connected_to, edge_strength, ridges, sobel_gradient
 
 
 def strength(grey: np.ndarray, *, sigma: float = 0.0, truncate: float = 4.0, edge: Edge = "nearest") -> np.ndarray:
@@ -83,3 +83,74 @@ def test_truncate_cuts_the_smoothing_off_at_that_many_sigmas() -> None:
     picture[:, 20:] = 1.0
     assert strength(picture, sigma=2.0, truncate=4.0)[4, 14] > 0.001
     assert strength(picture, sigma=2.0, truncate=1.0)[4, 14] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("slope_x", "slope_y"),
+    [(0.05, 0.0), (0.0, -0.05), (-0.03, 0.04)],
+    ids=["rising to the right: gx only", "falling downwards: negative gy only", "both, signed"],
+)
+def test_the_gradient_is_the_signed_slope_across_and_down(slope_x: float, slope_y: float) -> None:
+    rows, cols = np.mgrid[0:12, 0:14]
+    plane = (0.5 + slope_x * cols + slope_y * rows).astype(np.float32)
+    gx, gy = sobel_gradient(plane, edge="nearest")
+    np.testing.assert_allclose(gx[1:-1, 1:-1], slope_x, atol=1e-6)
+    np.testing.assert_allclose(gy[1:-1, 1:-1], slope_y, atol=1e-6)
+
+
+def crests(strength: np.ndarray, gx: np.ndarray, gy: np.ndarray) -> list[tuple[int, int]]:
+    return [(int(row), int(col)) for row, col in np.argwhere(ridges(strength, gx, gy))]
+
+
+@pytest.mark.parametrize(
+    ("profile", "expected"),
+    [
+        ([0, 1, 3, 5, 3, 1, 0], [3]),
+        ([0, 2, 2, 0, 0, 0, 0], [1]),
+        ([5, 3, 1, 0, 0, 0, 0], [0]),
+        ([1, 4, 1, 0, 3, 0, 0], [1, 4]),
+    ],
+    ids=["one hump: its top", "two equal tops: one stays", "the border pixel can be a crest", "two humps: both tops"],
+)
+def test_ridges_keep_the_crest_of_the_strength_across_a_horizontal_gradient(
+    profile: list[int], expected: list[int]
+) -> None:
+    strength = np.tile(np.asarray(profile, np.float32), (3, 1))
+    gradient_x = strength  # a gradient pointing right, as long as the strength
+    found = crests(strength, gradient_x, np.zeros_like(strength))
+    assert found == [(row, col) for row in range(3) for col in expected]
+
+
+def test_ridges_look_across_the_gradient_whichever_way_it_points() -> None:
+    """The same hump along the rows, with the gradient pointing down (then up): its top row stays, not its sides."""
+    strength = np.tile(np.asarray([0, 1, 3, 1, 0], np.float32)[:, None], (1, 3))
+    for sign in (1, -1):
+        found = crests(strength, np.zeros_like(strength), sign * strength)
+        assert found == [(2, col) for col in range(3)]
+
+
+def test_ridges_look_across_a_diagonal_line_when_the_gradient_points_across_it() -> None:
+    """A diagonal line of strength 4 with 2 on each flank and nothing further, its gradient pointing down and to the
+    left, across it: every pixel of the line stays and nothing beyond the flanks does. Equal flanks tie, and a tie
+    keeps one side only, so the line is no more than 2 px thick."""
+    index = np.arange(9)
+    across = index[:, None] - index[None, :]  # 0 on the main diagonal, then 1, 2... away from it
+    strength = np.select([across == 0, np.abs(across) == 1], [4.0, 2.0], 0.0).astype(np.float32)
+    found = crests(strength, -strength / np.sqrt(2), strength / np.sqrt(2))
+    assert {(i, i) for i in index} <= set(found)
+    assert all(abs(row - col) <= 1 for row, col in found)
+    assert all(sum(1 for r, _ in found if r == row) <= 2 for row in index)
+
+
+def test_connected_to_keeps_the_candidates_that_touch_a_seed_diagonals_included() -> None:
+    candidates = np.zeros((6, 8), bool)
+    candidates[0, 0:3] = True  # a run with a seed at one end
+    candidates[1, 3] = True  # continues diagonally
+    candidates[2, 4:6] = True
+    candidates[5, 5:8] = True  # a separate run, no seed
+    seeds = np.zeros_like(candidates)
+    seeds[0, 0] = True
+    kept = connected_to(candidates, seeds)
+    expected = candidates.copy()
+    expected[5] = False
+    np.testing.assert_array_equal(kept, expected)
