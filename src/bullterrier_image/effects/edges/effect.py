@@ -24,8 +24,9 @@ class EdgesParams(EffectParams):
         "canny",
         doc="How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that follow the picture's "
         "gradients), 'canny' (the same steepness reduced to thin connected lines: the weakest lines are dropped unless "
-        "they join a strong one) or 'dog' (difference of Gaussians: only features between `radius` and 1.6 times "
-        "`radius` in size, so slow gradients and fine texture both fall away).",
+        "they join a strong one) or 'dog' (sketch ink lines: the difference of Gaussians itself, so one line along "
+        "each dark stroke and on the dark side of each edge, from features between `radius` and 1.6 times `radius` "
+        "in size; slow gradients and fine texture fall away).",
     )
     radius: float = param(
         1.5,
@@ -41,7 +42,7 @@ class EdgesParams(EffectParams):
         unit="fraction",
         min=0.01,
         max=1,
-        doc="How steep an edge must be to show, as a share of the steepest edge there can be after smoothing (black "
+        doc="How strong an edge must be to show, as a share of the strongest edge there can be after smoothing (black "
         "straight to white = 1; a faint edge is near 0.05). Raising it keeps only the strongest edges.",
     )
     softness: float = param(
@@ -82,42 +83,52 @@ class EdgesParams(EffectParams):
     )
 
 
-def _gradient(
-    grey: np.ndarray, method: str, radius: float, truncate: float, edge: Edge
-) -> tuple[np.ndarray, np.ndarray]:
-    """The gradient the method looks at: the picture's own, smoothed by `radius`, or for 'dog' that of the difference
-    of two Gaussians."""
-    if method == "dog":
-        band = gaussian_blur(grey, radius, truncate=truncate, edge=edge)
-        band -= gaussian_blur(grey, radius * _DOG_RATIO, truncate=truncate, edge=edge)
-        return sobel_gradient(band, edge=edge)
-    return sobel_gradient(gaussian_blur(grey, radius, truncate=truncate, edge=edge), edge=edge)
+def _gradient(grey: np.ndarray, params: EdgesParams, edge: Edge) -> tuple[np.ndarray, np.ndarray]:
+    """The Sobel gradient of the picture smoothed by `radius`, in brightness per px."""
+    return sobel_gradient(gaussian_blur(grey, params.radius, truncate=params.truncate, edge=edge), edge=edge)
+
+
+def _strength(grey: np.ndarray, params: EdgesParams, edge: Edge) -> np.ndarray:
+    """How strongly each pixel reads as an edge, in brightness. For 'sobel' and 'canny' the steepness of the smoothed
+    picture. For 'dog' the response of the difference of Gaussians (`radius` and 1.6 times that), positive where the
+    picture is darker than its wider surroundings (a dark line on a light ground, or the dark side of an edge) and
+    negative where it is lighter, which is never drawn."""
+    if params.method == "dog":
+        narrow = gaussian_blur(grey, params.radius, truncate=params.truncate, edge=edge)
+        wide = gaussian_blur(grey, params.radius * _DOG_RATIO, truncate=params.truncate, edge=edge)
+        return wide - narrow
+    return np.hypot(*_gradient(grey, params, edge))
 
 
 def _steepest(params: EdgesParams) -> float:
-    """The strength of the steepest edge the method can see at `radius`: a step from black straight to white, found by
+    """The strength of the strongest edge the method can see at `radius`: a step from black straight to white, found by
     running the method on one, wide enough that its border cannot touch the step."""
     reach = int(params.truncate * params.radius * _DOG_RATIO + 0.5) + 3  # constant: 3 px of margin beyond the smoothing
     step = np.zeros((3, 2 * reach), np.float32)
     step[:, reach:] = 1.0  # constant: black to white, the full range of a picture
-    return float(np.hypot(*_gradient(step, params.method, params.radius, params.truncate, "nearest")).max())
+    return float(_strength(step, params, "nearest").max())
 
 
 @effect(category="stylised", params=EdgesParams)
 def edges(rgb: np.ndarray, params: EdgesParams) -> np.ndarray:
-    """Edge detection and line art: outlines in `color` on `background`, by Sobel, Canny or difference of Gaussians.
+    """Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians.
 
-    The picture's brightness is smoothed by `radius`, and its steepness (a black-to-white step reads 1, whichever
-    method and radius) decides how fully an edge is drawn: not at all below `threshold` x (1 - `softness`), fully from
-    threshold x (1 + softness), faded between. 'canny' keeps only the crest of each edge, one or two pixels wide, and
-    drops the weak ones that join no strong one; 'dog' looks at the steepness of the difference between two Gaussians
-    (`radius` and 1.6 times that), so it outlines features of about that size.
+    The picture's brightness is smoothed by `radius`, and how strongly a pixel reads as an edge (a black-to-white step
+    reads 1, whichever method and radius) decides how fully it is drawn: not at all below `threshold` x (1 -
+    `softness`), fully from threshold x (1 + softness), faded between. 'sobel' and 'canny' read the steepness;
+    'canny' keeps only the crest of each edge, one or two pixels wide, and drops the weak ones that join no strong one.
+    'dog' reads the difference between two Gaussians (`radius` and 1.6 times that) itself, not its steepness, so it
+    draws one ink line along each dark stroke and on the dark side of each edge, of features of about that size.
     Flat areas are always `background`. Screened over the picture (a step's `blend_mode = "screen"`) it lights up
     the edges; a dark `color` on a light `background` is line art.
     """
     p = params
-    gx, gy = _gradient(luminance(rgb), p.method, p.radius, p.truncate, p.edge)
-    steepness = np.hypot(gx, gy) / _steepest(p)
+    grey = luminance(rgb)
+    if p.method == "canny":
+        gx, gy = _gradient(grey, p, p.edge)
+        steepness = np.hypot(gx, gy) / _steepest(p)
+    else:
+        steepness = _strength(grey, p, p.edge) / _steepest(p)
     lower, upper = p.threshold * (1 - p.softness), p.threshold * (1 + p.softness)
     if upper > lower:
         drawn = np.clip((steepness - lower) / (upper - lower), 0.0, 1.0)

@@ -204,7 +204,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   effects have presets (a third-party effect's author ships data of their own); a look that needs several effects is
   a recipe, not a preset.
 - **Looks are recipes shipped as data, loaded by name: `load_recipe("crt")`, `bt-image render PHOTO crt`.** A look that
-  needs several steps (anaglyph, crt, glitch, hologram, tilt-shift, stained glass, low poly, spotlight, voronoi cells) is an ordinary recipe
+  needs several steps (crt, glitch, hologram, tilt-shift, stained glass, low poly, spotlight, voronoi cells) is an ordinary recipe
   file in `src/bullterrier_image/looks/<name>.toml` with a top-level `description` (one sentence), found the way presets
   are: by the folder, not by a list in code. `load_recipe` and every command argument that takes a recipe file also take
   a look's name: a `str` that is a look's name is that look (a `Path`, or `./crt`, is always a file, so a folder of yours
@@ -214,12 +214,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   not looks; a look is not a preset (one effect) and not an effect (one picture in, one out, with parameters).
 - **A name that is no effect says where it lives.** `registry.get` is the one place an effect name is looked up, so
   recipes, `fx`, the command line and the gallery give the same answer: if the name is a preset it names the effect
-  (`'glitch' is a preset: effect = "slice_shift", preset = "glitch"`), if it is a look it says how to load it, then (in this
-  order) a parameter of that name (`'vibrance' is a parameter of grade`), effects whose summary mentions the name with
-  underscores read as spaces (`'depth_of_field': see focus_blur`), otherwise the close matches among effects, presets and
-  looks. *Reason:* a cut effect lives on as a preset, a look, a parameter or a word in the survivor's summary (no
-  aliases), and a person or a model that remembers the old name must be able to reach it from the error. The answer is
-  read from the shipped presets, looks, parameters and summaries, never from a table of old names.
+  (`'glitch' is a preset: effect = "slice_shift", preset = "glitch"`), if it is a look it says how to load it, otherwise
+  it offers the close matches among effects, presets and looks. *Reason:* a cut effect lives on as a preset or a look
+  (no aliases), and a person or a model that remembers the old name must be able to reach it from the error. The answer
+  is read from the shipped presets and looks, never from a table of old names.
 - **Every step can be limited and blended: `mask`, `opacity` and `blend_mode` belong to the step, not to the effect.**
   `mask` (`subject` or `background`), `opacity` (0 to 1) and `blend_mode` (normal, multiply, screen, overlay,
   soft_light, difference, color) are applied by the runner after any effect, so a gradient can
@@ -394,6 +392,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the effects themselves aim far lower) and 12 picture-sized buffers of memory (`tracemalloc`), with a known-bad effect
   for each limit; an effect that needs more is redesigned, or the budget is raised in its own reviewed commit. The FFT is single-threaded, so CPU time stays predictable when photos are
   rendered in parallel.
+
+## Effects
+
+- **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
+  the gradient of the difference doubles every line and shows texture as busy rings; the response is positive on the
+  dark side of an edge and on dark strokes, which is one ink line, the sketch look, and unlike Sobel and Canny.
+  *Consequence:* the line sits about one radius beside the edge, on its dark side; 'dog' still uses `threshold` and
+  `softness` like the other methods.
 
 ## Fixing defects
 

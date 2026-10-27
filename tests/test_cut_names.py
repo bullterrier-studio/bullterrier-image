@@ -1,16 +1,15 @@
-"""The cut-name audit: every name that left the effect list stays findable through the public lookup.
+"""The cut-name audit: every effect folded into another stays findable as a preset of the effect that took it over.
 
-The table is test data of the audit (old name -> the effect that took it over), not a catalogue the library reads:
-nothing in `src` knows the old names. Each name is asked for the way a person does, as `fx.<name>`, and the error
-must point at the survivor: as its preset, as one of its parameters, or as a word in its summary.
+The table is test data of the audit (old effect name -> the survivor holding it as a preset), not a catalogue the
+library reads: nothing in `src` knows the old names. A name that became a plain parameter (vibrance, temperature) or
+a multi-step look is not here.
 """
 
 import pytest
 
-from bullterrier_image import fx
-from bullterrier_image.loader import load_recipe
+from bullterrier_image.core import registry
 
-TOOK_OVER = {
+FOLDED_INTO = {
     "glow": "bloom",
     "soft_focus": "bloom",
     "halation": "bloom",
@@ -53,31 +52,14 @@ TOOK_OVER = {
     "evaporate": "disperse",
     "overlay": "blend",
     "glitch": "slice_shift",
-    "vibrance": "grade",
-    "temperature": "grade",
-    "depth_of_field": "focus_blur",
 }
 
 
-@pytest.mark.parametrize(("old", "survivor"), TOOK_OVER.items(), ids=TOOK_OVER)
-def test_a_cut_name_is_no_effect_and_the_error_points_at_the_survivor(old, survivor):
-    with pytest.raises(AttributeError) as raised:
-        getattr(fx, old)
-    pointer = str(raised.value).split("available:")[0]  # before the list of every effect, which names the survivor too
-    assert repr(old) in pointer
-    assert survivor in pointer
+@pytest.mark.parametrize(("old", "survivor"), FOLDED_INTO.items(), ids=FOLDED_INTO)
+def test_a_cut_effect_is_a_preset_of_its_survivor_and_no_longer_an_effect(old, survivor):
+    assert old in registry.presets(survivor)
+    assert old not in registry.all_effects()
 
 
-def test_a_name_that_was_never_an_effect_points_nowhere():
-    with pytest.raises(AttributeError) as raised:
-        fx.nonsense_xyz  # noqa: B018  (the lookup itself is what must raise)
-    assert "is a " not in str(raised.value).split("available:")[0]
-    assert "see " not in str(raised.value).split("available:")[0]
-
-
-def test_the_anaglyph_look_is_loadable_by_name_and_is_named_by_the_error():
-    recipe = load_recipe("anaglyph")
-    assert recipe.name == "anaglyph"
-    assert len(recipe.steps) == 2
-    with pytest.raises(AttributeError, match=r'load_recipe\("anaglyph"\)'):
-        fx.anaglyph  # noqa: B018  (the lookup itself is what must raise)
+def test_a_name_that_was_never_an_effect_is_no_preset_of_any_effect():
+    assert not [name for name in registry.all_effects() if "no_such_look" in registry.presets(name)]

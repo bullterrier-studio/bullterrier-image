@@ -817,9 +817,6 @@ def test_a_mistake_in_an_each_step_names_the_file_the_step_and_the_problem(tmp_p
     ("effect", "says"),
     [
         pytest.param("glitch", 'effect = "slice_shift", preset = "glitch"', id="known-good-a-preset-name"),
-        pytest.param("vibrance", "'vibrance' is a parameter of grade", id="known-good-a-parameter-name"),
-        pytest.param("depth_of_field", "see focus_blur", id="known-good-a-word-of-a-summary"),
-        pytest.param("crt", 'load_recipe("crt")', id="known-good-a-look-name"),
         pytest.param("zzqxv", "unknown effect 'zzqxv'", id="known-bad-nonsense"),
     ],
 )

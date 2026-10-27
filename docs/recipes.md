@@ -324,9 +324,9 @@ third-party effects have none.
 
 ## Looks
 
-A look that needs several steps (`anaglyph`, `crt`, `glitch`, `hologram`, `tilt-shift`, `stained-glass`, `low-poly`, `spotlight`, `voronoi-cells`) is a
+A look that needs several steps (`crt`, `glitch`, `hologram`, `tilt-shift`, `stained-glass`, `low-poly`, `spotlight`, `voronoi-cells`) is a
 built-in recipe, listed under "Looks" by `bt-image effects`. Give its name where a recipe file goes: `load_recipe("crt")`,
 `bt-image render photo.jpg crt`, `bt-image sweep photo.jpg glitch rgb_split.amount 0..20`. Use a preset for one effect with a
 set of values, a look for several. A name that is a `str` is the look even when a file of that name exists; write `./crt` or
 pass a `Path` for the file. Data in `src/bullterrier_image/looks/<name>.toml`: a recipe file with a top-level `description`.
-Naming a preset or a look where an effect goes (`effect = "glitch"`, `fx.crt`) fails saying where the name lives: a preset, a look, a parameter of an effect, or the effects whose summary mentions it.
+Naming a preset or a look where an effect goes (`effect = "glitch"`, `fx.crt`) fails saying where the name lives.

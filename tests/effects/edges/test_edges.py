@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from scipy.special import ndtr
 
 from bullterrier_image.core import registry
 
@@ -29,19 +30,54 @@ def test_a_flat_picture_is_all_background(method: str) -> None:
 
 
 @pytest.mark.parametrize("radius", [0.5, 3.0, 12.0], ids=["radius 0.5", "radius 3", "radius 12"])
-@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("method", ["sobel", "canny"])
 def test_a_black_to_white_step_is_drawn_in_full_at_the_step_and_not_at_all_far_from_it(
     method: str, radius: float
 ) -> None:
-    """Whatever the method and the smoothing, the steepest edge there can be reads 1 (fully drawn); the Gaussians reach
-    4 x radius px (x 1.6 for 'dog') and the gradient one more, so beyond that there is nothing."""
+    """Whatever the method and the smoothing, the steepest edge there can be reads 1 (fully drawn); the Gaussian reaches
+    4 x radius px and the gradient one more, so beyond that there is nothing."""
     width = 400
     out = edge_map(step_picture(width, at=200), method=method, radius=radius)[4]
     assert out[198:202].max() == pytest.approx(1.0, abs=1e-5)
     assert out[198:202].max() == out.max()
-    reach = int(4 * radius * 1.6) + 3
+    reach = int(4 * radius) + 3
     np.testing.assert_array_equal(out[: 200 - reach], 0.0)
     np.testing.assert_array_equal(out[200 + reach :], 0.0)
+
+
+@pytest.mark.parametrize("radius", [0.5, 1.5, 3.0], ids=["radius 0.5", "radius 1.5", "radius 3"])
+def test_dog_draws_a_black_to_white_step_as_one_ink_line_on_its_dark_side(radius: float) -> None:
+    """One run of drawn pixels, fully drawn somewhere, entirely on the black side (columns before the step at 200) and
+    no farther from the step than the Gaussians reach (4 x 1.6 x radius px); nothing on the white side or beyond."""
+    out = edge_map(step_picture(400, at=200), method="dog", radius=radius, threshold=0.3)[4]
+    drawn = np.flatnonzero(out)
+    assert out.max() == pytest.approx(1.0, abs=1e-5)
+    np.testing.assert_array_equal(np.diff(drawn), 1)  # one line, not two
+    assert drawn.max() < 200
+    assert drawn.min() >= 200 - (int(4 * radius * 1.6) + 3)
+
+
+def test_dog_across_a_step_follows_the_difference_of_two_gaussians_of_radius_and_1_6_times_radius() -> None:
+    """Oracle: a step blurred by a Gaussian of sigma is the normal CDF, so on the black side at distance d from the step
+    the response is cdf(d / sigma) - cdf(d / 1.6 sigma), here drawn linearly (`threshold` 1, `softness` 1: half the
+    response relative to its peak). The ratio 1.6 is Marr and Hildreth's."""
+    sigma = 4.0
+    out = edge_map(step_picture(400, at=200), method="dog", radius=sigma, threshold=1.0, softness=1.0)[4]
+    distance = 199.5 - np.arange(200 - 30, 200)  # pixel centres to the step between columns 199 and 200
+    response = ndtr(distance / sigma) - ndtr(distance / (1.6 * sigma))
+    far = np.linspace(0, 40, 4001)
+    peak = (ndtr(far / sigma) - ndtr(far / (1.6 * sigma))).max()
+    np.testing.assert_allclose(out[200 - 30 : 200], response / peak / 2, atol=0.01)
+
+
+@pytest.mark.parametrize("radius", [0.5, 1.5, 3.0], ids=["radius 0.5", "radius 1.5", "radius 3"])
+def test_dog_draws_a_dark_line_on_light_but_not_a_light_line_on_dark(radius: float) -> None:
+    """Ink goes where the picture is darker than its surroundings: a dark stroke is drawn at its own pixel, a light
+    stroke is not (only the dark ground beside it is)."""
+    dark_stroke = np.ones((9, 400), np.float32)
+    dark_stroke[:, 200] = 0.0
+    assert edge_map(dark_stroke, method="dog", radius=radius)[4, 200] == pytest.approx(1.0, abs=1e-5)
+    assert edge_map(1.0 - dark_stroke, method="dog", radius=radius)[4, 200] == 0.0
 
 
 def test_edges_are_drawn_in_color_on_background() -> None:
@@ -72,7 +108,9 @@ def test_a_turned_picture_has_the_turned_edge_map(method: str, photo: np.ndarray
     grey = photo[..., 0]
     out = edge_map(grey, method=method, radius=1.5)
     turned = edge_map(np.rot90(grey).copy(), method=method, radius=1.5)
-    np.testing.assert_allclose(turned, np.rot90(out), atol=1e-5)
+    # 'dog' subtracts two float32 blurs summed in another order after a turn; the ramp from threshold to full (0.1 of
+    # the range at the defaults) magnifies that rounding about a hundredfold
+    np.testing.assert_allclose(turned, np.rot90(out), atol=1e-4)
 
 
 @pytest.mark.parametrize("radius", [0.5, 2.0, 6.0])

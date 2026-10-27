@@ -87,8 +87,6 @@ STEP_KEYS = ("effect", "mask", "opacity", "blend_mode", "preset", "partition", "
 
 # The end of a sentence: a full stop, ! or ? followed by a space or the end. Decimals ("0.5") and ranges ("0..1") are
 # never followed by a space; "e.g." and "i.e." are, so they are skipped.
-_LISTED = 5  # how many effects an unknown-name message names at most
-_CONTEXT = 30  # characters of a summary shown each side of the name it mentions
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")
 
 
@@ -240,49 +238,24 @@ def get(name: str) -> ModelledEffect:
 
 
 def _not_an_effect(name: str) -> str:
-    """Why `name` is no effect, first match winning: it is a preset or a built-in look, a parameter of some effects,
-    or named in the summary of some effects; else the close matches among effects, presets and looks."""
+    """Why `name` is no effect: it is a preset of some effects or a look, or it is near one of those names, or it is
+    nothing we know."""
     homes = {effect: sorted(presets(effect)) for effect in _EFFECTS}  # effect -> its preset names
     looks = look_files.read()
-    where = [f'a preset: effect = "{effect}", preset = "{name}"' for effect, names in homes.items() if name in names]
+    where = [f'effect = "{effect}", preset = "{name}"' for effect, names in homes.items() if name in names]
+    if where:
+        return f"{name!r} is a preset: {'; or '.join(where)}"
     if name in looks:
-        where.append(
-            f"a look, a recipe of several steps: {looks[name].description} "
+        return (
+            f"{name!r} is a look, a recipe of several steps, not an effect: {looks[name].description} "
             f'Load it by name: load_recipe("{name}"), or `bt-image render PHOTO {name}`'
         )
-    if where:
-        return f"{name!r} is {'; or '.join(where)}"
-    owners = sorted(
-        (effect for effect, fn in _EFFECTS.items() if name in fn.params_model.model_fields),
-        key=lambda effect: (len(_EFFECTS[effect].params_model.model_fields), effect),  # the narrowest effect first
-    )
-    if owners:
-        more = f" and {len(owners) - _LISTED} more" if len(owners) > _LISTED else ""
-        return f"{name!r} is a parameter of {', '.join(owners[:_LISTED])}{more}"
-    words = re.findall(r"[a-z0-9]+", name.lower())
-    mentions = [(effect, hit) for effect in _EFFECTS if (hit := _mention(summary(effect), words))]
-    if mentions:
-        seen = "; ".join(f"{effect} (summary: {hit})" for effect, hit in mentions[:_LISTED])
-        return f"{name!r}: see {seen}"
     names = {**dict.fromkeys(_EFFECTS, "effect"), **dict.fromkeys(looks, "look")}
     for effect, preset_names in homes.items():
         names.update((preset, f"preset of {effect}") for preset in preset_names)
     near = [f"{close} ({names[close]})" for close in difflib.get_close_matches(name, names)]
     hint = f"; did you mean: {', '.join(near)}" if near else ""
     return f"unknown effect {name!r}{hint}; available: {', '.join(sorted(_EFFECTS))}"
-
-
-def _mention(text: str, words: list[str]) -> str:
-    """The stretch of `text` around the first place where it has all of `words` in a row (case, hyphens and other
-    punctuation between words ignored), with `...` where it is cut; "" if it has no such place."""
-    found = list(re.finditer(r"[A-Za-z0-9]+", text))
-    for i in range(len(found) - len(words) + 1):
-        if [m.group().lower() for m in found[i : i + len(words)]] == words:
-            start = text.rfind(" ", 0, max(0, found[i].start() - _CONTEXT)) + 1  # cut between words
-            end = text.find(" ", found[i + len(words) - 1].end() + _CONTEXT)
-            end = len(text) if end < 0 else end
-            return f"{'...' if start else ''}{text[start:end]}{'...' if end < len(text) else ''}"
-    return ""
 
 
 def all_effects() -> dict[str, ModelledEffect]:
