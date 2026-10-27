@@ -14,6 +14,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch, faded blacks, or the negative (invert). | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
+| <img src="../gallery/lut.jpg" width="160" alt="lut"> | `lut` | Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`. | `file=Lut.identity(2)` `amount=1.0` | [lut.toml](../../examples/effects/lut.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a range as wide as the wheel is a hue shift. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
 
 ### `auto_levels`
@@ -172,6 +173,13 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- |
 | `invert` | The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement. |
 | `fade` | A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky. |
+
+### `lut`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `file` | lookup table |  |  | `Lut.identity(2)` | The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D tables are refused) in a recipe file (relative to the file) or in `fx`, or, in Python, a Lut or an (n, n, n, 3) array. The default table changes nothing. Colours between the table's entries are interpolated trilinearly. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `1.0` | How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the midway between the picture and the graded one, 1 is the table as written. |
 
 ### `selective_color`
 

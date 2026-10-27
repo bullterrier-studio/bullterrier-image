@@ -6,7 +6,7 @@ from typing import Literal, Union
 
 import numpy
 
-from .core.params import Drive, Picture
+from .core.params import Drive, Lut, Picture
 from .recipe import Step
 
 def ambient_occlusion(radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2384,6 +2384,24 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
     pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a
     seam)."""
+    ...
+
+def lut(file: Lut | os.PathLike[str] | str | numpy.ndarray = Lut.identity(2), amount: float | Drive = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.
+
+Each pixel's colour is looked up in the table, interpolating trilinearly between the eight nearest entries; values
+outside the table's domain take its edge entry, and the result is kept in 0..1.
+
+Parameters
+----------
+file : lookup table, default Lut.identity(2)
+    The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D
+    tables are refused) in a recipe file (relative to the file) or in `fx`, or, in
+    Python, a Lut or an (n, n, n, 3) array. The default table changes nothing. Colours
+    between the table's entries are interpolated trilinearly.
+amount : number (drivable), fraction, 0 to 1, default 1.0
+    How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the
+    midway between the picture and the graded one, 1 is the table as written."""
     ...
 
 def melt(amount: float = 40.0, scale: float = 12.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
