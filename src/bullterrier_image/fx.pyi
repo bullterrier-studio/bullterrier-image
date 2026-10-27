@@ -1106,6 +1106,57 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     mirrors it about the edge line."""
     ...
 
+def edges(method: Literal['sobel', 'canny', 'dog'] = 'canny', radius: float = 1.5, threshold: float = 0.1, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Edge detection and line art: outlines in `color` on `background`, by Sobel, Canny or difference of Gaussians.
+
+The picture's brightness is smoothed by `radius`, and its steepness (a black-to-white step reads 1, whichever
+method and radius) decides how fully an edge is drawn: not at all below `threshold` x (1 - `softness`), fully from
+threshold x (1 + softness), faded between. 'canny' keeps only the crest of each edge, one or two pixels wide, and
+drops the weak ones that join no strong one; 'dog' looks at the steepness of the difference between two Gaussians
+(`radius` and 1.6 times that), so it outlines features of about that size.
+Flat areas are always `background`. Screened over the picture (a step's `blend_mode = "screen"`) it lights up
+the edges; a dark `color` on a light `background` is line art.
+
+Parameters
+----------
+method : one of 'sobel', 'canny', 'dog', default 'canny'
+    How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that
+    follow the picture's gradients), 'canny' (the same steepness reduced to thin
+    connected lines: the weakest lines are dropped unless they join a strong one) or
+    'dog' (difference of Gaussians: only features between `radius` and 1.6 times
+    `radius` in size, so slow gradients and fine texture both fall away).
+radius : number, px, 0.5 to 50, default 1.5
+    How far the picture is smoothed before edges are looked for, as the Gaussian sigma
+    in px at the recipe's size ('dog': the finer of its two Gaussians). Raising it drops
+    fine detail and noise and makes broader, smoother edges.
+threshold : number, fraction, 0.01 to 1, default 0.1
+    How steep an edge must be to show, as a share of the steepest edge there can be
+    after smoothing (black straight to white = 1; a faint edge is near 0.05). Raising it
+    keeps only the strongest edges.
+softness : number, fraction, 0 to 1, default 0.5
+    How gradually edges fade in around `threshold`: they are fully drawn from threshold
+    x (1 + softness) and not at all below threshold x (1 - softness), and 'canny' also
+    keeps a line down to that lower value if it touches one above the upper. 0 = every
+    edge fully drawn or not at all; raising it adds weaker edges as faint lines.
+color : colour, default '#ffffff'
+    The colour of the edges: '#rrggbb', '#rgb' or [r, g, b] 0..1. Laid over a picture
+    with the blend mode 'screen' only the edges light up; dark on a light `background`
+    it is line art.
+background : colour, default '#000000'
+    The colour where there is no edge: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black suits
+    'screen' blending, a light colour with a dark `color` gives a drawing.
+
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the Gaussians are cut off, in sigmas: they reach truncate x radius px. Larger
+    is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the gradient see beyond the picture's border: 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
+    (the edge pixel repeated) or 'wrap' (the opposite edge)."""
+    ...
+
 def equalize(tiles: int = 8, limit: float = 3.0, bins: int = 256, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.
 

@@ -7,6 +7,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`. | `method='floyd_steinberg'` `palette='photo'` `colors=8` `cell=0.0005` `pattern=1.0` +6 advanced | [dither.toml](../../examples/effects/dither.toml) |
+| <img src="../gallery/edges.jpg" width="160" alt="edges"> | `edges` | Edge detection and line art: outlines in `color` on `background`, by Sobel, Canny or difference of Gaussians. | `method='canny'` `radius=1.5` `threshold=0.1` `softness=0.5` `color='#ffffff'` `background='#000000'` +2 advanced | [edges.toml](../../examples/effects/edges.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | Print-style dot screen: tone becomes dot size. | `cell=14` `angle=45.0` `ink=None` `ink_floor=0.35` `paper='#000000'` `paper_threshold=0.5` `sigma=0.5` `feather=1.0` +3 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=0.125` `min_cell=0.01` `gap=0.002` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
@@ -44,6 +45,26 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `posterize` | Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels. |
 | `threshold` | Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks. |
 | `palette_quantize` | Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8). |
+
+### `edges`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `method` | one of 'sobel', 'canny', 'dog' |  |  | `'canny'` | How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that follow the picture's gradients), 'canny' (the same steepness reduced to thin connected lines: the weakest lines are dropped unless they join a strong one) or 'dog' (difference of Gaussians: only features between `radius` and 1.6 times `radius` in size, so slow gradients and fine texture both fall away). |
+| `radius` | number | px | 0.5 to 50 | `1.5` | How far the picture is smoothed before edges are looked for, as the Gaussian sigma in px at the recipe's size ('dog': the finer of its two Gaussians). Raising it drops fine detail and noise and makes broader, smoother edges. |
+| `threshold` | number | fraction | 0.01 to 1 | `0.1` | How steep an edge must be to show, as a share of the steepest edge there can be after smoothing (black straight to white = 1; a faint edge is near 0.05). Raising it keeps only the strongest edges. |
+| `softness` | number | fraction | 0 to 1 | `0.5` | How gradually edges fade in around `threshold`: they are fully drawn from threshold x (1 + softness) and not at all below threshold x (1 - softness), and 'canny' also keeps a line down to that lower value if it touches one above the upper. 0 = every edge fully drawn or not at all; raising it adds weaker edges as faint lines. |
+| `color` | colour |  |  | `'#ffffff'` | The colour of the edges: '#rrggbb', '#rgb' or [r, g, b] 0..1. Laid over a picture with the blend mode 'screen' only the edges light up; dark on a light `background` it is line art. |
+| `background` | colour |  |  | `'#000000'` | The colour where there is no edge: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black suits 'screen' blending, a light colour with a dark `color` gives a drawing. |
+
+<details><summary>Advanced parameters (2)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the Gaussians are cut off, in sigmas: they reach truncate x radius px. Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the gradient see beyond the picture's border: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
+
+</details>
 
 ### `halftone`
 
