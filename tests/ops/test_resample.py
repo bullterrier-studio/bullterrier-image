@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from bullterrier_image.ops.resample import resize, stretch
+from bullterrier_image.ops.resample import box_resize, nearest_resize, resize, stretch
 
 
 def test_resize_keeps_aspect_ratio_and_range(photo, subject):
@@ -44,3 +44,24 @@ def test_stretch_blends_neighbours_linearly_by_pixel_centre():
     border repeated) they read 0, 1/4, 3/4 and 1."""
     out = stretch(np.array([[0.0, 1.0]], np.float32), 1, 4)
     np.testing.assert_allclose(out, [[0.0, 0.25, 0.75, 1.0]], atol=1e-6)
+
+
+def test_box_resize_by_a_whole_number_is_the_mean_of_each_block():
+    picture = np.arange(4 * 6 * 3, dtype=np.float32).reshape(4, 6, 3) / 100
+    by_hand = picture.reshape(2, 2, 3, 2, 3).mean(axis=(1, 3))
+    np.testing.assert_allclose(box_resize(picture, 2, 3), by_hand, atol=1e-6)
+
+
+def test_box_resize_to_the_same_size_is_a_no_op(photo):
+    assert box_resize(photo, *photo.shape[:2]) is photo
+
+
+def test_nearest_resize_by_a_whole_number_repeats_each_pixel_in_a_block():
+    picture = np.arange(2 * 3 * 3, dtype=np.float32).reshape(2, 3, 3)
+    expected = np.kron(picture, np.ones((2, 2, 1), np.float32))
+    np.testing.assert_array_equal(nearest_resize(picture, 4, 6), expected)
+
+
+def test_nearest_resize_never_makes_a_value_the_input_does_not_have():
+    picture = np.array([[[0.0], [1.0]], [[1.0], [0.0]]], np.float32)
+    assert set(np.unique(nearest_resize(picture, 5, 7))) <= {0.0, 1.0}

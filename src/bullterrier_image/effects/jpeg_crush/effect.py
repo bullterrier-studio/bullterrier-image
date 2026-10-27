@@ -5,6 +5,7 @@ import numpy as np
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.jpeg import BLOCK, decode, encode
+from bullterrier_image.ops.resample import box_resize, nearest_resize
 
 
 class JpegCrushParams(EffectParams):
@@ -16,9 +17,9 @@ class JpegCrushParams(EffectParams):
         min=1,
         max=100,
         doc="The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG Group's): 100 keeps almost "
-        "everything, about 75 is a normal photo, about 6 shows 8 px blocks, ringing round edges and colour bleed, 1 "
-        "is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a "
-        "larger jump in the picture.",
+        "everything, about 75 is a normal photo, about 6 shows blocks 8 px wide, ringing round edges and colour "
+        "bleed, 1 is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is "
+        "also a larger jump in the picture.",
     )
     hits: int = param(
         0,
@@ -61,7 +62,12 @@ class JpegCrushParams(EffectParams):
 
 
 @effect(category="glitch", params=JpegCrushParams)
-def jpeg_crush(rgb: np.ndarray, params: JpegCrushParams) -> np.ndarray:
+def jpeg_crush(
+    rgb: np.ndarray,
+    params: JpegCrushParams,
+    *,
+    size_ratio: float = 1.0,  # constant: a call outside a recipe is at its design size
+) -> np.ndarray:
     """Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`,
     damage `hits` coefficients, and decode it.
 
@@ -75,7 +81,22 @@ def jpeg_crush(rgb: np.ndarray, params: JpegCrushParams) -> np.ndarray:
     it (the DC value with chance `dc_share`, otherwise one of the 63 others), and adds or subtracts between 1 and
     `magnitude` quantisation steps before the decoding. A hit on a DC value also moves the DC value of every later
     block of its row in that plane, as a damaged difference does in the file.
+
+    The blocks are 8 design px, so the damage looks the same at any size while the fine detail stays. `size_ratio`
+    (injected: working px per design px, 1 outside a recipe) shrinks the picture to its design size by averaging,
+    crushes and damages that, and adds the damage (crushed minus shrunk) back to the full picture, each design pixel's
+    damage repeated over the working pixels it covers so block edges stay hard.
     """
+    height, width = rgb.shape[:2]
+    design = box_resize(rgb, max(1, round(height / size_ratio)), max(1, round(width / size_ratio)))
+    crushed = _crush(design, params)
+    # picture + damage, written so that at a ratio of 1 the picture cancels exactly and the plain crush is returned
+    plain = nearest_resize(design, height, width)
+    return np.clip(nearest_resize(crushed, height, width) + (rgb - plain), 0, 1)
+
+
+def _crush(rgb: np.ndarray, params: JpegCrushParams) -> np.ndarray:
+    """The JPEG round trip of `rgb` at `params.quality`, with `params.hits` coefficients damaged."""
     coded = encode(rgb, quality=params.quality)
     planes = coded.planes  # arrays `encode` just made, so they are ours to damage in place
     rng = np.random.default_rng(params.seed)

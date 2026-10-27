@@ -31,3 +31,33 @@ def stretch(layer: np.ndarray, height: int, width: int) -> np.ndarray:
     float32.
     """
     return np.asarray(Image.fromarray(layer).resize((width, height), Image.Resampling.BILINEAR), np.float32)
+
+
+def box_resize(array: np.ndarray, height: int, width: int) -> np.ndarray:
+    """Shrink an RGB image `array` to (height, width) by averaging the area each new pixel covers.
+
+    Float32 stays float32, with no 8 bits in between. Returns the input itself when it already has that size.
+    """
+    if array.shape[:2] == (height, width):
+        return array
+    planes = [
+        np.asarray(
+            Image.fromarray(np.ascontiguousarray(array[..., c], np.float32)).resize(
+                (width, height), Image.Resampling.BOX
+            )
+        )
+        for c in range(array.shape[2])
+    ]
+    return np.dstack(planes)
+
+
+def nearest_resize(array: np.ndarray, height: int, width: int) -> np.ndarray:
+    """Scale `array` (h, w, ...) to (height, width) by repeating the pixel each new one falls in: edges stay hard.
+
+    A whole-number scale gives equal blocks. Returns the input itself when it already has that size.
+    """
+    if array.shape[:2] == (height, width):
+        return array
+    rows = np.arange(height) * array.shape[0] // height
+    columns = np.arange(width) * array.shape[1] // width
+    return array[rows][:, columns]

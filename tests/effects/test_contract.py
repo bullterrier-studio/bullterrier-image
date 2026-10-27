@@ -1255,10 +1255,7 @@ CHANGE_FLOOR = 0.001  # ... or this, when that is less: a tenth of a percent of 
 
 # Effects whose default look legitimately differs between the two sizes, each with the reason; "BUG: ..." marks a
 # defect waiting for its fix (remove the entry with the fix: a test fails while a passing effect is listed).
-SIZE_EXCEPTIONS: dict[str, str] = {
-    "jpeg_crush": "BUG: the 8 x 8 block grid of the codec is in output px, so at 4 times the size the blocks are 4 "
-    "times finer and change the picture less",
-}
+SIZE_EXCEPTIONS: dict[str, str] = {}
 
 
 @pytest.fixture(scope="module")

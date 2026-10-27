@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.ops.jpeg import decode, encode
 
 NAME = "jpeg_crush"
 
@@ -179,3 +180,96 @@ def test_detail_hits_never_move_the_average_of_a_block_and_dc_hits_do_in_both_di
         (registry.apply(NAME, smooth, quality=90, hits=1, dc_share=1.0, seed=seed) - clean).sum() for seed in range(12)
     ]
     assert min(moves) < 0 < max(moves)
+
+
+RATIO = 4
+
+
+@pytest.fixture
+def textured() -> np.ndarray:
+    """A mid-range picture of 128 x 256 with fine detail (noise a pixel wide) over a gentle gradient, so damage at
+    design size neither clips nor hides."""
+    rng = np.random.default_rng(4)
+    y, x = np.mgrid[0:128, 0:256].astype(np.float32)
+    ramp = 0.4 + 0.2 * np.stack([x / 256, y / 128, (x + y) / 384], axis=-1)
+    return (ramp + 0.04 * rng.standard_normal((128, 256, 3))).astype(np.float32)
+
+
+def averaged(picture: np.ndarray, ratio: int) -> np.ndarray:
+    """`picture` shrunk by `ratio` along each side by the mean of each ratio x ratio block, by the definition."""
+    height, width = picture.shape[:2]
+    return picture.reshape(height // ratio, ratio, width // ratio, ratio, 3).mean(axis=(1, 3)).astype(np.float32)
+
+
+def repeated(damage: np.ndarray, ratio: int) -> np.ndarray:
+    """`damage` with every pixel repeated over a ratio x ratio block."""
+    return np.kron(damage, np.ones((ratio, ratio, 1), np.float32))
+
+
+DAMAGES = [
+    pytest.param({"quality": 6}, id="plain"),
+    pytest.param({"quality": 20, "hits": 30, "seed": 5}, id="hits"),
+    pytest.param({"quality": 20, "hits": 30, "seed": 5, "dc_share": 1.0, "magnitude": 30}, id="dc hits"),
+]
+
+
+@pytest.mark.parametrize("settings", DAMAGES)
+def test_at_a_size_ratio_of_1_the_picture_is_just_crushed(smooth, settings) -> None:
+    crushed = registry.apply(NAME, smooth, **settings)
+    np.testing.assert_array_equal(registry.apply(NAME, smooth, size_ratio=1.0, **settings), crushed)
+
+
+def test_at_a_size_ratio_of_1_the_result_is_the_codec_round_trip(textured) -> None:
+    expected = decode(encode(textured, quality=6))
+    np.testing.assert_array_equal(registry.apply(NAME, textured, quality=6, size_ratio=1.0), expected)
+
+
+@pytest.mark.parametrize("settings", DAMAGES)
+def test_at_a_size_ratio_of_4_the_damage_is_constant_over_each_4_x_4_block_of_pixels(textured, settings) -> None:
+    out = registry.apply(NAME, textured, size_ratio=RATIO, **settings)
+    damage = out - textured
+    blocks = damage.reshape(128 // RATIO, RATIO, 256 // RATIO, RATIO, 3)
+    # a block with a pixel at an end of the range is clipped there and breaks the pattern: leave those out
+    inside = ((out > 0) & (out < 1)).reshape(blocks.shape).all(axis=(1, 3), keepdims=True)
+    inside = np.broadcast_to(inside, blocks.shape)
+    assert inside.mean() > 0.25  # most blocks are still compared
+    np.testing.assert_allclose(blocks[inside], np.broadcast_to(blocks[:, :1, :, :1], blocks.shape)[inside], atol=1e-5)
+
+
+@pytest.mark.parametrize("settings", DAMAGES)
+def test_at_a_size_ratio_of_4_the_damage_is_the_design_size_damage_repeated(textured, settings) -> None:
+    """The picture averaged to design size and crushed, with the same hits, differs from it by the damage; the result
+    is the picture plus that damage with each pixel repeated over the 4 x 4 pixels it covers, held to 0..1."""
+    design = averaged(textured, RATIO)
+    damage = registry.apply(NAME, design, size_ratio=1.0, **settings) - design
+    out = registry.apply(NAME, textured, size_ratio=RATIO, **settings)
+    np.testing.assert_allclose(out, np.clip(textured + repeated(damage, RATIO), 0, 1), atol=1e-5)
+
+
+def test_at_a_size_ratio_of_4_the_blocks_are_32_px_wide_and_the_fine_detail_stays(textured) -> None:
+    """Block edges lie on the 32 px grid (8 design px), and the picture's pixel-wide detail is not smoothed away: the
+    mean distance of a pixel from the mean of its 4 x 4 block is what the picture has."""
+    out = registry.apply(NAME, textured, quality=6, size_ratio=RATIO)
+
+    def fine_detail(picture: np.ndarray) -> float:
+        return float(np.abs(picture - repeated(averaged(picture, RATIO), RATIO)).mean())
+
+    assert fine_detail(out) == pytest.approx(fine_detail(textured), rel=0.05)
+
+
+def test_at_a_size_ratio_of_4_the_codec_blocks_are_32_px_wide() -> None:
+    """The ratio 1 ramp test at four times the size: two flat blocks of 32 px at 132 and 134 round to 128 and 138,
+    with the jump exactly between column 31 and column 32."""
+    picture = grey(np.kron(np.array([[132, 134]]), np.ones((32, 32), dtype=int)))
+    out = registry.apply(NAME, picture, quality=10, size_ratio=RATIO)
+    np.testing.assert_allclose(out[:, :32], 128 / 255, atol=1e-5)
+    np.testing.assert_allclose(out[:, 32:], 138 / 255, atol=1e-5)
+
+
+@pytest.mark.parametrize("ratio", [1.5, 2.5])
+def test_a_ratio_that_is_not_whole_gives_a_picture_of_the_same_size_in_range(textured, ratio) -> None:
+    picture = textured[:100, :170]
+    out = registry.apply(NAME, picture, quality=6, hits=10, size_ratio=ratio)
+    assert out.shape == picture.shape
+    assert out.min() >= 0
+    assert out.max() <= 1
