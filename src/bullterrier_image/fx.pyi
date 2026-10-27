@@ -941,12 +941,14 @@ copies : whole number, count, 1 to 400, default 1
     How many copies of the silhouette are stacked behind the subject: 1 = a single
     shadow, more = a deeper stack of layers.
 offset : number, px, 0 to 1000, default 22.0
-    How far each copy lies beyond the one before it, in px at the recipe's size: the
-    first is `offset` from the subject, the last `copies` x `offset`. 0 = every copy
-    hidden behind the subject, leaving only what `blur` spreads past its edge.
-angle : number (cyclic), degrees, -180 to 180, default 56.0
-    The direction the copies step away in, clockwise as seen in the picture: 0 = to the
-    right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up.
+    How far each copy lies beyond the one before it, in px, tuned for a picture about
+    480 px high: the first is `offset` from the subject, the last `copies` x `offset`. 0
+    = every copy hidden behind the subject, leaving only what `blur` spreads past its
+    edge.
+angle : number (cyclic), degrees, 0 to 360, default 56.0
+    The direction the copies step away in, in degrees clockwise from pointing right on
+    the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to
+    the left, 270 = up.
 blur : number, px, 0 to 200, default 24.0
     Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger
     and fainter at their edge; 0 = hard-edged silhouettes.
@@ -2399,12 +2401,12 @@ flat, the mean is kept and the result never leaves the picture's own range. The 
 Parameters
 ----------
 angle : number (cyclic), degrees, 0 to 360, default 0.0
-    The direction of the motion, counter-clockwise as seen in the picture: 0 =
-    horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180)
-    give the same blur.
+    The direction of the motion, in degrees clockwise from pointing right on the screen,
+    0 to 360: 0 = horizontal, 90 = vertical, 45 = falling to the lower right. Opposite
+    directions (0 and 180) give the same blur.
 length : number (drivable), px, 0 to 500, default 24.0
-    How far the smear reaches along the line, end to end, in px at the recipe's size:
-    larger is a faster motion; 0 leaves the picture unchanged.
+    How far the smear reaches along the line, end to end, in px, tuned for a picture
+    about 480 px high: larger is a faster motion; 0 leaves the picture unchanged.
 
 Advanced parameters
 -------------------
@@ -3539,7 +3541,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, bands: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
+def slice_shift(slices: int = 30, amount: float = 24.0, seed: int = 0, bands: int = 0, band_min_height: float = 4.8, band_max_height: float = 28.8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
     """Glitch tearing: cut the picture into horizontal strips at random rows and slide each sideways by a random
 distance, then slide `bands` more strips of random height placed at random rows.
 
@@ -3554,11 +3556,11 @@ slices : whole number, count, 0 to 500, default 30
     it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides
     the whole picture as one; 0 = no tear, only the bands move. More strips make a
     finer, busier tear.
-amount : number, fraction, 0 to 1, default 0.05
-    The furthest a strip or band slides, as a fraction 0 to 1 of the picture's width:
-    each slides by a random whole number of pixels between that far left and that far
-    right, so one may also stay put. 0 leaves the picture unchanged; 1 can slide one by
-    a whole picture width.
+amount : number, px, 0 to 2000, default 24.0
+    The furthest a strip or band slides, in px, 0 to 2000, tuned for a picture about 480
+    px high: each slides by a random whole number of pixels between that far left and
+    that far right, so one may also stay put. 0 leaves the picture unchanged; the
+    picture's width or more can slide one by a whole picture width.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed for where the cuts and the bands fall and how far each slides: the same
     seed always gives the same tear, any other seed gives a different one.
@@ -3566,13 +3568,13 @@ bands : whole number, count, 0 to 500, default 0
     How many extra strips slide, 0 to 500, on top of the tear: each is placed at a
     random row, so they may overlap (a row in two slides by both) and the rest of the
     picture stays; 0 = none. A few bands with `slices` 0 make a corrupted video frame.
-band_min_height : number, fraction, 0 to 1, default 0.01
-    The lowest a band can be, as a fraction 0 to 1 of the picture's height (never below
-    1 px). Each band's height is drawn at random between this and `band_max_height`,
-    which it may not exceed.
-band_max_height : number, fraction, 0 to 1, default 0.06
-    The tallest a band can be, as a fraction 0 to 1 of the picture's height. Raising it
-    gives taller bands.
+band_min_height : number, px, 0 to 2000, default 4.8
+    The lowest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high
+    (never below 1 px). Each band's height is drawn at random between this and
+    `band_max_height`, which it may not exceed.
+band_max_height : number, px, 0 to 2000, default 28.8
+    The tallest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high.
+    Raising it gives taller bands.
 
 Presets
 -------
@@ -3648,7 +3650,7 @@ Presets
 sparkle : Scattered glitter: small white four-pointed glints on a random few of the bright points, of varied brightness."""
     ...
 
-def stretch(axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 0.15, side: Literal['both', 'after', 'before'] = 'both', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def stretch(axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 72.0, side: Literal['both', 'after', 'before'] = 'both', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Repeat one row (or column) of the picture over the `span` of rows (columns) beside it.
 
 The line sits at `at` and keeps its place; the lines within `span` of it on the chosen `side` become copies of it,
@@ -3665,11 +3667,11 @@ at : number, fraction, 0 to 1, default 0.5
     picture (down it for 'vertical', right for 'horizontal'): 0 = the first row or
     column, 0.5 = the middle, 1 = the last. Moving it chooses which colours the smear
     carries.
-span : number, fraction, 0 to 1, default 0.15
-    How far the line is smeared, as a fraction 0 to 1 of the picture's height (width for
-    'horizontal') on each side that `side` names, rounded to whole pixels. 0 = nothing
-    is smeared; 1 = the line covers the whole picture. Raising it hides more of the
-    picture behind the smear.
+span : number, px, 0 to 2000, default 72.0
+    How far the line is smeared, in px, 0 to 2000, tuned for a picture about 480 px
+    high, on each side that `side` names, rounded to whole pixels. 0 = nothing is
+    smeared; the picture's height (width for 'horizontal') or more = the line covers the
+    whole picture. Raising it hides more of the picture behind the smear.
 side : one of 'both', 'after', 'before', default 'both'
     Which sides of the line are smeared: 'both' (outward each way), 'after' (down, or
     right) or 'before' (up, or left). The other side keeps the picture as it is."""
@@ -3895,11 +3897,11 @@ seed : whole number, count, 0 to 4294967295, default 0
     seed a different one."""
     ...
 
-def vhs(tracking: float = 0.06, bands: int = 3, band_static: float | Drive = 0.0, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 0.04, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
+def vhs(tracking: float = 28.8, bands: int = 3, band_static: float | Drive = 0.0, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 19.2, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
     """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
 rows, bled colour and tape noise (static, snow).
 
-In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width and take `band_static` of
+In this order: `bands` horizontal bands slide sideways by up to `tracking` px and take `band_static` of
 grey static (solid bands of snow across a clean picture at 1); every row then drifts
 sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
 the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
@@ -3908,10 +3910,10 @@ of `seed`, so the same seed gives the same damage; changing the number of bands 
 
 Parameters
 ----------
-tracking : number, fraction, 0 to 1, default 0.06
-    How far a tracking band slides sideways, at most, as a fraction 0 to 1 of the
-    picture's width: each band slides by a random whole number of pixels up to this,
-    left or right. 0 = the bands do not move.
+tracking : number, px, 0 to 2000, default 28.8
+    How far a tracking band slides sideways, at most, in px, 0 to 2000, tuned for a
+    picture about 480 px high: each band slides by a random whole number of pixels up to
+    this, left or right. 0 = the bands do not move.
 bands : whole number, count, 0 to 50, default 3
     How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.
 band_static : number (drivable), fraction, 0 to 1, default 0.0
@@ -3921,8 +3923,7 @@ band_static : number (drivable), fraction, 0 to 1, default 0.0
 dropouts : whole number, count, 0 to 2000, default 0
     How many dropout streaks, 0 to 2000: short white marks where the signal was lost,
     each as tall as a speck of tape noise (`noise_size`) and between half of `tracking`
-    and `tracking` of the picture's width long. 0 = none; raising it covers more of the
-    picture.
+    and `tracking` px long. 0 = none; raising it covers more of the picture.
 bleed : number, px, 0 to 100, default 5.0
     How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a
     picture about 480 px high: colour lags the brightness by this many pixels and is
@@ -3941,9 +3942,10 @@ seed : whole number, count, 0 to 4294967295, default 0
 
 Advanced parameters
 -------------------
-band_height : number, fraction, 0 to 1, default 0.04
-    The tallest a tracking band can be, as a fraction 0 to 1 of the picture's height;
-    each band is between half this and this tall (never under 1 px).
+band_height : number, px, 0 to 2000, default 19.2
+    The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480
+    px high; each band is between half this and this tall (never under 1 px, never
+    taller than the picture).
 noise_size : number, px, 0.5 to 50, default 1.5
     How wide a speck of tape noise is, 0.5 to 50 px (up to 1 px every pixel is its own
     speck), tuned for a picture about 480 px high. Raising it gives coarser grain.
@@ -3953,12 +3955,12 @@ wobble_size : number, px, 0.5 to 500, default 12.0
 truncate : number, count, 0.5 to 10, default 4.0
     Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 0.5
     to 10. Lower is faster and gives slightly sharper tails.
-edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
+edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     What lies beyond the picture's left and right edges for everything that moves or
-    blurs sideways: 'wrap' the opposite side, 'nearest' the edge pixel repeated,
-    'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about
-    the edge pixel. For the noise and wobble the rules act on the rows and columns of
-    their own fields.
+    blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge
+    rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the
+    picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel.
+    For the noise and wobble the rules act on the rows and columns of their own fields.
 
 Presets
 -------

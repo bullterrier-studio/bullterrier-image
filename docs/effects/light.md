@@ -249,8 +249,8 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, 45 = rising to the right. Opposite directions (0 and 180) give the same blur. |
-| `length` | number (drivable) | px | 0 to 500 | `24.0` | How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster motion; 0 leaves the picture unchanged. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the motion, in degrees clockwise from pointing right on the screen, 0 to 360: 0 = horizontal, 90 = vertical, 45 = falling to the lower right. Opposite directions (0 and 180) give the same blur. |
+| `length` | number (drivable) | px | 0 to 500 | `24.0` | How far the smear reaches along the line, end to end, in px, tuned for a picture about 480 px high: larger is a faster motion; 0 leaves the picture unchanged. |
 
 <details><summary>Advanced parameters (1)</summary>
 

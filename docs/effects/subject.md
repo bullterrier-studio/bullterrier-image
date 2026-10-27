@@ -77,8 +77,8 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `copies` | whole number | count | 1 to 400 | `1` | How many copies of the silhouette are stacked behind the subject: 1 = a single shadow, more = a deeper stack of layers. |
-| `offset` | number | px | 0 to 1000 | `22.0` | How far each copy lies beyond the one before it, in px at the recipe's size: the first is `offset` from the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, leaving only what `blur` spreads past its edge. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `56.0` | The direction the copies step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. |
+| `offset` | number | px | 0 to 1000 | `22.0` | How far each copy lies beyond the one before it, in px, tuned for a picture about 480 px high: the first is `offset` from the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, leaving only what `blur` spreads past its edge. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `56.0` | The direction the copies step away in, in degrees clockwise from pointing right on the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, 270 = up. |
 | `blur` | number | px | 0 to 200 | `24.0` | Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger and fainter at their edge; 0 = hard-edged silhouettes. |
 | `color` | colour |  |  | `'#000000'` | The colour of the copy nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the subject; another colour tints it. |
 | `end_color` | colour |  |  | `'#000000'` | The colour of the farthest copy; the copies between step evenly from `color` to it. With one copy only `color` is used. |

@@ -12,7 +12,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
-| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `band_static=0.0` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
+| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=28.8` `bands=3` `band_static=0.0` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
 
 ### `dead_pixels`
 
@@ -122,10 +122,10 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `tracking` | number | fraction | 0 to 1 | `0.06` | How far a tracking band slides sideways, at most, as a fraction 0 to 1 of the picture's width: each band slides by a random whole number of pixels up to this, left or right. 0 = the bands do not move. |
+| `tracking` | number | px | 0 to 2000 | `28.8` | How far a tracking band slides sideways, at most, in px, 0 to 2000, tuned for a picture about 480 px high: each band slides by a random whole number of pixels up to this, left or right. 0 = the bands do not move. |
 | `bands` | whole number | count | 0 to 50 | `3` | How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none. |
 | `band_static` | number (drivable) | fraction | 0 to 1 | `0.0` | How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the share of every pixel in a band that becomes a random grey. 0 = none; 1 = bands of pure static. Does nothing when `bands` is 0. |
-| `dropouts` | whole number | count | 0 to 2000 | `0` | How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` of the picture's width long. 0 = none; raising it covers more of the picture. |
+| `dropouts` | whole number | count | 0 to 2000 | `0` | How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` px long. 0 = none; raising it covers more of the picture. |
 | `bleed` | number | px | 0 to 100 | `5.0` | How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a picture about 480 px high: colour lags the brightness by this many pixels and is blurred sideways by a Gaussian of this standard deviation. 0 = no bleed; raising it smears red and blue far past their edges. |
 | `noise` | number | fraction | 0 to 1 | `0.03` | The standard deviation of the tape noise added to brightness, 0 to 1 in picture units: 0 = none, 0.03 is visible, 0.1 is heavy. Colour is not touched. |
 | `wobble` | number | px | 0 to 50 | `1.5` | How far the rows wander sideways, as the standard deviation in px of a slow random drift from row to row, 0 to 50, tuned for a picture about 480 px high: 0 = straight rows, a few px = the shaky edges of a worn tape. |
@@ -135,11 +135,11 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `band_height` | number | fraction | 0 to 1 | `0.04` | The tallest a tracking band can be, as a fraction 0 to 1 of the picture's height; each band is between half this and this tall (never under 1 px). |
+| `band_height` | number | px | 0 to 2000 | `19.2` | The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480 px high; each band is between half this and this tall (never under 1 px, never taller than the picture). |
 | `noise_size` | number | px | 0.5 to 50 | `1.5` | How wide a speck of tape noise is, 0.5 to 50 px (up to 1 px every pixel is its own speck), tuned for a picture about 480 px high. Raising it gives coarser grain. |
 | `wobble_size` | number | px | 0.5 to 500 | `12.0` | How many rows one wander of the wobble spans, 0.5 to 500 px, tuned for a picture about 480 px high: small is a jitter from row to row, large a slow sway. |
 | `truncate` | number | count | 0.5 to 10 | `4.0` | Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 0.5 to 10. Lower is faster and gives slightly sharper tails. |
-| `edge` | one of 'wrap', 'nearest', 'reflect', 'mirror' |  |  | `'wrap'` | What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'wrap' the opposite side, 'nearest' the edge pixel repeated, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields. |
+| `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields. |
 
 </details>
 
