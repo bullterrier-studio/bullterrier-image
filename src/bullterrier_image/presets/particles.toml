@@ -1,4 +1,4 @@
-# Looks that are one particles step. They leave the step's opacity to the recipe: usual: embers 0.9, dust 0.55, rain 0.7.
+# Looks that are one particles step. They leave the step's opacity to the recipe: usual: embers 0.9, dust 0.55, rain 0.7, snow 0.8.
 
 [embers]
 description = "Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left."
@@ -24,3 +24,12 @@ length = 32
 angle = 80
 softness = 0
 color = "#dbe6f5"
+
+[snow]
+description = "Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter."
+density = 0.5
+size = 14
+softness = 0.5
+color = "#ffffff"
+layers = 4
+size_falloff = 1

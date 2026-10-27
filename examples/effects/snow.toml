@@ -1,8 +1,0 @@
-# Falling snow: soft white flakes in four depth layers, the near ones large and blurry.
-# It also makes the effect's picture in the catalogue.
-name = "snow"
-size = 480
-
-[[step]]
-effect = "snow"
-seed = 1

@@ -9,7 +9,6 @@ from typing import Any, Literal
 
 import numpy as np
 import pytest
-from scipy import ndimage
 
 from bullterrier_image import fx
 from bullterrier_image.core import registry, runner
@@ -537,10 +536,9 @@ def test_the_seed_check_flags_an_effect_that_ignores_its_seed_or_is_not_determin
 
 # --- the effects that scatter particles of light -----------------------------------------------------------------
 
-# effect: the settings that make it draw many white particles (snow has no colour of its own)
+# effect: the settings that make it draw many white particles
 PARTICLES: dict[str, dict[str, Any]] = {
     "particles": {"density": 3.0, "color": "#ffffff"},
-    "snow": {"density": 3.0},
 }
 TINTED = ["particles"]
 
@@ -550,7 +548,6 @@ TINTED = ["particles"]
     [
         pytest.param("particles", {"density": 0.0}, id="particles"),
         pytest.param("particles", {"density": 0.0, "color": "#e6eefa"}, id="particles, tinted"),
-        pytest.param("snow", {"density": 0.0}, id="snow"),
         pytest.param("sparkle", {"count": 0, "threshold": 0.0}, id="sparkle"),
         pytest.param("lens_drops", {"count": 0}, id="lens_drops"),
     ],
@@ -580,26 +577,6 @@ def test_particles_are_spread_over_the_whole_of_a_wide_or_a_tall_picture(name, s
     for axis in (0, 1):  # the picture's rows, then its columns: every third of them holds some particles
         thirds = np.array_split(lit.any(axis=1 - axis), 3)
         assert all(third.any() for third in thirds)
-
-
-# well separated particles, each big and sharp enough to reach full brightness at its middle (snow: its layers 1/4..1)
-SEPARATE = {
-    "snow": {"density": 0.1, "size": 40.0, "layers": 4, "softness": 0.0},
-}
-
-
-@pytest.mark.parametrize("name", SEPARATE)
-def test_depth_range_spreads_the_brightness_of_the_particles_from_all_alike_to_the_farthest_nearly_gone(name):
-    def peaks(depth_range):
-        settings = {**PARTICLES[name], **SEPARATE[name], "depth_range": depth_range, "seed": 1}
-        light = registry.apply(name, np.zeros((400, 400, 3), np.float32), **settings)[..., 0]
-        patches, found = ndimage.label(light > 0, structure=np.ones((3, 3)))
-        return np.array(ndimage.maximum(light, patches, range(1, found + 1)))
-
-    np.testing.assert_allclose(peaks(0.0), 1.0, atol=0.01)  # no depth range: every one at full brightness
-    spread = peaks(1.0)  # brightness is the particle's nearness, which runs from 0 (or 1/4 for snow) to 1
-    assert spread.min() < 0.3
-    assert spread.max() > 0.9
 
 
 @pytest.mark.parametrize("name", TINTED)

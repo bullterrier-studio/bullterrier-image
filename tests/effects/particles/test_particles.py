@@ -233,3 +233,11 @@ def test_the_rain_preset_makes_thin_streaks_falling_leaning_to_the_right(lone_pa
     axis, _ = axis_and_centre(streak)
     assert axis == pytest.approx(80.0, abs=2.0)
     assert (streak > 0).sum(axis=1).max() <= 4  # thin: a pixel or two across
+
+
+def test_the_snow_preset_makes_flakes_in_four_layers_the_largest_14_px_wide(lone_particle) -> None:
+    radii = [radius_of(lone_particle(light, seed, **preset("snow", softness=0.0))) for seed in range(0, 200, 8)]
+    expected = np.array([1.75, 3.5, 5.25, 7.0])
+    nearest = expected[np.abs(np.subtract.outer(radii, expected)).argmin(axis=1)]
+    np.testing.assert_allclose(radii, nearest, atol=0.5)
+    assert set(nearest) == set(expected)

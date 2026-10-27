@@ -196,7 +196,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `fog` ✓ | Layered haze, gradient or noise-based. | `fx.fog(density=0.4, color="#cfd8e3")` |
-| `snow` ✓ | Flakes in depth layers. | `fx.snow(density=0.4, seed=1)` |
 | `smoke` ✓ | Noise-driven smoke or steam. | `fx.smoke(amount=0.4, seed=1)` |
 | `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |

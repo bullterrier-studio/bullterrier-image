@@ -63,7 +63,6 @@ def test_bad_recipes_fail_at_load_time_and_name_the_problem(tmp_path, text, expe
 @pytest.mark.parametrize(
     ("effect_name", "old", "new"),
     [
-        pytest.param("snow", "depth", "depth_range", id="snow"),
         pytest.param("starfield", "depth", "depth_range", id="starfield"),
         pytest.param("emboss", "depth", "height", id="emboss"),
         pytest.param("torn_edge", "depth", "width", id="torn_edge"),
