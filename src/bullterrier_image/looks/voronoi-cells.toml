@@ -1,4 +1,4 @@
-# Voronoi cells: neon noise cut into flat, leaded cells behind the dog.
+description = "Voronoi cells: neon noise cut into flat, leaded cells behind the subject."
 name = "voronoi-cells"
 size = 480
 

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from bullterrier_image.core import registry
+from bullterrier_image.core import looks, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
 from bullterrier_image.core.steps import Each, Recipe, Step
@@ -167,7 +167,9 @@ def test_a_mistake_in_the_frame_table_names_the_file_the_table_and_the_key(tmp_p
 
 
 def test_a_misspelt_top_level_key_lists_the_keys_a_recipe_has(tmp_path):
-    with pytest.raises(RecipeError, match=r"`frames`.*format, name, size, \[frame\], \[region\.NAME\], \[\[step\]\]"):
+    with pytest.raises(
+        RecipeError, match=r"`frames`.*format, name, description, size, \[frame\], \[region\.NAME\], \[\[step\]\]"
+    ):
         load_recipe(_write(tmp_path, "[frames]\n" + STEP))
 
 
@@ -823,3 +825,48 @@ def test_a_step_naming_something_that_is_no_effect_says_where_the_name_lives(tmp
     with pytest.raises(UnknownEffectError, match=re.escape(says)) as raised:
         load_recipe(path)
     assert str(raised.value).startswith("look.toml: step 1")
+
+
+# --- built-in looks, loaded by name ------------------------------------------------------------------------------
+
+
+def test_a_look_loads_by_name_as_its_file_does():
+    shipped = looks.read()["crt"]
+    assert load_recipe("crt") == load_recipe(shipped.file)
+    assert load_recipe("crt").name == "crt"
+
+
+def test_a_str_that_is_a_look_name_is_the_look_even_beside_a_file_of_that_name(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "crt").write_text(STEP, encoding="utf-8")
+    assert load_recipe("crt") == load_recipe(looks.read()["crt"].file)
+    assert len(load_recipe("./crt").steps) == 1  # the file, spelt as a path
+
+
+def test_a_path_is_always_a_file_never_a_look(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        load_recipe(Path("crt"))
+
+
+def test_a_name_that_is_no_look_is_a_missing_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        load_recipe("cr")
+
+
+@pytest.mark.parametrize(
+    ("description", "ok"),
+    [
+        pytest.param("'A sentence.'", True, id="a-sentence"),
+        pytest.param("3", False, id="a-number"),
+        pytest.param("'  '", False, id="blank"),
+    ],
+)
+def test_a_recipe_may_describe_itself_in_a_sentence(tmp_path, description, ok):
+    path = _write(tmp_path, f"description = {description}\n{STEP}")
+    if ok:
+        assert load_recipe(path).name == "look"
+    else:
+        with pytest.raises(RecipeError, match=r"look\.toml.*description"):
+            load_recipe(path)

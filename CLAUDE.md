@@ -65,7 +65,7 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 1. **Effects never import other effects.** Shared logic goes to `ops/`, in a module named for its concept (`warp`, `noise`,
    `edges`, `colorspace`...), never `utils`/`common`/`helpers`. Extract when a second effect needs it. An `ops` module arrives
    with its first consumer (`vulture` fails on unused code). `ops` is internal.
-2. **Presets are data**: a named parameter set of one effect, `src/bullterrier_image/presets/<effect>.toml`.
+2. **Presets and looks are data**: a preset is a named parameter set of one effect, `src/bullterrier_image/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `src/bullterrier_image/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
 3. **Params are declared once** as a Pydantic model; it drives validation, defaults, generated docs (`help(fx.<effect>)`,
    `bt-image effects`, `docs/effects/`, `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates files named for it and modifies none (`tests/test_scaffold.py` proves it). Editing
@@ -83,7 +83,7 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 
 ## Standards
 
-- `src/` holds only code and the data it runs on (presets). Tests, examples and gallery pictures live outside it.
+- `src/` holds only code and the data it runs on (presets, looks). Tests, examples and gallery pictures live outside it.
 - Public API, each with `__all__`: `bullterrier_image`, `.recipe`, `.fx`, `.imageio`, `.plugin`. Everything else, including
   `core` and `ops`, is internal.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.

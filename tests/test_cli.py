@@ -13,7 +13,7 @@ from PIL import Image
 import bullterrier_image
 from bullterrier_image import BullterrierImageError, imageio
 from bullterrier_image.cli import main
-from bullterrier_image.core import registry
+from bullterrier_image.core import looks, registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.finding.depth import depth_map
@@ -56,7 +56,8 @@ def cut(files):
 def test_effects_lists_every_effect(capsys):
     assert cli("effects") == 0
     listed = {line for line in capsys.readouterr().out.splitlines() if line and not line.startswith(" ")}
-    assert listed == set(registry.describe())  # one unindented heading per effect, its documentation indented below
+    # one unindented heading per effect, its documentation indented below; then the looks, under their own heading
+    assert listed == {*registry.describe(), next(name for name in listed if name.startswith("Looks"))}
 
 
 class ProbeParams(EffectParams):
@@ -748,3 +749,39 @@ def test_effects_naming_a_preset_says_which_effect_it_belongs_to(capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert 'effect = "slice_shift", preset = "glitch"' in captured.err
+
+
+def test_effects_lists_every_look_with_its_description_after_the_effects(capsys):
+    assert cli("effects") == 0
+    lines = capsys.readouterr().out.splitlines()
+    start = lines.index(next(line for line in lines if line.startswith("Looks")))
+    assert start > max(lines.index(name) for name in registry.describe())  # the looks come after the last effect
+    shown = {line.split(" : ")[0].strip(): line.split(" : ", 1)[1] for line in lines[start + 1 :] if " : " in line}
+    assert shown == {name: look.description for name, look in looks.read().items()}
+    assert {"crt", "glitch", "tilt-shift"} <= shown.keys()
+
+
+@pytest.mark.parametrize("command", ["effects --category light", "effects grade", "effects --list-categories"])
+def test_effects_lists_looks_only_in_the_whole_catalogue(command, capsys):
+    assert cli(command) == 0
+    out = capsys.readouterr().out
+    assert not any(f"    {name} : " in out for name in looks.read())
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        pytest.param("render me.png glitch -o out", id="render"),
+        pytest.param("sheet me.png glitch recipes/a.toml -o out/s.png", id="sheet, with a file beside it"),
+        pytest.param("steps me.png glitch -o out", id="steps"),
+        pytest.param("sweep me.png glitch rgb_split.amount 0..10 -o out/s.png --count 2", id="sweep"),
+    ],
+)
+def test_a_built_in_look_is_accepted_wherever_a_recipe_file_is(files, command):
+    assert cli(command) == 0
+    assert any((files / "out").iterdir())
+
+
+def test_a_name_that_is_neither_a_look_nor_a_file_is_an_error_naming_it(files, capsys):
+    assert cli("render me.png glich -o out") == 1
+    assert "glich" in capsys.readouterr().err

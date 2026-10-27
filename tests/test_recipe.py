@@ -7,7 +7,7 @@ import pytest
 
 from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
 from bullterrier_image import recipe as facade
-from bullterrier_image.core import runner
+from bullterrier_image.core import looks, runner
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
@@ -335,3 +335,17 @@ def test_a_look_is_rendered_at_the_size_asked_with_its_pixel_values_scaled_to_it
     designed = Recipe("blur", (Step("gaussian_blur", {"radius": 4.0}),), size=64)
     by_hand = Recipe("blur", (Step("gaussian_blur", {"radius": 8.0}),), size=128)
     np.testing.assert_array_equal(picture_of(photo, designed, size=128), picture_of(photo, by_hand))
+
+
+# --- the built-in looks --------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", sorted(looks.read()))
+def test_every_look_loads_by_name_and_renders_something_other_than_the_photo(name, photo, subject):
+    recipe = load_recipe(name)
+    assert recipe.name == name
+    assert len(recipe.steps) >= 2  # one step is a preset, not a look
+    depth = np.repeat(np.linspace(0, 1, photo.shape[0], dtype=np.float32)[:, None], photo.shape[1], axis=1)
+    out = render(photo, recipe, maps={"subject": subject, "depth": depth}, size=max(photo.shape[:2]))
+    assert out.shape == photo.shape
+    assert not np.array_equal(out, photo)

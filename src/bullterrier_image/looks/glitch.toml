@@ -1,0 +1,14 @@
+description = "A corrupted video frame: bands at random rows slide sideways and the red and blue channels pull apart."
+name = "glitch"
+size = 480
+
+[[step]]
+effect = "slice_shift"
+preset = "glitch"
+seed = 11
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 6
+edge = "wrap"

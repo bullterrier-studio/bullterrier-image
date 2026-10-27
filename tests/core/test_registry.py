@@ -455,6 +455,7 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
     [
         pytest.param("glitch", ['"slice_shift"', 'preset = "glitch"'], id="a-preset-names-its-effect-and-itself"),
         pytest.param("sepia", ['"gradient_map"', 'preset = "sepia"'], id="a-preset-of-another-effect"),
+        pytest.param("crt", ["look", 'load_recipe("crt")'], id="a-look-says-how-to-load-it"),
         pytest.param("glich", ["did you mean", "glitch", "slice_shift"], id="a-misspelt-preset-offers-the-close-match"),
         pytest.param("gradient_mapp", ["did you mean", "gradient_map"], id="a-misspelt-effect-offers-the-close-match"),
     ],

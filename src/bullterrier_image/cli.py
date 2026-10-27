@@ -117,10 +117,10 @@ def _parser() -> argparse.ArgumentParser:
         "sweep",
         _sweep,
         summary="render one parameter of a recipe across a range of values, side by side in one image",
-        example="examples/photos/bullterrier.jpeg examples/recipes/glitch.toml rgb_split.amount 0..20",
+        example="examples/photos/bullterrier.jpeg glitch rgb_split.amount 0..20",
     )
     p.add_argument("photo", help="the photo to style")
-    p.add_argument("recipe", help="the recipe .toml whose parameter is swept")
+    p.add_argument("recipe", help="the recipe .toml, or the name of a built-in look, whose parameter is swept")
     p.add_argument(
         "target",
         help="the number's address, e.g. rgb_split.amount; rgb_split#2.amount for the second step of an effect used "
@@ -177,7 +177,7 @@ def _parser() -> argparse.ArgumentParser:
         example="examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml",
     )
     p.add_argument("photo", help="the photo to run the recipe on")
-    p.add_argument("recipe", help="the recipe .toml to look into")
+    p.add_argument("recipe", help="the recipe .toml, or the name of a built-in look, to look into")
     p.add_argument("-o", "--out", help="output folder (default: out/steps/<photo>__<recipe>)")
     _map_options(p)
 
@@ -243,7 +243,11 @@ def _progress(args: argparse.Namespace, message: str) -> None:
 
 def _photo_and_recipes(p: argparse.ArgumentParser) -> None:
     p.add_argument("photo", help="the photo to style")
-    p.add_argument("recipes", nargs="+", help="recipe .toml files, or folders of them")
+    p.add_argument(
+        "recipes",
+        nargs="+",
+        help="recipe .toml files, folders of them, or names of built-in looks (see `bt-image effects`)",
+    )
 
 
 def _map_options(p: argparse.ArgumentParser) -> None:
@@ -309,12 +313,18 @@ def _maps(args: argparse.Namespace) -> "tuple[dict[str, np.ndarray], dict[str, F
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
+    from .core import looks
     from .errors import RecipeError
     from .recipe import load_recipe
 
-    files: list[Path] = []
-    for path in map(Path, paths):
-        files += sorted(path.glob("*.toml")) if path.is_dir() else [path]
+    shipped = looks.read()
+    files: list[str | Path] = []
+    for text in paths:
+        path = Path(text)
+        if text in shipped:
+            files.append(text)
+        else:
+            files += sorted(path.glob("*.toml")) if path.is_dir() else [path]
     if not files:
         raise RecipeError(f"no recipe files found in {', '.join(paths)}")
     return [load_recipe(f) for f in files]
@@ -456,7 +466,7 @@ def _init(args: argparse.Namespace) -> int:
 
 
 def _effects(args: argparse.Namespace) -> int:
-    from .core import registry
+    from .core import looks, registry
     from .errors import RecipeError
 
     used = {category: names for category, names in registry.categories().items() if names}
@@ -477,4 +487,8 @@ def _effects(args: argparse.Namespace) -> int:
     full = args.advanced or args.effect is not None  # one named effect is asked for in full
     for name in names:  # line by line, so the parameter list stays a list
         print(f"{name}\n{textwrap.indent(registry.documentation(name, advanced=full), '    ')}\n")
+    if args.effect is None and args.category is None:  # the whole catalogue; the looks, which are no effects, come last
+        print("Looks (recipes of several steps; a name works where a recipe file does: `bt-image render PHOTO crt`)")
+        for name, look in looks.read().items():
+            print(f"    {name} : {look.description}")
     return 0

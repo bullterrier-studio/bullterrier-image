@@ -38,7 +38,7 @@ Python 3.12+. macOS, Linux, Windows.
 
 ```bash
 pip install bullterrier-image
-bt-image effects        # list every effect
+bt-image effects        # list every effect, and the built-in looks (`bt-image render photo.jpg crt`)
 ```
 
 ## Quick start

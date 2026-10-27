@@ -5,7 +5,8 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 
     format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
-    size = 1024                    # longest side in px; effect sizes (cell, radius...) are relative to this
+    description = "Green text."    # optional, one sentence; a built-in look must have one (see "Looks" below)
+    size = 1024                   # longest side in px; effect sizes (cell, radius...) are relative to this
 
     [frame]                        # optional: frame the photo before the steps, cut it out after them (see below)
     aspect = 1                     # crop to this width over height...
@@ -92,7 +93,11 @@ table with the geometry because it is the same model, `Recipe(..., frame=Framing
 recipe's picture is framed and cut. Any other top-level key is refused, so a misspelt `size` or `format` is not
 silently ignored; so is any other key in `[frame]`.
 
-Dependency direction: imports `core` (steps, framing, regions, registry, params), `imageio` and `errors`; it does
+Looks. The recipes that ship with the package (`bt-image effects` lists them under "Looks") load by name:
+`load_recipe("crt")`. A `str` that is exactly a look's name is that look; to load a file of the same name write
+`load_recipe("./crt")` or pass a `Path`.
+
+Dependency direction: imports `core` (steps, framing, regions, registry, params, looks), `imageio` and `errors`; it does
 not know `runner`.
 """
 
@@ -106,7 +111,7 @@ import numpy as np
 from bullterrier_image.errors import BullterrierImageError, ImageReadError, RecipeError
 
 from . import imageio
-from .core import registry
+from .core import looks, registry
 from .core.framing import Framing
 from .core.params import Picture
 from .core.regions import (
@@ -150,6 +155,7 @@ _REPLACED_IN_3 = {
 _KEYS = {
     "format": "format",
     "name": "name",
+    "description": "description",
     "size": "size",
     "frame": "[frame]",
     "region": "[region.NAME]",
@@ -219,19 +225,23 @@ def _read(path: Path) -> dict:
     unknown = sorted(set(raw) - set(_KEYS))
     if unknown:
         raise RecipeError(f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: {', '.join(_KEYS.values())}")
+    if "description" in raw and (type(raw["description"]) is not str or not raw["description"].strip()):
+        raise RecipeError(f"{path.name}: `description` is {raw['description']!r}; write a sentence in quotes")
     return raw
 
 
 def load_recipe(path: str | Path) -> Recipe:
-    """Read a recipe file and return the validated `Recipe`.
+    """Read a recipe file, or a built-in look by name, and return the validated `Recipe`.
 
-    path: a TOML file in the format above. A `name` it sets is used as written (and refused if it is not a safe file
-    name); without one the recipe is named after the file, made safe (see `steps.safe_name`: "my look.toml" gives
-    "my-look"), and a file name that leaves nothing usable ("日本.toml", "con.toml") is refused, asking for a `name`.
+    path: a TOML file in the format above, or a `str` that is exactly the name of a built-in look ("crt"). A `name` the
+    file sets is used as written (and refused if it is not a safe file name); without one the recipe is named after
+    the file, made safe (see `steps.safe_name`: "my look.toml" gives "my-look"), and a file name that leaves nothing
+    usable ("日本.toml", "con.toml") is refused, asking for a `name`.
     Raises RecipeError (a ValueError; an unknown effect is an UnknownEffectError) for anything invalid, starting with
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
-    path = Path(path)
+    shipped = looks.read()
+    path = shipped[path].file if isinstance(path, str) and path in shipped else Path(path)
     raw = _read(path)
     recipe_name = raw["name"] if "name" in raw else safe_name(path.stem)
     if not recipe_name:

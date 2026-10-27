@@ -1,4 +1,4 @@
-# Low poly: the picture as flat triangles, more of them where it has edges, over a soft wireframe.
+description = "Low poly: the picture as flat triangles, more of them where it has edges, over a soft wireframe."
 name = "low-poly"
 size = 480
 

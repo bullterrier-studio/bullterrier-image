@@ -1,0 +1,27 @@
+description = "A miniature: sharp in a band across the picture, blurred and more colourful away from it, as a toy-sized scene."
+format = 3
+name = "tilt-shift"
+size = 480
+
+[region.across]                # 0 at the top of the picture, 1 at the bottom
+kind = "linear_gradient"
+angle = 270
+
+[region.sharp]                 # 1 across the band (focus 0.4, width 0.18), fading to 0 over the feather 0.3
+kind = "band"
+of = "across"
+low = 0.31
+high = 0.49
+feather = 0.3
+
+[[step]]
+effect = "focus_blur"
+field = "across"
+focus = 0.4
+width = 0.18
+feather = 0.3
+radius = 9
+
+[[step]]
+effect = "grade"
+saturation = { by = "sharp", start = 1.4, end = 1.0, levels = 2 }

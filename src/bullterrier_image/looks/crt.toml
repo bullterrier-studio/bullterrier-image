@@ -1,4 +1,4 @@
-# A CRT: bulged glass in a black bezel, a soft glow, scanlines, a red-green-blue shadow mask and a dim edge.
+description = "An old CRT screen: bulged glass in a black bezel, a soft glow, scanlines, a red-green-blue shadow mask and a dim edge."
 name = "crt"
 size = 480
 
