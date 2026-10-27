@@ -163,14 +163,16 @@ def depth_probe(throwaway_effects):
 @pytest.fixture
 def apply_as_rendered() -> Callable[..., np.ndarray]:
     """`apply_as_rendered(name, rgb, **values)`: the effect `name` on `rgb` as a recipe renders it at the picture's own
-    size: every `px` value (given or default) is written for 480 and multiplied by the longest side over 480. Arrays
-    among the values are the effect's inputs (a field), the rest its parameters."""
+    size: every `px` value (given or default) is written for 480 and multiplied by the longest side over 480, and the
+    result is mixed into `rgb` by the effect's default step opacity. Arrays among the values are the effect's inputs (a
+    field), the rest its parameters."""
 
     def apply(name: str, rgb: np.ndarray, **values: object) -> np.ndarray:
         function = registry.get(name)
         inputs = {key: value for key, value in values.items() if isinstance(value, np.ndarray)}
         params = function.validate({key: value for key, value in values.items() if key not in inputs})
-        return function(rgb, params.scaled(max(rgb.shape[:2]) / 480), **inputs)
+        out = function(rgb, params.scaled(max(rgb.shape[:2]) / 480), **inputs)
+        return rgb + np.float32(function.opacity) * (out - rgb)
 
     return apply
 

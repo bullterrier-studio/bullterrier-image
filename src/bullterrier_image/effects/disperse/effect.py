@@ -11,15 +11,22 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops import cells, distance
 from bullterrier_image.ops.glyphs import cell_size
 
 
 class DisperseParams(EffectParams):
-    """The settings of `disperse`: the order pieces leave in, where they go, and the timing of each piece's exit."""
+    """The settings of `disperse`: the figure, the order pieces leave in, where they go, and the timing of each piece's
+    exit."""
 
+    field: FieldName = param(
+        "subject",
+        doc="The figure that `outline` and `hover` work from: `subject` (the subject's silhouette), `light` (the "
+        "bright parts), `depth` (the near parts), or a region of the recipe (text, a logo, a drawn shape). A piece "
+        "belongs to it when the field's average over the piece is above `field_threshold`.",
+    )
     cell: int = param(
         5,
         unit="px",
@@ -331,14 +338,14 @@ class DisperseParams(EffectParams):
         "the outline toward the border).",
         advanced=True,
     )
-    subject_threshold: float = param(
+    field_threshold: float = param(
         0.5,
         unit="fraction",
         min=0,
         max=1,
-        doc="With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to "
-        "the figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes in more of a "
-        "soft edge (hair, fur), raising it less. Ignored without a subject.",
+        doc="The field's average over a piece, 0 to 1, above which the piece belongs to the figure that `outline` "
+        "and `hover` work from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising "
+        "it less.",
         advanced=True,
     )
     background_threshold: float = param(
@@ -348,13 +355,13 @@ class DisperseParams(EffectParams):
         max=1,
         doc="How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black "
         "background: a piece no brighter never flies and is drawn black once the dispersal (or the shimmer) has "
-        "begun. Raising it drops dim, noisy pieces; without a subject it also decides the figure's outline.",
+        "begun. Raising it drops dim, noisy pieces.",
         advanced=True,
     )
 
 
 @effect(category="subject", params=DisperseParams)
-def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | None = None) -> np.ndarray:
+def disperse(rgb: np.ndarray, params: DisperseParams, *, field: np.ndarray) -> np.ndarray:
     """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
     `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
@@ -367,7 +374,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
     makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
-    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
+    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
     """
     p = params
     height, width = rgb.shape[:2]
@@ -377,7 +384,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     pieces = cells.cut(rgb, cell_w, cell_h)
     rows, cols = pieces.shape[:2]
     present = cells.lit(pieces, threshold=p.background_threshold)
-    figure = cells.figure(present, subject, cell_w, cell_h, height, width, threshold=p.subject_threshold)
+    figure = cells.figure(field, cell_w, cell_h, threshold=p.field_threshold)
     edges = distance.edge_distance(
         figure,
         sampling=(cell_h, cell_w),

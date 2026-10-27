@@ -6,7 +6,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/ambient_occlusion.jpg" width="160" alt="ambient_occlusion"> | `ambient_occlusion` | Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer. | `radius=10.0` `gain=4.0` +2 advanced | [ambient_occlusion.toml](../../examples/effects/ambient_occlusion.toml) |
+| <img src="../gallery/ambient_occlusion.jpg" width="160" alt="ambient_occlusion"> | `ambient_occlusion` | Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer. | `field='depth'` `radius=10.0` `gain=4.0` +2 advanced | [ambient_occlusion.toml](../../examples/effects/ambient_occlusion.toml) |
 | <img src="../gallery/anamorphic_streaks.jpg" width="160" alt="anamorphic_streaks"> | `anamorphic_streaks` | Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened over the picture by `amount`. | `length=168.0` `threshold=0.7` `amount=6.0` `color='#8fb8ff'` | [anamorphic_streaks.toml](../../examples/effects/anamorphic_streaks.toml) |
 | <img src="../gallery/bloom.jpg" width="160" alt="bloom"> | `bloom` | Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture. | `radius=32.0` `threshold=0.6` `amount=0.7` `color=None` `octaves=4` `persistence=0.5` +3 advanced | [bloom.toml](../../examples/effects/bloom.toml) |
 | <img src="../gallery/chromatic_aberration.jpg" width="160" alt="chromatic_aberration"> | `chromatic_aberration` | Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum. | `amount=4.0` `samples=3` `x=0.5` `y=0.5` +2 advanced | [chromatic_aberration.toml](../../examples/effects/chromatic_aberration.toml) |
@@ -30,6 +30,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
+| `field` | field name |  |  | `'depth'` | The field read as how near each pixel is, 1 = nearest: `depth` (the scene's depth), `light` (bright parts stand nearer, so dark creases between them darken), `subject` (a contact shadow around the subject), or a region of the recipe. |
 | `radius` | number | px | 1 to 200 | `10.0` | The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at the recipe's size over which the surrounding depth is averaged. Raising it darkens wider areas around nearer things; lowering it keeps the darkening to fine creases. |
 | `gain` | number | ratio | 1 to 100 | `4.0` | How strongly a depth difference darkens: a pixel lying d farther than its surroundings (depth 0..1) is darkened by gain x d, at most to black. Raising it darkens shallow creases more and turns deep ones black sooner. |
 

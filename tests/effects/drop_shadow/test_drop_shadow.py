@@ -48,7 +48,7 @@ def test_the_shadow_lands_offset_away_along_the_angle_and_nowhere_else(
 ) -> None:
     """With no blur and a black shadow, a shadow pixel is `picture x (1 - coverage)`; the coverage of a pixel moved by
     a whole number of pixels is 1 there, and of one moved by half a pixel is 1/2 on two pixels."""
-    out = registry.apply(NAME, grey(), subject=one_pixel(), offset=offset, angle=angle, blur=0.0)
+    out = registry.apply(NAME, grey(), field=one_pixel(), offset=offset, angle=angle, blur=0.0)
     expected = grey()
     for row, col in lands_at:
         expected[row, col] = GREY * (1 - 1 / len(lands_at))
@@ -58,7 +58,7 @@ def test_the_shadow_lands_offset_away_along_the_angle_and_nowhere_else(
 
 def test_the_subject_is_never_changed(photo: np.ndarray, subject: np.ndarray) -> None:
     for kwargs in ({}, {"offset": 3, "blur": 5.0}, {"offset": 0, "color": "#ff0000"}, {"copies": 5, "offset": 6.0}):
-        out = registry.apply(NAME, photo, subject=subject, **kwargs)
+        out = registry.apply(NAME, photo, field=subject, **kwargs)
         np.testing.assert_array_equal(out[subject == 1], photo[subject == 1])
 
 
@@ -71,7 +71,7 @@ def test_the_subject_is_never_changed(photo: np.ndarray, subject: np.ndarray) ->
     ],
 )
 def test_where_the_shadow_is_full_it_replaces_the_picture_with_its_colour(kwargs: dict, expected: list[float]) -> None:
-    out = registry.apply(NAME, grey(), subject=one_pixel(), offset=3 * 2**0.5, angle=45, blur=0.0, **kwargs)
+    out = registry.apply(NAME, grey(), field=one_pixel(), offset=3 * 2**0.5, angle=45, blur=0.0, **kwargs)
     np.testing.assert_allclose(out[13, 15], expected, atol=1e-6)
 
 
@@ -79,7 +79,7 @@ def test_blur_spreads_the_shadow_as_a_gaussian_of_that_sigma_and_keeps_its_amoun
     """Over a flat picture a black shadow removes `GREY x coverage`; the coverage of one pixel blurred by sigma is the
     2-D Gaussian, which peaks at 1 / (2 pi sigma^2) and sums to 1."""
     sigma = 2.0
-    out = registry.apply(NAME, grey(64), subject=one_pixel(30, 30, 64), offset=6 * 2**0.5, angle=45, blur=sigma)
+    out = registry.apply(NAME, grey(64), field=one_pixel(30, 30, 64), offset=6 * 2**0.5, angle=45, blur=sigma)
     removed = GREY - out[..., 0]
     assert removed[36, 36] == pytest.approx(GREY / (2 * np.pi * sigma**2), abs=1e-4)
     assert removed[36, 36 + 2] == pytest.approx(GREY * np.exp(-4 / (2 * sigma**2)) / (2 * np.pi * sigma**2), abs=1e-4)
@@ -89,7 +89,7 @@ def test_blur_spreads_the_shadow_as_a_gaussian_of_that_sigma_and_keeps_its_amoun
 def test_every_copy_is_blurred_by_blur() -> None:
     """Two copies of one pixel, 6 px apart: each is its own Gaussian, so the picture loses the amount of both."""
     sigma = 1.5
-    out = registry.apply(NAME, grey(64), subject=one_pixel(30, 10, 64), copies=2, offset=8.0, angle=0, blur=sigma)
+    out = registry.apply(NAME, grey(64), field=one_pixel(30, 10, 64), copies=2, offset=8.0, angle=0, blur=sigma)
     removed = GREY - out[..., 0]
     assert removed[30, 18] == pytest.approx(GREY / (2 * np.pi * sigma**2), abs=1e-3)
     assert removed[30, 26] == pytest.approx(GREY / (2 * np.pi * sigma**2), abs=1e-3)
@@ -101,7 +101,7 @@ def test_each_copy_is_the_silhouette_moved_one_more_offset_and_coloured_from_col
     out = registry.apply(
         NAME,
         grey(12, 40),
-        subject=block(slice(5, 7)),
+        field=block(slice(5, 7)),
         copies=3,
         offset=4.0,
         angle=0,
@@ -130,7 +130,7 @@ def test_a_copy_nearer_the_subject_is_in_front_of_the_farther_ones() -> None:
     out = registry.apply(
         NAME,
         grey(12, 40),
-        subject=block(slice(10, 16)),
+        field=block(slice(10, 16)),
         copies=3,
         offset=2.0,
         angle=0,
@@ -149,7 +149,7 @@ def test_copies_are_laid_over_each_other_by_their_copy_opacity() -> None:
     out = registry.apply(
         NAME,
         grey(12, 40),
-        subject=block(slice(10, 16)),
+        field=block(slice(10, 16)),
         copies=2,
         offset=2.0,
         angle=0,
@@ -164,7 +164,7 @@ def test_copies_are_laid_over_each_other_by_their_copy_opacity() -> None:
 
 def test_a_single_copy_at_a_copy_opacity_is_the_shadow_at_that_opacity() -> None:
     """One black copy at 0.25 over grey leaves 0.75 of the picture where it is full."""
-    out = registry.apply(NAME, grey(), subject=one_pixel(), offset=3, angle=0, blur=0.0, copy_opacity=0.25)
+    out = registry.apply(NAME, grey(), field=one_pixel(), offset=3, angle=0, blur=0.0, copy_opacity=0.25)
     np.testing.assert_allclose(out[10, 15], GREY * 0.75, atol=1e-6)
 
 
@@ -184,7 +184,7 @@ def test_the_copies_go_in_the_direction_of_the_angle(angle: float, step: tuple[i
     out = registry.apply(
         NAME,
         grey(21),
-        subject=subject,
+        field=subject,
         copies=2,
         offset=offset,
         angle=angle,
@@ -204,9 +204,7 @@ def test_a_soft_edge_keeps_its_share_of_the_subject_however_many_copies_lie_behi
     subject = block(slice(10, 16))
     subject[4:8, 16] = 0.5
     for copies in (1, 4):
-        out = registry.apply(
-            NAME, grey(12, 40), subject=subject, copies=copies, offset=1.0, angle=0, blur=0.0, color=RED
-        )
+        out = registry.apply(NAME, grey(12, 40), field=subject, copies=copies, offset=1.0, angle=0, blur=0.0, color=RED)
         np.testing.assert_allclose(out[5, 16], [0.9, 0.4, 0.4], atol=1e-6)
 
 
@@ -222,8 +220,8 @@ def test_a_subject_cut_by_the_border_casts_its_copies_without_a_gap(copies: int,
     wide = np.zeros((20, 22), np.float32)
     wide[2:5, :16] = 1.0
     kwargs = {"copies": copies, "offset": 4 * 2**0.5, "angle": 45, "blur": blur, "color": RED, "end_color": BLUE}
-    out = registry.apply(NAME, grey(20, 12), subject=subject, **kwargs)
-    out_wide = registry.apply(NAME, grey(20, 22), subject=wide, **kwargs)
+    out = registry.apply(NAME, grey(20, 12), field=subject, **kwargs)
+    out_wide = registry.apply(NAME, grey(20, 22), field=wide, **kwargs)
     np.testing.assert_allclose(out, out_wide[:, 10:], atol=1e-6)
     assert (out[8, 0] != GREY).all()  # in the copy of the part out of the picture
 
@@ -231,13 +229,9 @@ def test_a_subject_cut_by_the_border_casts_its_copies_without_a_gap(copies: int,
 def test_copy_opacity_zero_changes_nothing_and_a_stack_changes_the_picture(
     photo: np.ndarray, subject: np.ndarray
 ) -> None:
-    stack = registry.apply(NAME, photo, subject=subject, copies=5, offset=6.0, angle=30)
+    stack = registry.apply(NAME, photo, field=subject, copies=5, offset=6.0, angle=30)
     assert not np.array_equal(stack, photo)
-    np.testing.assert_array_equal(registry.apply(NAME, photo, subject=subject, copy_opacity=0.0), photo)
-
-
-def test_without_a_subject_there_is_no_shadow(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo), photo)
+    np.testing.assert_array_equal(registry.apply(NAME, photo, field=subject, copy_opacity=0.0), photo)
 
 
 @pytest.mark.parametrize(
@@ -252,13 +246,13 @@ def test_fade_lowers_each_copys_opacity_in_a_straight_line_along_the_copies(fade
     """Three black copies of a 2 px subject, 4 px apart, over grey leave `GREY x (1 - opacity)` of the picture in copy
     k: the opacity is 1 at the first copy, `1 - fade / 2` at the second and `1 - fade` at the third."""
     out = registry.apply(
-        NAME, grey(12, 40), subject=block(slice(5, 7)), copies=3, offset=4.0, angle=0, blur=0.0, fade=fade
+        NAME, grey(12, 40), field=block(slice(5, 7)), copies=3, offset=4.0, angle=0, blur=0.0, fade=fade
     )
     np.testing.assert_allclose([out[5, 9, 0], out[5, 13, 0], out[5, 17, 0]], expected, atol=1e-6)
 
 
 def test_a_single_copy_does_not_fade() -> None:
-    out = registry.apply(NAME, grey(), subject=one_pixel(), offset=3, angle=0, blur=0.0, copy_opacity=0.5, fade=1.0)
+    out = registry.apply(NAME, grey(), field=one_pixel(), offset=3, angle=0, blur=0.0, copy_opacity=0.5, fade=1.0)
     np.testing.assert_allclose(out[10, 15], GREY * 0.5, atol=1e-6)
 
 
@@ -267,7 +261,7 @@ def test_the_long_shadow_preset_is_a_solid_shadow_that_fades_out_over_300_px() -
     subject, lighter at every pixel farther on, gone 300 px past the subject's edge."""
     subject = np.zeros((6, 380), np.float32)
     subject[:, 10:50] = 1.0
-    out = registry.apply(NAME, grey(6, 380), subject=subject, **{**Step(NAME, preset="long_shadow").params, "angle": 0})
+    out = registry.apply(NAME, grey(6, 380), field=subject, **{**Step(NAME, preset="long_shadow").params, "angle": 0})
     removed = GREY - out[3, :, 0]
     assert removed[50] > 0.9 * GREY  # beside the subject
     assert (np.diff(removed[50:]) <= 1e-6).all()  # never darker farther out

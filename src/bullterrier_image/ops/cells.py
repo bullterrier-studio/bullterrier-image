@@ -6,7 +6,6 @@ A piece grid is an array of shape (rows, cols, cell_h, cell_w, 3). `cut` and `jo
 """
 
 import numpy as np
-from scipy import ndimage
 
 
 def cut(rgb: np.ndarray, cell_w: int, cell_h: int) -> np.ndarray:
@@ -40,28 +39,15 @@ def lit(pieces: np.ndarray, *, threshold: float) -> np.ndarray:
     return pieces.max(axis=(2, 3, 4)) > threshold
 
 
-def figure(
-    lit_pieces: np.ndarray,
-    matte: np.ndarray | None,
-    cell_w: int,
-    cell_h: int,
-    height: int,
-    width: int,
-    *,
-    threshold: float,
-) -> np.ndarray:
-    """(rows, cols) bool: the pieces that belong to the subject.
+def figure(matte: np.ndarray, cell_w: int, cell_h: int, *, threshold: float) -> np.ndarray:
+    """(rows, cols) bool: the pieces of the grid `cut` makes at `cell_w` x `cell_h` px that belong to the figure
+    `matte` (height, width, 0..1) draws.
 
-    `lit_pieces` is the (rows, cols) result of `lit` for the grid. `matte` is the subject's (height, width) silhouette,
-    0..1, or None. `cell_w`, `cell_h` (px) are the piece size and `height`, `width` (px) the picture size that the grid
-    was cut from.
-
-    With a matte, a piece belongs to the subject when the matte's average over it is above `threshold` (0..1; at 0.5,
-    more than half of its pixels are inside; padding beyond the picture counts as outside), so dark parts of the figure
-    (eyes, shadows) still count. Without one, it is the lit pieces with enclosed gaps filled in (`threshold` unused).
+    A piece belongs to the figure when the matte's average over it is above `threshold` (0..1; at 0.5, more than half
+    of its pixels are inside; padding beyond the picture counts as outside), so dark parts of the figure (eyes,
+    shadows) still count.
     """
-    if matte is None:
-        return ndimage.binary_fill_holes(lit_pieces)
-    rows, cols = lit_pieces.shape
+    height, width = matte.shape
+    rows, cols = -(-height // cell_h), -(-width // cell_w)
     padded = np.pad(matte, ((0, rows * cell_h - height), (0, cols * cell_w - width)))
     return padded.reshape(rows, cell_h, cols, cell_w).mean(axis=(1, 3)) > threshold

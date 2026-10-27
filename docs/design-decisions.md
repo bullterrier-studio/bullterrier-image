@@ -173,9 +173,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the effect the resolved float32 `(h, w)` array 0..1 as the keyword-only argument of the parameter's name
   (`def relight(rgb, params, *, field)`); a direct call passes that array (`registry.apply("relight", rgb, field=arr)`).
   A field is not a number: no address, not drivable. A step may have a field and a `Drive` on another parameter: the
-  field is resolved once and every level of the drive gets the same array; the drive keeps its own `by`. Effects declare
-  a field only for what picks where or how much they work; the maps `subject` and `depth` stay inputs until the effects
-  that take them move onto this. *Reason:* what an effect works from (depth, light, a band) is a choice of the look, so
+  field is resolved once and every level of the drive gets the same array; the drive keeps its own `by`. Every effect
+  that works from a map takes it as a field, defaulting to the map it was made for: `outline`, `rim_light`,
+  `reflection`, `drop_shadow` and `disperse` to `subject`, `parallax` and `ambient_occlusion` to `depth`, so an outline
+  or a shadow can follow text or a logo, and a shape's threshold is `field_threshold`. *Reason:* what an effect works from (depth, light, a band) is a choice of the look, so
   it is data in the recipe, not a second effect per source or an input only code can pick. *Consequence:* registering
   an effect fails unless each `FieldName` parameter has a keyword-only argument of its name; a map a field needs and
   nobody gave is the usual `MapNotFoundError`.
@@ -287,7 +288,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   whatever comes next). A name no recipe declares is a `RecipeError` listing the names there are, so a misspelt map
   fails instead of being ignored. *Consequence:* `matte=`, `depth=`, `find_subject=`, `find_depth=`, `--matte`,
   `--depth`, `load_matte`, `load_depth` and the effect input `matte` are gone, with no alias before 1.0 (`--map
-  NAME=PICTURE`, `imageio.load_map`, `subject`); the five effects' `matte_threshold` is `subject_threshold`; the `depth`
+  NAME=PICTURE`, `imageio.load_map`, `subject`); the five effects' `matte_threshold` is `subject_threshold` (since `field_threshold`); the `depth`
   region name is built in beside `subject` and `background`, so a `given` region cannot take it; `MapNotFoundError` is
   the base of `SubjectNotFoundError` and `DepthNotFoundError`; a project (`bt-image run`) holds no maps of its own, so a
   recipe with a `given` region needs a finder of that name. A map handed in is framed with the photo in one stack
@@ -364,8 +365,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
   input of `--map subject=`, of `maps=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
-- **Depth is injected like the subject.** An effect that needs distance (`parallax`,
-  `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; regions made of it (a `band` or `bands` of `depth`) read it too.
+- **Depth is found like the subject.** An effect that needs distance (`parallax`, `ambient_occlusion`) takes it as a
+  field (`field = "depth"`, the default): float32 (h, w), 0..1, 1 = nearest; regions made of it (a `band` or `bands` of
+  `depth`) read it too.
   The runner is given a depth map or a `Finder` for one (`maps={"depth": ...}`, `finders={"depth": ...}`; neither, when needed, is
   `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default:
   Depth Anything V2 Small (`onnx-community`, fp32, Apache-2.0) on ONNX Runtime, pinned to a commit and checked against

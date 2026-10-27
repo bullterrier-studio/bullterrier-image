@@ -9,7 +9,7 @@ import numpy
 from .core.params import Drive, Lut, Picture
 from .recipe import Step
 
-def ambient_occlusion(radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def ambient_occlusion(field: str = 'depth', radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer.
 
 Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus
@@ -17,11 +17,14 @@ its own depth, positive where it lies farther than its surroundings. It is darke
 one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping
 depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and
 leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
-`depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
-1 = nearest. Without a depth the picture is unchanged.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
 
 Parameters
 ----------
+field : field name, default 'depth'
+    The field read as how near each pixel is, 1 = nearest: `depth` (the scene's depth),
+    `light` (bright parts stand nearer, so dark creases between them darken), `subject`
+    (a contact shadow around the subject), or a region of the recipe.
 radius : number, px, 1 to 200, default 10.0
     The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at
     the recipe's size over which the surrounding depth is averaged. Raising it darkens
@@ -626,7 +629,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     edge) lets the far side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 96.0, angle: float = 350.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 72.0, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 2.0, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 58.0, acceleration: float = 0.5, sway: float = 6.0, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 96.0, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
+def disperse(field: str = 'subject', cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 96.0, angle: float = 350.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 72.0, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 2.0, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 58.0, acceleration: float = 0.5, sway: float = 6.0, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 96.0, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
 `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
@@ -639,10 +642,15 @@ When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `ji
 figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
 makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, used for `outline`.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
+field : field name, default 'subject'
+    The figure that `outline` and `hover` work from: `subject` (the subject's
+    silhouette), `light` (the bright parts), `depth` (the near parts), or a region of
+    the recipe (text, a logo, a drawn shape). A piece belongs to it when the field's
+    average over the piece is above `field_threshold`.
 cell : whole number, px, 1 to 64, default 5
     Character width in px; a piece is one character (its height comes from the bundled
     font). Use the same value as the ascii step before this one, so whole characters
@@ -767,16 +775,14 @@ edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'refle
     the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
     'constant' (open space, as if nothing were there, which blurs the outline toward the
     border).
-subject_threshold : number, fraction, 0 to 1, default 0.5
-    With a subject: how much of a piece, 0 to 1, the subject must cover on average for
-    the piece to belong to the figure that `outline` and `hover` work from; 0.5 = more
-    than half. Lowering it takes in more of a soft edge (hair, fur), raising it less.
-    Ignored without a subject.
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's average over a piece, 0 to 1, above which the piece belongs to the
+    figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes
+    in more of a soft edge (hair, fur), raising it less.
 background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never flies and is drawn black
-    once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces;
-    without a subject it also decides the figure's outline.
+    once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces.
 
 Presets
 -------
@@ -922,28 +928,30 @@ threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, spli
 palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."""
     ...
 
-def drop_shadow(copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
-    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`:
-a drop shadow, layered paper cutouts or a long shadow.
+def drop_shadow(field: str = 'subject', copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
+    """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by
+`blur`: a drop shadow, layered paper cutouts or a long shadow.
 
 One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
 at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
-from `color` (nearest the subject) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
-`copy_opacity` falling by `fade`, and the subject on top of all of them, so the subject itself is never changed.
+from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
+`copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
 
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
-no subject and so no copies: the picture comes back unchanged.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
+field : field name, default 'subject'
+    The shape that casts the copies: `subject` (the subject's silhouette), `light`,
+    `depth`, or a region of the recipe (text, a logo, a drawn shape), its value 0..1 how
+    much of a pixel belongs to it.
 copies : whole number, count, 1 to 400, default 1
-    How many copies of the silhouette are stacked behind the subject: 1 = a single
-    shadow, more = a deeper stack of layers.
+    How many copies of the shape are stacked behind it: 1 = a single shadow, more = a
+    deeper stack of layers.
 offset : number, px, 0 to 1000, default 22.0
     How far each copy lies beyond the one before it, in px, tuned for a picture about
-    480 px high: the first is `offset` from the subject, the last `copies` x `offset`. 0
-    = every copy hidden behind the subject, leaving only what `blur` spreads past its
-    edge.
+    480 px high: the first is `offset` from the shape, the last `copies` x `offset`. 0 =
+    every copy hidden behind the shape, leaving only what `blur` spreads past its edge.
 angle : number (cyclic), degrees, 0 to 360, default 56.0
     The direction the copies step away in, in degrees clockwise from pointing right on
     the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to
@@ -952,8 +960,8 @@ blur : number, px, 0 to 200, default 24.0
     Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger
     and fainter at their edge; 0 = hard-edged silhouettes.
 color : colour, default '#000000'
-    The colour of the copy nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-    Black darkens what lies behind the subject; another colour tints it.
+    The colour of the copy nearest the shape: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black
+    darkens what lies behind the shape; another colour tints it.
 end_color : colour, default '#000000'
     The colour of the farthest copy; the copies between step evenly from `color` to it.
     With one copy only `color` is used.
@@ -973,7 +981,7 @@ truncate : number, ratio, 1 to 10, default 4.0
     Larger is more exact and slower.
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What the copies see beyond the picture's edge, when moved and softened: 'nearest'
-    (the outermost row repeated, so a subject cut off by the border casts its copies on
+    (the outermost row repeated, so a shape cut off by the border casts its copies on
     without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
     the edge pixel) or 'wrap' (the opposite edge).
 
@@ -2519,27 +2527,30 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     mirrored about the edge pixel, 'wrap' the opposite side."""
     ...
 
-def outline(width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px.
+def outline(field: str = 'subject', width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, field_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.
 
-The stroke follows the edge of the subject on the side `position` says; 'outside' leaves the subject's own pixels
-exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the subject
-is soft the stroke lies behind the subject. The edge is antialiased over one pixel.
+The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly
+as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft
+the stroke lies behind it. The edge is antialiased over one pixel.
 
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
-no subject to outline and the picture is returned unchanged.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
+field : field name, default 'subject'
+    The shape outlined: `subject` (the subject's silhouette), `background`, `light`,
+    `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside
+    it from `field_threshold` up.
 width : number, px, 0 to 200, default 6.0
     Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0
     = no stroke.
 color : colour, default '#ffffff'
     The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
 position : one of 'outside', 'inside', 'center', default 'outside'
-    Which side of the silhouette's edge the stroke lies on: 'outside' (around the
-    subject, whose own pixels stay untouched), 'inside' (painted over the subject's rim)
-    or 'center' (half of `width` on each side).
+    Which side of the shape's edge the stroke lies on: 'outside' (around the shape,
+    whose own pixels stay untouched), 'inside' (painted over the shape's rim) or
+    'center' (half of `width` on each side).
 glow : number, px, 0 to 200, default 0.0
     How far a soft halo of the same colour reaches beyond the stroke, in px; it fades
     smoothly from the stroke to nothing. Raising it spreads the halo (a large value
@@ -2547,8 +2558,8 @@ glow : number, px, 0 to 200, default 0.0
 
 Advanced parameters
 -------------------
-subject_threshold : number, fraction, 0 to 1, default 0.5
-    The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
     outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
     (hair, fur), raising it less."""
     ...
@@ -2603,17 +2614,22 @@ fibre : number, fraction, 0 to 1, default 0.3
     same as 'paper'). Ignored for 'paper'."""
     ...
 
-def parallax(angle: float = 0.0, amount: float = 9.6, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def parallax(field: str = 'depth', angle: float = 0.0, amount: float = 9.6, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera
 move would.
 
 Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
 the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background
-beside it stretched over the gap: a 2.5D look, not a new view. `depth` is filled in by the recipe from the depth
-model (never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Without a depth the picture is unchanged.
+beside it stretched over the gap: a 2.5D look, not a new view.
+
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
 
 Parameters
 ----------
+field : field name, default 'depth'
+    The field read as how near each layer is, 1 = nearest: `depth` (the scene's depth),
+    `subject` (the subject moves as one layer against its background), `light` (bright
+    parts move as nearer), or a region of the recipe.
 angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction the nearest layers move, in degrees clockwise from pointing right, as
     seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move
@@ -3095,22 +3111,27 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles)."""
     ...
 
-def reflection(height: float = 0.4, fade: float = 0.7, blur: float = 2.0, threshold: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth.
+def reflection(field: str = 'subject', height: float = 0.4, fade: float = 0.7, blur: float = 2.0, field_threshold: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth.
 
-The floor line is the bottom of the subject; the reflection is `height` of the subject's height deep, blurred by
+The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by
 `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
 at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
 
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
-when nothing in it counts as the subject (see `threshold`), there is no floor line and so no reflection: the
-picture comes back unchanged.
+When nothing in the field counts as the shape (see `field_threshold`), there is no floor line and so no
+reflection: the picture comes back unchanged.
+
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
+field : field name, default 'subject'
+    The shape whose lowest row is the floor line: `subject` (the subject's silhouette),
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A row
+    belongs to it from `field_threshold` up.
 height : number, fraction, 0 to 1, default 0.4
-    How tall the reflection is, as a fraction of the subject's height: 0.4 = 40% of it
-    is mirrored into the floor below the subject's lowest row, 1 = all of it; 0 = no
+    How tall the reflection is, as a fraction of the shape's height: 0.4 = 40% of it is
+    mirrored into the floor below the shape's lowest row, 1 = all of it; 0 = no
     reflection. Where the picture ends first, the reflection is cut there.
 fade : number, fraction, 0 to 1, default 0.7
     How much of its strength the reflection loses between the floor line and its end, in
@@ -3122,11 +3143,11 @@ blur : number, px, 0 to 100, default 2.0
 
 Advanced parameters
 -------------------
-threshold : number, fraction, 0 to 1, default 0.5
-    How much of a subject row, 0 to 1, must be subject for the row to count as part of
-    it when its lowest and highest rows are found: 0.5 = a pixel of at least half.
-    Lowering it counts faint fringes, so the floor line moves down and the subject's
-    height grows.
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, that some pixel of a row must reach for the row to count
+    as part of the shape when its lowest and highest rows are found: 0.5 = a pixel of at
+    least half. Lowering it counts faint fringes, so the floor line moves down and the
+    shape's height grows.
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
     Larger is more exact and slower.
@@ -3243,19 +3264,24 @@ Presets
 anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."""
     ...
 
-def rim_light(angle: float = 320.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`.
+def rim_light(field: str = 'subject', angle: float = 320.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Light along a shape's edge (the subject by default) from one side: a band of `width` px inside the edge, tinted
+`color`.
 
 Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
 direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`.
-It is screened over the picture, so it only ever brightens, and never reaches the background or the subject's
-interior beyond `width`. The picture's own border is no edge.
+It is screened over the picture, so it only ever brightens, and never reaches outside the shape or its
+interior beyond `width`. The picture's own border is no edge. A shape without an edge (empty or full) lights
+nothing.
 
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one, or
-with a subject that has no edge (empty or full), there is nothing to light and the picture is returned unchanged.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
+field : field name, default 'subject'
+    The shape whose edge is lit: `subject` (the subject's silhouette), `background`,
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel
+    is inside it from `field_threshold` up.
 angle : number (cyclic), degrees, 0 to 360, default 320.0
     The direction the light comes from, in degrees clockwise from pointing right, as
     seen on screen: 0 = from the right, 90 = from below, 180 = from the left, 270 = from
@@ -3264,7 +3290,7 @@ color : colour, default '#ff9a4d'
     The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
     orange.
 width : number, px, 1 to 200, default 12.0
-    Depth of the lit band inside the subject's edge, in px at the recipe's size: raising
+    Depth of the lit band inside the shape's edge, in px at the recipe's size: raising
     it lets the light reach further in.
 amount : number, ratio, 0 to 5, default 1.0
     How strong the light is where it is brightest (an edge that faces the light head-
@@ -3287,8 +3313,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored,
     border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
     border pixel repeated) or 'wrap' (the opposite border).
-subject_threshold : number, fraction, 0 to 1, default 0.5
-    The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
     lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
     fur), raising it less."""
     ...

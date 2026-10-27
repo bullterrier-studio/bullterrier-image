@@ -74,7 +74,7 @@ def test_a_depth_without_hollows_leaves_the_picture_unchanged(
 ) -> None:
     """A flat or linear depth is its own Gaussian average, so nothing is sheltered (away from the edge rule)."""
     rgb = picture()
-    out = registry.apply(NAME, rgb, depth=depth, **settings)
+    out = registry.apply(NAME, rgb, field=depth, **settings)
     assert out.dtype == np.float32
     np.testing.assert_allclose(out[region], rgb[region], atol=1e-5)
 
@@ -93,7 +93,7 @@ def test_it_never_brightens_and_darkens_every_channel_by_one_grey_factor(
 ) -> None:
     rgb = picture(seed)
     depth = np.random.default_rng(seed).random((SIZE, SIZE), dtype=np.float32)
-    out = registry.apply(NAME, rgb, depth=depth, **settings)
+    out = registry.apply(NAME, rgb, field=depth, **settings)
     assert (out <= rgb).all()
     factor = out / rgb
     assert factor[..., 0].min() < 0.99  # a random depth has hollows: something is darkened
@@ -121,7 +121,7 @@ def test_the_darkening_is_the_gain_times_the_brute_force_cavity(
 ) -> None:
     """Expected: 1 - clip(gain x (Gaussian mean - depth), 0, 1), the mean summed by hand over the kernel's window."""
     rgb = picture()
-    out = registry.apply(NAME, rgb, depth=depth, radius=radius, gain=gain, truncate=truncate)
+    out = registry.apply(NAME, rgb, field=depth, radius=radius, gain=gain, truncate=truncate)
     cavity = shelter(depth, *point, sigma=radius, truncate=truncate)
     assert 0 < gain * cavity < 1  # every row is a case the clip leaves alone
     assert darkening(rgb, out)[point] == pytest.approx(gain * cavity, abs=1e-5)
@@ -131,7 +131,7 @@ def test_the_darkening_is_the_gain_times_the_brute_force_cavity(
 def test_a_pit_is_darkest_at_its_deepest_point_and_the_plane_far_from_it_is_untouched(radius: float) -> None:
     """A bowl minus its wider Gaussian average peaks at the bowl's centre."""
     rgb = picture()
-    dark = darkening(rgb, registry.apply(NAME, rgb, depth=bowl(), radius=radius, gain=1))
+    dark = darkening(rgb, registry.apply(NAME, rgb, field=bowl(), radius=radius, gain=1))
     assert dark[MIDDLE, MIDDLE] == dark.max()
     assert dark[MIDDLE, MIDDLE] > 0.05
     assert dark[5, 5] == pytest.approx(0, abs=1e-6)
@@ -141,7 +141,7 @@ def test_a_pit_is_darkest_at_its_deepest_point_and_the_plane_far_from_it_is_unto
 def test_a_bump_keeps_its_top_and_darkens_the_plane_beside_it(radius: float) -> None:
     """A contact shadow: the nearer side of a depth step is unchanged, the farther side darkened."""
     rgb = picture()
-    out = registry.apply(NAME, rgb, depth=BUMP, radius=radius)
+    out = registry.apply(NAME, rgb, field=BUMP, radius=radius)
     bump = BUMP > 0.5
     np.testing.assert_array_equal(out[bump], rgb[bump])
     assert darkening(rgb, out)[MIDDLE, MIDDLE + 10] > 0.05
@@ -150,7 +150,7 @@ def test_a_bump_keeps_its_top_and_darkens_the_plane_beside_it(radius: float) -> 
 def test_raising_the_radius_widens_the_darkened_area() -> None:
     rgb = picture()
     areas = [
-        int((darkening(rgb, registry.apply(NAME, rgb, depth=BUMP, radius=radius)) > 0.01).sum())
+        int((darkening(rgb, registry.apply(NAME, rgb, field=BUMP, radius=radius)) > 0.01).sum())
         for radius in (2, 6, 18)
     ]
     assert areas[0] < areas[1] < areas[2]
@@ -159,7 +159,7 @@ def test_raising_the_radius_widens_the_darkened_area() -> None:
 def test_raising_the_gain_darkens_more_until_the_pit_is_black() -> None:
     rgb = picture()
     centre, rim, far = (MIDDLE, MIDDLE), (MIDDLE, MIDDLE + 7), (5, 5)
-    outs = [registry.apply(NAME, rgb, depth=PIT, radius=6, gain=gain) for gain in (1, 2, 3, 4, 8, 100)]
+    outs = [registry.apply(NAME, rgb, field=PIT, radius=6, gain=gain) for gain in (1, 2, 3, 4, 8, 100)]
     for point in (centre, rim):
         values = [float(out[point][0]) for out in outs]
         assert values[0] > values[1] > values[2] > values[-1]  # the darkening grows with the gain while it can
@@ -176,14 +176,8 @@ def test_with_the_wrap_edge_a_tileable_picture_darkens_without_a_seam(radius: fl
     rgb = picture()
     depth = np.random.default_rng(5).random((SIZE, SIZE), dtype=np.float32)
     shift = (SIZE // 3, SIZE // 2)
-    out = registry.apply(NAME, rgb, depth=depth, radius=radius, edge="wrap")
+    out = registry.apply(NAME, rgb, field=depth, radius=radius, edge="wrap")
     moved = registry.apply(
-        NAME, np.roll(rgb, shift, axis=(0, 1)), depth=np.roll(depth, shift, axis=(0, 1)), radius=radius, edge="wrap"
+        NAME, np.roll(rgb, shift, axis=(0, 1)), field=np.roll(depth, shift, axis=(0, 1)), radius=radius, edge="wrap"
     )
     np.testing.assert_allclose(moved, np.roll(out, shift, axis=(0, 1)), atol=1e-5)
-
-
-def test_without_a_depth_the_picture_is_an_unchanged_copy(photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, radius=200, gain=100)
-    np.testing.assert_array_equal(out, photo)
-    assert out is not photo

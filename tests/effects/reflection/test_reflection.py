@@ -40,7 +40,7 @@ def test_the_picture_is_mirrored_about_the_lowest_row_of_the_subject_for_height_
     height: float, mirrored: int
 ) -> None:
     picture = rows_picture()
-    out = registry.apply(NAME, picture, subject=subject_map(), height=height, **FLAT)
+    out = registry.apply(NAME, picture, field=subject_map(), height=height, **FLAT)
     expected = picture.copy()
     for i in range(mirrored):
         expected[FLOOR + i] = picture[FLOOR - 1 - i]  # the row just below the floor line shows the row just above it
@@ -58,7 +58,7 @@ def test_the_picture_is_mirrored_about_the_lowest_row_of_the_subject_for_height_
 def test_the_reflection_fades_with_distance_from_the_floor_line(fade: float, weights: list[float]) -> None:
     """White above the floor over black below it: a mirrored row shows white by exactly its weight, a perfect mirror
     at the floor line."""
-    out = registry.apply(NAME, white_over_black(), subject=subject_map(), height=1.0, fade=fade, blur=0.0)
+    out = registry.apply(NAME, white_over_black(), field=subject_map(), height=1.0, fade=fade, blur=0.0)
     np.testing.assert_allclose(out[FLOOR : FLOOR + 8, 5, 0], weights, atol=1e-6)
     np.testing.assert_array_equal(out[:FLOOR], 1.0)  # the picture above the floor is never changed
     np.testing.assert_array_equal(out[FLOOR + 8 :], 0.0)  # and beyond the reflection's height
@@ -68,7 +68,7 @@ def test_where_the_picture_has_no_room_the_reflection_is_cut_at_the_edge() -> No
     """The subject's lowest row is 3 rows from the bottom, so only 3 of its 8 mirrored rows fit."""
     picture = rows_picture()
     subject = subject_map(top=HEIGHT - 11, floor=HEIGHT - 3)
-    out = registry.apply(NAME, picture, subject=subject, height=1.0, **FLAT)
+    out = registry.apply(NAME, picture, field=subject, height=1.0, **FLAT)
     expected = picture.copy()
     for i in range(3):
         expected[HEIGHT - 3 + i] = picture[HEIGHT - 4 - i]
@@ -80,14 +80,14 @@ def test_a_cut_reflection_fades_as_if_it_had_its_whole_height() -> None:
     subject = subject_map(top=HEIGHT - 11, floor=HEIGHT - 3)
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[: HEIGHT - 3] = 1.0
-    out = registry.apply(NAME, picture, subject=subject, height=1.0, fade=1.0, blur=0.0)
+    out = registry.apply(NAME, picture, field=subject, height=1.0, fade=1.0, blur=0.0)
     np.testing.assert_allclose(out[HEIGHT - 3 :, 5, 0], [1.0, 0.875, 0.75], atol=1e-6)
 
 
 def test_a_subject_that_reaches_the_bottom_has_nothing_to_reflect_on(photo: np.ndarray) -> None:
     subject = np.zeros(photo.shape[:2], np.float32)
     subject[20:, 30:90] = 1.0
-    np.testing.assert_array_equal(registry.apply(NAME, photo, subject=subject, height=1.0), photo)
+    np.testing.assert_array_equal(registry.apply(NAME, photo, field=subject, height=1.0), photo)
 
 
 @pytest.mark.parametrize(
@@ -98,13 +98,15 @@ def test_a_subject_that_reaches_the_bottom_has_nothing_to_reflect_on(photo: np.n
         pytest.param(0.5, 0.5, 11, id="a row exactly at the threshold counts"),
     ],
 )
-def test_threshold_decides_how_strong_a_row_of_the_matte_must_be_to_count_as_the_subject(
+def test_field_threshold_decides_how_strong_a_row_of_the_matte_must_be_to_count_as_the_subject(
     edge_value: float, threshold: float, floor: int
 ) -> None:
     subject = subject_map()
     subject[FLOOR, 4:20] = edge_value
     picture = rows_picture()
-    out = registry.apply(NAME, picture, subject=subject, height=0.25, threshold=threshold, **FLAT)  # 8 rows x 0.25 = 2
+    out = registry.apply(
+        NAME, picture, field=subject, height=0.25, field_threshold=threshold, **FLAT
+    )  # 8 rows x 0.25 = 2
     assert out[floor, 0, 0] == picture[floor - 1, 0, 0]
     assert out[floor + 1, 0, 0] == picture[floor - 2, 0, 0]
     assert out[floor + 2, 0, 0] == picture[floor + 2, 0, 0]
@@ -117,7 +119,7 @@ def test_blur_softens_the_reflection_as_a_gaussian_of_that_sigma() -> None:
     sigma = 1.5
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[4, 12] = 1.0
-    out = registry.apply(NAME, picture, subject=subject_map(), height=1.0, fade=0.0, blur=sigma)
+    out = registry.apply(NAME, picture, field=subject_map(), height=1.0, fade=0.0, blur=sigma)
     peak = 1 / (2 * np.pi * sigma**2)
     assert out[15, 12, 0] == pytest.approx(peak, abs=1e-4)
     assert out[15, 14, 0] == pytest.approx(peak * np.exp(-4 / (2 * sigma**2)), abs=1e-4)
@@ -129,11 +131,10 @@ def test_the_blur_continues_the_mirror_image_across_the_floor_line() -> None:
     sigma = 1.5
     picture = np.zeros((HEIGHT, WIDTH, 3), np.float32)
     picture[FLOOR - 1, 12] = 1.0
-    out = registry.apply(NAME, picture, subject=subject_map(), height=1.0, fade=0.0, blur=sigma)
+    out = registry.apply(NAME, picture, field=subject_map(), height=1.0, fade=0.0, blur=sigma)
     peak = 1 / (2 * np.pi * sigma**2)
     assert out[FLOOR, 12, 0] == pytest.approx(peak * (1 + np.exp(-1 / (2 * sigma**2))), abs=1e-4)
 
 
-def test_without_a_subject_there_is_no_reflection(photo: np.ndarray) -> None:
-    np.testing.assert_array_equal(registry.apply(NAME, photo), photo)
-    np.testing.assert_array_equal(registry.apply(NAME, photo, subject=np.zeros(photo.shape[:2], np.float32)), photo)
+def test_an_empty_shape_has_no_reflection(photo: np.ndarray) -> None:
+    np.testing.assert_array_equal(registry.apply(NAME, photo, field=np.zeros(photo.shape[:2], np.float32)), photo)

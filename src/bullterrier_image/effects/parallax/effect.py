@@ -1,11 +1,12 @@
-"""The `parallax` effect: the picture's layers shifted by their depth, as if the camera moved sideways."""
+"""The `parallax` effect: the picture's layers shifted by their depth (or any field), as if the camera moved
+sideways."""
 
 from typing import Literal
 
 import numpy as np
 from scipy import ndimage
 
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.warp import remap
 
@@ -14,6 +15,12 @@ class ParallaxParams(EffectParams):
     """A sideways camera move: layers nearer than `focus` shift along `angle`, farther ones the opposite way, each by
     its distance in depth from the focus."""
 
+    field: FieldName = param(
+        "depth",
+        doc="The field read as how near each layer is, 1 = nearest: `depth` (the scene's depth), `subject` (the "
+        "subject moves as one layer against its background), `light` (bright parts move as nearer), or a region of "
+        "the recipe.",
+    )
     angle: float = param(
         0.0,
         unit="degrees",
@@ -58,17 +65,16 @@ class ParallaxParams(EffectParams):
 
 
 @effect(category="distortion", params=ParallaxParams)
-def parallax(rgb: np.ndarray, params: ParallaxParams, *, depth: np.ndarray | None = None) -> np.ndarray:
+def parallax(rgb: np.ndarray, params: ParallaxParams, *, field: np.ndarray) -> np.ndarray:
     """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera
     move would.
 
     Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
     the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background
-    beside it stretched over the gap: a 2.5D look, not a new view. `depth` is filled in by the recipe from the depth
-    model (never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Without a depth the picture is unchanged.
+    beside it stretched over the gap: a 2.5D look, not a new view.
+
+    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
     """
-    if depth is None:
-        return rgb.copy()
     height, width = rgb.shape[:2]
     reach = params.amount  # px a layer moves per unit of depth from the focus
     # A pixel reads where it lies minus its shift, so a pixel a near object lands on must take the object's shift, not
@@ -76,7 +82,7 @@ def parallax(rgb: np.ndarray, params: ParallaxParams, *, depth: np.ndarray | Non
     # depth from the focus) px, so near objects move whole instead of tearing. A square is the simplest window that
     # covers every direction, and its maximum is separable (fast at any size).
     radius = int(np.ceil(reach * max(params.focus, 1 - params.focus)))
-    nearest = ndimage.maximum_filter(depth, size=2 * radius + 1, mode=params.edge)
+    nearest = ndimage.maximum_filter(field, size=2 * radius + 1, mode=params.edge)
     shift = reach * (nearest - params.focus)  # at the depth's own precision: a depth equal to the focus moves 0 px
     angle = np.radians(params.angle)
     rows = np.arange(height)[:, None] - shift * np.sin(angle)  # rows count down: a move down reads from above

@@ -1,10 +1,11 @@
-"""The `drop_shadow` effect: copies of the subject's silhouette behind it: a shadow, paper layers, a long shadow."""
+"""The `drop_shadow` effect: copies of a shape (the subject by default) behind it: a shadow, paper layers, a long
+shadow."""
 
 from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import Color, EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.cutout import put_behind
@@ -12,15 +13,20 @@ from bullterrier_image.ops.shift import BoxedImage
 
 
 class DropShadowParams(EffectParams):
-    """The settings of `drop_shadow`: how many copies, where they fall, how soft they are, and their colours."""
+    """The settings of `drop_shadow`: the shape, how many copies, where they fall, how soft they are, and their
+    colours."""
 
+    field: FieldName = param(
+        "subject",
+        doc="The shape that casts the copies: `subject` (the subject's silhouette), `light`, `depth`, or a region of "
+        "the recipe (text, a logo, a drawn shape), its value 0..1 how much of a pixel belongs to it.",
+    )
     copies: int = param(
         1,
         unit="count",
         min=1,
         max=400,
-        doc="How many copies of the silhouette are stacked behind the subject: 1 = a single shadow, more = a deeper "
-        "stack of layers.",
+        doc="How many copies of the shape are stacked behind it: 1 = a single shadow, more = a deeper stack of layers.",
     )
     offset: float = param(
         22.0,
@@ -28,7 +34,7 @@ class DropShadowParams(EffectParams):
         min=0,
         max=1000,
         doc="How far each copy lies beyond the one before it, in px, tuned for a picture about 480 px high: the first "
-        "is `offset` from the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, "
+        "is `offset` from the shape, the last `copies` x `offset`. 0 = every copy hidden behind the shape, "
         "leaving only what `blur` spreads past its edge.",
     )
     angle: float = param(
@@ -50,8 +56,8 @@ class DropShadowParams(EffectParams):
     )
     color: Color = param(
         "#000000",
-        doc="The colour of the copy nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies "
-        "behind the subject; another colour tints it.",
+        doc="The colour of the copy nearest the shape: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies "
+        "behind the shape; another colour tints it.",
     )
     end_color: Color = param(
         "#000000",
@@ -87,27 +93,24 @@ class DropShadowParams(EffectParams):
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
         doc="What the copies see beyond the picture's edge, when moved and softened: 'nearest' (the outermost row "
-        "repeated, so a subject cut off by the border casts its copies on without a gap), 'reflect' (mirrored, edge "
+        "repeated, so a shape cut off by the border casts its copies on without a gap), 'reflect' (mirrored, edge "
         "pixel repeated), 'mirror' (mirrored about the edge pixel) or 'wrap' (the opposite edge).",
         advanced=True,
     )
 
 
 @effect(category="subject", params=DropShadowParams, opacity=0.6)
-def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarray | None = None) -> np.ndarray:
-    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`:
-    a drop shadow, layered paper cutouts or a long shadow.
+def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, field: np.ndarray) -> np.ndarray:
+    """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by
+    `blur`: a drop shadow, layered paper cutouts or a long shadow.
 
     One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
     at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
-    from `color` (nearest the subject) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
-    `copy_opacity` falling by `fade`, and the subject on top of all of them, so the subject itself is never changed.
+    from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
+    `copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
 
-    `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
-    no subject and so no copies: the picture comes back unchanged.
+    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
     """
-    if subject is None:
-        return rgb.copy()
     heading = np.radians(params.angle)
     step = params.offset * np.array([np.sin(heading), np.cos(heading)])  # (down, right) as seen in the picture
     near, far = np.asarray(params.color, np.float32), np.asarray(params.end_color, np.float32)
@@ -118,13 +121,13 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarra
     # is summed as `near` and the `along`-weighted share, so every copy costs one-channel arrays, not three.
     # Every copy is a shift of the one silhouette, which is zero outside a box: it is read and laid on only where the
     # copy is not zero (the whole picture, once softened).
-    silhouette = BoxedImage(subject, edge=params.edge)
-    clear = np.ones(subject.shape, np.float32)
-    along_share = np.zeros(subject.shape, np.float32)
+    silhouette = BoxedImage(field, edge=params.edge)
+    clear = np.ones(field.shape, np.float32)
+    along_share = np.zeros(field.shape, np.float32)
     for number in range(1, params.copies + 1):
         rows, cols, cover = silhouette.shifted(*(step * number))
         if params.blur > 0:
-            whole = np.zeros(subject.shape, np.float32)
+            whole = np.zeros(field.shape, np.float32)
             whole[rows, cols] = cover
             cover = gaussian_blur(whole, params.blur, truncate=params.truncate, edge=params.edge)
             rows = cols = slice(None)
@@ -132,4 +135,4 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarra
         clear[rows, cols] -= taken
         along_share[rows, cols] += taken * along[number - 1]
     behind = rgb * clear[..., None] + near * (1 - clear)[..., None] + (far - near) * along_share[..., None]
-    return put_behind(rgb, subject, 1, behind)  # constant: the copies' own opacity is already in `behind`
+    return put_behind(rgb, field, 1, behind)  # constant: the copies' own opacity is already in `behind`

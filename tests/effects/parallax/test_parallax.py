@@ -36,7 +36,7 @@ def interior(picture: np.ndarray) -> np.ndarray:
 )
 def test_a_picture_with_nothing_to_shift_is_returned_exactly(settings: dict[str, float], depth: float) -> None:
     picture = noise()
-    out = registry.apply(NAME, picture, depth=flat(depth), **settings)
+    out = registry.apply(NAME, picture, field=flat(depth), **settings)
     np.testing.assert_array_equal(out, picture)
 
 
@@ -63,7 +63,7 @@ def test_a_single_plane_is_translated_by_its_distance_from_the_focus(
     out = registry.apply(
         NAME,
         picture,
-        depth=flat(depth, height, width),
+        field=flat(depth, height, width),
         amount=AMOUNT,
         focus=focus,
         angle=angle,
@@ -79,7 +79,7 @@ def test_layers_either_side_of_the_focus_move_opposite_ways() -> None:
     picture = noise()
     depth = flat(0.0)
     depth[:, : WIDTH // 2] = 1.0
-    out = registry.apply(NAME, picture, depth=depth, amount=AMOUNT, focus=0.5)
+    out = registry.apply(NAME, picture, field=depth, amount=AMOUNT, focus=0.5)
     np.testing.assert_allclose(out[:, 4:68], picture[:, 0:64], atol=1e-5)
     np.testing.assert_allclose(out[:, 68:124], picture[:, 72:128], atol=1e-5)
 
@@ -96,7 +96,7 @@ def test_a_near_object_moves_whole_over_a_still_background(angle: float, down: i
     square = np.zeros((HEIGHT, WIDTH), bool)
     square[40:56, 56:72] = True
     picture[square] = 0.9
-    out = registry.apply(NAME, picture, depth=square.astype(np.float32), amount=AMOUNT, focus=0.0, angle=angle)
+    out = registry.apply(NAME, picture, field=square.astype(np.float32), amount=AMOUNT, focus=0.0, angle=angle)
     bright = out[..., 0] > 0.5
     np.testing.assert_array_equal(bright, np.roll(square, (down, right), axis=(0, 1)))
 
@@ -105,13 +105,6 @@ def test_the_shift_never_leaves_the_range_of_the_picture() -> None:
     """Bilinear reading blends neighbours, so no value lies outside the picture's own range."""
     picture = noise() * 0.5 + 0.3  # 0.3..0.8: away from 0 and 1, so a wider range would show
     ramp = np.tile(np.linspace(1, 0, WIDTH, dtype=np.float32), (HEIGHT, 1))
-    out = registry.apply(NAME, picture, depth=ramp, amount=3.84, focus=0.4, angle=30.0)
+    out = registry.apply(NAME, picture, field=ramp, amount=3.84, focus=0.4, angle=30.0)
     assert out.min() >= picture.min()
     assert out.max() <= picture.max()
-
-
-def test_without_a_depth_the_picture_is_returned_unchanged_as_a_copy() -> None:
-    picture = noise()
-    out = registry.apply(NAME, picture, amount=12.8)
-    np.testing.assert_array_equal(out, picture)
-    assert out is not picture

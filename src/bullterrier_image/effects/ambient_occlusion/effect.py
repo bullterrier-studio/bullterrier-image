@@ -1,11 +1,11 @@
-"""The `ambient_occlusion` effect: the picture darkened where its depth says it is sheltered, in creases and beside
-nearer things."""
+"""The `ambient_occlusion` effect: the picture darkened where its depth (or any field) says it is sheltered, in creases
+and beside nearer things."""
 
 from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.blur import gaussian_blur
 
@@ -14,6 +14,12 @@ class AmbientOcclusionParams(EffectParams):
     """An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it,
     within `radius`."""
 
+    field: FieldName = param(
+        "depth",
+        doc="The field read as how near each pixel is, 1 = nearest: `depth` (the scene's depth), `light` (bright parts "
+        "stand nearer, so dark creases between them darken), `subject` (a contact shadow around the subject), or a "
+        "region of the recipe.",
+    )
     radius: float = param(
         10.0,
         unit="px",
@@ -51,9 +57,7 @@ class AmbientOcclusionParams(EffectParams):
 
 
 @effect(category="light", params=AmbientOcclusionParams, opacity=0.6)
-def ambient_occlusion(
-    rgb: np.ndarray, params: AmbientOcclusionParams, *, depth: np.ndarray | None = None
-) -> np.ndarray:
+def ambient_occlusion(rgb: np.ndarray, params: AmbientOcclusionParams, *, field: np.ndarray) -> np.ndarray:
     """Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer.
 
     Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus
@@ -61,11 +65,8 @@ def ambient_occlusion(
     one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping
     depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and
     leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
-    `depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
-    1 = nearest. Without a depth the picture is unchanged.
+    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
     """
-    if depth is None:
-        return rgb.copy()
-    cavity = gaussian_blur(depth, params.radius, truncate=params.truncate, edge=params.edge) - depth
+    cavity = gaussian_blur(field, params.radius, truncate=params.truncate, edge=params.edge) - field
     occlusion = np.clip(params.gain * cavity, 0, 1)
     return (rgb * (1 - occlusion)[..., None]).astype(np.float32)

@@ -499,7 +499,7 @@ SEED_NEEDS: dict[str, dict[str, float]] = {  # at their defaults nothing is rand
 
 
 def _assert_the_seed_decides_the_picture(name: str, photo: np.ndarray) -> None:
-    settings = SEED_NEEDS.get(name, {})
+    settings = {**SEED_NEEDS.get(name, {}), **_inputs(name, photo)}
     first = registry.apply(name, photo, seed=1, **settings)
     np.testing.assert_array_equal(first, registry.apply(name, photo, seed=1, **settings))
     assert (first != registry.apply(name, photo, seed=2, **settings)).any()
