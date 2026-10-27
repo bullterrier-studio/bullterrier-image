@@ -12,5 +12,5 @@ x = 0.72
 y = 0.12
 ghosts = 5
 spacing = 0.5
-size = 0.06
+size = 36
 amount = 1.0

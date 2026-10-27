@@ -48,35 +48,35 @@ class LensFlareParams(EffectParams):
         advanced=True,
     )
     size: float = param(
-        0.05,
-        unit="fraction",
-        min=0.002,
-        max=0.5,
-        doc="The radius of each ghost as a fraction of the picture's diagonal: the disc is brightest at its middle "
-        "and falls smoothly to nothing at this distance. Raising it makes bigger, softer ghosts.",
+        30.0,
+        unit="px",
+        min=1,
+        max=300,
+        doc="The radius in px of each ghost, tuned for a picture about 480 px high: the disc is brightest at its "
+        "middle and falls smoothly to nothing at this distance. Raising it makes bigger, softer ghosts.",
     )
     halo: float = param(
-        0.2,
-        unit="fraction",
+        120.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="The radius of the soft glow round the light, as a fraction of the picture's diagonal: brightest at the "
-        "light and falling smoothly to nothing at this distance. 0 = no halo.",
+        max=600,
+        doc="The radius in px of the soft glow round the light, tuned for a picture about 480 px high: brightest at "
+        "the light and falling smoothly to nothing at this distance. 0 = no halo.",
     )
     ring: float = param(
-        0.12,
-        unit="fraction",
+        72.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="The radius of the thin ring round the light, as a fraction of the picture's diagonal: the distance from "
-        "the light at which the ring is brightest. 0 = no ring.",
+        max=600,
+        doc="The radius in px of the thin ring round the light, tuned for a picture about 480 px high: the distance "
+        "from the light at which the ring is brightest. 0 = no ring.",
     )
     ring_width: float = param(
-        0.02,
-        unit="fraction",
-        min=0.002,
-        max=0.5,
-        doc="How far each side of its radius the ring reaches, as a fraction of the picture's diagonal: it falls "
+        12.0,
+        unit="px",
+        min=1,
+        max=300,
+        doc="How far each side of its radius the ring reaches, in px tuned for a picture about 480 px high: it falls "
         "smoothly from full brightness on the radius to nothing this far off. Raising it makes a wider, softer ring.",
         advanced=True,
     )
@@ -117,26 +117,25 @@ def lens_flare(rgb: np.ndarray, params: LensFlareParams) -> np.ndarray:
     picture's centre, tinted `color` and screened over the picture by `amount`.
 
     Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its
-    radius (`halo`, `size`) or half-width (`ring_width`), drawn straight from its formula with no blur or warp. Ghost
-    i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
+    radius (`halo`, `size`) or half-width (`ring_width`), in px, drawn straight from its formula with no blur or warp.
+    Ghost i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
     ghosts. The picture only ever gets brighter.
     """
     if params.amount == 0:
         return rgb.copy()
     height, width = rgb.shape[:2]
-    diagonal = float(np.hypot(height, width))
     light_at = np.array([params.y * (height - 1), params.x * (width - 1)])  # (row, column), in pixels
     centre = np.array([(height - 1) / 2, (width - 1) / 2])
     flare = np.zeros((height, width), np.float32)
     full = 1.0  # constant: a feature's peak brightness, before `amount` scales it
     no_ring = 0.0  # constant: the radius of a bump that is a disc and not a ring
     if params.halo > 0:
-        _paint(flare, (light_at[0], light_at[1]), params.halo * diagonal, full, no_ring)
+        _paint(flare, (light_at[0], light_at[1]), params.halo, full, no_ring)
     if params.ring > 0:
-        _paint(flare, (light_at[0], light_at[1]), params.ring_width * diagonal, full, params.ring * diagonal)
+        _paint(flare, (light_at[0], light_at[1]), params.ring_width, full, params.ring)
     for ghost in range(1, params.ghosts + 1):
         at = light_at + ghost * params.spacing * (centre - light_at)
         fade = (params.ghosts - ghost + 1) / params.ghosts
-        _paint(flare, (at[0], at[1]), params.size * diagonal, fade, no_ring)
+        _paint(flare, (at[0], at[1]), params.size, fade, no_ring)
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, params.amount * flare[..., None] * tint)

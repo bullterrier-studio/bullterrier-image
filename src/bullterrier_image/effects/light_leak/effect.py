@@ -25,13 +25,13 @@ class LightLeakParams(EffectParams):
         "brightness in `color`; above 1 it saturates to white sooner.",
     )
     size: float = param(
-        0.25,
-        unit="fraction",
-        min=0.01,
-        max=1,
-        doc="How big the patches are and how deep they reach into the picture, as a fraction of its diagonal: "
-        "each patch is a soft bump whose width is between half of this and all of it, centred between the edge "
-        "and this far in. Raising it floods more of the picture.",
+        150.0,
+        unit="px",
+        min=6,
+        max=600,
+        doc="How big the patches are and how deep they reach into the picture, in px tuned for a picture about 480 px "
+        "high: each patch is a soft bump whose width is between half of this and all of it, centred between the "
+        "edge and this far in. Raising it floods more of the picture.",
     )
     angle: float = param(
         0.0,
@@ -66,15 +66,14 @@ def light_leak(rgb: np.ndarray, params: LightLeakParams) -> np.ndarray:
     """Warm washes of light coming in from the side `angle` points to: `blobs` seeded patches, tinted `color` and
     screened over the picture by `amount`.
 
-    Each patch is a Gaussian bump, centred a random depth (up to `size` x the diagonal) in from that side and a random
-    place along it, with a random width of half to all of `size` x the diagonal, stretched along the edge by up to
+    Each patch is a Gaussian bump, centred a random depth (up to `size` px) in from that side and a random
+    place along it, with a random width of half to all of `size` px, stretched along the edge by up to
     twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so
     overlaps never clip into flat plateaus. The picture only ever gets brighter.
     """
     if params.amount == 0:
         return rgb.copy()
     height, width = rgb.shape[:2]
-    reach = params.size * float(np.hypot(height, width))
     theta = np.radians(params.angle)
     cos, sin = float(np.cos(theta)), float(np.sin(theta))  # Python floats, so the maps below stay float32
     down, right = np.mgrid[0:height, 0:width].astype(np.float32)
@@ -90,9 +89,11 @@ def light_leak(rgb: np.ndarray, params: LightLeakParams) -> np.ndarray:
     draws = zip(*(rng.random(params.blobs) for _ in range(5)), strict=True)  # constant: five random numbers per patch
     wash = np.zeros((height, width), np.float32)
     for place, offset, spread, stretch, weight in draws:
-        sigma = reach * (0.5 + 0.5 * float(spread))
+        sigma = params.size * (0.5 + 0.5 * float(spread))
         across = (along_edge - (2 * float(offset) - 1) * half_edge) / (sigma * (1 + float(stretch)))
-        wash += (0.5 + 0.5 * float(weight)) * np.exp(-0.5 * (((depth - float(place) * reach) / sigma) ** 2 + across**2))
+        wash += (0.5 + 0.5 * float(weight)) * np.exp(
+            -0.5 * (((depth - float(place) * params.size) / sigma) ** 2 + across**2)
+        )
     light = (1.0 - np.exp(-wash)).astype(np.float32)
     tint = np.asarray(params.color, np.float32)
     return screen(rgb, params.amount * light[..., None] * tint)

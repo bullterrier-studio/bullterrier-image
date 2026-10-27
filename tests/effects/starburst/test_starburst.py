@@ -8,7 +8,6 @@ from bullterrier_image.core import registry
 NAME = "starburst"
 SIZE = 201
 MIDDLE = SIZE // 2
-DIAGONAL = float(np.hypot(SIZE, SIZE))
 
 
 def point(value: float = 1.0, row: int = MIDDLE, col: int = MIDDLE, size: tuple[int, int] = (SIZE, SIZE)) -> np.ndarray:
@@ -49,7 +48,7 @@ def spikes_around(out: np.ndarray, radius: float, *, floor: float = 0.05) -> lis
     ids=["one spike", "a line", "a triangle pointing up", "a cross", "a diagonal cross", "five", "six", "eight"],
 )
 def test_a_bright_point_gains_exactly_rays_spikes_pointing_from_angle(rays: int, angle: float) -> None:
-    out = registry.apply(NAME, point(), rays=rays, angle=angle, length=0.2, amount=1.0, threshold=0.5)
+    out = registry.apply(NAME, point(), rays=rays, angle=angle, length=57.0, amount=1.0, threshold=0.5)
     expected = sorted((angle + 360.0 * k / rays) % 360 for k in range(rays))
     found = spikes_around(out, radius=30)
     assert len(found) == rays
@@ -60,11 +59,10 @@ def test_a_bright_point_gains_exactly_rays_spikes_pointing_from_angle(rays: int,
 
 def test_the_spikes_are_a_thin_line_and_light_nothing_else() -> None:
     """Brute force: every pixel the effect changes lies within one px of a spike's line, ahead of the point and no
-    farther than length x the diagonal; the lines themselves are lit."""
-    rays, angle, length = 3, 10.0, 0.25
-    out = registry.apply(NAME, point(), rays=rays, angle=angle, length=length, amount=1.0, threshold=0.5)[..., 0]
+    farther than `length` px; the lines themselves are lit."""
+    rays, angle, reach = 3, 10.0, 71.0
+    out = registry.apply(NAME, point(), rays=rays, angle=angle, length=reach, amount=1.0, threshold=0.5)[..., 0]
     distance, direction = polar(out.shape, MIDDLE, MIDDLE)
-    reach = length * DIAGONAL
     # how far each pixel is from the nearest spike's line, measured across it; spikes only run outward
     across = np.full(out.shape, np.inf)
     for k in range(rays):
@@ -79,28 +77,27 @@ def test_the_spikes_are_a_thin_line_and_light_nothing_else() -> None:
     assert (out[on_the_line] > 0.05).all()
 
 
-@pytest.mark.parametrize("length", [0.1, 0.3])
-def test_length_is_how_far_a_spike_reaches_as_a_fraction_of_the_diagonal(length: float) -> None:
+@pytest.mark.parametrize("length", [28.0, 85.0])
+def test_length_is_how_far_a_spike_reaches_in_px(length: float) -> None:
     out = registry.apply(NAME, point(), rays=4, angle=0.0, length=length, amount=1.0, threshold=0.5)[..., 0]
     distance, _ = polar(out.shape, MIDDLE, MIDDLE)
     farthest = distance[out > 1e-3].max()
-    assert length * DIAGONAL - 2.0 <= farthest <= length * DIAGONAL
+    assert length - 2.0 <= farthest <= length
 
 
 def test_a_spike_fades_linearly_from_the_highlight_to_nothing_at_its_full_length() -> None:
     """A pixel of 0.6 over a threshold of 0.5 holds 0.2 of highlight ((0.6 - 0.5) / (1 - 0.5)); `amount` 0.5 of it
-    lies at the point, and the spike along the row to the right fades to zero at length x the diagonal."""
-    length, amount = 0.2, 0.5
+    lies at the point, and the spike along the row to the right fades to zero at `length` px."""
+    length, amount = 57.0, 0.5
     out = registry.apply(NAME, point(0.6), rays=4, angle=0.0, length=length, amount=amount, threshold=0.5)[MIDDLE, :, 0]
-    reach = length * DIAGONAL
     for steps in (1, 10, 25, 40):
-        expected = 0.2 * amount * (1 - steps / reach)
+        expected = 0.2 * amount * (1 - steps / length)
         assert out[MIDDLE + steps] == pytest.approx(expected, abs=2e-5)
 
 
 def test_amount_scales_the_spikes() -> None:
-    weak = registry.apply(NAME, point(0.6), rays=4, length=0.2, amount=0.5, threshold=0.5)
-    strong = registry.apply(NAME, point(0.6), rays=4, length=0.2, amount=1.5, threshold=0.5)
+    weak = registry.apply(NAME, point(0.6), rays=4, length=57.0, amount=0.5, threshold=0.5)
+    strong = registry.apply(NAME, point(0.6), rays=4, length=57.0, amount=1.5, threshold=0.5)
     row = (MIDDLE, slice(MIDDLE + 5, MIDDLE + 40), 0)
     np.testing.assert_allclose(strong[row], 3 * weak[row], rtol=1e-3)
 
@@ -112,7 +109,7 @@ def test_amount_scales_the_spikes() -> None:
 )
 def test_only_what_is_brighter_than_threshold_makes_spikes(value: float, threshold: float, changes: bool) -> None:
     dark = point(value)
-    out = registry.apply(NAME, dark, length=0.2, amount=1.0, threshold=threshold)
+    out = registry.apply(NAME, dark, length=57.0, amount=1.0, threshold=threshold)
     assert bool((np.abs(out - dark) > 1e-4).any()) is changes
 
 
@@ -125,7 +122,7 @@ def test_black_and_a_picture_without_highlights_stay_as_they_are() -> None:
 
 @pytest.mark.parametrize("rays", [1, 4, 7])
 def test_the_picture_only_ever_gets_brighter(rays: int, photo: np.ndarray) -> None:
-    out = registry.apply(NAME, photo, rays=rays, threshold=0.5, length=0.3, amount=2.0)
+    out = registry.apply(NAME, photo, rays=rays, threshold=0.5, length=85.0, amount=2.0)
     assert (out >= photo - 1e-6).all()
     assert (out > photo + 0.01).any()  # and the settings do light something
 
@@ -133,7 +130,7 @@ def test_the_picture_only_ever_gets_brighter(rays: int, photo: np.ndarray) -> No
 def test_each_colour_channel_makes_spikes_of_its_own() -> None:
     red = np.zeros((SIZE, SIZE, 3), np.float32)
     red[MIDDLE, MIDDLE, 0] = 1.0
-    out = registry.apply(NAME, red, length=0.2, amount=1.0, threshold=0.5)
+    out = registry.apply(NAME, red, length=57.0, amount=1.0, threshold=0.5)
     assert out[..., 0].max() > 0.5
     assert out[..., 1:].max() < 1e-4
 
@@ -142,21 +139,21 @@ def test_no_light_enters_from_beyond_the_picture() -> None:
     """A spike that points out of the picture from its first column must not come back in from the other side, nor
     be mirrored: everywhere but at the point itself the picture is unchanged."""
     dark = point(0.6, row=MIDDLE, col=0)
-    out = registry.apply(NAME, dark, rays=1, angle=180.0, length=0.9, amount=1.0, threshold=0.5)
+    out = registry.apply(NAME, dark, rays=1, angle=180.0, length=256.0, amount=1.0, threshold=0.5)
     elsewhere = np.ones(dark.shape[:2], bool)
     elsewhere[MIDDLE, 0] = False
     assert np.abs(out - dark)[elsewhere].max() < 1e-4
 
 
 def test_a_spike_runs_on_to_the_picture_edge_when_it_is_longer_than_the_picture() -> None:
-    out = registry.apply(NAME, point(), rays=1, angle=0.0, length=1.0, amount=1.0, threshold=0.5)
+    out = registry.apply(NAME, point(), rays=1, angle=0.0, length=284.0, amount=1.0, threshold=0.5)
     assert out[MIDDLE, SIZE - 1, 0] > 0.3
 
 
 def test_a_point_on_the_picture_edge_makes_the_same_spike_as_one_in_the_middle() -> None:
     """Nothing beyond the edge adds light: the spike of a point in the first column, pointing into the picture, is the
     one the same point makes 30 columns in."""
-    settings = {"rays": 1, "angle": 0.0, "length": 0.3, "amount": 1.0, "threshold": 0.5}
+    settings = {"rays": 1, "angle": 0.0, "length": 85.0, "amount": 1.0, "threshold": 0.5}
     at_the_edge = registry.apply(NAME, point(0.8, col=0), **settings)[MIDDLE, :40, 0]
     inside = registry.apply(NAME, point(0.8, col=30), **settings)[MIDDLE, 30:70, 0]
     np.testing.assert_allclose(at_the_edge, inside, atol=2e-5)
@@ -176,9 +173,9 @@ def test_the_point_itself_is_lit_once_however_many_spikes_cross_it(rays: int) ->
     ids=["red spikes", "white spikes", "numbers 0..1 are a colour too"],
 )
 def test_color_tints_the_spikes(color: str | tuple[float, ...], expected: tuple[float, float, float]) -> None:
-    out = registry.apply(NAME, point(), color=color, amount=1.0, length=0.2, threshold=0.5)
+    out = registry.apply(NAME, point(), color=color, amount=1.0, length=57.0, threshold=0.5)
     # 10 px right of the point a spike of a white point has light 1 - 10 / reach in every channel
-    reach = 0.2 * DIAGONAL
+    reach = 57.0
     np.testing.assert_allclose(out[MIDDLE, MIDDLE + 10], np.array(expected) * (1 - 10 / reach), atol=2e-5)
 
 
@@ -190,7 +187,7 @@ def test_limit_keeps_a_large_bright_area_from_flooding_while_the_brightest_point
     picture[30, 170] = 1.0
     beside_the_block = (100, slice(145, 155), 0)  # right of the block, where its pixels' spikes run to the right
     beside_the_point = (30, slice(175, 185), 0)
-    settings = {"rays": 4, "length": 0.1, "amount": 1.0, "threshold": 0.5}
+    settings = {"rays": 4, "length": 28.0, "amount": 1.0, "threshold": 0.5}
     flooded = registry.apply(NAME, picture, **settings)
     capped = registry.apply(NAME, picture, limit=0.01, **settings)
     assert flooded[beside_the_block].min() > 0.05
@@ -209,14 +206,14 @@ def test_limit_lets_only_that_share_of_the_pixels_radiate_the_brightest_first(li
     picture = np.zeros((SIZE, SIZE, 3), np.float32)
     for row, value in zip(rows, (1.0, 0.9, 0.8), strict=True):
         picture[row, 30] = value
-    out = registry.apply(NAME, picture, rays=4, length=0.1, amount=1.0, threshold=0.0, limit=limit)
+    out = registry.apply(NAME, picture, rays=4, length=28.0, amount=1.0, threshold=0.0, limit=limit)
     for index, row in enumerate(rows):
         spike = out[row, 35:45, 0]  # to the right of the point
         assert bool(spike.min() > 0.02) is (index in shining)
 
 
 LATTICE = np.arange(10, SIZE - 10, 9)  # points 9 px apart: spikes of length 8 px never reach the next point
-FIELD = {"rays": 4, "length": 0.028, "amount": 0.5, "threshold": 0.5}
+FIELD = {"rays": 4, "length": 8.0, "amount": 0.5, "threshold": 0.5}
 
 
 def lattice_gains(**settings: float) -> np.ndarray:

@@ -56,8 +56,8 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `radial_blur` ✓ | Spin or zoom blur from a point. | `fx.radial_blur(mode="zoom", amount=0.1)` |
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
 | `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; presets `soft_focus` (Orton glow of the whole picture) and `halation` (film's red-orange glow). | `fx.bloom(radius=40, threshold=0.7)` |
-| `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
-| `starburst` ✓ | Diffraction spikes on bright points; `density` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=0.15)` |
+| `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=144)` |
+| `starburst` ✓ | Diffraction spikes on bright points; `density` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=90)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |

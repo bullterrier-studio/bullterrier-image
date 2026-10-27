@@ -24,12 +24,12 @@ class StarburstParams(EffectParams):
         "1 = a single comet tail. Raising it makes a denser star.",
     )
     length: float = param(
-        0.1,
-        unit="fraction",
-        min=0.001,
-        max=1,
-        doc="How far each spike reaches, as a fraction of the picture's diagonal: it fades linearly from the point "
-        "to nothing at this distance. Raising it makes longer, fainter-tipped spikes.",
+        60.0,
+        unit="px",
+        min=0.5,
+        max=600,
+        doc="How far each spike reaches, in px tuned for a picture about 480 px high: it fades linearly from the "
+        "point to nothing at this distance. Raising it makes longer, fainter-tipped spikes.",
     )
     threshold: float = param(
         0.95,
@@ -109,17 +109,15 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density`
     picks a random share of them, `variation` dims each by a random amount (both from `seed`).
 
-    Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
-    picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by
-    0 or 1 (`density`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the
-    picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from
-    points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black
-    stays black.
+    Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` px;
+    they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`density`)
+    and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a
+    point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
+    nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
     """
     if params.amount == 0 or params.limit == 0:
         return rgb.copy()
-    reach = params.length * float(np.hypot(*rgb.shape[:2]))  # the spike fades to nothing at this distance, in px
-    half = int(np.ceil(reach))
+    half = int(np.ceil(params.length))  # the spike fades to nothing at `length` px
     # offsets (row, column) from the point, row growing downward and the angle counterclockwise on the picture
     down, right = np.mgrid[-half : half + 1, -half : half + 1].astype(np.float64)
     kernel = np.zeros(down.shape)
@@ -128,7 +126,7 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         along = right * np.cos(theta) - down * np.sin(theta)  # px out along the spike's direction
         across = np.abs(right * np.sin(theta) + down * np.cos(theta))  # px sideways from its line
         thin = np.clip(1.0 - across, 0.0, 1.0)  # a line one px wide, soft at its sides
-        fade = np.clip(1.0 - along / reach, 0.0, 1.0) * (along >= 0)
+        fade = np.clip(1.0 - along / params.length, 0.0, 1.0) * (along >= 0)
         kernel = np.maximum(kernel, thin * fade)
     total = kernel.sum()
     kernel /= total  # `convolve` takes weights adding up to 1; the sum comes back below

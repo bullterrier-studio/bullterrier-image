@@ -18,13 +18,13 @@ def brute_force(rgb: np.ndarray, length: float, threshold: float, amount: float,
     """The effect pixel by pixel, from its definition.
 
     A channel's highlight is (value - threshold) / (1 - threshold) above the threshold, else 0. Each highlight sends
-    light along its own row only, to a pixel d columns away with weight exp(-|d| / s) / Z, where s is `length` times
-    the width and Z the sum of exp(-|d| / s) over every offset d that can occur in a row (-(w-1) to w-1), so the
+    light along its own row only, to a pixel d columns away with weight exp(-|d| / s) / Z, where s is `length` px
+    and Z the sum of exp(-|d| / s) over every offset d that can occur in a row (-(w-1) to w-1), so the
     weights add up to 1; nothing enters from beyond the picture. The light, times `amount` and `color`, is screened
     over the picture: 1 - (1 - value)(1 - min(light, 1)).
     """
     height, width = rgb.shape[:2]
-    scale = length * width
+    scale = length
     z = sum(np.exp(-abs(d) / scale) for d in range(-(width - 1), width))
     out = np.empty_like(rgb, dtype=np.float64)
     for y in range(height):
@@ -56,10 +56,13 @@ def test_a_threshold_above_every_value_leaves_the_picture_unchanged(photo: np.nd
     "settings",
     [
         pytest.param(
-            {"length": 0.25, "threshold": 0.6, "amount": 4.0, "color": [1.0, 0.5, 0.25]}, id="a quarter of the width"
+            {"length": 9.0, "threshold": 0.6, "amount": 4.0, "color": [1.0, 0.5, 0.25]},
+            id="a quarter of the width, 9 px",
         ),
-        pytest.param({"length": 0.02, "threshold": 0.5, "amount": 2.0, "color": [1.0, 1.0, 1.0]}, id="a short streak"),
-        pytest.param({"length": 1.0, "threshold": 0.7, "amount": 10.0, "color": [0.2, 0.4, 1.0]}, id="the whole width"),
+        pytest.param({"length": 1.0, "threshold": 0.5, "amount": 2.0, "color": [1.0, 1.0, 1.0]}, id="a short streak"),
+        pytest.param(
+            {"length": 37.0, "threshold": 0.7, "amount": 10.0, "color": [0.2, 0.4, 1.0]}, id="the whole width"
+        ),
     ],
 )
 def test_the_picture_matches_a_pixel_by_pixel_computation(settings: dict[str, Any]) -> None:
@@ -71,7 +74,7 @@ def test_the_picture_matches_a_pixel_by_pixel_computation(settings: dict[str, An
 def test_a_single_bright_pixel_spreads_along_its_row_only() -> None:
     picture = flat(0.0)
     picture[4, 12] = 1.0
-    settings: dict[str, Any] = {"length": 0.2, "threshold": 0.5, "amount": 3.0, "color": [1.0, 0.5, 0.25]}
+    settings: dict[str, Any] = {"length": 8.0, "threshold": 0.5, "amount": 3.0, "color": [1.0, 0.5, 0.25]}
     out = registry.apply(NAME, picture, **settings)
     expected = brute_force(picture, **settings)
     np.testing.assert_allclose(out[4], expected[4], atol=5e-6)
@@ -83,7 +86,7 @@ def test_a_single_bright_pixel_spreads_along_its_row_only() -> None:
 def test_no_light_comes_in_from_beyond_the_edge() -> None:
     picture = flat(0.0)
     picture[4, 0] = 1.0  # at the left edge
-    out = registry.apply(NAME, picture, length=0.05, threshold=0.5, amount=10.0, color=[1.0, 1.0, 1.0])
+    out = registry.apply(NAME, picture, length=2.0, threshold=0.5, amount=10.0, color=[1.0, 1.0, 1.0])
     near, far = out[4, 1, 0], out[4, 39, 0]
     assert near > 0.1
     assert far < 1e-6  # the right edge, 39 px on, is far beyond a streak of 2 px; nothing wraps round to it
@@ -97,7 +100,7 @@ def test_a_longer_streak_reaches_further_and_lights_less_close_by() -> None:
     def row(length: float) -> np.ndarray:
         return registry.apply(NAME, picture, length=length, threshold=0.5, amount=1.0)[2, :, 0]
 
-    short, long = row(0.05), row(0.4)
+    short, long = row(4.0), row(32.0)
     assert long[70] > short[70]  # 30 px away: the long streak is brighter
     assert long[41] < short[41]  # next to the source the short one is
 
@@ -105,7 +108,7 @@ def test_a_longer_streak_reaches_further_and_lights_less_close_by() -> None:
 def test_the_streaks_keep_the_colour_of_the_light_when_the_colour_is_white() -> None:
     red_light = flat(0.0)
     red_light[4, 12] = [1.0, 0.0, 0.0]
-    out = registry.apply(NAME, red_light, length=0.2, threshold=0.5, amount=3.0, color="#ffffff")
+    out = registry.apply(NAME, red_light, length=8.0, threshold=0.5, amount=3.0, color="#ffffff")
     assert out[4, 20, 0] > 0.01
     assert out[..., 1:].max() == 0.0
 
@@ -113,7 +116,7 @@ def test_the_streaks_keep_the_colour_of_the_light_when_the_colour_is_white() -> 
 def test_color_tints_the_streaks() -> None:
     spot = flat(0.0)
     spot[4, 12] = 1.0
-    r, g, b = registry.apply(NAME, spot, length=0.2, threshold=0.5, amount=3.0, color=[0.2, 0.5, 1.0])[4, 20]
+    r, g, b = registry.apply(NAME, spot, length=8.0, threshold=0.5, amount=3.0, color=[0.2, 0.5, 1.0])[4, 20]
     assert b > g > r > 0
     assert (g / b) == pytest.approx(0.5, rel=1e-4)
     assert (r / b) == pytest.approx(0.2, rel=1e-4)

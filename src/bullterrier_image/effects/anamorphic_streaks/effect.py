@@ -12,12 +12,12 @@ class AnamorphicStreaksParams(EffectParams):
     """Anamorphic lens streaks: the highlights are stretched sideways into thin lines of light and screened back."""
 
     length: float = param(
-        0.35,
-        unit="fraction",
-        min=0.001,
-        max=1,
-        doc="How far the streaks reach sideways, as a fraction of the picture's width: the distance over which a "
-        "streak fades to 37% of its brightness (the faint tail runs on, to the picture's edge). Raising it makes "
+        168.0,
+        unit="px",
+        min=0.5,
+        max=480,
+        doc="How far the streaks reach sideways, in px tuned for a picture about 480 px high: the distance over which "
+        "a streak fades to 37% of its brightness (the faint tail runs on, to the picture's edge). Raising it makes "
         "longer, fainter streaks.",
     )
     threshold: float = param(
@@ -48,7 +48,7 @@ def anamorphic_streaks(rgb: np.ndarray, params: AnamorphicStreaksParams) -> np.n
     """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
     screened over the picture by `amount`.
 
-    The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` x the picture's width, scaled to add
+    The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` px, scaled to add
     up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far
     enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's
     edge. The picture only ever gets brighter, and black stays black.
@@ -56,7 +56,7 @@ def anamorphic_streaks(rgb: np.ndarray, params: AnamorphicStreaksParams) -> np.n
     width = rgb.shape[1]
     reach = width - 1  # the farthest two columns of a row can be apart
     offsets = np.arange(-reach, reach + 1)
-    kernel = np.exp(-np.abs(offsets) / (params.length * width))
+    kernel = np.exp(-np.abs(offsets) / params.length)
     kernel /= kernel.sum()
     bright = highlights(rgb, params.threshold)
     streaks = np.empty_like(bright)
