@@ -41,7 +41,7 @@ def test_a_flow_of_no_amount_leaves_the_picture_unchanged(interpolation: str, ph
 @pytest.mark.parametrize("steps", [1, 7])
 @pytest.mark.parametrize(
     ("angle", "moved_by"),
-    [(0.0, (0.0, 10.0)), (90.0, (10.0, 0.0)), (180.0, (0.0, -10.0)), (-90.0, (-10.0, 0.0)), (30.0, (5.0, 8.660254))],
+    [(0.0, (0.0, 10.0)), (90.0, (10.0, 0.0)), (180.0, (0.0, -10.0)), (270.0, (-10.0, 0.0)), (30.0, (5.0, 8.660254))],
     ids=["right", "down", "left", "up", "30 degrees clockwise from right"],
 )
 def test_with_no_variation_the_whole_picture_is_carried_amount_px_along_the_angle(
@@ -58,7 +58,7 @@ def test_with_no_variation_the_whole_picture_is_carried_amount_px_along_the_angl
 
 @pytest.mark.parametrize(
     ("angle", "lands_at"),
-    [(0.0, (50, 62)), (90.0, (62, 50)), (180.0, (50, 38)), (-90.0, (38, 50))],
+    [(0.0, (50, 62)), (90.0, (62, 50)), (180.0, (50, 38)), (270.0, (38, 50))],
     ids=["right", "down", "left", "up"],
 )
 def test_a_lone_bright_pixel_travels_along_the_flow_by_amount(angle: float, lands_at: tuple[int, int]) -> None:

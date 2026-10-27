@@ -139,7 +139,7 @@ def test_angle_turns_the_screen_and_a_quarter_turn_gives_the_same_square_grid() 
     assert screen(30.0).mean() == pytest.approx(screen(0.0).mean(), rel=0.03)  # turning moves ink, adds none
 
 
-@pytest.mark.parametrize("angle", [20.0, -20.0, 65.0])
+@pytest.mark.parametrize("angle", [20.0, 340.0, 65.0])
 def test_angle_turns_the_screen_clockwise_on_screen(angle: float) -> None:
     """Rows of dots run along the direction `angle` degrees clockwise from the x axis (y points down): from any dot,
     the next one along a row lies at (cell cos angle, cell sin angle) in (x, y) and not at its mirror image."""

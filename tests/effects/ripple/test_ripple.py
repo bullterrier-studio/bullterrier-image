@@ -52,8 +52,8 @@ def test_a_phase_of_a_whole_cycle_is_no_phase_at_all(interpolation: str, photo: 
 
 @pytest.mark.parametrize(
     ("angle", "line_is"),
-    [(0.0, "a full column"), (90.0, "a full row"), (180.0, "a full column"), (-90.0, "a full row")],
-    ids=["angle 0 moves along columns", "angle 90 moves along rows", "angle 180", "angle -90"],
+    [(0.0, "a full column"), (90.0, "a full row"), (180.0, "a full column"), (270.0, "a full row")],
+    ids=["angle 0 moves along columns", "angle 90 moves along rows", "angle 180", "angle 270"],
 )
 def test_the_displacement_is_perpendicular_to_the_wave_so_a_line_along_it_does_not_change(
     angle: float, line_is: str
@@ -69,7 +69,7 @@ def test_the_displacement_is_perpendicular_to_the_wave_so_a_line_along_it_does_n
     assert np.abs(registry.apply(NAME, across, **settings) - across).max() == 1.0
 
 
-@pytest.mark.parametrize("angle", [30.0, -75.0, 180.0])
+@pytest.mark.parametrize("angle", [30.0, 285.0, 180.0])
 def test_the_angle_turns_the_whole_ripple_clockwise_about_the_centre(angle: float) -> None:
     """Turning the picture a quarter turn clockwise, rippling it at `angle` and turning it back is the same as
     rippling the original at angle - 90: the angle runs clockwise, like the picture's rows run down."""

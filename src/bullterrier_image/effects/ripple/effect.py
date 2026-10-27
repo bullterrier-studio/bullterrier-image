@@ -42,8 +42,8 @@ class RippleParams(EffectParams):
     angle: float = param(
         0.0,
         unit="degrees",
-        min=-180,
-        max=180,
+        min=0,
+        max=360,
         cyclic=True,
         doc="The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the "
         "picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 "

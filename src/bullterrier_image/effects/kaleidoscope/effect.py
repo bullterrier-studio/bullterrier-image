@@ -27,8 +27,8 @@ class KaleidoscopeParams(EffectParams):
     angle: float = param(
         0.0,
         unit="degrees",
-        min=-180,
-        max=180,
+        min=0,
+        max=360,
         cyclic=True,
         doc="Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), "
         "of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the "

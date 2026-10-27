@@ -21,7 +21,7 @@ def noise(height: int, width: int, seed: int = 8) -> np.ndarray:
     return np.random.default_rng(seed).random((height, width, 3), dtype=np.float32)
 
 
-@pytest.mark.parametrize("angle", [0.0, 17.0, -100.0])
+@pytest.mark.parametrize("angle", [0.0, 17.0, 260.0])
 @pytest.mark.parametrize("segments", [4, 8])
 def test_a_picture_with_four_or_eight_segments_looks_the_same_turned_a_quarter(segments: int, angle: float) -> None:
     """Every sector is the same, so turning a square picture about its centre by a whole number of sectors (a quarter
@@ -66,8 +66,8 @@ def test_a_square_picture_of_four_segments_is_symmetric_across_its_diagonals() -
 
 @pytest.mark.parametrize(
     ("segments", "angle", "from_degrees", "to_degrees"),
-    [(4, 0.0, 1.0, 44.0), (6, 20.0, 21.0, 49.0), (3, -90.0, -89.0, -31.0)],
-    ids=["the first wedge of 4 segments", "a wedge turned by 20 degrees", "a negative angle"],
+    [(4, 0.0, 1.0, 44.0), (6, 20.0, 21.0, 49.0), (3, 270.0, 271.0, 329.0)],
+    ids=["the first wedge of 4 segments", "a wedge turned by 20 degrees", "a wedge past 180 degrees"],
 )
 def test_the_wedge_that_follows_the_angle_shows_the_picture_as_it_is(
     segments: int, angle: float, from_degrees: float, to_degrees: float
