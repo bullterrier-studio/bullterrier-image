@@ -77,12 +77,12 @@ class GradientParams(EffectParams):
 
 @effect(category="backgrounds", params=GradientParams)
 def gradient(rgb: np.ndarray, params: GradientParams) -> np.ndarray:
-    """Replace the picture with a gradient (linear, radial or conic) or a flat colour fill, through `colors`.
+    """Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black;
+    set colors for another); to replace the background: mask = "background".
 
     A generated background: the input is used only for its height and width, its content is ignored. Sizes in
     fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
-    "#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill (preset
-    `fill`); masked to the background it removes the background.
+    "#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill.
     """
     height, width = rgb.shape[:2]
     angle = np.radians(np.float32(params.angle))

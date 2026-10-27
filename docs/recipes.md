@@ -39,7 +39,7 @@ blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
 
-Remove background = `gradient` step with one colour (preset `fill`) masked to background. Unknown effects, misspelt parameters, bad values fail at load, naming
+Replace the background = a `gradient` step with preset `fill` (black; set `colors` for another) and `mask = "background"`. Unknown effects, misspelt parameters, bad values fail at load, naming
 file and step.
 
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each

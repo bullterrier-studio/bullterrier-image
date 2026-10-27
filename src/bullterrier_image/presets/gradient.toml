@@ -1,5 +1,5 @@
 # Looks that are one gradient.
 
 [fill]
-description = "Flat colour fill: the whole picture one black; set `colors` to another single colour. Masked to the background, it removes the background."
+description = "Flat colour fill (black; set colors for another). To replace the background: mask = \"background\"."
 colors = ["#000000"]
