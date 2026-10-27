@@ -7,7 +7,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
-| <img src="../gallery/black_and_white.jpg" width="160" alt="black_and_white"> | `black_and_white` | Convert to black and white with `red`, `green` and `blue` filter weights, like a colour filter on B&W film. | `red=0.2126` `green=0.7152` `blue=0.0722` | [black_and_white.toml](../../examples/effects/black_and_white.toml) |
 | <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
 | <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Shift red, green and blue separately in the shadows, the midtones and the highlights. | `shadows_red=0.0` `shadows_green=0.0` `shadows_blue=0.0` `midtones_red=0.0` `midtones_green=0.0` `midtones_blue=0.0` `highlights_red=0.0` `highlights_green=0.0` `highlights_blue=0.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
@@ -31,14 +30,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | `clip` | number | fraction | 0 to 0.45 | `0.005` | The share of values (0..0.45) that end up saturated at each end, pure black and pure white: 0.005 is 0.5 percent, 0 stretches exactly from the darkest to the brightest value. Raising it gives more contrast and ignores stray dark or bright pixels, at the cost of detail in the extremes. |
 | `mode` | one of 'linked', 'per_channel' |  |  | `'per_channel'` | What is stretched: 'per_channel' stretches red, green and blue separately, which also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel Contrast); 'linked' finds one black and one white point over all channels together and stretches them alike, so colours keep their relationships (Enhance Monochromatic Contrast). |
 
-### `black_and_white`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `red` | number | ratio | 0 to 1 | `0.2126` | Weight of the red channel in the grey, 0..1. Raising it lightens reds and oranges (skin, red roses) and darkens blues. The default is the Rec. 709 luma weight of red. |
-| `green` | number | ratio | 0 to 1 | `0.7152` | Weight of the green channel in the grey, 0..1. Raising it lightens greens (foliage). The default is the Rec. 709 luma weight of green. |
-| `blue` | number | ratio | 0 to 1 | `0.0722` | Weight of the blue channel in the grey, 0..1. Raising it lightens blues (sky, water) and darkens skin. The default is the Rec. 709 luma weight of blue. |
-
 ### `channel_mixer`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -58,6 +49,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `infrared` | False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale. |
+| `monochrome` | Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter. |
 
 ### `color_balance`
 

@@ -236,27 +236,6 @@ mode : one of 'linked', 'per_channel', default 'per_channel'
     Contrast)."""
     ...
 
-def black_and_white(red: float = 0.2126, green: float = 0.7152, blue: float = 0.0722, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Convert to black and white with `red`, `green` and `blue` filter weights, like a colour filter on B&W film.
-
-The weights are shares: they are divided by their sum, so only their ratio matters and a grey picture comes back
-unchanged (the result is clipped only to absorb float rounding). The default weights are the Rec. 709 luma
-weights, applied to the gamma-encoded values as the rest of bullterrier-image measures brightness. If all three
-weights are 0 no light passes the filter and the result is black.
-
-Parameters
-----------
-red : number, ratio, 0 to 1, default 0.2126
-    Weight of the red channel in the grey, 0..1. Raising it lightens reds and oranges
-    (skin, red roses) and darkens blues. The default is the Rec. 709 luma weight of red.
-green : number, ratio, 0 to 1, default 0.7152
-    Weight of the green channel in the grey, 0..1. Raising it lightens greens (foliage).
-    The default is the Rec. 709 luma weight of green.
-blue : number, ratio, 0 to 1, default 0.0722
-    Weight of the blue channel in the grey, 0..1. Raising it lightens blues (sky, water)
-    and darkens skin. The default is the Rec. 709 luma weight of blue."""
-    ...
-
 def blend(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch or tile.
 
@@ -394,7 +373,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seam)."""
     ...
 
-def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared'] | None = None) -> Step:
+def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'monochrome'] | None = None) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
 
 The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
@@ -433,7 +412,8 @@ blue_from_blue : number, ratio, -3 to 3, default 1.0
 
 Presets
 -------
-infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale."""
+infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale.
+monochrome : Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."""
     ...
 
 def chromatic_aberration(amount: float | Drive = 4.0, samples: int = 3, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['prism'] | None = None) -> Step:
