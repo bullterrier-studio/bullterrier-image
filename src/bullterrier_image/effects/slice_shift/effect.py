@@ -23,13 +23,13 @@ class SliceShiftParams(EffectParams):
         "only the bands move. More strips make a finer, busier tear.",
     )
     amount: float = param(
-        0.05,
-        unit="fraction",
+        24.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="The furthest a strip or band slides, as a fraction 0 to 1 of the picture's width: each slides by a random "
-        "whole number of pixels between that far left and that far right, so one may also stay put. 0 leaves the "
-        "picture unchanged; 1 can slide one by a whole picture width.",
+        max=2000,
+        doc="The furthest a strip or band slides, in px, 0 to 2000, tuned for a picture about 480 px high: each "
+        "slides by a random whole number of pixels between that far left and that far right, so one may also stay "
+        "put. 0 leaves the picture unchanged; the picture's width or more can slide one by a whole picture width.",
     )
     seed: int = param(
         0,
@@ -49,19 +49,20 @@ class SliceShiftParams(EffectParams):
         "0 make a corrupted video frame.",
     )
     band_min_height: float = param(
-        0.01,
-        unit="fraction",
+        4.8,
+        unit="px",
         min=0,
-        max=1,
-        doc="The lowest a band can be, as a fraction 0 to 1 of the picture's height (never below 1 px). Each band's "
-        "height is drawn at random between this and `band_max_height`, which it may not exceed.",
+        max=2000,
+        doc="The lowest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high (never below 1 px). "
+        "Each band's height is drawn at random between this and `band_max_height`, which it may not exceed.",
     )
     band_max_height: float = param(
-        0.06,
-        unit="fraction",
+        28.8,
+        unit="px",
         min=0,
-        max=1,
-        doc="The tallest a band can be, as a fraction 0 to 1 of the picture's height. Raising it gives taller bands.",
+        max=2000,
+        doc="The tallest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high. Raising it gives "
+        "taller bands.",
     )
 
     @model_validator(mode="after")
@@ -84,9 +85,9 @@ def slice_shift(rgb: np.ndarray, params: SliceShiftParams) -> np.ndarray:
     moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the
     bands and the slides depend only on `seed`, `slices`, `bands`, `amount` and the picture's size.
     """
-    height, width = rgb.shape[:2]
+    height = len(rgb)
     rng = np.random.default_rng(params.seed)
-    furthest = round(params.amount * width)
+    furthest = round(params.amount)
     tear: list[tuple[int, int, int]] = []
     if params.slices:
         strips = min(params.slices, height)
@@ -97,7 +98,7 @@ def slice_shift(rgb: np.ndarray, params: SliceShiftParams) -> np.ndarray:
         tear = list(zip(tops, heights, slides, strict=True))
     placed = []
     for _ in range(params.bands):
-        band_height = max(1, int(rng.uniform(params.band_min_height, params.band_max_height) * height))
+        band_height = min(height, max(1, int(rng.uniform(params.band_min_height, params.band_max_height))))
         top = int(rng.uniform(0, height - band_height))
-        placed.append((top, band_height, int(rng.uniform(-params.amount, params.amount) * width)))
+        placed.append((top, band_height, int(rng.uniform(-params.amount, params.amount))))
     return slide_bands(rgb, tear + placed, edge="wrap")

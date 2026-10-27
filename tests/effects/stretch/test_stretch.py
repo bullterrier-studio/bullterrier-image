@@ -25,12 +25,12 @@ def expected_rows(source: np.ndarray, line: int, smeared: range) -> np.ndarray:
 @pytest.mark.parametrize(
     ("at", "span", "side", "line", "smeared"),
     [
-        (0.5, 0.25, "both", 20, range(10, 31)),  # 0.25 of 41 rows is 10 rows each way
-        (0.5, 0.25, "after", 20, range(20, 31)),
-        (0.5, 0.25, "before", 20, range(10, 21)),
-        (0.0, 0.5, "both", 0, range(21)),  # the first row has nothing before it
-        (1.0, 0.5, "both", 40, range(20, 41)),  # the last row has nothing after it
-        (0.25, 0.0, "both", 10, range(0)),  # a span of 0 smears nothing
+        (0.5, 10, "both", 20, range(10, 31)),  # 10 px is 10 rows each way
+        (0.5, 10, "after", 20, range(20, 31)),
+        (0.5, 10, "before", 20, range(10, 21)),
+        (0.0, 20, "both", 0, range(21)),  # the first row has nothing before it
+        (1.0, 20, "both", 40, range(20, 41)),  # the last row has nothing after it
+        (0.25, 0, "both", 10, range(0)),  # a span of 0 smears nothing
     ],
     ids=["both ways", "after only", "before only", "at the top edge", "at the bottom edge", "span 0"],
 )
@@ -41,13 +41,13 @@ def test_vertical_stretch_repeats_the_chosen_row_over_the_rows_beside_it_and_lea
     assert np.array_equal(out, expected_rows(noise, line, smeared))
 
 
-def test_a_span_of_one_smears_the_line_across_the_whole_picture(noise) -> None:
-    out = registry.apply(NAME, noise, axis="vertical", at=0.5, span=1.0, side="both")
+def test_a_span_of_the_picture_height_or_more_smears_the_line_across_the_whole_picture(noise) -> None:
+    out = registry.apply(NAME, noise, axis="vertical", at=0.5, span=2000, side="both")
     assert np.array_equal(out, np.broadcast_to(noise[20], noise.shape))
 
 
 def test_horizontal_stretch_is_the_vertical_one_of_the_turned_picture(noise) -> None:
-    sideways = registry.apply(NAME, noise, axis="horizontal", at=0.5, span=0.2, side="after")
-    turned = registry.apply(NAME, noise.transpose(1, 0, 2), axis="vertical", at=0.5, span=0.2, side="after")
+    sideways = registry.apply(NAME, noise, axis="horizontal", at=0.5, span=12, side="after")
+    turned = registry.apply(NAME, noise.transpose(1, 0, 2), axis="vertical", at=0.5, span=12, side="after")
     assert np.array_equal(sideways, turned.transpose(1, 0, 2))
     assert np.array_equal(sideways[:, 30:43], np.broadcast_to(noise[:, 30:31], (41, 13, 3)))

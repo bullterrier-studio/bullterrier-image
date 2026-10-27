@@ -23,7 +23,7 @@ TOXIC_NEON = Recipe(
         fx.sharpen(radius=40, amount=0.6),
         fx.gradient_map(stops=["#021a0b", "#00ff88", "#d8ffe8"]),
         fx.gradient(colors=["#000000"], mask="background"),  # only the background; the subject is found automatically
-        fx.slice_shift(preset="glitch", bands=6, amount=0.05, seed=3),
+        fx.slice_shift(preset="glitch", bands=6, amount=51.2, band_min_height=10.24, band_max_height=61.44, seed=3),
         fx.rgb_split(angle=0, amount=8, edge="wrap"),
         fx.bloom(radius=24, amount=0.7, threshold=0.55, octaves=1, opacity=0.9),  # mixed in at 90%
     ],

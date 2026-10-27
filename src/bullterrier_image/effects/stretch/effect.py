@@ -26,13 +26,13 @@ class StretchParams(EffectParams):
         "chooses which colours the smear carries.",
     )
     span: float = param(
-        0.15,
-        unit="fraction",
+        72.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="How far the line is smeared, as a fraction 0 to 1 of the picture's height (width for 'horizontal') on "
-        "each side that `side` names, rounded to whole pixels. 0 = nothing is smeared; 1 = the line covers the whole "
-        "picture. Raising it hides more of the picture behind the smear.",
+        max=2000,
+        doc="How far the line is smeared, in px, 0 to 2000, tuned for a picture about 480 px high, on each side that "
+        "`side` names, rounded to whole pixels. 0 = nothing is smeared; the picture's height (width for 'horizontal') "
+        "or more = the line covers the whole picture. Raising it hides more of the picture behind the smear.",
     )
     side: Literal["both", "after", "before"] = param(
         "both",
@@ -51,7 +51,7 @@ def stretch(rgb: np.ndarray, params: StretchParams) -> np.ndarray:
     axis = int(params.axis == "horizontal")  # array axis 0 runs down the rows, 1 across the columns
     size = rgb.shape[axis]
     line = round(params.at * (size - 1))
-    reach = round(params.span * size)
+    reach = round(params.span)
     place = np.arange(size)
     offset = place - line  # negative before the line, positive after it
     smeared = np.zeros(size, dtype=bool)

@@ -84,7 +84,7 @@ mask = "background"               # "subject", "background" or a region: apply o
 effect = "slice_shift"
 preset = "glitch"
 bands = 10
-amount = 0.05                     # how far a strip may slide, as a share of the width
+amount = 51.2                     # how far a strip may slide, in px (written for the size above)
 seed = 4                          # same seed, same result, every time
 
 [[step]]

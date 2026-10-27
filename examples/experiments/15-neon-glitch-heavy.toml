@@ -15,7 +15,9 @@ mask = "background"
 effect = "slice_shift"
 preset = "glitch"
 bands = 18
-amount = 0.09
+amount = 92.16
+band_min_height = 10.24
+band_max_height = 61.44
 seed = 33
 
 [[step]]
