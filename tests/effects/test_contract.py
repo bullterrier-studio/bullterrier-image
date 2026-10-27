@@ -2,6 +2,7 @@
 categories, every parameter across its documented range, and a time and memory budget on a real-sized photo."""
 
 import itertools
+import re
 import time
 import tracemalloc
 import typing
@@ -997,3 +998,249 @@ def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
     got = runner.render(photo, recipe, maps=maps)
     np.testing.assert_allclose(got[:, :64], registry.apply("field_probe", photo, field=maps["g"])[:, :64], atol=1e-6)
     np.testing.assert_array_equal(got[:, 64:], photo[:, 64:])
+
+
+# --- one convention for directions and lengths -------------------------------------------------------------------
+# A field is a direction (cyclic degrees, 0 to 360, clockwise from the right), a rotation amount (cyclic, signed
+# -180 to 180), a length (px, in design pixels) or a share of something named; the tables below hold every field that
+# breaks the convention by its name, each with the reason.
+
+# Degrees fields that are no direction and no rotation: the reason each is none.
+NOT_A_DIRECTION = {
+    ("disperse", "angle_spread"): "how far the wind's direction may differ, an amount",
+    ("dust_scratches", "angle"): "the most a scratch leans from vertical, a lean",
+    ("flow_lines", "twist"): "how far the flow turns per unit of noise, an amount",
+    ("flow_warp", "variation"): "how far the flow's direction may differ, an amount",
+    ("relight", "elevation"): "the light's height above the plane, an elevation",
+    ("ripple", "phase"): "where the wave starts, a phase",
+    ("selective_color", "feather"): "a width on the hue wheel",
+    ("selective_color", "hue"): "a position on the hue wheel",
+    ("selective_color", "hue_shift"): "a turn of the hue wheel",
+    ("selective_color", "width"): "a width on the hue wheel",
+    ("shatter", "angle"): "the most a piece is turned, an amount",
+    ("swirl", "angle"): "how far the centre is turned, an amount of several turns",
+}
+ROTATION_WORDS = {"turn", "rotate", "rotation"}  # a field named so is how far something is turned, not a direction
+DIRECTION_WORDS = {"angle", "direction"}
+
+
+def _degree_problems(name: str) -> list[str]:
+    """What is wrong with each degrees field of the effect `name`: a direction is cyclic 0..360 and its doc says
+    clockwise, a rotation is cyclic -180..180, any other field must be on `NOT_A_DIRECTION`."""
+    problems = []
+    for doc in registry.parameters(name).fields_doc():
+        words = set(doc.name.split("_"))
+        if doc.unit != "degrees" or (name, doc.name) in NOT_A_DIRECTION:
+            continue
+        where = f"{name}.{doc.name}"
+        if words & ROTATION_WORDS:
+            if not doc.cyclic or (doc.minimum, doc.maximum) != (-180, 180):
+                problems.append(f"{where} is a rotation: cyclic, -180 to 180, not {doc.minimum} to {doc.maximum}")
+        elif words & DIRECTION_WORDS:
+            if not doc.cyclic or (doc.minimum, doc.maximum) != (0, 360):
+                problems.append(f"{where} is a direction: cyclic, 0 to 360, not {doc.minimum} to {doc.maximum}")
+            if not re.search(r"(?<![a-z-])clockwise", doc.doc, re.I):
+                problems.append(f"{where} is a direction: its doc must say it runs clockwise")
+        else:
+            problems.append(f"{where} is in degrees but no direction or rotation: name it so or list it, with a reason")
+    return problems
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_every_direction_is_cyclic_degrees_clockwise_from_the_right_and_every_rotation_signed(name):
+    assert _degree_problems(name) == []
+
+
+def test_the_direction_table_names_only_degrees_fields_that_exist():
+    known = {
+        (name, doc.name) for name in ALL for doc in registry.parameters(name).fields_doc() if doc.unit == "degrees"
+    }
+    assert set(NOT_A_DIRECTION) - known == set()
+
+
+class _Heading(EffectParams):
+    """A direction as the convention wants it."""
+
+    angle: float = param(0.0, unit="degrees", min=0, max=360, cyclic=True, doc="Clockwise from pointing right.")
+
+
+class _HeadingSigned(EffectParams):
+    """A direction over the old signed range."""
+
+    angle: float = param(0.0, unit="degrees", min=-180, max=180, cyclic=True, doc="Clockwise from pointing right.")
+
+
+class _HeadingNotCyclic(EffectParams):
+    """A direction that does not wrap."""
+
+    angle: float = param(0.0, unit="degrees", min=0, max=360, doc="Clockwise from pointing right.")
+
+
+class _HeadingAnticlockwise(EffectParams):
+    """A direction that runs the other way."""
+
+    light_angle: float = param(0.0, unit="degrees", min=0, max=360, cyclic=True, doc="Anticlockwise from the right.")
+
+
+class _HeadingNamedDirection(EffectParams):
+    """A direction under another name, over a narrower range."""
+
+    direction: float = param(0.0, unit="degrees", min=0, max=90, doc="Clockwise from the right.")
+
+
+class _Turn(EffectParams):
+    """A rotation as the convention wants it."""
+
+    turn: float = param(0.0, unit="degrees", min=-180, max=180, cyclic=True, doc="Clockwise when positive.")
+
+
+class _TurnUnsigned(EffectParams):
+    """A rotation over a turn from zero."""
+
+    rotate: float = param(0.0, unit="degrees", min=0, max=360, cyclic=True, doc="Clockwise when positive.")
+
+
+class _Lean(EffectParams):
+    """A degrees field that is neither."""
+
+    lean: float = param(0.0, unit="degrees", min=0, max=45, doc="How far it leans.")
+
+
+DEGREE_PROBES: dict[str, tuple[type[EffectParams], str | None]] = {
+    "a direction, cyclic 0..360, clockwise": (_Heading, None),
+    "a rotation, cyclic -180..180": (_Turn, None),
+    "a direction over -180..180": (_HeadingSigned, "angle is a direction"),
+    "a direction that is not cyclic": (_HeadingNotCyclic, "angle is a direction"),
+    "a direction whose doc says anticlockwise": (_HeadingAnticlockwise, "must say it runs clockwise"),
+    "a direction named `direction` that is narrow and not cyclic": (_HeadingNamedDirection, "direction is a direction"),
+    "a rotation over 0..360": (_TurnUnsigned, "rotate is a rotation"),
+    "an unlisted degrees field": (_Lean, "lean is in degrees"),
+}
+
+
+@pytest.mark.parametrize(("params", "wanted"), DEGREE_PROBES.values(), ids=DEGREE_PROBES.keys())
+def test_the_direction_check_flags_what_breaks_the_convention_and_passes_what_keeps_it(
+    params, wanted, throwaway_effects
+):
+    @effect(category="light", params=params)
+    def degree_probe(rgb, params):
+        """Has one degrees field."""
+        return rgb
+
+    problems = _degree_problems("degree_probe")
+    assert len(problems) == (wanted is not None)
+    assert all(wanted in problem for problem in problems if wanted)
+
+
+# Fields named for a length whose unit is a share, each with what the share is of. A share of the picture's long side
+# is never right, since that is a length, in px; those listed "BUG" are waiting to be converted.
+LENGTHS_AS_SHARES = {
+    ("vignette", "radius"): "the distance from the centre to a corner",
+    ("vignette", "feather"): "the distance from the centre to a corner",
+    ("gradient", "radius"): "the picture's shorter side",
+    ("swirl", "radius"): "the picture's shorter side",
+    ("pinch_bulge", "radius"): "the picture's shorter side",
+    ("reflection", "height"): "the subject's height",
+    ("light_rays", "length"): "each pixel's distance from the light",
+    ("tile", "offset_x"): "one copy's width",
+    ("tile", "offset_y"): "one copy's height",
+    ("pattern", "thickness"): "one `cell`",
+    ("pattern", "radius"): "one `cell`",
+    ("pixel_grid", "gap"): "a stripe's width, a third of `cell`",
+    ("scanlines", "thickness"): "`spacing`",
+    ("focus_blur", "width"): "the field's range of values",
+    ("focus_blur", "feather"): "the field's range of values",
+    ("fog", "feather"): "the range of the noise that makes the clouds",
+    ("disperse", "flare_span"): "a piece's flight",
+    ("disperse", "reach"): "the figure, in the order its pieces leave",
+    ("blend", "margin"): "BUG: the photo's long side, a length: wants px",
+    ("parallax", "amount"): "BUG: the picture's long side, a length: wants px",
+}
+LENGTH_WORDS = {
+    "length", "width", "size", "offset", "height", "spacing", "radius", "span", "gap", "cell", "thickness",
+    "distance", "reach", "margin", "feather", "wavelength", "amplitude",
+}  # fmt: skip
+POSITIONS = {"x", "y", "at", "base"}  # a position is a fraction of each axis, not a length
+
+
+def _length_shares(name: str) -> list[tuple[str, str]]:
+    """(effect, field) for each field of `name` that is a share of something and either is named for a length (the
+    last word of its name, leaving out a trailing x, y, min or max, is a length word) or says in its doc that it is a
+    share of the long side (a distance called `amount`, say)."""
+    found = []
+    for doc in registry.parameters(name).fields_doc():
+        words = [word for word in doc.name.split("_") if word not in {"x", "y", "min", "max"}] or [doc.name]
+        named = words[-1] in LENGTH_WORDS and doc.name not in POSITIONS
+        if doc.unit == "fraction" and (named or "long side" in doc.doc):
+            found.append((name, doc.name))
+    return found
+
+
+def _length_problems(name: str) -> list[str]:
+    return [
+        f"{where[0]}.{where[1]} is a length in a share: give it in px, or list it in LENGTHS_AS_SHARES"
+        for where in _length_shares(name)
+        if where not in LENGTHS_AS_SHARES
+    ]
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_every_length_is_in_px_unless_it_is_a_share_of_a_named_reference(name):
+    assert _length_problems(name) == []
+
+
+def test_the_length_table_names_only_fields_that_are_still_lengths_in_shares():
+    still = {where for name in ALL for where in _length_shares(name)}
+    assert set(LENGTHS_AS_SHARES) - still == set()
+
+
+class _WidthInPx(EffectParams):
+    """A width in design pixels."""
+
+    width: float = param(4.0, unit="px", min=0, max=100, doc="How wide, in px.")
+    x: float = param(0.5, unit="fraction", min=0, max=1, doc="Where, as a fraction of the way across.")
+
+
+class _WidthInShare(EffectParams):
+    """A width as a share of the picture."""
+
+    width: float = param(0.1, unit="fraction", min=0, max=1, doc="How wide, as a fraction of the width.")
+
+
+class _ReachInShare(EffectParams):
+    """A reach as a share of the picture."""
+
+    band_min_reach: float = param(0.1, unit="fraction", min=0, max=1, doc="How far it goes, as a share.")
+
+
+class _AmountOfLongSide(EffectParams):
+    """A distance that is called an amount."""
+
+    amount: float = param(0.02, unit="fraction", min=0, max=0.1, doc="How far, as a fraction of the long side.")
+
+
+class _AmountOfStrength(EffectParams):
+    """An amount that is a strength."""
+
+    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of the effect to show.")
+
+
+LENGTH_PROBES: dict[str, tuple[type[EffectParams], int]] = {
+    "a width in px beside a position as a share": (_WidthInPx, 0),
+    "an amount that is a strength": (_AmountOfStrength, 0),
+    "a width as a share of the picture": (_WidthInShare, 1),
+    "a reach as a share, with min in its name": (_ReachInShare, 1),
+    "an amount that is a share of the long side": (_AmountOfLongSide, 1),
+}
+
+
+@pytest.mark.parametrize(("params", "problems"), LENGTH_PROBES.values(), ids=LENGTH_PROBES.keys())
+def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_strengths(
+    params, problems, throwaway_effects
+):
+    @effect(category="light", params=params)
+    def length_probe(rgb, params):
+        """Has one length-like field."""
+        return rgb
+
+    assert len(_length_problems("length_probe")) == problems
