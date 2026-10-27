@@ -89,7 +89,7 @@ class PerspectiveParams(EffectParams):
 
 @effect(category="distortion", params=PerspectiveParams)
 def perspective(rgb: np.ndarray, params: PerspectiveParams) -> np.ndarray:
-    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, skew, turn and zoom it.
+    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.
 
     The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the
     vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the

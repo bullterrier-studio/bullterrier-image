@@ -80,7 +80,8 @@ class GrainParams(EffectParams):
 
 @effect(category="texture", params=GrainParams)
 def grain(rgb: np.ndarray, params: GrainParams) -> np.ndarray:
-    """Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.
+    """Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier
+    where `balance` says.
 
     The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied
     by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It

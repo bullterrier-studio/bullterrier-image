@@ -73,7 +73,8 @@ class KaleidoscopeParams(EffectParams):
 
 @effect(category="distortion", params=KaleidoscopeParams)
 def kaleidoscope(rgb: np.ndarray, params: KaleidoscopeParams) -> np.ndarray:
-    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror.
+    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a
+    kaleidoscope, or with one segment a plain mirror.
 
     A pixel at angle a about the centre (clockwise from pointing right) and distance d shows the picture at the same
     distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that

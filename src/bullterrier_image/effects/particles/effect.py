@@ -99,7 +99,8 @@ class ParticlesParams(EffectParams):
 
 @effect(category="atmosphere", params=ParticlesParams, opacity=0.8)
 def particles(rgb: np.ndarray, params: ParticlesParams) -> np.ndarray:
-    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`.
+    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow,
+    rain, embers, floating dust, stars.
 
     Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n.
     Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens

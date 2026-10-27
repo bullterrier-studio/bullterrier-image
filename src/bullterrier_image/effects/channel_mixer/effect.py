@@ -89,7 +89,8 @@ class ChannelMixerParams(EffectParams):
 
 @effect(category="colour", params=ChannelMixerParams)
 def channel_mixer(rgb: np.ndarray, params: ChannelMixerParams) -> np.ndarray:
-    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
+    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights:
+    black and white, infrared, colour swaps.
 
     The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
     matrix (the `<output>_from_<input>` weights) is output channel i, so

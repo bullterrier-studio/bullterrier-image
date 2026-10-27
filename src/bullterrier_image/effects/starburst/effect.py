@@ -105,9 +105,9 @@ class StarburstParams(EffectParams):
 
 @effect(category="light", params=StarburstParams)
 def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
-    """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-    screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density` picks a random
-    share of them, `variation` dims each by a random amount (both from `seed`).
+    """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
+    tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density`
+    picks a random share of them, `variation` dims each by a random amount (both from `seed`).
 
     Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
     picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by

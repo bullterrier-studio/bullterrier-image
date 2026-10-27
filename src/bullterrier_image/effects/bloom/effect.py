@@ -92,7 +92,8 @@ class BloomParams(EffectParams):
 
 @effect(category="light", params=BloomParams)
 def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray:
-    """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
+    """Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at
+    `octaves` scales and screened over the picture.
 
     The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
     `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and

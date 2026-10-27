@@ -82,9 +82,9 @@ class FocusBlurParams(EffectParams):
 
 @effect(category="light", params=FocusBlurParams)
 def focus_blur(rgb: np.ndarray, params: FocusBlurParams, *, field: np.ndarray) -> np.ndarray:
-    """A shallow depth of field, or a miniature: each pixel is blurred by w x `radius`, w = clip((|field - focus| -
-    width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as
-    they are.
+    """A shallow depth of field, or a tilt-shift miniature: each pixel is blurred by w x `radius`,
+    w = clip((|field - focus| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of
+    `focus` are returned exactly as they are.
 
     The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
     sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a

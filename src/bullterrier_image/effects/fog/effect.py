@@ -152,7 +152,7 @@ class FogParams(EffectParams):
 
 @effect(category="atmosphere", params=FogParams)
 def fog(rgb: np.ndarray, params: FogParams) -> np.ndarray:
-    """Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom.
+    """Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom.
 
     The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
     when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`

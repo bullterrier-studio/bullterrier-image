@@ -47,7 +47,8 @@ class RgbSplitParams(EffectParams):
 
 @effect(category="glitch", params=RgbSplitParams)
 def rgb_split(rgb: np.ndarray, params: RgbSplitParams) -> np.ndarray:
-    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way.
+    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch
+    fringe or a red-cyan 3D anaglyph.
 
     Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves
     `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the

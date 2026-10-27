@@ -95,7 +95,8 @@ class DropShadowParams(EffectParams):
 
 @effect(category="subject", params=DropShadowParams, opacity=0.6)
 def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarray | None = None) -> np.ndarray:
-    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`.
+    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`:
+    a drop shadow, layered paper cutouts or a long shadow.
 
     One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
     at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour

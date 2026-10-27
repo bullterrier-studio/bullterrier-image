@@ -86,7 +86,8 @@ class RelightParams(EffectParams):
 
 @effect(category="light", params=RelightParams)
 def relight(rgb: np.ndarray, params: RelightParams, *, field: np.ndarray) -> np.ndarray:
-    """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`.
+    """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump
+    lighting, emboss, relighting by depth.
 
     The lighting comes from the shape of `field`, not from the picture's brightness unless that is the field: the
     height is the field smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its length with the slopes

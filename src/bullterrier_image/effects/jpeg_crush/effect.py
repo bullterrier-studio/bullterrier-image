@@ -62,7 +62,8 @@ class JpegCrushParams(EffectParams):
 
 @effect(category="glitch", params=JpegCrushParams)
 def jpeg_crush(rgb: np.ndarray, params: JpegCrushParams) -> np.ndarray:
-    """Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it.
+    """Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`,
+    damage `hits` coefficients, and decode it.
 
     The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction
     (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all

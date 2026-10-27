@@ -68,7 +68,8 @@ class BlendParams(EffectParams):
 
 @effect(category="compositing", params=BlendParams)
 def blend(rgb: np.ndarray, params: BlendParams) -> np.ndarray:
-    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch, width or tile."""
+    """Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover,
+    contain, stretch, width or tile."""
     layer = place(
         params.image.pixels,
         rgb.shape[:2],

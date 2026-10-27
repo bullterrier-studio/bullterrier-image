@@ -77,8 +77,8 @@ class SliceShiftParams(EffectParams):
 
 @effect(category="distortion", params=SliceShiftParams)
 def slice_shift(rgb: np.ndarray, params: SliceShiftParams) -> np.ndarray:
-    """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide
-    `bands` more strips of random height placed at random rows.
+    """Glitch tearing: cut the picture into horizontal strips at random rows and slide each sideways by a random
+    distance, then slide `bands` more strips of random height placed at random rows.
 
     A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip
     moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the

@@ -81,7 +81,8 @@ class DisplaceParams(EffectParams):
 
 @effect(category="distortion", params=DisplaceParams)
 def displace(rgb: np.ndarray, params: DisplaceParams) -> np.ndarray:
-    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px.
+    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp,
+    tearing, scatter, frosted glass.
 
     Each pixel shows the picture at its own place plus a move (rows, columns) from two fractal noise fields of the
     same `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. The moves

@@ -54,7 +54,8 @@ class LevelsParams(EffectParams):
 
 @effect(category="colour", params=LevelsParams)
 def levels(rgb: np.ndarray, params: LevelsParams) -> np.ndarray:
-    """Remap tones with an input black point, white point and midtone `gamma`, then an output range.
+    """Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch,
+    faded blacks, or the negative (invert).
 
     Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
     between `output_black` and `output_white`. The defaults change nothing.

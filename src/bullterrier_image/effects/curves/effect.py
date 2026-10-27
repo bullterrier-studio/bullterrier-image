@@ -149,7 +149,8 @@ class CurvesParams(EffectParams):
 
 @effect(category="colour", params=CurvesParams)
 def curves(rgb: np.ndarray, params: CurvesParams) -> np.ndarray:
-    """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
+    """Bend tones along smooth curves through control points: a master curve, then one per colour channel
+    (cross process, solarize).
 
     The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
     `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed

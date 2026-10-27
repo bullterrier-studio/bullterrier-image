@@ -77,7 +77,7 @@ class GradeParams(EffectParams):
 
 @effect(category="colour", params=GradeParams)
 def grade(rgb: np.ndarray, params: GradeParams) -> np.ndarray:
-    """White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first.
+    """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.
 
     Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.
 

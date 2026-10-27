@@ -69,7 +69,8 @@ class SelectiveColorParams(EffectParams):
 
 @effect(category="colour", params=SelectiveColorParams)
 def selective_color(rgb: np.ndarray, params: SelectiveColorParams) -> np.ndarray:
-    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched.
+    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a
+    range as wide as the wheel is a hue shift.
 
     Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the
     `hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a

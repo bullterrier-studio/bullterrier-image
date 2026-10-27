@@ -75,7 +75,8 @@ class ChromaticAberrationParams(EffectParams):
 
 @effect(category="light", params=ChromaticAberrationParams)
 def chromatic_aberration(rgb: np.ndarray, params: ChromaticAberrationParams) -> np.ndarray:
-    """Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.
+    """Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y`
+    and coloured as a spectrum.
 
     Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre
     read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red

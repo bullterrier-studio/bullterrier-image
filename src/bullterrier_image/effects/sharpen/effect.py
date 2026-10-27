@@ -65,7 +65,8 @@ class SharpenParams(EffectParams):
 
 @effect(category="light", params=SharpenParams)
 def sharpen(rgb: np.ndarray, params: SharpenParams) -> np.ndarray:
-    """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
+    """Sharpen, or add clarity, with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur
+    removes.
 
     Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
     kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local

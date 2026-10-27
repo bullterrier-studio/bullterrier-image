@@ -101,7 +101,8 @@ def _fisheye_reach(amount: float) -> float:
 
 @effect(category="distortion", params=LensDistortionParams)
 def lens_distortion(rgb: np.ndarray, params: LensDistortionParams) -> np.ndarray:
-    """Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does.
+    """Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength
+    `amount` about the axis `x`, `y`.
 
     Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the
     farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x
