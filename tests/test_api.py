@@ -231,7 +231,7 @@ class LanternParams(EffectParams):
 
 @pytest.fixture
 def lantern(throwaway_effects):
-    def lantern_probe(rgb: np.ndarray, params: LanternParams, *, subject: np.ndarray | None = None) -> np.ndarray:
+    def lantern_probe(rgb: np.ndarray, params: LanternParams) -> np.ndarray:
         """Hangs a lantern over the picture. Then more words."""
         return rgb
 

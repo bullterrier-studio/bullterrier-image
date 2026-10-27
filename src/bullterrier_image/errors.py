@@ -52,7 +52,7 @@ class UnknownEffectError(RecipeError, KeyError):
 
 
 class MapNotFoundError(BullterrierImageError, RuntimeError):
-    """A map of the photo (see `bullterrier_image.core.registry.MAP_INPUTS`: the subject, the depth, or one a recipe
+    """A map of the photo (see `bullterrier_image.core.regions.FOUND_MAPS`: the subject, the depth, or one a recipe
     declares with a `given` region) is needed but not given, not found, or not usable: no map and no finder given for
     its name, a finder that found nothing, a map of another size than the photo, or values outside 0..1."""
 

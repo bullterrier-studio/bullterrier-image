@@ -18,14 +18,15 @@ first query together wait for it and all see the whole table. After that, querie
 threads at once is safe. Registering is for import time: registering or unregistering while other threads query is not
 supported.
 
-An effect is written `def bloom(rgb, params: BloomParams, *, subject=None) -> rgb` and registered with its parameter
+An effect is written `def bloom(rgb, params: BloomParams) -> rgb` and registered with its parameter
 model (see `bullterrier_image.core.params`); the decorator returns a `ModelledEffect`, which validates its values
 through the model whichever way it is called.
 
 A parameter of the type `FieldName` names a field (a selection: `depth`, `light`, a region of the recipe). The effect
 takes the field's array, float32 (h, w) 0..1, as a keyword-only argument of the parameter's name, without a default:
 `def relight(rgb, params, *, field)`. A recipe's runner builds the named field and passes it; a direct call passes the
-array itself (`relight(rgb, field=array)`); the parameter's value, a name, is then not used.
+array itself (`relight(rgb, field=array)`); the parameter's value, a name, is then not used. This is how an effect gets
+any map of the photo (the subject, the depth, a given map).
 """
 
 import difflib
@@ -67,17 +68,12 @@ CATEGORY_DESCRIPTIONS = {
 }
 CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 
-# The maps of a photo an effect can take, by name: `subject`, the subject's silhouette, float32 (h, w) 0..1; `depth`,
-# how near each pixel is, float32 (h, w) 0..1, 1 = nearest. A map has the same name wherever it is handed in (`maps=`,
-# `finders=`, `--map`), named by a region (`mask = "subject"`) and taken by an effect.
-MAP_INPUTS = ("subject", "depth")
-
-# What a recipe hands an effect besides the image and its parameters, by name: the maps above; `partition`, the
+# What a recipe hands an effect besides the image, its parameters and its fields, by name: `partition`, the
 # pieces of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading
 # order, `bands` highest first); and `size_ratio`, a float: working px per design px (1.0 for a call outside a recipe),
 # for an effect whose light or density is per working pixel. An effect declares the ones it needs as keyword-only
 # parameters after `params`, each with a default.
-INPUTS = (*MAP_INPUTS, "partition", "size_ratio")
+INPUTS = ("partition", "size_ratio")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
@@ -98,8 +94,8 @@ class ModelledEffect[P: EffectParams]:
     Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
     `bloom(rgb)` (the defaults), `bloom(rgb, radius=30)`, or `bloom(rgb, BloomParams(radius=30))`. Giving both a model
     and keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
-    naming the effect, the field, the constraint and the value. Injected inputs (`subject`, `depth`) are passed by
-    keyword in every form. So is the array of each field parameter (`FieldName`), required: float (h, w) of the
+    naming the effect, the field, the constraint and the value. Injected inputs (`partition`, `size_ratio`) are passed
+    by keyword in every form. So is the array of each field parameter (`FieldName`), required: float (h, w) of the
     picture's size, 0..1, else a `MapNotFoundError` naming the parameter.
     """
 
@@ -203,7 +199,7 @@ _LOADING = _Loading()
 def effect[P: EffectParams](
     *, category: str, params: type[P], opacity: float = 1.0
 ) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
-    """Decorator: `@effect(category="light", params=BloomParams)` makes `bloom(rgb, params, *, subject=None) -> rgb`
+    """Decorator: `@effect(category="light", params=BloomParams)` makes `bloom(rgb, params) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
@@ -317,7 +313,7 @@ def opacity(name: str) -> float:
 
 
 def inputs(name: str) -> tuple[str, ...]:
-    """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("subject",) (KeyError like
+    """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("partition",) (KeyError like
     `get`)."""
     return get(name).inputs
 
@@ -445,8 +441,8 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     if not (isinstance(params, type) and issubclass(params, EffectParams)):
         raise ValueError(f"effect {name!r}: params must be an EffectParams subclass, got {params!r}")
     shape = (
-        f"write it as {name}(rgb, params, *, subject=None): the image, the model, then keyword-only inputs from "
-        f"{INPUTS}"
+        f"write it as {name}(rgb, params, *, size_ratio=1.0): the image, the model, then keyword-only inputs from "
+        f"{INPUTS} and fields"
     )
     every = list(inspect.signature(fn).parameters.values())
     positional = [p for p in every if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]

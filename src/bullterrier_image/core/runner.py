@@ -42,6 +42,7 @@ from . import registry
 from .params import Drive, design_scale
 from .regions import (
     DERIVED,
+    FOUND_MAPS,
     BoxFinder,
     Given,
     Partition,
@@ -95,8 +96,8 @@ def render(
     step, through the selection its `mask` names (the subject, the background or a region of the recipe), so only
     that changes. An `Each` step renders each of its looks once over the whole picture and shows it through the pieces
     of its partition that have it, blending the looks across the borders.
-    Effects that declare a `subject` parameter (see `disperse`) get the subject's silhouette automatically, and those
-    that declare `depth` the depth map. After the last step a recipe whose framing is `transparent` is cut out: the
+    An effect with a field parameter gets the map it names (`field = "subject"`: the subject's silhouette; `"depth"`:
+    the depth map). After the last step a recipe whose framing is `transparent` is cut out: the
     result then has four channels, RGB and straight alpha (h, w, 4), instead of three.
 
     rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. maps: the photo's maps by name, each float32 (h, w)
@@ -136,7 +137,7 @@ def _render(
 ) -> np.ndarray:
     """`render` once the maps are found (`_maps`)."""
     image, maps, regions, scale = _prepare(rgb, recipe, found, finders, size)
-    stages = _stages(image, recipe.steps, maps, regions, scale)
+    stages = _stages(image, recipe.steps, regions, scale)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     result = _last(stages)
     return recipe.frame.cut(result, maps.get("subject")) if recipe.frame.has_alpha else result
@@ -180,7 +181,7 @@ def trace(
         stages.append(Stage("depth (white = nearest)", np.repeat(scaled["depth"][..., None], 3, axis=2)))
     wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in step.references()))
     stages += [_region_stage(name, regions[name], rgb) for name in recipe.regions if name in wanted]
-    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, scaled, regions, scale), start=1):
+    for number, (step, image) in enumerate(_stages(rgb, recipe.steps, regions, scale), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
@@ -257,7 +258,7 @@ def known_maps(recipes: Sequence[Recipe]) -> set[str]:
     """The names of the maps `recipes` can be given: the built-in `subject` and `depth`, and every `Given` region of
     any of them."""
     return {
-        *registry.MAP_INPUTS,
+        *FOUND_MAPS,
         *(name for recipe in recipes for name, kind in recipe.regions.items() if isinstance(kind, Given)),
     }
 
@@ -275,12 +276,11 @@ def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
     """The error for the map `name` that `recipe` needs and neither it nor a finder was given for."""
     if name == "subject":
         return SubjectNotFoundError(
-            f"recipe {recipe.name!r} uses the subject (a mask, a region made from it, or an effect that takes it), so "
+            f"recipe {recipe.name!r} uses the subject (a mask, a field or a region made from it), so "
             "it needs the subject: pass `maps={'subject': alpha}` (the subject's alpha) "
             "or `finders={'subject': Finder}` (e.g. bullterrier_image.finding.subject.subject_finder())"
         )
     if name == "depth":
-        taking = [f"step {number} ({effect})" for number, effect in recipe.taking("depth")]
         regions = [
             f"step {number} (its `{key}` {region!r}, a region made from depth)"
             for number, step in enumerate(recipe.steps, start=1)
@@ -288,7 +288,7 @@ def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
             if "depth" in maps_used(recipe.regions, [region])
         ]
         return DepthNotFoundError(
-            f"recipe {recipe.name!r} needs depth for {', '.join(taking + regions)}: pass `maps={{'depth': depth}}` "
+            f"recipe {recipe.name!r} needs depth for {', '.join(regions)}: pass `maps={{'depth': depth}}` "
             "(float32 (h, w), 0..1, 1 = nearest, e.g. from bullterrier_image.imageio.load_map) or "
             "`finders={'depth': Finder}`"
         )
@@ -349,33 +349,27 @@ def _last(stages: Iterator[tuple[Step | Each, np.ndarray]]) -> np.ndarray:
 
 
 def _stages(
-    out: np.ndarray, steps: Sequence[Step | Each], maps: dict[str, np.ndarray], regions: Regions, scale: float
+    out: np.ndarray, steps: Sequence[Step | Each], regions: Regions, scale: float
 ) -> Iterator[tuple[Step | Each, np.ndarray]]:
     """Run the steps in order, yielding each step with the image after it. The one place a step is applied. `scale`
     multiplies the pixel values of every effect (see `_prepare`)."""
     for step in steps:
-        out = _apply(out, step, maps, regions, scale)
+        out = _apply(out, step, regions, scale)
         yield step, out
 
 
-def _apply(
-    before: np.ndarray, step: Step | Each, maps: dict[str, np.ndarray], regions: Regions, scale: float
-) -> np.ndarray:
+def _apply(before: np.ndarray, step: Step | Each, regions: Regions, scale: float) -> np.ndarray:
     """`before` with the step's result laid over it. A function of its own, like `_lay`, so that what a step needs on
     the way (the pieces' weights, a third of a picture or more) is freed before the next step runs."""
-    if isinstance(step, Each):
-        result = _each(before, step, maps, regions, scale)
-    else:
-        result = _effect(before, step, maps, regions, scale)
+    result = _each(before, step, regions, scale) if isinstance(step, Each) else _effect(before, step, regions, scale)
     return _lay(before, result, step, regions)
 
 
-def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions: Regions, scale: float) -> np.ndarray:
-    """The step's effect run on `before`, given the inputs it declares: the maps `_prepare` made for every step that
-    takes one, and the pieces of the step's partition. A step with driven parameters is run once for each level of
-    its drives, and each pixel takes the two renders either side of its field value (see `_driven`)."""
-    extra = {name: maps[name] for name in registry.inputs(step.effect) if name in registry.MAP_INPUTS}
-    extra |= {parameter: regions.selection(field).alpha for parameter, field in step.named_fields.items()}
+def _effect(before: np.ndarray, step: Step, regions: Regions, scale: float) -> np.ndarray:
+    """The step's effect run on `before`, given the fields it names and the pieces of the step's partition. A step
+    with driven parameters is run once for each level of its drives, and each pixel takes the two renders either side
+    of its field value (see `_driven`)."""
+    extra = {parameter: regions.selection(field).alpha for parameter, field in step.named_fields.items()}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
     drives = step.drives
@@ -422,7 +416,7 @@ def _driven(
     return out  # within 0..1 as the renders are: the weights of a pixel add up to exactly 1 in float32
 
 
-def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: Regions, scale: float) -> np.ndarray:
+def _each(before: np.ndarray, step: Each, regions: Regions, scale: float) -> np.ndarray:
     """`before` with each piece of the step's partition replaced by its look: every look that has pieces is rendered
     once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
@@ -432,7 +426,7 @@ def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: 
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered
-            out += weight[..., None] * (_apply(before, look, maps, regions, scale) - before)
+            out += weight[..., None] * (_apply(before, look, regions, scale) - before)
     return np.clip(out, 0.0, 1.0, out=out)
 
 

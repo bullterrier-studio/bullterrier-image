@@ -110,13 +110,13 @@ An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imagei
 
 ```python
 @effect(category="light", params=BloomParams)  # category is one of CATEGORIES
-def bloom(rgb: np.ndarray, params: BloomParams, *, subject: np.ndarray | None = None) -> np.ndarray: ...
+def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray: ...
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
-and maximum. `subject` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,
-`(h, w)` float32 0..1, 1 = nearest), `partition` (piece labels of a region, `(h, w)` int32) and `size_ratio` (float, working px per design px, default 1.0:
-declare it only if light or density is per working pixel). Contract tests check all of this
-for every effect.
+and maximum. A map it works from (the subject, the depth, a region) is a field parameter (see "Parameters"), never an
+input. The injected inputs, declared only if needed: `partition` (piece labels of a region, `(h, w)` int32) and `size_ratio`
+(float, working px per design px, default 1.0: declare it only if light or density is per working pixel). Contract tests
+check all of this for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
 (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`, `name`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.

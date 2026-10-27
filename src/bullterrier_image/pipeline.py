@@ -53,10 +53,9 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import finding, imageio
 from .checks import matte_warnings, still_warnings
-from .core import registry
 from .core.outlines import svg_bytes
 from .core.params import Lut, Picture, describe_error
-from .core.regions import Svg
+from .core.regions import FOUND_MAPS, Svg
 from .core.runner import Finder, find_map, known_maps
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .ops.maps import map_problem
@@ -391,7 +390,7 @@ def _finders_of(given: dict[str, Finder], recipes: list[Recipe]) -> dict[str, Fi
     for recipe in recipes:
         for name in sorted(recipe.maps_needed | ({"subject"} if recipe.needs_finder else set())):
             if name not in finders:
-                if name not in registry.MAP_INPUTS:
+                if name not in FOUND_MAPS:
                     raise ProjectError(
                         f"recipe {recipe.name!r} uses the map {name!r} (a `given` region), which a project cannot hand "
                         f"in: pass `finders={{{name!r}: Finder(...)}}`, or render the recipe with `maps=`"

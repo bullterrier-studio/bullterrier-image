@@ -16,10 +16,11 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .core import registry, runner
+from .core import runner
 from .core.framing import Framing
 from .core.params import Drive
 from .core.regions import (
+    FOUND_MAPS,
     Band,
     Bands,
     Combine,
@@ -121,7 +122,7 @@ def _finders(
     will ask for it: the subject when a recipe needs it and no `subject` map is given, or finds it piece by piece; the
     depth when a recipe needs it and no `depth` map is given. Each default is built only then, once per call."""
     maps, bound = maps or {}, dict(finders or {})
-    for name in registry.MAP_INPUTS:
+    for name in FOUND_MAPS:
         asks = name not in maps and any(name in recipe.maps_needed for recipe in recipes)
         asks = asks or (name == "subject" and any(recipe.needs_finder for recipe in recipes))
         if name not in bound and asks:

@@ -553,15 +553,14 @@ class Recipe(ValidatedModel):
 
     @property
     def maps_needed(self) -> frozenset[str]:
-        """The names of the maps of the photo that rendering must be given or find: `subject` when a step's effect takes
-        it, the framing crops around it or keeps only it, or a region a step uses is made from it (the built-in
-        `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (an effect
-        that takes it, the built-in `depth` or a region made from it, however indirectly); and the name of every `Given`
-        region a step uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder,
-        not a map (see `needs_finder`)."""
-        taken = {name for name in registry.MAP_INPUTS if self.taking(name)}
+        """The names of the maps of the photo that rendering must be given or find: `subject` when the framing crops
+        around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it (the
+        built-in `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (the
+        built-in `depth` or a region made from it, however indirectly); and the name of every `Given` region a step
+        uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map (see
+        `needs_finder`)."""
         framed = {"subject"} if self.frame.needs_subject else set()
-        return frozenset(taken | framed | maps_used(self.regions, self._names_used()))
+        return frozenset(framed | maps_used(self.regions, self._names_used()))
 
     @property
     def derived_maps(self) -> frozenset[str]:
@@ -569,16 +568,6 @@ class Recipe(ValidatedModel):
         picture's brightness) because a region a step uses is made from them, however indirectly. Nobody supplies
         these: they are not in `maps_needed`."""
         return frozenset(_derived_maps(self.regions, self._names_used()))
-
-    def taking(self, name: str) -> list[tuple[int, str]]:
-        """The steps whose effect, or the effect of one of whose looks, takes the injected input `name` (one of
-        `registry.INPUTS`), as (step number counted from 1, effect), in order."""
-        return [
-            (number, run.effect)
-            for number, step in enumerate(self.steps, start=1)
-            for run in step.runs
-            if name in registry.inputs(run.effect)
-        ]
 
     @property
     def needs_finder(self) -> bool:

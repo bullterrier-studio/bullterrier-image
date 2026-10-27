@@ -1,6 +1,6 @@
 """The effect library: one folder per effect, found automatically.
 
-An effect is a function `(rgb, params, *, subject=None) -> rgb`: it takes the image representation described in
+An effect is a function `(rgb, params) -> rgb`: it takes the image representation described in
 `imageio` and its validated parameter model (an `EffectParams` subclass, see `bullterrier_image.core.params`) and
 returns a new image of the same shape. Effects know nothing about files or recipes; where and how strongly one applies
 is decided by the recipe that calls it.

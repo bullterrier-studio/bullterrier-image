@@ -58,6 +58,7 @@ from .presets import SHIPPED, read
 
 __all__ = [
     "DERIVED",
+    "FOUND_MAPS",
     "Band",
     "Bands",
     "BoxFinder",
@@ -93,7 +94,8 @@ __all__ = [
 ]
 
 BUILT_IN = ("subject", "background", "depth", "light")
-BUILT_IN_MAPS = ("subject", "depth", "light")  # the built-in regions that are a map of the photo as it is
+FOUND_MAPS = ("subject", "depth")  # the built-in maps found in the photo: handed in (`maps=`) or by a finder
+BUILT_IN_MAPS = (*FOUND_MAPS, "light")  # the built-in regions that are a map of the photo as it is
 # The built-in maps made from the working picture itself, by name: not found, handed in or cached, so the runner makes
 # them for each render. `light` is the picture's brightness (Rec. 709 weights, `ops.color.luminance`).
 DERIVED = {"light": luminance}

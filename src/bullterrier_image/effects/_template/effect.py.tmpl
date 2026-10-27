@@ -33,7 +33,7 @@ def $name(
     """Mix the picture toward its negative by `amount`. (Replace: this first sentence is the summary.)
 
     An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of the same
-    shape and range out, the same for the same values, the input never modified. Add a keyword-only
-    `subject: np.ndarray | None = None` after `params` only if it needs the subject's cut-out.
+    shape and range out, the same for the same values, the input never modified. To work from a map (the
+    subject's cut-out, the depth), add a `FieldName` parameter and a keyword-only argument of its name.
     """
     return (rgb * (1 - params.amount) + (1 - rgb) * params.amount).astype(np.float32)

@@ -87,22 +87,6 @@ def test_the_wrapper_keeps_the_name_and_documentation_and_tells_its_model_catego
     assert "gain_probe" in registry.categories()["light"]
 
 
-def test_an_effect_that_declares_the_subject_gets_it_and_says_so(throwaway_effects):
-    def subject_probe(rgb: np.ndarray, params: GainParams, *, subject: np.ndarray | None = None) -> np.ndarray:
-        """Darkens where the subject is."""
-        return rgb if subject is None else (rgb * (1 - subject[..., None])).astype(np.float32)
-
-    probe = effect(category="subject", params=GainParams)(subject_probe)
-    subject = np.zeros((4, 5), np.float32)
-    subject[:, :2] = 1
-    out = probe(GREY, gain=2.0, subject=subject)  # parameters and the subject together
-    np.testing.assert_array_equal(out[:, :2], 0.0)
-    np.testing.assert_array_equal(out[:, 2:], 0.25)
-    assert probe.inputs == ("subject",)
-    assert registry.inputs("subject_probe") == ("subject",)
-    np.testing.assert_array_equal(probe(GREY), GREY)  # without a subject the effect decides what to do
-
-
 def test_an_effect_that_declares_size_ratio_gets_it_by_keyword_and_1_when_a_call_gives_none(throwaway_effects):
     def ratio_probe(rgb: np.ndarray, params: GainParams, *, size_ratio: float = 1.0) -> np.ndarray:
         """Fills the picture with its size ratio over 10."""
@@ -132,11 +116,21 @@ def _probe_with(signature: str):
         ("(rgb, params, extra)", "shape_probe(rgb, params"),
         ("(rgb, params, *more)", "shape_probe(rgb, params"),
         ("(rgb, params, **more)", "shape_probe(rgb, params"),
-        ("(rgb, params, subject=None)", "keyword-only"),
+        ("(rgb, params, size_ratio=1.0)", "keyword-only"),
         ("(rgb, params, *, glow=None)", "'glow'"),
-        ("(rgb, params, *, subject)", "default"),
+        ("(rgb, params, *, subject=None)", "'subject'"),
+        ("(rgb, params, *, size_ratio)", "default"),
     ],
-    ids=["no-params", "extra-positional", "args", "kwargs", "positional-input", "unknown-input", "input-no-default"],
+    ids=[
+        "no-params",
+        "extra-positional",
+        "args",
+        "kwargs",
+        "positional-input",
+        "unknown-input",
+        "a map is a field, not an input",
+        "input-no-default",
+    ],
 )
 def test_an_effect_function_of_the_wrong_shape_is_refused(signature, complaint, throwaway_effects):
     with pytest.raises(ValueError, match="shape_probe") as raised:
@@ -157,7 +151,7 @@ class ShadeParams(EffectParams):
     [
         ("(rgb, params)", "keyword-only argument `field`"),
         ("(rgb, params, *, field=None)", "no default"),
-        ("(rgb, params, *, subject=None)", "keyword-only argument `field`"),
+        ("(rgb, params, *, size_ratio=1.0)", "keyword-only argument `field`"),
     ],
     ids=["no argument", "a default", "another input instead"],
 )
@@ -215,8 +209,6 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
 @pytest.mark.parametrize(
     "name",
     [
-        "subject",
-        "depth",
         "partition",
         "size_ratio",
         "effect",
@@ -234,7 +226,7 @@ def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwawa
         "ClashParams", (EffectParams,), {"__doc__": "Claims a name.", "__annotations__": {name: float}, name: field}
     )
 
-    def clash_probe(rgb, params, *, subject=None):
+    def clash_probe(rgb, params):
         return rgb
 
     with pytest.raises(ValueError, match=rf"clash_probe.*`{name}`"):

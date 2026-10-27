@@ -8,7 +8,7 @@ import pytest
 from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import looks, registry, runner
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
@@ -72,10 +72,10 @@ def test_bad_recipes_fail_at_load_time_and_name_the_problem(tmp_path, text, expe
     ],
 )
 def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_path, effect_name, old, new):
-    """`depth` is the name of an injected input, so no effect field may carry it."""
+    """The old name is no alias: it is an unknown parameter."""
     (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{new}=0.5\n')).steps
     assert step.runs[0].params == {new: 0.5}
-    with pytest.raises(RecipeError, match=rf"step 1.*`{old}` is supplied by the recipe"):
+    with pytest.raises(RecipeError, match=rf"step 1.*`{old}` is not a parameter"):
         load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{old}=0.5\n', "old.toml"))
 
 
@@ -176,17 +176,23 @@ def test_a_step_says_its_mode_and_by_default_it_is_normal():
     assert Step("bloom", blend_mode="screen", opacity=0.8).describe() == "bloom() screen x0.8"
 
 
-def test_effects_that_declare_a_matte_parameter_get_the_person_silhouette(photo, subject, throwaway_effects):
+class SilhouetteParams(EffectParams):
+    """A field that is the subject unless a step names another."""
+
+    field: FieldName = param("subject", doc="The field recorded.")
+
+
+def test_an_effect_whose_field_is_the_subject_gets_the_silhouette(photo, subject, throwaway_effects):
     seen = []
 
-    @effect(category="utilities", params=AmountParams)
-    def silhouette_probe(rgb, params, *, subject=None):
+    @effect(category="utilities", params=SilhouetteParams)
+    def silhouette_probe(rgb, params, *, field):
         """Records the silhouette it is given."""
-        seen.append(subject)
+        seen.append(field)
         return rgb
 
     r = Recipe("s", (Step("silhouette_probe"),), size=None)
-    assert "subject" in r.maps_needed  # an effect that wants the silhouette makes the recipe look for the person
+    assert "subject" in r.maps_needed  # a field that is the subject makes the recipe look for it
     render(photo, r, maps={"subject": subject})
     assert len(seen) == 1
     np.testing.assert_array_equal(seen[0], subject)

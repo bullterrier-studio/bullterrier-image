@@ -16,7 +16,7 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import EffectParams, Picture, param
+from bullterrier_image.core.params import EffectParams, FieldName, Picture, param
 from bullterrier_image.core.registry import effect, unregister
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -147,17 +147,22 @@ def partition_probe(throwaway_effects):
     return effect(category="utilities", params=ProbeParams)(partition_probe)
 
 
+class DepthProbeParams(ProbeParams):
+    """A probe's parameter and the field it paints, the depth unless a step names another."""
+
+    field: FieldName = param("depth", doc="The field painted.")
+
+
 @pytest.fixture
 def depth_probe(throwaway_effects):
-    """Registers `depth_probe`, an effect that takes the injected input `depth` (float32 (h, w), 1 = nearest): it
-    returns the depth as a grey picture, so its output shows the depth map it was given."""
+    """Registers `depth_probe`, an effect whose field is the depth by default (float32 (h, w), 1 = nearest): it
+    returns the field as a grey picture, so its output shows the depth map it was given."""
 
-    def depth_probe(rgb: np.ndarray, params: ProbeParams, *, depth: np.ndarray | None = None) -> np.ndarray:
+    def depth_probe(rgb: np.ndarray, params: DepthProbeParams, *, field: np.ndarray) -> np.ndarray:
         """Paints each pixel with its depth."""
-        assert depth is not None
-        return np.repeat(depth[..., None], 3, axis=2)
+        return np.repeat(field[..., None], 3, axis=2)
 
-    return effect(category="utilities", params=ProbeParams)(depth_probe)
+    return effect(category="utilities", params=DepthProbeParams)(depth_probe)
 
 
 @pytest.fixture

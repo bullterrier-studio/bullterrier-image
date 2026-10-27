@@ -17,7 +17,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   can be written in parallel without conflicts. *Consequence:* an effect is new files named for it (its package, tests,
   example recipe, gallery picture) and nothing else; `poe new-effect` writes them from `effects/_template/`, and
   `gallery.effect_files(name)` is the one place that knows where they live.
-- **Effects are pure functions in packages.** `effect(rgb, params, *, subject=None) -> rgb` on float32 RGB `(h, w, 3)` in
+- **Effects are pure functions in packages.** `effect(rgb, params) -> rgb` on float32 RGB `(h, w, 3)` in
   0..1, deterministic, never modifying its input, one package per effect holding code only; its tests mirror `src/`
   (`tests/effects/<name>/`), its example and picture live outside the package. *Reason:* a pure function is trivially
   testable and composable, and keeping artefacts out of `src/` keeps the wheel small. *Consequence:* effects never import
@@ -281,7 +281,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `subject`, `depth`, or the name of a `given` region the recipe declares (`format = 3`). `render`, `trace` and
   `render_all` take `maps={name: array}` and `finders={name: Finder}`; `pipeline.run` takes `finders=`;
   `bullterrier_image.recipe` binds the default `subject` and `depth` finders, lazily, only when a recipe will ask. An
-  effect takes a map by the same name (`subject`, `depth`); a region of kind `given` makes any other map usable as a
+  effect takes a map as a field parameter naming it (`field = "subject"`), never as an input of its own; a region of kind `given` makes any other map usable as a
   selection (`mask = "star"`). *Reason:* the engine stays testable without a model, and the package serves a video tool
   that hands in maps of its own every frame (a drawing's silhouette from vector, a motion map from several frames) which
   image can neither make nor know in advance; one route for every map, not a keyword per map (`matte=`, `depth=`, then
