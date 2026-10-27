@@ -1,0 +1,7 @@
+# Looks that are one tile step.
+
+[scan_roll]
+description = "A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways."
+columns = 1
+rows = 1
+offset_y = 0.25

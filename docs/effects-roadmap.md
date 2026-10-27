@@ -138,7 +138,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
 | `mirror` ✓ (`kaleidoscope` with 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
 | `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
-| `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
+| `tile` ✓ | Repeat the picture in a grid; slide it around (rolling scan, wrap-around shift). | `fx.tile(columns=3, rows=3, offset_y=0.2)` |
 | `perspective` ✓ | Keystone, skew, turn and zoom. | `fx.perspective(vertical=0.3, shear_x=0.2, rotate=-3, scale=0.2)` |
 | `pixel_sort` ✓ | Sort runs of pixels by brightness or hue. | `fx.pixel_sort(by="brightness", low=0.25, high=0.75)` |
 | `melt` ✓ | Brightness-driven drips running down. | `fx.melt(amount=40, seed=1)` |
@@ -173,7 +173,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | --- | --- | --- |
 | `rgb_split` ✓ | Channel offset on its own, any direction; `pair='red_cyan'` after `grade(saturation=0)` is the red/cyan 3D look. | `fx.rgb_split(angle=330, amount=8)` |
 | `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)`; with `hits`, damaged coefficients: smears and colour blocks, `fx.jpeg_crush(quality=20, hits=40, seed=2)` |
-| `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |

@@ -1,8 +1,0 @@
-# A television whose vertical hold slipped: the picture has rolled down a fifth of its height and wrapped around.
-name = "scan_roll"
-size = 480
-
-[[step]]
-effect = "scan_roll"
-axis = "vertical"
-offset = 0.22
