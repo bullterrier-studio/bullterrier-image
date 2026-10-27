@@ -14,6 +14,7 @@ __all__ = [
     "BullterrierImageError",
     "DepthNotFoundError",
     "ImageReadError",
+    "LutError",
     "MapNotFoundError",
     "NonFiniteImageError",
     "ProjectError",
@@ -76,3 +77,9 @@ class BackendUnavailableError(BullterrierImageError, NotImplementedError):
 
 class ImageReadError(BullterrierImageError, OSError):
     """A file could not be read as an image: missing, not an image, truncated, or too large to decode safely."""
+
+
+class LutError(BullterrierImageError, ValueError):
+    """A colour lookup table is unusable: a `.cube` file that is missing, not UTF-8, 1D, malformed (the message names
+    the file and the line) or out of the supported size, or a table array of the wrong shape or with values that are
+    no numbers."""

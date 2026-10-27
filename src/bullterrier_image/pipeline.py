@@ -55,7 +55,7 @@ from . import finding, imageio
 from .checks import matte_warnings, still_warnings
 from .core import registry
 from .core.outlines import svg_bytes
-from .core.params import Picture, describe_error
+from .core.params import Lut, Picture, describe_error
 from .core.regions import Svg
 from .core.runner import Finder, find_map, known_maps
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
@@ -566,9 +566,14 @@ def _export_still(project: Project, image: np.ndarray, name: str, folder: Path) 
 
 
 def _picture_digests(recipe: Recipe) -> list[str]:
-    """The content digest of every picture the recipe's steps (and the looks of its `Each` steps) hold, in order."""
+    """The content digest of every picture or lookup table the recipe's steps (and the looks of its `Each` steps)
+    hold, in order."""
     return [
-        v.digest for step in recipe.steps for run in step.runs for v in run.params.values() if isinstance(v, Picture)
+        v.digest
+        for step in recipe.steps
+        for run in step.runs
+        for v in run.params.values()
+        if isinstance(v, Picture | Lut)
     ]
 
 

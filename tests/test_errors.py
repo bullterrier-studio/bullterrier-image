@@ -11,6 +11,7 @@ from bullterrier_image import (
     BullterrierImageError,
     DepthNotFoundError,
     ImageReadError,
+    LutError,
     NonFiniteImageError,
     ProjectError,
     RecipeError,
@@ -70,6 +71,7 @@ def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_
         (DepthNotFoundError, RuntimeError),
         (BackendUnavailableError, NotImplementedError),
         (ImageReadError, OSError),
+        (LutError, ValueError),
         (NonFiniteImageError, ValueError),
     ],
 )

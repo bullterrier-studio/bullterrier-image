@@ -12,7 +12,7 @@ Looks that are one effect with a set of values ship as presets of that effect (`
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
 it becomes a new effect only when it is a new idea. Planned merges of today's effects: "Planned consolidation", at the end.
 
-**Next:** `lut`, then `edges`. After them, effects are added only when a video look needs one.
+**Next:** `edges`. After them, effects are added only when a video look needs one.
 
 ## Colour and tone
 
@@ -29,7 +29,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
-| `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
+| `lut` ✓ | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ (a preset of `channel_mixer`) | Mono conversion; set the rows for a colour filter. | `fx.channel_mixer(preset="black_and_white")` |
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
 | `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |

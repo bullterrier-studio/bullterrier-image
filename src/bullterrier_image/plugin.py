@@ -18,6 +18,9 @@
 A parameter that is a second picture (a texture, a logo) is declared `image: Picture = param("#808080", doc="...")`:
 it holds a `Picture` (read-only RGBA float32 `pixels`, straight alpha, at its own size) and its default is a colour,
 which gives a flat 1x1 picture. A recipe file writes a path, `fx` takes a path, an array, a `Picture` or a colour.
+A parameter that is a 3D colour lookup table is declared `file: Lut = param(Lut.identity(), doc="...")`: it holds a
+`Lut` (`table` float32 `(n, n, n, 3)` indexed `[red, green, blue]`, with `domain_min`, `domain_max`). A recipe file
+writes a path to a `.cube` file, `fx` takes a path, an `(n, n, n, 3)` array or a `Lut`.
 
 Declare the module as an entry point of the group `bullterrier_image.effects` in your package's `pyproject.toml`, and
 install the package (`pip install`, or `uv sync` for an editable checkout):
@@ -45,7 +48,7 @@ the step (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `eac
 across every installed package.
 """
 
-from .core.params import Color, EffectParams, Picture, param
+from .core.params import Color, EffectParams, Lut, Picture, param
 from .core.registry import CATEGORIES, effect
 
-__all__ = ["CATEGORIES", "Color", "EffectParams", "Picture", "effect", "param"]
+__all__ = ["CATEGORIES", "Color", "EffectParams", "Lut", "Picture", "effect", "param"]

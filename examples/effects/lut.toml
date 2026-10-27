@@ -1,0 +1,8 @@
+# A warm film grade from a .cube lookup table (the path is relative to this file), shown at 0.8.
+name = "lut"
+size = 480
+
+[[step]]
+effect = "lut"
+file = "../assets/warm-film.cube"
+amount = 0.8

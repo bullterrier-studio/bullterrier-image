@@ -27,6 +27,9 @@ Promises:
 - A `FieldName` field (a selection an effect works from: `depth`, `light`, a band of the recipe) holds the name of a
   selection, as a step's `mask` and a `Drive`'s `by` do; the recipe checks the name, the runner builds the field and the
   effect receives its array (see `registry`). It is not a number: it has no address and cannot be driven.
+- A `Lut` field (a 3D colour lookup table, from a `.cube` file) holds a `Lut`, a read-only table with a content digest;
+  it must have a default such as `Lut.identity()`. Recipe files and `fx` turn a path or an array into a `Lut` before
+  validation (see `loader`).
 - `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
@@ -57,8 +60,9 @@ from pydantic import (
     WithJsonSchema,
 )
 from pydantic.fields import FieldInfo
+from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
 
-from bullterrier_image.errors import RecipeError
+from bullterrier_image.errors import LutError, RecipeError
 
 from .types import Color as ColorForms
 
@@ -206,6 +210,95 @@ _PICTURE = Annotated[
 
 PictureForms = Picture | os.PathLike[str] | np.ndarray | ColorForms
 """A picture as a caller may write it in `fx`: a Picture, a path, an array, or a colour."""
+
+
+_LUT_MAX = 256  # the largest LUT_3D_SIZE the Adobe/Resolve .cube specification allows
+
+
+class Lut:
+    """A 3D colour lookup table an effect uses besides the photo (a film look, a grade): read-only and hashable.
+
+    `Lut(table)`: `table` is a finite float array (n, n, n, 3) with 2 <= n <= 256, indexed `[red, green, blue]` by the
+    input colour's position on each axis, holding the output colour; `domain_min` and `domain_max` are the input
+    values at the first and last entry of each axis (three numbers each, min below max). Anything else is a
+    `LutError`. `Lut.identity()` is the table that changes nothing. Two tables are equal when their values are, and
+    hash alike; `label` (a file name, say) is only for messages.
+    """
+
+    __slots__ = ("digest", "domain_max", "domain_min", "label", "table")
+
+    def __init__(
+        self,
+        table: np.ndarray,
+        domain_min: Sequence[float] = (0.0, 0.0, 0.0),
+        domain_max: Sequence[float] = (1.0, 1.0, 1.0),
+        label: str = "array",
+    ) -> None:
+        """The table, with the domain it covers, called `label` in messages."""
+        data = np.asarray(table)
+        size = data.shape[0] if data.ndim else 0
+        if data.shape != (size, size, size, 3) or data.dtype.kind != "f" or not 2 <= size <= _LUT_MAX:
+            raise LutError(
+                f"a lookup table is a float array of shape (n, n, n, 3) with 2 to {_LUT_MAX} entries per axis, got "
+                f"{data.dtype} of shape {data.shape}"
+            )
+        low, high = np.asarray(domain_min, np.float64), np.asarray(domain_max, np.float64)
+        if low.shape != (3,) or high.shape != (3,) or not (np.isfinite(low).all() and np.isfinite(high).all()):
+            raise LutError(f"{label}: the domain is three finite numbers for its minimum and for its maximum")
+        if not (low < high).all():
+            raise LutError(f"{label}: the domain minimum must be below its maximum on every channel, got {low}, {high}")
+        if not np.isfinite(data).all():
+            raise LutError(f"{label}: the values of a lookup table must be finite")
+        values = np.array(data, np.float32)
+        values.setflags(write=False)
+        self.table, self.label = values, label
+        self.domain_min, self.domain_max = tuple(low.tolist()), tuple(high.tolist())
+        self.digest = hashlib.sha256(values.tobytes() + low.tobytes() + high.tobytes()).hexdigest()
+
+    @classmethod
+    def identity(cls, size: int = 2) -> Self:
+        """The table of `size` entries per axis that returns every colour as it is, over the domain 0..1."""
+        axis = np.linspace(0.0, 1.0, size, dtype=np.float32)
+        red, green, blue = np.meshgrid(axis, axis, axis, indexing="ij")
+        return cls(np.stack([red, green, blue], axis=-1), label="identity")
+
+    @property
+    def size(self) -> int:
+        """Entries per axis."""
+        return int(self.table.shape[0])
+
+    def __eq__(self, other: object) -> bool:
+        """Equal values and domain (by digest), whatever the labels."""
+        return self.digest == other.digest if isinstance(other, Lut) else NotImplemented
+
+    def __hash__(self) -> int:
+        """By digest, as `==`."""
+        return hash(self.digest)
+
+    def __repr__(self) -> str:
+        """`Lut('film.cube', 33)`: label, then entries per axis, never the values; `Lut.identity(2)` for an identity."""
+        return f"Lut.identity({self.size})" if self.label == "identity" else f"Lut({self.label!r}, {self.size})"
+
+
+def _to_lut(value: object) -> Lut:
+    """A `Lut` as it is (validation runs at every apply: no copy)."""
+    if isinstance(value, Lut):
+        return value
+    shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
+    raise ValueError(
+        f"a lookup table is a Lut; a path or an array is turned into a Lut by a recipe file or fx, got {shown}"
+    )
+
+
+_LUT = Annotated[
+    Lut,
+    PlainValidator(_to_lut),
+    WithJsonSchema({"type": "string", "description": "a path to a .cube file, relative to the recipe file"}),
+]
+"""What a `Lut` field is made of: a `Lut` is accepted (a path or an array only through `loader`)."""
+
+LutForms = Lut | os.PathLike[str] | str | np.ndarray
+"""A lookup table as a caller may write it in `fx`: a Lut, a path to a `.cube` file, or an (n, n, n, 3) array."""
 
 
 def _as_tuple(value: object) -> object:
@@ -378,6 +471,12 @@ class FieldDoc(NamedTuple):
         return f"{_number(self.minimum)} to {_number(self.maximum)}"
 
 
+class _EffectSchema(GenerateJsonSchema):
+    """The JSON schema generator of effect parameters: a field whose default has no JSON form (a `Lut`) shows none."""
+
+    ignored_warning_kinds = {"non-serializable-default"}  # noqa: RUF012  (pydantic reads it, never changes it)
+
+
 class EffectParams(ValidatedModel):
     """Base class of every effect's parameter model: subclass it and declare each field with `param`.
 
@@ -385,6 +484,18 @@ class EffectParams(ValidatedModel):
     """
 
     model_config = ConfigDict(validate_default=True)
+
+    @classmethod
+    def model_json_schema(
+        cls,
+        by_alias: bool = True,
+        ref_template: str = DEFAULT_REF_TEMPLATE,
+        schema_generator: type[GenerateJsonSchema] = _EffectSchema,
+        mode: JsonSchemaMode = "validation",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """The JSON schema of the parameters (pydantic's), without a default for a field that cannot show one."""
+        return super().model_json_schema(by_alias, ref_template, schema_generator, mode, **kwargs)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Check every field's declaration and turn it into a strict pydantic field.
@@ -423,6 +534,12 @@ class EffectParams(ValidatedModel):
         """The fields that name a field (`FieldName`), in declaration order: the effect receives the array of each."""
         hints = typing.get_type_hints(cls, include_extras=True)
         return tuple(name for name in cls.model_fields if hints[name] == FieldName)
+
+    @classmethod
+    def lut_fields(cls) -> frozenset[str]:
+        """The fields that hold a `Lut`: a recipe file writes a path to a `.cube` file, `fx` a path or an array."""
+        hints = typing.get_type_hints(cls)
+        return frozenset(name for name in cls.model_fields if hints[name] is Lut)
 
     def scaled(self, factor: float) -> Self:
         """A copy with every pixel value (a field with the unit `px`) multiplied by `factor`: the same look at another
@@ -607,6 +724,8 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
     elif annotation is Picture:
         typed = _PICTURE
+    elif annotation is Lut:
+        typed = _LUT
     made = Field(
         spec.default,
         description=spec.doc,
@@ -652,6 +771,8 @@ def _public(annotation: Any) -> Any:
         return ColorForms
     if annotation is Picture:
         return PictureForms
+    if annotation is Lut:
+        return LutForms
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _public(args[0])
@@ -676,6 +797,8 @@ def _type_text(annotation: Any) -> str:
         return "picture"
     if annotation == FieldName:
         return "field name"
+    if annotation is Lut:
+        return "lookup table"
     origin, args = get_origin(annotation), get_args(annotation)
     if origin is Annotated:
         return _type_text(args[0])

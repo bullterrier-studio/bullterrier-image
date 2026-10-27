@@ -36,8 +36,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   layout package, and before/after is the `compare` command. *Consequence:* the recipe reader moved from `core` to the
   adapters layer, beside `imageio` (`bullterrier_image/loader.py`); the pipeline's fingerprint covers each asset's content, not only the recipe text;
   a large asset is counted nowhere (the effect contract measures the budget on an effect's default 1x1 pictures, and a recipe's
-  assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file (a `.cube` LUT, a folder of tiles) gets
-  its own value type and reader in the adapters layer together with its first effect.
+  assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file gets its own value type and reader in the adapters layer together with its first effect:
+  the `.cube` lookup table is `Lut` (`core/params.py`), read by `imageio.load_lut` (`LutError` names file and line) and held by `lut`'s `file`.
+  `lut` interpolates trilinearly with no parameter for it: nearest-entry lookup only bands, so no look needs the choice.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
   point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing
@@ -316,7 +317,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Errors and I/O
 
 - **One error hierarchy.** Library code raises `BullterrierImageError` subclasses (`RecipeError`, `UnknownEffectError`,
-  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
+  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `LutError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
   *Reason:* callers catch one type; `except ValueError` keeps working. *Consequence:* the CLI catches them and prints a
   message, never a traceback, for a user's mistake; a broken effect definition is a programming error (plain
   `ValueError`/`TypeError` at import).

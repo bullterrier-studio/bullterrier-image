@@ -85,6 +85,10 @@ three numbers):
 The picture is read once, when the recipe is loaded; a file that is missing or not a picture fails there, naming the
 file, the step, the parameter and the path.
 
+A parameter that is a colour lookup table (`file` of `lut`) is written the same way, as the path of a `.cube` file
+relative to the recipe file's folder; it is read once at load, and a file that is missing, 1D or malformed fails there
+with a `LutError` naming the file, its line, the step and the parameter.
+
 The `[frame]` table holds the fields of `Framing` (`Framing.documentation()` lists them with their units and ranges):
 `flip`, `angle` (with `fit` and `resample`), `aspect` (with `anchor` and `margin`), `pad_top`, `pad_right`, `pad_bottom`
 and `pad_left` (with `fill`), applied to the photo and the subject map in that order, before the first step and
@@ -108,12 +112,12 @@ from pathlib import Path
 
 import numpy as np
 
-from bullterrier_image.errors import BullterrierImageError, ImageReadError, RecipeError
+from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutError, RecipeError
 
 from . import imageio
 from .core import looks, registry
 from .core.framing import Framing
-from .core.params import Picture
+from .core.params import Lut, Picture
 from .core.regions import (
     Band,
     Bands,
@@ -132,7 +136,7 @@ from .core.regions import (
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step, safe_name
 
-__all__ = ["load_recipe", "with_pictures"]
+__all__ = ["load_recipe", "with_files"]
 
 # The recipe format versions this release reads; a file without `format` is the first. A release that changes the
 # format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`, `looks`
@@ -185,17 +189,19 @@ def _located[E: BullterrierImageError](error: E, where: str) -> E:
     return type(error)(f"{where}: {error}")
 
 
-def with_pictures(effect: str, values: Mapping[str, object], folder: Path) -> dict[str, object]:
-    """`values` (the parameters of `effect`) with each picture given as a path or an array turned into a `Picture`.
+def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[str, object]:
+    """`values` (the parameters of `effect`) with each picture or lookup table given as a path or an array turned into
+    a `Picture` or a `Lut`.
 
-    A path (a `str` not starting with `#`, which is a colour, or a `PathLike`) is read with `imageio.load_picture`,
-    relative to `folder` and labelled as written; a 3-d array is a `Picture` labelled "array". A `Picture`, a colour and
-    every other parameter pass unchanged. ImageReadError naming the effect, the parameter and the path when a file
-    cannot be read; an unknown effect is the registry's UnknownEffectError.
+    A path (a `str` not starting with `#`, which is a colour, or a `PathLike`; for a lookup table any `str`) is read
+    with `imageio.load_picture` or `imageio.load_lut`, relative to `folder` and labelled as written; an array becomes
+    a `Picture` (3-d) or a `Lut` (4-d). A `Picture`, a `Lut`, a colour and every other parameter pass unchanged.
+    ImageReadError (LutError for a table) naming the effect, the parameter and the path when a file cannot be read;
+    an unknown effect is the registry's UnknownEffectError.
     """
-    pictures = registry.parameters(effect).picture_fields()
+    model = registry.parameters(effect)
     resolved = dict(values)
-    for key in pictures & values.keys():
+    for key in model.picture_fields() & values.keys():
         value = values[key]
         if isinstance(value, PathLike) or (isinstance(value, str) and not value.startswith("#")):
             try:
@@ -204,6 +210,15 @@ def with_pictures(effect: str, values: Mapping[str, object], folder: Path) -> di
                 raise ImageReadError(f"effect {effect!r}: `{key}`: {error}") from None
         elif isinstance(value, np.ndarray) and value.ndim == 3:
             resolved[key] = Picture(value)
+    for key in model.lut_fields() & values.keys():
+        value = values[key]
+        if isinstance(value, PathLike | str):
+            try:
+                resolved[key] = imageio.load_lut(folder / value)
+            except LutError as error:
+                raise LutError(f"effect {effect!r}: `{key}`: {error}") from None
+        elif isinstance(value, np.ndarray):
+            resolved[key] = Lut(value)
     return resolved
 
 
@@ -284,7 +299,7 @@ def load_recipe(path: str | Path) -> Recipe:
             )
         try:
             steps.append(_step(entry, where, path.parent))
-        except (RecipeError, ImageReadError) as error:
+        except (RecipeError, ImageReadError, LutError) as error:
             raise _located(error, where) from None
     try:
         return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame, regions)
@@ -349,7 +364,7 @@ def _step(entry: dict, where: str, folder: Path) -> Step | Each:
         elif isinstance(look, dict):
             try:
                 made.append(_effect_step(look, f"look {number}", folder))
-            except (RecipeError, ImageReadError) as error:
+            except (RecipeError, ImageReadError, LutError) as error:
                 raise _located(error, f"look {number}") from None
         else:
             raise RecipeError(f'look {number} is {look!r}: write a table with an `effect`, or "none"')
@@ -362,4 +377,4 @@ def _effect_step(entry: dict, where: str, folder: Path) -> Step:
     keys = {key: entry.pop(key) for key in registry.STEP_KEYS if key in entry}  # the rest are the parameters
     if "effect" not in keys:
         raise RecipeError("missing `effect`")
-    return Step(**keys, params=with_pictures(keys["effect"], entry, folder))
+    return Step(**keys, params=with_files(keys["effect"], entry, folder))

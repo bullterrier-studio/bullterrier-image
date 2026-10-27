@@ -40,7 +40,7 @@ from typing import Any, Literal
 from .core import registry
 from .core.steps import Step
 from .errors import RecipeError
-from .loader import with_pictures
+from .loader import with_files
 
 # The effect builders are module attributes made on demand (`__getattr__`), one per registered effect.
 __all__ = ["stub_text"]
@@ -69,7 +69,8 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     `blend_mode`, `preset`, `partition`, `name`) only by keyword. The Step checks them all, so a misspelt or
     out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the effect's presets (see
     `registry.presets`); the values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path
-    (read now, relative to the current folder) or an array (float, height x width x 3 or 4).
+    (read now, relative to the current folder) or an array (float, height x width x 3 or 4). A lookup table
+    parameter takes a `Lut`, the path of a `.cube` file or an array (float, n x n x n x 3).
     """
     fields = tuple(registry.parameters(name).model_fields)
 
@@ -85,7 +86,7 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
                 f"(got {values['effect']!r}); call the fx function of the effect you want"
             )
         keys = {key: values.pop(key) for key in registry.STEP_KEYS if key in values}  # the rest are the parameters
-        return Step(name, with_pictures(name, {**positional, **values}, Path()), **keys)
+        return Step(name, with_files(name, {**positional, **values}, Path()), **keys)
 
     build.__name__, build.__qualname__ = name, f"fx.{name}"
     build.__doc__ = registry.documentation(name)
@@ -126,7 +127,7 @@ def stub_text() -> str:
         "",
         "import numpy",
         "",
-        "from .core.params import Drive, Picture",
+        "from .core.params import Drive, Lut, Picture",
         "from .recipe import Step",
         "",
     ]
@@ -134,6 +135,7 @@ def stub_text() -> str:
         # Python before 3.14 writes `X | None` of a Literal as Optional[X]; a stub is written the short way
         signature = re.sub(r"Optional\[(Literal\[[^\]]*\])\]", r"\1 | None", str(_signature(name)))
         signature = signature.replace("bullterrier_image.core.params.Picture", "Picture")
+        signature = signature.replace("bullterrier_image.core.params.Lut", "Lut")
         signature = signature.replace("bullterrier_image.core.params.Drive", "Drive")
         lines.append(f"def {name}{signature} -> Step:")
         doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")

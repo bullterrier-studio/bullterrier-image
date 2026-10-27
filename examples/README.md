@@ -10,7 +10,7 @@ Everything here uses one photo, `photos/bullterrier.jpeg`.
 | `fields/` | recipes that cut or drive by a field (recipe format 3), none needing a model: `tilt-shift` (a blur whose radius a gradient drives), `shadow-grain` (grain driven by a band of the picture's own light) and `tonal-grade` (a look per band of light); [the pictures](../docs/gallery/fields/README.md) |
 | `output/bullterrier/` | the rendered pictures the main README shows (re-made by the command below) |
 | `transparent/` | recipes whose picture is cut out (a circle, rounded corners, the subject): their render has an alpha channel, so it is a PNG, and a project that exports `jpg` refuses them; the picture is made with the command below, not by the demo project |
-| `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence (the commands are below), and `mosaic.svg`, a drawing of closed shapes made for the examples, also free of licence |
+| `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence (the commands are below), `mosaic.svg`, a drawing of closed shapes made for the examples, and `warm-film.cube`, a colour lookup table made by the command below; all free of licence |
 | `effects/` | one short recipe per effect, the source of its catalogue picture in `docs/gallery/` |
 | `experiments/` | older recipes, mostly variants of glitch, ASCII and disperse; not part of the demo |
 | `python_api.py` | the same pipeline driven from Python |
@@ -51,4 +51,18 @@ mv out/grey__grain-texture.png examples/assets/grain-texture.png
 uv run python -c "import numpy as np; from bullterrier_image import imageio; imageio.save(np.full((768, 614, 3), 0.5, np.float32), 'out/sky.png')"
 uv run bt-image render out/sky.png examples/assets/night-sky.toml -o out --format jpg
 mv out/sky__night-sky.jpg examples/assets/night-sky.jpg
+```
+
+```bash
+# warm-film.cube: a 17-point lookup table, half an S-curve with red up and blue down and lifted
+uv run python -c "
+from itertools import product
+n = 17
+curve = lambda v: 0.5 * v + 0.5 * v * v * (3 - 2 * v)  # half an S-curve: a little more contrast
+rows = []
+for b, g, r in product(range(n), repeat=3):  # .cube order: red changes fastest
+    r, g, b = (curve(c / (n - 1)) for c in (r, g, b))
+    rows.append(f'{min(1, r * 1.08 + 0.02):.6f} {g:.6f} {b * 0.88 + 0.04:.6f}')  # warm: red up, blue down and lifted
+open('examples/assets/warm-film.cube', 'w', encoding='utf-8').write(f'TITLE \"warm film\"\nLUT_3D_SIZE {n}\n' + '\n'.join(rows) + '\n')
+"
 ```

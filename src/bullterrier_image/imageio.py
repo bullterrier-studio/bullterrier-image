@@ -15,9 +15,10 @@ from typing import cast
 import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
-from bullterrier_image.errors import BackendUnavailableError, ImageReadError, NonFiniteImageError
+from bullterrier_image.core.params import Lut
+from bullterrier_image.errors import BackendUnavailableError, ImageReadError, LutError, NonFiniteImageError
 
-__all__ = ["from_pil", "load", "load_map", "load_picture", "save", "to_pil"]
+__all__ = ["from_pil", "load", "load_lut", "load_map", "load_picture", "save", "to_pil"]
 
 _SRGB = ImageCms.createProfile("sRGB")
 # littlecms's built-in sRGB profile, 588 bytes, embedded in every saved still. littlecms stamps the time it was made
@@ -96,6 +97,63 @@ def load_picture(path: str | Path) -> np.ndarray:
         if alpha is None:
             alpha = np.ones((*rgb.shape[:2], 1), np.float32)
         return np.concatenate([rgb, alpha], axis=2)
+
+
+def load_lut(path: str | Path) -> Lut:
+    """Read a 3D colour lookup table from an Adobe/Resolve `.cube` file (UTF-8 text).
+
+    Understood: `TITLE`, `DOMAIN_MIN` and `DOMAIN_MAX` (three numbers each, default 0 and 1), `LUT_3D_SIZE` (2 to 256)
+    and `LUT_3D_INPUT_RANGE` (a minimum and a maximum for all channels), `#` comments, and then the size cubed rows of
+    three numbers, red changing fastest. The `Lut` is labelled with `path` as given. LutError naming the file, and the
+    line of a fault in it, for a file that is missing, not UTF-8, 1D (`LUT_1D_SIZE`), has a keyword or row it cannot
+    read, or has too few or too many rows.
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise LutError(f"cannot read {path} as a .cube file: {error}") from error
+    size = 0
+    domain: dict[str, tuple[float, ...]] = {"DOMAIN_MIN": (0.0, 0.0, 0.0), "DOMAIN_MAX": (1.0, 1.0, 1.0)}
+    rows: list[tuple[float, float, float]] = []
+    counts = {"DOMAIN_MIN": 3, "DOMAIN_MAX": 3, "LUT_3D_SIZE": 1, "LUT_3D_INPUT_RANGE": 2}  # constant: .cube spec
+
+    def fault(number: int, problem: str) -> LutError:
+        return LutError(f"{path}, line {number}: {problem}")
+
+    for number, line in enumerate(text.splitlines(), start=1):
+        words = line.split("#")[0].split()
+        if not words or words[0] == "TITLE":  # a blank or comment line, or free text
+            continue
+        key, is_row = words[0], words[0][0] in "+-.0123456789"
+        if key == "LUT_1D_SIZE":
+            raise fault(number, "a 1D lookup table is not supported, only LUT_3D_SIZE")
+        if not is_row and key not in counts:
+            raise fault(number, f"unknown keyword {key!r}")
+        try:
+            numbers = tuple(float(word) for word in (words if is_row else words[1:]))
+        except ValueError:
+            raise fault(number, f"cannot read the numbers in {line.strip()!r}") from None
+        if is_row and size == 0:
+            raise fault(number, "a row of numbers before LUT_3D_SIZE")
+        wanted = 3 if is_row else counts[key]  # constant: a row holds red, green and blue
+        if len(numbers) != wanted:
+            raise fault(number, f"{'a row' if is_row else key} needs {wanted} numbers, got {line.strip()!r}")
+        if is_row:
+            rows.append((numbers[0], numbers[1], numbers[2]))
+        elif key == "LUT_3D_SIZE":
+            if not numbers[0].is_integer() or not 2 <= numbers[0] <= 256:  # constant: .cube spec
+                raise fault(number, f"LUT_3D_SIZE is a whole number from 2 to 256, got {line.strip()!r}")
+            size = int(numbers[0])
+        elif key == "LUT_3D_INPUT_RANGE":
+            domain = {"DOMAIN_MIN": numbers[:1] * 3, "DOMAIN_MAX": numbers[1:] * 3}
+        else:
+            domain[key] = numbers
+    if size == 0:
+        raise LutError(f"{path}: no LUT_3D_SIZE line; this is not a 3D .cube file")
+    if len(rows) != size**3:
+        raise LutError(f"{path}: LUT_3D_SIZE {size} needs {size**3} rows of numbers, the file has {len(rows)}")
+    table = np.array(rows, np.float32).reshape(size, size, size, 3).transpose(2, 1, 0, 3)  # file order: red fastest
+    return Lut(table, domain["DOMAIN_MIN"], domain["DOMAIN_MAX"], str(path))
 
 
 @contextmanager
