@@ -1,0 +1,7 @@
+# Looks that are one dither step with no dot pattern.
+
+[posterize]
+description = "Posterize: the picture in 6 flat colours found in it, a poster with bands where the tones were. Set `colors` for more or fewer."
+palette = "photo"
+colors = 6
+pattern = 0.0

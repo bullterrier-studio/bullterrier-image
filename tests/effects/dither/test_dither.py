@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from bullterrier_image import fx
+from bullterrier_image import Recipe, fx, render
 from bullterrier_image.core import registry
 from bullterrier_image.errors import RecipeError
 
@@ -349,3 +349,26 @@ def test_a_hue_only_palette_dithers_a_grey_into_all_of_its_colours() -> None:
     for method in ("bayer", "blue_noise", "floyd_steinberg"):
         out = registry.apply(NAME, flat(0.33), method=method, palette=["#ff0000", "#00ff00", "#0000ff"], cell=1 / 64)
         assert len(colours_of(out)) == 3, method
+
+
+# --- the preset `posterize`: a few flat colours found in the photo --------------------------------------------------
+
+
+def with_preset(photo: np.ndarray, *steps) -> np.ndarray:
+    """The photo through the given steps as one recipe, at its own size."""
+    return render(photo, Recipe("t", size=None, steps=list(steps)))
+
+
+def test_the_posterize_preset_repaints_a_photo_in_a_handful_of_flat_colours(photo: np.ndarray) -> None:
+    """Flat: each pixel is the nearest (in Oklab) of the few colours found, with no dot pattern between them."""
+    out = with_preset(photo, fx.dither(preset="posterize"))
+    found = colours_of(out)
+    assert 2 <= len(found) <= 8
+    assert len(colours_of(photo)) > 1000  # the photo really had far more
+    np.testing.assert_array_equal(out.reshape(-1, 3), closest(photo.reshape(-1, 3), found, oklab))
+
+
+@pytest.mark.parametrize("colors", [3, 12])
+def test_the_posterize_preset_takes_its_number_of_colours_from_the_step(photo: np.ndarray, colors: int) -> None:
+    out = with_preset(photo, fx.dither(preset="posterize", colors=colors))
+    assert 2 <= len(colours_of(out)) <= colors
