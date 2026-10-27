@@ -616,47 +616,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     side's darkest values set the haze at the border."""
     ...
 
-def depth_of_field(focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A shallow depth of field: each pixel is blurred by w x `radius`, w = clip((|depth - focus| - width / 2) /
-feather, 0, 1), so the depths within `width` / 2 of `focus` are returned exactly as they are.
-
-The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
-sharp picture being copy 0) either side of w x `levels`. `depth` is filled in by the recipe from the depth model
-(never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Without a depth the picture is unchanged.
-
-Parameters
-----------
-focus : number, fraction, 0 to 1, default 0.8
-    The depth that stays sharp, as a fraction of the picture's depth range: 1 = the
-    nearest, 0 = the farthest. Raising it moves the focus towards the camera.
-width : number, fraction, 0 to 1, default 0.15
-    How wide a band of depth around the focus stays exactly as it is, as a fraction of
-    the depth range. Raising it keeps more of the picture sharp.
-feather : number, fraction, 0.01 to 1, default 0.4
-    How far in depth beyond the band's edge the blur takes to reach its full radius, as
-    a fraction of the depth range: the blur grows evenly across it. Raising it makes a
-    gentler fall-off, lowering it an abrupt one.
-radius : number, px, 0 to 100, default 10.0
-    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
-    distance from the focus (a further `feather` from the band's edge): larger blurs the
-    out-of-focus picture more; 0 = no blur.
-
-Advanced parameters
--------------------
-levels : whole number, count, 1 to 16, default 6
-    How many blurred copies of the picture the blur is built from: copy k has the sigma
-    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
-    the first) nearest its distance from the focus. More is smoother between levels and
-    slower; 1 mixes the sharp picture with one blur.
-truncate : number, ratio, 1 to 10, default 4.0
-    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
-    sigma px. Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated) or 'wrap' (the opposite edge)."""
-    ...
-
 def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
 
@@ -1352,6 +1311,55 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when the flow carries it in from beyond the
     picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    ...
+
+def focus_blur(field: str = 'depth', focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A shallow depth of field, or a miniature: each pixel is blurred by w x `radius`, w = clip((|field - focus| -
+width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as
+they are.
+
+The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
+sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a
+linear gradient...), float32 (h, w), 0..1: `depth` gives a lens focused in the scene, a linear gradient a sharp
+band across the picture.
+
+Parameters
+----------
+field : field name, default 'depth'
+    The selection the focus is measured on: `depth` (1 = nearest: a lens focused in the
+    scene), `light`, `subject`, or a region of the recipe such as a linear gradient (a
+    band of focus across the picture, the miniature look) or a radial one. Its value at
+    a pixel is compared with `focus`.
+focus : number, fraction, 0 to 1, default 0.8
+    The value of the field that stays sharp, as a fraction of its range: for `depth` 1 =
+    the nearest and 0 = the farthest. Raising it moves the focus towards the field's
+    high values; driving it moves the focus through the scene.
+width : number, fraction, 0 to 1, default 0.15
+    How wide a band of the field's values around the focus stays exactly as it is, as a
+    fraction of its range. Raising it keeps more of the picture sharp.
+feather : number, fraction, 0.01 to 1, default 0.4
+    How far in the field's values beyond the band's edge the blur takes to reach its
+    full radius, as a fraction of its range: the blur grows evenly across it. Raising it
+    makes a gentler fall-off, lowering it an abrupt one.
+radius : number, px, 0 to 100, default 10.0
+    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
+    distance from the focus (a further `feather` from the band's edge): larger blurs the
+    out-of-focus picture more; 0 = no blur.
+
+Advanced parameters
+-------------------
+levels : whole number, count, 1 to 16, default 6
+    How many blurred copies of the picture the blur is built from: copy k has the sigma
+    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
+    the first) nearest its distance from the focus. More is smoother between levels and
+    slower; 1 mixes the sharp picture with one blur.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
+    sigma px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 def fog(density: float | Drive = 0.8, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, patchiness: float = 0.6, scale: float = 150.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -4083,61 +4091,6 @@ rows : whole number, count, 1 to 100, default 3
     How many copies sit one above another, 1 to 100; 1 keeps the picture whole down.
     Each copy is the height of the picture divided by this, rounded down (at least 1
     px)."""
-    ...
-
-def tilt_shift(focus: float = 0.5, width: float = 0.2, feather: float = 0.25, angle: float = 0.0, radius: float = 10.0, saturation: float = 0.3, levels: int = 4, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to
-`radius` and its colour raised by `saturation`.
-
-A pixel's distance from the band's middle, as a fraction of the picture's extent across it, less half the band's
-width, over `feather`, clipped to 0..1, is its blur weight w. The blur is `levels` copies of the picture with
-sigma radius x k / levels, and a pixel mixes the two copies (the sharp picture being copy 0) either side of
-w x `levels`; its colour is moved from its grey by 1 + `saturation` x w. Pixels with w = 0, the whole band, are
-returned exactly as they are.
-
-Parameters
-----------
-focus : number, fraction, 0 to 1, default 0.5
-    Where the middle of the sharp band lies across the picture, as a fraction of its
-    extent at right angles to the band: 0 = the top (for angle 0), 0.5 = the middle, 1 =
-    the bottom.
-width : number, fraction, 0 to 1, default 0.2
-    How wide the sharp band is, as a fraction of the picture's extent at right angles to
-    it: the whole band stays exactly as it is. Raising it keeps more of the picture
-    sharp.
-feather : number, fraction, 0.01 to 1, default 0.25
-    How far from the band's edge the blur takes to reach its full radius, as a fraction
-    of the picture's extent at right angles to the band: the blur and the colour boost
-    grow evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt
-    one.
-angle : number (cyclic), degrees, 0 to 360, default 0.0
-    The direction of the band, counterclockwise as seen on the picture: 0 = horizontal,
-    with the focus counted from the top; 90 = vertical, counted from the left; 45 runs
-    from the lower left to the upper right.
-radius : number, px, 0 to 100, default 10.0
-    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
-    distance from the band (a further `feather` from its edge): larger blurs the far
-    picture more; 0 = no blur.
-saturation : number, ratio, 0 to 2, default 0.3
-    How much colour is added away from the band, the usual miniature look: where the
-    blur is at its full radius each colour moves this much further (1 + saturation
-    times) from the grey of the pixel, and partway through the feather by the same
-    share; nothing in the band. 0 = no change in colour.
-levels : whole number, count, 1 to 16, default 4
-    How many blurred copies of the picture the blur is built from: copy k has the sigma
-    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
-    the first) nearest its distance from the band. More is smoother between levels and
-    slower; 1 mixes the sharp picture with one blur.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
-    sigma px. Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 def tone_map(contrast: float = 0.5, amount: float = 0.5, radius: float = 30.0, edge_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

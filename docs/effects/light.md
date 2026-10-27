@@ -11,7 +11,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/bloom.jpg" width="160" alt="bloom"> | `bloom` | Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture. | `radius=32.0` `threshold=0.6` `amount=0.7` `color=None` `octaves=4` `persistence=0.5` +3 advanced | [bloom.toml](../../examples/effects/bloom.toml) |
 | <img src="../gallery/chromatic_aberration.jpg" width="160" alt="chromatic_aberration"> | `chromatic_aberration` | Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum. | `amount=4.0` `samples=3` `x=0.5` `y=0.5` +2 advanced | [chromatic_aberration.toml](../../examples/effects/chromatic_aberration.toml) |
 | <img src="../gallery/dehaze.jpg" width="160" alt="dehaze"> | `dehaze` | Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009). | `amount=0.9` `patch=15` `radius=30.0` `airlight_fraction=0.001` +3 advanced | [dehaze.toml](../../examples/effects/dehaze.toml) |
-| <img src="../gallery/depth_of_field.jpg" width="160" alt="depth_of_field"> | `depth_of_field` | A shallow depth of field: each pixel is blurred by w x `radius`, w = clip((\|depth - focus\| - width / 2) / feather, 0, 1), so the depths within `width` / 2 of `focus` are returned exactly as they are. | `focus=0.8` `width=0.15` `feather=0.4` `radius=10.0` +3 advanced | [depth_of_field.toml](../../examples/effects/depth_of_field.toml) |
+| <img src="../gallery/focus_blur.jpg" width="160" alt="focus_blur"> | `focus_blur` | A shallow depth of field, or a miniature: each pixel is blurred by w x `radius`, w = clip((\|field - focus\| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as they are. | `field='depth'` `focus=0.8` `width=0.15` `feather=0.4` `radius=10.0` +3 advanced | [focus_blur.toml](../../examples/effects/focus_blur.toml) |
 | <img src="../gallery/gaussian_blur.jpg" width="160" alt="gaussian_blur"> | `gaussian_blur` | Soften the picture with a Gaussian blur of standard deviation `radius` px. | `radius=4.0` +3 advanced | [gaussian_blur.toml](../../examples/effects/gaussian_blur.toml) |
 | <img src="../gallery/highpass.jpg" width="160" alt="highpass"> | `highpass` | Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey. | `radius=4.0` +2 advanced | [highpass.toml](../../examples/effects/highpass.toml) |
 | <img src="../gallery/lens_blur.jpg" width="160" alt="lens_blur"> | `lens_blur` | Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels. | `radius=8.0` `highlights=0.0` +1 advanced | [lens_blur.toml](../../examples/effects/lens_blur.toml) |
@@ -24,7 +24,6 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
 | <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `limit=1.0` `amount=0.8` `angle=0.0` `color='#ffffff'` | [starburst.toml](../../examples/effects/starburst.toml) |
-| <img src="../gallery/tilt_shift.jpg" width="160" alt="tilt_shift"> | `tilt_shift` | A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to `radius` and its colour raised by `saturation`. | `focus=0.5` `width=0.2` `feather=0.25` `angle=0.0` `radius=10.0` `saturation=0.3` `levels=4` +2 advanced | [tilt_shift.toml](../../examples/effects/tilt_shift.toml) |
 | <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
 | <img src="../gallery/vignette.jpg" width="160" alt="vignette"> | `vignette` | Fade the picture toward `color` from `radius` out to its corners, the centre untouched. | `amount=0.5` `radius=0.5` `feather=0.5` `roundness=1.0` `color='#000000'` | [vignette.toml](../../examples/effects/vignette.toml) |
 
@@ -126,13 +125,14 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 </details>
 
-### `depth_of_field`
+### `focus_blur`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `focus` | number | fraction | 0 to 1 | `0.8` | The depth that stays sharp, as a fraction of the picture's depth range: 1 = the nearest, 0 = the farthest. Raising it moves the focus towards the camera. |
-| `width` | number | fraction | 0 to 1 | `0.15` | How wide a band of depth around the focus stays exactly as it is, as a fraction of the depth range. Raising it keeps more of the picture sharp. |
-| `feather` | number | fraction | 0.01 to 1 | `0.4` | How far in depth beyond the band's edge the blur takes to reach its full radius, as a fraction of the depth range: the blur grows evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt one. |
+| `field` | field name |  |  | `'depth'` | The selection the focus is measured on: `depth` (1 = nearest: a lens focused in the scene), `light`, `subject`, or a region of the recipe such as a linear gradient (a band of focus across the picture, the miniature look) or a radial one. Its value at a pixel is compared with `focus`. |
+| `focus` | number | fraction | 0 to 1 | `0.8` | The value of the field that stays sharp, as a fraction of its range: for `depth` 1 = the nearest and 0 = the farthest. Raising it moves the focus towards the field's high values; driving it moves the focus through the scene. |
+| `width` | number | fraction | 0 to 1 | `0.15` | How wide a band of the field's values around the focus stays exactly as it is, as a fraction of its range. Raising it keeps more of the picture sharp. |
+| `feather` | number | fraction | 0.01 to 1 | `0.4` | How far in the field's values beyond the band's edge the blur takes to reach its full radius, as a fraction of its range: the blur grows evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt one. |
 | `radius` | number | px | 0 to 100 | `10.0` | The Gaussian sigma in px at the recipe's size that the blur reaches at the full distance from the focus (a further `feather` from the band's edge): larger blurs the out-of-focus picture more; 0 = no blur. |
 
 <details><summary>Advanced parameters (3)</summary>
@@ -357,27 +357,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `amount` | number | ratio | 0 to 10 | `0.8` | How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as bright as the point that makes it, at the point; above 1 it saturates to white sooner. |
 | `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X. |
 | `color` | colour |  |  | `'#ffffff'` | The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that makes them. |
-
-### `tilt_shift`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `focus` | number | fraction | 0 to 1 | `0.5` | Where the middle of the sharp band lies across the picture, as a fraction of its extent at right angles to the band: 0 = the top (for angle 0), 0.5 = the middle, 1 = the bottom. |
-| `width` | number | fraction | 0 to 1 | `0.2` | How wide the sharp band is, as a fraction of the picture's extent at right angles to it: the whole band stays exactly as it is. Raising it keeps more of the picture sharp. |
-| `feather` | number | fraction | 0.01 to 1 | `0.25` | How far from the band's edge the blur takes to reach its full radius, as a fraction of the picture's extent at right angles to the band: the blur and the colour boost grow evenly across it. Raising it makes a gentler fall-off, lowering it an abrupt one. |
-| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction of the band, counterclockwise as seen on the picture: 0 = horizontal, with the focus counted from the top; 90 = vertical, counted from the left; 45 runs from the lower left to the upper right. |
-| `radius` | number | px | 0 to 100 | `10.0` | The Gaussian sigma in px at the recipe's size that the blur reaches at the full distance from the band (a further `feather` from its edge): larger blurs the far picture more; 0 = no blur. |
-| `saturation` | number | ratio | 0 to 2 | `0.3` | How much colour is added away from the band, the usual miniature look: where the blur is at its full radius each colour moves this much further (1 + saturation times) from the grey of the pixel, and partway through the feather by the same share; nothing in the band. 0 = no change in colour. |
-| `levels` | whole number | count | 1 to 16 | `4` | How many blurred copies of the picture the blur is built from: copy k has the sigma radius x k / levels, and each pixel mixes the two copies (or the sharp picture and the first) nearest its distance from the band. More is smoother between levels and slower; 1 mixes the sharp picture with one blur. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its sigma px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
-
-</details>
 
 ### `tone_map`
 
