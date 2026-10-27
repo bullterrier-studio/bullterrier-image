@@ -1107,13 +1107,14 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     ...
 
 def edges(method: Literal['sobel', 'canny', 'dog'] = 'canny', radius: float = 1.5, threshold: float = 0.1, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Edge detection and line art: outlines in `color` on `background`, by Sobel, Canny or difference of Gaussians.
+    """Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians.
 
-The picture's brightness is smoothed by `radius`, and its steepness (a black-to-white step reads 1, whichever
-method and radius) decides how fully an edge is drawn: not at all below `threshold` x (1 - `softness`), fully from
-threshold x (1 + softness), faded between. 'canny' keeps only the crest of each edge, one or two pixels wide, and
-drops the weak ones that join no strong one; 'dog' looks at the steepness of the difference between two Gaussians
-(`radius` and 1.6 times that), so it outlines features of about that size.
+The picture's brightness is smoothed by `radius`, and how strongly a pixel reads as an edge (a black-to-white step
+reads 1, whichever method and radius) decides how fully it is drawn: not at all below `threshold` x (1 -
+`softness`), fully from threshold x (1 + softness), faded between. 'sobel' and 'canny' read the steepness;
+'canny' keeps only the crest of each edge, one or two pixels wide, and drops the weak ones that join no strong one.
+'dog' reads the difference between two Gaussians (`radius` and 1.6 times that) itself, not its steepness, so it
+draws one ink line along each dark stroke and on the dark side of each edge, of features of about that size.
 Flat areas are always `background`. Screened over the picture (a step's `blend_mode = "screen"`) it lights up
 the edges; a dark `color` on a light `background` is line art.
 
@@ -1123,14 +1124,15 @@ method : one of 'sobel', 'canny', 'dog', default 'canny'
     How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that
     follow the picture's gradients), 'canny' (the same steepness reduced to thin
     connected lines: the weakest lines are dropped unless they join a strong one) or
-    'dog' (difference of Gaussians: only features between `radius` and 1.6 times
-    `radius` in size, so slow gradients and fine texture both fall away).
+    'dog' (sketch ink lines: the difference of Gaussians itself, so one line along each
+    dark stroke and on the dark side of each edge, from features between `radius` and
+    1.6 times `radius` in size; slow gradients and fine texture fall away).
 radius : number, px, 0.5 to 50, default 1.5
     How far the picture is smoothed before edges are looked for, as the Gaussian sigma
     in px at the recipe's size ('dog': the finer of its two Gaussians). Raising it drops
     fine detail and noise and makes broader, smoother edges.
 threshold : number, fraction, 0.01 to 1, default 0.1
-    How steep an edge must be to show, as a share of the steepest edge there can be
+    How strong an edge must be to show, as a share of the strongest edge there can be
     after smoothing (black straight to white = 1; a faint edge is near 0.05). Raising it
     keeps only the strongest edges.
 softness : number, fraction, 0 to 1, default 0.5
