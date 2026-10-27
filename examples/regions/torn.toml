@@ -17,7 +17,7 @@ looks = [
     "none",
     { effect = "gradient_map", preset = "cyanotype" },
     "none",
-    { effect = "halftone", cell = 9 },
+    { effect = "halftone", cell = 4 },
     "none",
 ]
 
@@ -25,5 +25,5 @@ looks = [
 effect = "seams"
 partition = "scraps"
 mask = "subject"
-width = 7                  # a solid band: no generated paper fibres
+width = 3.2812                  # a solid band: no generated paper fibres
 color = "#f6f1e6"

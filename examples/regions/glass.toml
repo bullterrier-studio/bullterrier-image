@@ -20,7 +20,7 @@ looks = [
     "none",
     { effect = "gradient_map", preset = "thermal", opacity = 0.8 },
     "none",
-    { effect = "halftone", cell = 8 },
+    { effect = "halftone", cell = 4 },
     "none",
 ]
 
@@ -28,5 +28,5 @@ looks = [
 effect = "seams"
 partition = "glass"
 mask = "subject"
-width = 1.6
+width = 0.75
 color = "#ffffff"

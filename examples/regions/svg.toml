@@ -19,19 +19,19 @@ looks = [
     "none",                                                        # 0 outside every shape: as it was
     { effect = "gradient_map", preset = "cyanotype" },             # 1 wave
     { effect = "gradient_map", preset = "thermal" },               # 2 sun
-    { effect = "halftone", cell = 7 },                             # 3 drop
+    { effect = "halftone", cell = 3 },                             # 3 drop
     "none",                                                        # 4 leaf (outlined below)
     "none",                                                        # 5 right vein
     "none",                                                        # 6 left vein
     { effect = "gradient_map", preset = "thermal", opacity = 0.8 },  # 7 ring
     { effect = "gradient_map", preset = "cyanotype" },             # 8 tile
     { effect = "gradient_map", preset = "cyanotype", opacity = 0.6 },  # 9 hill
-    { effect = "halftone", cell = 7 },                             # 10 star
+    { effect = "halftone", cell = 3 },                             # 10 star
     { effect = "gradient_map", preset = "thermal" },               # 11 pebble
 ]
 
 [[step]]
 effect = "seams"
 partition = "leaf"
-width = 4
+width = 1.875
 color = "#ffffff"

@@ -16,5 +16,5 @@ looks = ["none", { effect = "gradient_map", preset = "cyanotype" }]
 [[step]]
 effect = "seams"
 partition = "tear"
-width = 12
+width = 5.625
 color = "#111111"

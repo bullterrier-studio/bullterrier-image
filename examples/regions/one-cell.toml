@@ -22,5 +22,5 @@ mask = "cell"
 [[step]]
 effect = "seams"
 partition = "panes"
-width = 1.5
+width = 0.7031
 color = "#ffffff"
