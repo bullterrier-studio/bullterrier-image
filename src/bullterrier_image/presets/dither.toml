@@ -1,9 +1,9 @@
 # Looks that are one dither step with no dot pattern.
 
 [posterize]
-description = "Posterize: the picture in 6 flat colours found in it, a poster with bands where the tones were. Set `colors` for more or fewer."
-palette = "photo"
-colors = 6
+description = "Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels."
+palette = "cube4"
+space = "rgb"
 pattern = 0.0
 
 [threshold]

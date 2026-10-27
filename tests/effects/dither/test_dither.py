@@ -351,7 +351,7 @@ def test_a_hue_only_palette_dithers_a_grey_into_all_of_its_colours() -> None:
         assert len(colours_of(out)) == 3, method
 
 
-# --- the preset `posterize`: a few flat colours found in the photo --------------------------------------------------
+# --- the colour space and the cube palettes; the preset `posterize` -----------------------------------------------
 
 
 def with_preset(photo: np.ndarray, *steps) -> np.ndarray:
@@ -359,19 +359,106 @@ def with_preset(photo: np.ndarray, *steps) -> np.ndarray:
     return render(photo, Recipe("t", size=None, steps=list(steps)))
 
 
-def test_the_posterize_preset_repaints_a_photo_in_a_handful_of_flat_colours(photo: np.ndarray) -> None:
-    """Flat: each pixel is the nearest (in Oklab) of the few colours found, with no dot pattern between them."""
+CUBES = range(2, 7)
+
+
+def cube(levels: int) -> np.ndarray:
+    """Every colour whose channels are each one of `levels` evenly spaced values, as the corners of a grid."""
+    steps = np.arange(levels, dtype=np.float32) / (levels - 1)
+    return np.stack(np.meshgrid(steps, steps, steps, indexing="ij"), axis=-1).reshape(-1, 3)
+
+
+def noise(size: int = 128) -> np.ndarray:
+    return np.random.default_rng(5).random((size, size, 3), dtype=np.float32)
+
+
+def rgb_distance(x: np.ndarray) -> np.ndarray:
+    return x.astype(np.float64)
+
+
+@pytest.mark.parametrize("levels", CUBES)
+def test_a_cube_palette_has_every_combination_of_its_levels_and_no_others(levels: int) -> None:
+    out = registry.apply(NAME, noise(), palette=f"cube{levels}", space="rgb", pattern=0.0)
+    np.testing.assert_allclose(colours_of(out), colours_of(cube(levels).reshape(1, -1, 3)), atol=1e-6)
+    assert len(colours_of(out)) == levels**3
+
+
+@pytest.mark.parametrize("levels", CUBES)
+def test_a_cube_palette_matched_in_rgb_gives_each_pixel_its_nearest_colour_by_brute_force(levels: int) -> None:
+    picture = noise(48)
+    out = registry.apply(NAME, picture, palette=f"cube{levels}", space="rgb", pattern=0.0)
+    np.testing.assert_allclose(
+        out.reshape(-1, 3), closest(picture.reshape(-1, 3), cube(levels), rgb_distance), atol=1e-6
+    )
+
+
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("palette", ["cga", "ega"])
+@pytest.mark.parametrize(("space", "distance"), [("oklab", oklab), ("rgb", rgb_distance)], ids=["oklab", "rgb"])
+def test_without_the_pattern_each_pixel_takes_the_palette_colour_nearest_in_the_space_asked_for(
+    photo: np.ndarray, method: str, palette: str, space: str, distance
+) -> None:
+    out = registry.apply(NAME, photo, palette=palette, method=method, space=space, pattern=0.0)
+    expected = closest(photo.reshape(-1, 3), rgb_of(PALETTES[palette]), distance)
+    np.testing.assert_allclose(out.reshape(-1, 3), expected, atol=1e-6)
+
+
+def test_the_space_changes_which_colour_a_pixel_gets(photo: np.ndarray) -> None:
+    settings = {"palette": "ega", "pattern": 0.0}
+    assert not np.array_equal(
+        registry.apply(NAME, photo, space="oklab", **settings), registry.apply(NAME, photo, space="rgb", **settings)
+    )
+
+
+@pytest.mark.parametrize("method", ["floyd_steinberg", "bayer", "blue_noise"])  # Atkinson drops error: see above
+@pytest.mark.parametrize("tone", [0.2, 0.5, 0.8])
+def test_matched_in_rgb_a_flat_grey_lights_the_share_of_white_dots_equal_to_its_value(method: str, tone: float) -> None:
+    """In RGB, black and white dots average to a grey when the share of white is the grey's own value (not its Oklab
+    lightness, as above)."""
+    out = registry.apply(NAME, flat(tone, 128), method=method, cell=1 / 128, space="rgb", **BLACK_WHITE)
+    assert out[..., 0].mean() == pytest.approx(tone, abs=1 / 16)
+
+
+@pytest.mark.parametrize("space", ["oklab", "rgb"])
+def test_in_either_space_each_colour_found_is_the_average_of_the_pixels_it_replaces(space: str) -> None:
+    shades = [(0.10, 0.10, 0.10), (0.14, 0.14, 0.14), (0.80, 0.80, 0.80), (0.90, 0.90, 0.90)]
+    out = registry.apply(NAME, patches(shades), colors=2, pattern=0.0, space=space)
+    np.testing.assert_allclose(out[:, :16], 0.12, atol=1e-6)
+    np.testing.assert_allclose(out[:, 16:], 0.85, atol=1e-6)
+
+
+def test_the_colours_found_in_rgb_settle_where_each_is_the_average_of_the_pixels_nearest_to_it_in_rgb(
+    photo: np.ndarray,
+) -> None:
+    """Searched to convergence in RGB, the colours are a fixed point of k-means there: each is the mean of the photo
+    pixels it paints. Searched in Oklab and painted in RGB they would drift (about 0.01 on this photo)."""
+    out = registry.apply(NAME, photo, colors=4, pattern=0.0, space="rgb", iterations=100, tolerance=0.0)
+    painted = out.reshape(-1, 3)
+    for colour in colours_of(out):
+        pixels = photo.reshape(-1, 3)[(painted == colour).all(axis=1)]
+        np.testing.assert_allclose(pixels.mean(axis=0), colour, atol=0.003)
+
+
+@pytest.mark.parametrize("levels", CUBES)
+def test_the_posterize_preset_rounds_each_channel_to_evenly_spaced_levels(levels: int) -> None:
+    """The oracle is per-channel rounding itself: red, green and blue each go to the nearest of `levels` values."""
+    picture = noise()
+    out = with_preset(picture, fx.dither(preset="posterize", palette=f"cube{levels}"))
+    steps = np.float32(levels - 1)
+    np.testing.assert_allclose(out, np.rint(picture * steps) / steps, atol=1e-6)
+
+
+def test_the_posterize_preset_separates_each_channel_on_its_own() -> None:
+    picture = np.array([[[0.1, 0.5, 0.9]]], np.float32)
+    out = with_preset(picture, fx.dither(preset="posterize", palette="cube3"))
+    np.testing.assert_allclose(out[0, 0], [0.0, 0.5, 1.0], atol=1e-6)
+
+
+def test_the_posterize_preset_leaves_a_photo_with_a_few_flat_levels_per_channel(photo: np.ndarray) -> None:
     out = with_preset(photo, fx.dither(preset="posterize"))
-    found = colours_of(out)
-    assert 2 <= len(found) <= 8
-    assert len(colours_of(photo)) > 1000  # the photo really had far more
-    np.testing.assert_array_equal(out.reshape(-1, 3), closest(photo.reshape(-1, 3), found, oklab))
-
-
-@pytest.mark.parametrize("colors", [3, 12])
-def test_the_posterize_preset_takes_its_number_of_colours_from_the_step(photo: np.ndarray, colors: int) -> None:
-    out = with_preset(photo, fx.dither(preset="posterize", colors=colors))
-    assert 2 <= len(colours_of(out)) <= colors
+    for channel in range(3):
+        assert 2 <= len(np.unique(out[..., channel])) <= 6
+    assert len(colours_of(out)) <= 6**3
 
 
 # --- the preset `threshold`: two colours split at the middle of the lightness ----------------------------------------

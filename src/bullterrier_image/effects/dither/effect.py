@@ -1,5 +1,6 @@
 """The `dither` effect: the picture redrawn in a few colours, found in it or chosen, its tones kept as a dot pattern."""
 
+from itertools import product
 from typing import Literal
 
 import numpy as np
@@ -8,8 +9,7 @@ from pydantic import TypeAdapter
 from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.cluster import kmeans, nearest
-from bullterrier_image.ops.colorspace import rgb_to_oklab
-from bullterrier_image.ops.dither import choose
+from bullterrier_image.ops.dither import choose, in_space
 
 # The named palettes are data, as their authors publish them (sRGB hex):
 # - gameboy: the four greens widely used to draw a Game Boy screen, darkest to lightest (a community palette; the real
@@ -17,7 +17,9 @@ from bullterrier_image.ops.dither import choose
 # - cga: IBM CGA graphics mode 4, palette 1, high intensity: black, cyan, magenta, white.
 # - ega: the 16 default colours of the IBM EGA (and VGA text mode).
 # - pico8: the 16 colours of the PICO-8 fantasy console.
-_PALETTES: dict[str, tuple[str, ...]] = {
+# - cube2 to cube6: every combination of n evenly spaced levels per channel (0, 1/(n-1) ... 1), n^3 colours; matched in
+#   RGB (`space`) it rounds each channel on its own.
+_PALETTES: dict[str, tuple[str | tuple[float, ...], ...]] = {
     "gameboy": ("#0f380f", "#306230", "#8bac0f", "#9bbc0f"),
     "cga": ("#000000", "#55ffff", "#ff55ff", "#ffffff"),
     "ega": (
@@ -29,6 +31,8 @@ _PALETTES: dict[str, tuple[str, ...]] = {
         "#ff004d", "#ffa300", "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa",
     ),
 }  # fmt: skip
+# constant: the cubes offered, from 2 levels (8 colours) to 6 (216)
+_PALETTES |= {f"cube{n}": tuple(product([i / (n - 1) for i in range(n)], repeat=3)) for n in range(2, 7)}
 _COLOUR = TypeAdapter(Color)  # reads the hex codes above like a recipe's `Color` field does
 
 
@@ -43,13 +47,16 @@ class DitherParams(EffectParams):
         "matrix. 'blue_noise' is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible "
         "pattern. Both of those mix colours of any palette, in steps of a sixteenth.",
     )
-    palette: Literal["photo", "gameboy", "cga", "ega", "pico8"] | tuple[Color, ...] = param(
+    palette: (
+        Literal["photo", "gameboy", "cga", "ega", "pico8", "cube2", "cube3", "cube4", "cube5", "cube6"]
+        | tuple[Color, ...]
+    ) = param(
         "photo",
         doc="Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' "
         "(the 4 greens widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM "
-        "EGA colours) and 'pico8' (the 16 PICO-8 colours) are fixed palettes; or give your own list of at least two "
-        "colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1). Colours are matched in Oklab, a space "
-        "where equal distances look equally different.",
+        "EGA colours), 'pico8' (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every "
+        "mix of 2 to 6 evenly spaced levels of red, green and blue: 8 to 216 colours) are fixed palettes; or give your "
+        "own list of at least two colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1).",
         min_length=2,
     )
     colors: int = param(
@@ -80,6 +87,14 @@ class DitherParams(EffectParams):
         "(floyd_steinberg, atkinson) or mixes fewer colours per dot (bayer, blue_noise), so flatter areas; 0 gives "
         "each dot its nearest palette colour, plain flat colours with no pattern, whatever the method.",
     )
+    space: Literal["oklab", "rgb"] = param(
+        "oklab",
+        doc="The colour space in which dots are matched to palette colours, the 'photo' colours are searched, and "
+        "errors are measured. 'oklab' is where equal distances look equally different, so colours match as the eye "
+        "sees them; 'rgb' is the picture's own red, green and blue values, where each channel is matched on its own: "
+        "with a 'cube' palette and `pattern` 0 it snaps every channel to a few levels, hard colour separations.",
+        advanced=True,
+    )
     init: Literal["k-means++", "random"] = param(
         "k-means++",
         doc="How the search for colours starts (palette 'photo'): 'k-means++' spreads the starting colours out "
@@ -100,8 +115,8 @@ class DitherParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
-        doc="Stop the k-means rounds early once no colour has moved farther than this in Oklab (where black to white "
-        "is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result.",
+        doc="Stop the k-means rounds early once no colour has moved farther than this in `space` (in Oklab black to "
+        "white is 1). 0 runs all `iterations`; raising it stops sooner with a rougher result.",
         advanced=True,
     )
     sample: int = param(
@@ -134,7 +149,7 @@ def _colours(dots: np.ndarray, params: DitherParams) -> np.ndarray:
     if params.palette != "photo":
         return np.array([_COLOUR.validate_python(c) for c in _PALETTES[params.palette]], np.float32)
     flat = dots.reshape(dots.shape[0] * dots.shape[1], dots.shape[2])
-    lab = rgb_to_oklab(flat)
+    lab = in_space(flat, params.space)
     search = lab
     if params.sample < len(flat):
         chooser = np.random.default_rng(params.seed + 1)  # another stream than the one kmeans starts from
@@ -164,7 +179,7 @@ def dither(rgb: np.ndarray, params: DitherParams) -> np.ndarray:
     The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
     afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours
     (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives
-    plain flat colours. Colours are matched, and errors measured, in Oklab.
+    plain flat colours. Colours are matched, and errors measured, in `space`.
     """
     height, width = rgb.shape[:2]
     cell = max(1, round(params.cell * max(height, width)))
@@ -173,5 +188,5 @@ def dither(rgb: np.ndarray, params: DitherParams) -> np.ndarray:
     sums = np.add.reduceat(np.add.reduceat(rgb, row_starts, axis=0), column_starts, axis=1)
     dots = sums / (row_sizes[:, None] * column_sizes[None, :])[..., None]  # the average colour of each square
     palette = _colours(dots, params)
-    chosen = choose(dots, palette, method=params.method, amount=params.pattern)
+    chosen = choose(dots, palette, method=params.method, amount=params.pattern, space=params.space)
     return np.repeat(np.repeat(palette[chosen], cell, axis=0), cell, axis=1)[:height, :width]

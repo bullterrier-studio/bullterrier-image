@@ -38,6 +38,12 @@ _BAND_PIXELS = 2**16
 _BLUE_SEED = 0
 
 
+def in_space(rgb: np.ndarray, space: Literal["oklab", "rgb"]) -> np.ndarray:
+    """sRGB colours (last axis 3, 0..1) as float32 in the space where they are matched and errors measured: Oklab, or
+    sRGB as it is."""
+    return rgb_to_oklab(rgb) if space == "oklab" else np.asarray(rgb, np.float32)
+
+
 def diffuse(
     values: np.ndarray, palette: np.ndarray, *, method: Literal["floyd_steinberg", "atkinson"], amount: float
 ) -> np.ndarray:
@@ -158,16 +164,16 @@ def ordered(values: np.ndarray, palette: np.ndarray, tile: np.ndarray, *, amount
     """The palette colour chosen for each pixel of `values` by ordered dithering: (height, width) indices into
     `palette`, for any palette (not only one that runs from dark to light).
 
-    `values` is a (height, width, 3) picture and `palette` (count, 3) colours, in a space whose first channel is
-    brightness and where distance is the Euclidean one (Oklab). Each pixel first gets a mix that averages to its
-    value: candidate colours picked one after another, each the palette colour closest to the pixel's value plus the
-    error of the candidates so far (Knoll's mixing; the error is what the colours chosen for it still owe it). There
-    are n candidates, n = 1 + round(15 `amount`) with `amount` from 0 to 1: 16 at the full pattern, fewer for a
-    weaker one, and at `amount` 0 only the first, the palette colour nearest to the value. The candidates are put in
-    order of brightness (the first channel; ties by palette order) and the `tile` (from `threshold_tile`), which
-    repeats across the picture from its top left corner, picks one of them: a pixel with level T takes the candidate
-    at position floor(n T). So with n = 16 a pixel mixed of four dark and twelve light candidates is dark for the
-    quarter of the tile's levels below 0.25.
+    `values` is a (height, width, 3) picture and `palette` (count, 3) colours, in a space where distance is the
+    Euclidean one (Oklab or RGB) and whose first channel orders the candidates (lightness, or red). Each pixel first
+    gets a mix that averages to its value: candidate colours picked one after another, each the palette colour closest
+    to the pixel's value plus the error of the candidates so far (Knoll's mixing; the error is what the colours chosen
+    for it still owe it). There are n candidates, n = 1 + round(15 `amount`) with `amount` from 0 to 1: 16 at the full
+    pattern, fewer for a weaker one, and at `amount` 0 only the first, the palette colour nearest to the value. The
+    candidates are put in order of the first channel (ties by palette order) and the `tile` (from `threshold_tile`),
+    which repeats across the picture from its top left corner, picks one of them: a pixel with level T takes the
+    candidate at position floor(n T). So with n = 16 a pixel mixed of four dark and twelve light candidates is dark for
+    the quarter of the tile's levels below 0.25.
     """
     height, width = values.shape[:2]
     rows, columns = -(-height // tile.shape[0]), -(-width // tile.shape[1])
@@ -203,17 +209,18 @@ def choose(
     *,
     method: Literal["floyd_steinberg", "atkinson", "bayer", "blue_noise"],
     amount: float,
+    space: Literal["oklab", "rgb"],
 ) -> np.ndarray:
     """The palette colour chosen for each dot of `dots` by `method`: (height, width) indices into `palette`.
 
     `dots` is a (height, width, 3) sRGB picture and `palette` (count, 3) sRGB colours, both 0..1. Colours are matched,
-    and errors measured, in Oklab. `amount` (0 to 1) is how much of the pattern is used; at 0 every dot takes the
-    palette colour nearest to it, whatever the method. `method` is one of the four above ('floyd_steinberg' and
-    'atkinson' diffuse the error; 'bayer' and 'blue_noise' dither by a threshold pattern).
+    and errors measured, in `space` (`in_space`). `amount` (0 to 1) is how much of the pattern is used; at 0 every dot
+    takes the palette colour nearest to it, whatever the method. `method` is one of the four above ('floyd_steinberg'
+    and 'atkinson' diffuse the error; 'bayer' and 'blue_noise' dither by a threshold pattern).
     """
-    lab_dots, lab_palette = rgb_to_oklab(dots), rgb_to_oklab(palette)
+    matched_dots, matched_palette = in_space(dots, space), in_space(palette, space)
     match method:
         case "bayer" | "blue_noise":
-            return ordered(lab_dots, lab_palette, threshold_tile(method), amount=amount)
+            return ordered(matched_dots, matched_palette, threshold_tile(method), amount=amount)
         case "floyd_steinberg" | "atkinson":
-            return diffuse(lab_dots, lab_palette, method=method, amount=amount)
+            return diffuse(matched_dots, matched_palette, method=method, amount=amount)
