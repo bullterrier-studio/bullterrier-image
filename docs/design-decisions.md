@@ -77,12 +77,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   basic layout engine is pinned: its optional Raqm engine keeps fractional advances where the basic one rounds, which
   moves a glyph a pixel. *Consequence:* the licence is `MIT AND OFL-1.1` with the OFL text at the repository root
   (`LICENSE-FONT`); a `Font` value type arrives only on request.
-- **`drop_shadow` stacks copies; `long_shadow` stays apart.** `drop_shadow` lays `copies` offset copies of the silhouette
-  over each other, each at `copy_opacity`, from `color` to `end_color` (one copy is a shadow, a stack is cut paper).
-  `long_shadow` is one solid extrusion: the maximum over a copy per pixel, with a subtractive fade. *Reason:* stacked
-  copies compound where they overlap and a soft edge compounds across the stack, so the two pictures differ by up to
-  0.85 even with the same colour (measured at 320 px); no one engine gives both, and the extrusion's log-time doubling
-  does not carry a colour ramp.
+- **`drop_shadow` is every silhouette-copies look.** It lays `copies` offset copies of the silhouette over each other,
+  each at `copy_opacity` falling by `fade`, from `color` to `end_color`: one copy is a shadow, a few with `blur` 0 are
+  cut paper, many at a small `offset` in one colour are a long shadow (preset `long_shadow`). *Reason:* three effects
+  shared the silhouette, the shift and the layer behind the subject. The old `long_shadow` took the maximum over its
+  copies with a subtractive fade; stacked copies compound where they overlap instead, so the preset differs by up to
+  0.08 (mean 0.006) at 480 and 1920 px, and its shadow's edge is softer where few copies overlap. The cost is one shift
+  per copy: 150 copies take about 3 s at 480 px and half a minute at 1920 px, against the maximum's log-time doubling.
 
 ## Parameters
 

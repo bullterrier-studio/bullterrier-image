@@ -1,0 +1,10 @@
+# Looks that are one drop_shadow step.
+
+[long_shadow]
+description = "The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px."
+copies = 150
+offset = 2.0
+angle = 45.0
+blur = 0.0
+copy_opacity = 0.16
+fade = 1.0

@@ -1,4 +1,4 @@
-# The subject on a pale backdrop: five paper-like layers stacked behind it, and one soft shadow under the stack.
+# The subject on a pale backdrop: a long fading shadow, and five paper-like layers stacked over it, behind the subject.
 name = "drop_shadow"
 size = 480
 
@@ -9,6 +9,13 @@ mask = "background"           # a plain backdrop, so the copies show
 
 [[step]]
 effect = "drop_shadow"
+preset = "long_shadow"        # 150 copies of the silhouette, one colour, fading out
+color = "#3b1f6b"
+end_color = "#3b1f6b"
+opacity = 0.4                 # the shadow covers 40% of the backdrop where it is full
+
+[[step]]
+effect = "drop_shadow"
 copies = 5                    # a stack of layers, from orange to purple
 offset = 15
 angle = 45
@@ -16,10 +23,3 @@ blur = 0
 color = "#ff8a5b"
 end_color = "#3b1f6b"
 opacity = 1.0                 # the layers are opaque paper
-
-[[step]]
-effect = "drop_shadow"        # one soft copy, laid behind the stack
-offset = 80
-angle = 45
-blur = 18
-opacity = 0.35                # the shadow covers 35% of what lies behind it where it is full

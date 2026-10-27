@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.steps import Step
 
 NAME = "drop_shadow"
 GREY = 0.8
@@ -237,3 +238,39 @@ def test_copy_opacity_zero_changes_nothing_and_a_stack_changes_the_picture(
 
 def test_without_a_subject_there_is_no_shadow(photo: np.ndarray) -> None:
     np.testing.assert_array_equal(registry.apply(NAME, photo), photo)
+
+
+@pytest.mark.parametrize(
+    ("fade", "expected"),
+    [
+        pytest.param(0.0, [0.0, 0.0, 0.0], id="no fade: every copy as opaque as the first"),
+        pytest.param(0.5, [0.0, 0.2, 0.4], id="half: opacity falls in a straight line to half at the farthest copy"),
+        pytest.param(1.0, [0.0, 0.4, GREY], id="full: the farthest copy vanishes"),
+    ],
+)
+def test_fade_lowers_each_copys_opacity_in_a_straight_line_along_the_copies(fade: float, expected: list[float]) -> None:
+    """Three black copies of a 2 px subject, 4 px apart, over grey leave `GREY x (1 - opacity)` of the picture in copy
+    k: the opacity is 1 at the first copy, `1 - fade / 2` at the second and `1 - fade` at the third."""
+    out = registry.apply(
+        NAME, grey(12, 40), subject=block(slice(5, 7)), copies=3, offset=4.0, angle=0, blur=0.0, fade=fade
+    )
+    np.testing.assert_allclose([out[5, 9, 0], out[5, 13, 0], out[5, 17, 0]], expected, atol=1e-6)
+
+
+def test_a_single_copy_does_not_fade() -> None:
+    out = registry.apply(NAME, grey(), subject=one_pixel(), offset=3, angle=0, blur=0.0, copy_opacity=0.5, fade=1.0)
+    np.testing.assert_allclose(out[10, 15], GREY * 0.5, atol=1e-6)
+
+
+def test_the_long_shadow_preset_is_a_solid_shadow_that_fades_out_over_300_px() -> None:
+    """A 40 px wide band that fills the picture's height, the preset's shadow turned to the right: dark beside the
+    subject, lighter at every pixel farther on, gone 300 px past the subject's edge."""
+    subject = np.zeros((6, 380), np.float32)
+    subject[:, 10:50] = 1.0
+    out = registry.apply(NAME, grey(6, 380), subject=subject, **{**Step(NAME, preset="long_shadow").params, "angle": 0})
+    removed = GREY - out[3, :, 0]
+    assert removed[50] > 0.9 * GREY  # beside the subject
+    assert (np.diff(removed[50:]) <= 1e-6).all()  # never darker farther out
+    assert removed[290] > 0.2 * GREY  # still there 240 px out
+    assert removed[330] < 0.1 * GREY  # nearly gone 280 px out
+    np.testing.assert_allclose(removed[352:], 0.0, atol=1e-6)  # nothing past the last copy

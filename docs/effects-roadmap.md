@@ -232,7 +232,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000", mask="background")` |
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
 | `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
-| `long_shadow` ✓ | Flat-design shadow at an angle. | `fx.long_shadow(angle=45, length=300)` |
+| `long_shadow` ✓ | Flat-design shadow at an angle. A preset of `drop_shadow`. | `fx.drop_shadow(preset="long_shadow", angle=45)` |
 | `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
 | `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
 | `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `fill`, `gradient` or any other effect. | `fill / gradient with mask = "background"` |
@@ -351,7 +351,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | Goes | Into |
 | --- | --- |
 | `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
-| `layered_cutouts` | `drop_shadow` + `copies`, `end_color`, `copy_opacity` (`long_shadow` stays: one solid extrusion) |
+| `layered_cutouts`, `long_shadow` | `drop_shadow` + `copies`, `end_color`, `copy_opacity`, `fade`; preset `long_shadow` (done) |
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
 | `sparkle` | `starburst` + `count`, `dot` |
 | `fog`, `smoke` | one, with presets |

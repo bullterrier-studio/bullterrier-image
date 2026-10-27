@@ -1,4 +1,4 @@
-"""The `drop_shadow` effect: copies of the subject's silhouette behind it, a soft shadow or a stack of paper layers."""
+"""The `drop_shadow` effect: copies of the subject's silhouette behind it: a shadow, paper layers, a long shadow."""
 
 from typing import Literal
 
@@ -18,7 +18,7 @@ class DropShadowParams(EffectParams):
         1,
         unit="count",
         min=1,
-        max=20,
+        max=400,
         doc="How many copies of the silhouette are stacked behind the subject: 1 = a single shadow, more = a deeper "
         "stack of layers.",
     )
@@ -67,6 +67,14 @@ class DropShadowParams(EffectParams):
         "and the picture; 0 = no copies. Overlapping copies compound (two copies at 0.5 cover 0.75); the step's "
         "`opacity` mixes the finished stack in once.",
     )
+    fade: float = param(
+        0.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="How much of `copy_opacity` the farthest copy loses, falling in a straight line along the copies: 0 = all "
+        "copies alike, 0.5 = the farthest half as opaque, 1 = it vanishes. With one copy nothing fades.",
+    )
     truncate: float = param(
         4.0,
         unit="ratio",
@@ -89,9 +97,10 @@ class DropShadowParams(EffectParams):
 def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarray | None = None) -> np.ndarray:
     """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`.
 
-    One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper. The
-    copies run in colour from `color` (nearest the subject) to `end_color` (farthest); a nearer copy lies over the ones
-    beyond it, each at `copy_opacity`, and the subject on top of all of them, so the subject itself is never changed.
+    One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
+    at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
+    from `color` (nearest the subject) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
+    `copy_opacity` falling by `fade`, and the subject on top of all of them, so the subject itself is never changed.
 
     `subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
     no subject and so no copies: the picture comes back unchanged.
@@ -102,10 +111,17 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarra
     step = params.offset * np.array([np.sin(heading), np.cos(heading)])  # (down, right) as seen in the picture
     near, far = np.asarray(params.color, np.float32), np.asarray(params.end_color, np.float32)
     along = np.arange(params.copies, dtype=np.float32) / max(params.copies - 1, 1)  # 0 at the first copy, 1 at the last
-    colors = near + (far - near) * along[:, None]
-    behind = rgb  # what lies behind the subject: the picture with the copies laid over it, the farthest first
-    for number in range(params.copies, 0, -1):
+    opacity = params.copy_opacity * (1 - params.fade * along)
+    # Laying the copies over the picture, the farthest first, is the same as walking them from the nearest: each takes
+    # its opacity of what the nearer ones left clear, and its colour, which is `near` plus `along` of the way to `far`,
+    # is summed as `near` and the `along`-weighted share, so every copy costs one-channel arrays, not three.
+    clear = np.ones(subject.shape, np.float32)
+    along_share = np.zeros(subject.shape, np.float32)
+    for number in range(1, params.copies + 1):
         cover = shift(subject, *(step * number), edge=params.edge)
         cover = gaussian_blur(cover, params.blur, truncate=params.truncate, edge=params.edge)
-        behind = behind + (params.copy_opacity * cover)[..., None] * (colors[number - 1] - behind)
+        taken = clear * (opacity[number - 1] * cover)
+        clear -= taken
+        along_share += taken * along[number - 1]
+    behind = rgb * clear[..., None] + near * (1 - clear)[..., None] + (far - near) * along_share[..., None]
     return put_behind(rgb, subject, 1, behind)  # constant: the copies' own opacity is already in `behind`
