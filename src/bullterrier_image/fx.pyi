@@ -617,10 +617,12 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
+def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
+    """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
-The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
+`progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
+of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it
+on a cut-out on black. Each piece
 has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
 fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
 
@@ -766,7 +768,14 @@ background_threshold : number, fraction, 0 to 1, default 0.02
     How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
     rather than black background: a piece no brighter never flies and is drawn black
     once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces;
-    without a subject it also decides the figure's outline."""
+    without a subject it also decides the figure's outline.
+
+Presets
+-------
+evaporate : The top of the figure dissolves into pieces that rise like smoke, thin out and fade.
+halo : The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces.
+windblown : The edges dissolve and everything is blown to the right, like dust in a wind.
+disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
 def displace(amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -1113,116 +1122,6 @@ bins : whole number, count, 2 to 256, default 256
     Histogram bins over the brightness range 0..1: fewer bins give a coarser mapping and
     fewer distinct brightnesses in the result (2 = every tile ends up with two
     brightnesses), 256 matches 8-bit pictures."""
-    ...
-
-def evaporate(cell: int = 5, start: float = 0.6, ramp: float = 0.3, outline: float = 0.0, outward: float = 0.0, rise: float = 0.3, wind: float = 0.0, vanish: float = 0.3, seed: int = 0, rise_gamma: float = 0.6, rise_minimum: float = 0.1, rise_skew: float = 1.5, thinning: float = 0.5, falloff: float = 1.5, sway: float = 0.12, sway_minimum: float = 0.3, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['halo', 'windblown', 'disintegrate'] | None = None) -> Step:
-    """Dissolve the picture into pieces that float away, thin out and fade.
-
-The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Two things
-make pieces detach, at random and more often the stronger they act (the stronger of the two wins at any spot): from
-the top down, over the `ramp` above `start`; and from the outline, within `outline` of the edge of the figure and
-of the left, right and top borders of the picture (and the bottom unless `open_bottom`).
-
-A detached piece rises up to `rise`, the further the sparser (`thinning`) and dimmer (`falloff`), and sways
-sideways (`sway`). `outward` turns it away from the edge it came from; `wind` pushes everything sideways. Pieces
-leaving the picture are gone. With `outline` and `outward` at 0 pieces only move up, so everything more than one
-character row below `start` is untouched. The same `seed` always gives the same dissolve.
-
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette, which defines
-"the edge of the figure". Dark parts of the picture (eyes, shadows) are then still part of the figure. Without
-a subject the lit pieces are used, with enclosed dark gaps filled in.
-
-Parameters
-----------
-cell : whole number, px, 1 to 64, default 5
-    Character width in px; a piece is one character (its height comes from the bundled
-    font). Use the same value as the ascii step before this one, so whole characters fly
-    away.
-start : number, fraction, 0 to 1, default 0.6
-    Height (fraction of the picture, 0 = top) above which pieces begin to detach from
-    the top down. 0 switches the top-down dissolve off.
-outline : number, fraction, 0 to 1, default 0.0
-    Width of the band (fraction of the picture width) along the figure's outline, and
-    the left, right and top borders, where pieces detach; stronger nearer the edge. 0
-    switches it off. Raising it eats further in.
-outward : number, fraction, 0 to 1, default 0.0
-    How much a piece turns away from the edge it came from (the left of the head sheds
-    to the left): 0 = straight up, 1 = as much sideways as up.
-rise : number, fraction, 0 to 1, default 0.3
-    Farthest a piece climbs, as a fraction of the picture height (at least one character
-    row). Raising it spreads the smoke higher.
-wind : number, ratio, -5 to 5, default 0.0
-    Sideways drift in characters per row climbed: positive to the right, negative to the
-    left.
-vanish : number, fraction, 0 to 1, default 0.3
-    Share of detached pieces already gone before they climb (0..1); `thinning` removes
-    more with height.
-seed : whole number, count, 0 to 2147483647, default 0
-    Random seed: the same seed always gives the same dissolve, another seed another one.
-
-Advanced parameters
--------------------
-ramp : number, fraction, 0.01 to 1, default 0.3
-    Height of the band (fraction of the picture) above `start` over which the chance of
-    detaching rises smoothly from 0 to 1; above the band every piece has detached.
-    Raising it spreads the dissolve out.
-rise_gamma : number, ratio, 0 to 5, default 0.6
-    Gamma of the climb against how strongly a piece is pulled away (0..1): a piece
-    climbs up to `rise` x pull^rise_gamma. Below 1 even weakly pulled pieces climb far,
-    above 1 only the strongly pulled ones.
-rise_minimum : number, fraction, 0 to 1, default 0.1
-    Shortest climb as a share of a piece's longest one; 1 makes every piece climb the
-    full way.
-rise_skew : number, ratio, 0 to 5, default 1.5
-    Exponent on each piece's random share of its climb: above 1 most pieces stay low and
-    a few go high, 1 spreads them evenly, below 1 most go high.
-thinning : number, fraction, 0 to 1, default 0.5
-    Extra share of pieces gone by the time they climb the full `rise` (on top of
-    `vanish`): raising it makes the smoke sparser higher up.
-falloff : number, ratio, 0 to 5, default 1.5
-    How fast a piece dims as it climbs: brightness is (1 - climbed share of
-    `rise`)^falloff. 0 keeps full brightness, 1 dims evenly, above 1 dims quickly at
-    first.
-sway : number, ratio, 0 to 1, default 0.12
-    Random sideways sway in characters per row climbed (a standard deviation): raising
-    it makes the smoke spread wider the higher it goes.
-sway_minimum : number, count, 0 to 5, default 0.3
-    Sideways sway every detached piece has, however little it climbs, in characters (a
-    standard deviation).
-open_bottom : true or false, default True
-    True: the bottom border is not an edge for `outline` (a portrait is simply cut off
-    there). False: it sheds like the other borders.
-normal_smoothing : number, count, 0 to 10, default 1.0
-    Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
-    direction: raising it makes neighbouring pieces fly in more similar directions; 0
-    uses the raw outline.
-normal_truncate : number, ratio, 1 to 10, default 4.0
-    Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times
-    `normal_smoothing` characters from the outline, so the pieces' direction `outward`
-    is read from that far out. Larger is more exact and slower, smaller shortens the
-    reach. Nothing changes with `normal_smoothing` at 0.
-edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the `normal_smoothing` blur sees beyond the picture's border: 'reflect'
-    (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about
-    the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
-    'constant' (open space, as if nothing were there, which blurs the outline toward the
-    border).
-subject_threshold : number, fraction, 0 to 1, default 0.5
-    With a subject: how much of a piece, 0 to 1, the subject must cover on average for
-    the piece to belong to the figure that `outline` sheds from; 0.5 = more than half.
-    Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored
-    without a subject.
-background_threshold : number, fraction, 0 to 1, default 0.02
-    How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
-    rather than black background: a piece no brighter never drifts (it simply vanishes
-    if it detaches). Raising it leaves dim, noisy pieces behind; without a subject it
-    also decides the figure's outline.
-
-Presets
--------
-halo : The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces.
-windblown : The edges dissolve and everything is blown to the right, like dust in a wind.
-disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
 def flow_lines(density: float = 0.002, length: int = 120, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

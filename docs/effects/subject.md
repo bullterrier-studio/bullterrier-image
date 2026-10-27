@@ -6,9 +6,8 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
+| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo). | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
 | <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`. | `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
-| <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `start=0.6` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` +14 advanced | [evaporate.toml](../../examples/effects/evaporate.toml) |
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px. | `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth. | `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
 | <img src="../gallery/rim_light.jpg" width="160" alt="rim_light"> | `rim_light` | Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`. | `angle=40.0` `color='#ff9a4d'` `width=12.0` `amount=1.0` `falloff=1.5` +4 advanced | [rim_light.toml](../../examples/effects/rim_light.toml) |
@@ -64,6 +63,15 @@ Effects that work on the cut-out subject, apart from its background.
 
 </details>
 
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `evaporate` | The top of the figure dissolves into pieces that rise like smoke, thin out and fade. |
+| `halo` | The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces. |
+| `windblown` | The edges dissolve and everything is blown to the right, like dust in a wind. |
+| `disintegrate` | Heavy: the whole outline and the top come apart, in long plumes in every direction. |
+
 ### `drop_shadow`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -93,48 +101,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. |
-
-### `evaporate`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `cell` | whole number | px | 1 to 64 | `5` | Character width in px; a piece is one character (its height comes from the bundled font). Use the same value as the ascii step before this one, so whole characters fly away. |
-| `start` | number | fraction | 0 to 1 | `0.6` | Height (fraction of the picture, 0 = top) above which pieces begin to detach from the top down. 0 switches the top-down dissolve off. |
-| `outline` | number | fraction | 0 to 1 | `0.0` | Width of the band (fraction of the picture width) along the figure's outline, and the left, right and top borders, where pieces detach; stronger nearer the edge. 0 switches it off. Raising it eats further in. |
-| `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece turns away from the edge it came from (the left of the head sheds to the left): 0 = straight up, 1 = as much sideways as up. |
-| `rise` | number | fraction | 0 to 1 | `0.3` | Farthest a piece climbs, as a fraction of the picture height (at least one character row). Raising it spreads the smoke higher. |
-| `wind` | number | ratio | -5 to 5 | `0.0` | Sideways drift in characters per row climbed: positive to the right, negative to the left. |
-| `vanish` | number | fraction | 0 to 1 | `0.3` | Share of detached pieces already gone before they climb (0..1); `thinning` removes more with height. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: the same seed always gives the same dissolve, another seed another one. |
-
-<details><summary>Advanced parameters (14)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `ramp` | number | fraction | 0.01 to 1 | `0.3` | Height of the band (fraction of the picture) above `start` over which the chance of detaching rises smoothly from 0 to 1; above the band every piece has detached. Raising it spreads the dissolve out. |
-| `rise_gamma` | number | ratio | 0 to 5 | `0.6` | Gamma of the climb against how strongly a piece is pulled away (0..1): a piece climbs up to `rise` x pull^rise_gamma. Below 1 even weakly pulled pieces climb far, above 1 only the strongly pulled ones. |
-| `rise_minimum` | number | fraction | 0 to 1 | `0.1` | Shortest climb as a share of a piece's longest one; 1 makes every piece climb the full way. |
-| `rise_skew` | number | ratio | 0 to 5 | `1.5` | Exponent on each piece's random share of its climb: above 1 most pieces stay low and a few go high, 1 spreads them evenly, below 1 most go high. |
-| `thinning` | number | fraction | 0 to 1 | `0.5` | Extra share of pieces gone by the time they climb the full `rise` (on top of `vanish`): raising it makes the smoke sparser higher up. |
-| `falloff` | number | ratio | 0 to 5 | `1.5` | How fast a piece dims as it climbs: brightness is (1 - climbed share of `rise`)^falloff. 0 keeps full brightness, 1 dims evenly, above 1 dims quickly at first. |
-| `sway` | number | ratio | 0 to 1 | `0.12` | Random sideways sway in characters per row climbed (a standard deviation): raising it makes the smoke spread wider the higher it goes. |
-| `sway_minimum` | number | count | 0 to 5 | `0.3` | Sideways sway every detached piece has, however little it climbs, in characters (a standard deviation). |
-| `open_bottom` | true or false |  |  | `True` | True: the bottom border is not an edge for `outline` (a portrait is simply cut off there). False: it sheds like the other borders. |
-| `normal_smoothing` | number | count | 0 to 10 | `1.0` | Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it makes neighbouring pieces fly in more similar directions; 0 uses the raw outline. |
-| `normal_truncate` | number | ratio | 1 to 10 | `4.0` | Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0. |
-| `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `normal_smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border), 'constant' (open space, as if nothing were there, which blurs the outline toward the border). |
-| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | With a subject: how much of a piece, 0 to 1, the subject must cover on average for the piece to belong to the figure that `outline` sheds from; 0.5 = more than half. Lowering it takes in more of a soft edge (hair, fur), raising it less. Ignored without a subject. |
-| `background_threshold` | number | fraction | 0 to 1 | `0.02` | How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture rather than black background: a piece no brighter never drifts (it simply vanishes if it detaches). Raising it leaves dim, noisy pieces behind; without a subject it also decides the figure's outline. |
-
-</details>
-
-Presets (`preset="name"` in a recipe step or `fx`):
-
-| Preset | Description |
-| --- | --- |
-| `halo` | The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces. |
-| `windblown` | The edges dissolve and everything is blown to the right, like dust in a wind. |
-| `disintegrate` | Heavy: the whole outline and the top come apart, in long plumes in every direction. |
 
 ### `outline`
 
