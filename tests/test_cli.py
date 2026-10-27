@@ -53,11 +53,59 @@ def cut(files):
     return files
 
 
-def test_effects_lists_every_effect(capsys):
+def _short_listing(out: str) -> dict[str, dict[str, str]]:
+    """The short `bt-image effects` listing as {section heading: {name: text}}: an unindented line starts a section, a
+    line with two spaces an entry, a line with four a wrapped continuation of the entry above."""
+    sections: dict[str, dict[str, str]] = {}
+    section = entry = ""
+    for line in out.splitlines():
+        if line.startswith("    "):
+            sections[section][entry] += " " + line.strip()
+        elif line.startswith("  "):
+            entry, text = line.strip().split(": ", 1)
+            sections[section][entry] = text
+        elif line:
+            section = line
+            sections[section] = {}
+    return sections
+
+
+def _section(listing: dict[str, dict[str, str]], heading: str) -> dict[str, str]:
+    """The entries of the section whose heading starts with `heading`."""
+    return next(entries for title, entries in listing.items() if title.startswith(heading))
+
+
+def test_effects_lists_one_entry_per_effect_with_its_summary(capsys):
     assert cli("effects") == 0
-    listed = {line for line in capsys.readouterr().out.splitlines() if line and not line.startswith(" ")}
-    # one unindented heading per effect, its documentation indented below; then the looks, under their own heading
-    assert listed == {*registry.describe(), next(name for name in listed if name.startswith("Looks"))}
+    entries = _section(_short_listing(capsys.readouterr().out), "Effects")
+    assert set(entries) == set(registry.describe())
+    assert all(text.startswith(registry.summary(name)) for name, text in entries.items())
+
+
+def test_effects_names_the_presets_of_an_effect_on_its_line_and_none_where_it_has_none(capsys):
+    assert cli("effects") == 0
+    entries = _section(_short_listing(capsys.readouterr().out), "Effects")
+    for name, text in entries.items():
+        found = list(registry.presets(name))
+        assert text.endswith(f"(presets: {', '.join(found)})") if found else "presets:" not in text
+    assert any(registry.presets(name) for name in entries)  # the check above is not vacuous
+
+
+def test_effects_listing_is_short_and_ends_in_where_to_find_the_details(capsys):
+    assert cli("effects") == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[-1] == "details: bt-image effects NAME, or --all"
+    assert max(map(len, lines)) <= 120
+    assert len(lines) <= 2 * len(registry.describe()) + 3 * len(looks.read()) + 10  # wrapped to at most two lines
+
+
+def test_effects_all_prints_every_effect_in_full_after_the_looks(capsys):
+    assert cli("effects --all") == 0
+    out = capsys.readouterr().out
+    headings = _headings(out)
+    assert headings[0].startswith("Looks")
+    assert headings[1:] == sorted(registry.describe())
+    assert "    radius : number, px" in out  # the parameters are here, which the short listing leaves out
 
 
 class ProbeParams(EffectParams):
@@ -72,9 +120,8 @@ def test_effects_prints_every_parameter_of_a_modelled_effect(capsys, throwaway_e
         """Lights a candle."""
         return rgb
 
-    assert cli("effects") == 0
-    out = capsys.readouterr().out
-    entry = out[out.index("wick_probe\n") :]
+    assert cli("effects wick_probe") == 0
+    entry = capsys.readouterr().out
     assert "    Lights a candle." in entry
     assert "    length : number, px, 0 to 9, default 2.0" in entry
     assert "Length of the candle wick, a rather distinctive phrase." in entry
@@ -97,19 +144,25 @@ def tuned_probe(throwaway_effects):
 
 
 @pytest.mark.parametrize(
-    ("command", "shows_advanced"),
+    ("command", "shows_basic", "shows_advanced"),
     [
-        pytest.param("effects", False, id="listing-hides-advanced"),
-        pytest.param("effects --category light", False, id="category-listing-hides-advanced"),
-        pytest.param("effects --advanced", True, id="advanced-switch-shows-all"),
-        pytest.param("effects tuned_probe", True, id="naming-an-effect-shows-all"),
+        pytest.param("effects --all", True, False, id="all-hides-advanced"),
+        pytest.param("effects --category light --all", True, False, id="category-all-hides-advanced"),
+        pytest.param("effects --advanced", True, True, id="advanced-switch-shows-all"),
+        pytest.param("effects --category light --advanced", True, True, id="advanced-switch-narrowed-by-category"),
+        pytest.param("effects tuned_probe", True, True, id="naming-an-effect-shows-all"),
+        pytest.param("effects", False, False, id="listing-shows-no-parameters"),
+        pytest.param("effects --category light", False, False, id="category-listing-shows-no-parameters"),
     ],
 )
-def test_effects_shows_advanced_parameters_only_when_asked_or_when_one_effect_is_named(
-    command, shows_advanced, tuned_probe, capsys
+def test_effects_shows_parameters_only_in_full_and_advanced_ones_only_when_asked_or_named(
+    command, shows_basic, shows_advanced, tuned_probe, capsys
 ):
     assert cli(command) == 0
     out = capsys.readouterr().out
+    if not shows_basic:
+        assert "amount : number" not in out
+        return
     lines = out[out.index("tuned_probe\n") :].splitlines()[1:]
     entry = "\n".join(itertools.takewhile(lambda line: not line or line.startswith(" "), lines))
     assert "amount : number, fraction, 0 to 1, default 0.5" in entry
@@ -143,13 +196,14 @@ def _headings(out: str) -> list[str]:
     return [line for line in out.splitlines() if line and not line.startswith(" ")]
 
 
-def test_effects_category_lists_only_the_effects_of_that_category(fresh_registry, register_probe, capsys):
+def test_effects_category_lists_only_the_effects_of_that_category_in_short(fresh_registry, register_probe, capsys):
     for name, category in [("lamp", "light"), ("tint", "colour"), ("beam", "light")]:
         register_probe(name, category)
     assert cli("effects --category light") == 0
     out = capsys.readouterr().out
-    assert _headings(out) == ["beam", "lamp"]  # sorted, and not the colour effect
-    assert "    The beam probe." in out  # with the same documentation the plain call prints
+    assert list(_section(_short_listing(out), "Effects")) == ["beam", "lamp"]  # sorted, and not the colour effect
+    assert "beam: The beam probe." in out
+    assert not any(title.startswith("Looks") for title in _short_listing(out))
 
 
 @pytest.mark.parametrize(
@@ -759,21 +813,29 @@ def test_effects_naming_something_that_is_no_effect_says_where_it_lives(name, sa
     assert says in captured.err
 
 
-def test_effects_lists_every_look_with_its_description_after_the_effects(capsys):
+def test_effects_lists_every_look_with_its_description_before_the_effects(capsys):
     assert cli("effects") == 0
-    lines = capsys.readouterr().out.splitlines()
-    start = lines.index(next(line for line in lines if line.startswith("Looks")))
-    assert start > max(lines.index(name) for name in registry.describe())  # the looks come after the last effect
-    shown = {line.split(" : ")[0].strip(): line.split(" : ", 1)[1] for line in lines[start + 1 :] if " : " in line}
-    assert shown == {name: look.description for name, look in looks.read().items()}
-    assert {"crt", "glitch", "tilt-shift"} <= shown.keys()
+    listing = _short_listing(capsys.readouterr().out)
+    titles = list(listing)
+    assert titles[0].startswith("Looks")
+    assert titles[1] == "Effects"
+    assert _section(listing, "Looks") == {name: look.description for name, look in looks.read().items()}
+    assert {"crt", "glitch", "tilt-shift"} <= _section(listing, "Looks").keys()
 
 
-@pytest.mark.parametrize("command", ["effects --category light", "effects grade", "effects --list-categories"])
+@pytest.mark.parametrize(
+    "command",
+    [
+        "effects --category light",
+        "effects --category light --all",
+        "effects grade",
+        "effects --list-categories",
+    ],
+)
 def test_effects_lists_looks_only_in_the_whole_catalogue(command, capsys):
     assert cli(command) == 0
     out = capsys.readouterr().out
-    assert not any(f"    {name} : " in out for name in looks.read())
+    assert not any(f"  {name}: " in out for name in looks.read())
 
 
 @pytest.mark.parametrize(

@@ -7,8 +7,10 @@
 same program when script not on `PATH`. Results to stdout, progress and errors to stderr. Mistake -> one line
 `error: ...`, exit 1 (usage mistakes 2, Ctrl-C 130). `-q` hides progress. Traceback: `--debug` or `BT_IMAGE_DEBUG=1`.
 
-`bt-image effects` lists every effect and its main parameters; `--advanced` shows all, `--category NAME` one category,
-`--list-categories` the categories with their number of effects, `NAME` one effect in full.
+`bt-image effects` lists the built-in looks, then one line per effect (its summary and presets). `NAME` shows one effect in
+full (every parameter and preset); `--all` shows every effect in full, `--advanced` also the advanced parameters;
+`--category NAME` narrows the listing (short, or full with `--all`/`--advanced`); `--list-categories` shows the
+categories with their number of effects.
 
 `sweep` shows what one number does: recipe at five values (`--count`, 2 to 24), side by side, labelled. Target = number's
 address: `effect.parameter`, `effect#2.parameter` for effect used twice. Range starting below zero goes after `--`:

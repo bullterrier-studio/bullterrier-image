@@ -9,6 +9,7 @@ so `--help`, `--version` and a usage error answer without loading numpy, scipy, 
 import argparse
 import os
 import re
+import shutil
 import sys
 import textwrap
 from collections.abc import Callable
@@ -192,11 +193,11 @@ def _parser() -> argparse.ArgumentParser:
     p = command(
         "effects",
         _effects,
-        summary="list the available effects and their parameters",
+        summary="list the built-in looks and the effects, one line each",
         example="--category light",
     )
     which = p.add_mutually_exclusive_group()
-    which.add_argument("effect", nargs="?", help="show only this effect, with all its parameters")
+    which.add_argument("effect", nargs="?", help="show only this effect, in full: every parameter and preset")
     which.add_argument(
         "--category", metavar="NAME", help="list only the effects of this category (see --list-categories)"
     )
@@ -205,7 +206,16 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="list the categories that have effects, with their number of effects and what each holds",
     )
-    p.add_argument("--advanced", action="store_true", help="also list the advanced parameters of every effect")
+    p.add_argument(
+        "--all",
+        action="store_true",
+        help="show every effect in full (parameters and presets) instead of one line; with --category, those of it",
+    )
+    p.add_argument(
+        "--advanced",
+        action="store_true",
+        help="like --all, and also list the advanced parameters (--category narrows it as well)",
+    )
     return parser
 
 
@@ -465,6 +475,9 @@ def _init(args: argparse.Namespace) -> int:
     return 0
 
 
+_LISTING_WIDTH = (60, 120)  # the narrowest and widest a short listing is wrapped to; the width of a pipe is the widest
+
+
 def _effects(args: argparse.Namespace) -> int:
     from .core import looks, registry
     from .errors import RecipeError
@@ -476,19 +489,34 @@ def _effects(args: argparse.Namespace) -> int:
             print(f"{category:<{width}}  {len(names):>3}  {registry.CATEGORY_DESCRIPTIONS[category]}")
         return 0
     if args.effect is not None:
-        registry.get(args.effect)  # a misspelt name raises UnknownEffectError listing the available ones
-        names = [args.effect]
-    elif args.category is None:
+        registry.get(args.effect)  # a misspelt name raises UnknownEffectError saying where the name lives
+        print(f"{args.effect}\n{textwrap.indent(registry.documentation(args.effect), '    ')}")
+        return 0
+    if args.category is None:
         names = sorted(registry.describe())
     elif args.category in used:
         names = used[args.category]
     else:
         raise RecipeError(f"no effects in category {args.category!r}; categories with effects: {', '.join(used)}")
-    full = args.advanced or args.effect is not None  # one named effect is asked for in full
-    for name in names:  # line by line, so the parameter list stays a list
-        print(f"{name}\n{textwrap.indent(registry.documentation(name, advanced=full), '    ')}\n")
-    if args.effect is None and args.category is None:  # the whole catalogue; the looks, which are no effects, come last
+    if args.category is None:  # the looks, which are no effects, come first: a person looks for a style before a tool
         print("Looks (recipes of several steps; a name works where a recipe file does: `bt-image render PHOTO crt`)")
         for name, look in looks.read().items():
-            print(f"    {name} : {look.description}")
+            print(_entry(name, look.description))
+        print()
+    if args.all or args.advanced:
+        for name in names:  # line by line, so the parameter list stays a list
+            print(f"{name}\n{textwrap.indent(registry.documentation(name, advanced=args.advanced), '    ')}\n")
+        return 0
+    print("Effects" if args.category is None else f"Effects in {args.category}")
+    for name in names:
+        found = list(registry.presets(name))
+        print(_entry(name, registry.summary(name) + (f" (presets: {', '.join(found)})" if found else "")))
+    print("\ndetails: bt-image effects NAME, or --all")
     return 0
+
+
+def _entry(name: str, text: str) -> str:
+    """`  name: text`, wrapped to the terminal's width (see `_LISTING_WIDTH`), continuation lines indented further."""
+    low, high = _LISTING_WIDTH
+    width = min(max(shutil.get_terminal_size((high, 24)).columns, low), high)
+    return textwrap.fill(f"{name}: {text}", width, initial_indent="  ", subsequent_indent="    ")

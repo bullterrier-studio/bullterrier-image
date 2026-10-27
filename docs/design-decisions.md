@@ -208,7 +208,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   file in `src/bullterrier_image/looks/<name>.toml` with a top-level `description` (one sentence), found the way presets
   are: by the folder, not by a list in code. `load_recipe` and every command argument that takes a recipe file also take
   a look's name: a `str` that is a look's name is that look (a `Path`, or `./crt`, is always a file, so a folder of yours
-  never changes what the name means); `bt-image effects` lists the looks under "Looks". *Reason:* one way to load a
+  never changes what the name means); `bt-image effects` lists the looks first, under "Looks". *Reason:* one way to load a
   recipe, no `load_look` beside it; a look is a recipe, so it passes the same validation and the same tests, and it is
   data, so a look is added without touching code. *Consequence:* `examples/recipes/` keeps the demonstrations that are
   not looks; a look is not a preset (one effect) and not an effect (one picture in, one out, with parameters).
@@ -325,6 +325,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Reason:* callers catch one type; `except ValueError` keeps working. *Consequence:* the CLI catches them and prints a
   message, never a traceback, for a user's mistake; a broken effect definition is a programming error (plain
   `ValueError`/`TypeError` at import).
+- **`bt-image effects` is a short list: looks first, then one line per effect.** The default output is the looks
+  (name and description), then each effect's name, summary and presets, then where the details are (`bt-image effects
+  NAME`, or `--all`). *Reason:* a person or a model that reads it to find a style must see all of it on a few screens;
+  the full parameter lists (about 15 times longer) bury the looks and the presets. *Consequence:* `--all` and
+  `--advanced` give the full documentation; `--category` narrows either form; the generated `docs/effects/` is the full
+  reference.
 - **`imageio` is the only module that knows file formats**, EXIF rotation, colour profiles and 8-bit conversion.
   *Consequence:* everything else works on one in-memory image type.
 
