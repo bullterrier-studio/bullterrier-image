@@ -1377,7 +1377,7 @@ def disc(long_side: int) -> np.ndarray:
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
 @pytest.mark.parametrize(
     "step",
-    [Step("gaussian_blur", {"radius": 16.0}), Step("drop_shadow", {"dx": 24.0, "dy": 24.0, "blur": 12.0})],
+    [Step("gaussian_blur", {"radius": 16.0}), Step("drop_shadow", {"offset": 34.0, "angle": 45.0, "blur": 12.0})],
     ids=["a blur radius", "a shadow's offset and blur"],
 )
 def test_a_recipe_without_a_size_gives_the_same_look_on_a_photo_of_any_size(picture_of, step):
