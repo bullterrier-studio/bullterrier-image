@@ -6,38 +6,12 @@ Grain and other surface texture laid over the picture.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/crt.jpg" width="160" alt="crt"> | `crt` | Show the picture on a CRT: bulged glass, a glow, scanlines, a shadow mask, a dim edge and the bezel `border`. | `curve=0.15` `shadow_mask=0.35` `scanlines=0.3` `bloom=0.3` `vignette=0.35` +8 advanced | [crt.toml](../../examples/effects/crt.toml) |
 | <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places over the picture. | `density=0.6` `size=8.0` `scratches=2` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
 | <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says. | `amount=0.08` `balance=0.0` `size=1.0` `color=False` `distribution='gaussian'` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
 | <img src="../gallery/paper_texture.jpg" width="160" alt="paper_texture"> | `paper_texture` | Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture. | `kind='paper'` `amount=0.1` `scale=6.0` `octaves=3` `spacing=6.0` `seed=0` +3 advanced | [paper_texture.toml](../../examples/effects/paper_texture.toml) |
-| <img src="../gallery/pixel_grid.jpg" width="160" alt="pixel_grid"> | `pixel_grid` | The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between. | `cell=4` `gap=0.15` `amount=0.4` | [pixel_grid.toml](../../examples/effects/pixel_grid.toml) |
-| <img src="../gallery/scanlines.jpg" width="160" alt="scanlines"> | `scanlines` | Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`. | `spacing=3.0` `thickness=0.5` `darkness=0.35` `offset=0.0` | [scanlines.toml](../../examples/effects/scanlines.toml) |
+| <img src="../gallery/pixel_grid.jpg" width="160" alt="pixel_grid"> | `pixel_grid` | The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between. | `cell=4` `gap=0.15` `amount=0.4` `keep_brightness=False` | [pixel_grid.toml](../../examples/effects/pixel_grid.toml) |
+| <img src="../gallery/scanlines.jpg" width="160" alt="scanlines"> | `scanlines` | Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`. | `spacing=3.0` `thickness=0.5` `darkness=0.35` `offset=0.0` `softness=0.0` | [scanlines.toml](../../examples/effects/scanlines.toml) |
 | <img src="../gallery/torn_edge.jpg" width="160" alt="torn_edge"> | `torn_edge` | Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`. | `width=24.0` `roughness=0.5` `scale=24.0` `octaves=3` `persistence=0.4` `lacunarity=2.0` `fill='#f5f0e6'` `seed=0` | [torn_edge.toml](../../examples/effects/torn_edge.toml) |
-
-### `crt`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `curve` | number | ratio | 0 to 1 | `0.15` | How far the glass bulges: each pixel shows the picture at 1 + curve x (d / R)^2 times its distance from the middle, d its own distance from it and R the distance of a corner (the radial term of the Brown-Conrady lens model), so straight lines bow outward, more toward the corners, and the corners and edges reach beyond the picture and show `border` instead. 0 = a flat screen; 1 = a strongly bulged one. |
-| `shadow_mask` | number | fraction | 0 to 1 | `0.35` | How strongly the shadow mask shows: the screen is covered with red, green and blue vertical stripes, and a stripe lets through only its own colour. 0 = no mask; at 1 each channel is lit in a third of the columns only. The mask keeps the picture's average brightness (the lit stripes are brightened by as much as the others are darkened), so raising it shows the stripes without dimming the picture. |
-| `scanlines` | number | fraction | 0 to 1 | `0.3` | How dark the gaps between the lines of the raster are: the picture is darkened between the lines by up to this share, smoothly, so a line is brightest in its middle. 0 = no scanlines, 1 = black between them. |
-| `bloom` | number | ratio | 0 to 2 | `0.3` | How strongly the bright parts glow into their surroundings, as light spreading in the glass: the blurred highlights are screened over the picture by this much. 0 = no glow, 1 = the halo at full brightness, above 1 it reaches white sooner. |
-| `vignette` | number | fraction | 0 to 1 | `0.35` | How much dimmer the screen is at its corners than in the middle: the picture is darkened in proportion to the square of the distance from the middle, up to this share at a corner. 0 = an evenly lit screen. |
-
-<details><summary>Advanced parameters (8)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `border` | colour |  |  | `'#000000'` | The colour beyond the curved screen, where the glass ends and the bezel begins: '#rrggbb', '#rgb' or [r, g, b] 0..1. It covers everything else there, and is only seen where `curve` is above 0. |
-| `shadow_mask_pitch` | whole number | px | 3 to 24 | `3` | The width in px of one triad of red, green and blue stripes, a third of it for each, tuned for a picture about 480 px high: 3 gives stripes one pixel wide, larger gives coarser ones. |
-| `scanline_spacing` | number | px | 2 to 32 | `4.0` | The distance in px from one line of the raster to the next, tuned for a picture about 480 px high: lines are centred on rows 0, spacing, 2 x spacing... and the gaps between them lie half a spacing away. A larger spacing is fewer, wider-set lines. |
-| `bloom_radius` | number | px | 0 to 100 | `10.0` | Gaussian sigma in px of the glow, tuned for a picture about 480 px high: larger spreads the light further; 0 keeps it on the highlights themselves. |
-| `bloom_threshold` | number | fraction | 0 to 0.99 | `0.5` | The brightness (0..1, per channel) where the glow starts: only values above it give light, rising to full at 1. Raising it limits the glow to the brightest parts. |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x `bloom_radius` px. Larger is more exact and slower. |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read when the glass bends the picture: 'nearest' takes the closest pixel (fastest, but lines turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the bend and the glow's blur see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). The bend's own beyond is covered by `border`. |
-
-</details>
 
 ### `dust_scratches`
 
@@ -110,6 +84,7 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 | `cell` | whole number | px | 3 to 32 | `4` | Width and height in px of one grid cell, which holds one red, one green and one blue stripe, each a third of the cell wide. Larger = a coarser grid; the smallest, 3, gives stripes one pixel wide. |
 | `gap` | number | fraction | 0 to 1 | `0.15` | Width of the dark lines between sub-pixels, as a fraction of a stripe's width (cell / 3): the same lines run between the stripes and between rows of cells, half of each inside its own sub-pixel. 0 = stripes touch, 1 = nothing is lit and the grid is black. Raising it darkens the picture and shows the grid. |
 | `amount` | number | fraction | 0 to 1 | `0.4` | How far the picture is shown through the grid: 0 = the picture unchanged, 1 = the picture as the grid lights it (each channel only inside its own sub-pixels, a third of the picture's brightness or less), in between a mix of the two. |
+| `keep_brightness` | true or false |  |  | `False` | Whether the grid is brightened by the share it darkens the picture on average, so the average brightness is kept and raising `amount` or `gap` shows the grid without dimming the picture (a lit stripe is lifted above the picture's own value and clips at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and the picture is black). False = the grid only ever darkens, as an LCD does. |
 
 ### `scanlines`
 
@@ -118,7 +93,8 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 | `spacing` | number | px | 1 to 64 | `3.0` | Distance in px from the top of one line to the top of the next. A spacing that is not a whole number drifts against the pixel rows and the lines are anti-aliased. Larger = fewer, wider-set lines. |
 | `thickness` | number | fraction | 0 to 1 | `0.5` | How thick each line is, as a fraction of `spacing`: 0 = no line (the picture is unchanged), 0.5 = lines and gaps equally wide, 1 = the lines touch and the whole picture is darkened alike. A line that covers only part of a pixel row darkens that row in proportion. |
 | `darkness` | number | fraction | 0 to 1 | `0.35` | How much a line darkens what is under it: 0 = nothing (the picture is unchanged), 0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 - darkness, so colours keep their ratios. |
-| `offset` | number | px | 0 to 64 | `0.0` | How far down in px the first line starts from the top of the picture. Offsets of more than `spacing` repeat the pattern: the lines are at offset + k x spacing. |
+| `offset` | number | px | 0 to 64 | `0.0` | How far down in px the first line starts from the top of the picture (the middle of its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat the pattern: the lines are at offset + k x spacing. |
+| `softness` | number | fraction | 0 to 1 | `0.0` | How softly a line fades in and out: 0 = hard edges, each row darkened by the share of it a line covers; 1 = as soft as the lines and gaps allow, so with a `thickness` of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line and nothing in the middle of a gap, as on a CRT. In between, each edge fades over `softness` x the narrower of a line and a gap, either side of the hard edge. It keeps the average darkening of the picture: only its shape changes. |
 
 ### `torn_edge`
 

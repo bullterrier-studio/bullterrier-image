@@ -457,79 +457,6 @@ preserve_luminosity : true or false, default True
     allows."""
     ...
 
-def crt(curve: float = 0.15, shadow_mask: float = 0.35, scanlines: float = 0.3, bloom: float = 0.3, vignette: float = 0.35, border: str | list[float] | tuple[float, float, float] = '#000000', shadow_mask_pitch: int = 3, scanline_spacing: float = 4.0, bloom_radius: float = 10.0, bloom_threshold: float = 0.5, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Show the picture on a CRT: bulged glass, a glow, scanlines, a shadow mask, a dim edge and the bezel `border`.
-
-In this order: each pixel d px from the middle reads the picture at d x (1 + `curve` x (d / R)^2), R the distance
-of a corner; the highlights above `bloom_threshold` are blurred by `bloom_radius` and screened over by `bloom`;
-each row is darkened by `scanlines` x sin^2(pi x row / `scanline_spacing`); the red, green and blue stripes of
-the mask (a triad every `shadow_mask_pitch` px) pass their own channel fully and the others by
-1 - `shadow_mask`, the gains divided by their mean; the picture is darkened by `vignette` x (d / R)^2; and what
-the bend read from beyond the picture is `border` (blended in over the last pixel). The mask can brighten a lit
-stripe above 1; the result is clipped to 0..1. With every part off the picture is returned as it is.
-
-Parameters
-----------
-curve : number, ratio, 0 to 1, default 0.15
-    How far the glass bulges: each pixel shows the picture at 1 + curve x (d / R)^2
-    times its distance from the middle, d its own distance from it and R the distance of
-    a corner (the radial term of the Brown-Conrady lens model), so straight lines bow
-    outward, more toward the corners, and the corners and edges reach beyond the picture
-    and show `border` instead. 0 = a flat screen; 1 = a strongly bulged one.
-shadow_mask : number, fraction, 0 to 1, default 0.35
-    How strongly the shadow mask shows: the screen is covered with red, green and blue
-    vertical stripes, and a stripe lets through only its own colour. 0 = no mask; at 1
-    each channel is lit in a third of the columns only. The mask keeps the picture's
-    average brightness (the lit stripes are brightened by as much as the others are
-    darkened), so raising it shows the stripes without dimming the picture.
-scanlines : number, fraction, 0 to 1, default 0.3
-    How dark the gaps between the lines of the raster are: the picture is darkened
-    between the lines by up to this share, smoothly, so a line is brightest in its
-    middle. 0 = no scanlines, 1 = black between them.
-bloom : number, ratio, 0 to 2, default 0.3
-    How strongly the bright parts glow into their surroundings, as light spreading in
-    the glass: the blurred highlights are screened over the picture by this much. 0 = no
-    glow, 1 = the halo at full brightness, above 1 it reaches white sooner.
-vignette : number, fraction, 0 to 1, default 0.35
-    How much dimmer the screen is at its corners than in the middle: the picture is
-    darkened in proportion to the square of the distance from the middle, up to this
-    share at a corner. 0 = an evenly lit screen.
-
-Advanced parameters
--------------------
-border : colour, default '#000000'
-    The colour beyond the curved screen, where the glass ends and the bezel begins:
-    '#rrggbb', '#rgb' or [r, g, b] 0..1. It covers everything else there, and is only
-    seen where `curve` is above 0.
-shadow_mask_pitch : whole number, px, 3 to 24, default 3
-    The width in px of one triad of red, green and blue stripes, a third of it for each,
-    tuned for a picture about 480 px high: 3 gives stripes one pixel wide, larger gives
-    coarser ones.
-scanline_spacing : number, px, 2 to 32, default 4.0
-    The distance in px from one line of the raster to the next, tuned for a picture
-    about 480 px high: lines are centred on rows 0, spacing, 2 x spacing... and the gaps
-    between them lie half a spacing away. A larger spacing is fewer, wider-set lines.
-bloom_radius : number, px, 0 to 100, default 10.0
-    Gaussian sigma in px of the glow, tuned for a picture about 480 px high: larger
-    spreads the light further; 0 keeps it on the highlights themselves.
-bloom_threshold : number, fraction, 0 to 0.99, default 0.5
-    The brightness (0..1, per channel) where the glow starts: only values above it give
-    light, rising to full at 1. Raising it limits the glow to the brightest parts.
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x
-    `bloom_radius` px. Larger is more exact and slower.
-interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How a point between pixels is read when the glass bends the picture: 'nearest' takes
-    the closest pixel (fastest, but lines turn jagged), 'bilinear' blends the four
-    pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the
-    neighbouring pixels (sharpest, a little slower, and may ring beside hard edges).
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the bend and the glow's blur see beyond the picture's edge: 'reflect'
-    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
-    (the edge pixel repeated), 'wrap' (the opposite edge). The bend's own beyond is
-    covered by `border`."""
-    ...
-
 def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
 
@@ -1313,41 +1240,6 @@ color : colour, default '#000000'
     The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
-def fisheye(amount: float = 0.6, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Bend the picture as a fisheye lens with its axis at `x`, `y` would, magnifying the middle.
-
-The picture is taken as a flat scene seen by a lens that sees a half angle of `amount` x 90 degrees out to the
-farthest corner, and drawn as an equidistant fisheye (distance from the axis proportional to the angle). A pixel at
-distance d from the axis, the farthest corner at R and w the half angle, shows the picture at R x tan(d / R x w) /
-tan(w) on the same ray: always nearer the axis than the pixel, and exactly there at the axis and at the corner. So
-the whole result lies inside the picture, with no edge to fill, and never leaves 0..1.
-
-Parameters
-----------
-amount : number, fraction, 0 to 0.9, default 0.6
-    How wide the lens sees, as a fraction of 90 degrees: the half angle of its field of
-    view, reaching the farthest corner of the picture, is amount x 90 degrees (0.5 is a
-    90 degree lens, 0.9 a 162 degree one). Larger bends the picture more: the middle
-    swells and the edges are squeezed in toward the corner; 0 leaves the picture
-    unchanged. Wider than 0.9 is not offered, as the middle would grow beyond all
-    reason.
-x : number, fraction, 0 to 1, default 0.5
-    The lens axis's horizontal position as a fraction of the way across the picture: 0 =
-    the first pixel column, 0.5 = the middle, 1 = the last.
-y : number, fraction, 0 to 1, default 0.5
-    The lens axis's vertical position as a fraction of the way down the picture: 0 = the
-    first pixel row, 0.5 = the middle, 1 = the last.
-
-Advanced parameters
--------------------
-interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How a point between pixels is read from the picture: 'nearest' takes the closest
-    pixel (fastest, keeps every value exactly as it is but the magnified middle turns
-    blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
-    slower, and may ring beside hard edges)."""
-    ...
-
 def flow_lines(density: float = 0.002, length: int = 120, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
 
@@ -2121,24 +2013,36 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def lens_distortion(distortion: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does.
+def lens_distortion(model: Literal['brown_conrady', 'fisheye'] = 'brown_conrady', amount: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, border: str | list[float] | tuple[float, float, float] | None = None, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does.
 
-Each pixel at distance d from the axis shows the picture on the same ray at d x (1 + distortion x (d / R)^2), R the
-distance of the farthest corner (the Brown-Conrady radial term, k1 only), divided by 1 + distortion for `fit`
-'frame' so that the corner stays put (a barrel then reads only inside the picture). The axis never moves, and the
-result never leaves 0..1.
+Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the
+farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x
+(d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant
+fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is
+divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never
+moves, and the result never leaves 0..1. What the bend reads from beyond the picture is the `edge` rule's, or
+`border` where that is set.
 
 Parameters
 ----------
-distortion : number, ratio, -0.3 to 1, default 0.2
-    The lens's radial distortion coefficient (the k1 of the Brown-Conrady model), with
-    the distance from the axis measured in units of the farthest corner's. Positive is
-    barrel distortion: straight lines bow outward and the picture looks wrapped around a
-    ball. Negative is pincushion: lines bow inward and the corners are pulled out. The
-    size is how much farther from the axis than its own place each pixel's source lies
-    at the farthest corner: 0.2 is 20% farther. -0.3 is the most pincushion that does
-    not fold the picture over, 1 the strongest barrel; 0 leaves the picture unchanged.
+model : one of 'brown_conrady', 'fisheye', default 'brown_conrady'
+    The curve of the bend, with the same `amount` giving the same stretch at the
+    farthest corner: 'brown_conrady' is the radial polynomial of the Brown-Conrady lens
+    model (k1 only), which bends evenly from the axis out, as an ordinary lens does;
+    'fisheye' is an equidistant fisheye, a pixel's distance from the axis proportional
+    to the angle it sees, which keeps the middle almost flat and bends the edges
+    hardest, and for a negative `amount` is its inverse, an arctangent curve.
+amount : number, ratio, -0.3 to 3.5, default 0.2
+    How strongly the lens bends: at the farthest corner each pixel's source lies 1 +
+    amount times as far from the axis as the pixel's own place, where at the axis it
+    lies at its own place (0.2 is 20% farther; 'fit' then scales it back). The distance
+    from the axis is measured in units of the farthest corner's. Positive is barrel:
+    straight lines bow outward, the middle swells and the picture looks wrapped around a
+    ball. Negative is pincushion: lines bow inward and the corners are pulled out; -0.3
+    is the most the 'brown_conrady' curve can have without folding the picture over. 0
+    leaves the picture unchanged. For a fisheye, 0.4 is about a 103 degree lens, 1 a 134
+    degree one and 3.5 a 162 degree one.
 fit : one of 'frame', 'centre', default 'frame'
     How the picture is scaled back after the bend: 'frame' keeps the farthest corner in
     its corner, so the picture fills the frame (a barrel is zoomed in and loses its
@@ -2152,6 +2056,12 @@ x : number, fraction, 0 to 1, default 0.5
 y : number, fraction, 0 to 1, default 0.5
     The lens axis's vertical position as a fraction of the way down the picture: 0 = the
     first pixel row, 0.5 = the middle, 1 = the last.
+border : colour or none, default None
+    The colour shown where the bend reads from beyond the picture (with fit 'centre', or
+    a pincushion): '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) fills it by
+    the `edge` rule instead. A source less than a pixel beyond the picture is blended
+    into the border, so its edge is smooth. A black border is a bezel round a curved
+    screen.
 
 Advanced parameters
 -------------------
@@ -2164,7 +2074,9 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What shows where the bend reads from beyond the picture (with fit 'centre', or a
     pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
-    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a
+    `border`, only what the bend reads from within a pixel of the edge, which blends
+    into the border."""
     ...
 
 def lens_drops(count: int = 14, radius: float = 24.0, size_variation: float = 0.5, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3003,13 +2915,14 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def pixel_grid(cell: int = 4, gap: float = 0.15, amount: float = 0.4, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def pixel_grid(cell: int = 4, gap: float = 0.15, amount: float = 0.4, keep_brightness: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.
 
 A stripe is a third of the cell wide and lights only its own channel, in a rectangle that leaves half the gap
 free on each side (the gap's width is `gap` x the stripe's, horizontally and vertically alike). A pixel on a
 stripe's edge is lit in proportion to the area it shares with it. The result is the picture mixed with that
-pattern by `amount`, so it never brightens the picture.
+pattern by `amount`, so it never brightens the picture; with `keep_brightness` the gains are divided by their mean
+over a whole cell (the same at every picture size), which brightens a lit stripe above the picture (clipped at 1).
 
 Parameters
 ----------
@@ -3025,7 +2938,13 @@ gap : number, fraction, 0 to 1, default 0.15
 amount : number, fraction, 0 to 1, default 0.4
     How far the picture is shown through the grid: 0 = the picture unchanged, 1 = the
     picture as the grid lights it (each channel only inside its own sub-pixels, a third
-    of the picture's brightness or less), in between a mix of the two."""
+    of the picture's brightness or less), in between a mix of the two.
+keep_brightness : true or false, default False
+    Whether the grid is brightened by the share it darkens the picture on average, so
+    the average brightness is kept and raising `amount` or `gap` shows the grid without
+    dimming the picture (a lit stripe is lifted above the picture's own value and clips
+    at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and
+    the picture is black). False = the grid only ever darkens, as an LCD does."""
     ...
 
 def pixel_sort(by: Literal['brightness', 'hue'] = 'brightness', low: float = 0.25, high: float = 0.75, axis: Literal['horizontal', 'vertical'] = 'horizontal', order: Literal['ascending', 'descending'] = 'ascending', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3512,7 +3431,7 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
     about the edge line."""
     ...
 
-def scanlines(spacing: float = 3.0, thickness: float = 0.5, darkness: float = 0.35, offset: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def scanlines(spacing: float = 3.0, thickness: float = 0.5, darkness: float = 0.35, offset: float = 0.0, softness: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.
 
 The lines start at row `offset` and repeat every `spacing` px. A pixel row is multiplied by 1 - `darkness` x the
@@ -3535,8 +3454,16 @@ darkness : number, fraction, 0 to 1, default 0.35
     0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 -
     darkness, so colours keep their ratios.
 offset : number, px, 0 to 64, default 0.0
-    How far down in px the first line starts from the top of the picture. Offsets of
-    more than `spacing` repeat the pattern: the lines are at offset + k x spacing."""
+    How far down in px the first line starts from the top of the picture (the middle of
+    its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat
+    the pattern: the lines are at offset + k x spacing.
+softness : number, fraction, 0 to 1, default 0.0
+    How softly a line fades in and out: 0 = hard edges, each row darkened by the share
+    of it a line covers; 1 = as soft as the lines and gaps allow, so with a `thickness`
+    of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line
+    and nothing in the middle of a gap, as on a CRT. In between, each edge fades over
+    `softness` x the narrower of a line and a gap, either side of the hard edge. It
+    keeps the average darkening of the picture: only its shape changes."""
     ...
 
 def seams(width: float = 0.004, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:

@@ -8,10 +8,9 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), the longest move being `amount` px. | `amount=12.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
 | <img src="../gallery/droste.jpg" width="160" alt="droste"> | `droste` | Show the picture again, `scale` times as large and turned by `turn`, in its own middle, up to `repeats` times. | `scale=0.5` `turn=20.0` `repeats=4` +2 advanced | [droste.toml](../../examples/effects/droste.toml) |
-| <img src="../gallery/fisheye.jpg" width="160" alt="fisheye"> | `fisheye` | Bend the picture as a fisheye lens with its axis at `x`, `y` would, magnifying the middle. | `amount=0.6` `x=0.5` `y=0.5` +1 advanced | [fisheye.toml](../../examples/effects/fisheye.toml) |
 | <img src="../gallery/flow_warp.jpg" width="160" alt="flow_warp"> | `flow_warp` | Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise. | `amount=20.0` `scale=80.0` `octaves=3` `seed=0` `angle=0.0` `variation=60.0` +5 advanced | [flow_warp.toml](../../examples/effects/flow_warp.toml) |
 | <img src="../gallery/kaleidoscope.jpg" width="160" alt="kaleidoscope"> | `kaleidoscope` | Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror. | `segments=6` `angle=0.0` `x=0.5` `y=0.5` +2 advanced | [kaleidoscope.toml](../../examples/effects/kaleidoscope.toml) |
-| <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does. | `distortion=0.2` `fit='frame'` `x=0.5` `y=0.5` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
+| <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does. | `model='brown_conrady'` `amount=0.2` `fit='frame'` `x=0.5` `y=0.5` `border=None` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
 | <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
 | <img src="../gallery/parallax.jpg" width="160" alt="parallax"> | `parallax` | Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera move would. | `angle=0.0` `amount=0.02` `focus=0.5` +2 advanced | [parallax.toml](../../examples/effects/parallax.toml) |
@@ -63,22 +62,6 @@ Warps that bend, ripple or displace the picture's geometry.
 
 </details>
 
-### `fisheye`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 0.9 | `0.6` | How wide the lens sees, as a fraction of 90 degrees: the half angle of its field of view, reaching the farthest corner of the picture, is amount x 90 degrees (0.5 is a 90 degree lens, 0.9 a 162 degree one). Larger bends the picture more: the middle swells and the edges are squeezed in toward the corner; 0 leaves the picture unchanged. Wider than 0.9 is not offered, as the middle would grow beyond all reason. |
-| `x` | number | fraction | 0 to 1 | `0.5` | The lens axis's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
-| `y` | number | fraction | 0 to 1 | `0.5` | The lens axis's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but the magnified middle turns blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-
-</details>
-
 ### `flow_warp`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -124,17 +107,19 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `distortion` | number | ratio | -0.3 to 1 | `0.2` | The lens's radial distortion coefficient (the k1 of the Brown-Conrady model), with the distance from the axis measured in units of the farthest corner's. Positive is barrel distortion: straight lines bow outward and the picture looks wrapped around a ball. Negative is pincushion: lines bow inward and the corners are pulled out. The size is how much farther from the axis than its own place each pixel's source lies at the farthest corner: 0.2 is 20% farther. -0.3 is the most pincushion that does not fold the picture over, 1 the strongest barrel; 0 leaves the picture unchanged. |
+| `model` | one of 'brown_conrady', 'fisheye' |  |  | `'brown_conrady'` | The curve of the bend, with the same `amount` giving the same stretch at the farthest corner: 'brown_conrady' is the radial polynomial of the Brown-Conrady lens model (k1 only), which bends evenly from the axis out, as an ordinary lens does; 'fisheye' is an equidistant fisheye, a pixel's distance from the axis proportional to the angle it sees, which keeps the middle almost flat and bends the edges hardest, and for a negative `amount` is its inverse, an arctangent curve. |
+| `amount` | number | ratio | -0.3 to 3.5 | `0.2` | How strongly the lens bends: at the farthest corner each pixel's source lies 1 + amount times as far from the axis as the pixel's own place, where at the axis it lies at its own place (0.2 is 20% farther; 'fit' then scales it back). The distance from the axis is measured in units of the farthest corner's. Positive is barrel: straight lines bow outward, the middle swells and the picture looks wrapped around a ball. Negative is pincushion: lines bow inward and the corners are pulled out; -0.3 is the most the 'brown_conrady' curve can have without folding the picture over. 0 leaves the picture unchanged. For a fisheye, 0.4 is about a 103 degree lens, 1 a 134 degree one and 3.5 a 162 degree one. |
 | `fit` | one of 'frame', 'centre' |  |  | `'frame'` | How the picture is scaled back after the bend: 'frame' keeps the farthest corner in its corner, so the picture fills the frame (a barrel is zoomed in and loses its sides, and nothing beyond the picture is shown; a pincushion is zoomed out toward the middle and pulls in what lies beyond the middle of each edge, which the edge rule fills); 'centre' keeps the scale at the lens axis, so a barrel shrinks toward the middle, and the edge rule fills the corners it exposes. |
 | `x` | number | fraction | 0 to 1 | `0.5` | The lens axis's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
 | `y` | number | fraction | 0 to 1 | `0.5` | The lens axis's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
+| `border` | colour or none |  |  | `None` | The colour shown where the bend reads from beyond the picture (with fit 'centre', or a pincushion): '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) fills it by the `edge` rule instead. A source less than a pixel beyond the picture is blended into the border, so its edge is smooth. A black border is a bezel round a curved screen. |
 
 <details><summary>Advanced parameters (2)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but lines turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What shows where the bend reads from beyond the picture (with fit 'centre', or a pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What shows where the bend reads from beyond the picture (with fit 'centre', or a pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a `border`, only what the bend reads from within a pixel of the edge, which blends into the border. |
 
 </details>
 
