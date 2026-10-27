@@ -16,7 +16,7 @@ looks = [
     { effect = "white_balance", temperature = 0.7 },
     "none",
     "none",
-    { effect = "split_tone", shadow = "#1b3a6b", highlight = "#a9c4e0", amount = 0.45 },
+    { effect = "color_balance", shadows = "#1b3a6b", midtones = "#627fa6", highlights = "#a9c4e0", amount = 0.45 },
 ]
 
 [[step]]

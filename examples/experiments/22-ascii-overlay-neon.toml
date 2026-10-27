@@ -9,9 +9,10 @@ photo = 0.85
 gamma = 0.8
 
 [[step]]
-effect = "split_tone"
-shadow = "#3a1bff"
-highlight = "#00f0ff"
+effect = "color_balance"
+shadows = "#3a1bff"
+midtones = "#1d86ff"
+highlights = "#00f0ff"
 amount = 0.4
 
 [[step]]

@@ -1,10 +1,16 @@
-# Teal shadows, warm highlights: the classic cinema colour split.
+# Teal shadows and orange highlights behind the dog, blue-violet shadows and pink highlights on the dog.
 name = "color_balance"
 size = 480
 
 [[step]]
 effect = "color_balance"
-shadows_red = -0.14
-shadows_blue = 0.12
-highlights_red = 0.14
-highlights_blue = -0.12
+preset = "teal_orange"
+mask = "background"
+
+[[step]]
+effect = "color_balance"
+shadows = "#3a1bff"
+midtones = "#9d23eb"
+highlights = "#ff2bd6"
+amount = 0.3
+mask = "subject"

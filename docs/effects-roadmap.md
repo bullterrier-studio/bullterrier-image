@@ -20,14 +20,13 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | --- | --- | --- |
 | `grade` ✓ | Exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5)` |
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
-| `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
 | `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points; preset `solarize` folds the highlights back dark. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
 | `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
 | `selective_color` ✓ | Shift hue/saturation/lightness of one colour range or, with preset `hue_shift`, of every colour. | `fx.selective_color(hue=30, saturation=0.6)` |
-| `color_balance` ✓ | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights_red=0.05, highlights_blue=-0.05)` |
+| `color_balance` ✓ | A colour pushed into the shadows, midtones and highlights: split toning, duotone, teal and orange (presets `split_tone`, `color_balance`, `teal_orange`). | `fx.color_balance(shadows="#3a1bff", highlights="#ff2bd6")` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
 | `posterize` ✓ | Few tone levels per channel. | `fx.posterize(levels=4)` |
@@ -38,7 +37,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
 | `cyanotype` ✓ (a preset of `gradient_map`) | Prussian-blue print. | `fx.gradient_map(preset="cyanotype")` |
 | `cross_process` ✓ (a preset of `curves`) | Shifted curves per channel. | `fx.curves(preset="cross_process")` |
-| `teal_orange` ✓ (a preset of `split_tone`) | The blockbuster grade. | `fx.split_tone(preset="teal_orange", amount=0.4)` |
+| `teal_orange` ✓ (a preset of `color_balance`) | The blockbuster grade. | `fx.color_balance(preset="teal_orange", amount=0.4)` |
 | `thermal` ✓ (a preset of `gradient_map`) | Heat-camera false colour. | `fx.gradient_map(preset="thermal")` |
 | `infrared` ✓ (a preset of `channel_mixer`) | False-colour infrared (swapped channels, bright foliage). | `fx.channel_mixer(preset="infrared")` |
 | `xray` ✓ (a preset of `gradient_map`) | Inverted and blue (not edge-lit). | `fx.gradient_map(preset="xray")` |
@@ -212,7 +211,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | `fill` with `mask` = a `band` of `depth` region |
-| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
+| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `color_balance` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
@@ -352,7 +351,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `sparkle` | a `starburst` preset + `density`, `variation`, `seed` |
 | `fog`, `smoke` | one, with presets |
 | `hologram` | a recipe (needs `edges`; `scanlines` has `softness`) |
-| `split_tone`, `color_balance` | one three-range tool |
+| `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |
 | `overlay` | `blend` + `fit="width"` |
 | `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |
 | `shadows_highlights` + `tone_map` | one, if one set of curves covers both looks |

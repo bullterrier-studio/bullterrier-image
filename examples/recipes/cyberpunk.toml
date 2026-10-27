@@ -3,9 +3,10 @@ name = "cyberpunk"
 size = 768
 
 [[step]]
-effect = "split_tone"
-shadow = "#1b1464"
-highlight = "#ff2bd6"
+effect = "color_balance"
+shadows = "#1b1464"
+midtones = "#8d209d"
+highlights = "#ff2bd6"
 amount = 0.45
 
 [[step]]

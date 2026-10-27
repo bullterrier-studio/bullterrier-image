@@ -1,9 +1,0 @@
-# Blue-violet shadows and pink highlights, without changing brightness.
-name = "split_tone"
-size = 480
-
-[[step]]
-effect = "split_tone"
-shadow = "#3a1bff"
-highlight = "#ff2bd6"
-amount = 0.4

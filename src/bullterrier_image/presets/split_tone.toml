@@ -1,7 +1,0 @@
-# Looks that are one split tone.
-
-[teal_orange]
-description = "The blockbuster grade: teal in the shadows, orange in the highlights."
-shadow = "#128c9c"
-highlight = "#ff8c3c"
-amount = 0.5

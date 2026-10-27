@@ -21,9 +21,10 @@ amount = 9
 edge = "wrap"
 
 [[step]]
-effect = "split_tone"
-shadow = "#ff2bd6"
-highlight = "#00f0ff"
+effect = "color_balance"
+shadows = "#ff2bd6"
+midtones = "#808eeb"
+highlights = "#00f0ff"
 amount = 0.35
 
 [[step]]

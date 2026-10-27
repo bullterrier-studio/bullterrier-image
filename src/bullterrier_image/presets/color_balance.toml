@@ -1,0 +1,22 @@
+# Looks that are one colour balance.
+
+[teal_orange]
+description = "The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between."
+shadows = "#128c9c"
+midtones = "#898c6c"
+highlights = "#ff8c3c"
+amount = 0.5
+
+[split_tone]
+description = "Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones."
+shadows = "#3a1bff"
+midtones = "#9d23eb"
+highlights = "#ff2bd6"
+amount = 0.3
+
+[color_balance]
+description = "A starting point for colour balancing: cool shadows, untouched midtones, warm highlights."
+shadows = "#5a82b4"
+midtones = "#808080"
+highlights = "#d9a066"
+amount = 0.4
