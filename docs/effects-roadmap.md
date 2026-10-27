@@ -200,7 +200,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `snow` ✓ | Flakes in depth layers. | `fx.snow(density=0.4, seed=1)` |
 | `smoke` ✓ | Noise-driven smoke or steam. | `fx.smoke(amount=0.4, seed=1)` |
 | `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
-| `floating_dust` ✓ | Slow bokeh particles. | `fx.floating_dust(count=80, seed=1)` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
 | `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `dust`, `stars`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
 

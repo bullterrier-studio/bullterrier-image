@@ -218,3 +218,11 @@ def test_the_embers_preset_makes_sparks_whose_streaks_trail_down_and_to_the_left
     spark = lone_particle(light, 3, **preset("embers", length=60.0, size=3.0, softness=0.0))
     axis, _ = axis_and_centre(spark)
     assert axis == pytest.approx(105.0, abs=2.0)
+
+
+def test_the_dust_preset_makes_round_soft_specks(lone_particle) -> None:
+    speck = lone_particle(light, 3, **preset("dust"))
+    rows, columns = np.nonzero(speck)
+    assert rows.max() - rows.min() == pytest.approx(columns.max() - columns.min(), abs=1)  # no streak
+    assert rows.max() - rows.min() > 12  # specks, not dots
+    assert ((speck > 0.05 * speck.max()) & (speck < 0.95 * speck.max())).sum() > 0.3 * (speck > 0).sum()  # soft
