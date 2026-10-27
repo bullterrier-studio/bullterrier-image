@@ -2201,21 +2201,27 @@ A pixel at angle a about the centre (clockwise from pointing right) and distance
 distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that
 passes half a sector, mirrored to what it falls short of the sector by, then `angle` added back. The wedge from
 `angle` for half a sector is the picture as it is, the next half a sector its mirror image, and so on round the
-centre, which keeps its own pixel.
+centre, which keeps its own pixel. One segment is a single mirror axis: the half of the picture clockwise from
+`angle` is kept, its reflection replaces the other half.
 
 Parameters
 ----------
-segments : whole number, count, 2 to 64, default 6
+segments : whole number, count, 1 to 64, default 6
     How many times the pattern repeats round the centre: the full circle is cut into
     this many equal sectors, each holding a wedge of the picture (half a sector wide)
     and its mirror image, so every wedge borders its own reflection and the seams
-    between them do not show. 2 = a picture mirrored across a line through the centre
-    and again across the line at right angles; raising it makes more, narrower wedges.
+    between them do not show. 1 = one line through the centre: the half of the picture
+    clockwise from `angle` is kept and its reflection replaces the other half (a face
+    made symmetric, a reflection in water); 2 = mirrored across that line and again
+    across the line at right angles (the kept quarter copied into the other three);
+    raising it makes more, narrower wedges.
 angle : number (cyclic), degrees, -180 to 180, default 0.0
-    Where the pattern starts, as the direction in degrees, clockwise from pointing
-    right, of the first mirror axis and of the wedge that follows it: 0 puts an axis
-    along the line right of the centre; turning it turns the mirror axes, and shows a
-    different wedge of the picture. The pattern repeats every 360 / segments degrees.
+    Where the pattern starts, as the direction in degrees, clockwise from pointing right
+    (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts
+    an axis along the line right of the centre; turning it turns the mirror axes, and
+    shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90
+    the left, 180 the top and -90 the right. The pattern repeats every 360 / segments
+    degrees.
 x : number, fraction, 0 to 1, default 0.5
     The centre's horizontal position as a fraction of the way across the picture: 0 =
     the first pixel column, 0.5 = the middle, 1 = the last.
@@ -2230,7 +2236,10 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
     a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    ring beside hard edges). With 'nearest' every output pixel is an input pixel, so a
+    mirror (1 or 2 segments through the middle) is exact and exactly symmetric; the
+    other two blend, and a mirror then differs from an exact reflection by rounding
+    error only.
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the
     corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
@@ -2733,28 +2742,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     pulled from there): 'nearest' (the top row repeated, so the top smears down),
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'wrap' (the bottom of the picture)."""
-    ...
-
-def mirror(direction: Literal['left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right'] = 'left_to_right', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Make the picture symmetric: keep one half (or quarter) and replace the rest by its reflection.
-
-`direction` names the copy: 'left_to_right' keeps the left half and reflects it onto the right, and so on for
-the other halves; 'top_left' and the other three corners keep that quarter and reflect it across both lines.
-The kept part is copied untouched, pixel for pixel, so the result is exactly symmetric and uses only the
-picture's own values.
-
-Parameters
-----------
-direction : one of 'left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right', default 'left_to_right'
-    Which part is kept as it is and copied, reflected, onto the rest, named as image
-    editors name it. 'left_to_right' copies the left half onto the right (a face made
-    symmetric about a vertical line down the middle), 'right_to_left' the right half
-    onto the left, 'top_to_bottom' the top half onto the bottom (a reflection in water,
-    about a horizontal line across the middle), 'bottom_to_top' the bottom half onto the
-    top. For a picture symmetric in four quarters, name the quarter that is copied into
-    the other three: 'top_left', 'top_right', 'bottom_left' or 'bottom_right'. On a
-    picture with an odd width or height the middle column or row lies on the line and
-    stays."""
     ...
 
 def motion_blur(angle: float = 0.0, length: float | Drive = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

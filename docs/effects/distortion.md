@@ -14,7 +14,6 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does. | `distortion=0.2` `fit='frame'` `x=0.5` `y=0.5` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
 | <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
-| <img src="../gallery/mirror.jpg" width="160" alt="mirror"> | `mirror` | Make the picture symmetric: keep one half (or quarter) and replace the rest by its reflection. | `direction='left_to_right'` | [mirror.toml](../../examples/effects/mirror.toml) |
 | <img src="../gallery/parallax.jpg" width="160" alt="parallax"> | `parallax` | Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera move would. | `angle=0.0` `amount=0.02` `focus=0.5` +2 advanced | [parallax.toml](../../examples/effects/parallax.toml) |
 | <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, turn it, zoom it. | `vertical=0.25` `horizontal=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
 | <img src="../gallery/pinch_bulge.jpg" width="160" alt="pinch_bulge"> | `pinch_bulge` | Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`. | `amount=0.5` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [pinch_bulge.toml](../../examples/effects/pinch_bulge.toml) |
@@ -109,8 +108,8 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `segments` | whole number | count | 2 to 64 | `6` | How many times the pattern repeats round the centre: the full circle is cut into this many equal sectors, each holding a wedge of the picture (half a sector wide) and its mirror image, so every wedge borders its own reflection and the seams between them do not show. 2 = a picture mirrored across a line through the centre and again across the line at right angles; raising it makes more, narrower wedges. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right, of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. The pattern repeats every 360 / segments degrees. |
+| `segments` | whole number | count | 1 to 64 | `6` | How many times the pattern repeats round the centre: the full circle is cut into this many equal sectors, each holding a wedge of the picture (half a sector wide) and its mirror image, so every wedge borders its own reflection and the seams between them do not show. 1 = one line through the centre: the half of the picture clockwise from `angle` is kept and its reflection replaces the other half (a face made symmetric, a reflection in water); 2 = mirrored across that line and again across the line at right angles (the kept quarter copied into the other three); raising it makes more, narrower wedges. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90 the left, 180 the top and -90 the right. The pattern repeats every 360 / segments degrees. |
 | `x` | number | fraction | 0 to 1 | `0.5` | The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
 | `y` | number | fraction | 0 to 1 | `0.5` | The centre's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
 
@@ -118,7 +117,7 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). With 'nearest' every output pixel is an input pixel, so a mirror (1 or 2 segments through the middle) is exact and exactly symmetric; the other two blend, and a mirror then differs from an exact reflection by rounding error only. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
@@ -172,12 +171,6 @@ Warps that bend, ripple or displace the picture's geometry.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the drips read above the picture's top edge (only the top `amount` rows are pulled from there): 'nearest' (the top row repeated, so the top smears down), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the bottom of the picture). |
 
 </details>
-
-### `mirror`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `direction` | one of 'left_to_right', 'right_to_left', 'top_to_bottom', 'bottom_to_top', 'top_left', 'top_right', 'bottom_left', 'bottom_right' |  |  | `'left_to_right'` | Which part is kept as it is and copied, reflected, onto the rest, named as image editors name it. 'left_to_right' copies the left half onto the right (a face made symmetric about a vertical line down the middle), 'right_to_left' the right half onto the left, 'top_to_bottom' the top half onto the bottom (a reflection in water, about a horizontal line across the middle), 'bottom_to_top' the bottom half onto the top. For a picture symmetric in four quarters, name the quarter that is copied into the other three: 'top_left', 'top_right', 'bottom_left' or 'bottom_right'. On a picture with an odd width or height the middle column or row lies on the line and stays. |
 
 ### `parallax`
 
