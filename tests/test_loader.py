@@ -629,7 +629,7 @@ def test_a_step_and_an_each_take_a_name_in_a_recipe_file_and_it_addresses_their_
     assert [step.name for step in recipe.steps] == ["pulse", "pieces"]
     numbers = recipe.parameters()
     assert numbers["pulse.radius"].value == 30
-    assert numbers["pieces.feather"].value == 0.001
+    assert numbers["pieces.feather"].value == 0.5
     assert numbers["pieces.looks[1].exposure"].value == 0.5
     assert recipe.with_values({"pulse.radius": 12}).parameters()["pulse.radius"].value == 12
 

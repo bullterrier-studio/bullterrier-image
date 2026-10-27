@@ -20,9 +20,10 @@ equal ranges (highest first), `Combine` multiplies, takes the least or the great
 `look_weights` turns a partition and a look for each piece into the weights that blend the looks.
 
 Promises:
-- Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over) and
-  lengths are shares of the picture's long side, so the same declaration cuts the same pieces at any resolution
-  (a torn edge too: its noise is laid on the frame).
+- Positions are shares of the *frame* (the picture, or the bounding box of the selection a kind is laid `fit` over)
+  and the other extents shares of a named reference; the lengths of a torn `Edge` are design px (`px`, written for a
+  picture whose long side is `DESIGN_SIZE`, scaled to the picture like an effect's), so the same declaration cuts the
+  same pieces at any resolution (a torn edge too: its noise is laid on the frame).
 - The same declaration, picture size and seed give the same regions on the same machine and library versions; no global
   random state is used.
 - Regions are made once per `resolve` and handed out read-only.
@@ -52,7 +53,7 @@ from bullterrier_image.ops.raster import coverage, paint
 from bullterrier_image.ops.voronoi import centres, nearest
 
 from .outlines import path_outlines, read_svg
-from .params import EffectParams, param
+from .params import EffectParams, design_scale, param
 from .presets import SHIPPED, read
 
 __all__ = [
@@ -142,20 +143,20 @@ class Edge(_Model):
         "pieces have ragged, wandering edges (the other edge fields only matter for 'torn').",
     )
     amount: float = param(
-        0.01,
-        unit="fraction",
+        4.8,
+        unit="px",
         min=0,
-        max=0.1,
-        doc="How far a torn border strays, as a share of the picture's long side (0 to 0.1): the standard deviation "
-        "of the shift. Raising it tears the edge wider; 0 is straight.",
+        max=48,
+        doc="How far a torn border strays, in px (0 to 48): the standard deviation of the shift. Raising it tears "
+        "the edge wider; 0 is straight.",
     )
     scale: float = param(
-        0.05,
-        unit="fraction",
-        min=0.01,
-        max=1,
-        doc="The size of the bends of a torn border, as a share of the picture's long side (0.01 to 1): the spacing "
-        "of the coarsest noise. Raising it gives long gentle wanders, lowering it a jagged edge.",
+        24.0,
+        unit="px",
+        min=1,
+        max=480,
+        doc="The size of the bends of a torn border, in px (1 to 480): the spacing of the coarsest noise. Raising it "
+        "gives long gentle wanders, lowering it a jagged edge.",
     )
     seed: int = param(
         0,
@@ -622,10 +623,10 @@ class RadialGradient(_Model):
         0.5,
         unit="fraction",
         min=0.01,
-        max=2,
-        doc="The distance from the centre at which the value reaches 1, as a share of the picture's long side (0.01 to "
-        "2). Raising it spreads the gradient wider; 0.5 reaches the edges' midpoints of a picture as wide as it is "
-        "tall, centred.",
+        max=3,
+        doc="The distance from the centre at which the value reaches 1, as a share of the picture's shorter side "
+        "(0.01 to 3). Raising it spreads the gradient wider; 0.5, centred, reaches the midpoints of the shorter sides' "
+        "edges.",
     )
 
 
@@ -699,22 +700,23 @@ def as_partition(selection: Selection) -> Partition:
 
 
 def _coordinates(shape: tuple[int, int], edge: Edge) -> tuple[np.ndarray, np.ndarray]:
-    """The `(x, y)` that every kind classifies, in px: the pixel centres, bent by noise for a torn `edge`. They
-    broadcast against each other to `shape`."""
+    """The `(x, y)` that every kind classifies, in px: the pixel centres, bent by noise for a torn `edge` (whose px
+    are design px, scaled to `shape`). They broadcast against each other to `shape`."""
     x, y = centres(shape)
     if edge.style == "straight":
         return x, y
+    edge = edge.scaled(design_scale(shape))
     long_side = max(shape)
     bend = [
         frame_fractal(
             shape,
-            scale=edge.scale,
+            scale=edge.scale / long_side,
             octaves=edge.octaves,
             persistence=edge.persistence,
             lacunarity=_LACUNARITY,
             seed=[edge.seed, axis],
         )
-        * (edge.amount * long_side)
+        * edge.amount
         for axis in (0, 1)
     ]
     return x + bend[0], y + bend[1]
@@ -889,7 +891,7 @@ def _radial(kind: RadialGradient, shape: tuple[int, int]) -> Selection:
     height, width = shape
     x, y = centres(shape)
     distance = np.hypot(x - kind.x * width, y - kind.y * height)
-    return Selection(_frozen(np.clip(distance / (kind.radius * max(shape)), 0, 1).astype(np.float32)))
+    return Selection(_frozen(np.clip(distance / (kind.radius * min(shape)), 0, 1).astype(np.float32)))
 
 
 def look_weights(partition: Partition, assignment: Sequence[int], count: int, *, feather: float) -> np.ndarray:

@@ -910,7 +910,7 @@ def test_each_piece_shows_its_look_and_the_looks_take_turns(photo, count):
 
 
 @pytest.mark.parametrize("size", [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)])
-@pytest.mark.parametrize("feather", [0, 0.5 / 128, 3 / 128])  # shares of the 128 px long side
+@pytest.mark.parametrize("feather", [0, 1.875, 11.25])  # design px: 0.5 and 3 px on the 128 px photo
 @pytest.mark.parametrize("assign", ["cycle", "random"])
 def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_feather(size, feather, assign):
     photo = np.random.default_rng(2).random((*size, 3), dtype=np.float32)
@@ -934,7 +934,7 @@ def test_a_none_look_leaves_its_pieces_exactly_as_they_were(photo):
 
 
 def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
-    out = run(photo, [Each("cols", [fill(RED), "none"], feather=2 / 128)], columns(4))
+    out = run(photo, [Each("cols", [fill(RED), "none"], feather=7.5)], columns(4))  # 2 px on the 128 px photo
     reach = 4 * 2 + 1  # a feather of 2 px, cut off at 4 sigmas
     np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
     assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
@@ -943,7 +943,7 @@ def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
     assert (border < photo[:, 31, 1]).all()  # a mix of the two looks, not either one
 
 
-@pytest.mark.parametrize("feather", [0, 3 / 128])
+@pytest.mark.parametrize("feather", [0, 11.25])  # design px: 3 px on the 128 px photo
 @pytest.mark.parametrize("assign", ["cycle", "random"])
 def test_looks_that_change_nothing_give_back_the_photo_exactly(photo, feather, assign):
     nothing: list[Step | str] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), "none"]
@@ -1197,9 +1197,9 @@ def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
     assert labels[-1].startswith("1. each panes [gradient(colors=['#ff0000']), none]")
 
 
-def test_a_feather_is_a_share_of_the_long_side_so_the_blend_is_the_same_at_two_resolutions():
+def test_a_feather_is_in_design_px_so_the_blend_is_the_same_at_two_resolutions():
     grey = np.full((96, 128, 3), 0.5, np.float32)
-    recipe = [Each("cols", [fill(RED), "none"], feather=0.02)]
+    recipe = [Each("cols", [fill(RED), "none"], feather=9.6)]
 
     def rendered(size: int) -> np.ndarray:
         return runner.render(grey, Recipe("scaled", recipe, size=size, regions=columns(2)))

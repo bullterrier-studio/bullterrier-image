@@ -276,15 +276,15 @@ class Each(_Layer):
         description="Random seed of assign='random': the same seed always gives the same looks to the same pieces.",
     )
     feather: float = Field(
-        0.001,
+        0.5,
         ge=0,
-        le=0.05,
+        le=24,
         strict=True,
         allow_inf_nan=False,
-        json_schema_extra={"unit": "fraction"},
-        description="How softly a piece's look fades into its neighbours' across a border, as a share of the "
-        "picture's long side (0 to 0.05): the standard deviation of a Gaussian. 0 gives hard borders; about 0.001 "
-        "only smooths the stair-steps of the pixels; raising it blends the looks over a wider band.",
+        json_schema_extra={"unit": "px"},
+        description="How softly a piece's look fades into its neighbours' across a border, in px (0 to 24): the "
+        "standard deviation of a Gaussian. 0 gives hard borders; about 0.5 only smooths the stair-steps of the "
+        "pixels; raising it blends the looks over a wider band.",
     )
 
     def __init__(
@@ -296,7 +296,7 @@ class Each(_Layer):
         blend_mode: str = "normal",
         assign: str = "cycle",
         seed: int = 0,
-        feather: float = 0.001,
+        feather: float = 0.5,
         name: str | None = None,
         **unknown: Any,
     ) -> None:

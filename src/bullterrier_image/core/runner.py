@@ -39,7 +39,7 @@ from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .params import Drive
+from .params import Drive, design_scale
 from .regions import (
     DERIVED,
     BoxFinder,
@@ -55,8 +55,6 @@ from .regions import (
     used,
 )
 from .steps import Each, Recipe, Step
-
-_DESIGN_SIZE = 480  # px: the longest side every px value is written for (the effects' defaults are tuned for it)
 
 
 @dataclass(frozen=True)
@@ -324,17 +322,15 @@ def _prepare(
     """Frame the photo and the maps the recipe needs together, scale them all to `size` (else the recipe's size) and
     set up the recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its
     maps by name (those the recipe needs), its regions and the factor for the recipe's pixel values: the working
-    size over `_DESIGN_SIZE`, the one decision of the design size."""
+    size over the design size (`design_scale`)."""
     rgb, maps = recipe.frame.apply(rgb, {name: found[name] for name in sorted(recipe.maps_needed)})
     working = size or recipe.size
     if working:
         rgb = resize(rgb, working)
         maps = {name: resize(layer, working) for name, layer in maps.items()}
-    else:
-        working = max(rgb.shape[:2])
     maps |= {name: DERIVED[name](rgb) for name in sorted(recipe.derived_maps)}  # made from the picture as it is worked
     find = _finder_in(rgb, (finders or {}).get("subject"))
-    scale = working / _DESIGN_SIZE
+    scale = design_scale(rgb.shape[:2])
     return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find), scale
 
 
@@ -432,7 +428,7 @@ def _each(before: np.ndarray, step: Each, maps: dict[str, np.ndarray], regions: 
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
     partition = regions.partition(step.each)
     assignment = step.assignment(partition.count)
-    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather * max(before.shape[:2]))
+    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather * scale)
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered

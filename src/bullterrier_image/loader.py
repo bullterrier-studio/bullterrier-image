@@ -47,19 +47,20 @@ Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `gr
 (`op`, `of`), `linear_gradient` (`angle`), `radial_gradient` (`x`, `y`, `radius`) and `given` (no fields); they are the
 fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
 `RadialGradient` and `Given`. `fit` lays a grid, shards, cuts, path or svg over a selection and `edge` is a table
-(`style`, `amount`, `scale`, `seed`) that tears the borders. A *partition* (a grid, shards, cuts, svg or bands) cuts the
-picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`, a `band`, a `combine`, a gradient, a
-`given` map or the built-in `subject`, `background`, `depth` and `light`) chooses pixels; a `subject` with `per` finds
-the subject inside each piece of a partition. `band`, `bands` and `combine` are made of another selection named by `of`,
-read for its values: the built-in `depth` (1 = nearest), `light` (the picture's brightness) or any other (bands are
-numbered highest first). Steps name regions: `mask` (a selection) limits a step to it, and `partition` names the
-partition an effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own look:
+(`style`, `amount` and `scale` in px, `seed`) that tears the borders. A *partition* (a grid, shards, cuts, svg or
+bands) cuts the picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`, a `band`, a `combine`, a
+gradient, a `given` map or the built-in `subject`, `background`, `depth` and `light`) chooses pixels; a `subject` with
+`per` finds the subject inside each piece of a partition. `band`, `bands` and `combine` are made of another selection
+named by `of`, read for its values: the built-in `depth` (1 = nearest), `light` (the picture's brightness) or any other
+(bands are numbered highest first). Steps name regions: `mask` (a selection) limits a step to it, and `partition` names
+the partition an effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own
+look:
 
     [[step]]
     each = "panes"                 # a partition
     looks = [{ effect = "halftone", cell = 9 }, "none"]   # each look is a step table, or "none": the piece stays
     assign = "cycle"               # or "random" (with `seed`): how the pieces get looks
-    feather = 0.001                # soft borders between pieces, a share of the long side
+    feather = 0.5                  # soft borders between pieces, in px
     mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
 
 Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them. The region

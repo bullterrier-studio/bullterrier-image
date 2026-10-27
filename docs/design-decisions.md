@@ -447,15 +447,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **A look is a single inline step, or `"none"` (the piece is left as it is).** Named multi-step looks wait for a real
   need. Each distinct look is rendered once over the whole picture and blended through its pieces' weights, which sum
   to 1 and are then multiplied by `mask`: the cost is the number of looks, not pieces.
-- **Positions are shares of the frame, lengths shares of the picture's long side.** The frame is the picture, or the
-  box of the selection named by `fit`. The same look comes out at any resolution, torn edges too (their noise is laid
-  on the frame, not on the pixel grid).
+- **Positions are shares of the frame, lengths are design px.** The frame is the picture, or the box of the selection
+  named by `fit`. A length (a torn `Edge`'s `amount` and `scale`, an `Each`'s `feather`) is `px` written for a picture
+  whose long side is 480 and scaled by the runner like an effect's, so the same look comes out at any resolution, torn
+  edges too (their noise is laid on the frame, not on the pixel grid). An extent relative to something else stays a
+  share with its reference named: `radial_gradient.radius` (the shorter side, as `swirl` and `pinch_bulge`),
+  `Shards.jitter` (the lattice spacing), `Band.feather` (the field's range), `Framing` `margin` (the subject's box),
+  `pad_*` and `corner_radius` (the shorter side).
 - **A field is a selection read for its values; `band`, `bands` and `combine` cut and join fields, `light` and two
   gradients make them.** A selection is already a float map 0..1, so no second concept is declared: a field is whatever
   selection a region's `of` names, built in (`depth`, `light`, `subject`) or the recipe's own. `band` (a selection)
   chooses where a field lies from `low` to `high`, fading linearly over `feather`; `bands` (a partition) cuts the field
   into `count` equal ranges, highest first; `combine` multiplies, takes the least or the greatest of several;
-  `linear_gradient` and `radial_gradient` rise evenly with position (shares of the picture and of its long side, so a
+  `linear_gradient` and `radial_gradient` rise evenly with position (shares of the picture and of its shorter side, so a
   look has one shape at every resolution). `light` is the Rec. 709 brightness of the picture the steps work on, made by
   the runner after the framing and scaling, once per render, so it is not found, handed in or cached, and the first step
   does not change it. *Reason:* the depth selection and depth bands were already a band and bands of one field; making
@@ -521,8 +525,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   regions; the recipe that holds it does, and `fx` declares none, so by itself it knows the built-in two). `partition`
   names the region an effect with the injected input `partition` draws (int32 piece numbers; a selection is split into
   what it chooses and what it does not). `each` and `looks` make an `Each` step, a step type of its own: it has no
-  effect or parameters, only `each`, `looks`, `assign`, `seed`, `name` and `feather` (a share of the long side, so the same look
-  comes out at any resolution; how softly the looks blend across a border, default 0.001 to smooth the pixels'
+  effect or parameters, only `each`, `looks`, `assign`, `seed`, `name` and `feather` (in px, so the same look
+  comes out at any resolution; how softly the looks blend across a border, default 0.5 to smooth the pixels'
   stair-steps) beside the layer keys `mask`, `opacity` and `blend_mode`, which
   apply to the blended looks. `partition`, `each` and `looks` are reserved like the other step keys, so no effect
   parameter takes them (`name` too, see "Every number has an address"); `seed` and `feather` are not, as an `Each` has

@@ -234,15 +234,15 @@ AT_THE_LIMITS: dict[str, Kind] = {
     **{f"line {id_}": Cuts(lines=[Line(**values)]) for id_, values in extremes(Line)},
     **{f"path {id_}": Path(d=BLOB, **values) for id_, values in extremes(Path)},
     "cuts of most": Cuts(lines=[Line(x=i / 31, y=1 - i / 31, angle=11 * i) for i in range(32)]),
-    "a cut torn at the limit": Cuts(lines=[Curve(path=WAVE)], edge=Edge(style="torn", amount=0.1, scale=1)),
-    "a path torn at the limit": Path(d=BLOB, edge=Edge(style="torn", amount=0.1, scale=0.01)),
+    "a cut torn at the limit": Cuts(lines=[Curve(path=WAVE)], edge=Edge(style="torn", amount=48, scale=480)),
+    "a path torn at the limit": Path(d=BLOB, edge=Edge(style="torn", amount=48, scale=4.8)),
     "shards impact at one corner": Shards(impact=(0, 0)),
     "shards impact at the other": Shards(impact=(1, 1)),
     "grid of one": Grid(columns=1, rows=1),
     "grid of most": Grid(columns=1000, rows=1000),
     "grid of one share": Grid(columns=[1], rows=[1]),
     "grid of tiny and huge shares": Grid(columns=[0.001, 1000], rows=[1000, 0.001]),
-    "grid on the subject, torn": Grid(columns=3, rows=3, fit="subject", edge=Edge(style="torn", amount=0.1)),
+    "grid on the subject, torn": Grid(columns=3, rows=3, fit="subject", edge=Edge(style="torn", amount=48)),
     **{f"subject {id_}": Subject(per="panes", **values) for id_, values in extremes(Subject)},
     **{f"band {id_}": Band(**values) for id_, values in extremes(Band, of="depth", low=0)},
     **{f"bands {id_}": Bands(**values) for id_, values in extremes(Bands, of="depth")},
@@ -287,8 +287,8 @@ def test_a_selection_of_a_picture_with_fewer_pieces_than_picked_selects_what_exi
         Grid(columns=[1, 2], rows=[3, 1, 1]),
         Shards(preset="glass"),
         Shards(preset="mosaic"),
-        Grid(columns=3, rows=4, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=3)),
-        Shards(count=12, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=5)),
+        Grid(columns=3, rows=4, edge=Edge(style="torn", amount=38.4, scale=144, seed=3)),
+        Shards(count=12, edge=Edge(style="torn", amount=38.4, scale=144, seed=5)),
         Shards(preset="torn"),
         Shards(preset="stone"),
         Cuts(lines=[Line(angle=330), Line(x=0.3, y=0.6, angle=240)]),
@@ -314,9 +314,9 @@ def test_the_same_pieces_come_out_at_twice_the_resolution(kind):
     a 2 x 2 block of fine pixels, so its piece must be one of the four the block holds, unless a piece is thinner than
     a pixel there: at most 1 coarse pixel in 100 may fail that. A piece smaller than a coarse pixel may have no pixel
     there, so the coarse picture may have fewer pieces, never more. A torn edge bends the positions by noise defined
-    in shares of the frame too, so it is the same tear: it differs only where the coarse picture leaves out a layer
-    finer than its pixel, which moves a border by a fraction of a pixel. A different tear (the wide ones here, 8% of
-    the long side, 7 px on the coarse picture) fails it."""
+    in design px, scaled to the picture, so it is the same tear: it differs only where the coarse picture leaves out a
+    layer finer than its pixel, which moves a border by a fraction of a pixel. A different tear (the wide ones here, 38
+    design px, 7 px on the coarse picture) fails it."""
     coarse = labels_of({"k": kind}, "k", (60, 90))
     fine = labels_of({"k": kind}, "k", (120, 180))
     assert coarse.max() <= fine.max()
@@ -479,11 +479,11 @@ def test_shards_laid_over_a_selection_are_smaller_inside_it_than_without_fit():
 def test_a_straight_edge_ignores_the_other_edge_settings_and_a_torn_one_with_no_amount_is_straight():
     shape = (60, 80)
     straight = labels_of({"k": Shards(count=20)}, "k", shape)
-    for edge in (Edge(amount=0.1, scale=0.5, seed=9), Edge(style="torn", amount=0)):
+    for edge in (Edge(amount=48, scale=240, seed=9), Edge(style="torn", amount=0)):
         np.testing.assert_array_equal(labels_of({"k": Shards(count=20, edge=edge)}, "k", shape), straight)
 
 
-@pytest.mark.parametrize("amount", [0.01, 0.05], ids=["a small tear", "a wide tear"])
+@pytest.mark.parametrize("amount", [4.8, 24], ids=["a small tear", "a wide tear"])  # design px
 @pytest.mark.parametrize(
     "straight",
     [
@@ -496,11 +496,12 @@ def test_a_straight_edge_ignores_the_other_edge_settings_and_a_torn_one_with_no_
     ids=["grid", "shards", "cut", "curve", "svg"],
 )
 def test_a_torn_edge_moves_the_borders_by_about_its_amount_and_nothing_else(straight, amount):
-    """The coordinates are shifted by noise of unit standard deviation times `amount` of the long side, so a pixel
+    """The coordinates are shifted by noise of unit standard deviation times `amount` (design px, here scaled to the
+    200 px long side), so a pixel
     may change piece only if a straight border lies within a few standard deviations: 6, as the noise is smooth and a
     value that far out has a chance below 1e-8 of showing in a picture of this size."""
     shape = (150, 200)
-    torn = straight.model_copy(update={"edge": Edge(style="torn", amount=amount, scale=0.3, seed=4)})
+    torn = straight.model_copy(update={"edge": Edge(style="torn", amount=amount, scale=144, seed=4)})
     before = labels_of({"k": straight}, "k", shape)
     after = labels_of({"k": torn}, "k", shape)
     assert after.max() == before.max()
@@ -510,7 +511,7 @@ def test_a_torn_edge_moves_the_borders_by_about_its_amount_and_nothing_else(stra
     from_border = ndimage.distance_transform_edt(~on_border)
     moved = ~same_pieces(before, after)
     assert moved.any()  # it tears at all
-    assert from_border[moved].max() <= 6 * amount * 200 + 1
+    assert from_border[moved].max() <= 6 * amount * 200 / 480 + 1
 
 
 def border_length(labels: np.ndarray) -> int:
@@ -523,7 +524,7 @@ def border_length(labels: np.ndarray) -> int:
     [
         pytest.param({"persistence": 0.0}, {"persistence": 1.0}, id="persistence"),
         pytest.param({"octaves": 1}, {"octaves": 8}, id="octaves"),
-        pytest.param({"scale": 0.5}, {"scale": 0.02}, id="scale"),
+        pytest.param({"scale": 240}, {"scale": 9.6}, id="scale"),
     ],
 )
 def test_a_rougher_tear_has_longer_borders(smoother, rougher):
@@ -531,7 +532,7 @@ def test_a_rougher_tear_has_longer_borders(smoother, rougher):
     shape = (240, 320)
 
     def tear(**fields: float) -> Grid:
-        return Grid(columns=2, rows=2, edge=Edge(style="torn", amount=0.02, **{"scale": 0.1, **fields}))
+        return Grid(columns=2, rows=2, edge=Edge(style="torn", amount=9.6, **{"scale": 48, **fields}))
 
     assert border_length(labels_of({"k": tear(**smoother)}, "k", shape)) < border_length(
         labels_of({"k": tear(**rougher)}, "k", shape)
@@ -888,7 +889,7 @@ BAD_VALUES = {
     "a negative seed": (Shards, {"seed": -1}, "seed"),
     "a preset that does not exist": (Shards, {"preset": "nope"}, "nope.*glass"),
     "an edge style that is not offered": (Shards, {"edge": {"style": "wavy"}}, "style"),
-    "an edge amount that is too large": (Shards, {"edge": {"amount": 0.5}}, "amount"),
+    "an edge amount that is too large": (Shards, {"edge": {"amount": 240}}, "amount"),
     "an edge with a misspelt field": (Grid, {"edge": {"stlye": "torn"}}, "stlye"),
     "no pieces to pick": (Pick, {"pieces": []}, "pieces"),
     "a negative piece": (Pick, {"pieces": [0, -1]}, "pieces"),
@@ -919,7 +920,7 @@ BAD_VALUES = {
     ),
     "a centre off the picture": (RadialGradient, {"x": 1.1}, "x"),
     "a radius of nothing": (RadialGradient, {"radius": 0}, "radius"),
-    "a radius past 2": (RadialGradient, {"radius": 2.5}, "radius"),
+    "a radius past 3": (RadialGradient, {"radius": 3.5}, "radius"),
     "a radial gradient named by its kind as a recipe writes it": (
         RadialGradient,
         {"radius": 0},
@@ -936,8 +937,8 @@ def test_a_bad_value_is_refused_naming_the_field(model, values, complaint):
 
 def test_values_written_as_a_recipe_file_writes_them_are_accepted():
     """TOML gives lists and tables, numpy arrays come from scripts: both make the same model."""
-    from_file = Grid(columns=[1, 2], rows=[1, 1, 2], edge={"style": "torn", "amount": 0.02})
-    from_script = Grid(columns=np.array([1, 2]), rows=(1, 1, 2), edge=Edge(style="torn", amount=0.02))
+    from_file = Grid(columns=[1, 2], rows=[1, 1, 2], edge={"style": "torn", "amount": 9.6})
+    from_script = Grid(columns=np.array([1, 2]), rows=(1, 1, 2), edge=Edge(style="torn", amount=9.6))
     assert from_file == from_script
     assert Shards(impact=[0.2, 0.8]).impact == (0.2, 0.8)
     assert Pick(pieces=np.array([2, 3])).pieces == (2, 3)
@@ -1446,7 +1447,7 @@ def test_a_torn_edge_of_no_amount_is_the_straight_drawing_exactly(kind):
 
 def test_a_torn_path_has_soft_values_inside_a_pixel_aligned_shape_because_it_reads_between_pixels():
     square = "M 0.25 0.25 H 0.75 V 0.75 H 0.25 Z"
-    torn = alpha_of(Path(d=square, edge=Edge(style="torn", amount=0.02, scale=0.2)), (60, 60))
+    torn = alpha_of(Path(d=square, edge=Edge(style="torn", amount=9.6, scale=96)), (60, 60))
     assert (
         (torn > 0) & (torn < 1)
     ).sum() > 100  # a straight one has about 4 * 30 soft pixels at most, all on its border
@@ -1454,7 +1455,7 @@ def test_a_torn_path_has_soft_values_inside_a_pixel_aligned_shape_because_it_rea
 
 def test_a_torn_path_keeps_its_area_roughly_and_moves_its_border():
     plain = alpha_of(Path(d=BLOB), (200, 300))
-    torn = alpha_of(Path(d=BLOB, edge=Edge(style="torn", amount=0.02, scale=0.1, seed=3)), (200, 300))
+    torn = alpha_of(Path(d=BLOB, edge=Edge(style="torn", amount=9.6, scale=48, seed=3)), (200, 300))
     assert torn.sum() == pytest.approx(plain.sum(), rel=0.15)
     assert abs(torn - plain).sum() > 0.02 * plain.sum()
 
@@ -1859,10 +1860,10 @@ def test_a_radial_gradient_is_the_distance_from_its_centre_as_a_share_of_the_rad
     np.testing.assert_allclose(alpha, alpha[::-1, ::-1], atol=1e-6)  # and about the centre
 
 
-def test_a_radial_gradients_radius_is_a_share_of_the_pictures_long_side_even_when_that_is_the_height():
-    alpha = resolve({"g": RadialGradient(x=0.5, y=0.5, radius=0.25)}, (80, 40), maps={}).selection("g").alpha
-    # a portrait picture: the long side is the 80 rows, so the radius is 20 px. The centre is at (20, 40) in px, a pixel
-    # corner, so every pixel centre is a half pixel off it in each direction.
+def test_a_radial_gradients_radius_is_a_share_of_the_pictures_shorter_side_even_when_that_is_the_width():
+    alpha = resolve({"g": RadialGradient(x=0.5, y=0.5, radius=0.5)}, (80, 40), maps={}).selection("g").alpha
+    # a portrait picture: the shorter side is the 40 columns, so the radius is 20 px. The centre is at (20, 40) in px,
+    # a pixel corner, so every pixel centre is a half pixel off it in each direction.
     assert alpha[40, 20] == pytest.approx(np.hypot(0.5, 0.5) / 20, abs=1e-6)
     assert alpha[49, 20] == pytest.approx(np.hypot(0.5, 9.5) / 20, abs=1e-6)  # 9.5 px below
     assert alpha[40, 29] == pytest.approx(np.hypot(9.5, 0.5) / 20, abs=1e-6)  # and 9.5 px across: the same unit
@@ -1873,7 +1874,7 @@ def test_a_radial_gradient_follows_its_centre_and_scales_with_the_picture():
     off = resolve({"g": RadialGradient(x=0.25, y=0.75, radius=0.4)}, (40, 80), maps={}).selection("g").alpha
     row, column = np.unravel_index(off.argmin(), off.shape)
     assert (int(row), int(column)) in {(29, 19), (29, 20), (30, 19), (30, 20)}  # near (0.25 x 80, 0.75 x 40) = (20, 30)
-    assert off[row, column] < 0.03
+    assert off[row, column] < 0.05  # the centre is a pixel corner: half a pixel diagonally, 0.71 px of the 16 px radius
     double = resolve({"g": RadialGradient(x=0.25, y=0.75, radius=0.4)}, (80, 160), maps={}).selection("g").alpha
     np.testing.assert_allclose(double[1::2, 1::2], off, atol=0.03)
 

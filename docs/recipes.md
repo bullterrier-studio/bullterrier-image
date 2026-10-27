@@ -71,7 +71,7 @@ file), `path` (inside a closed SVG path), `pick` (some pieces of a partition), `
   `shards`, `cuts`, `svg`, `bands`.
 - **Selection**: values 0..1: `path`, `pick`, `subject`, `given`, `band`, `combine`, gradients, built-in `subject`,
   `background`, `depth`, `light`.
-- `fit = "subject"` lays a kind over the subject instead of whole picture. `edge = { style = "torn" }` tears its borders.
+- `fit = "subject"` lays a kind over the subject instead of whole picture. `edge = { style = "torn", amount = 4.8, scale = 24 }` tears its borders (`amount`, `scale` in design px like any px value).
 - A step uses regions by name: `mask` limits to a selection; `each` + `looks` gives every piece its own look (each look
   rendered once over whole picture: cost = number of looks, not pieces); `partition` names the partition `seams` draws
   along. Unused region costs nothing. Names and kinds checked when recipe is made.
@@ -136,7 +136,7 @@ both (shares of field's 0..1 scale; `low` above `high` = error). `bands` = parti
 **highest first** (only exception to reading order): piece 0 = nearest of depth, brightest of light; empty range dropped,
 rest renumbered. `combine` = product (`multiply`, all), least (`min`), greatest (`max`, any). `linear_gradient` rises across
 the picture along `angle` (clockwise from right: 90 rises downward), 0 at one edge, 1 at other. `radial_gradient` rises
-from centre (`x`, `y`, shares) to 1 at `radius`, share of long side. Band of gradient = tilt-shift zone or vignette ring; band
+from centre (`x`, `y`, shares) to 1 at `radius`, share of shorter side. Band of gradient = tilt-shift zone or vignette ring; band
 of light = shadows or highlights; subject combined with shadows = shadows on subject.
 
 Version 2 of the file format named depth kinds `depth` and `depth_bands`. Now `band` and `bands` with `of = "depth"` (`far` is

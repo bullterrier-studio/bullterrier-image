@@ -10,13 +10,13 @@ focus = 2.5
 description = "A few big pieces with wide ragged edges, like paper torn apart by hand."
 count = 6
 jitter = 0.7
-edge = { style = "torn", amount = 0.012, scale = 0.07 }
+edge = { style = "torn", amount = 5.76, scale = 33.6 }
 
 [stone]
 description = "About a dozen cracked slabs with slightly rough edges, like a broken pavement."
 count = 14
 jitter = 0.8
-edge = { style = "torn", amount = 0.005, scale = 0.018 }
+edge = { style = "torn", amount = 2.4, scale = 8.64 }
 
 [mosaic]
 description = "Many small, nearly even tiles with straight edges, like a mosaic of cut glass."

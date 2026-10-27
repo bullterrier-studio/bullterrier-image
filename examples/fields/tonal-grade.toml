@@ -12,7 +12,7 @@ count = 3
 [[step]]
 each = "tones"
 name = "tones"
-feather = 0.004                # a soft border between the tones, so no hard contour shows
+feather = 1.92                 # a soft border between the tones, so no hard contour shows
 looks = [
     { effect = "grade", temperature = 0.8 },
     "none",
@@ -21,7 +21,7 @@ looks = [
 
 [[step]]
 each = "tones"
-feather = 0.004
+feather = 1.92
 looks = ["none", "none", { effect = "levels", output_black = 0.12 }]
 
 [[step]]
