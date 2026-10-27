@@ -11,7 +11,6 @@ NAME = "dither"
 METHODS = ["floyd_steinberg", "atkinson", "bayer", "blue_noise"]
 DIFFUSING = ["floyd_steinberg", "atkinson"]
 BLACK_WHITE = {"palette": ["#000000", "#ffffff"]}
-ONE_PX_ON_64 = 1 / 64  # a dot one pixel wide on a 64 px picture
 
 # The named palettes as their authors publish them: Nintendo Game Boy (DMG) LCD greens, IBM CGA mode 4 palette 1 (high
 # intensity), IBM EGA default 16, PICO-8 16.
@@ -234,7 +233,11 @@ def test_a_given_palette_ignores_the_settings_for_finding_colours(photo: np.ndar
 
 @pytest.mark.parametrize("method", METHODS)
 @pytest.mark.parametrize("value", [0.0, 1.0], ids=["black stays black", "white stays white"])
-@pytest.mark.parametrize(("size", "cell"), [(64, 1), (42, 4)], ids=["one pixel dots", "4 px dots, the last ones 2 px"])
+@pytest.mark.parametrize(
+    ("size", "cell"),
+    [(64, 0), (64, 1), (42, 4)],
+    ids=["a cell of 0 is one pixel", "a cell of 1 is one pixel", "4 px dots, the last ones 2 px"],
+)
 def test_a_picture_already_in_the_palette_comes_back_unchanged(
     method: str, value: float, size: int, cell: float
 ) -> None:
@@ -260,6 +263,13 @@ def test_a_size_that_is_not_whole_pixels_is_rounded_and_the_last_dots_are_cut_sh
     assert changes.tolist() == list(range(12, 128, 12))
     changes = np.flatnonzero((out[1:] != out[:-1]).any(axis=(1, 2))) + 1
     assert changes.tolist() == list(range(12, 96, 12))
+
+
+def test_the_default_cell_stays_one_dot_per_pixel_when_the_render_is_larger_than_the_recipe() -> None:
+    """A cell of 0 is not scaled up with the render size: a recipe of size 32 rendered at 128 still recolours pixels."""
+    picture = np.random.default_rng(6).random((128, 128, 3), dtype=np.float32)
+    out = render(picture, Recipe("t", size=32, steps=[fx.dither(palette="cube3", space="rgb", pattern=0.0)]), size=128)
+    np.testing.assert_allclose(out.reshape(-1, 3), closest(picture.reshape(-1, 3), cube(3), rgb_distance), atol=1e-6)
 
 
 def test_the_dots_are_the_dithered_average_of_each_square(photo: np.ndarray) -> None:

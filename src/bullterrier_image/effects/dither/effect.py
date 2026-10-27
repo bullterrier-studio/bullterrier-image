@@ -69,13 +69,14 @@ class DitherParams(EffectParams):
         "'blue_noise' take longer with more colours.",
     )
     cell: float = param(
-        1.0,
+        0.0,
         unit="px",
-        min=1,
+        min=0,
         max=48,
-        doc="The size of one dot in px at the recipe's size (rounded to whole pixels, at least 1): the picture is "
-        "dithered on a grid of this size and shown with hard square dots. The default is one pixel; 4 is a chunky "
-        "dot on a 480 px picture and 10 or more a pixel-art look. Raising it gives coarser, larger dots.",
+        doc="The size of one dot in px at the recipe's size (rounded to whole pixels): the picture is dithered on a "
+        "grid of this size and shown with hard square dots. 0, the default, is one dot per pixel at any render size "
+        "(so a `pattern` of 0 recolours pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a "
+        "pixel-art look. Raising it gives coarser, larger dots.",
     )
     pattern: float = param(
         1.0,
