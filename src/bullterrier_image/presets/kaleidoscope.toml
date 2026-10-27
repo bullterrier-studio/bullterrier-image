@@ -1,0 +1,7 @@
+# Looks that are one kaleidoscope step.
+
+[mirror]
+description = "A mirror: the left half copied, reflected, onto the right (a symmetric face). Turn `angle` to keep another half."
+segments = 1
+angle = 90
+interpolation = "nearest"

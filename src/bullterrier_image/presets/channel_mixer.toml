@@ -10,7 +10,7 @@ green_from_blue = 0.4
 blue_from_blue = 0.2
 blue_from_green = 0.8
 
-[monochrome]
+[black_and_white]
 description = "Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."
 red_from_red = 0.2126
 red_from_green = 0.7152

@@ -10,6 +10,6 @@ mode = "soft_light"
 
 [[step]]
 effect = "blend"
-preset = "logo"
+preset = "overlay"
 image = "../assets/bullterrier-cutout.png"
 scale = 0.3

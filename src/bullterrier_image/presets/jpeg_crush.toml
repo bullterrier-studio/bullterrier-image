@@ -1,0 +1,6 @@
+# Looks that are one jpeg_crush step.
+
+[byte_corrupt]
+description = "A corrupted JPEG: a moderate-quality picture with 40 damaged coefficients, showing as smeared blocks, colour streaks and stripes."
+quality = 20
+hits = 40

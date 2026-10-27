@@ -1,0 +1,6 @@
+# Looks that are one perspective step.
+
+[shear]
+description = "A shear: rows slid sideways in proportion to their height, so the picture leans like italic type."
+vertical = 0.0
+shear_x = 0.2

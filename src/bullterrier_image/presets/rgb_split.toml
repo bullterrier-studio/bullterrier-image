@@ -1,0 +1,7 @@
+# Looks that are one rgb_split step.
+
+[anaglyph]
+description = "A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."
+pair = "red_cyan"
+angle = 180
+amount = 6

@@ -1,0 +1,6 @@
+# Looks that are one lens_distortion step.
+
+[fisheye]
+description = "A fisheye lens: the middle swells and the edges squeeze in, like a 108 degree equidistant lens."
+model = "fisheye"
+amount = 0.46

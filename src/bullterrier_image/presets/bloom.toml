@@ -14,3 +14,10 @@ threshold = 0.5
 amount = 1.8
 octaves = 1
 color = "#ff4a14"
+
+[glow]
+description = "A glow: the bright parts blurred into one soft halo and screened over the sharp picture."
+radius = 24
+threshold = 0.55
+amount = 0.6
+octaves = 1

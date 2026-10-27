@@ -4,3 +4,7 @@
 description = "The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement."
 output_black = 1.0
 output_white = 0.0
+
+[fade]
+description = "A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky."
+output_black = 0.12

@@ -14,6 +14,6 @@ opacity = 0.6
 
 [[step]]
 effect = "particles"
-preset = "stars"
+preset = "starfield"
 density = 1.9
 opacity = 0.6

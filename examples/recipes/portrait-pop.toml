@@ -4,7 +4,7 @@ size = 768
 
 [[step]]
 effect = "channel_mixer"
-preset = "monochrome"
+preset = "black_and_white"
 mask = "background"
 
 [[step]]

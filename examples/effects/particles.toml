@@ -11,7 +11,7 @@ mask = "background"
 
 [[step]]
 effect = "particles"
-preset = "stars"
+preset = "starfield"
 density = 3.3
 seed = 1
 mask = "background"

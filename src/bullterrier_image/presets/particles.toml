@@ -9,7 +9,7 @@ angle = 105
 softness = 1
 color = "#ff8a2b"
 
-[dust]
+[floating_dust]
 description = "Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam."
 density = 0.977
 size = 24
@@ -34,7 +34,7 @@ color = "#ffffff"
 layers = 4
 size_falloff = 1
 
-[stars]
+[starfield]
 description = "Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."
 density = 7.324
 size = 3

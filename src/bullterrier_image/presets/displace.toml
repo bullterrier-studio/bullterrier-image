@@ -1,0 +1,8 @@
+# Looks that are one displace step.
+
+[scatter]
+description = "Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."
+amount = 14
+scale = 1
+octaves = 1
+interpolation = "nearest"

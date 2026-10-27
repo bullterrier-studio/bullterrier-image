@@ -19,7 +19,7 @@ WEIGHTS = (
     "blue_from_blue",
 )
 TOLERANCE = 2 * float(np.finfo(np.float32).eps)  # 2 x float32 epsilon: float32 rounding of a sum of three products
-MONOCHROME = registry.presets(NAME)["monochrome"].params
+MONOCHROME = registry.presets(NAME)["black_and_white"].params
 PIXEL = np.array([[[0.2, 0.4, 0.6]]], np.float32)  # three distinct channels, so a swapped row or column shows
 
 
@@ -62,14 +62,14 @@ def test_each_output_channel_is_the_row_of_the_matrix_applied_to_the_input_chann
         pytest.param((0.2, 0.4, 0.6), 0.2126 * 0.2 + 0.7152 * 0.4 + 0.0722 * 0.6, id="a mixed colour"),
     ],
 )
-def test_the_monochrome_preset_gives_every_channel_the_rec_709_luma(
+def test_the_black_and_white_preset_gives_every_channel_the_rec_709_luma(
     pixel: tuple[float, float, float], expected: float
 ) -> None:
     out = registry.apply(NAME, np.array([[pixel]], np.float32), **MONOCHROME)
     np.testing.assert_allclose(out[0, 0], [expected] * 3, atol=TOLERANCE)
 
 
-def test_the_monochrome_preset_keeps_greys_unchanged() -> None:
+def test_the_black_and_white_preset_keeps_greys_unchanged() -> None:
     ramp = np.linspace(0, 1, 21, dtype=np.float32)[None, :, None].repeat(3, axis=2)
     out = registry.apply(NAME, ramp, **MONOCHROME)
     np.testing.assert_allclose(out, ramp, atol=TOLERANCE)

@@ -10,3 +10,7 @@ pattern = 0.0
 description = "Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks."
 palette = ["#000000", "#ffffff"]
 pattern = 0.0
+
+[palette_quantize]
+description = "Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."
+pattern = 0.0

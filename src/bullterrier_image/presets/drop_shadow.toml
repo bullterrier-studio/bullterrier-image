@@ -8,3 +8,12 @@ angle = 45.0
 blur = 0.0
 copy_opacity = 0.16
 fade = 1.0
+
+[layered_cutouts]
+description = "Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."
+copies = 4
+offset = 14.0
+angle = 45.0
+blur = 0.0
+color = "#ff8a5b"
+end_color = "#3b1f6b"

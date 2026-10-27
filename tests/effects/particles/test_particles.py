@@ -221,7 +221,7 @@ def test_the_embers_preset_makes_sparks_whose_streaks_trail_down_and_to_the_left
 
 
 def test_the_dust_preset_makes_round_soft_specks(lone_particle) -> None:
-    speck = lone_particle(light, 3, **preset("dust"))
+    speck = lone_particle(light, 3, **preset("floating_dust"))
     rows, columns = np.nonzero(speck)
     assert rows.max() - rows.min() == pytest.approx(columns.max() - columns.min(), abs=1)  # no streak
     assert rows.max() - rows.min() > 12  # specks, not dots
@@ -244,7 +244,7 @@ def test_the_snow_preset_makes_flakes_in_four_layers_the_largest_14_px_wide(lone
 
 
 def test_the_stars_preset_makes_small_crisp_dots(lone_particle) -> None:
-    star = lone_particle(light, 3, **preset("stars"))
+    star = lone_particle(light, 3, **preset("starfield"))
     rows, columns = np.nonzero(star)
     assert max(rows.max() - rows.min(), columns.max() - columns.min()) <= 3  # 3 px across at most: 4 pixels
     assert star.max() > 0.3

@@ -165,7 +165,7 @@ def logo_corner(photo, **params):
 
 
 def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_the_bottom_right_corner(photo):
-    out, rows, columns = logo_corner(photo, **Step(NAME, preset="logo").params)
+    out, rows, columns = logo_corner(photo, **Step(NAME, preset="overlay").params)
     assert abs((columns.max() - columns.min() + 1) - 0.2 * 128) <= 1  # a fifth of the photo's 128 px
     assert 1 <= 96 - 1 - rows.max() <= 4  # a small margin from the bottom edge
     assert 1 <= 128 - 1 - columns.max() <= 4  # and from the right edge
@@ -173,5 +173,5 @@ def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_t
 
 
 def test_a_parameter_given_beside_the_logo_preset_wins(photo):
-    _, _rows, columns = logo_corner(photo, **Step(NAME, {"scale": 0.01}, preset="logo").params)
+    _, _rows, columns = logo_corner(photo, **Step(NAME, {"scale": 0.01}, preset="overlay").params)
     assert columns.max() - columns.min() + 1 <= 2  # 1 % of 128 px

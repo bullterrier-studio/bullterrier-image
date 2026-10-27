@@ -1,0 +1,15 @@
+# Looks that are one grain step.
+
+[film_grain]
+description = "Film grain: grey speckle that is heaviest in the shadows and lightest in the highlights, as on a photographic negative."
+amount = 0.065
+balance = -0.54
+size = 1.0
+color = false
+
+[noise]
+description = "Plain sensor noise: independent colour speckle of the same strength in shadows and highlights."
+amount = 0.06
+balance = 0.0
+size = 1.0
+color = true
