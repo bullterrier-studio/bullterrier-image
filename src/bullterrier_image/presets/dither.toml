@@ -5,3 +5,8 @@ description = "Posterize: the picture in 6 flat colours found in it, a poster wi
 palette = "photo"
 colors = 6
 pattern = 0.0
+
+[threshold]
+description = "Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks."
+palette = ["#000000", "#ffffff"]
+pattern = 0.0

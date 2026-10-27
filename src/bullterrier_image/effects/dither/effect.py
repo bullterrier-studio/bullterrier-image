@@ -158,7 +158,8 @@ def _colours(dots: np.ndarray, params: DitherParams) -> np.ndarray:
 
 @effect(category="stylised", params=DitherParams)
 def dither(rgb: np.ndarray, params: DitherParams) -> np.ndarray:
-    """Redraw the picture in a few colours, its tones kept as a pattern of dots of `cell` size.
+    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither,
+    1-bit black and white, retro palettes, and the presets `posterize` and `threshold`.
 
     The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
     afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours

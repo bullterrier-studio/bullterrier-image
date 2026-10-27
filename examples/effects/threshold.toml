@@ -1,9 +1,0 @@
-# A two-colour bitmap: ink on cream paper, split at mid brightness.
-name = "threshold"
-size = 480
-
-[[step]]
-effect = "threshold"
-level = 0.6
-dark = "#1b1f3a"
-light = "#f4ecd8"

@@ -29,7 +29,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `color_balance` ✓ | A colour pushed into the shadows, midtones and highlights: split toning, duotone, teal and orange (presets `split_tone`, `color_balance`, `teal_orange`). | `fx.color_balance(shadows="#3a1bff", highlights="#ff2bd6")` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
-| `threshold` ✓ | Two-colour bitmap. | `fx.threshold(level=0.5, dark="#000", light="#fff")` |
 | `color_transfer` | Match the colour mood of a reference photo. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` (next) | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ (a preset of `channel_mixer`) | Mono conversion; set the rows for a colour filter. | `fx.channel_mixer(preset="monochrome")` |
@@ -93,7 +92,7 @@ belong to a layout package, not here.
 | `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=0.2, min_cell=0.012)` |
-| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction. | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
+| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (a few flat colours) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
 | `edges` (next) | Outlines by Sobel, Canny or difference of Gaussians; on the existing `ops.edges`. | `fx.edges(method="dog", width=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | line and CMYK screens (planned, on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none or cmyk (four inks at the screen angles). Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", cell=9)` |

@@ -372,3 +372,38 @@ def test_the_posterize_preset_repaints_a_photo_in_a_handful_of_flat_colours(phot
 def test_the_posterize_preset_takes_its_number_of_colours_from_the_step(photo: np.ndarray, colors: int) -> None:
     out = with_preset(photo, fx.dither(preset="posterize", colors=colors))
     assert 2 <= len(colours_of(out)) <= colors
+
+
+# --- the preset `threshold`: two colours split at the middle of the lightness ----------------------------------------
+
+
+def test_the_threshold_preset_paints_black_where_oklab_lightness_is_below_the_middle_and_white_above(
+    photo: np.ndarray,
+) -> None:
+    out = with_preset(photo, fx.dither(preset="threshold"))
+    lightness_of_each = oklab(photo.reshape(-1, 3))[:, 0].reshape(photo.shape[:2])
+    clearly_dark, clearly_light = lightness_of_each < 0.499, lightness_of_each > 0.501  # float32 vs float64 at the edge
+    assert clearly_dark.sum() > 1000
+    assert clearly_light.sum() > 1000
+    assert (out[clearly_dark] == 0).all()
+    assert (out[clearly_light] == 1).all()
+
+
+@pytest.mark.parametrize(
+    ("exposure", "grey", "white"),
+    [
+        pytest.param(0.0, 0.30, False, id="a 0.30 grey is below the split (about 0.39) as it is"),
+        pytest.param(0.5, 0.30, True, id="half a stop up lifts that grey over the split (0.30 x 1.41)"),
+        pytest.param(0.0, 0.50, True, id="a 0.50 grey is above the split as it is"),
+        pytest.param(-0.5, 0.50, False, id="half a stop down drops it under (0.50 / 1.41)"),
+    ],
+)
+def test_a_grade_step_before_the_threshold_preset_moves_the_split(exposure: float, grey: float, white: bool) -> None:
+    out = with_preset(flat(grey), fx.grade(exposure=exposure), fx.dither(preset="threshold"))
+    np.testing.assert_array_equal(out, flat(1.0 if white else 0.0))
+
+
+def test_the_threshold_preset_takes_two_other_colours_from_the_step(photo: np.ndarray) -> None:
+    ink, paper = "#1b1f3a", "#f4ecd8"
+    out = with_preset(photo, fx.dither(preset="threshold", palette=[ink, paper]))
+    np.testing.assert_allclose(colours_of(out), rgb_of([ink, paper]), atol=1e-6)  # unique rows come sorted, ink first
