@@ -6,8 +6,8 @@ import pytest
 from bullterrier_image.core import registry
 
 NAME = "parallax"
-HEIGHT, WIDTH = 96, 128  # the long side is 128 px: amount 0.0625 is 8 px per unit of depth from the focus
-AMOUNT = 0.0625
+HEIGHT, WIDTH = 96, 128  # amount 8 px is the shift per unit of depth from the focus
+AMOUNT = 8.0
 MARGIN = 8  # px from each border: no shift below reaches farther, so inside it no pixel reads beyond the picture
 
 
@@ -30,8 +30,8 @@ def interior(picture: np.ndarray) -> np.ndarray:
     ("settings", "depth"),
     [
         pytest.param({"amount": 0.0, "focus": 0.5}, 1.0, id="amount 0 shifts nothing"),
-        pytest.param({"amount": 0.1, "focus": 0.3}, 0.3, id="every depth at the focus stays put"),
-        pytest.param({"amount": 0.1, "focus": 1.0, "angle": 45.0}, 1.0, id="focus 1 on the nearest plane"),
+        pytest.param({"amount": 12.8, "focus": 0.3}, 0.3, id="every depth at the focus stays put"),
+        pytest.param({"amount": 12.8, "focus": 1.0, "angle": 45.0}, 1.0, id="focus 1 on the nearest plane"),
     ],
 )
 def test_a_picture_with_nothing_to_shift_is_returned_exactly(settings: dict[str, float], depth: float) -> None:
@@ -50,14 +50,14 @@ def test_a_picture_with_nothing_to_shift_is_returned_exactly(settings: dict[str,
         pytest.param(HEIGHT, WIDTH, 0.75, 0.5, 0.0, 0, 2, id="a quarter from the focus: 8 x 0.25"),
         pytest.param(HEIGHT, WIDTH, 0.0, 0.5, 0.0, 0, -4, id="farther than the focus: against the angle"),
         pytest.param(HEIGHT, WIDTH, 0.25, 1.0, 90.0, -6, 0, id="0.75 behind the focus, angle 90: up by 6, against it"),
-        pytest.param(WIDTH, 64, 1.0, 0.5, 0.0, 0, 4, id="portrait: the long side is the height"),
+        pytest.param(WIDTH, 64, 1.0, 0.5, 0.0, 0, 4, id="portrait: the same px, the long side does not matter"),
     ],
 )
 @pytest.mark.parametrize("interpolation", ["bilinear", "bicubic"])
 def test_a_single_plane_is_translated_by_its_distance_from_the_focus(
     height: int, width: int, depth: float, focus: float, angle: float, down: int, right: int, interpolation: str
 ) -> None:
-    """The shift is amount x long side x (depth - focus) px along `angle` (0 = right, 90 = down); the expected picture
+    """The shift is amount x (depth - focus) px along `angle` (0 = right, 90 = down); the expected picture
     is the input rolled by that many whole px, compared away from the borders, where the edge rule decides."""
     picture = noise(height, width)
     out = registry.apply(
@@ -105,13 +105,13 @@ def test_the_shift_never_leaves_the_range_of_the_picture() -> None:
     """Bilinear reading blends neighbours, so no value lies outside the picture's own range."""
     picture = noise() * 0.5 + 0.3  # 0.3..0.8: away from 0 and 1, so a wider range would show
     ramp = np.tile(np.linspace(1, 0, WIDTH, dtype=np.float32), (HEIGHT, 1))
-    out = registry.apply(NAME, picture, depth=ramp, amount=0.03, focus=0.4, angle=30.0)
+    out = registry.apply(NAME, picture, depth=ramp, amount=3.84, focus=0.4, angle=30.0)
     assert out.min() >= picture.min()
     assert out.max() <= picture.max()
 
 
 def test_without_a_depth_the_picture_is_returned_unchanged_as_a_copy() -> None:
     picture = noise()
-    out = registry.apply(NAME, picture, amount=0.1)
+    out = registry.apply(NAME, picture, amount=12.8)
     np.testing.assert_array_equal(out, picture)
     assert out is not picture

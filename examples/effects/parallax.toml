@@ -4,5 +4,5 @@ size = 480
 
 [[step]]
 effect = "parallax"
-amount = 0.03
+amount = 14.4
 focus = 0.5

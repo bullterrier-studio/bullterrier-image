@@ -7,9 +7,8 @@ expectations are worked out by hand: a neutral picture per mode, a multiply, a h
 import numpy as np
 import pytest
 
-from bullterrier_image import Picture
+from bullterrier_image import Picture, Recipe, fx, render
 from bullterrier_image.core import registry
-from bullterrier_image.core.steps import Step
 
 NAME = "blend"
 
@@ -82,7 +81,7 @@ def test_tile_repeats_the_picture_scale_times_the_photos_width(photo):
 
 def test_the_margin_keeps_the_edge_of_the_photo_clear(photo):
     red = Picture.of_color("#ff0000")
-    out = registry.apply(NAME, photo, image=red, mode="normal", fit="stretch", margin=0.125)  # 16 of 128 px
+    out = registry.apply(NAME, photo, image=red, mode="normal", fit="stretch", margin=16)
     np.testing.assert_array_equal(out[:16], photo[:16])
     np.testing.assert_allclose(out[16:80, 16:112], np.broadcast_to([1, 0, 0], (64, 96, 3)), atol=1e-6)
 
@@ -143,8 +142,8 @@ def test_a_fit_by_width_puts_the_picture_at_its_anchor(photo, at, top, left):
     assert (rows.min(), columns.min(), rows.max(), columns.max()) == (top, left, top + 15, left + 31)
 
 
-def test_the_margin_is_a_share_of_the_photos_long_side(photo):
-    out = put_logo(photo, at="bottom_right", scale=0.25, margin=0.125)  # 16 px of the 128 px long side
+def test_the_margin_is_px_from_the_edges(photo):
+    out = put_logo(photo, at="bottom_right", scale=0.25, margin=16)
     rows, columns = np.nonzero(np.any(out != photo, axis=2))
     assert (int(rows.max()), int(columns.max())) == (96 - 16 - 1, 128 - 16 - 1)
 
@@ -158,14 +157,16 @@ def test_a_cut_out_keeps_its_shape_so_the_photo_shows_through_its_transparent_pi
     np.testing.assert_array_equal(out[8:24, :8], photo[8:24, :8])
 
 
-def logo_corner(photo, **params):
-    """The photo with the logo laid by the given step parameters, and the rows and columns the logo changed."""
-    out = registry.apply(NAME, photo, image=Picture(logo_pixels()), **params)
+def logo_corner(photo, **settings):
+    """The photo with the logo laid by a `blend` step, drawn for 480 px and rendered at the photo's 128 px, and the
+    rows and columns the logo changed."""
+    step = fx.blend(image=Picture(logo_pixels()), **settings)
+    out = render(photo, Recipe("logo", size=480, steps=[step]), size=128)
     return out, *np.nonzero(np.any(out != photo, axis=2))
 
 
 def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_the_bottom_right_corner(photo):
-    out, rows, columns = logo_corner(photo, **Step(NAME, preset="overlay").params)
+    out, rows, columns = logo_corner(photo, preset="overlay")
     assert abs((columns.max() - columns.min() + 1) - 0.2 * 128) <= 1  # a fifth of the photo's 128 px
     assert 1 <= 96 - 1 - rows.max() <= 4  # a small margin from the bottom edge
     assert 1 <= 128 - 1 - columns.max() <= 4  # and from the right edge
@@ -173,5 +174,5 @@ def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_t
 
 
 def test_a_parameter_given_beside_the_logo_preset_wins(photo):
-    _, _rows, columns = logo_corner(photo, **Step(NAME, {"scale": 0.01}, preset="overlay").params)
+    _, _rows, columns = logo_corner(photo, preset="overlay", scale=0.01)
     assert columns.max() - columns.min() + 1 <= 2  # 1 % of 128 px

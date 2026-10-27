@@ -24,13 +24,12 @@ class ParallaxParams(EffectParams):
         "right, 90 = down, 180 = left. Layers farther than the focus move the opposite way.",
     )
     amount: float = param(
-        0.02,
-        unit="fraction",
+        9.6,
+        unit="px",
         min=0,
-        max=0.1,
-        doc="How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a fraction of the "
-        "picture's long side: a layer moves amount x (its depth - focus) of it. Raising it exaggerates the shift; "
-        "0 leaves the picture unchanged.",
+        max=48,
+        doc="How far the nearest layer (depth 1) moves when the focus is the farthest depth, 0 to 48 px: a layer "
+        "moves amount x (its depth - focus) px. Raising it exaggerates the shift; 0 leaves the picture unchanged.",
     )
     focus: float = param(
         0.5,
@@ -60,7 +59,7 @@ class ParallaxParams(EffectParams):
 
 @effect(category="distortion", params=ParallaxParams)
 def parallax(rgb: np.ndarray, params: ParallaxParams, *, depth: np.ndarray | None = None) -> np.ndarray:
-    """Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera
+    """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera
     move would.
 
     Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
@@ -71,7 +70,7 @@ def parallax(rgb: np.ndarray, params: ParallaxParams, *, depth: np.ndarray | Non
     if depth is None:
         return rgb.copy()
     height, width = rgb.shape[:2]
-    reach = params.amount * max(height, width)  # px a layer moves per unit of depth from the focus
+    reach = params.amount  # px a layer moves per unit of depth from the focus
     # A pixel reads where it lies minus its shift, so a pixel a near object lands on must take the object's shift, not
     # its own (farther) one: the depth is replaced by the nearest within the largest shift, ceil(reach x the farthest
     # depth from the focus) px, so near objects move whole instead of tearing. A square is the simplest window that

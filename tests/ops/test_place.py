@@ -52,10 +52,10 @@ def test_a_picture_sits_at_one_of_nine_anchors_in_the_free_space(at, top, left):
     assert box(fit(SQUARE, (20, 20), at=at, scale=0.5)) == (top, left, 10, 10)
 
 
-def test_the_margin_is_a_share_of_the_long_side_kept_clear_of_the_picture():
-    placed = fit(SQUARE, (40, 60), margin=0.1)  # 6 px of 60; the area is 28 x 48, so a square picture is 28 x 28
+def test_the_margin_is_px_kept_clear_of_the_picture_on_every_side():
+    placed = fit(SQUARE, (40, 60), margin=6)  # the area is 28 x 48, so a square picture is 28 x 28
     assert box(placed) == (6, 16, 28, 28)
-    assert box(fit(SQUARE, (40, 60), margin=0.1, at="top_left")) == (6, 6, 28, 28)
+    assert box(fit(SQUARE, (40, 60), margin=6, at="top_left")) == (6, 6, 28, 28)
 
 
 def test_contain_keeps_the_aspect_and_leaves_the_rest_transparent():
@@ -69,7 +69,7 @@ def test_width_sets_the_pictures_width_to_the_photos_times_scale_whatever_its_as
     tall = np.ones((8, 2, 4), np.float32)
     placed = fit(tall, (80, 20), fit="width", scale=0.5, at="top_left")  # 10 px wide, so 40 px tall
     assert box(placed) == (0, 0, 40, 10)
-    assert box(fit(tall, (80, 20), fit="width", scale=0.5, at="top_left", margin=0.1))[2:] == (
+    assert box(fit(tall, (80, 20), fit="width", scale=0.5, at="top_left", margin=8))[2:] == (
         40,
         10,
     )  # not the margin's
@@ -111,7 +111,7 @@ def test_transparent_pixels_lend_the_resampled_edge_no_colour():
 def test_every_resampling_gives_a_float_rgba_picture_of_the_photos_size_in_range(shape, resample):
     source = np.random.default_rng(0).random((6, 9, 4), dtype=np.float32)
     before = source.copy()
-    placed = fit(source, shape, fit="cover", margin=0.45, resample=resample)
+    placed = fit(source, shape, fit="cover", margin=216, resample=resample)
     assert placed.shape == (*shape, 4)
     assert placed.dtype == np.float32
     assert placed.min() >= 0

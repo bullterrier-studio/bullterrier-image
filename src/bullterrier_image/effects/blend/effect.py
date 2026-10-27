@@ -51,11 +51,11 @@ class BlendParams(EffectParams):
     )
     margin: float = param(
         0.0,
-        unit="fraction",
+        unit="px",
         min=0,
-        max=0.45,
-        doc="Space kept clear around the fitted picture, as a share of the photo's long side, 0 to 0.45 (never more "
-        "than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain' and 'stretch' fill and "
+        max=216,
+        doc="Space kept clear around the fitted picture on every side, 0 to 216 px (never more than leaves a pixel "
+        "of the shorter side). Raising it shrinks what 'cover', 'contain' and 'stretch' fill and "
         "moves a smaller picture at an edge or corner inward.",
     )
     resample: Resample = param(

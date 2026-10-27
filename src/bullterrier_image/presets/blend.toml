@@ -6,4 +6,4 @@ mode = "normal"
 fit = "width"
 at = "bottom_right"
 scale = 0.2
-margin = 0.025
+margin = 12

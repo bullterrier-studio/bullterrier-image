@@ -40,14 +40,13 @@ def place(
     - `width` makes the picture as wide as the photo (a logo's `scale` is then a share of the photo's width);
     - `tile` is `width`, repeated over the whole photo with one tile at the anchor.
     `at` says where in the free space a picture smaller or larger than the area sits (the tiles' phase for `tile`).
-    `margin` is a share of the photo's long side, kept clear on every side (at most as much as leaves a pixel of the
-    shorter side).
+    `margin` is a length in px, kept clear on every side (at most as much as leaves a pixel of the shorter side).
     `resample` is the filter that sizes it; colours are weighted by alpha while sizing, so a transparent pixel lends
     its neighbours no colour.
     """
     height, width = shape
     short = min(shape)
-    inset = min(round(margin * max(shape)), (short - 1) // 2)
+    inset = min(round(margin), (short - 1) // 2)
     area_h, area_w = height - 2 * inset, width - 2 * inset
     source_h, source_w = picture.shape[:2]
     if fit == "stretch":

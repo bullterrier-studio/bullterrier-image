@@ -284,7 +284,7 @@ no time of its own.
 | `disperse` ✓ | Pieces detach, drift on the wind and fade. Presets `evaporate`, `halo`, `windblown`, `disintegrate` are stills part-way through. | `fx.disperse(progress=0.45, wind=0.3)` |
 | `dissolve` | Pixels or blocks of `cell` px vanish in noise order, with a burning edge (covers the old `pixel_dissolve`). | `fx.dissolve(progress=0.5, cell=16, edge="#ff7a2b")` |
 | burst (planned, on `disperse`) | Pieces burst outward from a point (`x`, `y`) as well as drifting on the wind. Replaces `explode`. | `fx.disperse(progress=0.5, burst=1, x=0.5, y=0.4)` |
-| `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=0.03, focus=0.5)` |
+| `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=14.4, focus=0.5)` |
 
 Dropped: `assemble`. Pieces flying in and settling is `disperse` with `progress` running from 1 to 0, set by video.
 

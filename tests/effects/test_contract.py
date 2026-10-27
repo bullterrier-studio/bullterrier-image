@@ -1134,7 +1134,7 @@ def test_the_direction_check_flags_what_breaks_the_convention_and_passes_what_ke
 
 
 # Fields named for a length whose unit is a share, each with what the share is of. A share of the picture's long side
-# is never right, since that is a length, in px; those listed "BUG" are waiting to be converted.
+# is never right, since that is a length, in px.
 LENGTHS_AS_SHARES = {
     ("vignette", "radius"): "the distance from the centre to a corner",
     ("vignette", "feather"): "the distance from the centre to a corner",
@@ -1154,8 +1154,6 @@ LENGTHS_AS_SHARES = {
     ("fog", "feather"): "the range of the noise that makes the clouds",
     ("disperse", "flare_span"): "a piece's flight",
     ("disperse", "reach"): "the figure, in the order its pieces leave",
-    ("blend", "margin"): "BUG: the photo's long side, a length: wants px",
-    ("parallax", "amount"): "BUG: the picture's long side, a length: wants px",
 }
 LENGTH_WORDS = {
     "length", "width", "size", "offset", "height", "spacing", "radius", "span", "gap", "cell", "thickness",

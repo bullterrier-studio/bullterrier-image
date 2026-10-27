@@ -134,8 +134,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   effect with one picture names it `image`; one with several names each for its role.
 - **A logo is `blend` with `fit="width"`, not an effect of its own.** `overlay` was `blend` in the `normal` mode with the
   picture sized by the photo's width; folding it leaves one placement model and seven parameters instead of twelve, and
-  the preset `logo` keeps the short way to write it. `margin` is a share of the long side (the lengths rule), not of the
-  shorter one.
+  the preset `logo` keeps the short way to write it. `margin` is a length in px (the lengths rule).
 - **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
   nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
   channel), not a `matrix` or a `points` list. *Reason:* only scalars can be driven by a control signal from outside, become a slider
