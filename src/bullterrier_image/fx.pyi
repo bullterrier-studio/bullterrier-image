@@ -1839,14 +1839,19 @@ it (the DC value with chance `dc_share`, otherwise one of the 63 others), and ad
 `magnitude` quantisation steps before the decoding. A hit on a DC value also moves the DC value of every later
 block of its row in that plane, as a damaged difference does in the file.
 
+The blocks are 8 design px, so the damage looks the same at any size while the fine detail stays. `size_ratio`
+(injected: working px per design px, 1 outside a recipe) shrinks the picture to its design size by averaging,
+crushes and damages that, and adds the damage (crushed minus shrunk) back to the full picture, each design pixel's
+damage repeated over the working pixels it covers so block edges stay hard.
+
 Parameters
 ----------
 quality : whole number, count, 1 to 100, default 6
     The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG
-    Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows 8
-    px blocks, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it
-    coarsens the quantisation of every 8 x 8 block, so each hit is also a larger jump in
-    the picture.
+    Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows
+    blocks 8 px wide, ringing round edges and colour bleed, 1 is a few flat blocks.
+    Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a
+    larger jump in the picture.
 hits : whole number, count, 0 to 5000, default 0
     How many coefficients are damaged after the compression, 0 to 5000, each at a random
     place in a random 8 x 8 block of the brightness or one of the two colour planes, as

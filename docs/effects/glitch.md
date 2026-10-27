@@ -60,7 +60,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `quality` | whole number | count | 1 to 100 | `6` | The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows 8 px blocks, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a larger jump in the picture. |
+| `quality` | whole number | count | 1 to 100 | `6` | The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows blocks 8 px wide, ringing round edges and colour bleed, 1 is a few flat blocks. Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a larger jump in the picture. |
 | `hits` | whole number | count | 0 to 5000 | `0` | How many coefficients are damaged after the compression, 0 to 5000, each at a random place in a random 8 x 8 block of the brightness or one of the two colour planes, as a corrupted file shows. 0 leaves the plain crushed picture, and then `seed`, `dc_share` and `magnitude` do nothing. Raising it spreads more damage over the picture. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the hits land and how large they are: the same seed always gives the same damage, any other a different one. |
 
