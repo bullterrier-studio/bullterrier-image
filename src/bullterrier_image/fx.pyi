@@ -2435,8 +2435,9 @@ A generated background: the input is used only for its height and width, its con
 standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
 distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
 noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
-Perlin's fade curve); 'worley' is the distance to the nearest feature point (F1); 'sine' sums octaves of two
-plane sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
+Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the nearest feature point, one point per cell
+of `scale` / `lacunarity`**i, measured in those cells), weight `persistence`**i; 'sine' sums octaves of two plane
+sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
 directions a and phases p, weight `persistence`**i, layer i evaluated at positions pushed along x and y by `warp`
 px times the two waves of layer i - 1.
 
@@ -2450,27 +2451,26 @@ kind : one of 'value', 'perlin', 'worley', 'sine', default 'perlin'
     blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more
     even, zero at the lattice points) or 'worley' (cellular noise: the distance to the
     nearest of a scatter of random points, one per cell of `scale` px, dark at each
-    point and brightening away from it; a single layer, so it ignores `octaves`,
-    `persistence` and `lacunarity`) or 'sine' (crossed sine waves: smooth, regular
-    swirls; the classic plasma).
+    point and brightening away from it; each layer is a finer scatter) or 'sine'
+    (crossed sine waves: smooth, regular swirls; the classic plasma).
 scale : number, px, 2 to 1024, default 120.0
     Size of the coarsest features in pixels: the spacing of the first lattice (value,
     perlin), the size of a cell (worley) or the wavelength from crest to crest of the
     first waves (sine); tuned for a picture about 480 px high. Larger = broad, slow
     variation; small = fine grain.
 octaves : whole number, count, 1 to 8, default 4
-    How many layers of noise are summed (value, perlin, sine), each finer than the last
-    (by `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine
-    detail. Each sine layer is two waves crossing at random angles. Layers finer than
-    one pixel (sine: two pixels) are dropped.
+    How many layers of noise are summed (all kinds), each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail.
+    Each sine layer is two waves crossing at random angles. Layers finer than one pixel
+    (sine: two pixels) are dropped.
 persistence : number, ratio, 0 to 1, default 0.5
-    How much weaker each finer layer is than the one before (value, perlin, sine): each
-    layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 =
-    every layer equally strong (very rough).
+    How much weaker each finer layer is than the one before (all kinds): each layer's
+    weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
+    layer equally strong (very rough).
 lacunarity : number, ratio, 1 to 4, default 2.0
-    How much finer each layer is than the one before (value, perlin, sine): the lattice
-    spacing or wavelength is divided by this per layer. 1 = every layer the same size, 2
-    = each half as coarse, larger = detail drops off faster.
+    How much finer each layer is than the one before (all kinds): the lattice spacing,
+    cell size or wavelength is divided by this per layer. 1 = every layer the same size,
+    2 = each half as coarse, larger = detail drops off faster.
 warp : number, px, 0 to 500, default 0.0
     How far in pixels the pattern is pushed about, the typical shift of a point: the
     swirling, folded look of a domain warp. 0 = no warp, and a little is nearly the same
