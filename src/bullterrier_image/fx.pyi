@@ -2725,47 +2725,65 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def noise_field(kind: Literal['value', 'perlin', 'worley'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with a noise field of `kind` (value, perlin or worley), coloured through `colors`.
+def noise_field(kind: Literal['value', 'perlin', 'worley', 'sine'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 0.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['plasma'] | None = None) -> Step:
+    """Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`.
 
 A generated background: the input is used only for its height and width, its content is ignored. The noise is
 standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
 distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
 noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
-Perlin's fade curve); 'worley' is the distance to the nearest feature point (F1).
+Perlin's fade curve); 'worley' is the distance to the nearest feature point (F1); 'sine' sums octaves of two
+plane sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
+directions a and phases p, weight `persistence`**i, layer i evaluated at positions pushed along x and y by `warp`
+px times the two waves of layer i - 1.
+
+For the other kinds `warp` reads the finished picture at points shifted by two further fields of the kind (the
+seed's streams 1 and 2, standardised, so their deviation is `warp` px), bicubically, mirrored beyond the edge.
 
 Parameters
 ----------
-kind : one of 'value', 'perlin', 'worley', default 'perlin'
+kind : one of 'value', 'perlin', 'worley', 'sine', default 'perlin'
     The noise: 'value' (random values on a lattice, smoothly interpolated: soft
     blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more
     even, zero at the lattice points) or 'worley' (cellular noise: the distance to the
     nearest of a scatter of random points, one per cell of `scale` px, dark at each
     point and brightening away from it; a single layer, so it ignores `octaves`,
-    `persistence` and `lacunarity`).
+    `persistence` and `lacunarity`) or 'sine' (crossed sine waves: smooth, regular
+    swirls; the classic plasma).
 scale : number, px, 2 to 1024, default 120.0
     Size of the coarsest features in pixels: the spacing of the first lattice (value,
-    perlin) or the size of a cell (worley); tuned for a picture about 480 px high.
-    Larger = broad, slow variation; small = fine grain.
+    perlin), the size of a cell (worley) or the wavelength from crest to crest of the
+    first waves (sine); tuned for a picture about 480 px high. Larger = broad, slow
+    variation; small = fine grain.
 octaves : whole number, count, 1 to 8, default 4
-    How many layers of noise are summed (value, perlin), each finer than the last (by
-    `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail.
-    Layers finer than one pixel are dropped.
+    How many layers of noise are summed (value, perlin, sine), each finer than the last
+    (by `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine
+    detail. Each sine layer is two waves crossing at random angles. Layers finer than
+    one pixel (sine: two pixels) are dropped.
 persistence : number, ratio, 0 to 1, default 0.5
-    How much weaker each finer layer is than the one before (value, perlin): each
+    How much weaker each finer layer is than the one before (value, perlin, sine): each
     layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 =
     every layer equally strong (very rough).
 lacunarity : number, ratio, 1 to 4, default 2.0
-    How much finer each layer is than the one before (value, perlin): the lattice
-    spacing is divided by this per layer. 1 = every layer the same size, 2 = each half
-    as coarse, larger = detail drops off faster.
+    How much finer each layer is than the one before (value, perlin, sine): the lattice
+    spacing or wavelength is divided by this per layer. 1 = every layer the same size, 2
+    = each half as coarse, larger = detail drops off faster.
+warp : number, px, 0 to 500, default 0.0
+    How far in pixels the pattern is pushed about, the typical shift of a point: the
+    swirling, folded look of a domain warp. 0 = no warp, and a little is nearly the same
+    picture. In 'sine' the first layer is never pushed, so with one octave `warp`
+    changes nothing.
 colors : list of colours, default ('#0b1d3a', '#2a7f9e', '#f4e9c8')
     The colours the noise is shown in, from its lowest values to its highest, evenly
     spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
     the noise, so every colour is used about equally.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same picture, another seed a different
-    one."""
+    one.
+
+Presets
+-------
+plasma : Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel."""
     ...
 
 def ntsc(sigma: float = 4.0, crawl: float = 0.3, phase: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3149,49 +3167,6 @@ axis : one of 'horizontal', 'vertical', default 'horizontal'
 order : one of 'ascending', 'descending', default 'ascending'
     Which way a run is ordered: 'ascending' puts the lowest key first (the left or top
     end of the run), 'descending' the highest key first."""
-    ...
-
-def plasma(scale: float = 160.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 25.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with a plasma: warped, crossed sine waves coloured through `colors`.
-
-A generated background: the input is used only for its height and width, its content is ignored. Layer i has two
-plane waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random directions a
-and phases p, and weight `persistence`**i; it is evaluated at positions pushed along x and y by `warp` px times
-the two waves of layer i - 1 (so layer 0 is not warped). The sum is standardised and passed through the normal
-cumulative distribution, so a pixel's place on the colour ramp is about its rank among all pixels.
-
-Parameters
-----------
-scale : number, px, 4 to 1024, default 160.0
-    Wavelength in pixels of the coarsest layer's waves, the distance from crest to
-    crest; tuned for a picture about 480 px high. Larger = broad, slow swirls; small =
-    fine, busy ripples.
-octaves : whole number, count, 1 to 8, default 2
-    How many layers of waves are summed, each finer than the last (by `lacunarity`) and
-    weaker (by `persistence`). Each layer is two sine waves crossing at random angles. 1
-    = a plain weave of two waves, more = richer, busier patterns. Layers with fewer than
-    2 px a wavelength are dropped.
-persistence : number, ratio, 0 to 1, default 0.5
-    How much weaker each finer layer is than the one before: each layer's weight is this
-    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
-    strong (very busy).
-lacunarity : number, ratio, 1 to 4, default 2.0
-    How much finer each layer is than the one before: its wavelength is divided by this
-    per layer. 1 = every layer the same size, 2 = each half as long, larger = detail
-    drops off faster in size.
-warp : number, px, 0 to 500, default 25.0
-    How far in pixels each layer's waves are pushed along by the two waves of the layer
-    before it (a layer's position is shifted by up to this much). 0 = plain straight
-    waves; larger = the swirling, folded look of a plasma. The first layer has nothing
-    before it, so it is not warped.
-colors : list of colours, default ('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080')
-    The colours the plasma is shown in, from its lowest values to its highest, evenly
-    spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
-    the pattern, so every colour is used about equally. The default's last colour is its
-    first, so the palette comes round without a seam.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same plasma (the angles and phases of
-    the waves), another seed a different one."""
     ...
 
 def polar(mode: Literal['to', 'from'] = 'to', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

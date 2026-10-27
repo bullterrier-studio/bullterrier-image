@@ -10,9 +10,8 @@ Generated or replaced backgrounds behind the subject.
 | <img src="../gallery/flow_lines.jpg" width="160" alt="flow_lines"> | `flow_lines` | Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow. | `density=0.002` `length=120` `thickness=1.5` `scale=120.0` `octaves=2` `twist=180.0` `seed=0` `line='#ffd84a'` `background='#12002b'` +3 advanced | [flow_lines.toml](../../examples/effects/flow_lines.toml) |
 | <img src="../gallery/fractal.jpg" width="160" alt="fractal"> | `fractal` | Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes. | `kind='julia'` `zoom=1.0` `x=0.0` `y=0.0` `c_real=-0.8` `c_imag=0.156` `iterations=64` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [fractal.toml](../../examples/effects/fractal.toml) |
 | <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep. | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
-| <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin or worley), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
+| <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `warp=0.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
-| <img src="../gallery/plasma.jpg" width="160" alt="plasma"> | `plasma` | Replace the picture with a plasma: warped, crossed sine waves coloured through `colors`. | `scale=160.0` `octaves=2` `persistence=0.5` `lacunarity=2.0` `warp=25.0` `colors=('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080')` `seed=0` | [plasma.toml](../../examples/effects/plasma.toml) |
 | <img src="../gallery/starfield.jpg" width="160" alt="starfield"> | `starfield` | A night sky of `count` stars of `color` over `sky`: a generated picture that replaces the input. | `count=600` `size=3.0` `depth_range=0.7` `color='#dfe8ff'` `sky='#04060f'` `seed=0` | [starfield.toml](../../examples/effects/starfield.toml) |
 | <img src="../gallery/voronoi_cells.jpg" width="160" alt="voronoi_cells"> | `voronoi_cells` | Replace the picture with a Voronoi diagram: random cells filled from a colour ramp, with thin borders. | `cells=80` `seed=0` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffb347')` `shade=0.35` `line_width=1.5` `line_color='#0a0014'` | [voronoi_cells.toml](../../examples/effects/voronoi_cells.toml) |
 
@@ -104,13 +103,20 @@ Generated or replaced backgrounds behind the subject.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `kind` | one of 'value', 'perlin', 'worley' |  |  | `'perlin'` | The noise: 'value' (random values on a lattice, smoothly interpolated: soft blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more even, zero at the lattice points) or 'worley' (cellular noise: the distance to the nearest of a scatter of random points, one per cell of `scale` px, dark at each point and brightening away from it; a single layer, so it ignores `octaves`, `persistence` and `lacunarity`). |
-| `scale` | number | px | 2 to 1024 | `120.0` | Size of the coarsest features in pixels: the spacing of the first lattice (value, perlin) or the size of a cell (worley); tuned for a picture about 480 px high. Larger = broad, slow variation; small = fine grain. |
-| `octaves` | whole number | count | 1 to 8 | `4` | How many layers of noise are summed (value, perlin), each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail. Layers finer than one pixel are dropped. |
-| `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before (value, perlin): each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
-| `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before (value, perlin): the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster. |
+| `kind` | one of 'value', 'perlin', 'worley', 'sine' |  |  | `'perlin'` | The noise: 'value' (random values on a lattice, smoothly interpolated: soft blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more even, zero at the lattice points) or 'worley' (cellular noise: the distance to the nearest of a scatter of random points, one per cell of `scale` px, dark at each point and brightening away from it; a single layer, so it ignores `octaves`, `persistence` and `lacunarity`) or 'sine' (crossed sine waves: smooth, regular swirls; the classic plasma). |
+| `scale` | number | px | 2 to 1024 | `120.0` | Size of the coarsest features in pixels: the spacing of the first lattice (value, perlin), the size of a cell (worley) or the wavelength from crest to crest of the first waves (sine); tuned for a picture about 480 px high. Larger = broad, slow variation; small = fine grain. |
+| `octaves` | whole number | count | 1 to 8 | `4` | How many layers of noise are summed (value, perlin, sine), each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail. Each sine layer is two waves crossing at random angles. Layers finer than one pixel (sine: two pixels) are dropped. |
+| `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before (value, perlin, sine): each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
+| `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before (value, perlin, sine): the lattice spacing or wavelength is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster. |
+| `warp` | number | px | 0 to 500 | `0.0` | How far in pixels the pattern is pushed about, the typical shift of a point: the swirling, folded look of a domain warp. 0 = no warp, and a little is nearly the same picture. In 'sine' the first layer is never pushed, so with one octave `warp` changes nothing. |
 | `colors` | list of colours |  |  | `('#0b1d3a', '#2a7f9e', '#f4e9c8')` | The colours the noise is shown in, from its lowest values to its highest, evenly spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in the noise, so every colour is used about equally. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same picture, another seed a different one. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `plasma` | Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel. |
 
 ### `pattern`
 
@@ -124,18 +130,6 @@ Generated or replaced backgrounds behind the subject.
 | `thickness` | number | fraction | 0 to 1 | `0.2` | Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and 'dots'. |
 | `radius` | number | fraction | 0 to 0.75 | `0.3` | Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes', 'checks' and 'grid'. |
 | `feather` | number | px | 0 to 32 | `1.0` | The width of the soft edge in px, centred on the shape's border and blended linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes. |
-
-### `plasma`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `scale` | number | px | 4 to 1024 | `160.0` | Wavelength in pixels of the coarsest layer's waves, the distance from crest to crest; tuned for a picture about 480 px high. Larger = broad, slow swirls; small = fine, busy ripples. |
-| `octaves` | whole number | count | 1 to 8 | `2` | How many layers of waves are summed, each finer than the last (by `lacunarity`) and weaker (by `persistence`). Each layer is two sine waves crossing at random angles. 1 = a plain weave of two waves, more = richer, busier patterns. Layers with fewer than 2 px a wavelength are dropped. |
-| `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very busy). |
-| `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before: its wavelength is divided by this per layer. 1 = every layer the same size, 2 = each half as long, larger = detail drops off faster in size. |
-| `warp` | number | px | 0 to 500 | `25.0` | How far in pixels each layer's waves are pushed along by the two waves of the layer before it (a layer's position is shifted by up to this much). 0 = plain straight waves; larger = the swirling, folded look of a plasma. The first layer has nothing before it, so it is not warped. |
-| `colors` | list of colours |  |  | `('#ff0080', '#ff8c00', '#ffee00', '#00e5a0', '#00a2ff', '#7a00ff', '#ff0080')` | The colours the plasma is shown in, from its lowest values to its highest, evenly spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in the pattern, so every colour is used about equally. The default's last colour is its first, so the palette comes round without a seam. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same plasma (the angles and phases of the waves), another seed a different one. |
 
 ### `starfield`
 
