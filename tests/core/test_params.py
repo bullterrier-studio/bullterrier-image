@@ -817,6 +817,21 @@ def test_pixel_fields_scale_by_the_factor_and_nothing_else_does(factor, radius, 
     assert (scaled.amount, scaled.count) == (0.5, 4)  # a fraction and a count are not pixels
 
 
+@pytest.mark.parametrize(
+    ("factors", "ratio"),
+    [
+        pytest.param((), 1.0, id="values as written: 1"),
+        pytest.param((2,), 2.0, id="scaled once"),
+        pytest.param((2, 1.5), 3.0, id="scaling a scaled copy multiplies"),
+    ],
+)
+def test_size_ratio_is_the_product_of_the_factors_the_values_were_scaled_by(factors, ratio):
+    params = Sized()
+    for factor in factors:
+        params = params.scaled(factor)
+    assert params.size_ratio == pytest.approx(ratio)
+
+
 def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
     first = Sized()
     assert first.scaled(2) is not first

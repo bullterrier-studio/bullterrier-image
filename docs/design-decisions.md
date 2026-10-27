@@ -319,7 +319,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the defaults (tuned for 480) came out tiny on a large photo. *Consequence:* the
   scaled values are not checked against the range (the model is copied, not rebuilt); regions and the framing hold no
   pixel values (shares and angles), so only effects scale; noise and random placements keep their character at another
-  size, not their exact positions.
+  size, not their exact positions. An effect whose light depends on how many pixels cover a design area (`starburst`
+  with every bright pixel radiating) reads `EffectParams.size_ratio` (working px per design px) and gives each pixel
+  its share, so the total stays the same.
 
 - **Marks: a count or a density.** A few marks (`dead_pixels.count`, `lens_drops.count`, `scratches`, `pieces`, `bands`)
   are a `count`: it reads naturally, and the marks' sizes are `px`, so the same count covers the same share at any size.

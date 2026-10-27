@@ -289,6 +289,25 @@ def test_the_number_of_glints_does_not_grow_with_the_resolution() -> None:
     assert large == pytest.approx(small, rel=0.35)
 
 
+def square_light(size: int) -> float:
+    """The light a small bright square (6 design px wide, in a recipe of design size 240) adds, summed over the picture
+    rendered at `size` px, per design px squared (the sum divided by (size / 240)^2)."""
+    side, middle = round(6 * size / 240), size // 2
+    picture = np.zeros((size, size, 3), np.float32)
+    picture[middle : middle + side, middle : middle + side] = 0.52
+    # a faint highlight and a low amount keep the light far from white, where screening stops being proportional
+    glow = fx.starburst(rays=4, length=30.0, width=3.0, threshold=0.5, amount=0.1)
+    out = render(picture, Recipe("square", size=240, steps=[glow]), size=size)
+    return float((out - picture).sum() / (size / 240) ** 2)
+
+
+@pytest.mark.parametrize("size", [120, 720, 960], ids=["half", "three times", "four times"])
+def test_the_light_of_a_bright_area_does_not_grow_with_the_resolution(size: int) -> None:
+    """Every pixel of a bright area radiates, and the area has more pixels the higher the resolution: the same
+    recipe lights the same total (per design px squared) at any size."""
+    assert square_light(size) == pytest.approx(square_light(240), rel=0.05)
+
+
 def test_variation_dims_points_by_a_random_share_between_one_minus_variation_and_one() -> None:
     alike = lattice_gains(variation=0.0, seed=2)
     varied = lattice_gains(variation=0.5, seed=2)

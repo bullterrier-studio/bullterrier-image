@@ -55,6 +55,7 @@ from pydantic import (
     ConfigDict,
     Field,
     PlainValidator,
+    PrivateAttr,
     StringConstraints,
     ValidationError,
     WithJsonSchema,
@@ -485,6 +486,15 @@ class EffectParams(ValidatedModel):
 
     model_config = ConfigDict(validate_default=True)
 
+    _ratio: float = PrivateAttr(default=1.0)
+
+    @property
+    def size_ratio(self) -> float:
+        """How many working pixels one design pixel is: the product of the factors `scaled` was given, 1 for values
+        as written. An effect whose result depends on how many pixels cover a design area (not only on lengths in px)
+        reads it here; it is no parameter, so a recipe cannot set it."""
+        return self._ratio
+
     @classmethod
     def model_json_schema(
         cls,
@@ -546,7 +556,7 @@ class EffectParams(ValidatedModel):
         per 1000 design px²) divided by `factor` squared: the same look at another size. A whole number is rounded.
         When shrinking (`factor` below 1) a pixel value stops at the field's `min`, which keeps a small picture valid
         (a cell of at least 3 pixels); growing has no ceiling, as a range is in design pixels and the copy is not
-        checked against it. Other units are unchanged."""
+        checked against it. Other units are unchanged. `size_ratio` of the copy is that of this model times `factor`."""
         whole = self.whole_number_fields()
         changes = {}
         for name, info in type(self).model_fields.items():
@@ -558,7 +568,9 @@ class EffectParams(ValidatedModel):
                 value = getattr(self, name) * factor
                 value = round(value) if name in whole else value
                 changes[name] = max(bounds(info)[0], value) if factor < 1 else value
-        return self.model_copy(update=changes)
+        scaled = self.model_copy(update=changes)
+        scaled._ratio = self._ratio * factor  # noqa: SLF001  (the copy is of this class: its own attribute)
+        return scaled
 
     @classmethod
     def drivable_fields(cls) -> frozenset[str]:

@@ -86,8 +86,9 @@ class StarburstParams(EffectParams):
         doc="The average distance in px, tuned for a picture about 480 px high, between the points that send out "
         "spikes inside a bright area: each bright pixel sends them with the chance 1 / spacing^2 (the same ones for "
         "the same `seed`; raising it only drops points), so the glints keep their number per area of the picture "
-        "at any size. 0, or anything below 1, = every bright point. Raise it to turn a bright area into separate "
-        "glints; 13 gives a scatter of glitter.",
+        "at any size. 0, or anything below 1, = every bright point, each with its share of a design pixel's light, so "
+        "a bright area gives the same total light at any size. Raise it to turn a bright area into separate glints; "
+        "13 gives a scatter of glitter.",
     )
     variation: float = param(
         0.0,
@@ -148,9 +149,14 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         threshold = min(max(threshold, float(brightest)), MAX_THRESHOLD)
     bright = highlights(rgb, threshold)
     rng = np.random.default_rng(params.seed)
-    chosen = rng.random(bright.shape[:2]) < 1 / max(params.spacing, 1) ** 2  # a chance of 1 below a spacing of 1
+    # More than one design px apart: a chance of 1 / spacing^2 per pixel. Else every bright pixel, each with its share
+    # of the design pixel's light, so that a bright area keeps its total light at any size.
+    sparse = params.spacing > params.size_ratio
+    chance = 1 / params.spacing**2 if sparse else 1  # constant: a chance of 1 is every pixel
+    weight = 1 if sparse else 1 / params.size_ratio**2  # constant: a weight of 1 leaves a point's light as it is
+    chosen = rng.random(bright.shape[:2]) < chance
     scale = 1.0 - params.variation * rng.random(bright.shape[:2])
-    bright *= (chosen * scale).astype(np.float32)[..., None]
+    bright *= (weight * chosen * scale).astype(np.float32)[..., None]
     # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own
     # border: no light comes in from beyond the edge.
     framed = np.pad(bright, ((1, 1), (1, 1), (0, 0)))
