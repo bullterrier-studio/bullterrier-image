@@ -42,6 +42,9 @@ opacity = 0.6                     # mix this step in at 60%
 Replace the background = a `gradient` step with preset `fill` (black; set `colors` for another) and `mask = "background"`. Unknown effects, misspelt parameters, bad values fail at load, naming
 file and step.
 
+`size` defaults to 1024. A Python `Recipe(size=None)` keeps the photo's own size; its pixel values are then written for 480
+(the size effect defaults are tuned for), so a 4000 px photo multiplies them by 4000/480.
+
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each
 step is a layer over picture below, as in image editor. Result combined by blend mode, mixed by opacity, only where mask says.
 

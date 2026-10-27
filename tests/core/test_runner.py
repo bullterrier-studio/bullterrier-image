@@ -1301,7 +1301,7 @@ def blur(radius, size=64, **recipe) -> Recipe:
         pytest.param(blur(4.0), 128, blur(8.0, 128), id="twice the size: twice the radius"),
         pytest.param(blur(4.0), 32, blur(2.0, 32), id="half the size: half the radius"),
         pytest.param(blur(4.0), 64, blur(4.0, 64), id="the recipe's own size: nothing scaled"),
-        pytest.param(blur(8.0, None), 64, blur(4.0, 64), id="a recipe of the photo's own pixels, 128 wide, at 64"),
+        pytest.param(blur(24.0, None), 64, blur(3.2, 64), id="a recipe without a size is written for 480: 24 x 64/480"),
         pytest.param(
             Recipe("grid", [Step("pixel_grid", {"cell": 4})], size=64),
             128,
@@ -1356,6 +1356,53 @@ def test_a_look_at_another_size_has_its_pixel_values_scaled_by_the_ratio_of_the_
 )
 def test_a_render_at_a_size_comes_out_with_that_longest_side(photo, picture_of, recipe_size, size):
     assert max(picture_of(photo, blur(4.0, recipe_size), size=size).shape[:2]) == size
+
+
+def scene(long_side: int) -> np.ndarray:
+    """A smooth, deterministic 3:2 scene of flat blocks and a diagonal gradient, drawn at any resolution."""
+    height = long_side * 2 // 3
+    y, x = np.mgrid[0:height, 0:long_side].astype(np.float32)
+    x, y = x / long_side, y / long_side
+    blocks = ((x > 0.3) & (x < 0.6) & (y > 0.15) & (y < 0.5)).astype(np.float32)
+    return np.stack([x, blocks, (x + y) / 2], axis=-1).astype(np.float32)
+
+
+def disc(long_side: int) -> np.ndarray:
+    """A hard-edged disc of 0.15 of the long side in radius, left of the centre, as a subject matte."""
+    height = long_side * 2 // 3
+    y, x = np.mgrid[0:height, 0:long_side].astype(np.float32)
+    return (np.hypot(x - 0.4 * long_side, y - 0.33 * long_side) < 0.15 * long_side).astype(np.float32)
+
+
+@pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
+@pytest.mark.parametrize(
+    "step",
+    [Step("gaussian_blur", {"radius": 16.0}), Step("drop_shadow", {"dx": 24.0, "dy": 24.0, "blur": 12.0})],
+    ids=["a blur radius", "a shadow's offset and blur"],
+)
+def test_a_recipe_without_a_size_gives_the_same_look_on_a_photo_of_any_size(picture_of, step):
+    recipe = Recipe("anysize", [step], size=None)
+
+    def render_at(long_side: int) -> np.ndarray:
+        return picture_of(scene(long_side), recipe, maps={"subject": disc(long_side)})
+
+    small, large = render_at(480), render_at(1920)
+    assert np.abs(resize(large, 480) - small).mean() < 0.002  # the same look, up to resampling
+    assert np.abs(small - scene(480)).mean() > 0.01  # and the look is there to compare
+
+
+def test_a_recipe_with_a_size_keeps_it_as_the_size_its_pixel_values_are_written_for():
+    own = Recipe("own", [Step("gaussian_blur", {"radius": 6.0})], size=960)
+    unsized = Recipe("unsized", [Step("gaussian_blur", {"radius": 3.0})], size=None)  # 3 x 960/480 = 6
+    np.testing.assert_array_equal(runner.render(scene(1920), own), runner.render(resize(scene(1920), 960), unsized))
+
+
+@pytest.mark.parametrize("effect_name", ["gaussian_blur", "pixel_grid"])
+def test_a_recipe_without_a_size_renders_a_photo_far_smaller_than_480(effect_name):
+    photo = scene(64)
+    out = runner.render(photo, Recipe("tiny", [Step(effect_name)], size=None))
+    assert out.shape == photo.shape
+    assert np.isfinite(out).all()
 
 
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())

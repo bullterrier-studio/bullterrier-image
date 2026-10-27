@@ -858,7 +858,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name
     name, field, selection, photo, subject
 ):
     maps = field_maps(photo, subject)
-    recipe = Recipe("named", [Step(name, {field: selection})], size=None, regions=FIELD_REGIONS)
+    recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
     direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
     assert_a_picture_like(named, photo)
@@ -885,7 +885,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_
     name, field, selection, photo, subject
 ):
     maps = field_maps(photo, subject)
-    recipe = Recipe("named", [Step(name, {field: selection})], size=None, regions=FIELD_REGIONS)
+    recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
     direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
