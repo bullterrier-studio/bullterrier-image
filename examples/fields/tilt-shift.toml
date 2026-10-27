@@ -19,7 +19,7 @@ feather = 0.33
 [[step]]
 effect = "gaussian_blur"
 name = "blur"
-radius = { by = "focus", start = 16, end = 0 }   # blurred where the field is 0, sharp where it is 1
+radius = { by = "focus", start = 7.5, end = 0 }   # blurred where the field is 0, sharp where it is 1
 
 [[step]]
 effect = "grade"

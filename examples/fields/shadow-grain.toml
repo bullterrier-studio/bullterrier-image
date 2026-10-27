@@ -20,7 +20,7 @@ contrast = 1.15
 effect = "grain"
 name = "dust"
 amount = { by = "dark", start = 0, end = 0.35 }  # no grain in the light, a lot in the dark
-size = 1.6
+size = 0.75
 
 [[step]]
 effect = "vignette"
