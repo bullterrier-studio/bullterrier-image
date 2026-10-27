@@ -112,3 +112,29 @@ def test_a_slanted_segment_is_drawn_by_the_perpendicular_distance_from_its_line(
     radius of exactly that distance it is half covered."""
     layer = one((10.0, 5.0), (40.0, 35.0), radius=5 / np.sqrt(2))
     assert layer[20, 30] == pytest.approx(0.5, abs=1e-5)
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_many_segments_of_every_size_match_a_brute_force_drawing_of_each_over_the_whole_picture(seed: int) -> None:
+    """The oracle takes every segment on its own over every pixel, with the point-to-segment distance written the
+    textbook way (project, clamp, measure), and keeps the brightest."""
+    rng = np.random.default_rng(seed)
+    count = 400
+    height, width = SHAPE
+    starts = rng.random((count, 2)) * (width - 1, height - 1)
+    ends = starts + rng.normal(0, 25, (count, 2)) * (rng.random((count, 1)) < 0.7)  # 30 % are discs
+    radii, weights, feathers = rng.uniform(0.2, 30, count), rng.uniform(0.1, 1, count), rng.uniform(0, 12, count)
+
+    rows, cols = np.mgrid[:height, :width]
+    expected = np.zeros(SHAPE)
+    for (x0, y0), (x1, y1), radius, weight, feather in zip(starts, ends, radii, weights, feathers, strict=True):
+        feather = max(feather, 1.0)
+        along = np.array([x1 - x0, y1 - y0])
+        offset = np.stack([cols - x0, rows - y0], axis=-1)
+        length_squared = along @ along
+        t = np.clip(offset @ along / length_squared, 0, 1) if length_squared else np.zeros(SHAPE)
+        distance = np.linalg.norm(offset - t[..., None] * along, axis=-1)
+        expected = np.maximum(expected, weight * np.clip((radius + feather / 2 - distance) / feather, 0, 1))
+
+    layer = draw_segments(SHAPE, starts, ends, radii, weights, feathers)
+    np.testing.assert_allclose(layer, expected, atol=1e-6)

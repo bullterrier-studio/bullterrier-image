@@ -29,17 +29,34 @@ def draw_segments(
     count = len(start)
     radii, weights, feathers = (np.broadcast_to(value, count) for value in (radius, weight, feather))
     feathers = np.maximum(feathers, 1.0)
-    for (x0, y0), (x1, y1), reach, light, edge in zip(start, end, radii, weights, feathers, strict=True):
-        margin = reach + edge / 2 + 1
-        top, bottom = max(int(min(y0, y1) - margin), 0), min(int(max(y0, y1) + margin) + 1, height)
-        left, right = max(int(min(x0, x1) - margin), 0), min(int(max(x0, x1) + margin) + 1, width)
-        rows, cols = np.mgrid[top:bottom, left:right]
-        along = (x1 - x0, y1 - y0)
-        squared = along[0] ** 2 + along[1] ** 2
+    # each segment's window: its bounding box grown by its reach and a pixel, cut to the picture; outside it covers 0
+    margin = (radii + feathers / 2 + 1)[:, None]
+    left, top = np.maximum(np.minimum(start, end) - margin, 0).astype(np.intp).T
+    right, bottom = np.minimum((np.maximum(start, end) + margin).astype(np.intp) + 1, (width, height)).T
+    # Windows of similar area go together, padded to the largest of their batch (the padding covers 0), and a batch
+    # is about `budget` pixels so that its temporaries stay in the cache.
+    # constant: 2**18 values of 8 bytes are 2 MB, a few of which fit a CPU cache
+    budget = 2**18
+    order = np.argsort((bottom - top) * (right - left))
+    tall, wide = (bottom - top)[order], (right - left)[order]
+    first = 0  # constant: the first of the sorted windows
+    while first < count:
+        last = min(first + max(budget // (tall[first] * wide[first]), 1), count)
+        while last - first > 1 and (last - first) * tall[first:last].max() * wide[first:last].max() > budget:
+            last = first + (last - first) // 2
+        rows = top[order[first:last], None, None] + np.arange(tall[first:last].max())[:, None]
+        cols = left[order[first:last], None, None] + np.arange(wide[first:last].max())
+        x0, y0, x1, y1, reach, light, edge = (
+            value[order[first:last], None, None] for value in (*start.T, *end.T, radii, weights, feathers)
+        )
+        first = last
+        along_x, along_y = x1 - x0, y1 - y0
+        squared = along_x**2 + along_y**2
         # how far along the segment (0..1) the nearest point to each pixel is
         # constant: a point has no length to divide by, and its nearest point is its own
-        nearest = np.clip(((cols - x0) * along[0] + (rows - y0) * along[1]) / squared, 0.0, 1.0) if squared else 0.0
-        distance = np.hypot(cols - x0 - nearest * along[0], rows - y0 - nearest * along[1])
+        nearest = np.clip(((cols - x0) * along_x + (rows - y0) * along_y) / np.where(squared > 0, squared, 1), 0, 1)
+        distance = np.hypot(cols - x0 - nearest * along_x, rows - y0 - nearest * along_y)
         cover = light * np.clip((reach + 0.5 * edge - distance) / edge, 0.0, 1.0)
-        layer[top:bottom, left:right] = np.maximum(layer[top:bottom, left:right], cover)
+        drawn = (rows < height) & (cols < width) & (cover > 0)
+        np.maximum.at(layer.ravel(), (rows * width + cols)[drawn], cover[drawn].astype(np.float32))
     return layer
