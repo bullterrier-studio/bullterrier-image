@@ -5,3 +5,11 @@ description = "The picture's own brightness read as a fine relief (8 px tall) an
 field = "light"
 height = 8.0
 blur = 1.0
+
+[emboss]
+description = "An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees."
+field = "light"
+saturation = 0.0
+elevation = 30.0
+height = 6.0
+blur = 0.0

@@ -314,8 +314,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   rely on (nearest = 1), but a caller that knows more (several photos of one scene, a known range) cannot scale them alike
   from it; the unscaled answer is public for that, and the caller hands its own scaling in as `maps={"depth": ...}`. The input keeps the photo's aspect ratio, so an extreme one (about 1:10 and beyond) needs a lot of memory;
   there is no cap. Further:
-  - the input keeps the name `depth`; the seven fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
-    `floating_dust`, `rain`, `snow`, `starfield`, `height` in `emboss`, `width` in `torn_edge`;
+  - the input keeps the name `depth`; the six fields that clashed are renamed: `depth` becomes `depth_range` in `embers`,
+    `floating_dust`, `rain`, `snow`, `starfield`, `width` in `torn_edge`;
   - the depth is a field (see "Fields"): `depth-haze` and `depth-grade` are recipes of a `band` and `bands` of it
     (`examples/recipes/`), not effects;
   - framing pads the depth map with 0 (farthest), like the matte;

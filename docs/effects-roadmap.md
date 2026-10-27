@@ -79,7 +79,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `grain` ✓ | Film grain or sensor noise: Gaussian or uniform, heavier in the shadows or highlights, grey or per channel. | `fx.grain(amount=0.065, balance=-0.54, color=True)` |
 | `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
 | `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
-| `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, height=6)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
 | `crt` ✓ | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.15, shadow_mask=0.35)` |
@@ -335,9 +334,9 @@ and each parameter matters for every look. About 128 effects become about 94. Th
 lands.
 
 **Core: field parameters.** An effect may name a field (`depth`, `light`, `subject`, a region such as a gradient or a
-band), resolved like a `Drive`'s `by`; only named fields are built. This merges `relight`, `bump_light` and `emboss`
-(`field`), and `depth_of_field` with `tilt_shift` (`focus_blur`; the tilt look = a linear-gradient field), and gives
-`topographic` depth contours.
+band), resolved like a `Drive`'s `by`; only named fields are built. This merged `relight`, `bump_light` and `emboss`
+(`relight`'s `field`; presets `bump_light` and `emboss`), will merge `depth_of_field` with `tilt_shift` (`focus_blur`; the
+tilt look = a linear-gradient field), and gives `topographic` depth contours.
 
 **Merges that change no picture:**
 

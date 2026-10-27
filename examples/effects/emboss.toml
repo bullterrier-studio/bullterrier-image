@@ -1,6 +1,0 @@
-# A grey emboss lit from the upper left.
-name = "emboss"
-size = 480
-
-[[step]]
-effect = "emboss"

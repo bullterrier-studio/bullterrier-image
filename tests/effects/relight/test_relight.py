@@ -157,6 +157,38 @@ def test_a_grazing_light_on_a_tall_relief_clips_the_lit_side_to_white_and_the_fa
     assert out.min() == 0.0
 
 
+@pytest.mark.parametrize("saturation", [0.0, 0.25, 0.5, 1.0])
+def test_saturation_mixes_the_pictures_colours_into_a_mid_grey_that_the_relief_lights(
+    photo: np.ndarray, saturation: float
+) -> None:
+    """The surface lit is `saturation` of the picture over the rest of mid grey: gain x (s x picture + (1 - s) / 2)."""
+    dim = photo * 0.5  # headroom: the gain of 1.4 clips nothing
+    out = registry.apply(NAME, dim, field=ramp(180), angle=0, height=150, saturation=saturation)
+    surface = saturation * dim + (1 - saturation) * 0.5
+    np.testing.assert_allclose(out[INSIDE], surface[INSIDE] * 1.4, atol=2e-5)
+
+
+def test_saturation_0_is_the_relief_alone_so_the_picture_does_not_show(photo: np.ndarray) -> None:
+    field = disc()
+    out = registry.apply(NAME, photo, field=field, saturation=0)
+    other = registry.apply(NAME, photo[::-1, ::-1], field=field, saturation=0)
+    np.testing.assert_array_equal(out, other)
+    np.testing.assert_array_equal(out[..., 0], out[..., 1])  # grey
+    flat = registry.apply(NAME, photo, field=np.zeros((HEIGHT, WIDTH), np.float32), saturation=0)
+    np.testing.assert_allclose(flat, 0.5, atol=1e-6)  # nothing to light: mid grey
+
+
+def test_a_grey_relief_from_a_grazing_light_spans_black_to_white(photo: np.ndarray) -> None:
+    """The emboss look: the picture's brightness as the field, no colour, a low light."""
+    recipe = Recipe(
+        "emboss", [Step(NAME, {"field": "light", "saturation": 0, "elevation": 5, "height": 20, "blur": 0})], size=None
+    )
+    out = runner.render(photo, recipe)
+    np.testing.assert_array_equal(out[..., 0], out[..., 2])
+    assert out.min() < 0.1
+    assert out.max() > 0.9
+
+
 def test_the_light_field_lights_the_pictures_own_brightness_as_a_relief() -> None:
     """A grey picture rising 0.005 per px to the right, lit from the left (0.005 x 100 px = a slope of 1/2)."""
     x = np.arange(40, dtype=np.float64)
