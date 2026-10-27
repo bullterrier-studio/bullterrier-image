@@ -4,7 +4,7 @@ size = 1024
 
 [[step]]
 effect = "ascii"
-cell = 6
+cell = 3
 photo = 0.85
 gamma = 0.8
 
@@ -22,7 +22,7 @@ mask = "background"
 
 [[step]]
 effect = "bloom"
-radius = 18
+radius = 8.4375
 amount = 0.3
 threshold = 0.6
 octaves = 1

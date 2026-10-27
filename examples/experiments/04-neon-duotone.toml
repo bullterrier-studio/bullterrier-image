@@ -13,7 +13,7 @@ mask = "background"
 
 [[step]]
 effect = "bloom"
-radius = 28
+radius = 13.125
 amount = 0.7
 threshold = 0.5
 octaves = 1

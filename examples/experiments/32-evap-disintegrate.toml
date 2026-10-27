@@ -8,12 +8,12 @@ saturation = 1.25
 
 [[step]]
 effect = "sharpen"
-radius = 60
+radius = 18
 amount = 0.5
 
 [[step]]
 effect = "ascii"
-cell = 5
+cell = 1
 chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
 gamma = 0.6
 
@@ -25,4 +25,4 @@ mask = "background"
 [[step]]
 effect = "disperse"
 preset = "disintegrate"
-cell = 5                     # same as the ascii step, so whole characters fly away
+cell = 1                     # same as the ascii step, so whole characters fly away

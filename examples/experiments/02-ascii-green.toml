@@ -9,12 +9,12 @@ contrast = 1.1
 
 [[step]]
 effect = "sharpen"
-radius = 60
+radius = 28.125
 amount = 0.6
 
 [[step]]
 effect = "ascii"
-cell = 5
+cell = 2
 ink = "#00ff9c"
 gamma = 0.85
 

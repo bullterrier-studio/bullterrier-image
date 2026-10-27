@@ -8,12 +8,12 @@ saturation = 1.25            # keeps skin warm; brightness comes from the ascii 
 
 [[step]]
 effect = "sharpen"
-radius = 60
+radius = 18
 amount = 0.5
 
 [[step]]
 effect = "ascii"
-cell = 4                     # small letters
+cell = 1                     # small letters
 chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'   # 60 characters = many tonal steps
 gamma = 0.6
 
@@ -25,6 +25,6 @@ mask = "background"
 [[step]]
 effect = "disperse"
 preset = "evaporate"
-cell = 4                     # same as the ascii step, so whole characters fly away
+cell = 1                     # same as the ascii step, so whole characters fly away
 reach = 0.4
 seed = 1
