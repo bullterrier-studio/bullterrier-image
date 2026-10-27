@@ -818,14 +818,14 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold'] | None = None) -> Step:
+def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither,
 1-bit black and white, retro palettes, and the presets `posterize` and `threshold`.
 
 The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
 afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours
 (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives
-plain flat colours. Colours are matched, and errors measured, in Oklab.
+plain flat colours. Colours are matched, and errors measured, in `space`.
 
 Parameters
 ----------
@@ -837,13 +837,14 @@ method : one of 'floyd_steinberg', 'atkinson', 'bayer', 'blue_noise', default 'f
     'blue_noise' is an even, grainless scatter from a repeating 64 x 64 tile, the one
     with no visible pattern. Both of those mix colours of any palette, in steps of a
     sixteenth.
-palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8' or list of colours, default 'photo'
+palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6' or list of colours, default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
     (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
-    (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours) and 'pico8' (the 16
-    PICO-8 colours) are fixed palettes; or give your own list of at least two colours,
-    in any order ('#rrggbb', '#rgb' or three numbers 0 to 1). Colours are matched in
-    Oklab, a space where equal distances look equally different.
+    (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8' (the 16
+    PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2
+    to 6 evenly spaced levels of red, green and blue: 8 to 216 colours) are fixed
+    palettes; or give your own list of at least two colours, in any order ('#rrggbb',
+    '#rgb' or three numbers 0 to 1).
 colors : whole number, count, 2 to 256, default 8
     How many colours to find when `palette` is 'photo' (ignored for any other palette).
     Raising it keeps more detail and gradation; fewer than this many are used if the
@@ -863,6 +864,13 @@ pattern : number, fraction, 0 to 1, default 1.0
 
 Advanced parameters
 -------------------
+space : one of 'oklab', 'rgb', default 'oklab'
+    The colour space in which dots are matched to palette colours, the 'photo' colours
+    are searched, and errors are measured. 'oklab' is where equal distances look equally
+    different, so colours match as the eye sees them; 'rgb' is the picture's own red,
+    green and blue values, where each channel is matched on its own: with a 'cube'
+    palette and `pattern` 0 it snaps every channel to a few levels, hard colour
+    separations.
 init : one of 'k-means++', 'random', default 'k-means++'
     How the search for colours starts (palette 'photo'): 'k-means++' spreads the
     starting colours out (Arthur and Vassilvitskii, 2007) and usually finds a better
@@ -872,9 +880,9 @@ iterations : whole number, count, 1 to 100, default 20
     colour to the average of the pixels nearest to it; raising it lets the search settle
     further.
 tolerance : number, fraction, 0 to 1, default 0.001
-    Stop the k-means rounds early once no colour has moved farther than this in Oklab
-    (where black to white is 1). 0 runs all `iterations`; raising it stops sooner with a
-    rougher result.
+    Stop the k-means rounds early once no colour has moved farther than this in `space`
+    (in Oklab black to white is 1). 0 runs all `iterations`; raising it stops sooner
+    with a rougher result.
 sample : whole number, count, 1 to 1000000, default 10000
     How many randomly chosen dots the colours are searched on when `palette` is 'photo';
     every dot is still repainted. A picture with fewer dots is searched whole. Raising
@@ -887,7 +895,7 @@ seed : whole number, count, 0 to 4294967295, default 0
 
 Presets
 -------
-posterize : Posterize: the picture in 6 flat colours found in it, a poster with bands where the tones were. Set `colors` for more or fewer.
+posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
 threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks."""
     ...
 
