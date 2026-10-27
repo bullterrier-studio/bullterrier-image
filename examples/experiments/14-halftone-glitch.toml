@@ -14,8 +14,14 @@ color = "#000000"
 mask = "background"
 
 [[step]]
-effect = "glitch"
-split = 6
+effect = "slice_shift"
+preset = "glitch"
 bands = 9
-shift = 0.06
+amount = 0.06
 seed = 21
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 6
+edge = "wrap"

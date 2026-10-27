@@ -65,8 +65,8 @@ def sweep(recipe: Recipe, target: str, start: float, end: float, count: int = 5)
     """`recipe` once for each of `count` values of one number, evenly spaced from `start` to `end`, each with the label
     `number=value`: the tiles of a sheet that shows what the number does.
 
-    target: the number's address (`Recipe.parameters` lists them): `glitch.split`, `grain#2.amount` for the second of
-    an effect the recipe has twice, `pulse.gain` for a step called `pulse`, `pulse.gain.end` for the end of a drive,
+    target: the number's address (`Recipe.parameters` lists them): `rgb_split.amount`, `grain#2.amount` for the second
+    of an effect the recipe has twice, `pulse.gain` for a step called `pulse`, `pulse.gain.end` for the end of a drive,
     `region.near.low`, `frame.angle`. The value replaces whatever the recipe has there. A whole-number parameter takes
     the values rounded to the nearest whole number, each once. count: 2 to 24. A value outside the number's range is
     refused as in any recipe, naming it, never clamped; a cyclic angle takes any value and wraps it into its turn.

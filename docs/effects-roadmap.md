@@ -152,7 +152,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `stretch` ✓ | Smear one pixel row or column outward. | `fx.stretch(axis="vertical", at=0.5)` |
 | `shatter` ✓ | Cracked-glass pieces, slightly offset and rotated; or flat stained glass and low-poly triangles (`fill`, `detail`, `shape`). | `fx.shatter(pieces=24, gap=1.5, seed=1)` |
 | `droste` ✓ | Recursive picture-in-picture spiral. | `fx.droste(scale=0.5)` |
-| `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
+| `slice_shift` ✓ | Horizontal slices slide; `bands` adds a few strips at random rows (preset `glitch`, then `rgb_split` with `edge='wrap'` is the glitch look). | `fx.slice_shift(preset='glitch', bands=8)` |
 
 **Changing the picture's size and shape**
 
@@ -177,7 +177,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `glitch` ✓ | Channel split and sliding bands. | `fx.glitch(split=9, bands=8)` |
 | `rgb_split` ✓ | Channel offset on its own, any direction; `pair='red_cyan'` after `grade(saturation=0)` is the red/cyan 3D look. | `fx.rgb_split(angle=330, amount=8)` |
 | `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)`; with `hits`, damaged coefficients: smears and colour blocks, `fx.jpeg_crush(quality=20, hits=40, seed=2)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
@@ -280,7 +279,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `avatar` ✓ (a recipe, [avatar.toml](../examples/transparent/avatar.toml)) | Square crop on the subject, optional circle: framing and transparency settings. | `aspect = 1.0`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
 | `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
 | `palette_from_photo` | Extract dominant colours to feed other steps. | `palette = photo.palette(5)` |
-| `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml glitch.split 0..20` |
+| `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml rgb_split.amount 0..20` |
 | `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
 | `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
 

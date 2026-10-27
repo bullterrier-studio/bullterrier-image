@@ -21,11 +21,17 @@ color = "#000000"
 mask = "background"               # "subject", "background" or a region: apply only there
 
 [[step]]
-effect = "glitch"
-split = 10
+effect = "slice_shift"
+preset = "glitch"
 bands = 10
-shift = 0.05                      # how far a strip may slide, as a share of the width
+amount = 0.05                     # how far a strip may slide, as a share of the width
 seed = 4                          # same seed, same result, every time
+
+[[step]]
+effect = "rgb_split"              # red right, blue left, wrapping
+angle = 0
+amount = 10
+edge = "wrap"
 
 [[step]]
 effect = "bloom"

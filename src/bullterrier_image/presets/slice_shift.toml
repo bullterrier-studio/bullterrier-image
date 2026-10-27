@@ -1,0 +1,7 @@
+# Looks that are strips slid sideways.
+
+[glitch]
+description = "A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."
+slices = 0
+bands = 7
+amount = 0.06

@@ -12,11 +12,17 @@ color = "#000000"
 mask = "background"
 
 [[step]]
-effect = "glitch"
-split = 10
+effect = "slice_shift"
+preset = "glitch"
 bands = 10
-shift = 0.05
+amount = 0.05
 seed = 4
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 10
+edge = "wrap"
 
 [[step]]
 effect = "bloom"

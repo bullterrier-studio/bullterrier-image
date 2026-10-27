@@ -95,6 +95,15 @@ def test_edge_decides_what_a_channel_that_leaves_the_picture_brings_back(edge: s
     assert lit(out, 2) == pytest.approx(blue)
 
 
+@pytest.mark.parametrize(("angle", "sign"), [(0, 1), (180, -1)], ids=["angle 0: red right", "angle 180: red left"])
+def test_with_wrap_a_whole_number_of_pixels_rolls_red_and_blue_round_the_picture(angle, sign, photo) -> None:
+    """The glitch look: red rolled `amount` columns one way, blue the other, green untouched."""
+    out = registry.apply(NAME, photo, angle=angle, amount=7, edge="wrap")
+    np.testing.assert_allclose(out[..., 0], np.roll(photo[..., 0], sign * 7, axis=1), atol=FLOAT32_TOLERANCE)
+    np.testing.assert_array_equal(out[..., 1], photo[..., 1])
+    np.testing.assert_allclose(out[..., 2], np.roll(photo[..., 2], -sign * 7, axis=1), atol=FLOAT32_TOLERANCE)
+
+
 @pytest.mark.parametrize("edge", ["wrap", "nearest", "reflect", "mirror"])
 def test_a_flat_picture_stays_flat(edge: str) -> None:
     out = registry.apply(NAME, np.full((9, 11, 3), 0.3, np.float32), angle=77, amount=6.5, edge=edge)

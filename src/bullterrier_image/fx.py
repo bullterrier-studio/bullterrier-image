@@ -5,14 +5,15 @@
     look = Recipe("neon-glitch", size=1024, steps=[
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
         fx.fill("#000000", mask="background"),                  # only where the photo's background is
-        fx.glitch(split=12, bands=8, seed=4),
+        fx.slice_shift(preset="glitch", bands=8, seed=4),
+        fx.rgb_split(angle=0, amount=12, edge="wrap"),
         fx.bloom(radius=26, amount=0.65, opacity=0.8),           # mixed in at 80%
         fx.gradient(blend_mode="screen", opacity=0.5),          # a gradient screened over the picture
     ])
     image = render(photo, look)
 
 Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
-(`help(fx.glitch)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask` (a
+(`help(fx.bloom)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask` (a
 selection: "subject", "background", "depth", "light" or a region), `opacity` (0..1), `blend_mode` (normal, multiply,
 screen, overlay, soft_light, difference, color), `name` (a word that addresses the step's numbers, see
 `Recipe.parameters`), for an effect with presets `preset`, and for an effect that draws along the borders of a partition

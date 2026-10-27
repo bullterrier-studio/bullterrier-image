@@ -158,6 +158,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   key), so a look's usual opacity (embers 0.9, dust 0.55, rain 0.7, snow 0.8, stars 1) is written in the step.
   *Consequence:* the stars of `starfield` (now `fill` and the preset `stars`) take the common depth direction, so the
   same seed gives the same star positions with other sizes and brightnesses; counts became `density`.
+- **`glitch` is a recipe: `slice_shift(preset="glitch")` then `rgb_split(angle=0, edge="wrap")`.** *Reason:* it was a
+  band slide followed by a red/blue roll, each already an effect; the two steps are as short to write and sweep as the
+  one effect was (`rgb_split.amount`, a negative `split` is `angle = 180`). `slice_shift` gained `bands` (extra
+  strips of random height at random rows, laid on the tear) and `slices = 0` (no tear), so a few bands alone make the
+  glitch; both stages draw from one `seed`, the tear first. One band slide, `ops.shift.slide_bands`, serves
+  `slice_shift` and `vhs`; each draws its own bands. *Consequence:* a whole-pixel `split` is no longer rounded at the
+  recipe's scale: `rgb_split.amount` is a float, so a split of 9 px at 0.3125 scale blends 2.8 px instead of
+  rounding to 3.
 - **A parameter may name a field.** `field: FieldName = param("depth", doc=...)` holds the name of a selection, written
   as `mask` and `Drive.by` are: `depth`, `light`, `subject`, `background` or a region of the recipe (`field = "light"`,
   `fx.relight(field="light")`). The step checks the name when it is made, as it checks `by`: it exists and is a

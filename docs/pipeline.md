@@ -15,7 +15,7 @@ address: `effect.parameter`, `effect#2.parameter` for effect used twice. Range s
 `... -o out/sweep.png -- -2..2`.
 
 ```
-uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
+uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml rgb_split.amount 0..20
 ```
 
 ## The pipeline

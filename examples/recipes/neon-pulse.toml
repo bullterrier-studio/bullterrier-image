@@ -17,9 +17,10 @@ color = "#000000"
 mask = "background"         # only the subject stays
 
 [[step]]
-effect = "glitch"           # no sliding bands, only the red/blue split
-bands = 0
-split = 9
+effect = "rgb_split"
+angle = 0
+amount = 9
+edge = "wrap"
 
 [[step]]
 effect = "bloom"

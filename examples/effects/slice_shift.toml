@@ -1,9 +1,16 @@
-# A torn, glitching frame: sixteen strips slide a few percent of the width to either side.
+# A torn, glitching frame: sixteen strips slide a few percent of the width, five bands slide on top, red and blue part.
 name = "slice_shift"
 size = 480
 
 [[step]]
 effect = "slice_shift"
 slices = 16
-amount = 0.03
+amount = 0.04
+bands = 5
 seed = 3
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 6
+edge = "wrap"

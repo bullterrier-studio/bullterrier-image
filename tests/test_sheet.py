@@ -4,16 +4,17 @@ from PIL import Image
 
 from bullterrier_image import RecipeError
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import Drive
+from bullterrier_image.core.params import Drive, EffectParams, param
+from bullterrier_image.core.registry import effect
 from bullterrier_image.recipe import Band, Each, Grid, Recipe, Stage, Step, render
 from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
-GLITCH_PARAMS = {"split": 4, "bands": 3, "seed": 5}
+SLIDE_PARAMS = {"bands": 3, "seed": 5}
 GRAIN_PARAMS = {"amount": 0.1, "size": 1.6, "seed": 2}
-GLITCH = Step("glitch", GLITCH_PARAMS)
+SLIDE = Step("slice_shift", SLIDE_PARAMS)
 GRAIN = Step("grain", GRAIN_PARAMS)
-LOOK = Recipe("look", [GLITCH, GRAIN], size=48)
-TWICE = Recipe("twice", [GRAIN, GLITCH, Step("grain", {"amount": 0.3})], size=48)
+LOOK = Recipe("look", [SLIDE, GRAIN], size=48)
+TWICE = Recipe("twice", [GRAIN, SLIDE, Step("grain", {"amount": 0.3})], size=48)
 
 
 def labels(tiles) -> list[str]:
@@ -25,9 +26,8 @@ def labels(tiles) -> list[str]:
 SWEEPS = {
     "an even spacing of a number": ("grain.amount", 0, 0.2, 5, [0, 0.05, 0.1, 0.15, 0.2]),
     "a descending range": ("grain.amount", 0.2, 0, 3, [0.2, 0.1, 0]),
-    "whole numbers rounded to the nearest": ("glitch.split", 0, 10, 4, [0, 3, 7, 10]),
-    "whole numbers made unique": ("glitch.split", 0, 2, 4, [0, 1, 2]),
-    "a negative whole number": ("glitch.split", -4, 4, 3, [-4, 0, 4]),
+    "whole numbers rounded to the nearest": ("slice_shift.bands", 0, 10, 4, [0, 3, 7, 10]),
+    "whole numbers made unique": ("slice_shift.bands", 0, 2, 4, [0, 1, 2]),
 }
 
 
@@ -37,29 +37,45 @@ def test_a_sweep_renders_the_recipe_once_for_each_value_of_the_parameter(photo, 
     tiles = sweep(LOOK, target, start, end, count)
     assert labels(tiles) == [f"{name}={value:g}" for value in values]
     for (_, tile), value in zip(tiles, values, strict=True):
-        if effect == "glitch":
-            steps = [Step("glitch", GLITCH_PARAMS | {name: value}), GRAIN]
+        if effect == "slice_shift":
+            steps = [Step("slice_shift", SLIDE_PARAMS | {name: value}), GRAIN]
         else:
-            steps = [GLITCH, Step("grain", GRAIN_PARAMS | {name: value})]
+            steps = [SLIDE, Step("grain", GRAIN_PARAMS | {name: value})]
         np.testing.assert_array_equal(render(photo, tile), render(photo, Recipe("by-hand", steps, size=48)))
+
+
+class OffsetParams(EffectParams):
+    """The one whole number of the probe, which may be negative."""
+
+    offset: int = param(0, unit="px", min=-10, max=10, doc="A whole number from -10 to 10 that the probe ignores.")
+
+
+def test_a_sweep_through_negative_whole_numbers_rounds_each_to_the_nearest_whole_number(throwaway_effects):
+    @effect(category="utilities", params=OffsetParams)
+    def offset_probe(rgb: np.ndarray, params: OffsetParams) -> np.ndarray:
+        """Returns the picture as it is."""
+        return rgb
+
+    tiles = sweep(Recipe("probe", [Step("offset_probe", {})], size=48), "offset_probe.offset", -4, 4, 4)
+    assert labels(tiles) == ["offset=-4", "offset=-1", "offset=1", "offset=4"]  # -4, -1.33, 1.33, 4
 
 
 def test_a_sweep_keeps_the_other_steps_as_they_are():
     tiles = sweep(LOOK, "grain.amount", 0, 0.2, 3)
-    assert all(tile.steps[0] == GLITCH and tile.size == LOOK.size and tile.name == LOOK.name for _, tile in tiles)
+    assert all(tile.steps[0] == SLIDE and tile.size == LOOK.size and tile.name == LOOK.name for _, tile in tiles)
 
 
 def test_a_sweep_keeps_the_recipes_framing():
-    framed = Recipe("framed", [GLITCH, GRAIN], size=48, frame=Framing(aspect=1.0, transparent="circle"))
+    framed = Recipe("framed", [SLIDE, GRAIN], size=48, frame=Framing(aspect=1.0, transparent="circle"))
     assert all(tile.frame == framed.frame for _, tile in sweep(framed, "grain.amount", 0, 0.2, 3))
 
 
 def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():
     masked = Step("grain", GRAIN_PARAMS, mask="subject", opacity=0.5, blend_mode="screen")
-    recipe = Recipe("masked", [GLITCH, masked], size=48)
+    recipe = Recipe("masked", [SLIDE, masked], size=48)
     for _, tile in sweep(recipe, "grain.amount", 0, 0.2, 3):
         assert (tile.steps[1].mask, tile.steps[1].opacity, tile.steps[1].blend_mode) == ("subject", 0.5, "screen")
-        assert tile.steps[0] == GLITCH
+        assert tile.steps[0] == SLIDE
 
 
 def test_effect_number_picks_one_of_an_effect_the_recipe_has_twice():

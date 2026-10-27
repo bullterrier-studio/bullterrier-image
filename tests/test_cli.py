@@ -33,12 +33,12 @@ def cli(command: str) -> int:
 
 @pytest.fixture
 def files(photo, tmp_path, monkeypatch):
-    """The test's working folder: me.png (the 128x96 photo) and recipes/a.toml (grain) and recipes/b.toml (glitch)."""
+    """The test's working folder: me.png (the 128x96 photo), recipes/a.toml (grain), recipes/b.toml (rgb_split)."""
     monkeypatch.chdir(tmp_path)  # commands name files as a user in that folder would
     imageio.save(photo, tmp_path / "me.png")
     (tmp_path / "recipes").mkdir()
     (tmp_path / "recipes" / "a.toml").write_text('name="a"\nsize=64\n[[step]]\neffect="grain"\n', encoding="utf-8")
-    (tmp_path / "recipes" / "b.toml").write_text('name="b"\nsize=64\n[[step]]\neffect="glitch"\n', encoding="utf-8")
+    (tmp_path / "recipes" / "b.toml").write_text('name="b"\nsize=64\n[[step]]\neffect="rgb_split"\n', encoding="utf-8")
     return tmp_path
 
 
@@ -223,14 +223,14 @@ def test_sweep_puts_the_recipe_at_each_value_of_a_parameter_side_by_side(files, 
 
 def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that_needs_the_subject(cut):
     (cut / "masked.toml").write_text(
-        'name="masked"\nsize=128\n[[step]]\neffect="glitch"\nmask="subject"\nbands=3\nseed=5\n', encoding="utf-8"
+        'name="masked"\nsize=128\n[[step]]\neffect="rgb_split"\nmask="subject"\namount=6\n', encoding="utf-8"
     )
-    assert cli("sweep me.png masked.toml glitch.split --count 3 --map subject=matte.png -o s.png -- -6..6") == 0
+    assert cli("sweep me.png masked.toml rgb_split.angle --count 3 --map subject=matte.png -o s.png -- -90..90") == 0
     photo = imageio.load(cut / "me.png")
     tiles = []
-    for split in (-6, 0, 6):
-        look = Recipe("masked", [Step("glitch", {"split": split, "bands": 3, "seed": 5}, mask="subject")], size=128)
-        tiles.append((f"split={split}", render(photo, look, maps={"subject": imageio.load_map(cut / "matte.png")})))
+    for angle in (-90, 0, 90):
+        look = Recipe("masked", [Step("rgb_split", {"angle": angle, "amount": 6}, mask="subject")], size=128)
+        tiles.append((f"angle={angle}", render(photo, look, maps={"subject": imageio.load_map(cut / "matte.png")})))
     imageio.save(contact_sheet(tiles), cut / "expected.png")
     np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))
 

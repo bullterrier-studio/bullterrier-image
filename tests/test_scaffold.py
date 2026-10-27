@@ -111,7 +111,7 @@ def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
 
 REFUSED = {  # name, category -> what the refusal must name
     "the name of an existing effect: grade": ("grade", "light", ["'grade'"]),
-    "the name of an existing effect: glitch": ("glitch", "light", ["'glitch'"]),
+    "the name of an existing effect: vhs": ("vhs", "light", ["'vhs'"]),
     # a name that is no lowercase identifier
     "capitalised": ("Lamp", "light", ["'Lamp'"]),
     "starting with a digit": ("2lamp", "light", ["'2lamp'"]),

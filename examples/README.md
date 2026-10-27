@@ -18,7 +18,7 @@ Everything here uses one photo, `photos/bullterrier.jpeg`.
 ```bash
 uv run bt-image run examples/bt-image.toml           # render every recipe (finished work is skipped next time)
 open examples/output/index.html                      # the results and any quality warnings (xdg-open on Linux)
-uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20
+uv run bt-image sweep examples/photos/bullterrier.jpeg examples/recipes/glitch.toml rgb_split.amount 0..20
 uv run python examples/python_api.py
 ```
 

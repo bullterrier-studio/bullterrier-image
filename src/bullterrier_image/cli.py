@@ -117,14 +117,15 @@ def _parser() -> argparse.ArgumentParser:
         "sweep",
         _sweep,
         summary="render one parameter of a recipe across a range of values, side by side in one image",
-        example="examples/photos/bullterrier.jpeg examples/recipes/glitch.toml glitch.split 0..20",
+        example="examples/photos/bullterrier.jpeg examples/recipes/glitch.toml rgb_split.amount 0..20",
     )
     p.add_argument("photo", help="the photo to style")
     p.add_argument("recipe", help="the recipe .toml whose parameter is swept")
     p.add_argument(
         "target",
-        help="the number's address, e.g. glitch.split; glitch#2.split for the second step of an effect used twice, "
-        "pulse.gain for a step called pulse, pulse.gain.end for the end of a drive, region.near.low, frame.angle",
+        help="the number's address, e.g. rgb_split.amount; rgb_split#2.amount for the second step of an effect used "
+        "twice, pulse.gain for a step called pulse, pulse.gain.end for the end of a drive, region.near.low, "
+        "frame.angle",
     )
     p.add_argument(
         "range",

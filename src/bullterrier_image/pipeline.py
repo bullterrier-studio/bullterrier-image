@@ -695,11 +695,17 @@ name = "glitch"
 size = 1600
 
 [[step]]
-effect = "glitch"
-split = 9
+effect = "slice_shift"
+preset = "glitch"
 bands = 8
-shift = 0.05
+amount = 0.05
 seed = 4
+
+[[step]]
+effect = "rgb_split"
+angle = 0
+amount = 9
+edge = "wrap"
 
 [[step]]
 effect = "grain"

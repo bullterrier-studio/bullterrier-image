@@ -104,7 +104,7 @@ def test_effect_queries_live_only_in_the_registry(name):
     ("make", "expect"),
     [
         (lambda: Step("no_such_effect"), "unknown effect.*ascii"),
-        (lambda: Step("glitch", {"spilt": 3}), "spilt"),
+        (lambda: Step("rgb_split", {"spilt": 3}), "spilt"),
         (lambda: Step("grain", mask=3), "mask"),  # type: ignore[arg-type]
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
@@ -177,25 +177,25 @@ def test_a_step_describes_itself_briefly_for_labels():
 
 
 def test_fx_builds_steps_from_keyword_or_positional_arguments():
-    assert fx.glitch(split=3, seed=2) == Step("glitch", {"split": 3, "seed": 2})
+    assert fx.rgb_split(amount=3, angle=2) == Step("rgb_split", {"amount": 3, "angle": 2})
     assert fx.fill("#fff") == Step("fill", {"color": "#fff"})  # positional: the first parameter after the image
     assert fx.grain() == Step("grain", {})
 
 
 def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
-    with pytest.raises(ValueError, match=r"glitch.*`spilt` is not a parameter"):
-        fx.glitch(spilt=3)
+    with pytest.raises(ValueError, match=r"rgb_split.*`spilt` is not a parameter"):
+        fx.rgb_split(spilt=3)
     with pytest.raises(AttributeError, match=r"available: .*ascii"):
         fx.no_such_effect  # noqa: B018  (the lookup itself is what must raise)
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
-    signature = inspect.signature(fx.glitch)
-    assert list(signature.parameters)[:3] == ["split", "bands", "shift"]  # no image parameter, no subject
+    signature = inspect.signature(fx.rgb_split)
+    assert list(signature.parameters)[:3] == ["pair", "angle", "amount"]  # no image parameter, no subject
     assert "subject" not in inspect.signature(fx.evaporate).parameters
-    assert "slide sideways" in str(fx.glitch.__doc__)
-    assert fx.glitch.__name__ == "glitch"
-    assert {"ascii", "glitch", "disperse"} <= set(dir(fx))
+    assert "along `angle`" in str(fx.rgb_split.__doc__)
+    assert fx.rgb_split.__name__ == "rgb_split"
+    assert {"ascii", "rgb_split", "disperse"} <= set(dir(fx))
 
 
 def test_every_effect_is_available_as_a_step_builder():
@@ -398,8 +398,8 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
         ),
         pytest.param('effect = "gradient_map"\npreset = "sepia"', lambda: fx.gradient_map(preset="sepia"), id="preset"),
         pytest.param(
-            'effect = "glitch"\nsplit = 4\nmask = "subject"\nopacity = 0.5\nblend_mode = "difference"',
-            lambda: fx.glitch(split=4, mask="subject", opacity=0.5, blend_mode="difference"),
+            'effect = "rgb_split"\namount = 4\nmask = "subject"\nopacity = 0.5\nblend_mode = "difference"',
+            lambda: fx.rgb_split(amount=4, mask="subject", opacity=0.5, blend_mode="difference"),
             id="every key at once",
         ),
     ],
@@ -413,9 +413,9 @@ def test_a_step_is_written_with_the_same_keys_in_a_recipe_file_and_in_fx(tmp_pat
 
 
 def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
-    look = Recipe("t", size=None, steps=[fx.grade(exposure=0.5), fx.glitch(seed=1), fx.grain(seed=2)])
+    look = Recipe("t", size=None, steps=[fx.grade(exposure=0.5), fx.slice_shift(seed=1), fx.grain(seed=2)])
     stages = trace(photo, look)
-    assert [s.label.split("(")[0] for s in stages] == ["input", "1. grade", "2. glitch", "3. grain"]
+    assert [s.label.split("(")[0] for s in stages] == ["input", "1. grade", "2. slice_shift", "3. grain"]
     np.testing.assert_array_equal(stages[0].image, photo)
     assert not np.array_equal(stages[1].image, stages[0].image)
     assert not np.array_equal(stages[3].image, stages[2].image)
@@ -460,15 +460,22 @@ def test_the_pipeline_runs_recipes_defined_in_code_and_notices_when_they_change(
 
 
 def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_report(tmp_path, photo):
-    look = Recipe("look", size=64, steps=[fx.grade(exposure=0.4), fx.glitch(seed=1)])
+    look = Recipe("look", size=64, steps=[fx.grade(exposure=0.4), fx.slice_shift(seed=1)])
     project = make_project(tmp_path, photo, [look], steps=True)
     (item,) = run(project)
     folder = tmp_path / "out" / "one" / "steps" / "look"
-    assert sorted(p.name for p in folder.iterdir()) == ["00-input.jpg", "01-grade.jpg", "02-glitch.jpg", "_sheet.jpg"]
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "00-input.jpg",
+        "01-grade.jpg",
+        "02-slice_shift.jpg",
+        "_sheet.jpg",
+    ]
     assert item.steps == "one/steps/look/_sheet.jpg"
     assert item.outputs == ("one/look.jpg", "one/steps/look/_sheet.jpg")  # links: `/` on every system, Windows too
     final = imageio.load(tmp_path / "out" / "one" / "look.jpg")
-    assert np.abs(final - imageio.load(folder / "02-glitch.jpg")).max() < 0.03  # the last step is the exported result
+    assert (
+        np.abs(final - imageio.load(folder / "02-slice_shift.jpg")).max() < 0.03
+    )  # the last step is the exported result
     assert 'href="one/steps/look/_sheet.jpg"' in (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
     manifest = json.loads((tmp_path / "out" / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["items"][0]["steps"] == "one/steps/look/_sheet.jpg"
