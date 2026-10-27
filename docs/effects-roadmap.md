@@ -77,11 +77,11 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `grain` ✓ | Film grain or sensor noise: Gaussian or uniform, heavier in the shadows or highlights, grey or per channel. | `fx.grain(amount=0.065, balance=-0.54, color=True)` |
-| `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
-| `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
+| `scanlines` ✓ | Horizontal line pattern, hard or soft (`softness` 1 is a CRT's sin^2). | `fx.scanlines(spacing=3, darkness=0.3)` |
+| `pixel_grid` ✓ | LCD sub-pixel grid; `keep_brightness` for a shadow mask that does not dim. | `fx.pixel_grid(cell=4)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
-| `crt` ✓ | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.15, shadow_mask=0.35)` |
+| `crt` ✓ (a recipe, [crt.toml](../examples/recipes/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
 | `vhs` ✓ | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.06, bleed=5)` |
 | `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
@@ -358,7 +358,7 @@ tilt look = a linear-gradient field), and gives `topographic` depth contours.
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
 | `sparkle` | `starburst` + `count`, `dot` |
 | `fog`, `smoke` | one, with presets |
-| `crt`, `hologram` | recipes (`scanlines` gains `softness`; `lens_distortion` gains a border colour; needs `edges`) |
+| `hologram` | a recipe (needs `edges`; `scanlines` has `softness`) |
 | `split_tone`, `color_balance` | one three-range tool |
 | `overlay` | `blend` + `fit="width"` |
 | `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |

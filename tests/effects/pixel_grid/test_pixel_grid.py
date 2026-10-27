@@ -61,3 +61,54 @@ def test_the_pattern_repeats_with_the_period_of_the_cell() -> None:
     out = registry.apply(NAME, white(35), cell=7, gap=0.3, amount=1)
     np.testing.assert_allclose(out[7:28, 7:28], out[:21, :21], atol=1e-6)
     assert not np.allclose(out[1:8, 1:8], out[:7, :7])  # and not with a shorter one
+
+
+@pytest.mark.parametrize(
+    ("cell", "gap", "amount"),
+    [
+        pytest.param(3, 0.0, 0.5, id="stripes one pixel wide, no gap"),
+        pytest.param(6, 0.25, 0.8, id="a gap"),
+        pytest.param(4, 0.3, 0.6, id="a cell that is not a whole number of pixels a stripe"),
+        pytest.param(9, 0.0, 1.0, id="the full grid"),
+    ],
+)
+def test_keep_brightness_keeps_the_average_of_a_dim_picture_over_whole_cells(
+    cell: int, gap: float, amount: float
+) -> None:
+    """Over whole cells the gains average 1 - amount x (1 - the lit share), which they are divided by; a grey of 0.2
+    stays below 1 whatever it is lifted by, so nothing clips and the picture averages 0.2."""
+    grey = np.full((4 * cell, 4 * cell, 3), 0.2, np.float32)
+    out = registry.apply(NAME, grey, cell=cell, gap=gap, amount=amount, keep_brightness=True)
+    assert out.mean() == pytest.approx(0.2, abs=1e-5)
+    assert out.std() > 0.01  # and the grid still shows
+    assert registry.apply(NAME, grey, cell=cell, gap=gap, amount=amount).mean() < 0.2  # where it dims without
+
+
+def test_keep_brightness_lifts_a_lit_stripe_by_the_mean_darkening() -> None:
+    """Cell 3, no gap, amount 0.5: a lit stripe passes all the light and an unlit one half, the mean gain is
+    (1 + 0.5 + 0.5) / 3 = 2/3, so the gains are 1.5 and 0.75:
+    a grey of 0.4 shows 0.6 on the lit stripe, 0.3 elsewhere."""
+    out = registry.apply(NAME, np.full((3, 6, 3), 0.4, np.float32), cell=3, gap=0, amount=0.5, keep_brightness=True)
+    expected = np.full((3, 6, 3), 0.3, np.float32)
+    for column in range(6):
+        expected[:, column, column % 3] = 0.6
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+def test_keep_brightness_gives_the_same_stripes_whatever_the_size_of_the_picture() -> None:
+    """The mean is over a cell, not over the picture: a smaller picture is the top left of a larger one."""
+    noise = np.random.default_rng(4).random((30, 50, 3), dtype=np.float32)
+    small = registry.apply(NAME, noise[:11, :17], cell=5, gap=0.2, amount=0.7, keep_brightness=True)
+    large = registry.apply(NAME, noise, cell=5, gap=0.2, amount=0.7, keep_brightness=True)
+    np.testing.assert_allclose(small, large[:11, :17], atol=1e-6)
+
+
+def test_keep_brightness_with_nothing_lit_is_black_and_with_amount_0_changes_nothing(photo: np.ndarray) -> None:
+    np.testing.assert_allclose(registry.apply(NAME, photo, gap=1.0, amount=1.0, keep_brightness=True), 0, atol=1e-6)
+    np.testing.assert_array_equal(registry.apply(NAME, photo, amount=0.0, keep_brightness=True), photo)
+
+
+def test_keep_brightness_clips_a_lifted_stripe_at_white() -> None:
+    """Cell 3, no gap, amount 0.5 lifts a lit stripe by 1.5: white stays 1 there and is 0.75 on the other stripes."""
+    out = registry.apply(NAME, white(6), cell=3, gap=0, amount=0.5, keep_brightness=True)
+    np.testing.assert_allclose(out[0, :3], [[1, 0.75, 0.75], [0.75, 1, 0.75], [0.75, 0.75, 1]], atol=1e-6)

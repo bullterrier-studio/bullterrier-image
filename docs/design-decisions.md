@@ -188,7 +188,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   one place for the general blend. Eleven effects (`drop_shadow`, `dust_scratches`, `embers`, `floating_dust`,
   `long_shadow`, `outline`, `rain`, `reflection`, `snow`, `soft_focus`, `sparkle`) had an `opacity` of their own that
   rendered exactly what the step's `opacity` renders, and in a recipe file the key always reached the step, so the same
-  word meant two things depending on whether a look was written in TOML or Python; `crt`'s `mask` could not be set
+  word meant two things depending on whether a look was written in TOML or Python; an effect's `mask` could not be set
   from a recipe at all. *Consequence:* no effect parameter is named like a step key (`effect`, `mask`, `opacity`,
   `blend_mode`, `preset`), and registering one fails, as a parameter named like an injected input does; the eleven
   fields are removed; an effect whose natural strength is below full declares the default of its steps' opacity

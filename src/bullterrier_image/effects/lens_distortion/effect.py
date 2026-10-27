@@ -4,7 +4,7 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.warp import Centre, remap
 
@@ -58,6 +58,13 @@ class LensDistortionParams(EffectParams):
         doc="The lens axis's vertical position as a fraction of the way down the picture: 0 = the first pixel row, "
         "0.5 = the middle, 1 = the last.",
     )
+    border: Color | None = param(
+        None,
+        doc="The colour shown where the bend reads from beyond the picture (with fit 'centre', or a pincushion): "
+        "'#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) fills it by the `edge` rule instead. A source "
+        "less than a pixel beyond the picture is blended into the border, so its edge is smooth. A black border "
+        "is a bezel round a curved screen.",
+    )
     interpolation: Literal["nearest", "bilinear", "bicubic"] = param(
         "bilinear",
         doc="How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps "
@@ -70,7 +77,8 @@ class LensDistortionParams(EffectParams):
         "reflect",
         doc="What shows where the bend reads from beyond the picture (with fit 'centre', or a pincushion): "
         "'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge "
-        "pixel repeated), 'wrap' (the opposite edge).",
+        "pixel repeated), 'wrap' (the opposite edge). With a `border`, only what the bend reads from within a pixel "
+        "of the edge, which blends into the border.",
         advanced=True,
     )
 
@@ -100,7 +108,8 @@ def lens_distortion(rgb: np.ndarray, params: LensDistortionParams) -> np.ndarray
     (d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant
     fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is
     divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never
-    moves, and the result never leaves 0..1.
+    moves, and the result never leaves 0..1. What the bend reads from beyond the picture is the `edge` rule's, or
+    `border` where that is set.
     """
     height, width = rgb.shape[:2]
     # the farthest corner, in pixels: where the radius is 1
@@ -119,4 +128,11 @@ def lens_distortion(rgb: np.ndarray, params: LensDistortionParams) -> np.ndarray
     if params.fit == "frame":
         scale = scale / (1 + params.amount)
     rows, cols = centre.sources(scale=scale)
-    return remap(rgb, rows, cols, interpolation=params.interpolation, edge=params.edge)
+    out = remap(rgb, rows, cols, interpolation=params.interpolation, edge=params.edge)
+    if params.border is None:
+        return out
+    # reading from less than a pixel beyond the first or last pixel blends it into the border; farther out is all border
+    inside_rows = np.clip(np.minimum(rows + 1, height - rows), 0, 1)
+    inside_cols = np.clip(np.minimum(cols + 1, width - cols), 0, 1)
+    picture = (inside_rows * inside_cols).astype(np.float32)[..., None]
+    return (out * picture + np.asarray(params.border, np.float32) * (1 - picture)).astype(np.float32)

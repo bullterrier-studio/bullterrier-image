@@ -1,7 +1,8 @@
-# An LCD pixel grid: 5 px cells of red, green and blue stripes over the photo.
+# An LCD pixel grid: 5 px cells of red, green and blue stripes over the photo, lifted to keep its brightness.
 name = "pixel_grid"
 size = 480
 
 [[step]]
 effect = "pixel_grid"
 cell = 5
+keep_brightness = true

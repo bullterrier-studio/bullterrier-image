@@ -1,0 +1,35 @@
+# A CRT: bulged glass in a black bezel, a soft glow, scanlines, a red-green-blue shadow mask and a dim edge.
+name = "crt"
+size = 480
+
+[[step]]
+effect = "lens_distortion"
+amount = 0.15
+fit = "centre"                    # the bulge pushes the edges of the picture out of the glass
+border = "#000000"                # the bezel
+
+[[step]]
+effect = "bloom"
+octaves = 1
+radius = 10
+threshold = 0.5
+amount = 0.3
+
+[[step]]
+effect = "scanlines"
+spacing = 4
+softness = 1                      # a line fades in and out along sin^2, as the beam does
+darkness = 0.3
+
+[[step]]
+effect = "pixel_grid"             # the shadow mask: one stripe each of red, green and blue
+cell = 3
+gap = 0
+amount = 0.35
+keep_brightness = true
+
+[[step]]
+effect = "vignette"
+amount = 0.35
+radius = 0.2
+feather = 1

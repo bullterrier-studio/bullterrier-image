@@ -37,9 +37,7 @@ effect = "vignette"
 amount = 0.5
 
 [[step]]
-effect = "crt"
-curve = 0.1
-shadow_mask = 0
-scanlines = 0
-bloom = 0
-vignette = 0
+effect = "lens_distortion"
+amount = 0.1
+fit = "centre"
+border = "#000000"

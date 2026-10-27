@@ -16,10 +16,33 @@ photo = 0.45
 gamma = 0.6
 
 [[step]]
-effect = "crt"
-curve = 0.12
-shadow_mask = 0.25
-scanlines = 0.25
-bloom = 0.5
-bloom_threshold = 0.55
-vignette = 0.4
+effect = "lens_distortion"
+amount = 0.12
+fit = "centre"
+border = "#000000"
+
+[[step]]
+effect = "bloom"
+octaves = 1
+radius = 10
+threshold = 0.55
+amount = 0.5
+
+[[step]]
+effect = "scanlines"
+spacing = 4
+softness = 1
+darkness = 0.25
+
+[[step]]
+effect = "pixel_grid"
+cell = 3
+gap = 0
+amount = 0.25
+keep_brightness = true
+
+[[step]]
+effect = "vignette"
+amount = 0.4
+radius = 0.2
+feather = 1

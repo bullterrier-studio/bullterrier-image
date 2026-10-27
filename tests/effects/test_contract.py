@@ -457,11 +457,6 @@ def test_a_background_that_reads_the_picture_is_caught(throwaway_effects, regist
     assert _picture_changes_the_background("reading_probe")
 
 
-# Effects that change a flat picture by design, unless the parts that do are off: a screen's mask, scanlines, vignette
-# and the border beyond its curved glass.
-FLAT_NEEDS = {"crt": {"curve": 0.0, "shadow_mask": 0.0, "scanlines": 0.0, "bloom": 0.0, "vignette": 0.0}}
-
-
 def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
     """(effect, choices) for every combination of the choice fields (`mode`, `edge`, `interpolation`...) of the
     effects that read the picture between its pixels (those with an `interpolation` field)."""
@@ -481,7 +476,7 @@ def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
 )
 def test_a_constant_picture_stays_constant_under_every_way_of_reading_between_pixels(name, setting):
     flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(name, flat, **FLAT_NEEDS.get(name, {}), **setting, **_inputs(name, flat))
+    out = registry.apply(name, flat, **setting, **_inputs(name, flat))
     np.testing.assert_allclose(out, 0.4, atol=1e-6)
 
 

@@ -1,4 +1,4 @@
-# CRT scanlines: a dark line every 4 px, half a spacing thick.
+# CRT scanlines: a line every 4 px, half a spacing thick, with soft edges.
 name = "scanlines"
 size = 480
 
@@ -6,3 +6,4 @@ size = 480
 effect = "scanlines"
 spacing = 4
 darkness = 0.45
+softness = 0.6

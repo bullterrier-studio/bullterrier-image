@@ -228,3 +228,64 @@ def test_a_fisheye_leaves_the_middle_flatter_than_a_polynomial_of_the_same_amoun
     assert polynomial[50, 60, 0] == pytest.approx(0.5 + 0.1 * 1.02 / 2, abs=1e-4)
     assert fisheye[50, 95, 0] == pytest.approx(0.5 + 0.45 * 1.2317 / 2, abs=1e-3)
     assert polynomial[50, 95, 0] == pytest.approx(0.5 + 0.45 * 1.405 / 2, abs=1e-3)
+
+
+def flat(value: float, height: int, width: int) -> np.ndarray:
+    return np.full((height, width, 3), value, np.float32)
+
+
+@pytest.mark.parametrize("model", MODELS)
+@pytest.mark.parametrize("border", ["#ff0000", "#1020ff"])
+def test_beyond_the_bent_picture_the_border_colour_shows_and_inside_it_does_not(model: str, border: str) -> None:
+    """With fit 'centre' the corner of a barrel reads beyond the picture; the middle never does."""
+    out = registry.apply(NAME, flat(0.5, 41, 61), model=model, amount=0.5, fit="centre", border=border)
+    wanted = np.array([int(border[i : i + 2], 16) / 255 for i in (1, 3, 5)], np.float32)
+    np.testing.assert_allclose(out[0, 0], wanted, atol=1e-6)
+    np.testing.assert_allclose(out[-1, -1], wanted, atol=1e-6)
+    np.testing.assert_allclose(out[20, 30], 0.5, atol=1e-6)
+
+
+def test_the_middle_of_every_side_of_a_barrel_with_the_centre_kept_is_beyond_the_picture_too() -> None:
+    """On 41 x 61 px with amount 0.5 the middle of the top edge, (0, 30), is 20 px from the centre and R = hypot(20, 30)
+    = 36.06 px, so it reads at 1 + 0.5 x (20 / 36.06)^2 = 1.15 of that, 3 px above the picture; the middle of the left
+    edge, (20, 0), reads 1 + 0.5 x (30 / 36.06)^2 = 1.35 of 30 px, 10 px to its left; likewise the other two."""
+    out = registry.apply(NAME, flat(0.5, 41, 61), amount=0.5, fit="centre", border="#ffffff")
+    for pixel in [(0, 30), (40, 30), (20, 0), (20, 60)]:
+        np.testing.assert_allclose(out[pixel], 1.0, atol=1e-6)
+
+
+def test_a_pixel_that_reads_less_than_a_pixel_beyond_the_picture_is_blended_with_the_border() -> None:
+    """With amount 0.02 on 41 x 61 px the pixel (20, 0) reads 30 x (1 + 0.02 x (30 / 36.0555)^2) = 30.415 px from the
+    centre, 0.415 px beyond the first column, and shows the picture by 1 - 0.415 = 0.585: 0.585 x 0.5 + 0.415 x 1 =
+    0.7077 against a white border. The pixel (0, 30) reads 20.123 px up, 0.123 px beyond: 0.877 x 0.5 + 0.123 =
+    0.5615."""
+    out = registry.apply(NAME, flat(0.5, 41, 61), amount=0.02, fit="centre", border="#ffffff")
+    for pixel, value in [((20, 0), 0.70769), ((20, 60), 0.70769), ((0, 30), 0.56154), ((40, 30), 0.56154)]:
+        assert out[pixel][0] == pytest.approx(value, abs=1e-4)
+
+
+@pytest.mark.parametrize("model", MODELS)
+@pytest.mark.parametrize(
+    ("amount", "fit"),
+    [(0.0, "centre"), (0.5, "frame")],
+    ids=["a lens that does not bend", "a barrel with the frame filled reads only inside the picture"],
+)
+def test_the_border_colour_stays_out_when_nothing_is_read_from_beyond_the_picture(
+    model: str, amount: float, fit: str
+) -> None:
+    noise = np.random.default_rng(7).random((41, 61, 3), dtype=np.float32)
+    plain = registry.apply(NAME, noise, model=model, amount=amount, fit=fit)
+    out = registry.apply(NAME, noise, model=model, amount=amount, fit=fit, border="#ff0000")
+    np.testing.assert_allclose(out, plain, atol=1e-5)
+
+
+@pytest.mark.parametrize(("edge", "shows_far_side"), [("wrap", True), ("reflect", False), ("mirror", False)])
+def test_edge_sets_what_a_source_less_than_a_pixel_beyond_the_picture_shows_before_it_blends_into_the_border(
+    edge: str, shows_far_side: bool
+) -> None:
+    """On 41 x 61 px with amount 0.02 the pixel (20, 0) reads 0.415 px beyond the first column, which is black, with a
+    white last column: the picture wraps to the last column there and shows white, mirrored it repeats black."""
+    picture = np.zeros((41, 61, 3), np.float32)
+    picture[:, -1] = 1.0
+    out = registry.apply(NAME, picture, amount=0.02, fit="centre", border="#000000", edge=edge)
+    assert (out[20, 0, 0] > 0.05) == shows_far_side
