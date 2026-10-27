@@ -15,12 +15,14 @@ class KaleidoscopeParams(EffectParams):
     segments: int = param(
         6,
         unit="count",
-        min=2,
+        min=1,
         max=64,
         doc="How many times the pattern repeats round the centre: the full circle is cut into this many equal sectors, "
         "each holding a wedge of the picture (half a sector wide) and its mirror image, so every wedge borders its own "
-        "reflection and the seams between them do not show. 2 = a picture mirrored across a line through the centre "
-        "and again across the line at right angles; raising it makes more, narrower wedges.",
+        "reflection and the seams between them do not show. 1 = one line through the centre: the half of the picture "
+        "clockwise from `angle` is kept and its reflection replaces the other half (a face made symmetric, a "
+        "reflection in water); 2 = mirrored across that line and again across the line at right angles (the kept "
+        "quarter copied into the other three); raising it makes more, narrower wedges.",
     )
     angle: float = param(
         0.0,
@@ -28,9 +30,10 @@ class KaleidoscopeParams(EffectParams):
         min=-180,
         max=180,
         cyclic=True,
-        doc="Where the pattern starts, as the direction in degrees, clockwise from pointing right, of the first mirror "
-        "axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns "
-        "the mirror axes, and shows a different wedge of the picture. The pattern repeats every 360 / segments "
+        doc="Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), "
+        "of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the "
+        "centre; turning it turns the mirror axes, and shows a different wedge of the picture. With 1 segment, 0 "
+        "keeps the bottom half, 90 the left, 180 the top and -90 the right. The pattern repeats every 360 / segments "
         "degrees.",
     )
     x: float = param(
@@ -54,7 +57,9 @@ class KaleidoscopeParams(EffectParams):
         doc="How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps "
         "every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, "
         "slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, "
-        "and may ring beside hard edges).",
+        "and may ring beside hard edges). With 'nearest' every output pixel is an input pixel, so a mirror (1 or 2 "
+        "segments through the middle) is exact and exactly symmetric; the other two blend, and a mirror then "
+        "differs from an exact reflection by rounding error only.",
         advanced=True,
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
@@ -74,7 +79,8 @@ def kaleidoscope(rgb: np.ndarray, params: KaleidoscopeParams) -> np.ndarray:
     distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that
     passes half a sector, mirrored to what it falls short of the sector by, then `angle` added back. The wedge from
     `angle` for half a sector is the picture as it is, the next half a sector its mirror image, and so on round the
-    centre, which keeps its own pixel.
+    centre, which keeps its own pixel. One segment is a single mirror axis: the half of the picture clockwise from
+    `angle` is kept, its reflection replaces the other half.
     """
     height, width = rgb.shape[:2]
     centre = Centre(height, width, x=params.x, y=params.y)

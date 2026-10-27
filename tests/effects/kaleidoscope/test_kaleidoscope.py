@@ -146,3 +146,80 @@ def test_edge_sets_what_a_pixel_sees_when_the_fold_reads_it_from_beyond_the_pict
     columns = np.tile(np.arange(21) / 20.0, (21, 1))
     out = registry.apply(NAME, grey(columns), segments=8, angle=0.0, edge=edge, interpolation="bilinear")
     assert out[0, 0, 0] == pytest.approx(expected, abs=1e-5)
+
+
+# How to ask for each way of keeping part of a picture and reflecting it onto the rest: (segments, angle) ->
+# which rows are kept (None: the rows are not mirrored), which columns are kept; 'first' keeps the first
+# `ceil(n / 2)` lines, 'last' the last `ceil(n / 2)`. One segment is one axis at `angle`, the half clockwise
+# from it is kept; two segments are two axes at right angles, the quarter clockwise from `angle` is kept.
+KEPT_BY_AXES = {
+    "left half": (1, 90.0, None, "first"),
+    "right half": (1, -90.0, None, "last"),
+    "top half": (1, 180.0, "first", None),
+    "bottom half": (1, 0.0, "last", None),
+    "top left quarter": (2, 180.0, "first", "first"),
+    "top right quarter": (2, -90.0, "first", "last"),
+    "bottom left quarter": (2, 90.0, "last", "first"),
+    "bottom right quarter": (2, 0.0, "last", "last"),
+}
+SIZES = [(96, 128), (13, 29), (61, 37)]  # even by even, and odd ones: the middle row or column is its own mirror
+
+
+def reflected(rgb: np.ndarray, rows: str | None, columns: str | None) -> np.ndarray:
+    """Brute-force reference: every pixel looks up where it comes from. A pixel on the kept side comes from itself,
+    any other from its mirror image."""
+    height, width = rgb.shape[:2]
+
+    def source(index: int, size: int, kept: str | None) -> int:
+        if kept is None:
+            return index
+        on_kept_side = index < (size + 1) // 2 if kept == "first" else index >= size // 2
+        return index if on_kept_side else size - 1 - index
+
+    out = np.empty_like(rgb)
+    for y in range(height):
+        for x in range(width):
+            out[y, x] = rgb[source(y, height, rows), source(x, width, columns)]
+    return out
+
+
+@pytest.mark.parametrize("size", SIZES, ids=lambda size: f"{size[0]}x{size[1]}")
+@pytest.mark.parametrize("kept", KEPT_BY_AXES)
+def test_nearest_with_one_or_two_segments_keeps_part_untouched_and_reflects_it_onto_the_rest(
+    kept: str, size: tuple[int, int]
+) -> None:
+    """Every output pixel is a pixel of the input, the kept part exactly as it was and the rest its reflection, so the
+    result is exactly symmetric."""
+    segments, angle, rows, columns = KEPT_BY_AXES[kept]
+    picture = noise(*size)
+    out = registry.apply(NAME, picture, segments=segments, angle=angle, interpolation="nearest")
+    np.testing.assert_array_equal(out, reflected(picture, rows, columns))
+
+
+@pytest.mark.parametrize(
+    ("segments", "angle", "flips"),
+    [
+        (1, 0.0, ["flipud"]),
+        (1, 90.0, ["fliplr"]),
+        (1, 180.0, ["flipud"]),
+        (2, 0.0, ["flipud", "fliplr"]),
+        (2, 90.0, ["flipud", "fliplr"]),
+    ],
+    ids=[
+        "1 segment, axis along the middle row",
+        "1 segment, axis down the middle column",
+        "1 segment, axis pointing left",
+        "2 segments",
+        "2 segments, turned a quarter",
+    ],
+)
+def test_one_segment_is_symmetric_about_its_axis_and_two_about_both(
+    segments: int, angle: float, flips: list[str]
+) -> None:
+    """Axes pass through the centre every 180 / segments degrees from `angle`: reflecting an odd-sized picture across
+    its middle row, or column, changes nothing when an axis lies along it."""
+    picture = noise(61, 61)
+    out = registry.apply(NAME, picture, segments=segments, angle=angle, interpolation="bilinear")
+    for flip in flips:
+        np.testing.assert_allclose(getattr(np, flip)(out), out, atol=1e-6)
+    assert np.abs(out - picture).max() > 0.2  # and the picture really is folded

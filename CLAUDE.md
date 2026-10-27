@@ -204,7 +204,7 @@ Follow the `testing-best-practices` skill. A test coupled to implementation or o
 golden file, sleep, mock of our own code) is worse than none: delete it. Reviewers treat such tests as blocking.
 
 - Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
-  `mirror` is symmetric; a blur never leaves the input's range.
+  `kaleidoscope` is symmetric about its mirror axes; a blur never leaves the input's range.
 - Expected values come from an independent oracle (standard, hand computation, brute-force reference), never the code's formula.
 - Every checker/validator gets a known-good and a known-bad input. Seeds pin determinism. No sleeps, live network or wall-clock
   assertions.

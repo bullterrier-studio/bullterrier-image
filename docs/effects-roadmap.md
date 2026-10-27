@@ -148,7 +148,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
 | `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
-| `mirror` ✓ | Symmetry on an axis, or four-way. | `fx.mirror(direction="left_to_right")` |
+| `mirror` ✓ (`kaleidoscope` with 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
 | `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
 | `tile` ✓ | Repeat the picture in a grid. | `fx.tile(columns=3, rows=3)` |
 | `shear` ✓ | Skew with edge fill. | `fx.shear(x=0.2)` |
