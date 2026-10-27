@@ -57,7 +57,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
 | `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; presets `soft_focus` (Orton glow of the whole picture) and `halation` (film's red-orange glow). | `fx.bloom(radius=40, threshold=0.7)` |
 | `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=144)` |
-| `starburst` ✓ | Diffraction spikes on bright points; `density` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=90)` |
+| `starburst` ✓ | Diffraction spikes on bright points; `spacing` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=90)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
@@ -341,7 +341,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
 | `layered_cutouts`, `long_shadow` | `drop_shadow` + `copies`, `end_color`, `copy_opacity`, `fade`; preset `long_shadow` (done) |
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
-| `sparkle` | a `starburst` preset + `density`, `variation`, `seed` |
+| `sparkle` | a `starburst` preset + `spacing`, `variation`, `seed` |
 | `fog`, `smoke` | one, with presets |
 | `hologram` | a look (done) |
 | `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |

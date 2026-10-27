@@ -31,6 +31,15 @@ class StarburstParams(EffectParams):
         doc="How far each spike reaches, in px tuned for a picture about 480 px high: it fades linearly from the "
         "point to nothing at this distance. Raising it makes longer, fainter-tipped spikes.",
     )
+    width: float = param(
+        1.0,
+        unit="px",
+        min=1,
+        max=20,
+        advanced=True,
+        doc="The thickness in px of each spike, tuned for a picture about 480 px high, with a soft edge one px wide: "
+        "1 = a hairline. Raising it makes bolder spikes.",
+    )
     threshold: float = param(
         0.95,
         unit="fraction",
@@ -69,14 +78,16 @@ class StarburstParams(EffectParams):
         doc="The direction of the first spike, in degrees clockwise from pointing right, as seen on screen: 0 = to the "
         "right, 90 = down. The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
     )
-    density: float = param(
-        1.0,
-        unit="fraction",
+    spacing: float = param(
+        0.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="The share of the bright points that send out spikes, picked at random (the same ones for the same "
-        "`seed`; raising it only adds points): 1 = all of them, 0.01 = one in a hundred, scattered over the bright "
-        "areas, 0 = none. Lower it to turn a bright area into separate glints.",
+        max=200,
+        doc="The average distance in px, tuned for a picture about 480 px high, between the points that send out "
+        "spikes inside a bright area: each bright pixel sends them with the chance 1 / spacing^2 (the same ones for "
+        "the same `seed`; raising it only drops points), so the glints keep their number per area of the picture "
+        "at any size. 0, or anything below 1, = every bright point. Raise it to turn a bright area into separate "
+        "glints; 13 gives a scatter of glitter.",
     )
     variation: float = param(
         0.0,
@@ -93,7 +104,7 @@ class StarburstParams(EffectParams):
         min=0,
         max=2**32 - 1,
         advanced=True,
-        doc="Random seed for `density` and `variation`: the same seed picks the same points of the same picture, "
+        doc="Random seed for `spacing` and `variation`: the same seed picks the same points of the same picture, "
         "another seed others.",
     )
     color: Color = param(
@@ -106,18 +117,18 @@ class StarburstParams(EffectParams):
 @effect(category="light", params=StarburstParams)
 def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
-    tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density`
-    picks a random share of them, `variation` dims each by a random amount (both from `seed`).
+    tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing`
+    thins them to a random few, `variation` dims each by a random amount (both from `seed`).
 
-    Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` px;
-    they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`density`)
+    Each spike is `width` px wide, starts at the point at full brightness and fades linearly to nothing at `length` px;
+    they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`spacing`)
     and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a
     point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
     nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
     """
     if params.amount == 0 or params.limit == 0:
         return rgb.copy()
-    half = int(np.ceil(params.length))  # the spike fades to nothing at `length` px
+    half = int(np.ceil(max(params.length, params.width)))  # the kernel covers the spike's length and its thickness
     # offsets (row, column) from the point, row growing downward and the angle clockwise on the picture
     down, right = np.mgrid[-half : half + 1, -half : half + 1].astype(np.float64)
     kernel = np.zeros(down.shape)
@@ -125,7 +136,7 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         theta = np.radians(params.angle) + 2 * np.pi * spike / params.rays
         along = right * np.cos(theta) + down * np.sin(theta)  # px out along the spike's direction
         across = np.abs(down * np.cos(theta) - right * np.sin(theta))  # px sideways from its line
-        thin = np.clip(1.0 - across, 0.0, 1.0)  # a line one px wide, soft at its sides
+        thin = np.clip(params.width / 2 + 0.5 - across, 0.0, 1.0)  # a line `width` px wide, soft at its sides
         fade = np.clip(1.0 - along / params.length, 0.0, 1.0) * (along >= 0)
         kernel = np.maximum(kernel, thin * fade)
     total = kernel.sum()
@@ -137,7 +148,7 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         threshold = min(max(threshold, float(brightest)), MAX_THRESHOLD)
     bright = highlights(rgb, threshold)
     rng = np.random.default_rng(params.seed)
-    chosen = rng.random(bright.shape[:2]) < params.density
+    chosen = rng.random(bright.shape[:2]) < 1 / max(params.spacing, 1) ** 2  # a chance of 1 below a spacing of 1
     scale = 1.0 - params.variation * rng.random(bright.shape[:2])
     bright *= (chosen * scale).astype(np.float32)[..., None]
     # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own

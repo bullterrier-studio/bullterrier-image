@@ -2,7 +2,9 @@
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
+from bullterrier_image import Recipe, fx, render
 from bullterrier_image.core import registry
 
 NAME = "starburst"
@@ -93,6 +95,17 @@ def test_length_is_how_far_a_spike_reaches_in_px(length: float) -> None:
     distance, _ = polar(out.shape, MIDDLE, MIDDLE)
     farthest = distance[out > 1e-3].max()
     assert length - 2.0 <= farthest <= length
+
+
+@pytest.mark.parametrize("width", [1.0, 3.0, 6.0])
+def test_width_is_how_many_px_thick_a_spike_is_with_a_soft_edge_one_px_wide(width: float) -> None:
+    """One spike to the right, 20 px out: a pixel `d` rows off its line lights by the brute-force profile
+    clip(width / 2 + 0.5 - d, 0, 1) times the fade 1 - 20 / length."""
+    length = 57.0
+    out = registry.apply(NAME, point(), rays=1, angle=0.0, length=length, width=width, amount=1.0, threshold=0.5)
+    offsets = np.arange(-5, 6)
+    expected = np.clip(width / 2 + 0.5 - np.abs(offsets), 0.0, 1.0) * (1 - 20 / length)
+    np.testing.assert_allclose(out[MIDDLE + offsets, MIDDLE + 20, 0], expected, atol=2e-5)
 
 
 def test_a_spike_fades_linearly_from_the_highlight_to_nothing_at_its_full_length() -> None:
@@ -235,21 +248,45 @@ def lattice_gains(**settings: float) -> np.ndarray:
     return ((out[np.ix_(LATTICE, LATTICE)][..., 0] - 0.6) / 0.4 / 0.1).ravel()
 
 
-@pytest.mark.parametrize("density", [0.0, 0.2, 0.5, 0.9, 1.0])
-def test_density_is_the_share_of_the_bright_points_that_radiate(density: float) -> None:
-    gains = lattice_gains(density=density, seed=3)
-    share = float((gains > 0.5).mean())  # each point is lit fully (variation 0) or not at all
-    assert share == pytest.approx(density, abs=0.08)  # 441 points: binomial spread under 0.025
+@pytest.mark.parametrize(
+    ("spacing", "share"),
+    [(0.0, 1.0), (0.5, 1.0), (1.0, 1.0), (1.5, 4 / 9), (2.0, 0.25), (4.0, 1 / 16)],
+    ids=["0 = every point", "below 1 = every point", "1 = every point", "1.5: 1 in 2.25", "2: 1 in 4", "4: 1 in 16"],
+)
+def test_each_bright_pixel_radiates_with_the_chance_one_over_spacing_squared(spacing: float, share: float) -> None:
+    gains = lattice_gains(spacing=spacing, seed=3)
+    picked = float((gains > 0.5).mean())  # each point is lit fully (variation 0) or not at all
+    assert picked == pytest.approx(share, abs=0.07)  # 441 points: binomial spread under 0.024
     assert set(np.round(gains, 3)) <= {0.0, 1.0}
 
 
-def test_raising_density_only_adds_points_and_the_seed_picks_which() -> None:
-    few = lattice_gains(density=0.2, seed=3) > 0.5
-    many = lattice_gains(density=0.6, seed=3) > 0.5
-    other = lattice_gains(density=0.2, seed=4) > 0.5
-    assert (many | ~few).all()  # every point of the thinner pick is in the fuller one
+def test_raising_spacing_only_drops_points_and_the_seed_picks_which() -> None:
+    many = lattice_gains(spacing=1.5, seed=3) > 0.5
+    few = lattice_gains(spacing=3.0, seed=3) > 0.5
+    other = lattice_gains(spacing=3.0, seed=4) > 0.5
+    assert (many | ~few).all()  # every point of the sparser pick is in the denser one
     assert many.sum() > few.sum()
     assert (few != other).any()
+
+
+def count_glints(size: int, seed: int) -> int:
+    """The separate lit patches the preset `sparkle` (spacing 70) leaves round a bright block, the middle third of a
+    `size` px square picture, in a recipe of design size 240."""
+    block = np.zeros((size, size, 3), np.float32)
+    block[size // 3 : 2 * size // 3, size // 3 : 2 * size // 3] = 0.9
+    glitter = fx.starburst(preset="sparkle", spacing=70.0, seed=seed, threshold=0.5, variation=0.0)
+    lit = (render(block, Recipe("glints", size=240, steps=[glitter]), size=size) - block).max(axis=-1)
+    return int(ndimage.label(lit > 0.02)[1])
+
+
+def test_the_number_of_glints_does_not_grow_with_the_resolution() -> None:
+    """The same recipe on a 240 and on a 720 px render lights about as many glints (the bright area has nine times
+    the pixels at 720, and the chance per pixel is nine times smaller); 80 seeds keep the counts within about
+    20% of each other."""
+    small = sum(count_glints(240, seed) for seed in range(80))
+    large = sum(count_glints(720, seed) for seed in range(80))
+    assert small > 70  # glints, not a handful by luck
+    assert large == pytest.approx(small, rel=0.35)
 
 
 def test_variation_dims_points_by_a_random_share_between_one_minus_variation_and_one() -> None:
@@ -264,13 +301,13 @@ def test_variation_dims_points_by_a_random_share_between_one_minus_variation_and
 
 
 def test_the_preset_sparkle_scatters_glints_over_a_bright_area_where_plain_spikes_flood_it() -> None:
-    """A bright block: the preset's spikes without its density wrap the whole block in light; with it a few small
+    """A bright block: the preset's spikes without its spacing wrap the whole block in light; with it a few small
     separate glints are lit."""
     picture = np.zeros((SIZE, SIZE, 3), np.float32)
     picture[60:140, 60:140] = 0.95
     sparkle = registry.presets(NAME)["sparkle"].params
     glitter = registry.apply(NAME, picture, **sparkle, seed=1)
-    flood = registry.apply(NAME, picture, **{**sparkle, "density": 1.0})
+    flood = registry.apply(NAME, picture, **{**sparkle, "spacing": 0.0})
     lit_glitter = (glitter - picture).max(axis=-1) > 0.02
     lit_flood = (flood - picture).max(axis=-1) > 0.02
     assert lit_glitter.any()
