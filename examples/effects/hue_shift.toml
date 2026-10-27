@@ -1,7 +1,0 @@
-# Every hue turned 150 degrees around the colour wheel; the lighting stays.
-name = "hue_shift"
-size = 480
-
-[[step]]
-effect = "hue_shift"
-hue = 150

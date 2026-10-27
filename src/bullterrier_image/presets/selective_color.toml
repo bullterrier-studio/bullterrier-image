@@ -1,0 +1,7 @@
+# Looks that are one hue range.
+
+[hue_shift]
+description = "Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay."
+width = 360
+feather = 0
+hue_shift = 150

@@ -21,13 +21,12 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `grade` ✓ | Exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5)` |
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `split_tone` ✓ | Tint shadows and highlights. | `fx.split_tone(shadow="#3a1bff")` |
-| `hue_shift` ✓ | Rotate hues, keep brightness. | `fx.hue_shift(hue=150)` |
 | `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points; preset `solarize` folds the highlights back dark. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
 | `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
-| `selective_color` ✓ | Shift hue/saturation/lightness of one colour range. | `fx.selective_color(hue=30, saturation=0.6)` |
+| `selective_color` ✓ | Shift hue/saturation/lightness of one colour range or, with preset `hue_shift`, of every colour. | `fx.selective_color(hue=30, saturation=0.6)` |
 | `color_balance` ✓ | Separate RGB shifts for shadows, mids, highlights. | `fx.color_balance(highlights_red=0.05, highlights_blue=-0.05)` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
@@ -200,7 +199,7 @@ varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gauss
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
 `grain`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`, `vibrance`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
-`hue_shift`'s `hue`; `fog`'s `amount`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
+`selective_color`'s `hue_shift`; `fog`'s `amount`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
 

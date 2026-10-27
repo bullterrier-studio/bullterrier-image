@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.steps import Step
 
 NAME = "selective_color"
 
@@ -171,3 +172,10 @@ def test_a_hue_centre_past_a_full_turn_selects_the_same_colours_as_the_centre_in
     np.testing.assert_array_equal(
         registry.apply(NAME, photo, hue=361, hue_shift=40), registry.apply(NAME, photo, hue=1, hue_shift=40)
     )
+
+
+@pytest.mark.parametrize("hue", [0, 30, 90, 150, 200, 270, 330])
+def test_the_hue_shift_preset_turns_a_vivid_colour_of_any_hue_150_degrees_round_the_wheel(hue: float) -> None:
+    out = registry.apply(NAME, pixel(hue), **Step(NAME, preset="hue_shift").params)
+    assert circular_distance(hue_of(out), hue + 150) < 0.05
+    np.testing.assert_allclose(out.max(), 1.0, atol=1e-6)  # the brightness (HSV value) is kept

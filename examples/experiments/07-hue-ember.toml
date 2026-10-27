@@ -3,8 +3,8 @@ name = "hue-teal"
 size = 1024
 
 [[step]]
-effect = "hue_shift"
-hue = 150
+effect = "selective_color"
+preset = "hue_shift"
 
 [[step]]
 effect = "grade"

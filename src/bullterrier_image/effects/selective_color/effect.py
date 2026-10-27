@@ -44,8 +44,10 @@ class SelectiveColorParams(EffectParams):
         unit="degrees",
         min=-180,
         max=180,
+        drivable=True,
         doc="How far the selected hues are turned round the colour wheel, -180..180 degrees; positive goes red toward "
-        "yellow, green, blue. 0 keeps the hue.",
+        "yellow, green, blue. 0 keeps the hue. With `width` 360 and `feather` 0 every colour turns (preset "
+        "`hue_shift`).",
     )
     saturation: float = param(
         1.0,
