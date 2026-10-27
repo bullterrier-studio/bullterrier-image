@@ -8,7 +8,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/dead_pixels.jpg" width="160" alt="dead_pixels"> | `dead_pixels` | Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black. | `count=120` `size=4` `stuck=0.5` `color='#ffffff'` `seed=0` | [dead_pixels.toml](../../examples/effects/dead_pixels.toml) |
 | <img src="../gallery/echo.jpg" width="160" alt="echo"> | `echo` | Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`. | `copies=4` `dx=14.0` `dy=0.0` `fade=0.5` +1 advanced | [echo.toml](../../examples/effects/echo.toml) |
-| <img src="../gallery/hologram.jpg" width="160" alt="hologram"> | `hologram` | Show the picture as light of `color`, outlined where its brightness changes, with scanlines and a flicker. | `color='#30e0ff'` `tint=0.85` `glow=5.0` `scanlines=0.35` `flicker=0.3` `phase=0.0` +5 advanced | [hologram.toml](../../examples/effects/hologram.toml) |
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
@@ -39,29 +38,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a copy shows where it has moved off the picture's edge: 'nearest' repeats the picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror' mirrors it about the edge line. |
-
-</details>
-
-### `hologram`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `color` | colour |  |  | `'#30e0ff'` | The colour of the projected light, which the picture's brightness and its edges are shown in: '#rrggbb', '#rgb' or [r, g, b] 0..1. A cyan is the classic hologram. |
-| `tint` | number | fraction | 0 to 1 | `0.85` | How far the picture is replaced by its brightness as light of `color`: 0 = the picture's own colours, 1 = only the colour, bright where the picture is bright and dark where it is dark. |
-| `glow` | number | ratio | 0 to 50 | `5.0` | How brightly the edges shine: the steepness of the picture's brightness (its change per pixel, about 0.1 at a clear edge) times this is the light of `color` screened over the picture there, so it lights both sides of an edge. 0 = no edge light, and a flat area never has any; raising it makes edges brighter and more of the weaker ones show. |
-| `scanlines` | number | fraction | 0 to 1 | `0.35` | How dark the gaps between the scanlines are: the picture is darkened between the lines by up to this share, smoothly, so a line is brightest in its middle. 0 = no scanlines, 1 = black between them. |
-| `flicker` | number | fraction | 0 to 1 | `0.3` | How dim the dimmest rows of the flicker are: bands of rows are darkened, smoothly, by up to this share, and `phase` says where on the picture they are. 0 = no flicker, 1 = black at the dimmest. |
-| `phase` | number | cycles | 0 to 1 | `0.0` | Where the flicker's bands are in their cycle: they roll down the picture by their own height over one cycle, so 0.25 is a quarter of the way and 1 is back at 0. It only matters when `flicker` is above 0. |
-
-<details><summary>Advanced parameters (5)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `scanline_spacing` | number | px | 2 to 32 | `3.0` | The distance in px from one scanline to the next, tuned for a picture about 480 px high: lines are centred on rows 0, spacing, 2 x spacing... and the gaps between them lie half a spacing away. A larger spacing is fewer, wider-set lines. |
-| `flicker_period` | number | px | 2 to 2000 | `160.0` | The height in px of one band of the flicker, from one dim row to the next, tuned for a picture about 480 px high: the flicker repeats every this many rows. A larger period is fewer, wider bands. |
-| `edge_sigma` | number | px | 0 to 20 | `1.5` | Gaussian sigma in px of the smoothing the edges are found after, tuned for a picture about 480 px high: larger ignores fine detail and noise and gives wider, softer outlines; 0 finds every pixel's edge. |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the edge smoothing's Gaussian is cut off, in sigmas: it reaches truncate x `edge_sigma` px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the edge finding sees beyond the picture's border: 'nearest' (the edge pixel repeated, so the border is no edge), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the opposite edge, so a different brightness there makes an edge). |
 
 </details>
 

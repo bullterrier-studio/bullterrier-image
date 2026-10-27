@@ -1788,66 +1788,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def hologram(color: str | list[float] | tuple[float, float, float] = '#30e0ff', tint: float = 0.85, glow: float = 5.0, scanlines: float = 0.35, flicker: float = 0.3, phase: float = 0.0, scanline_spacing: float = 3.0, flicker_period: float = 160.0, edge_sigma: float = 1.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Show the picture as light of `color`, outlined where its brightness changes, with scanlines and a flicker.
-
-In this order: the picture is mixed by `tint` with its Rec. 709 brightness times `color`; light of `color` x `glow`
-x the steepness of the brightness (`ops.edges`, smoothed by `edge_sigma`) is screened over it, so it never
-darkens; each row is darkened by `scanlines` x sin^2(pi x row / `scanline_spacing`) and by `flicker` x (1 - cos(2 pi
-x (row / `flicker_period` - `phase`))) / 2, so the bands roll down by their period over one cycle of `phase`.
-
-Parameters
-----------
-color : colour, default '#30e0ff'
-    The colour of the projected light, which the picture's brightness and its edges are
-    shown in: '#rrggbb', '#rgb' or [r, g, b] 0..1. A cyan is the classic hologram.
-tint : number, fraction, 0 to 1, default 0.85
-    How far the picture is replaced by its brightness as light of `color`: 0 = the
-    picture's own colours, 1 = only the colour, bright where the picture is bright and
-    dark where it is dark.
-glow : number, ratio, 0 to 50, default 5.0
-    How brightly the edges shine: the steepness of the picture's brightness (its change
-    per pixel, about 0.1 at a clear edge) times this is the light of `color` screened
-    over the picture there, so it lights both sides of an edge. 0 = no edge light, and a
-    flat area never has any; raising it makes edges brighter and more of the weaker ones
-    show.
-scanlines : number, fraction, 0 to 1, default 0.35
-    How dark the gaps between the scanlines are: the picture is darkened between the
-    lines by up to this share, smoothly, so a line is brightest in its middle. 0 = no
-    scanlines, 1 = black between them.
-flicker : number, fraction, 0 to 1, default 0.3
-    How dim the dimmest rows of the flicker are: bands of rows are darkened, smoothly,
-    by up to this share, and `phase` says where on the picture they are. 0 = no flicker,
-    1 = black at the dimmest.
-phase : number, cycles, 0 to 1, default 0.0
-    Where the flicker's bands are in their cycle: they roll down the picture by their
-    own height over one cycle, so 0.25 is a quarter of the way and 1 is back at 0. It
-    only matters when `flicker` is above 0.
-
-Advanced parameters
--------------------
-scanline_spacing : number, px, 2 to 32, default 3.0
-    The distance in px from one scanline to the next, tuned for a picture about 480 px
-    high: lines are centred on rows 0, spacing, 2 x spacing... and the gaps between them
-    lie half a spacing away. A larger spacing is fewer, wider-set lines.
-flicker_period : number, px, 2 to 2000, default 160.0
-    The height in px of one band of the flicker, from one dim row to the next, tuned for
-    a picture about 480 px high: the flicker repeats every this many rows. A larger
-    period is fewer, wider bands.
-edge_sigma : number, px, 0 to 20, default 1.5
-    Gaussian sigma in px of the smoothing the edges are found after, tuned for a picture
-    about 480 px high: larger ignores fine detail and noise and gives wider, softer
-    outlines; 0 finds every pixel's edge.
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the edge smoothing's Gaussian is cut off, in sigmas: it reaches truncate x
-    `edge_sigma` px. Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-    What the edge finding sees beyond the picture's border: 'nearest' (the edge pixel
-    repeated, so the border is no edge), 'reflect' (mirrored, edge pixel repeated),
-    'mirror' (mirrored about the edge pixel), 'wrap' (the opposite edge, so a different
-    brightness there makes an edge)."""
-    ...
-
 def interlace(offset: float = 6.0, field: Literal['odd', 'even'] = 'odd', edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched.
 
@@ -3388,7 +3328,7 @@ no line touches are unchanged; the same gain applies to every column and channel
 
 Parameters
 ----------
-spacing : number, px, 1 to 64, default 3.0
+spacing : number, px, 1 to 2000, default 3.0
     Distance in px from the top of one line to the top of the next. A spacing that is
     not a whole number drifts against the pixel rows and the lines are anti-aliased.
     Larger = fewer, wider-set lines.
@@ -3401,7 +3341,7 @@ darkness : number, fraction, 0 to 1, default 0.35
     How much a line darkens what is under it: 0 = nothing (the picture is unchanged),
     0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 -
     darkness, so colours keep their ratios.
-offset : number, px, 0 to 64, default 0.0
+offset : number, px, 0 to 2000, default 0.0
     How far down in px the first line starts from the top of the picture (the middle of
     its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat
     the pattern: the lines are at offset + k x spacing.

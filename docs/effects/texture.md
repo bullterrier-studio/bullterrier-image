@@ -97,10 +97,10 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `spacing` | number | px | 1 to 64 | `3.0` | Distance in px from the top of one line to the top of the next. A spacing that is not a whole number drifts against the pixel rows and the lines are anti-aliased. Larger = fewer, wider-set lines. |
+| `spacing` | number | px | 1 to 2000 | `3.0` | Distance in px from the top of one line to the top of the next. A spacing that is not a whole number drifts against the pixel rows and the lines are anti-aliased. Larger = fewer, wider-set lines. |
 | `thickness` | number | fraction | 0 to 1 | `0.5` | How thick each line is, as a fraction of `spacing`: 0 = no line (the picture is unchanged), 0.5 = lines and gaps equally wide, 1 = the lines touch and the whole picture is darkened alike. A line that covers only part of a pixel row darkens that row in proportion. |
 | `darkness` | number | fraction | 0 to 1 | `0.35` | How much a line darkens what is under it: 0 = nothing (the picture is unchanged), 0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 - darkness, so colours keep their ratios. |
-| `offset` | number | px | 0 to 64 | `0.0` | How far down in px the first line starts from the top of the picture (the middle of its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat the pattern: the lines are at offset + k x spacing. |
+| `offset` | number | px | 0 to 2000 | `0.0` | How far down in px the first line starts from the top of the picture (the middle of its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat the pattern: the lines are at offset + k x spacing. |
 | `softness` | number | fraction | 0 to 1 | `0.0` | How softly a line fades in and out: 0 = hard edges, each row darkened by the share of it a line covers; 1 = as soft as the lines and gaps allow, so with a `thickness` of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line and nothing in the middle of a gap, as on a CRT. In between, each edge fades over `softness` x the narrower of a line and a gap, either side of the hard edge. It keeps the average darkening of the picture: only its shape changes. |
 
 ### `torn_edge`
