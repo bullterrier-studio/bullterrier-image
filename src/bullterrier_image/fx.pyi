@@ -3450,44 +3450,6 @@ Presets
 hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay."""
     ...
 
-def shadows_highlights(shadows: float = 0.5, highlights: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.1, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness.
-
-The base layer B (0..1) is the Rec. 709 luma of the sRGB-encoded picture smoothed by a guided filter (He, Sun and
-Tang 2010, guided by the luma itself) over a window of 2 x `radius` + 1 px, which averages flat areas but keeps
-its edges. Every channel c then becomes c^e with e = (1 + `highlights` B^2) / (1 + `shadows` (1 - B)^2): a gamma
-curve whose exponent follows the surroundings B, not the pixel, so a dark pixel in a bright area is lifted less
-than the same pixel in a dark one. Raising `shadows` only lowers e (lifting c towards 1) and raising
-`highlights` only raises it (pulling c towards 0), black and white stay where they are, and 0..1 maps into 0..1.
-
-Parameters
-----------
-shadows : number, ratio, 0 to 4, default 0.5
-    How much dark areas are lightened: 0 = off. In the darkest surroundings a value v
-    becomes v^(1 / (1 + shadows)), a gamma of 1 + shadows (1 = square root, 3 = fourth
-    root); surroundings that are brighter are lifted less, and areas brighter than mid
-    grey hardly at all. Black stays black.
-highlights : number, ratio, 0 to 4, default 0.0
-    How much bright areas are darkened: 0 = off. In the brightest surroundings a value v
-    becomes v^(1 + highlights), a gamma of 1 + highlights (1 = squared, 3 = to the
-    fourth power); surroundings that are darker are darkened less, and areas darker than
-    mid grey hardly at all. White stays white.
-radius : number, px, 0 to 500, default 30.0
-    Size of the surroundings that decide whether an area is dark or bright, in px at the
-    recipe's size (rounded to whole px): the base layer is an average over a square of 2
-    x radius + 1 px. Larger judges bigger regions and recovers whole dark or bright
-    areas; smaller follows fine detail; 0 judges every pixel by its own brightness (a
-    plain tone curve).
-
-Advanced parameters
--------------------
-edge_threshold : number, fraction, 0.001 to 1, default 0.1
-    The brightness step (0..1, Rec. 709 luma) that counts as an edge the base layer must
-    not blur across: steps above it keep their own side of the base, which avoids halos
-    around them; steps below it are averaged away. Raising it makes the base smoother
-    and more like a plain blur; lowering it follows ever smaller edges."""
-    ...
-
 def sharpen(radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['clarity'] | None = None) -> Step:
     """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
 
@@ -3857,16 +3819,19 @@ Presets
 scan_roll : A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways."""
     ...
 
-def tone_map(contrast: float = 0.5, amount: float = 0.5, radius: float = 30.0, edge_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Compress the broad brightness differences of the picture and keep (or boost) its fine detail.
+def tone_map(contrast: float = 0.5, amount: float = 0.5, pivot: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shadows_highlights'] | None = None) -> Step:
+    """HDR tone mapping, shadows and highlights recovery, lifted shadows.
+
+Compresses the broad brightness differences of the picture and keeps (or boosts) its fine detail.
 
 Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in
 stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px,
 edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002).
-The new log brightness is `contrast` x B + (1 + `amount`) x D, and every pixel's red, green and blue are
-multiplied by 2^(new - L) = 2^((`contrast` - 1) B + `amount` D), so hue and saturation stay and the
-result is held to 0..1. An even area of luma Y comes out as Y^`contrast`. B is an average of values of L, so it
-never leaves their range: with `amount` 0 lowering `contrast` only ever brightens.
+The new log brightness is `contrast` x (B + `pivot`) - `pivot` + (1 + `amount`) x D, and every pixel's red, green
+and blue are multiplied by 2^(new - L) = 2^((`contrast` - 1) (B + `pivot`) + `amount` D), so hue and saturation
+stay and the result is held to 0..1. An even area of luma Y comes out as Y (Y 2^`pivot`)^(`contrast` - 1), which
+is Y^`contrast` for `pivot` 0. B is an average of values of L, so it never leaves their range: with `amount` 0
+and `pivot` 0 lowering `contrast` only ever brightens; areas brighter than 2^-`pivot` are darkened.
 
 Parameters
 ----------
@@ -3880,6 +3845,12 @@ amount : number, ratio, 0 to 5, default 0.5
     How strongly the fine detail (what is left of the brightness once the broad areas
     are taken out) is exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it
     brings out texture; it can clip highlights.
+pivot : number, stops, 0 to 8, default 0.0
+    The brightness, in stops below white, that compression leaves where it is: 0 = white
+    (everything is lightened, nothing darkened); 2 = a quarter of white's brightness
+    (about 0.25), where areas brighter than it are darkened and darker ones lightened,
+    recovering highlights as well as shadows. Raising it darkens bright areas more and
+    lightens dark ones less.
 radius : number, px, 0 to 500, default 30.0
     Size of what counts as a broad area, in px at the recipe's size (rounded to whole
     px): the base layer is an average over a square of 2 x radius + 1 px. Larger treats
@@ -3892,7 +3863,11 @@ edge_threshold : number, stops, 0.01 to 8, default 0.5
     The brightness step, in stops, that counts as an edge the base layer must not blur
     across: steps above it keep their own side of the base, which avoids halos around
     them; steps below it are averaged away and count as detail. Raising it makes the
-    base smoother and more like a plain blur."""
+    base smoother and more like a plain blur.
+
+Presets
+-------
+shadows_highlights : Shadows and highlights recovery: dark areas lifted and bright areas tamed by their local surroundings, texture kept."""
     ...
 
 def topographic(field: str = 'light', levels: int = 8, thickness: float = 1.5, line: str | list[float] | tuple[float, float, float] = '#ffffff', fill: Literal['none', 'bands'] = 'none', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea'), smoothing: float = 5.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

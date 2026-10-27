@@ -21,10 +21,9 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/motion_blur.jpg" width="160" alt="motion_blur"> | `motion_blur` | Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would. | `angle=0.0` `length=24.0` +1 advanced | [motion_blur.toml](../../examples/effects/motion_blur.toml) |
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
 | <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`. | `field='depth'` `angle=225.0` `elevation=45.0` `height=200.0` `blur=2.0` `saturation=1.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
-| <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
 | <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `amount=0.8` `angle=0.0` `density=1.0` `color='#ffffff'` +3 advanced | [starburst.toml](../../examples/effects/starburst.toml) |
-| <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
+| <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | HDR tone mapping, shadows and highlights recovery, lifted shadows. | `contrast=0.5` `amount=0.5` `pivot=0.0` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
 | <img src="../gallery/vignette.jpg" width="160" alt="vignette"> | `vignette` | Fade the picture toward `color` from `radius` out to its corners, the centre untouched. | `amount=0.5` `radius=0.5` `feather=0.5` `roundness=1.0` `color='#000000'` | [vignette.toml](../../examples/effects/vignette.toml) |
 
 ### `ambient_occlusion`
@@ -306,22 +305,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `bump_light` | The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left. |
 | `emboss` | An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees. |
 
-### `shadows_highlights`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `shadows` | number | ratio | 0 to 4 | `0.5` | How much dark areas are lightened: 0 = off. In the darkest surroundings a value v becomes v^(1 / (1 + shadows)), a gamma of 1 + shadows (1 = square root, 3 = fourth root); surroundings that are brighter are lifted less, and areas brighter than mid grey hardly at all. Black stays black. |
-| `highlights` | number | ratio | 0 to 4 | `0.0` | How much bright areas are darkened: 0 = off. In the brightest surroundings a value v becomes v^(1 + highlights), a gamma of 1 + highlights (1 = squared, 3 = to the fourth power); surroundings that are darker are darkened less, and areas darker than mid grey hardly at all. White stays white. |
-| `radius` | number | px | 0 to 500 | `30.0` | Size of the surroundings that decide whether an area is dark or bright, in px at the recipe's size (rounded to whole px): the base layer is an average over a square of 2 x radius + 1 px. Larger judges bigger regions and recovers whole dark or bright areas; smaller follows fine detail; 0 judges every pixel by its own brightness (a plain tone curve). |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge_threshold` | number | fraction | 0.001 to 1 | `0.1` | The brightness step (0..1, Rec. 709 luma) that counts as an edge the base layer must not blur across: steps above it keep their own side of the base, which avoids halos around them; steps below it are averaged away. Raising it makes the base smoother and more like a plain blur; lowering it follows ever smaller edges. |
-
-</details>
-
 ### `sharpen`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -380,6 +363,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `contrast` | number | ratio | 0 to 1 | `0.5` | How much of the broad brightness differences between areas is kept: 1 = all of them (no compression), 0.5 = halved in stops (a picture with dark areas three stops below its bright ones gets them one and a half apart), 0 = every area brought up to white and only the detail left. Lowering it lightens dark areas the most; white stays white. |
 | `amount` | number | ratio | 0 to 5 | `0.5` | How strongly the fine detail (what is left of the brightness once the broad areas are taken out) is exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it brings out texture; it can clip highlights. |
+| `pivot` | number | stops | 0 to 8 | `0.0` | The brightness, in stops below white, that compression leaves where it is: 0 = white (everything is lightened, nothing darkened); 2 = a quarter of white's brightness (about 0.25), where areas brighter than it are darkened and darker ones lightened, recovering highlights as well as shadows. Raising it darkens bright areas more and lightens dark ones less. |
 | `radius` | number | px | 0 to 500 | `30.0` | Size of what counts as a broad area, in px at the recipe's size (rounded to whole px): the base layer is an average over a square of 2 x radius + 1 px. Larger treats bigger structures as base and keeps only finer ones as detail; 0 makes every pixel its own base, a plain global curve (a grey v becomes v^contrast). |
 
 <details><summary>Advanced parameters (1)</summary>
@@ -389,6 +373,12 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `edge_threshold` | number | stops | 0.01 to 8 | `0.5` | The brightness step, in stops, that counts as an edge the base layer must not blur across: steps above it keep their own side of the base, which avoids halos around them; steps below it are averaged away and count as detail. Raising it makes the base smoother and more like a plain blur. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `shadows_highlights` | Shadows and highlights recovery: dark areas lifted and bright areas tamed by their local surroundings, texture kept. |
 
 ### `vignette`
 
