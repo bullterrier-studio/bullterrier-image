@@ -1,6 +1,0 @@
-# The photo's brightness as relief, lit from the upper left at a raking angle.
-name = "bump_light"
-size = 480
-
-[[step]]
-effect = "bump_light"

@@ -26,13 +26,13 @@ def lambert(rise_y: np.ndarray, rise_x: np.ndarray, *, angle: float, elevation: 
     direction towards a light, an array of the slopes' shape from -1 to 1.
 
     The normal is `(-rise_x, -rise_y, 1)` over its length. The light is `elevation` degrees above the picture's plane
-    (0 = level with it, 90 = straight above) and comes from `angle` degrees clockwise from the top of the picture (0 =
-    above, 90 = the right). A flat surface catches `sin(elevation)`; one rising away from the light catches more, one
-    rising towards it less; at elevation 0 the result is how far the normal leans towards the light, 0 for a flat
-    surface.
+    (0 = level with it, 90 = straight above) and comes from `angle` degrees clockwise from pointing right, on screen
+    (0 = the right, 90 = below, 180 = the left, 270 = above). A flat surface catches `sin(elevation)`; one rising away
+    from the light catches more, one rising towards it less; at elevation 0 the result is how far the normal leans
+    towards the light, 0 for a flat surface.
     """
     angle, elevation = np.radians(angle), np.radians(elevation)
-    toward = rise_x * np.sin(angle) - rise_y * np.cos(angle)  # how fast the surface rises towards the light
+    toward = rise_x * np.cos(angle) + rise_y * np.sin(angle)  # how fast the surface rises towards the light
     return (np.sin(elevation) - np.cos(elevation) * toward) / np.sqrt(1 + rise_x**2 + rise_y**2)
 
 

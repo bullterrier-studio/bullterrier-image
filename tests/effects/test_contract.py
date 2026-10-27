@@ -51,7 +51,7 @@ def test_every_shipped_preset_is_valid_for_its_effect_and_makes_a_picture_that_d
 ):
     step = Step(name, preset=preset)  # validated by the effect's own model, like a recipe's step
     inputs = _inputs(name, photo)
-    out = registry.apply(name, photo, **step.params, **inputs)
+    out = registry.apply(name, photo, **{**step.params, **inputs})  # a preset names a field; the array replaces it
     assert_a_picture_like(out, photo)
     assert not np.array_equal(out, registry.apply(name, photo, **inputs))
 
@@ -818,7 +818,8 @@ def field_probe(throwaway_effects):
         return np.clip(rgb * (1 - field[..., None] / 2) * params.gain, 0, 1).astype(np.float32)
 
 
-LUMA = np.asarray([0.2126, 0.7152, 0.0722])  # Rec. 709, written here again so that the test does not use the code's
+# Rec. 709, written here again so that the test does not use the code's (float32 like the picture: a relief amplifies)
+LUMA = np.asarray([0.2126, 0.7152, 0.0722], np.float32)
 FIELD_REGIONS: dict[str, Kind] = {"g": Given(), "middle": Band(of="depth", low=0.3, high=0.7, feather=0)}
 
 
@@ -851,6 +852,26 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
     direct = registry.apply("field_probe", photo, field=the_field(name, photo, maps))
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
     assert np.abs(named - photo).max() > 0.01  # the field darkened something: this is not a comparison of two copies
+
+
+FIELD_EFFECTS = [(name, field) for name in ALL for field in registry.parameters(name).field_name_fields()]
+
+
+@pytest.mark.parametrize(("name", "field"), FIELD_EFFECTS, ids=[f"{n}-{f}" for n, f in FIELD_EFFECTS])
+@pytest.mark.parametrize("selection", ["depth", "light", "subject", "background", "g", "middle"])
+def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name_and_for_the_equal_array(
+    name, field, selection, photo, subject
+):
+    maps = field_maps(photo, subject)
+    recipe = Recipe("named", [Step(name, {field: selection})], size=None, regions=FIELD_REGIONS)
+    named = runner.render(photo, recipe, maps=maps)
+    direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
+    assert_a_picture_like(named, photo)
+    np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
+
+
+def test_some_effects_have_a_field_parameter():
+    assert FIELD_EFFECTS  # else the test above is parametrized over nothing and passes without testing anything
 
 
 def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(field_probe, photo, subject):

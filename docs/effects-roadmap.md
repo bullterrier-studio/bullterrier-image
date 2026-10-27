@@ -80,7 +80,6 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `scanlines` ✓ | Horizontal line pattern. | `fx.scanlines(spacing=3, darkness=0.3)` |
 | `pixel_grid` ✓ | LCD sub-pixel grid. | `fx.pixel_grid(cell=4)` |
 | `emboss` ✓ | Relief from luminance. | `fx.emboss(angle=135, height=6)` |
-| `bump_light` ✓ | Light a height map from a direction. | `fx.bump_light(angle=45, height=8)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
 | `crt` ✓ | Curvature, shadow mask, bloom, scanlines. | `fx.crt(curve=0.15, shadow_mask=0.35)` |
@@ -222,7 +221,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | --- | --- | --- |
 | `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | `fill` with `mask` = a `band` of `depth` region |
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
-| `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
+| `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |

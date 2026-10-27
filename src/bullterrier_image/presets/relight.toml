@@ -1,0 +1,7 @@
+# Looks that are one relight step.
+
+[bump_light]
+description = "The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left."
+field = "light"
+height = 8.0
+blur = 1.0

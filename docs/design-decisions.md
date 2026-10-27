@@ -300,7 +300,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
   input of `--map subject=`, of `maps=` and of picture parameters (a logo, the example assets), so it is made once, checked
   and reused, which a look's last stage is not meant for. *Consequence:* both stay; the README says which to use when.
-- **Depth is injected like the subject.** An effect that needs distance (`depth_of_field`, `parallax`, `relight`,
+- **Depth is injected like the subject.** An effect that needs distance (`depth_of_field`, `parallax`,
   `ambient_occlusion`) declares the input `depth`: float32 (h, w), 0..1, 1 = nearest; regions made of it (a `band` or `bands` of `depth`) read it too.
   The runner is given a depth map or a `Finder` for one (`maps={"depth": ...}`, `finders={"depth": ...}`; neither, when needed, is
   `DepthNotFoundError` naming the step, and the region when a region needs it), and the public API binds the default:

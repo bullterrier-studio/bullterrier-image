@@ -65,14 +65,14 @@ class TestLambert:
     @pytest.mark.parametrize(
         ("angle", "rise_y", "rise_x", "elevation", "expected"),
         [
-            pytest.param(270, 0, 0.75, 0, 0.6, id="light from the left, surface rising right at 3/4: leans 3/5 to it"),
-            pytest.param(90, 0, 0.75, 0, -0.6, id="the same surface lit from the right: leans 3/5 away"),
-            pytest.param(0, 0.75, 0, 0, 0.6, id="light from above, surface rising downwards: leans to it"),
-            pytest.param(0, -0.75, 0, 0, -0.6, id="light from above, surface rising upwards: leans away"),
-            pytest.param(180, -0.75, 0, 0, 0.6, id="light from below, surface rising upwards: leans to it"),
-            pytest.param(270, 0, 0.75, 90, 0.8, id="light straight above: the normal's own height, 1 / (5/4)"),
-            pytest.param(270, 0, 0.75, 53.130102354, 1.0, id="light along the normal (3/5 over, 4/5 up) catches all"),
-            pytest.param(0, 0.3, 0.4, 90, 1 / np.sqrt(1.25), id="a slope of 0.5 whichever way: 1 / sqrt(1.25)"),
+            pytest.param(180, 0, 0.75, 0, 0.6, id="light from the left, surface rising right at 3/4: leans 3/5 to it"),
+            pytest.param(0, 0, 0.75, 0, -0.6, id="the same surface lit from the right: leans 3/5 away"),
+            pytest.param(270, 0.75, 0, 0, 0.6, id="light from above, surface rising downwards: leans to it"),
+            pytest.param(270, -0.75, 0, 0, -0.6, id="light from above, surface rising upwards: leans away"),
+            pytest.param(90, -0.75, 0, 0, 0.6, id="light from below, surface rising upwards: leans to it"),
+            pytest.param(180, 0, 0.75, 90, 0.8, id="light straight above: the normal's own height, 1 / (5/4)"),
+            pytest.param(180, 0, 0.75, 53.130102354, 1.0, id="light along the normal (3/5 over, 4/5 up) catches all"),
+            pytest.param(77, 0.3, 0.4, 90, 1 / np.sqrt(1.25), id="a slope of 0.5 whichever way: 1 / sqrt(1.25)"),
         ],
     )
     def test_the_catch_is_the_dot_product_of_the_unit_normal_and_the_light_worked_by_hand(
@@ -92,13 +92,13 @@ def hand_gain(slope_x: float, angle: float, elevation: float) -> float:
     (-slope_x, 0, 1) / sqrt(1 + slope_x^2) dotted with the unit vector towards the light (x right, y down, z up), over
     what a flat surface (normal (0, 0, 1)) catches."""
     a, e = np.radians(angle), np.radians(elevation)
-    light = np.array([np.cos(e) * np.sin(a), -np.cos(e) * np.cos(a), np.sin(e)])
+    light = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
     normal = np.array([-slope_x, 0.0, 1.0]) / np.hypot(slope_x, 1.0)
     return float(normal @ light / light[2])
 
 
 def lit(
-    surface: np.ndarray, *, height: float = 100.0, angle: float = 90.0, elevation: float = 45.0, blur: float = 0.0
+    surface: np.ndarray, *, height: float = 100.0, angle: float = 0.0, elevation: float = 45.0, blur: float = 0.0
 ) -> np.ndarray:
     """`shade` with the tests' usual light: from the right, 45 degrees up, on an unsmoothed relief 100 px tall."""
     return shade(surface, height=height, angle=angle, elevation=elevation, blur=blur, truncate=4.0, edge="reflect")
@@ -126,11 +126,13 @@ class TestShade:
         [
             pytest.param(-0.0075, {}, 1.4, id="rises away from a light at the right: faces it, (1 + 3/4) / (5/4)"),
             pytest.param(0.0075, {}, 0.2, id="rises towards a light at the right: faces away, (1 - 3/4) / (5/4)"),
-            pytest.param(0.0075, {"angle": 270}, 1.4, id="the light moved to the left: the same slope faces it"),
-            pytest.param(0.0075, {"angle": 0}, 0.8, id="light across the slope: only the tilt dims, 1 / (5/4)"),
+            pytest.param(0.0075, {"angle": 180}, 1.4, id="the light moved to the left: the same slope faces it"),
+            pytest.param(0.0075, {"angle": 270}, 0.8, id="light across the slope: only the tilt dims, 1 / (5/4)"),
             pytest.param(0.0075, {"elevation": 90}, 0.8, id="light straight above: only the tilt dims"),
-            pytest.param(0.0075, {"angle": 270, "elevation": 20}, hand_gain(0.75, 270, 20), id="low light, left"),
-            pytest.param(-0.004, {"angle": 60, "elevation": 70, "height": 50}, hand_gain(-0.2, 60, 70), id="any angle"),
+            pytest.param(0.0075, {"angle": 180, "elevation": 20}, hand_gain(0.75, 180, 20), id="low light, left"),
+            pytest.param(
+                -0.004, {"angle": 330, "elevation": 70, "height": 50}, hand_gain(-0.2, 330, 70), id="any angle"
+            ),
         ],
     )
     def test_on_a_ramp_the_gain_is_lamberts_law_worked_out_by_hand(
@@ -151,15 +153,15 @@ class TestShade:
     )
     def test_edge_decides_the_slope_of_the_first_column(self, edge: Edge, first_column_slope: float) -> None:
         """A ramp 24 px wide rising 3/4 px per px: its first column's neighbour beyond the edge is the edge rule's."""
-        gain = shade(ramp(0.0075), height=100, angle=90, elevation=45, blur=0, truncate=4, edge=edge)
-        np.testing.assert_allclose(gain[:, 0], hand_gain(first_column_slope, 90, 45), atol=1e-5)
+        gain = shade(ramp(0.0075), height=100, angle=0, elevation=45, blur=0, truncate=4, edge=edge)
+        np.testing.assert_allclose(gain[:, 0], hand_gain(first_column_slope, 0, 45), atol=1e-5)
 
     def test_edge_wrap_reaches_the_blur_too_so_a_tile_lights_without_a_seam(self) -> None:
         """Under 'wrap' the surface is a tile: shifting it round shifts its lighting the same way, border included."""
         tile = np.random.default_rng(4).random((20, 26), dtype=np.float32)
         shifted = np.roll(tile, (7, 11), axis=(0, 1))
-        gain = shade(tile, height=5, angle=90, elevation=45, blur=3, truncate=4, edge="wrap")
-        gain_of_shifted = shade(shifted, height=5, angle=90, elevation=45, blur=3, truncate=4, edge="wrap")
+        gain = shade(tile, height=5, angle=0, elevation=45, blur=3, truncate=4, edge="wrap")
+        gain_of_shifted = shade(shifted, height=5, angle=0, elevation=45, blur=3, truncate=4, edge="wrap")
         np.testing.assert_allclose(gain_of_shifted, np.roll(gain, (7, 11), axis=(0, 1)), atol=1e-5)
 
     def test_blur_smooths_the_surface_so_a_spike_lights_less_steeply(self) -> None:

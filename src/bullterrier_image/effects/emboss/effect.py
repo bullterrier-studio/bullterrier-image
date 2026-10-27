@@ -61,6 +61,8 @@ def emboss(rgb: np.ndarray, params: EmbossParams) -> np.ndarray:
     rise_y, rise_x = slopes(luminance(rgb), scale=params.height, edge=params.edge)
     horizon = 0  # constant: a light level with the picture's plane, so a flat surface catches none and is mid grey
     # The shade is 1 where the surface leans edge-on to the light, 0 where it leans away, 0.5 where it is flat.
-    shade = (0.5 + 0.5 * lambert(rise_y, rise_x, angle=params.angle, elevation=horizon)).astype(np.float32)[..., None]
+    shade = (0.5 + 0.5 * lambert(rise_y, rise_x, angle=params.angle - 90, elevation=horizon)).astype(np.float32)[
+        ..., None
+    ]
     coloured = np.clip(2 * shade * rgb, 0, 1)
     return ((1 - params.saturation) * shade + params.saturation * coloured).astype(np.float32)
