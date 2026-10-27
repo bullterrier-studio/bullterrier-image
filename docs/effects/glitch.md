@@ -18,7 +18,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `count` | whole number | count | 0 to 100000 | `120` | How many faulty pixels there are, each a square of `size` px: 0 leaves the picture unchanged. They lie on a grid of `size` px cells, so none overlaps another, and each is a different one. A count larger than the number of cells fills every cell. Raising it adds faulty pixels and never moves one already there. |
+| `count` | whole number | count | 0 to 100000 | `120` | How many faulty pixels there are, each a square of `size` px: 0 leaves the picture unchanged. They lie on a grid of `size` px cells, so none overlaps another, and each is a different one. A count larger than the number of cells fills every cell. Raising it adds faulty pixels and never moves one already there. A count, not a density: the pixels' size is in design px, so the same count covers the same share of any picture size. |
 | `size` | whole number | px | 1 to 64 | `4` | The width and height in px of one faulty pixel, tuned for a picture about 480 px high: 1 is a single pixel of the picture, larger is a screen with bigger pixels, a block at the edge being cut off by it. |
 | `stuck` | number | fraction | 0 to 1 | `0.5` | The share of the faulty pixels that are stuck on `color`; the rest are dead and black. 0 = all dead, 1 = all stuck. The number stuck is `count` x `stuck`, rounded to a whole pixel. |
 | `color` | colour |  |  | `'#ffffff'` | The colour a stuck pixel shows whatever the picture is under it: '#rrggbb', '#rgb' or [r, g, b] 0..1. White is the usual fault; a red, green or blue is one stuck sub-pixel. |

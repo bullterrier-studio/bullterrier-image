@@ -17,9 +17,9 @@ Grain and other surface texture laid over the picture.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `density` | number | count | 0 to 5 | `0.6` | How many specks and hairs there are: marks per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none, 0.6 is a light dusting, 3 is filthy. |
+| `density` | number | density | 0 to 5 | `0.6` | How many specks and hairs there are: marks per 1000 design px² (a 32 x 32 px area at the recipe's size), so any picture size looks alike. 0 = none, 0.6 is a light dusting, 3 is filthy. |
 | `size` | number | px | 1 to 50 | `8.0` | The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most marks are smaller (speck radii are random, with many tiny ones); larger = bigger blotches and longer hairs. |
-| `scratches` | whole number | count | 0 to 100 | `2` | How many scratches: thin, long, nearly vertical lines, each running over half to all of the picture's height. 0 = none. |
+| `scratches` | whole number | count | 0 to 100 | `2` | How many scratches: thin, long, nearly vertical lines, each running over half to all of the picture's height. 0 = none. A count, not a density: their width is in design px, so the same count looks alike at any picture size. |
 | `light` | colour |  |  | `'#ffffff'` | The colour of the light marks (dust on a dark print, scratches into the emulsion): '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance. |
 | `dark` | colour |  |  | `'#000000'` | The colour of the dark marks (dust on the scanner glass): '#rrggbb', '#rgb' or [r, g, b] 0..1. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always puts the same marks in the same places, another seed others. |

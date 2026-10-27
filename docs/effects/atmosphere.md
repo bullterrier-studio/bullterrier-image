@@ -47,7 +47,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `count` | whole number | count | 0 to 200 | `14` | How many drops there are, whatever the size of the picture (a number, not a density). 0 = none (the picture unchanged). |
+| `count` | whole number | count | 0 to 200 | `14` | How many drops there are, whatever the size of the picture (a number, not a density: the drops' size is in design px, so the same count looks alike at any size). 0 = none (the picture unchanged). |
 | `radius` | number | px | 1 to 200 | `24.0` | The radius in px of the biggest drops; the smallest are smaller by `size_variation`. Tuned for a picture about 480 px high. Larger = bigger drops. |
 | `size_variation` | number | fraction | 0 to 1 | `0.5` | How much the drops differ in size: each has a random share of `radius` from 1 - size_variation to 1. 0 = every drop alike, 1 = from the full radius down to specks. |
 | `refraction` | number | ratio | 0.25 to 4 | `1.5` | How strongly a drop bends the scene: it shows the picture turned upside down about the drop's middle and this many times as wide. 1 = the same scale, turned round; above 1 a wider view in miniature, as in a real drop; below 1 a magnified view. |
@@ -69,7 +69,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `density` | number | count | 0 to 300 | `1.0` | How many particles there are: particles per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense field of tiny ones. |
+| `density` | number | density | 0 to 300 | `1.0` | How many particles there are: particles per 1000 design px² (a 32 x 32 px area at the recipe's size), so any picture size looks alike. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense field of tiny ones. |
 | `size` | number | px | 1 to 200 | `6.0` | The width in px of the nearest, largest particles; farther ones are narrower by `size_falloff`. Tuned for a picture about 480 px high. Larger = bigger dots and thicker streaks. |
 | `length` | number | px | 0 to 200 | `0.0` | The length in px of the streak each nearest particle draws from its head along `angle`; farther ones are shorter by `size_falloff`. Tuned for a picture about 480 px high. 0 = round dots, larger = longer streaks, as with a slower shutter. |
 | `angle` | number (cyclic) | degrees | 0 to 360 | `90.0` | The direction a streak runs from its head, in degrees clockwise from pointing right, as seen on screen: 0 = right, 90 = down, 180 = left, 270 = up. Only streaks show it: with a `length` of 0 it changes nothing. |

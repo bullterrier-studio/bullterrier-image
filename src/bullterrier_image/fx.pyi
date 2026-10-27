@@ -548,7 +548,9 @@ count : whole number, count, 0 to 100000, default 120
     How many faulty pixels there are, each a square of `size` px: 0 leaves the picture
     unchanged. They lie on a grid of `size` px cells, so none overlaps another, and each
     is a different one. A count larger than the number of cells fills every cell.
-    Raising it adds faulty pixels and never moves one already there.
+    Raising it adds faulty pixels and never moves one already there. A count, not a
+    density: the pixels' size is in design px, so the same count covers the same share
+    of any picture size.
 size : whole number, px, 1 to 64, default 4
     The width and height in px of one faulty pixel, tuned for a picture about 480 px
     high: 1 is a single pixel of the picture, larger is a screen with bigger pixels, a
@@ -1036,17 +1038,18 @@ the same `seed` always gives the same marks.
 
 Parameters
 ----------
-density : number, count, 0 to 5, default 0.6
-    How many specks and hairs there are: marks per 1000 square px of picture (a 32 x 32
-    px area), so the same density looks alike on any picture size. 0 = none, 0.6 is a
-    light dusting, 3 is filthy.
+density : number, density, 0 to 5, default 0.6
+    How many specks and hairs there are: marks per 1000 design px² (a 32 x 32 px area at
+    the recipe's size), so any picture size looks alike. 0 = none, 0.6 is a light
+    dusting, 3 is filthy.
 size : number, px, 1 to 50, default 8.0
     The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most
     marks are smaller (speck radii are random, with many tiny ones); larger = bigger
     blotches and longer hairs.
 scratches : whole number, count, 0 to 100, default 2
     How many scratches: thin, long, nearly vertical lines, each running over half to all
-    of the picture's height. 0 = none.
+    of the picture's height. 0 = none. A count, not a density: their width is in design
+    px, so the same count looks alike at any picture size.
 light : colour, default '#ffffff'
     The colour of the light marks (dust on a dark print, scratches into the emulsion):
     '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance.
@@ -1193,24 +1196,26 @@ bins : whole number, count, 2 to 256, default 256
     brightnesses), 256 matches 8-bit pictures."""
     ...
 
-def flow_lines(density: float = 0.002, length: int = 120, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def flow_lines(density: float = 2.0, length: float = 120.0, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
 
 A generated background: the input is used only for its height and width, its content is ignored. The flow's
-direction at each pixel is `twist` times a fractal noise field. Each of the `density` x pixels lines starts at a
-random point and takes `length` steps of `step` px along the flow (the direction read at the pixel the line is
-in), ending early where it would leave the picture. A soft disc `thickness` px across is stamped at every
-point; where discs overlap the strongest counts, so lines stay as bold as one.
+direction at each pixel is `twist` times a fractal noise field. Each of the `density` per 1000 px² lines starts at
+a random point and follows the flow for `length` px in steps of `step` px (the direction read at the pixel the
+line is in; the steps are `length` / `step` rounded), ending early where it would leave the picture. A soft disc
+`thickness` px across is stamped at every point; where discs overlap the strongest counts, so lines stay as bold
+as one.
 
 Parameters
 ----------
-density : number, fraction, 0 to 0.05, default 0.002
-    How many lines: the share of the picture's pixels that start one, so a 480 x 384
-    picture at 0.002 has about 370. 0 draws none. More = a denser weave; lines cross
-    freely.
-length : whole number, count, 1 to 2000, default 120
-    How many steps each line follows the flow; with `step` it sets the line's length in
-    px. A line also ends where it reaches the edge of the picture.
+density : number, density, 0 to 50, default 2.0
+    How many lines: lines started per 1000 design px² (a 32 x 32 px area at the recipe's
+    size), so any picture size looks alike; a 480 x 384 picture at 2 has about 370. 0
+    draws none. More = a denser weave; lines cross freely.
+length : number, px, 1 to 2000, default 120.0
+    How far each line follows the flow, in px along the line, tuned for a picture about
+    480 px high. It is drawn in steps of `step`. A line also ends where it reaches the
+    edge of the picture.
 thickness : number, px, 0.5 to 16, default 1.5
     The width of the lines in px (a soft disc of this diameter is stamped at every
     step). Tuned for a picture about 480 px high.
@@ -2037,8 +2042,9 @@ same drops.
 Parameters
 ----------
 count : whole number, count, 0 to 200, default 14
-    How many drops there are, whatever the size of the picture (a number, not a
-    density). 0 = none (the picture unchanged).
+    How many drops there are, whatever the size of the picture (a number, not a density:
+    the drops' size is in design px, so the same count looks alike at any size). 0 =
+    none (the picture unchanged).
 radius : number, px, 1 to 200, default 24.0
     The radius in px of the biggest drops; the smallest are smaller by `size_variation`.
     Tuned for a picture about 480 px high. Larger = bigger drops.
@@ -2642,9 +2648,9 @@ gives the same particles.
 
 Parameters
 ----------
-density : number, count, 0 to 300, default 1.0
-    How many particles there are: particles per 1000 square px of picture (a 32 x 32 px
-    area), so the same density looks alike on any picture size. 0 = none (the picture
+density : number, density, 0 to 300, default 1.0
+    How many particles there are: particles per 1000 design px² (a 32 x 32 px area at
+    the recipe's size), so any picture size looks alike. 0 = none (the picture
     unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense
     field of tiny ones.
 size : number, px, 1 to 200, default 6.0
