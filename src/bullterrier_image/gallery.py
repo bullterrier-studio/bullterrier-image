@@ -11,7 +11,6 @@ developer commands; they need a source checkout of bullterrier-image.
 """
 
 import ast
-import functools
 import keyword
 import re
 from collections.abc import Callable, Sequence
@@ -35,10 +34,9 @@ CHECKOUT = (
 
 _SIDE = 480  # px, longest side of a gallery picture
 _QUALITY = 82  # JPEG: small files, and these are thumbnails
-# how each map an example recipe may need is found, by name: the real models, run once on the demo photo. The subject
-# is cut with the portable model by name, not by the machine's default, so a Mac and CI render the same pictures.
+# how each map an example recipe may need is found, by name: the real models, run once on the demo photo
 _FINDERS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
-    "subject": functools.partial(subject_matte, segmenter="onnx"),
+    "subject": subject_matte,
     "depth": depth_map,
 }
 _INDEX = "README.md"  # the catalogue's index page: GitHub shows it when the folder is opened

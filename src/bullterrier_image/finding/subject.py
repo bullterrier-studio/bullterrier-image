@@ -4,17 +4,17 @@ One question, one answer: `subject_matte(rgb)` returns how much each pixel belon
 background (0), at the picture's own size; `subject_finder()` is the same as a `Finder` that the renderers take
 (`finders={"subject": ...}`), named by its backend and model. Two backends can answer it:
 
-- `"onnx"`, the default everywhere: a portable model, IS-Net (general use, Apache-2.0), run by ONNX Runtime on macOS,
-  Linux and Windows, so a recipe cuts alike on every platform. The model (about 180 MB) is not part of the package:
+- `"vision"`, the default on macOS: Apple Vision's subject segmentation (the "lift subject" feature). Runs on the
+  Neural Engine, needs no download; on macOS before 14 it uses Vision's older people-only model. Its cut is cleaner than
+  the portable model's, and differs from it, so a look made on a Mac cuts a little differently elsewhere.
+- `"onnx"`, the default everywhere else: a portable model, IS-Net (general use, Apache-2.0), run by ONNX Runtime on
+  macOS, Linux and Windows. The model (about 180 MB) is not part of the package:
   the first use downloads it into the user's cache folder (`onnx_model_path()`), checks its SHA-256 and keeps it there;
   nothing is downloaded at import time. Offline, download the file by hand (the error says from where and to where) or
   set `BT_IMAGE_SUBJECT_MODEL` to a local copy, which is then used as it is and never downloaded.
-- `"vision"`, only when asked: Apple Vision's subject segmentation (the "lift subject" feature). macOS only; runs on
-  the Neural Engine, needs no download; on macOS before 14 it uses Vision's older people-only model. Its cut differs
-  from the portable model's, so a look made with it does not travel to other machines.
 
 The backend is chosen by, in order: the `segmenter` argument; the `BT_IMAGE_SEGMENTER` environment variable (`onnx` or
-`vision`); otherwise the portable model, on every platform.
+`vision`); otherwise Apple Vision on macOS and the portable model everywhere else.
 
 No model at all is needed when the caller already has the subject's matte: every renderer takes it as
 `maps={"subject": ...}` (load a black-and-white or transparent PNG with `imageio.load_map`, or pass
@@ -25,6 +25,7 @@ import functools
 import hashlib
 import os
 import platform
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -38,7 +39,7 @@ from . import _isnet, _vision
 from .download import DownloadError, fetch, user_cache_dir
 
 SEGMENTERS = ("onnx", "vision")
-DEFAULT_SEGMENTER = "onnx"  # the one place that decides: the portable model on every platform
+DEFAULT_SEGMENTER = "vision" if sys.platform == "darwin" else "onnx"  # the one place that decides: the best cut here
 SEGMENTER_VARIABLE = "BT_IMAGE_SEGMENTER"
 MODEL_VARIABLE = "BT_IMAGE_SUBJECT_MODEL"
 _HALF = 0.5  # a pixel is the subject's when the model is at least this sure: the even split of a probability
@@ -53,8 +54,8 @@ def subject_matte(
     The segmenter's edge is soft and slightly generous, which shows as a coloured halo once the background is
     replaced. `shrink` pulls the edge in by that many pixels and `feather` blurs it by that many pixels,
     both measured in `rgb`'s own pixels; the defaults give a clean, slightly soft cut for a 1000-1600 px photo.
-    `segmenter` is `"vision"` or `"onnx"`; None leaves the choice to `BT_IMAGE_SEGMENTER`, then to the portable
-    model (see the module documentation).
+    `segmenter` is `"vision"` or `"onnx"`; None leaves the choice to `BT_IMAGE_SEGMENTER`, then to the platform
+    (Apple Vision on macOS, else the portable model; see the module documentation).
 
     Raises SubjectNotFoundError if nothing stands out, and BackendUnavailableError for a segmenter name that is
     unknown, or if the chosen backend cannot run here (the message says what was tried and what to do instead).
@@ -85,7 +86,7 @@ def subject_finder(segmenter: str | None = None) -> Finder:
     """`subject_matte` with its default edge clean-up, as a `Finder`: the segmenter is chosen now and kept.
 
     `segmenter` is as for `subject_matte`, and is chosen the same way (the argument, then `BT_IMAGE_SEGMENTER`, then the
-    portable model). The identity names the backend and its model, so it changes exactly when the answers could: for
+    platform). The identity names the backend and its model, so it changes exactly when the answers could: for
     the portable model a hash of the model, the pinned one when the standard model is meant (it is not downloaded to
     find out), else of the file `BT_IMAGE_SUBJECT_MODEL` names, so the same model at another path is the same finder;
     for Apple Vision the macOS version, whose release brings the model. Raises BackendUnavailableError for an unknown

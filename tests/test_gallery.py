@@ -24,7 +24,6 @@ from bullterrier_image.core import registry
 from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.finding.depth import depth_map
-from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.ops.resample import resize
 
 
@@ -412,26 +411,6 @@ def test_gallery_pictures_of_a_recipe_that_takes_depth_show_the_depth_models_map
     picture = imageio.load(gallery.effect_files("depth_probe", checkout=checkout).picture)
     expected = resize(depth_map(imageio.load(checkout / "examples" / "photos" / "bullterrier.jpeg")), 480)
     assert picture.shape[:2] == expected.shape
-    assert np.abs(picture[..., 0] - expected).mean() < 0.02  # JPEG and resampling only
-
-
-def test_gallery_pictures_cut_the_subject_with_the_portable_model_whatever_the_machine_prefers(
-    checkout, throwaway_effects, echo_model, monkeypatch, photo
-):
-    @effect(category="utilities", params=AmountParams)
-    def subject_probe(rgb, params, *, subject=None):
-        """Paints each pixel with its subject matte."""
-        assert subject is not None
-        return np.repeat(subject[..., None], 3, axis=2)
-
-    (checkout / "examples" / "effects" / "subject_probe.toml").write_text(
-        'name = "subject_probe"\nsize = 128\n[[step]]\neffect = "subject_probe"\n', encoding="utf-8"
-    )
-    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "vision")  # what a Mac user might have set: the gallery must ignore it
-    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))  # the portable model's stand-in
-    gallery.render_gallery(only=["subject_probe"], checkout=checkout)
-    picture = imageio.load(gallery.effect_files("subject_probe", checkout=checkout).picture)
-    expected = resize(subject_matte(photo, segmenter="onnx"), 480)
     assert np.abs(picture[..., 0] - expected).mean() < 0.02  # JPEG and resampling only
 
 

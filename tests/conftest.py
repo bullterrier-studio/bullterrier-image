@@ -205,11 +205,12 @@ def subject() -> np.ndarray:
 def no_model_download(monkeypatch):
     """No test may download a model, or depend on the settings of the person running the tests:
     `BT_IMAGE_SUBJECT_MODEL` and `BT_IMAGE_DEPTH_MODEL` point at files that do not exist (so the portable subject
-    backend and the depth model fail at once, naming them, instead of downloading) and `BT_IMAGE_SEGMENTER` is unset. A
-    test that needs a model sets the variable itself."""
+    backend and the depth model fail at once, naming them, instead of downloading), and `BT_IMAGE_SEGMENTER` is `onnx`,
+    so the subject is found the same way on every OS (macOS would default to Apple Vision). A test that needs a model
+    sets the variable itself."""
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(Path(__file__).parent / "no-such-model.onnx"))
     monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(Path(__file__).parent / "no-such-depth-model.onnx"))
-    monkeypatch.delenv("BT_IMAGE_SEGMENTER", raising=False)
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
 
 
 @pytest.fixture

@@ -194,20 +194,25 @@ def test_apple_vision_is_refused_off_macos_saying_what_to_use_instead():
     assert "onnx" in str(caught.value)
 
 
-def test_the_default_is_the_portable_model_on_every_platform(echo_red):
-    """A recipe must cut the same on a Mac and on Linux, so Apple Vision is never chosen unless it is asked for."""
+@pytest.mark.skipif(sys.platform == "darwin", reason="macOS defaults to Apple Vision")
+def test_off_macos_the_default_is_the_portable_model(echo_red, monkeypatch):
+    monkeypatch.delenv("BT_IMAGE_SEGMENTER")
     photo = ramp()
     np.testing.assert_array_equal(subject_matte(photo), subject_matte(photo, segmenter="onnx"))
-    np.testing.assert_allclose(found(photo)[:, 2:-2], photo[:, 2:-2, 0], atol=0.01)
-
-
-def test_the_default_identity_is_the_portable_models_where_vision_exists_too(monkeypatch):
-    monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")  # the standard model: the identity is pinned, nothing is downloaded
-    assert subject_finder().identity.startswith("onnx:")
     assert subject_finder().identity == subject_finder("onnx").identity
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="Apple Vision exists only on macOS")
+def test_on_macos_the_default_is_apple_vision(echo_red, monkeypatch):
+    """Vision cuts cleaner than the portable model, so a Mac uses it unless told otherwise."""
+    monkeypatch.delenv("BT_IMAGE_SEGMENTER")
+    assert subject_finder().identity == subject_finder("vision").identity
+    assert subject_finder().identity != subject_finder("onnx").identity
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="macOS defaults to Apple Vision, which needs no model file")
 def test_a_default_that_cannot_run_names_the_model_it_needs(monkeypatch):
+    monkeypatch.delenv("BT_IMAGE_SEGMENTER")
     with pytest.raises(BackendUnavailableError, match="no-such-model") as caught:  # the suite's BT_IMAGE_SUBJECT_MODEL
         subject_matte(ramp())
     assert "default" in str(caught.value)

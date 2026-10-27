@@ -6,17 +6,17 @@ Models, backends, your own finders and maps. Basics are in the [README](../READM
 
 | Backend | Where | Notes |
 |---|---|---|
-| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | Default everywhere: same cut on every platform. People, pets, objects. Few seconds per photo on laptop CPU. |
-| `vision`: Apple Vision subject segmentation | macOS | Only when asked (`--segmenter vision`, `BT_IMAGE_SEGMENTER=vision`). Built in: no download, Neural Engine. Cut differs from portable model. |
+| `vision`: Apple Vision subject segmentation | macOS | Default on macOS. Built in: no download, Neural Engine. Cleaner cut than the portable model. |
+| `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | Default off macOS. People, pets, objects. Few seconds per photo on laptop CPU. Softer at fine details. |
 
-Portable model (178 MB) not in package. First cut-out that needs it downloads it once into cache folder
+Portable model (178 MB) not in package. First cut-out off macOS (or with `--segmenter onnx`) that needs it downloads it once into cache folder
 (`~/Library/Caches/bt-image` macOS, `$XDG_CACHE_HOME/bt-image` or `~/.cache/bt-image` Linux, `%LOCALAPPDATA%\bt-image\Cache`
 Windows), checks SHA-256 against the one pinned in code, keeps it. Nothing downloads at import. Offline or download blocked:
 fetch the file the error names, save where it says, or set `BT_IMAGE_SUBJECT_MODEL=/models/isnet-general-use.onnx` (used as
 is, never downloaded).
 
 Pick backend: `--segmenter onnx|vision` (Python: `finders={"subject": subject_finder("vision")}` from
-`bullterrier_image.finding.subject`) or `BT_IMAGE_SEGMENTER=vision` for every run. Option beats variable. No model needed if
+`bullterrier_image.finding.subject`) or `BT_IMAGE_SEGMENTER=onnx` for every run. Option beats variable. No model needed if
 matte already exists: `--map subject=cutout.png` (transparent PNG = its alpha, black-and-white mask: white = subject, photo's
 size); Python: `maps={"subject": imageio.load_map("cutout.png")}`. New backend = new file in
 [`finding/`](../src/bullterrier_image/finding), nothing else changes. Python newer than 3.14: ONNX Runtime has no release yet,

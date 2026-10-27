@@ -243,13 +243,14 @@ def run(
     (a framing with `transparent`) exported to jpg, raise ProjectError.
     `finders` has a `Finder` by map name, finding that map of a photo for the recipes that need it. The `subject` one,
     when none is given, is `bullterrier_image.finding.subject.subject_finder()` (the segmenter the environment chooses,
-    else the portable model) and the `depth` one `bullterrier_image.finding.depth.depth_finder()` (the depth model),
-    each built only when a recipe needs its map (BackendUnavailableError at once if it cannot run). A map is asked at
-    most once per photo, and never again for a photo whose map is remembered in the project's cache from an earlier run
-    by a finder of the same `identity`; if it raises, the recipes of that photo that need it fail, and the rest run. A
-    finder is known by its `identity` alone: another identity finds the maps again and redoes the recipes that use them,
-    the same identity reuses what is remembered, so give a finder whose answers could differ another identity (or delete
-    `project.cache`). A damaged cache entry is found again, also with `force`. A recipe whose regions find the subject
+    else Apple Vision on macOS and the portable model elsewhere) and the `depth` one
+    `bullterrier_image.finding.depth.depth_finder()` (the depth model), each built only when a recipe needs its map
+    (BackendUnavailableError at once if it cannot run). A map is asked at most once per photo, and never again for a
+    photo whose map is remembered in the project's cache from an earlier run by a finder of the same `identity`; if it
+    raises, the recipes of that photo that need it fail, and the rest run. A finder is known by its `identity` alone:
+    another identity finds the maps again and redoes the recipes that use them, the same identity reuses what is
+    remembered, so give a finder whose answers could differ another identity (or delete `project.cache`). A damaged
+    cache entry is found again, also with `force`. A recipe whose regions find the subject
     piece by piece (`Subject` with `per`) asks the `subject` finder about each crop of the recipe's working picture,
     once for each crop of pixels, and remembers the answer likewise, whatever recipe cut the crop. Each map is
     remembered under its own finder's identity: changing one finder redoes only the recipes that use its map. A project
@@ -717,7 +718,7 @@ effect = "grain"
 amount = 0.07
 size = 0.48
 """,
-    "cutout-black.toml": """# Just the subject, on pure black (the portable model finds it; downloaded on first use).
+    "cutout-black.toml": """# Just the subject, on pure black (found by Apple Vision on macOS, else a portable model).
 name = "cutout-black"
 size = 1600
 

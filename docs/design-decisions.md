@@ -351,11 +351,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Finding the subject and depth
 
-- **Two backends behind one function**, `subject_matte(rgb)`: IS-Net on ONNX Runtime, the default on every platform, and
-  Apple Vision on macOS, used only when asked (`segmenter="vision"`, `BT_IMAGE_SEGMENTER=vision`); `--map subject=FILE` (or
-  `maps={"subject": ...}`) skips both. *Reason:* a recipe must cut the same on a Mac and on Linux, so the portable model decides unless someone
-  asks for the platform's own; neither makes the core depend on it. *Consequence:* `subject_finder()`'s identity by default
-  is the portable model's (the cache keys of subjects remembered under Vision change once, so they are found again). The portable model (about 180 MB) is downloaded on first use into the
+- **Two backends behind one function**, `subject_matte(rgb)`: Apple Vision, the default on macOS, and IS-Net on ONNX
+  Runtime, the default everywhere else; `segmenter=` or `BT_IMAGE_SEGMENTER` picks either, `--map subject=FILE` (or
+  `maps={"subject": ...}`) skips both. *Reason:* the owner's choice: Vision cuts cleaner (the portable model smears at fine
+  details), and a Mac needs no download; a look made on a Mac cuts a little differently on Linux. Neither makes the core
+  depend on it. *Consequence:* `subject_finder()`'s identity follows the platform, so remembered subjects are found again
+  when a project moves between a Mac and Linux. The test suite pins `onnx` so it runs alike on every OS. The portable model (about 180 MB) is downloaded on first use into the
   user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_SUBJECT_MODEL` points at a local
   copy for offline use.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
@@ -506,8 +507,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   when* another package wants to add kinds.
 - **Seams are solid lines or bands; no faked materials.** A paper or metal look may come only from a real texture
   picture. *Reason:* generated paper fringes read as 2000s camera presets.
-- **The portable model is the default subject finder on every platform.** Apple Vision is used only when asked.
-  *Reason:* `fit = "subject"` must cut the same on a Mac and on Linux.
+- **Apple Vision is the default subject finder on macOS; the portable model elsewhere.** *Reason:* the owner prefers
+  the better cut over the same cut on every platform (2026-10-27, reversing "the portable model everywhere").
 - **Piece numbers come from one rule with no constants.** The first pixel in the raster scan decides the order, for
   every kind, so a looks list is predictable and a partition's numbers need no per-kind code. A picture too small to
   give every piece a pixel has fewer pieces, still numbered 0..n-1, and a `Pick` of a number it has no piece for
