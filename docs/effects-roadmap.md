@@ -277,9 +277,8 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `gradient` ✓ | Linear, radial, conic or mesh gradient. | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
-| `noise_field` ✓ | Perlin, simplex or Worley noise as colour. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
+| `noise_field` ✓ | Value, Perlin, Worley or sine noise as colour, with a domain `warp`; preset `plasma`. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
 | `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
-| `plasma` ✓ | Classic plasma colours. | `fx.plasma(scale=120, seed=1)` |
 | `starfield` ✓ | Stars with depth. | `fx.starfield(count=600, seed=1)` |
 | `voronoi_cells` ✓ | Cell pattern. | `fx.voronoi_cells(cells=200, seed=1)` |
 | `topographic` ✓ | Contour lines of luminance or noise. | `fx.topographic(levels=14)` |

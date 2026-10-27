@@ -1,4 +1,4 @@
-"""Behaviour of the `noise_field` effect: a generated noise picture (value, perlin or worley) through a ramp."""
+"""Behaviour of the `noise_field` effect: a generated noise picture (value, perlin, worley or sine) through a ramp."""
 
 import numpy as np
 import pytest
@@ -7,7 +7,12 @@ from scipy import ndimage
 from bullterrier_image.core import registry
 
 NAME = "noise_field"
-KINDS = ["value", "perlin", "worley"]
+# A warp of 0.01 px shifts a point by at most about 0.04 px (its push is a standardised field, four deviations at
+# most), and the ramp's grey level changes by under 0.05 per pixel at scale 60 (measured 0.0018 at most over the
+# kinds), so a merely small warp moves no pixel by more than this; a jump on leaving 0 does.
+TINY_WARP_MOVES_BY_AT_MOST = 0.005
+KINDS = ["value", "perlin", "worley", "sine"]
+LAYERED = ["value", "perlin", "sine"]  # the kinds built from octaves; worley is a single layer
 GREY = ["#000000", "#ffffff"]
 
 
@@ -57,7 +62,7 @@ def test_a_larger_scale_gives_broader_features(kind: str) -> None:
     assert fine < medium < coarse
 
 
-@pytest.mark.parametrize("kind", ["value", "perlin"])
+@pytest.mark.parametrize("kind", LAYERED)
 @pytest.mark.parametrize(
     ("smoother", "rougher"),
     [
@@ -132,3 +137,68 @@ def test_worley_has_feature_points_just_beyond_the_border_too() -> None:
         middle = grey[40:-40, 40:-40].mean()
         excess += [grey[:3, 40:-40].mean() - middle, grey[40:-40, :3].mean() - middle]
     assert np.mean(excess) == pytest.approx(0.0, abs=0.08)
+
+
+def strongest_wavelength(values: np.ndarray) -> float:
+    """The period in px of the strongest wave of a square picture, from the peak of its 2-D spectrum (not the mean)."""
+    spectrum = np.abs(np.fft.fftshift(np.fft.fft2(values - values.mean())))
+    centre = len(values) // 2
+    peak_row, peak_col = np.unravel_index(np.argmax(spectrum), spectrum.shape)
+    return len(values) / float(np.hypot(peak_row - centre, peak_col - centre))
+
+
+@pytest.mark.parametrize("scale", [16.0, 32.0, 64.0])
+def test_sine_scale_is_the_wavelength_of_the_coarsest_waves(scale: float) -> None:
+    """One layer is two plane waves of wavelength `scale`: the 2-D spectrum peaks at radius 256 / scale cycles."""
+    grey = field({"kind": "sine", "scale": scale, "octaves": 1, "seed": 3}, shape=(256, 256))
+    assert strongest_wavelength(grey) == pytest.approx(scale, rel=0.1)
+
+
+def test_sine_layers_finer_than_two_pixels_are_left_out() -> None:
+    """Wavelengths 5, 2.5, 1.25, ...: from the third layer on a wave has fewer than 2 px a period, which a pixel grid
+    cannot show, so they add nothing."""
+    two = field({"kind": "sine", "scale": 5.0, "octaves": 2, "seed": 2})
+    np.testing.assert_array_equal(field({"kind": "sine", "scale": 5.0, "octaves": 8, "seed": 2}), two)
+
+
+def test_sine_zero_persistence_leaves_only_the_first_layer() -> None:
+    only_first = field({"kind": "sine", "octaves": 1, "seed": 6})
+    np.testing.assert_allclose(
+        field({"kind": "sine", "octaves": 4, "persistence": 0.0, "seed": 6}), only_first, atol=1e-5
+    )
+
+
+def test_sine_warp_needs_a_layer_before_to_push_by() -> None:
+    """Each sine layer is pushed along by the layer before it, so with one layer there is nothing to push by."""
+    one = {"kind": "sine", "octaves": 1, "seed": 4}
+    np.testing.assert_array_equal(field({**one, "warp": 0.0}), field({**one, "warp": 100.0}))
+
+
+@pytest.mark.parametrize("kind", KINDS)
+@pytest.mark.parametrize(
+    ("warp", "kept_at_least", "kept_at_most"),
+    [(0.5, 0.99, 1.0), (60.0, -1.0, 0.9)],
+    ids=["half a pixel barely moves it", "60 px visibly changes it"],
+)
+def test_warp_pushes_the_pattern_about_in_every_kind(
+    kind: str, warp: float, kept_at_least: float, kept_at_most: float
+) -> None:
+    base = {"kind": kind, "scale": 60.0, "octaves": 3, "seed": 4}
+    kept = np.corrcoef(field({**base, "warp": 0.0}).ravel(), field({**base, "warp": warp}).ravel())[0, 1]
+    assert kept_at_least <= kept <= kept_at_most
+
+
+@pytest.mark.parametrize("kind", ["value", "perlin", "worley"])
+def test_warp_keeps_every_part_of_the_ramp_in_use(kind: str) -> None:
+    """Pushing a noise about moves its values, it does not squash them: the ramp is still used end to end."""
+    grey = field({"kind": kind, "scale": 40.0, "warp": 30.0, "seed": 2}, shape=(256, 256))
+    assert grey.min() < 0.1
+    assert grey.max() > 0.9
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_a_tiny_warp_gives_nearly_the_unwarped_picture(kind: str) -> None:
+    """Raising `warp` from 0 must not jump, so that animating it up from 0 starts smoothly."""
+    base = {"kind": kind, "scale": 60.0, "octaves": 3, "seed": 4}
+    moved = np.abs(field({**base, "warp": 0.0}) - field({**base, "warp": 0.01}))
+    assert moved.max() <= TINY_WARP_MOVES_BY_AT_MOST

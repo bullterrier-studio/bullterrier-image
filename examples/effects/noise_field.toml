@@ -1,8 +1,16 @@
-# Perlin noise in a deep-blue to cream ramp behind the dog, on the background only.
+# Warped Perlin noise in a deep-blue to cream ramp behind the dog, then a plasma over it, on the background only.
 name = "noise_field"
 size = 480
 
 [[step]]
 effect = "noise_field"
 seed = 2
+warp = 40
 mask = "background"
+
+[[step]]
+effect = "noise_field"
+preset = "plasma"
+seed = 3
+mask = "background"
+blend_mode = "soft_light"

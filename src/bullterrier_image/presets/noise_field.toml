@@ -1,0 +1,9 @@
+# Looks that are one noise_field step: a picture generated from nothing, coloured through a ramp.
+
+[plasma]
+description = "Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel."
+kind = "sine"
+scale = 160
+octaves = 2
+warp = 25
+colors = ["#ff0080", "#ff8c00", "#ffee00", "#00e5a0", "#00a2ff", "#7a00ff", "#ff0080"]
