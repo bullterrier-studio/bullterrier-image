@@ -11,11 +11,10 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading. | `shadows='#3a1bff'` `midtones='#808080'` `highlights='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=1.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
-| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
+| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
-| <img src="../gallery/white_balance.jpg" width="160" alt="white_balance"> | `white_balance` | Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light. | `temperature=0.0` `tint=0.0` | [white_balance.toml](../../examples/effects/white_balance.toml) |
 
 ### `auto_levels`
 
@@ -117,11 +116,19 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
+| `temperature` | number (drivable) | stops | -2 to 2 | `0.0` | Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm light. |
+| `tint` | number (drivable) | stops | -1 to 1 | `0.0` | Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the balance alone. |
 | `exposure` | number (drivable) | stops | -10 to 10 | `0.0` | Brightness in photographic stops: +1 doubles every value, -1 halves it. |
 | `contrast` | number (drivable) | ratio | 0 to 5 | `1.0` | How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot. |
 | `pivot` | number | fraction | 0 to 1 | `0.5` | The brightness (0..1) that contrast leaves where it is; values above it brighten, below it darken. |
 | `saturation` | number (drivable) | ratio | 0 to 5 | `1.0` | Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid. |
 | `vibrance` | number (drivable) | fraction | 0 to 1 | `0.0` | How far muted colours are pushed toward full saturation (0..1), after `saturation`: 0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated colours stay as they are; colours are never made duller. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `white_balance` | White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature. |
 
 ### `gradient_map`
 
@@ -181,10 +188,3 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `hue_shift` | Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay. |
-
-### `white_balance`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `temperature` | number (drivable) | stops | -2 to 2 | `0.0` | Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm light. |
-| `tint` | number (drivable) | stops | -1 to 1 | `0.0` | Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the balance alone. |

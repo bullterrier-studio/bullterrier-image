@@ -1554,8 +1554,15 @@ constant_value : number, fraction, 0 to 1, default 0.0
     'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
-def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`.
+def grade(temperature: float | Drive = 0.0, tint: float | Drive = 0.0, exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['white_balance'] | None = None) -> Step:
+    """White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first.
+
+Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.
+
+The colour balance is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel
+is multiplied by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue
+2**(-temperature/2), divided by the largest of the three, so the balance never brightens or clips and white keeps
+one full channel instead of turning into a cast. Temperature and tint at 0 leave the picture as it was.
 
 The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the
 saturation (before the vibrance) and at the end.
@@ -1567,6 +1574,15 @@ whose saturation is 0, is unchanged.
 
 Parameters
 ----------
+temperature : number (drivable), stops, -2 to 2, default 0.0
+    Warm-cool shift in stops (-2..2): the difference in stops between the red and the
+    blue gain, shared evenly (red up and blue down by half of it each). Positive warms
+    the picture (more orange), negative cools it (more blue), 0 leaves the colour
+    balance alone. Use a negative value to correct a picture shot under warm light.
+tint : number (drivable), stops, -1 to 1, default 0.0
+    Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
+    of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
+    balance alone.
 exposure : number (drivable), stops, -10 to 10, default 0.0
     Brightness in photographic stops: +1 doubles every value, -1 halves it.
 contrast : number (drivable), ratio, 0 to 5, default 1.0
@@ -1582,7 +1598,11 @@ vibrance : number (drivable), fraction, 0 to 1, default 0.0
     How far muted colours are pushed toward full saturation (0..1), after `saturation`:
     0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour
     at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated
-    colours stay as they are; colours are never made duller."""
+    colours stay as they are; colours are never made duller.
+
+Presets
+-------
+white_balance : White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."""
     ...
 
 def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -4100,26 +4120,4 @@ line_width : number, px, 0 to 32, default 1.5
     borders (below 1 px the lines get fainter). Tuned for a picture about 480 px high.
 line_color : colour, default '#0a0014'
     The colour of the border lines."""
-    ...
-
-def white_balance(temperature: float | Drive = 0.0, tint: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light.
-
-This is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel is multiplied
-by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue
-2**(-temperature/2), divided by the largest of the three, so the result is never brighter than the input, never
-clips, and a white pixel keeps one full channel instead of turning into a coloured cast. The defaults give gains
-of 1: no change.
-
-Parameters
-----------
-temperature : number (drivable), stops, -2 to 2, default 0.0
-    Warm-cool shift in stops (-2..2): the difference in stops between the red and the
-    blue gain, shared evenly (red up and blue down by half of it each). Positive warms
-    the picture (more orange), negative cools it (more blue), 0 leaves the colour
-    balance alone. Use a negative value to correct a picture shot under warm light.
-tint : number (drivable), stops, -1 to 1, default 0.0
-    Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
-    of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
-    balance alone."""
     ...
