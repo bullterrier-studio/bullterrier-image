@@ -17,7 +17,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
 | <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
-| <img src="../gallery/solarize.jpg" width="160" alt="solarize"> | `solarize` | Invert every red, green and blue value that is above `threshold` and leave the others as they are. | `threshold=0.5` | [solarize.toml](../../examples/effects/solarize.toml) |
 | <img src="../gallery/split_tone.jpg" width="160" alt="split_tone"> | `split_tone` | Tint the dark parts with `shadow` and the bright parts with `highlight`, without changing brightness. | `shadow='#3a1bff'` `highlight='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=0.5` `black_fade=0.1` | [split_tone.toml](../../examples/effects/split_tone.toml) |
 | <img src="../gallery/threshold.jpg" width="160" alt="threshold"> | `threshold` | Turn the picture into a two-colour bitmap: `light` where its brightness reaches `level`, `dark` elsewhere. | `level=0.5` `dark='#000000'` `light='#ffffff'` | [threshold.toml](../../examples/effects/threshold.toml) |
 | <img src="../gallery/white_balance.jpg" width="160" alt="white_balance"> | `white_balance` | Shift the colour balance by `temperature` (warm-cool) and `tint` (green-magenta), in stops of linear light. | `temperature=0.0` `tint=0.0` | [white_balance.toml](../../examples/effects/white_balance.toml) |
@@ -103,6 +102,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `cross_process` | Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows. |
+| `solarize` | Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet. |
 
 ### `equalize`
 
@@ -186,12 +186,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `hue_shift` | number | degrees | -180 to 180 | `0.0` | How far the selected hues are turned round the colour wheel, -180..180 degrees; positive goes red toward yellow, green, blue. 0 keeps the hue. |
 | `saturation` | number | ratio | 0 to 3 | `1.0` | Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above 1 makes them more vivid (stopping at full saturation). |
 | `lightness` | number | fraction | -1 to 1 | `0.0` | Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the gap in that direction. |
-
-### `solarize`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `threshold` | number | fraction | 0 to 1 | `0.5` | Channel value (0..1) above which red, green and blue are inverted; values at or below it stay. Lowering it reverses more of the tones (0 inverts everything but pure black); 1 changes nothing. |
 
 ### `split_tone`
 

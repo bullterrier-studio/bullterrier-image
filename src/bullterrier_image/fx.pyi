@@ -457,7 +457,7 @@ preserve_luminosity : true or false, default True
     allows."""
     ...
 
-def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process'] | None = None) -> Step:
+def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
 
 The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
@@ -524,7 +524,8 @@ blue_highlights : number, fraction, 0 to 1, default 0.75
 
 Presets
 -------
-cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows."""
+cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows.
+solarize : Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."""
     ...
 
 def dead_pixels(count: int = 120, size: int = 4, stuck: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3703,20 +3704,6 @@ band_max_height : number, fraction, 0 to 1, default 0.06
 Presets
 -------
 glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
-    ...
-
-def solarize(threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Invert every red, green and blue value that is above `threshold` and leave the others as they are.
-
-The tones fold back on themselves at the threshold, the look of an over-exposed darkroom print (the Sabattier
-effect): shadows stay, highlights turn dark, and a bright edge appears where the two meet.
-
-Parameters
-----------
-threshold : number, fraction, 0 to 1, default 0.5
-    Channel value (0..1) above which red, green and blue are inverted; values at or
-    below it stay. Lowering it reverses more of the tones (0 inverts everything but pure
-    black); 1 changes nothing."""
     ...
 
 def split_tone(shadow: str | list[float] | tuple[float, float, float] = '#3a1bff', highlight: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float = 0.3, balance: float = 0.5, softness: float = 0.5, black_fade: float = 0.1, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange'] | None = None) -> Step:
