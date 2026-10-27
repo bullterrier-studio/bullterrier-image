@@ -1,6 +1,7 @@
 """Moving a picture, or one of its channels, by a distance in pixels: whole or fractional, with a rule for the edge."""
 
 import math
+from collections.abc import Iterable
 from typing import Literal
 
 import numpy as np
@@ -26,6 +27,20 @@ def shift(image: np.ndarray, dy: float, dx: float, *, edge: Edge) -> np.ndarray:
         if distance != 0:
             out = _shift_axis(out, distance, axis, edge)
     return out.copy() if out is image else out
+
+
+def slide_bands(image: np.ndarray, bands: Iterable[tuple[int, int, float]], *, edge: Edge) -> np.ndarray:
+    """A copy of `image` (height, width, ...) in which each band `(top, height, distance)` (`height` rows from row
+    `top`) is moved `distance` px right (left if negative) as `shift` does, the rest of the picture left as it was.
+
+    The bands are applied in order, each to the picture the earlier ones left, so a row in two bands moves by both.
+    """
+    out = image.copy()
+    for top, height, distance in bands:
+        out[top : top + height] = shift(
+            out[top : top + height], 0, distance, edge=edge
+        )  # constant: no vertical distance
+    return out
 
 
 def _shift_axis(image: np.ndarray, distance: float, axis: int, edge: Edge) -> np.ndarray:

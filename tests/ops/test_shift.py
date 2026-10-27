@@ -9,7 +9,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.shift import Edge, shift
+from bullterrier_image.ops.shift import Edge, shift, slide_bands
 
 EDGES: list[Edge] = ["wrap", "nearest", "reflect", "mirror"]
 # numpy's names for the same rules: its 'symmetric' repeats the edge pixel (our 'reflect'), its 'reflect' does not
@@ -106,3 +106,33 @@ def test_a_picture_wrapped_by_whole_pixels_and_back_is_the_picture() -> None:
 
 def test_the_output_keeps_the_dtype_of_the_input() -> None:
     assert shift(noise((4, 5, 3)), 1.5, 0.5, edge="nearest").dtype == np.float32
+
+
+@pytest.mark.parametrize("edge", EDGES)
+def test_a_band_is_the_rows_moved_by_shift_alone_and_the_other_rows_stay(edge: Edge) -> None:
+    image = noise((10, 12, 3))
+    out = slide_bands(image, [(3, 4, 5)], edge=edge)
+    np.testing.assert_array_equal(out[3:7], reference(image[3:7], 0, 5, edge).astype(np.float32))
+    np.testing.assert_array_equal(out[:3], image[:3])
+    np.testing.assert_array_equal(out[7:], image[7:])
+
+
+def test_a_negative_distance_moves_a_band_left_and_the_input_is_not_modified() -> None:
+    image = noise((6, 9, 3))
+    kept = image.copy()
+    out = slide_bands(image, [(0, 2, -3)], edge="wrap")
+    np.testing.assert_array_equal(out[:2], np.roll(image[:2], -3, axis=1))
+    np.testing.assert_array_equal(image, kept)
+
+
+@pytest.mark.parametrize(
+    ("edge", "comes_back"),
+    [("wrap", True), ("nearest", False)],
+    ids=["wrap: slid out and back, the rows return", "nearest: the second slide meets the edge the first made"],
+)
+def test_bands_are_applied_in_order_each_to_what_the_earlier_ones_left(edge: Edge, comes_back: bool) -> None:
+    image = noise((8, 10, 3))
+    out = slide_bands(image, [(0, 5, 4), (3, 5, -4)], edge=edge)  # rows 3 and 4 are in both: right 4, then left 4
+    in_both = shift(shift(image[3:5], 0, 4, edge=edge), 0, -4, edge=edge)
+    np.testing.assert_array_equal(out[3:5], in_both)
+    assert comes_back == np.array_equal(in_both, image[3:5])

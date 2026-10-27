@@ -9,7 +9,7 @@ from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.colorspace import rgb_to_yiq, yiq_to_rgb
 from bullterrier_image.ops.noise import clumped_noise
-from bullterrier_image.ops.shift import Edge, shift
+from bullterrier_image.ops.shift import Edge, shift, slide_bands
 
 
 class VhsParams(EffectParams):
@@ -123,12 +123,12 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     rng = np.random.default_rng(params.seed)
     noise_seed = int(rng.integers(np.iinfo(np.uint32).max))
     wobble_seed = int(rng.integers(np.iinfo(np.uint32).max))
-    out = rgb.copy()
+    bands = []
     for _ in range(params.bands):
         thickness = min(height, max(1, round(rng.uniform(params.band_height / 2, params.band_height) * height)))
         top = int(rng.integers(height - thickness + 1))
-        slide = round(rng.uniform(-params.tracking, params.tracking) * width)
-        out[top : top + thickness] = _slid(out[top : top + thickness], slide, params.edge)
+        bands.append((top, thickness, round(rng.uniform(-params.tracking, params.tracking) * width)))
+    out = slide_bands(rgb, bands, edge=params.edge)
     # constant: the wander is one value for each row, a field one column wide
     wander = params.wobble * clumped_noise(
         (height, 1), size=params.wobble_size, seed=wobble_seed, truncate=params.truncate, edge=params.edge

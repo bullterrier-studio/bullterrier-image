@@ -117,6 +117,15 @@ def test_tracking_bands_slide_both_ways_and_can_reach_the_first_and_the_last_row
     assert min(slides) < 0 < max(slides)
 
 
+def test_a_tracking_band_is_at_least_one_row_tall_however_small_band_height_is(photo) -> None:
+    """On 96 rows `band_height` 0.0105 draws a thickness between 0.50 and 1.01 rows, which is one row every time."""
+    outs = [
+        registry.apply(NAME, photo, **{**OFF, "tracking": 0.5}, bands=1, band_height=0.0105, seed=s) for s in range(20)
+    ]
+    rows = [(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2))).sum() for out in outs]
+    assert max(rows) == 1
+
+
 @pytest.mark.parametrize(("wobble", "size", "smooth"), [(2.0, 12.0, True), (4.0, 12.0, True), (2.0, 1.0, False)])
 def test_wobble_is_a_drift_of_the_asked_deviation_that_is_smooth_over_the_asked_number_of_rows(
     wobble, size, smooth

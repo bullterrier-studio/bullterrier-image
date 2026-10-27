@@ -4,6 +4,7 @@ import numpy as np
 
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.ops.shift import slide_bands
 
 
 class SliceShiftParams(EffectParams):
@@ -53,8 +54,6 @@ def slice_shift(rgb: np.ndarray, params: SliceShiftParams) -> np.ndarray:
         np.sort(rng.choice(height - 1, strips - 1, replace=False)) + 1
     )  # the first row of every strip but the first
     slides = rng.integers(-furthest, furthest + 1, size=strips)
-    first_row = np.zeros(height, dtype=bool)
-    first_row[starts] = True
-    slide = slides[np.cumsum(first_row)]  # a row's strip is the number of strips begun at or above it
-    columns = (np.arange(width)[None, :] - slide[:, None]) % width
-    return rgb[np.arange(height)[:, None], columns]
+    tops = [0, *starts.tolist()]
+    heights = np.diff([*tops, height]).tolist()
+    return slide_bands(rgb, zip(tops, heights, slides.tolist(), strict=True), edge="wrap")
