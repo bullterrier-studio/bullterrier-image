@@ -1420,19 +1420,6 @@ scale : number, px, 1 to 1024, default 150.0
     Size of the biggest clouds across, in pixels, the spacing of the first noise lattice
     before `rise` stretches it; tuned for a picture about 480 px high. Larger = broad
     banks of fog; small = fine, wispy mottling.
-rise : number, ratio, 1 to 8, default 1.0
-    How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round
-    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
-turbulence : number, px, 0 to 500, default 0.0
-    How far in pixels two more noise fields (with the same `scale`, `octaves`,
-    `persistence` and `lacunarity`) push the clouds sideways and up and down: the
-    typical displacement (their standard deviation). 0 = smooth, regular clouds; larger
-    = twisting, curling smoke; much larger than `scale` tears the clouds into scattered
-    wisps.
-octaves : whole number, count, 1 to 8, default 4
-    How many layers of noise are summed to make the clouds, each finer than the last (by
-    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
-    detail. Layers finer than one pixel are dropped.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same clouds, another seed a different
     bank of fog.
@@ -1448,6 +1435,19 @@ floor : number, fraction, 0 to 1, default 0.5
     there is no cloud is `amount` x `floor`. 0 = open gaps of clear air, like plumes of
     smoke; 1 = an even veil with no clouds at all; 0.5 = a haze that thins between
     drifts but never clears.
+rise : number, ratio, 1 to 8, default 1.0
+    How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round
+    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
+turbulence : number, px, 0 to 500, default 0.0
+    How far in pixels two more noise fields (with the same `scale`, `octaves`,
+    `persistence` and `lacunarity`) push the clouds sideways and up and down: the
+    typical displacement (their standard deviation). 0 = smooth, regular clouds; larger
+    = twisting, curling smoke; much larger than `scale` tears the clouds into scattered
+    wisps.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed to make the clouds, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
+    detail. Layers finer than one pixel are dropped.
 persistence : number, ratio, 0 to 1, default 0.5
     How much weaker each finer layer is than the one before: each layer's weight is this
     to the power of its number. 0 = only the coarsest layer, 1 = every layer equally

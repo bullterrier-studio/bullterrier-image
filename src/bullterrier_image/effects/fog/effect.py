@@ -85,6 +85,7 @@ class FogParams(EffectParams):
         max=8,
         doc="How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round puffs, 2 = twice as "
         "tall as wide, 8 = long columns, like smoke from a chimney.",
+        advanced=True,
     )
     turbulence: float = param(
         0.0,
@@ -95,6 +96,7 @@ class FogParams(EffectParams):
         "`lacunarity`) push the clouds sideways and up and down: the typical displacement (their standard "
         "deviation). 0 = smooth, regular clouds; larger = twisting, curling smoke; much larger than `scale` tears "
         "the clouds into scattered wisps.",
+        advanced=True,
     )
     octaves: int = param(
         4,
@@ -104,6 +106,7 @@ class FogParams(EffectParams):
         doc="How many layers of noise are summed to make the clouds, each finer than the last (by `lacunarity`) and "
         "weaker (by `persistence`). 1 = smooth blobs, more = more wispy detail. Layers finer than one pixel are "
         "dropped.",
+        advanced=True,
     )
     persistence: float = param(
         0.5,
