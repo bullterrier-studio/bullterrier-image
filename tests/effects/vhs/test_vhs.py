@@ -106,7 +106,7 @@ def test_tracking_bands_slide_both_ways_and_can_reach_the_first_and_the_last_row
     """Over many seeds, with tall bands: some slide left and some right, and between them they cover every row."""
     covered = np.zeros(photo.shape[0], bool)
     slides = []
-    for seed in range(40):
+    for seed in range(100):
         out = registry.apply(NAME, photo, **{**OFF, "tracking": 0.3}, bands=4, band_height=0.5, seed=seed, edge="wrap")
         changed = ~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2))
         covered |= changed
@@ -139,6 +139,25 @@ def test_wobble_is_a_drift_of_the_asked_deviation_that_is_smooth_over_the_asked_
     np.testing.assert_allclose(slides.std(), wobble, rtol=0.05 if smooth else 0.25)
     correlation = np.corrcoef(slides[:-1], slides[1:])[0, 1]
     assert (correlation > 0.8) == smooth
+
+
+@pytest.mark.parametrize("static", [0.5, 1.0])
+def test_band_static_mixes_grey_snow_into_whole_band_rows_and_leaves_the_other_rows_alone(photo, static) -> None:
+    """In a band `out = (1 - static) * photo + static * grey`, one grey in 0..1 per pixel, so
+    `(out - (1 - static) * photo) / static` has equal channels inside 0..1; rows outside the bands are the photo's."""
+    out = registry.apply(NAME, photo, **OFF, bands=1, band_height=0.2, band_static=static, seed=3)
+    rows = np.flatnonzero(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2)))  # the YIQ round trip is not exact
+    assert len(runs(rows)) == 1
+    assert 96 * 0.2 / 2 <= len(rows) <= 96 * 0.2  # between half the tallest band and the tallest
+    inside = (out[rows] - (1 - static) * photo[rows]) / static
+    np.testing.assert_allclose(inside, inside[..., :1].repeat(3, axis=-1), atol=1e-5)
+    assert -1e-5 <= inside.min() <= inside.max() <= 1 + 1e-5
+    assert inside.std() > 0.2  # snow, not a flat grey: uniform over 0..1 has a deviation of 0.29
+
+
+@pytest.mark.parametrize("settings", [{"bands": 0, "band_static": 1.0}, {"bands": 4, "band_static": 0.0}])
+def test_no_bands_or_no_band_static_leaves_every_row_as_it_was(photo, settings) -> None:
+    np.testing.assert_allclose(registry.apply(NAME, photo, **{**OFF, **settings}), photo, atol=1e-5)
 
 
 def test_the_failing_signal_look_is_a_preset_of_vhs() -> None:
@@ -175,7 +194,7 @@ def test_more_dropouts_cover_more_of_the_picture(photo) -> None:
 
 def test_the_dropouts_do_not_move_when_the_bands_change(photo) -> None:
     """Bands and dropouts draw from their own streams of one seed: more bands move no dropout."""
-    settings = {**OFF, "tracking": 0.3, "dropouts": 6, "seed": 4}
+    settings = {**OFF, "tracking": 0.3, "dropouts": 6, "seed": 4, "band_static": 1.0}
     without = registry.apply(NAME, photo, bands=0, **settings)
     with_bands = registry.apply(NAME, photo, bands=3, **settings)
     streak = white_changes(photo, without)

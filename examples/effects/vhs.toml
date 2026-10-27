@@ -1,5 +1,5 @@
-# A worn tape: tracking bands slide, the rows waver, colour bleeds to the right and the picture is grainy; then the
-# failing-signal look (static, white dropouts) on its own copy, laid over at half opacity.
+# A worn tape: tracking bands slide, the rows waver, colour bleeds to the right and the picture is grainy; then a bad
+# signal on its own: solid bands of static and white dropouts, laid over at 0.8 opacity.
 name = "vhs"
 size = 480
 
@@ -11,5 +11,5 @@ seed = 4
 [[step]]
 effect = "vhs"
 preset = "signal_noise"
-opacity = 0.5
+opacity = 0.8
 seed = 2

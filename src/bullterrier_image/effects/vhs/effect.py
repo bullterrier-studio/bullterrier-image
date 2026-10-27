@@ -31,6 +31,15 @@ class VhsParams(EffectParams):
         max=50,
         doc="How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.",
     )
+    band_static: float = param(
+        0.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        drivable=True,
+        doc="How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the share of every pixel "
+        "in a band that becomes a random grey. 0 = none; 1 = bands of pure static. Does nothing when `bands` is 0.",
+    )
     dropouts: int = param(
         0,
         unit="count",
@@ -124,7 +133,8 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
     rows, bled colour and tape noise (static, snow).
 
-    In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width; every row then drifts
+    In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width and take `band_static` of
+    grey static (solid bands of snow across a clean picture at 1); every row then drifts
     sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
     the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
     `noise` of grain is added to the brightness. The bands, dropouts, noise and wobble each draw from their own stream
@@ -135,12 +145,16 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     noise_seed = int(rng.integers(np.iinfo(np.uint32).max))
     wobble_seed = int(rng.integers(np.iinfo(np.uint32).max))
     dropout_rng = np.random.default_rng(int(rng.integers(np.iinfo(np.uint32).max)))
+    static_rng = np.random.default_rng(int(rng.integers(np.iinfo(np.uint32).max)))
     bands = []
     for _ in range(params.bands):
         thickness = min(height, max(1, round(rng.uniform(params.band_height / 2, params.band_height) * height)))
         top = int(rng.integers(height - thickness + 1))
         bands.append((top, thickness, round(rng.uniform(-params.tracking, params.tracking) * width)))
     out = slide_bands(rgb, bands, edge=params.edge)
+    for top, thickness, _ in bands:
+        snow = static_rng.random((thickness, width, 1), dtype=np.float32)  # one grey for each pixel
+        out[top : top + thickness] = out[top : top + thickness] * (1 - params.band_static) + snow * params.band_static
     # constant: the wander is one value for each row, a field one column wide
     wander = params.wobble * clumped_noise(
         (height, 1), size=params.wobble_size, seed=wobble_seed, truncate=params.truncate, edge=params.edge
