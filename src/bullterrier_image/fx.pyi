@@ -3620,8 +3620,9 @@ spacing : number, px, 0 to 200, default 0.0
     points that send out spikes inside a bright area: each bright pixel sends them with
     the chance 1 / spacing^2 (the same ones for the same `seed`; raising it only drops
     points), so the glints keep their number per area of the picture at any size. 0, or
-    anything below 1, = every bright point. Raise it to turn a bright area into separate
-    glints; 13 gives a scatter of glitter.
+    anything below 1, = every bright point, each with its share of a design pixel's
+    light, so a bright area gives the same total light at any size. Raise it to turn a
+    bright area into separate glints; 13 gives a scatter of glitter.
 color : colour, default '#ffffff'
     The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
     of the light that makes them.
