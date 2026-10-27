@@ -17,19 +17,21 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/banner.jpg" alt="One photo of a bull terrier turned into five styles: neon-pulse, glitch, ascii-colour, halftone-print and ember-glitch">
+  <img src="docs/images/banner.jpg" alt="One photo of a bull terrier turned into five styles: neon-pulse, glitch-noir, ascii-colour, halftone-print and ember-glitch">
 </p>
 
 **A look you can write down, change with one number, and run on a thousand photos.**
 
 Styling by hand does not repeat. Styling in image code means arrays, loops and magic numbers nobody can read next month.
-bullterrier-image makes a look *data*: a short recipe, TOML or Python, listing effects and their values. 120+ effects ready.
+bullterrier-image makes a look *data*: a short recipe, TOML or Python, listing effects and their values. 84 effects ready.
 It finds the subject first: bloom can hit the dog, glitch the background, blur can grow with depth. Edit a number, rerun: only
 that recipe redone. Same seed, same pixels. Look wrong? See the picture after every step.
 
 - **Recipes are data.** Look = list of effects, TOML or Python. Same recipe, any photo.
 - **Batch ready.** Many photos x many recipes, cached. One bad photo never stops the run. HTML report.
 - **Subject- and depth-aware.** Aim an effect at subject, background, near or far.
+- **Looks and presets built in.** `bt-image render photo.jpg crt`: nine multi-step looks (glitch, crt, hologram, stained glass...);
+  a preset is one effect's named values (`slice_shift` preset `glitch`). `bt-image effects` lists both.
 - **Fails early.** Typo fails at load, not halfway through batch.
 
 ## Install
@@ -43,7 +45,7 @@ bt-image effects        # the built-in looks (`bt-image render photo.jpg crt`), 
 
 ## Quick start
 
-Repo ships demo project: one photo, a dozen recipes.
+Repo ships demo project: one photo, 16 recipes.
 
 ```bash
 git clone https://github.com/bullterrier-studio/bullterrier-image.git
