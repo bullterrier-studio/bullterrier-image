@@ -6,7 +6,8 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     description = "Green text."    # optional, one sentence; a built-in look must have one (see "Looks" below)
-    size = 1024                   # longest side in px; px values (cell, radius...) are written for this
+    size = 1024                    # optional: longest side in px the recipe is written for; absent = tuned for
+                                   # 480, rendered at the photo's own size
 
     [frame]                        # optional: frame the photo before the steps, cut it out after them (see below)
     aspect = 1                     # crop to this width over height...
@@ -302,7 +303,7 @@ def load_recipe(path: str | Path) -> Recipe:
         except (RecipeError, ImageReadError, LutError) as error:
             raise _located(error, where) from None
     try:
-        return Recipe(recipe_name, tuple(steps), raw.get("size", 1024), frame, regions)
+        return Recipe(recipe_name, tuple(steps), raw.get("size"), frame, regions)
     except RecipeError as error:
         raise _located(error, path.name) from None
 

@@ -69,7 +69,7 @@ Ordered list of effects. Each `[[step]]` names an effect; other keys are its par
 
 ```toml
 name = "ember-glitch"
-size = 1024                       # longest side in px; the pixel values below (radius, cell...) are written for it
+size = 1024                       # optional: longest side in px the recipe is written for; absent = tuned for 480, rendered at the photo's own size
 
 [[step]]
 effect = "gradient_map"           # a fire palette

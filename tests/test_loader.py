@@ -80,6 +80,26 @@ def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "format = 3\nname = 'd'\n" + STEP, "d.toml")).name == "d"
 
 
+@pytest.mark.parametrize(
+    ("written", "size"),
+    [
+        pytest.param("", None, id="absent: left unset, not defaulted to some size"),
+        pytest.param("size = 1024\n", 1024, id="given: kept"),
+        pytest.param("size = 64\n", 64, id="given small: kept"),
+    ],
+)
+def test_a_files_size_is_what_it_says_and_unset_when_it_says_none(tmp_path, written, size):
+    assert load_recipe(_write(tmp_path, written + STEP)).size == size
+
+
+@pytest.mark.parametrize(
+    ("written", "shown"), [("0", "0"), ("-5", "-5"), ("'64'", "'64'"), ("64.0", "64.0"), ("true", "True")]
+)
+def test_a_size_that_is_not_a_positive_whole_number_is_refused_naming_it(tmp_path, written, shown):
+    with pytest.raises(RecipeError, match=rf"^look\.toml: .*size.*{re.escape(shown)}"):
+        load_recipe(_write(tmp_path, f"size = {written}\n" + STEP))
+
+
 GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'gradient'\ncolors = ['#000000']\nmask = 'star'\n"
 
 
@@ -384,6 +404,7 @@ mask = "near"
 def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
     written = Recipe(
         "look",
+        size=None,
         regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
             Each("bands", [Step("grade", {"exposure": 0.5}), "none"]),
@@ -496,6 +517,7 @@ threshold = 0.6
 def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_in_python(tmp_path):
     written = Recipe(
         "look",
+        size=None,
         regions={"near": Band(of="depth", low=0.5)},
         steps=[
             Step(

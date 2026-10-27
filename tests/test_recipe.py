@@ -216,6 +216,25 @@ def test_size_scales_photo_and_matte_together(photo, subject):
     assert out.shape == (48, 64, 3)
 
 
+BLUR = '[[step]]\neffect = "gaussian_blur"\nradius = 3\n'
+
+
+def test_a_file_without_size_is_tuned_for_480_and_rendered_at_the_photos_own_size(tmp_path, photo):
+    big = resize(photo, 960)
+    unset = load_recipe(write(tmp_path, BLUR, "unset.toml"))
+    at_480 = load_recipe(write(tmp_path, "size = 480\n" + BLUR, "at480.toml"))
+    out = render(big, unset)
+    assert out.shape == big.shape
+    # a radius of 3 design pixels is 6 px on a 960 px picture, whichever way the recipe says it was tuned for 480
+    np.testing.assert_allclose(out, render(big, at_480, size=960), atol=1e-6)
+    assert not np.allclose(out, render(big, Recipe("one", (Step("gaussian_blur", {"radius": 3.0}),), size=960)))
+
+
+def test_a_file_with_a_size_scales_the_photo_to_it(tmp_path, photo):
+    out = render(resize(photo, 960), load_recipe(write(tmp_path, "size = 64\n" + BLUR)))
+    assert max(out.shape[:2]) == 64
+
+
 def test_matte_of_the_wrong_size_is_rejected(photo):
     with pytest.raises(SubjectNotFoundError, match="subject"):
         render(photo, Recipe("r", (Step("grain"),), size=None), maps={"subject": np.ones((5, 5), np.float32)})

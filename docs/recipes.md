@@ -9,7 +9,7 @@ Recipe = ordered list of effects. Each `[[step]]` names an effect; other keys ar
 
 ```toml
 name = "ember-glitch"
-size = 1024                       # longest side in px; the pixel values below (radius, cell...) are written for it
+size = 1024                       # optional: longest side in px the recipe is written for; absent = tuned for 480, rendered at the photo's own size
 
 [[step]]
 effect = "gradient_map"           # a fire palette
@@ -42,8 +42,9 @@ opacity = 0.6                     # mix this step in at 60%
 Replace the background = a `gradient` step with preset `fill` (black; set `colors` for another) and `mask = "background"`. Unknown effects, misspelt parameters, bad values fail at load, naming
 file and step.
 
-`size` defaults to 1024. A Python `Recipe(size=None)` keeps the photo's own size; its pixel values are then written for 480
-(the size effect defaults are tuned for), so a 4000 px photo multiplies them by 4000/480.
+`size`: longest side in px the recipe is written for. Absent (the default for a file), the pixel values are tuned for 480 (the size
+effect defaults are tuned for) and the picture renders at the photo's own size, so a 4000 px photo multiplies them by 4000/480.
+A Python `Recipe(size=None)` is the same.
 
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each
 step is a layer over picture below, as in image editor. Result combined by blend mode, mixed by opacity, only where mask says.
