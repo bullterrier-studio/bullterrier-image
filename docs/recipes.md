@@ -9,7 +9,7 @@ Recipe = ordered list of effects. Each `[[step]]` names an effect; other keys ar
 
 ```toml
 name = "ember-glitch"
-size = 1024                       # optional: longest side in px the recipe is written for; absent = tuned for 480, rendered at the photo's own size
+size = 1024                       # optional: the output's longest side in px; absent = the photo's own size
 
 [[step]]
 effect = "gradient_map"           # a fire palette
@@ -24,7 +24,7 @@ mask = "background"               # "subject", "background" or a region: apply o
 effect = "slice_shift"
 preset = "glitch"
 bands = 10
-amount = 51.2                     # how far a strip may slide, in px (written for the size above)
+amount = 51.2                     # how far a strip may slide, in px (design pixels, see `size` below)
 seed = 4                          # same seed, same result, every time
 
 [[step]]
@@ -42,9 +42,9 @@ opacity = 0.6                     # mix this step in at 60%
 Replace the background = a `gradient` step with preset `fill` (black; set `colors` for another) and `mask = "background"`. Unknown effects, misspelt parameters, bad values fail at load, naming
 file and step.
 
-`size`: longest side in px the recipe is written for. Absent (the default for a file), the pixel values are tuned for 480 (the size
-effect defaults are tuned for) and the picture renders at the photo's own size, so a 4000 px photo multiplies them by 4000/480.
-A Python `Recipe` without `size` (its default, `size=None`) is the same.
+Values in `px` are design pixels: pixels on a picture whose long side is 480, whatever the output size. `size` is only how
+big the output is (its longest side in px); absent (the default, also for a Python `Recipe`: `size=None`), the picture renders
+at the photo's own size, and a 4000 px photo multiplies every px value by 4000/480.
 
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each
 step is a layer over picture below, as in image editor. Result combined by blend mode, mixed by opacity, only where mask says.

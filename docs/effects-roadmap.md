@@ -256,7 +256,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `gradient` ✓ | Linear, radial, conic or mesh gradient; one colour is a flat fill (preset `fill`). | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
 | `noise_field` ✓ | Value, Perlin, Worley or sine noise as colour, with a domain `warp`; preset `plasma`. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
 | `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
-| `voronoi_cells` ✓ (recipe: `noise_field`, then `shatter` with `fill`) | Flat Voronoi cells in a colour ramp, leaded. [Recipe](../examples/recipes/voronoi-cells.toml). | `fx.shatter(pieces=200, offset=0, angle=0, fill=1, gap=1.5)` over `fx.noise_field(kind="value", scale=50, octaves=3)` |
+| `voronoi_cells` ✓ (the look `voronoi-cells`: `noise_field`, then `shatter` with `fill`) | Flat Voronoi cells in a colour ramp, leaded. [Look](../src/bullterrier_image/looks/voronoi-cells.toml). | `fx.shatter(pieces=200, offset=0, angle=0, fill=1, gap=1.5)` over `fx.noise_field(kind="value", scale=50, octaves=3)` |
 | `topographic` ✓ | Contour lines of luminance, depth or any field. | `fx.topographic(levels=14)` |
 | `flow_lines` ✓ | Streamlines through a noise flow field. | `fx.flow_lines(density=0.004, seed=1)` |
 | `aurora` ✓ | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |

@@ -67,11 +67,10 @@ a beat onto a bloom, frame after frame) can read the numbers and set them withou
 
 ## One look at any size
 
-Pixel values (numbers in `px`: radius, cell, shift) are written for recipe's `size`, or for 480 without one
-(the size effect defaults are tuned for). `Recipe(size=None)`, the default, renders at the photo's own size, so on a 4000 px
-photo every pixel value is multiplied by 4000/480. `render(photo, recipe, size=480)` (also `trace`, `render_all`) makes the picture 480 px longest side
-and multiplies every pixel value (ends of a driven number too) by 480 over the recipe's size: same look at draft and full size,
-differing in detail. Whole number rounded, value stops at its minimum when shrinking, growing has no ceiling.
+Pixel values (numbers in `px`: radius, cell, shift) are design pixels: pixels on a picture whose long side is 480, whatever
+the output size. `Recipe(size=None)`, the default, renders at the photo's own size, so on a 4000 px photo every pixel value is
+multiplied by 4000/480. `render(photo, recipe, size=480)` (also `trace`, `render_all`) makes the picture 480 px longest side
+with the same multiplication (ends of a driven number too): same look at draft and full size, differing in detail. Whole number rounded, value stops at its minimum when shrinking, growing has no ceiling.
 
 ## Cyclic angles
 

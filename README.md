@@ -71,7 +71,7 @@ Ordered list of effects. Each `[[step]]` names an effect; other keys are its par
 
 ```toml
 name = "ember-glitch"
-size = 1024                       # optional: longest side in px the recipe is written for; absent = tuned for 480, rendered at the photo's own size
+size = 1024                       # optional: the output's longest side in px; absent = the photo's own size
 
 [[step]]
 effect = "gradient_map"           # a fire palette
@@ -86,7 +86,7 @@ mask = "background"               # "subject", "background" or a region: apply o
 effect = "slice_shift"
 preset = "glitch"
 bands = 10
-amount = 51.2                     # how far a strip may slide, in px (written for the size above)
+amount = 51.2                     # how far a strip may slide, in px (design pixels: a picture 480 px long)
 seed = 4                          # same seed, same result, every time
 
 [[step]]

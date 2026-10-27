@@ -55,14 +55,15 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
                            scaling). Which model finds them (IS-Net, Depth Anything V2 on ONNX Runtime; or Apple Vision
                            for subject, when asked) is hidden here
   presets/                 named parameter sets of built-in effects, one TOML per effect (data, not code)
+  looks/                   built-in multi-step recipes, one TOML each, loaded by name (`load_recipe("crt")`; data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
   plugin.py                effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
-  core/          core      registry.py, params.py (parameter models), presets.py, types.py, vocabulary.py, and the recipe
-                           engine: steps.py (`Step`, `Recipe`), framing.py (`Framing`), runner.py (render, render_all,
-                           trace; given the photo and the subject)
-  ops/           ops       shared numeric primitives named by concept: blur, cells, color, distance, frame, glyphs,
-                           resample, textart (internal; core may import ops; ops imports nothing above)
+  core/          core      registry.py, params.py (parameter models), presets.py, looks.py, types.py, vocabulary.py, and the
+                           recipe engine: steps.py (`Step`, `Recipe`), regions.py, framing.py (`Framing`), runner.py
+                           (render, render_all, trace; given the photo and the subject)
+  ops/           ops       shared numeric primitives named by concept: one module per concept (`blur`, `noise`, `warp`,
+                           `edges`, `colorspace`...; internal; core may import ops; ops imports nothing above)
   errors.py      errors    BullterrierImageError and subclasses: bottom layer, importable from every other
 examples/        demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/),
                  older experiments (experiments/), a Python example; see examples/README.md
