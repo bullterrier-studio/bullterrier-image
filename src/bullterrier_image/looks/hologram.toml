@@ -1,0 +1,35 @@
+description = "A hologram: the picture as projected cyan light, outlined at its edges, cut by scanlines and dimmed by wide bands of darker rows."
+name = "hologram"
+size = 480
+
+[[step]]
+effect = "grade"
+saturation = 0                    # only brightness is left to light up
+
+[[step]]
+effect = "blend"
+image = "#30e0ff"                 # the colour of the light
+mode = "multiply"
+opacity = 0.85
+
+[[step]]
+effect = "edges"
+method = "sobel"
+color = "#30e0ff"
+blend_mode = "screen"             # edges add light, never darken
+opacity = 0.45
+threshold = 0.1
+
+[[step]]
+effect = "scanlines"
+spacing = 3
+softness = 1
+darkness = 0.35
+offset = 1.25                     # darkest on the boundary of rows 1 and 2
+
+[[step]]
+effect = "scanlines"              # the flicker: wide soft bands, one per 160 rows
+spacing = 160
+softness = 1
+darkness = 0.3
+offset = 88

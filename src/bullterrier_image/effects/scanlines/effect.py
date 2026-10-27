@@ -14,7 +14,7 @@ class ScanlinesParams(EffectParams):
         3.0,
         unit="px",
         min=1,
-        max=64,
+        max=2000,
         doc="Distance in px from the top of one line to the top of the next. A spacing that is not a whole number "
         "drifts against the pixel rows and the lines are anti-aliased. Larger = fewer, wider-set lines.",
     )
@@ -39,7 +39,7 @@ class ScanlinesParams(EffectParams):
         0.0,
         unit="px",
         min=0,
-        max=64,
+        max=2000,
         doc="How far down in px the first line starts from the top of the picture (the middle of its soft edge, when "
         "`softness` is above 0). Offsets of more than `spacing` repeat the pattern: the lines are at offset + k x "
         "spacing.",

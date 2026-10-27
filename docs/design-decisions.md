@@ -204,7 +204,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   effects have presets (a third-party effect's author ships data of their own); a look that needs several effects is
   a recipe, not a preset.
 - **Looks are recipes shipped as data, loaded by name: `load_recipe("crt")`, `bt-image render PHOTO crt`.** A look that
-  needs several steps (crt, glitch, tilt-shift, stained glass, low poly, spotlight, voronoi cells) is an ordinary recipe
+  needs several steps (crt, glitch, hologram, tilt-shift, stained glass, low poly, spotlight, voronoi cells) is an ordinary recipe
   file in `src/bullterrier_image/looks/<name>.toml` with a top-level `description` (one sentence), found the way presets
   are: by the folder, not by a list in code. `load_recipe` and every command argument that takes a recipe file also take
   a look's name: a `str` that is a look's name is that look (a `Path`, or `./crt`, is always a file, so a folder of yours

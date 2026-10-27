@@ -174,7 +174,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
-| `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |
+| `hologram` ✓ (a look, [hologram.toml](../src/bullterrier_image/looks/hologram.toml)) | Cyan light, edge glow, scanlines, flicker. | `grade`, `blend` (multiply), `edges` (screen), `scanlines` twice (`softness` 1) |
 
 ## Atmosphere
 
@@ -343,7 +343,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
 | `sparkle` | a `starburst` preset + `density`, `variation`, `seed` |
 | `fog`, `smoke` | one, with presets |
-| `hologram` | a recipe (needs `edges`; `scanlines` has `softness`) |
+| `hologram` | a look (done) |
 | `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |
 | `overlay` | `blend` + `fit="width"` |
 
