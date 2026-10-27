@@ -1,6 +1,0 @@
-# A red-cyan 3D anaglyph: the brightness moved 6 px left in red and 6 px right in cyan.
-name = "anaglyph"
-size = 480
-
-[[step]]
-effect = "anaglyph"

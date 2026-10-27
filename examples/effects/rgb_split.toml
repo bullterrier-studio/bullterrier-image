@@ -1,8 +1,13 @@
-# Red and blue fringes: the channels pulled eight pixels apart along a rising diagonal, green left in place.
+# A red-cyan 3D anaglyph: the picture greyed, then red moved 6 px left and green and blue 6 px right.
 name = "rgb_split"
 size = 480
 
 [[step]]
+effect = "grade"
+saturation = 0
+
+[[step]]
 effect = "rgb_split"
-angle = 30
-amount = 8
+pair = "red_cyan"
+angle = 180
+amount = 6

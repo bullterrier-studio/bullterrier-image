@@ -184,13 +184,12 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `glitch` ✓ | Channel split and sliding bands. | `fx.glitch(split=9, bands=8)` |
-| `rgb_split` ✓ | Channel offset on its own, any direction. | `fx.rgb_split(angle=30, amount=8)` |
+| `rgb_split` ✓ | Channel offset on its own, any direction; `pair='red_cyan'` after `grade(saturation=0)` is the red/cyan 3D look. | `fx.rgb_split(angle=330, amount=8)` |
 | `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)`; with `hits`, damaged coefficients: smears and colour blocks, `fx.jpeg_crush(quality=20, hits=40, seed=2)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `signal_noise` ✓ | Static bands and dropouts. | `fx.signal_noise(bands=3, seed=1)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
-| `anaglyph` ✓ | Red/cyan 3D look. | `fx.anaglyph(shift=6)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
 | `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |
 
@@ -360,7 +359,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | `black_and_white` | a `channel_mixer` preset |
 | `vibrance` | `grade` + `vibrance` |
 | `mirror` | `kaleidoscope(segments=1)` |
-| `anaglyph` | `rgb_split` + `pair` |
 | `plasma` | `noise_field(kind="sine")` + `warp` |
 
 **Family merges:**
