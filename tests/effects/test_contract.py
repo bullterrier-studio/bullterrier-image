@@ -1252,10 +1252,15 @@ def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_
 DESIGN_SIZE = 240  # the recipe's size: the px its numbers are written for
 LARGE_SIZE = 960  # the size rendered again, four times as many px along each side
 LOOK_TOLERANCE = 0.02  # the most the mean of any colour may differ: 2% of the range
+CHANGE_SHARE = 0.2  # the most the mean change of any colour may differ: 20% of its value at the design size ...
+CHANGE_FLOOR = 0.001  # ... or this, when that is less: a tenth of a percent of the range
 
 # Effects whose default look legitimately differs between the two sizes, each with the reason; "BUG: ..." marks a
 # defect waiting for its fix (remove the entry with the fix: a test fails while a passing effect is listed).
-SIZE_EXCEPTIONS: dict[str, str] = {}
+SIZE_EXCEPTIONS: dict[str, str] = {
+    "jpeg_crush": "BUG: the 8 x 8 block grid of the codec is in output px, so at 4 times the size the blocks are 4 "
+    "times finer and change the picture less",
+}
 
 
 @pytest.fixture(scope="module")
@@ -1282,28 +1287,57 @@ def design_photo() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     return picture, maps
 
 
-def _size_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> float:
-    """How far the mean colour of the effect `name` at its defaults, in a recipe of size 240, differs between the
-    render at 240 and the render at 960 shrunk back to 240 by averaging each 4 x 4 block: the largest difference of
-    the three channels."""
+def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dict[int, tuple[np.ndarray, np.ndarray]]:
+    """For the sizes 240 and 960: the picture at that size and the effect `name` at its defaults applied to it, in a
+    recipe of size 240. The picture is the same photo scaled the same way (a step with no opacity leaves it be)."""
     step = Step(name, partition="subject") if "partition" in registry.inputs(name) else Step(name)
+    untouched = Recipe("untouched", [Step("grade", opacity=0)], size=DESIGN_SIZE)
     look = Recipe(name, [step], size=DESIGN_SIZE)
-    at_design = runner.render(picture, look, maps=maps)
-    at_large = runner.render(picture, look, maps=maps, size=LARGE_SIZE)
+    return {
+        size: (
+            runner.render(picture, untouched, maps=maps, size=size),
+            runner.render(picture, look, maps=maps, size=size),
+        )
+        for size in (DESIGN_SIZE, LARGE_SIZE)
+    }
+
+
+def _mean_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> float:
+    """How far the mean colour of the effect `name` differs between the render at 240 and the render at 960 shrunk
+    back to 240 by averaging each 4 x 4 block: the largest difference of the three channels. Blind to marks that
+    lighten as much as they darken."""
+    renders = _renders(name, picture, maps)
+    at_design, at_large = renders[DESIGN_SIZE][1], renders[LARGE_SIZE][1]
     ratio = LARGE_SIZE // DESIGN_SIZE
     height, width = at_design.shape[:2]
     shrunk = at_large.reshape(height, ratio, width, ratio, 3).mean(axis=(1, 3))
     return float(np.abs(shrunk.mean(axis=(0, 1)) - at_design.mean(axis=(0, 1))).max())
 
 
+def _change_agrees(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> bool:
+    """Whether the effect `name` changes the picture as much at 960 as at 240: per colour, the mean of |output - input|
+    at 960 is within `CHANGE_SHARE` of its value at 240 (at least `CHANGE_FLOOR`). It ignores where the changes are,
+    so marks drawn at other places at each size agree, and it sees marks become smaller or fewer, which the mean
+    does not when light marks and dark marks cancel."""
+    change = {size: np.abs(out - rgb).mean(axis=(0, 1)) for size, (rgb, out) in _renders(name, picture, maps).items()}
+    at_design = change[DESIGN_SIZE]
+    return bool((np.abs(change[LARGE_SIZE] - at_design) <= np.maximum(CHANGE_FLOOR, CHANGE_SHARE * at_design)).all())
+
+
+def _looks_alike(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> bool:
+    """Whether the effect `name` passes both the mean check and the change check."""
+    return _mean_drift(name, picture, maps) <= LOOK_TOLERANCE and _change_agrees(name, picture, maps)
+
+
 @pytest.mark.parametrize("name", [name for name in ALL if name not in SIZE_EXCEPTIONS])
 def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_four_times_it(name, design_photo):
-    assert _size_drift(name, *design_photo) <= LOOK_TOLERANCE
+    assert _mean_drift(name, *design_photo) <= LOOK_TOLERANCE
+    assert _change_agrees(name, *design_photo)
 
 
 def test_the_size_exceptions_name_only_effects_that_still_differ(design_photo):
     assert set(SIZE_EXCEPTIONS) - set(ALL) == set()
-    assert [name for name in SIZE_EXCEPTIONS if _size_drift(name, *design_photo) <= LOOK_TOLERANCE] == []
+    assert [name for name in SIZE_EXCEPTIONS if _looks_alike(name, *design_photo)] == []
 
 
 class _DotsInPx(EffectParams):
@@ -1337,4 +1371,44 @@ def test_the_size_check_flags_marks_that_do_not_scale_and_passes_marks_that_do(
         dots = (y % params.spacing < params.size) & (x % params.spacing < params.size)
         return np.where(dots[..., None], np.float32(1), rgb)
 
-    assert (_size_drift("dot_probe", *design_photo) <= LOOK_TOLERANCE) == same_look
+    assert _looks_alike("dot_probe", *design_photo) == same_look
+
+
+class _SpecksInPx(EffectParams):
+    """Specks whose size is design pixels."""
+
+    count: int = param(40, unit="count", min=0, max=500, doc="How many specks there are.")
+    size: float = param(8.0, unit="px", min=1, max=64, doc="Width of a speck, in px.")
+
+
+class _SpecksSizedInCount(EffectParams):
+    """The size is declared as a count, so it is not scaled with the size."""
+
+    count: int = param(40, unit="count", min=0, max=500, doc="How many specks there are.")
+    size: float = param(8.0, unit="count", min=1, max=64, doc="Width of a speck, in px.")
+
+
+@pytest.mark.parametrize(
+    ("params", "change_agrees"),
+    [
+        pytest.param(_SpecksInPx, True, id="specks whose size is px"),
+        pytest.param(_SpecksSizedInCount, False, id="specks whose size is not scaled: 16 times less of the picture"),
+    ],
+)
+def test_the_change_check_flags_scattered_marks_that_shrink_though_their_mean_holds(
+    params, change_agrees, design_photo, throwaway_effects
+):
+    @effect(category="light", params=params)
+    def speck_probe(rgb, params):
+        """Black and white specks at random places, as many of each."""
+        rng = np.random.default_rng(0)  # the places depend on the picture's size, as for a scattering effect
+        out = rgb.copy()
+        side = round(params.size)
+        for index in range(params.count):
+            y = rng.integers(0, rgb.shape[0] - side)
+            x = rng.integers(0, rgb.shape[1] - side)
+            out[y : y + side, x : x + side] = index % 2
+        return out
+
+    assert _mean_drift("speck_probe", *design_photo) <= LOOK_TOLERANCE
+    assert _change_agrees("speck_probe", *design_photo) == change_agrees
