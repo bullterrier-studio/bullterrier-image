@@ -24,8 +24,9 @@ amount = 0.6
 threshold = 0.6
 
 [[step]]
-effect = "rain"
-angle = 12
+effect = "particles"
+preset = "rain"
+angle = 78
 length = 40
 opacity = 0.35
 color = "#9fd8ff"

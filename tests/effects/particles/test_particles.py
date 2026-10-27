@@ -226,3 +226,10 @@ def test_the_dust_preset_makes_round_soft_specks(lone_particle) -> None:
     assert rows.max() - rows.min() == pytest.approx(columns.max() - columns.min(), abs=1)  # no streak
     assert rows.max() - rows.min() > 12  # specks, not dots
     assert ((speck > 0.05 * speck.max()) & (speck < 0.95 * speck.max())).sum() > 0.3 * (speck > 0).sum()  # soft
+
+
+def test_the_rain_preset_makes_thin_streaks_falling_leaning_to_the_right(lone_particle) -> None:
+    streak = lone_particle(light, 3, **preset("rain"))
+    axis, _ = axis_and_centre(streak)
+    assert axis == pytest.approx(80.0, abs=2.0)
+    assert (streak > 0).sum(axis=1).max() <= 4  # thin: a pixel or two across
