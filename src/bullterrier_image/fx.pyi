@@ -842,7 +842,7 @@ Presets
 scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."""
     ...
 
-def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
+def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither,
 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.
 
@@ -874,12 +874,12 @@ colors : whole number, count, 2 to 256, default 8
     Raising it keeps more detail and gradation; fewer than this many are used if the
     picture has fewer distinct colours. 'bayer' and 'blue_noise' take longer with more
     colours.
-cell : number, fraction, 0.0005 to 0.1, default 0.0005
-    The size of one dot, as a share of the picture's long side (at least one pixel): the
-    picture is dithered on a grid of this size and shown with hard square dots. The
-    default is one pixel on a picture up to 2000 px wide; about 0.004 is two pixels on a
-    480 px picture and 0.02 or more a chunky pixel look. Raising it gives coarser,
-    larger dots.
+cell : number, px, 0 to 48, default 0.0
+    The size of one dot in px at the recipe's size (rounded to whole pixels): the
+    picture is dithered on a grid of this size and shown with hard square dots. 0, the
+    default, is one dot per pixel at any render size (so a `pattern` of 0 recolours
+    pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a pixel-art
+    look. Raising it gives coarser, larger dots.
 pattern : number, fraction, 0 to 1, default 1.0
     How much of the dot pattern is used: 1 = the method as designed; lower passes less
     error on (floyd_steinberg, atkinson) or mixes fewer colours per dot (bayer,
@@ -2959,7 +2959,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     (the opposite edge)."""
     ...
 
-def quadtree(threshold: float = 0.06, max_cell: float = 0.125, min_cell: float = 0.01, gap: float = 0.002, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def quadtree(threshold: float = 0.06, max_cell: float = 60.0, min_cell: float = 5.0, gap: float = 1.0, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges.
 
 Each cell is filled with the average colour of the photo under it. A cell splits into four while its colours spread
@@ -2974,18 +2974,17 @@ threshold : number, fraction, 0 to 0.5, default 0.06
     (0.5 is the most any cell can have, half black and half white). 0 splits every cell
     that is not perfectly flat; 0.5 splits none. Raising it gives bigger cells and a
     coarser picture.
-max_cell : number, fraction, 0.005 to 1, default 0.125
-    The largest a cell can be, as a share of the picture's long side: the picture starts
-    as an even grid of cells at most this size. Raising it makes the flat parts coarser.
-min_cell : number, fraction, 0.002 to 1, default 0.01
-    The smallest a cell can be, as a share of the picture's long side, never above
-    `max_cell`. A cell does not split into halves smaller than this. Lowering it keeps
-    finer detail at edges.
-gap : number, fraction, 0 to 0.05, default 0.002
-    Width of the line between neighbouring cells, as a share of the picture's long side:
-    0 = cells touch, about 0.002 a thin grid, 0.01 or more visible tiles. The picture's
-    own edge gets no line. A cell no wider than the line is all line, so keep it below
-    `min_cell`.
+max_cell : number, px, 2 to 480, default 60.0
+    The largest a cell can be, in px at the recipe's size: the picture starts as an even
+    grid of cells at most this wide. Raising it makes the flat parts coarser.
+min_cell : number, px, 1 to 480, default 5.0
+    The smallest a cell can be, in px at the recipe's size, never above `max_cell`. A
+    cell does not split into halves smaller than this. Lowering it keeps finer detail at
+    edges.
+gap : number, px, 0 to 24, default 1.0
+    Width of the line between neighbouring cells, in px at the recipe's size: 0 = cells
+    touch, 1 a thin grid, 5 or more visible tiles. The picture's own edge gets no line.
+    A cell no wider than the line is all line, so keep it below `min_cell`.
 gap_color : colour, default '#000000'
     The colour of the lines between cells, and of the corners a `rounding` cuts away:
     '#rrggbb', '#rgb' or three numbers 0 to 1.
@@ -3367,7 +3366,7 @@ softness : number, fraction, 0 to 1, default 0.0
     keeps the average darkening of the picture: only its shape changes."""
     ...
 
-def seams(width: float = 0.004, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:
+def seams(width: float = 2.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:
     """Draw a solid line or band along every border between the pieces of a partition.
 
 The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
@@ -3380,10 +3379,9 @@ border and the picture is unchanged.
 
 Parameters
 ----------
-width : number, fraction, 0 to 0.1, default 0.004
-    Width of the line as a share of the picture's long side (0 to 0.1), centred on each
-    border: 0 draws nothing, about 0.002 is a hairline, 0.02 or more a band. Raising it
-    widens the line.
+width : number, px, 0 to 48, default 2.0
+    Width of the line in px at the recipe's size, centred on each border: 0 draws
+    nothing, 1 is a hairline, 10 or more a band. Raising it widens the line.
 color : colour, default '#ffffff'
     Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1."""
     ...
