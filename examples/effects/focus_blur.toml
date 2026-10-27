@@ -1,10 +1,29 @@
-# Focused on the dog: the room behind it melts away.
+# A miniature: a sharp band across the dog's face, the picture blurred and more colourful away from it. The field is a
+# gradient that is 0 at the top and 1 at the bottom; the grade is driven by the band that stays sharp. Without a `field`,
+# focus_blur works on the depth: focus = 0.58, width = 0.25, feather = 0.3, radius = 8 keeps the dog sharp, the room not.
+format = 3
 name = "focus_blur"
 size = 480
 
+[region.across]
+kind = "linear_gradient"
+angle = 270
+
+[region.sharp]                 # 1 across the band (focus 0.4, width 0.18), fading to 0 over the feather 0.3
+kind = "band"
+of = "across"
+low = 0.31
+high = 0.49
+feather = 0.3
+
 [[step]]
 effect = "focus_blur"
-focus = 0.58
-width = 0.25
+field = "across"
+focus = 0.4
+width = 0.18
 feather = 0.3
-radius = 8
+radius = 9
+
+[[step]]
+effect = "grade"
+saturation = { by = "sharp", start = 1.4, end = 1.0, levels = 2 }

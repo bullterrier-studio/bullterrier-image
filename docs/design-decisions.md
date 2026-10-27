@@ -164,6 +164,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   it is data in the recipe, not a second effect per source or an input only code can pick. *Consequence:* registering
   an effect fails unless each `FieldName` parameter has a keyword-only argument of its name; a map a field needs and
   nobody gave is the usual `MapNotFoundError`.
+- **`focus_blur` is one effect; the miniature is a recipe.** The blur depends only on how far a field lies from `focus`, so a
+  depth gives a lens, a linear gradient gives a tilt-shift band, `light` or a given map gives any other. The colour a miniature
+  adds is not blur: it is a `grade` driven by the band that stays sharp (`examples/effects/focus_blur.toml`). *Reason:*
+  `depth_of_field` and `tilt_shift` were the same blur with two ways to find a distance; a saturation in the blur effect
+  would be a parameter the depth look never wants. *Consequence:* the blur is byte-identical to both old effects; the
+  saturation is not, because `grade` takes its grey from the blurred picture where `tilt_shift` took it from the sharp one
+  (up to 0.23 at the old example's settings).
 
 ## Recipes
 

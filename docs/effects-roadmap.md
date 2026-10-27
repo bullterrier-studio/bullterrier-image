@@ -68,9 +68,8 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
-| `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
-| `focus_blur` ✓ | Blur by how far a `field` (default `depth`: the model, or a map you supply) lies from `focus`; a band around it stays sharp. | `fx.focus_blur(focus=0.58, radius=8)` |
+| `focus_blur` ✓ | Blur by how far a `field` (default `depth`: the model, or a map you supply) lies from `focus`; a band around it stays sharp. A linear-gradient `field` and a `grade` driven by the band is the miniature look ([focus_blur.toml](../examples/effects/focus_blur.toml)). | `fx.focus_blur(focus=0.58, radius=8)` |
 
 ## Texture and finish
 
@@ -334,8 +333,8 @@ lands.
 
 **Core: field parameters.** An effect may name a field (`depth`, `light`, `subject`, a region such as a gradient or a
 band), resolved like a `Drive`'s `by`; only named fields are built. This merged `relight`, `bump_light` and `emboss`
-(`relight`'s `field`; presets `bump_light` and `emboss`), will merge `depth_of_field` with `tilt_shift` (`focus_blur`; the
-tilt look = a linear-gradient field), and gives `topographic` depth contours.
+(`relight`'s `field`; presets `bump_light` and `emboss`) and `depth_of_field` with `tilt_shift` (`focus_blur`; the tilt
+look = a linear-gradient field), and gives `topographic` depth contours.
 
 **Merges that change no picture:**
 
