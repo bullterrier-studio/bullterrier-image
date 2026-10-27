@@ -70,7 +70,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
 | `tilt_shift` ✓ | Miniature effect: blur away from a band, boost colour. | `fx.tilt_shift(focus=0.5, width=0.15)` |
 | `light_leak` ✓ | Warm coloured light washes . | `fx.light_leak(color="#ff7a2b")` |
-| `depth_of_field` ✓ | Blur by distance, from the injected depth (the model, or a map you supply); a band around `focus` stays sharp. | `fx.depth_of_field(focus=0.58, radius=8)` |
+| `focus_blur` ✓ | Blur by how far a `field` (default `depth`: the model, or a map you supply) lies from `focus`; a band around it stays sharp. | `fx.focus_blur(focus=0.58, radius=8)` |
 
 ## Texture and finish
 

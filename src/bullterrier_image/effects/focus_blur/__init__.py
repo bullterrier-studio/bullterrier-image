@@ -1,4 +1,4 @@
-"""The `depth_of_field` effect's code: importing this package registers the effect.
+"""The `focus_blur` effect's code: importing this package registers the effect.
 
 Its tests, example recipe and gallery picture carry its name in tests/effects/, examples/effects/ and docs/gallery/.
 """

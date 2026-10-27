@@ -874,6 +874,23 @@ def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(f
     assert runner.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
 
 
+FIELD_PARAMETERS = [(name, field) for name in ALL for field in registry.parameters(name).field_name_fields()]
+
+
+@pytest.mark.parametrize(("name", "field"), FIELD_PARAMETERS)
+# Not `light`: the hand-made brightness differs from the runner's by float32 rounding, which steep contour lines
+# (topographic) amplify past any tolerance worth having; the probe test above covers `light`.
+@pytest.mark.parametrize("selection", ["depth", "subject", "background", "g", "middle"])
+def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_field_and_the_equal_array(
+    name, field, selection, photo, subject
+):
+    maps = field_maps(photo, subject)
+    recipe = Recipe("named", [Step(name, {field: selection})], size=None, regions=FIELD_REGIONS)
+    named = runner.render(photo, recipe, maps=maps)
+    direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
+    np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
+
+
 @pytest.mark.parametrize(
     ("step_params", "asked"),
     [
