@@ -10,7 +10,6 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/anamorphic_streaks.jpg" width="160" alt="anamorphic_streaks"> | `anamorphic_streaks` | Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened over the picture by `amount`. | `length=0.35` `threshold=0.7` `amount=6.0` `color='#8fb8ff'` | [anamorphic_streaks.toml](../../examples/effects/anamorphic_streaks.toml) |
 | <img src="../gallery/bloom.jpg" width="160" alt="bloom"> | `bloom` | Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture. | `radius=32.0` `threshold=0.6` `amount=0.7` `color=None` `octaves=4` `persistence=0.5` +3 advanced | [bloom.toml](../../examples/effects/bloom.toml) |
 | <img src="../gallery/chromatic_aberration.jpg" width="160" alt="chromatic_aberration"> | `chromatic_aberration` | Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum. | `amount=4.0` `samples=3` `x=0.5` `y=0.5` +2 advanced | [chromatic_aberration.toml](../../examples/effects/chromatic_aberration.toml) |
-| <img src="../gallery/clarity.jpg" width="160" alt="clarity"> | `clarity` | Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when the whole face sits in a narrow band of brightness. | `radius=30.0` `amount=1.0` +3 advanced | [clarity.toml](../../examples/effects/clarity.toml) |
 | <img src="../gallery/dehaze.jpg" width="160" alt="dehaze"> | `dehaze` | Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009). | `amount=0.9` `patch=15` `radius=30.0` `airlight_fraction=0.001` +3 advanced | [dehaze.toml](../../examples/effects/dehaze.toml) |
 | <img src="../gallery/depth_of_field.jpg" width="160" alt="depth_of_field"> | `depth_of_field` | A shallow depth of field: each pixel is blurred by w x `radius`, w = clip((\|depth - focus\| - width / 2) / feather, 0, 1), so the depths within `width` / 2 of `focus` are returned exactly as they are. | `focus=0.8` `width=0.15` `feather=0.4` `radius=10.0` +3 advanced | [depth_of_field.toml](../../examples/effects/depth_of_field.toml) |
 | <img src="../gallery/gaussian_blur.jpg" width="160" alt="gaussian_blur"> | `gaussian_blur` | Soften the picture with a Gaussian blur of standard deviation `radius` px. | `radius=4.0` +3 advanced | [gaussian_blur.toml](../../examples/effects/gaussian_blur.toml) |
@@ -23,7 +22,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
 | <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture's depth, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=200.0` `blur=2.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
-| <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +2 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
+| <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
 | <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `limit=1.0` `amount=0.8` `angle=0.0` `color='#ffffff'` | [starburst.toml](../../examples/effects/starburst.toml) |
 | <img src="../gallery/tilt_shift.jpg" width="160" alt="tilt_shift"> | `tilt_shift` | A miniature look: the band `width` wide at `focus` stays sharp, and away from it the picture is blurred up to `radius` and its colour raised by `saturation`. | `focus=0.5` `width=0.2` `feather=0.25` `angle=0.0` `radius=10.0` `saturation=0.3` `levels=4` +2 advanced | [tilt_shift.toml](../../examples/effects/tilt_shift.toml) |
 | <img src="../gallery/tone_map.jpg" width="160" alt="tone_map"> | `tone_map` | Compress the broad brightness differences of the picture and keep (or boost) its fine detail. | `contrast=0.5` `amount=0.5` `radius=30.0` +1 advanced | [tone_map.toml](../../examples/effects/tone_map.toml) |
@@ -107,23 +106,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `prism` | Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge. |
-
-### `clarity`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `radius` | number | px | 0 to 500 | `30.0` | Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the recipe's size. Larger compares bigger regions; 0 turns the effect off. |
-| `amount` | number (drivable) | ratio | 0 to 5 | `1.0` | How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1 = doubled. |
-
-<details><summary>Advanced parameters (3)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), 'constant' (constant_value). |
-| `constant_value` | number | fraction | 0 to 1 | `0.0` | The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise. |
-
-</details>
 
 ### `dehaze`
 
@@ -339,14 +321,21 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `amount` | number (drivable) | ratio | 0 to 5 | `0.8` | How much of the detail is added back: 0 = off, 1 = the full difference from the blurred copy; above 1 edges overshoot and halos show. |
 | `threshold` | number | fraction | 0 to 1 | `0.0` | The smallest difference (0..1, per channel) from the blurred copy that is sharpened: smaller differences are left alone, which keeps grain and smooth skin from being sharpened; 0 sharpens everything. |
 
-<details><summary>Advanced parameters (2)</summary>
+<details><summary>Advanced parameters (3)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+| `edge` | one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the border stands out from it). |
+| `constant_value` | number | fraction | 0 to 1 | `0.0` | The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored otherwise. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `clarity` | Local contrast: features stand out against a wide (30 px) blur of their surroundings. |
 
 ### `starburst`
 

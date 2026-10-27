@@ -439,34 +439,6 @@ Presets
 prism : Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."""
     ...
 
-def clarity(radius: float = 30.0, amount: float | Drive = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Local contrast: exaggerate how each area differs from its surroundings, so features stand out even when
-the whole face sits in a narrow band of brightness. `radius` = size of 'surroundings' in px, `amount` 0 = off.
-Put it before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
-
-Parameters
-----------
-radius : number, px, 0 to 500, default 30.0
-    Size of each area's 'surroundings': the Gaussian sigma of the blur, in px at the
-    recipe's size. Larger compares bigger regions; 0 turns the effect off.
-amount : number (drivable), ratio, 0 to 5, default 1.0
-    How strongly each area's difference from its surroundings is exaggerated: 0 = off, 1
-    = doubled.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
-    Larger is more exact and slower.
-edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge), 'constant' (constant_value).
-constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
-    otherwise."""
-    ...
-
 def color_balance(shadows_red: float = 0.0, shadows_green: float = 0.0, shadows_blue: float = 0.0, midtones_red: float = 0.0, midtones_green: float = 0.0, midtones_blue: float = 0.0, highlights_red: float = 0.0, highlights_green: float = 0.0, highlights_blue: float = 0.0, preserve_luminosity: bool = True, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Shift red, green and blue separately in the shadows, the midtones and the highlights.
 
@@ -3845,11 +3817,14 @@ edge_threshold : number, fraction, 0.001 to 1, default 0.1
     and more like a plain blur; lowering it follows ever smaller edges."""
     ...
 
-def sharpen(radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def sharpen(radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['clarity'] | None = None) -> Step:
     """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
 
 Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
-kept within 0..1.
+kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local
+contrast, which exaggerates how each area differs from its surroundings so features stand out even when the
+whole face sits in a narrow band of brightness. Put that before effects that turn tone into marks (ascii,
+halftone), which are blind to small tonal differences.
 
 Parameters
 ----------
@@ -3870,10 +3845,18 @@ Advanced parameters
 truncate : number, ratio, 1 to 10, default 4.0
     Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
     px. Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge)."""
+    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the border
+    stands out from it).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
+    otherwise.
+
+Presets
+-------
+clarity : Local contrast: features stand out against a wide (30 px) blur of their surroundings."""
     ...
 
 def shatter(pieces: int = 24, shape: Literal['voronoi', 'triangles'] = 'voronoi', detail: float = 0.0, fill: float = 0.0, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
