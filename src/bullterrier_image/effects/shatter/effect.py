@@ -101,8 +101,8 @@ class ShatterParams(EffectParams):
         "reflect",
         doc="What lies beyond the picture's edge, for a moved piece that reads from there and for the edges `detail` "
         "looks for at the border (with 'wrap' a mismatch between opposite sides counts as an edge): 'reflect' "
-        "(mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel "
-        "repeated), 'wrap' (the opposite edge).",
+        "(the default, as for warps: mirrored, edge pixel repeated, so a moved piece shows no gap at the border), "
+        "'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).",
         advanced=True,
     )
 

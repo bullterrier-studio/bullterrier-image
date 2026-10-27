@@ -46,9 +46,10 @@ class PolarParams(EffectParams):
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
         doc="What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre planet leaves it in "
-        "'from' (the angle itself never has an edge; it wraps round): 'nearest' (the edge pixel repeated: the sky "
-        "stays one flat tone of the top row), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the "
-        "edge pixel), 'wrap' (the opposite edge).",
+        "'from' (the angle itself never has an edge; it wraps round): 'nearest' (the default, unlike other warps' "
+        "'reflect': the edge pixel repeated, so the sky stays one flat tone of the top row and the rim stays clean), "
+        "'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the opposite "
+        "edge).",
         advanced=True,
     )
 

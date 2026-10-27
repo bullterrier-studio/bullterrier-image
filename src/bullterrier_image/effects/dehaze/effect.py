@@ -77,7 +77,8 @@ class DehazeParams(EffectParams):
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "nearest",
         doc="What the darkest-value search sees beyond the picture's edge, which sets the haze estimate along the "
-        "border: 'nearest' (the edge pixel repeated) and 'reflect' (mirrored, edge pixel repeated) look only at "
+        "border (dehaze filters by local darkest values rather than warping, so the default is 'nearest', not "
+        "'reflect'): 'nearest' (the edge pixel repeated) and 'reflect' (mirrored, edge pixel repeated) look only at "
         "pixels of the patch inside the picture and give the same result; 'mirror' (mirrored about the edge pixel) "
         "also looks at pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far side's "
         "darkest values set the haze at the border.",

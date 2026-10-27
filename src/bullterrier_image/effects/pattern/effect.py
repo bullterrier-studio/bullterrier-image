@@ -31,8 +31,9 @@ class PatternParams(EffectParams):
         min=0,
         max=360,
         cyclic=True,
-        doc="Turns the pattern clockwise on screen about the picture's top-left corner. At 0 the stripes are vertical "
-        "and the checks, dots and grid lines are aligned with the picture's edges; at 90 the stripes are horizontal.",
+        doc="The direction the pattern varies along, in degrees clockwise from pointing right, about the picture's "
+        "top-left corner: at 0 it changes from left to right, so the stripes are vertical and the checks, dots and "
+        "grid lines are aligned with the picture's edges; at 90 it changes downward and the stripes are horizontal.",
     )
     foreground: Color = param("#ffffff", doc="The colour of the stripes, the dark checks, the dots and the grid lines.")
     background: Color = param("#101018", doc="The colour between them.")
