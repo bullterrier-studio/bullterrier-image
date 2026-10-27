@@ -12,7 +12,6 @@ Effects that work on the cut-out subject, apart from its background.
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px. | `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth. | `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
 | <img src="../gallery/rim_light.jpg" width="160" alt="rim_light"> | `rim_light` | Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`. | `angle=40.0` `color='#ff9a4d'` `width=12.0` `amount=1.0` `falloff=1.5` +4 advanced | [rim_light.toml](../../examples/effects/rim_light.toml) |
-| <img src="../gallery/spotlight.jpg" width="160" alt="spotlight"> | `spotlight` | Light the subject and darken the rest: the further from the silhouette, the more the picture goes to `color`. | `amount=0.8` `falloff=0.8` `radius=200.0` `feather=10.0` `color='#000000'` +3 advanced | [spotlight.toml](../../examples/effects/spotlight.toml) |
 
 ### `disperse`
 
@@ -192,25 +191,5 @@ A step of `reflection` has `opacity = 0.6` unless it sets its own.
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the `smoothing` blur is cut off, in sigmas: it reaches truncate x smoothing px. Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored, border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the border pixel repeated) or 'wrap' (the opposite border). |
 | `subject_threshold` | number | fraction | 0 to 1 | `0.5` | The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
-
-</details>
-
-### `spotlight`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `amount` | number | fraction | 0 to 1 | `0.8` | How far the picture is darkened where it is darkest, far from the subject: 0 = unchanged, 1 = fully `color`. |
-| `falloff` | number | ratio | 0.1 to 10 | `0.8` | How fast the darkening grows with distance from the subject: it is (distance / radius)^falloff of its full strength. 1 = evenly, below 1 darkens quickly near the subject, above 1 stays light near it and darkens late. |
-| `radius` | number | px | 1 to 5000 | `200.0` | The distance from the subject's silhouette, in px at the recipe's size, at which the darkening reaches full strength; beyond it the picture stays that dark. Raising it spreads the light further. |
-| `feather` | number | px | 0 to 200 | `10.0` | How softly the light spills from the subject, as a Gaussian sigma in px: the area around the silhouette stays lit through this much of its surroundings. Raising it makes a softer pool of light round the subject; 0 = the darkening starts right at the silhouette. |
-| `color` | colour |  |  | `'#000000'` | The colour the surroundings darken toward: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens; a dark blue gives a night look. |
-
-<details><summary>Advanced parameters (3)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the `feather` blur is cut off, in sigmas: it reaches truncate x feather px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the `feather` blur sees beyond the picture's border: 'reflect' (mirrored, border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the border pixel repeated) or 'wrap' (the opposite border). |
-| `subject_threshold` | number | fraction | 0 to 1 | `0.5` | The subject's value, 0 to 1, from which a pixel belongs to the subject that stays lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
 
 </details>

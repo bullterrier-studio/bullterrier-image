@@ -3602,53 +3602,6 @@ Presets
 glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
     ...
 
-def spotlight(amount: float = 0.8, falloff: float = 0.8, radius: float = 200.0, feather: float = 10.0, color: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Light the subject and darken the rest: the further from the silhouette, the more the picture goes to `color`.
-
-Darkness is `amount` x (distance / `radius`)^`falloff` (full from `radius` px out), times the share of the
-surroundings that `feather` leaves unlit, so a feathered spotlight bleeds light softly past the silhouette. The
-subject itself is never touched. With a subject that covers nothing, everything is the rest and is darkened fully.
-
-`subject` is filled in by the recipe (never set it in a recipe file): the subject's silhouette. Without one there is
-no subject to light and the picture is returned unchanged.
-
-Parameters
-----------
-amount : number, fraction, 0 to 1, default 0.8
-    How far the picture is darkened where it is darkest, far from the subject: 0 =
-    unchanged, 1 = fully `color`.
-falloff : number, ratio, 0.1 to 10, default 0.8
-    How fast the darkening grows with distance from the subject: it is (distance /
-    radius)^falloff of its full strength. 1 = evenly, below 1 darkens quickly near the
-    subject, above 1 stays light near it and darkens late.
-radius : number, px, 1 to 5000, default 200.0
-    The distance from the subject's silhouette, in px at the recipe's size, at which the
-    darkening reaches full strength; beyond it the picture stays that dark. Raising it
-    spreads the light further.
-feather : number, px, 0 to 200, default 10.0
-    How softly the light spills from the subject, as a Gaussian sigma in px: the area
-    around the silhouette stays lit through this much of its surroundings. Raising it
-    makes a softer pool of light round the subject; 0 = the darkening starts right at
-    the silhouette.
-color : colour, default '#000000'
-    The colour the surroundings darken toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-    Black darkens; a dark blue gives a night look.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the `feather` blur is cut off, in sigmas: it reaches truncate x feather px.
-    Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the `feather` blur sees beyond the picture's border: 'reflect' (mirrored,
-    border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
-    border pixel repeated) or 'wrap' (the opposite border).
-subject_threshold : number, fraction, 0 to 1, default 0.5
-    The subject's value, 0 to 1, from which a pixel belongs to the subject that stays
-    lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
-    fur), raising it less."""
-    ...
-
 def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, density: float = 1.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
     """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
 screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density` picks a random
