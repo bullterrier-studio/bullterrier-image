@@ -1,0 +1,7 @@
+# Looks that are one tone_map step.
+
+[shadows_highlights]
+description = "Shadows and highlights recovery: dark areas lifted and bright areas tamed by their local surroundings, texture kept."
+contrast = 0.7
+pivot = 1.5
+amount = 0.3

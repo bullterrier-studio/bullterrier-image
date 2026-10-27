@@ -1,9 +1,0 @@
-# Open up the black sofa and the dark corners without touching the bright coat.
-name = "shadows_highlights"
-size = 480
-
-[[step]]
-effect = "shadows_highlights"
-shadows = 1.0
-highlights = 0.3
-radius = 30

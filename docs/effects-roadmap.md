@@ -48,9 +48,8 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
 | `denoise` (deferred) | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
 | `lens_blur` aperture (planned) | `blades` on `lens_blur`: hexagonal or cat's-eye bokeh; 0 = a disc. | `fx.lens_blur(radius=12, highlights=4, blades=6)` |
-| `shadows_highlights` ✓ | Recover dark and bright areas. | `fx.shadows_highlights(shadows=0.4)` |
 | `dehaze` ✓ | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
-| `tone_map` ✓ | Local tone mapping, the "HDR look". | `fx.tone_map(amount=0.7)` |
+| `tone_map` ✓ | Local tone mapping: the "HDR look", shadows and highlights recovery (preset `shadows_highlights`). | `fx.tone_map(amount=0.7)` |
 | `vignette` ✓ | Darken (or colour) the corners. | `fx.vignette(amount=0.5, roundness=0.8)` |
 | `gaussian_blur` ✓ | Blur. | `fx.gaussian_blur(radius=6)` |
 | `motion_blur` ✓ | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
@@ -349,7 +348,6 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |
 | `overlay` | `blend` + `fit="width"` |
 | `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |
-| `shadows_highlights` + `tone_map` | one, if one set of curves covers both looks |
 
 **Conventions, applied with the merges:**
 - Angles of a direction are measured clockwise from pointing right.

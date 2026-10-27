@@ -1,4 +1,4 @@
-"""The `tone_map` effect: local tone mapping that compresses broad brightness differences and keeps fine detail."""
+"""The `tone_map` effect: HDR-style local tone mapping and shadows and highlights recovery."""
 
 import numpy as np
 
@@ -34,6 +34,16 @@ class ToneMapParams(EffectParams):
         "exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it brings out texture; it can clip "
         "highlights.",
     )
+    pivot: float = param(
+        0.0,
+        unit="stops",
+        min=0,
+        max=8,
+        doc="The brightness, in stops below white, that compression leaves where it is: 0 = white (everything is "
+        "lightened, nothing darkened); 2 = a quarter of white's brightness (about 0.25), where areas brighter than it "
+        "are darkened and darker ones lightened, recovering highlights as well as shadows. Raising it darkens "
+        "bright areas more and lightens dark ones less.",
+    )
     radius: float = param(
         30.0,
         unit="px",
@@ -58,17 +68,20 @@ class ToneMapParams(EffectParams):
 
 @effect(category="light", params=ToneMapParams)
 def tone_map(rgb: np.ndarray, params: ToneMapParams) -> np.ndarray:
-    """Compress the broad brightness differences of the picture and keep (or boost) its fine detail.
+    """HDR tone mapping, shadows and highlights recovery, lifted shadows.
+
+    Compresses the broad brightness differences of the picture and keeps (or boosts) its fine detail.
 
     Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in
     stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px,
     edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002).
-    The new log brightness is `contrast` x B + (1 + `amount`) x D, and every pixel's red, green and blue are
-    multiplied by 2^(new - L) = 2^((`contrast` - 1) B + `amount` D), so hue and saturation stay and the
-    result is held to 0..1. An even area of luma Y comes out as Y^`contrast`. B is an average of values of L, so it
-    never leaves their range: with `amount` 0 lowering `contrast` only ever brightens.
+    The new log brightness is `contrast` x (B + `pivot`) - `pivot` + (1 + `amount`) x D, and every pixel's red, green
+    and blue are multiplied by 2^(new - L) = 2^((`contrast` - 1) (B + `pivot`) + `amount` D), so hue and saturation
+    stay and the result is held to 0..1. An even area of luma Y comes out as Y (Y 2^`pivot`)^(`contrast` - 1), which
+    is Y^`contrast` for `pivot` 0. B is an average of values of L, so it never leaves their range: with `amount` 0
+    and `pivot` 0 lowering `contrast` only ever brightens; areas brighter than 2^-`pivot` are darkened.
     """
     log_luma = np.log2(np.maximum(luminance(rgb), _LUMINANCE_FLOOR))
     base = guided_filter(log_luma, log_luma, radius=round(params.radius), epsilon=params.edge_threshold**2)
-    gain = np.exp2((params.contrast - 1.0) * base + params.amount * (log_luma - base))
+    gain = np.exp2((params.contrast - 1.0) * (base + params.pivot) + params.amount * (log_luma - base))
     return np.clip(rgb * gain[..., None], 0.0, 1.0).astype(np.float32)

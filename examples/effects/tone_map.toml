@@ -1,4 +1,5 @@
-# Compress the contrast between the dark sofa and the bright coat while keeping the fur's texture.
+# Compress the contrast between the dark sofa and the bright coat while keeping the fur's texture, then the recovery
+# preset: open up the sofa's dark corners and tame the brightest areas.
 name = "tone_map"
 size = 480
 
@@ -7,3 +8,8 @@ effect = "tone_map"
 contrast = 0.65
 amount = 0.5
 radius = 30
+
+[[step]]
+effect = "tone_map"
+preset = "shadows_highlights"
+opacity = 0.6

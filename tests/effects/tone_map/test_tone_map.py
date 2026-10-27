@@ -5,6 +5,7 @@ from itertools import pairwise
 import numpy as np
 import pytest
 
+from bullterrier_image import Recipe, fx, render
 from bullterrier_image.core import registry
 
 NAME = "tone_map"
@@ -124,3 +125,30 @@ def test_the_base_stays_within_the_brightness_the_picture_has() -> None:
     gain = out[..., 0] / picture[..., 0]
     assert (gain >= luma.max() ** -0.5 - 1e-4).all()
     assert (gain <= luma.min() ** -0.5 + 1e-4).all()
+
+
+# Pivot p (stops below white): an even grey v is multiplied by (v x 2^p)^(contrast - 1), so a grey at 2^-p stays put,
+# darker ones are lifted and brighter ones lowered. Worked out by hand (calculator) per row.
+PIVOT_ROWS = {
+    "at the pivot (0.5, one stop) nothing changes": (0.5, 0.5, 1.0, 0.5),
+    "a stop under the pivot: 0.25 x 0.5^-0.5": (0.25, 0.5, 1.0, 0.3535534),
+    "white above the pivot is lowered: 1 x 2^-0.5": (1.0, 0.5, 1.0, 0.7071068),
+    "pivot 2 (0.25) and white: 1 x 4^-0.5": (1.0, 0.5, 2.0, 0.5),
+    "pivot 0 is the old behaviour: white stays white": (1.0, 0.5, 0.0, 1.0),
+    "contrast 1 leaves any pivot alone": (0.8, 1.0, 3.0, 0.8),
+}
+
+
+@pytest.mark.parametrize(("grey", "contrast", "pivot", "expected"), PIVOT_ROWS.values(), ids=list(PIVOT_ROWS))
+def test_the_pivot_is_the_brightness_the_compression_leaves_where_it_is(grey, contrast, pivot, expected) -> None:
+    out = registry.apply(NAME, flat(grey), contrast=contrast, amount=0.0, pivot=pivot)
+    np.testing.assert_allclose(out, expected, atol=1e-5)
+
+
+def test_the_shadows_highlights_preset_lifts_dark_areas_and_lowers_bright_ones() -> None:
+    """Far from their edge, a dark half (0.05) comes out brighter and a bright half (0.9) darker."""
+    out = render(
+        two_blocks(0.05, 0.9, (16, 128)), Recipe("look", size=128, steps=[fx.tone_map(preset="shadows_highlights")])
+    )
+    assert out[8, 5, 0] > 0.05 * 1.3
+    assert out[8, 122, 0] < 0.9 * 0.95
