@@ -241,3 +241,10 @@ def test_the_snow_preset_makes_flakes_in_four_layers_the_largest_14_px_wide(lone
     nearest = expected[np.abs(np.subtract.outer(radii, expected)).argmin(axis=1)]
     np.testing.assert_allclose(radii, nearest, atol=0.5)
     assert set(nearest) == set(expected)
+
+
+def test_the_stars_preset_makes_small_crisp_dots(lone_particle) -> None:
+    star = lone_particle(light, 3, **preset("stars"))
+    rows, columns = np.nonzero(star)
+    assert max(rows.max() - rows.min(), columns.max() - columns.min()) <= 3  # 3 px across at most: 4 pixels
+    assert star.max() > 0.3

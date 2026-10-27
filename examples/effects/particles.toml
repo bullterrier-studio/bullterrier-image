@@ -1,10 +1,24 @@
-# Sparks, snow and stars: the presets `embers`, `snow` and `stars`, each at its usual opacity.
+# A night sky behind the dog with sparks rising: the presets `stars` (over a dark `fill`, on the background only) and
+# `embers`. Rain, snow and dust are the presets `rain`, `snow` and `dust`, each at its usual opacity.
 # It also makes the effect's picture in the catalogue.
 name = "particles"
 size = 480
 
 [[step]]
+effect = "fill"
+color = "#04060f"
+mask = "background"
+
+[[step]]
+effect = "particles"
+preset = "stars"
+density = 3.3
+seed = 1
+mask = "background"
+
+[[step]]
 effect = "particles"
 preset = "embers"
+density = 0.65
 opacity = 0.9
 seed = 1

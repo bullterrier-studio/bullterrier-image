@@ -8,6 +8,12 @@ effect = "aurora"
 colors = ["#2bff9a", "#7a2cff"]
 
 [[step]]
-effect = "starfield"
-count = 900
+effect = "fill"
+color = "#04060f"
+opacity = 0.6
+
+[[step]]
+effect = "particles"
+preset = "stars"
+density = 1.9
 opacity = 0.6

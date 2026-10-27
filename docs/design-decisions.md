@@ -143,6 +143,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `amount` (s + h) / 2, `balance` (h - s) / (h + s). *Consequence:* grey grain draws the stream of the old `grain` (and
   of `noise(color=False)`, equal to 6e-8); colour grain draws that of `film_grain` (channel seed = `seed << 2 |
   channel`), so colour `noise` keeps its distribution but not its random values.
+- **`particles` is one effect for rain, snow, embers, dust and stars: dots and streaks at random depths.** `length` 0 is
+  a dot (there is no `shape`); `angle` is the streak's direction clockwise from right. A particle at nearness d (1 =
+  nearest; `layers` n puts it on plane k / n) has size and length 1 - `size_falloff` x (1 - d) of the nearest and
+  brightness 1 - `brightness_falloff` x (1 - d). *Reason:* the five effects differed only in these terms; snow's full-
+  range size with its half-range brightness is why the two falloffs are separate. A preset cannot set `opacity` (a step
+  key), so a look's usual opacity (embers 0.9, dust 0.55, rain 0.7, snow 0.8, stars 1) is written in the step.
+  *Consequence:* the stars of `starfield` (now `fill` and the preset `stars`) take the common depth direction, so the
+  same seed gives the same star positions with other sizes and brightnesses; counts became `density`.
 - **A parameter may name a field.** `field: FieldName = param("depth", doc=...)` holds the name of a selection, written
   as `mask` and `Drive.by` are: `depth`, `light`, `subject`, `background` or a region of the recipe (`field = "light"`,
   `fx.relight(field="light")`). The step checks the name when it is made, as it checks `by`: it exists and is a
