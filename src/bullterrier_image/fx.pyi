@@ -3618,46 +3618,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     opposite edge)."""
     ...
 
-def signal_noise(bands: int = 3, band_height: float = 0.04, static: float = 0.7, dropouts: int = 12, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, dropout_length: float = 0.12, dropout_height: int = 2, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Mix random grey static into `bands` full-width bands, then stamp `dropouts` short streaks of `color` on top.
-
-A band of static replaces `static` of every pixel in it by one random grey (the same in all three channels, a
-different one for each pixel). A dropout is a short streak `dropout_height` rows tall in one flat colour. Bands
-and streaks draw from separate random streams of `seed`, so changing the number of bands moves no streak.
-
-Parameters
-----------
-bands : whole number, count, 0 to 200, default 3
-    How many horizontal bands of static cross the picture, 0 to 200; 0 = none. Bands
-    land at random rows and may overlap.
-band_height : number, fraction, 0 to 1, default 0.04
-    The tallest a band of static can be, as a fraction 0 to 1 of the picture's height.
-    Each band is between half this and this tall (never under 1 px); raising it gives
-    thicker bands.
-static : number, fraction, 0 to 1, default 0.7
-    How much static a band holds, 0 to 1: the share of each pixel in a band that is
-    replaced by a random grey. 0 leaves the bands invisible, 1 fills them with pure
-    snow.
-dropouts : whole number, count, 0 to 2000, default 12
-    How many dropout streaks, 0 to 2000: short horizontal marks where the signal was
-    lost and the tape shows `color`. 0 = none. Raising it covers more of the picture.
-color : colour, default '#ffffff'
-    The colour of a dropout streak: '#rrggbb', '#rgb' or [r, g, b] 0..1. White is the
-    usual look of a tape dropout; black gives dead gaps.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for where the bands and streaks fall and the grey of the static: the
-    same seed always gives the same damage, any other a different one.
-
-Advanced parameters
--------------------
-dropout_length : number, fraction, 0 to 1, default 0.12
-    The longest a dropout streak can be, as a fraction 0 to 1 of the picture's width.
-    Each streak is between half this and this long (never under 1 px).
-dropout_height : whole number, px, 1 to 100, default 2
-    How many rows tall a dropout streak is, 1 to 100 px, tuned for a picture about 480
-    px high. A streak that would cross the bottom edge is cut there."""
-    ...
-
 def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, bands: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
     """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide
 `bands` more strips of random height placed at random rows.
@@ -4045,14 +4005,15 @@ seed : whole number, count, 0 to 4294967295, default 0
     seed a different one."""
     ...
 
-def vhs(tracking: float = 0.06, bands: int = 3, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 0.04, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Make the picture look like a worn videotape: tracking bands, wobbling rows, bled colour and tape noise.
+def vhs(tracking: float = 0.06, bands: int = 3, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 0.04, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
+    """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
+rows, bled colour and tape noise (static, snow).
 
 In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width; every row then drifts
-sideways by a slow random wander of about `wobble` px; in YIQ (as `ntsc`) the colour is moved `bleed` px right and
-blurred sideways by that much, as colour on tape lags and smears; and `noise` of grain is added to the brightness.
-The bands, the noise and the wobble draw from `seed`, so the same seed gives the same damage; changing the number
-of bands moves neither noise nor wobble.
+sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
+the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
+`noise` of grain is added to the brightness. The bands, dropouts, noise and wobble each draw from their own stream
+of `seed`, so the same seed gives the same damage; changing the number of bands moves no dropout, noise or wobble.
 
 Parameters
 ----------
@@ -4062,6 +4023,11 @@ tracking : number, fraction, 0 to 1, default 0.06
     left or right. 0 = the bands do not move.
 bands : whole number, count, 0 to 50, default 3
     How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.
+dropouts : whole number, count, 0 to 2000, default 0
+    How many dropout streaks, 0 to 2000: short white marks where the signal was lost,
+    each as tall as a speck of tape noise (`noise_size`) and between half of `tracking`
+    and `tracking` of the picture's width long. 0 = none; raising it covers more of the
+    picture.
 bleed : number, px, 0 to 100, default 5.0
     How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a
     picture about 480 px high: colour lags the brightness by this many pixels and is
@@ -4075,8 +4041,8 @@ wobble : number, px, 0 to 50, default 1.5
     drift from row to row, 0 to 50, tuned for a picture about 480 px high: 0 = straight
     rows, a few px = the shaky edges of a worn tape.
 seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for the bands, the noise and the wobble: the same seed always gives the
-    same damage, any other a different one.
+    Random seed for the bands, the dropouts, the noise and the wobble: the same seed
+    always gives the same damage, any other a different one.
 
 Advanced parameters
 -------------------
@@ -4097,7 +4063,11 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
     blurs sideways: 'wrap' the opposite side, 'nearest' the edge pixel repeated,
     'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about
     the edge pixel. For the noise and wobble the rules act on the rows and columns of
-    their own fields."""
+    their own fields.
+
+Presets
+-------
+signal_noise : A failing analog signal: VHS static and snow with white tape dropouts, and a few bands torn sideways."""
     ...
 
 def vignette(amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

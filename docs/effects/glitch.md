@@ -14,8 +14,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
 | <img src="../gallery/scan_roll.jpg" width="160" alt="scan_roll"> | `scan_roll` | Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does. | `axis='vertical'` `offset=0.2` +1 advanced | [scan_roll.toml](../../examples/effects/scan_roll.toml) |
-| <img src="../gallery/signal_noise.jpg" width="160" alt="signal_noise"> | `signal_noise` | Mix random grey static into `bands` full-width bands, then stamp `dropouts` short streaks of `color` on top. | `bands=3` `band_height=0.04` `static=0.7` `dropouts=12` `color='#ffffff'` `seed=0` +2 advanced | [signal_noise.toml](../../examples/effects/signal_noise.toml) |
-| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape: tracking bands, wobbling rows, bled colour and tape noise. | `tracking=0.06` `bands=3` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
+| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
 
 ### `dead_pixels`
 
@@ -147,36 +146,17 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 </details>
 
-### `signal_noise`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `bands` | whole number | count | 0 to 200 | `3` | How many horizontal bands of static cross the picture, 0 to 200; 0 = none. Bands land at random rows and may overlap. |
-| `band_height` | number | fraction | 0 to 1 | `0.04` | The tallest a band of static can be, as a fraction 0 to 1 of the picture's height. Each band is between half this and this tall (never under 1 px); raising it gives thicker bands. |
-| `static` | number | fraction | 0 to 1 | `0.7` | How much static a band holds, 0 to 1: the share of each pixel in a band that is replaced by a random grey. 0 leaves the bands invisible, 1 fills them with pure snow. |
-| `dropouts` | whole number | count | 0 to 2000 | `12` | How many dropout streaks, 0 to 2000: short horizontal marks where the signal was lost and the tape shows `color`. 0 = none. Raising it covers more of the picture. |
-| `color` | colour |  |  | `'#ffffff'` | The colour of a dropout streak: '#rrggbb', '#rgb' or [r, g, b] 0..1. White is the usual look of a tape dropout; black gives dead gaps. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the bands and streaks fall and the grey of the static: the same seed always gives the same damage, any other a different one. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `dropout_length` | number | fraction | 0 to 1 | `0.12` | The longest a dropout streak can be, as a fraction 0 to 1 of the picture's width. Each streak is between half this and this long (never under 1 px). |
-| `dropout_height` | whole number | px | 1 to 100 | `2` | How many rows tall a dropout streak is, 1 to 100 px, tuned for a picture about 480 px high. A streak that would cross the bottom edge is cut there. |
-
-</details>
-
 ### `vhs`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `tracking` | number | fraction | 0 to 1 | `0.06` | How far a tracking band slides sideways, at most, as a fraction 0 to 1 of the picture's width: each band slides by a random whole number of pixels up to this, left or right. 0 = the bands do not move. |
 | `bands` | whole number | count | 0 to 50 | `3` | How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none. |
+| `dropouts` | whole number | count | 0 to 2000 | `0` | How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` of the picture's width long. 0 = none; raising it covers more of the picture. |
 | `bleed` | number | px | 0 to 100 | `5.0` | How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a picture about 480 px high: colour lags the brightness by this many pixels and is blurred sideways by a Gaussian of this standard deviation. 0 = no bleed; raising it smears red and blue far past their edges. |
 | `noise` | number | fraction | 0 to 1 | `0.03` | The standard deviation of the tape noise added to brightness, 0 to 1 in picture units: 0 = none, 0.03 is visible, 0.1 is heavy. Colour is not touched. |
 | `wobble` | number | px | 0 to 50 | `1.5` | How far the rows wander sideways, as the standard deviation in px of a slow random drift from row to row, 0 to 50, tuned for a picture about 480 px high: 0 = straight rows, a few px = the shaky edges of a worn tape. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the bands, the noise and the wobble: the same seed always gives the same damage, any other a different one. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for the bands, the dropouts, the noise and the wobble: the same seed always gives the same damage, any other a different one. |
 
 <details><summary>Advanced parameters (5)</summary>
 
@@ -189,3 +169,9 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | `edge` | one of 'wrap', 'nearest', 'reflect', 'mirror' |  |  | `'wrap'` | What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'wrap' the opposite side, 'nearest' the edge pixel repeated, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `signal_noise` | A failing analog signal: VHS static and snow with white tape dropouts, and a few bands torn sideways. |
