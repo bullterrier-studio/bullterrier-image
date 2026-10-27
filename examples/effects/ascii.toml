@@ -9,6 +9,6 @@ gamma = 0.5
 photo = 0.35                  # thin text alone is dark; a faint copy of the photo behind it keeps it readable
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"           # the subject on black

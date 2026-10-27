@@ -205,7 +205,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | `fill` with `mask` = a `band` of `depth` region |
+| `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: a one-colour `gradient` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | one-colour `gradient` with `mask` = a `band` of `depth` region |
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `grade`, `color_balance` and `gaussian_blur` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
@@ -219,16 +219,16 @@ Use the subject cut-out, so they target the subject or the background.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `fill` ✓ | Flat colour; masked = background removal. | `fx.fill("#000", mask="background")` |
+| `fill` ✓ (a preset of `gradient`) | Flat colour; masked = background removal. | `fx.gradient(preset="fill", mask="background")` |
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
 | `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. A preset of `drop_shadow`. | `fx.drop_shadow(preset="long_shadow", angle=45)` |
 | `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=40, color="#ff9a4d")` |
 | `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
-| `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `fill`, `gradient` or any other effect. | `fill / gradient with mask = "background"` |
+| `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `gradient` (one colour = flat fill) or any other effect. | `gradient with mask = "background"` |
 | `background_blur` ✓ | Portrait-mode blur. A recipe step: `gaussian_blur` with `mask = "background"`. | `gaussian_blur(radius=24) with mask = "background"` |
 | `sticker` ✓ | White border and shadow: a die-cut sticker. A recipe: `outline` then `drop_shadow` (examples/recipes/sticker.toml). | `outline(width=14) + drop_shadow` |
-| `silhouette` ✓ | Flat colour subject. A recipe: `fill` masked to the subject, then to the background. | `fill(color="#000") mask = "subject"` |
+| `silhouette` ✓ | Flat colour subject. A recipe: `gradient` with one colour masked to the subject, then to the background. | `gradient(colors=["#000"]) mask = "subject"` |
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="monochrome")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "monochrome", mask = "background"` |
 | `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
@@ -255,7 +255,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `gradient` ✓ | Linear, radial, conic or mesh gradient. | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
+| `gradient` ✓ | Linear, radial, conic or mesh gradient; one colour is a flat fill (preset `fill`). | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
 | `noise_field` ✓ | Value, Perlin, Worley or sine noise as colour, with a domain `warp`; preset `plasma`. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
 | `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
 | `voronoi_cells` ✓ (recipe: `noise_field`, then `shatter` with `fill`) | Flat Voronoi cells in a colour ramp, leaded. [Recipe](../examples/recipes/voronoi-cells.toml). | `fx.shatter(pieces=200, offset=0, angle=0, fill=1, gap=1.5)` over `fx.noise_field(kind="value", scale=50, octaves=3)` |

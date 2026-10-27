@@ -18,8 +18,8 @@ chars = ' .`:,;-_~^!i+*Il1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao#MW&8%B@$'
 gamma = 0.6
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]

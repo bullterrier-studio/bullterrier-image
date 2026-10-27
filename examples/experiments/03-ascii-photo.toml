@@ -19,6 +19,6 @@ chars = " .:-=+*#%@"
 gamma = 0.85
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"

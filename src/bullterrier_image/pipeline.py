@@ -717,8 +717,8 @@ name = "cutout-black"
 size = 1600
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 """,
 }

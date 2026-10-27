@@ -8,8 +8,8 @@ effect = "aurora"
 colors = ["#2bff9a", "#7a2cff"]
 
 [[step]]
-effect = "fill"
-color = "#04060f"
+effect = "gradient"
+colors = ["#04060f"]
 opacity = 0.6
 
 [[step]]

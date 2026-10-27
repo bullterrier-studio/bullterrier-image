@@ -3,8 +3,8 @@ name = "reflection"
 size = 480
 
 [[step]]
-effect = "fill"
-color = "#1c2530"
+effect = "gradient"
+colors = ["#1c2530"]
 mask = "background"           # a dark floor and wall, so the mirror image shows
 
 [[step]]

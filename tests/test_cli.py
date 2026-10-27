@@ -22,7 +22,7 @@ from bullterrier_image.recipe import Recipe, Step, load_recipe, render
 from bullterrier_image.sheet import contact_sheet
 
 ROOT = Path(__file__).resolve().parents[1]
-CUT = '[[step]]\neffect="fill"\ncolor="#000000"\nmask="background"\n'  # black wherever the matte is 0
+CUT = '[[step]]\neffect="gradient"\ncolors=["#000000"]\nmask="background"\n'  # black wherever the matte is 0
 PROJECT = 'photos = ["me.png"]\nrecipes = ["cut.toml"]\noutput = "done"\n'
 
 
@@ -254,7 +254,9 @@ def test_bad_recipe_is_reported_before_any_work(files, capsys):
 def test_photo_without_a_subject_is_reported_clearly(files, echo_model, monkeypatch, capsys):
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))  # answers with the red channel; the photo is black
     imageio.save(np.zeros((96, 128, 3), np.float32), files / "me.png")
-    (files / "m.toml").write_text('[[step]]\neffect="fill"\nmask="background"\n', encoding="utf-8")
+    (files / "m.toml").write_text(
+        '[[step]]\neffect="gradient"\ncolors=["#000000"]\nmask="background"\n', encoding="utf-8"
+    )
     assert cli("render me.png m.toml") == 1
     assert "no subject" in capsys.readouterr().err.lower()
 
@@ -336,13 +338,13 @@ per = "cells"
 context = 0
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]
-effect = "fill"
-color = "#ffffff"
+effect = "gradient"
+colors = ["#ffffff"]
 mask = "found"
 """
 
@@ -466,7 +468,7 @@ def star(files):
     map for the photo: white on the left half, black on the right."""
     (files / "star.toml").write_text(
         'format=3\nname="star"\nsize=128\n[region.star]\nkind="given"\n'
-        '[[step]]\neffect="fill"\ncolor="#000000"\nmask="star"\n',
+        '[[step]]\neffect="gradient"\ncolors=["#000000"]\nmask="star"\n',
         encoding="utf-8",
     )
     halves = np.zeros((96, 128), np.uint8)

@@ -3,8 +3,8 @@ name = "drop_shadow"
 size = 480
 
 [[step]]
-effect = "fill"
-color = "#f3ead8"
+effect = "gradient"
+colors = ["#f3ead8"]
 mask = "background"           # a plain backdrop, so the copies show
 
 [[step]]

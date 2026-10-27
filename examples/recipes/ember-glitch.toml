@@ -7,8 +7,8 @@ effect = "gradient_map"
 stops = ["#0a0000", "#e0261b", "#ffb347", "#fff3d6"]
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]

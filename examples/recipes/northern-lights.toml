@@ -8,8 +8,8 @@ colors = ["#2bff9a", "#7a2cff"]
 mask = "background"
 
 [[step]]
-effect = "fill"
-color = "#04060f"
+effect = "gradient"
+colors = ["#04060f"]
 mask = "background"
 opacity = 0.4
 

@@ -146,7 +146,9 @@ def test_a_model_answering_nan_is_refused_by_the_render_not_taken_for_a_flat_ans
     model = tmp_path / "nan.onnx"
     onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8), model)
     monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(model))
-    near = Recipe("near", (Step("fill", {"color": "#000000"}, "near"),), size=None, regions={"near": Band(of="depth")})
+    near = Recipe(
+        "near", (Step("gradient", {"colors": ["#000000"]}, "near"),), size=None, regions={"near": Band(of="depth")}
+    )
     with pytest.raises(DepthNotFoundError, match="not finite"):
         render(ramp(), near)
 

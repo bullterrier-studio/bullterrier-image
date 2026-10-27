@@ -32,8 +32,10 @@ def write(tmp_path, text, name="r.toml"):
 
 
 def test_load_recipe_reads_steps_params_and_masks(tmp_path):
-    r = load_recipe(write(tmp_path, 'name="x"\nsize=64\n[[step]]\neffect="fill"\ncolor="#fff"\nmask="background"\n'))
-    assert r == Recipe("x", (Step("fill", {"color": "#fff"}, "background"),), 64)
+    r = load_recipe(
+        write(tmp_path, 'name="x"\nsize=64\n[[step]]\neffect="gradient"\ncolors=["#fff"]\nmask="background"\n')
+    )
+    assert r == Recipe("x", (Step("gradient", {"colors": ["#fff"]}, "background"),), 64)
     assert "subject" in r.maps_needed
 
 
@@ -50,7 +52,10 @@ def test_recipe_name_defaults_to_the_file_name(tmp_path):
     [
         ('[[step]]\neffect="no_such_effect"\n', "step 1.*unknown effect"),
         ('[[step]]\neffect="grain"\nbogus=1\n', "step 1.*bogus"),
-        ('[[step]]\neffect="grain"\n[[step]]\neffect="fill"\nmask="sideways"\n', "step 2.*mask"),
+        (
+            '[[step]]\neffect="grain"\n[[step]]\neffect="gradient"\ncolors=["#000000"]\nmask="sideways"\n',
+            "step 2.*mask",
+        ),
         ('[[step]]\ncolor="red"\n', "missing `effect`"),
         ("name='empty'\n", "at least one"),
     ],
@@ -79,25 +84,27 @@ def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_
 )
 def test_a_masked_step_changes_only_its_region(photo, subject, mask, color, filled, region):
     """`region` is the subject value of the pixels the mask selects."""
-    out = render(photo, Recipe("m", (Step("fill", {"color": color}, mask),), size=None), maps={"subject": subject})
+    out = render(
+        photo, Recipe("m", (Step("gradient", {"colors": [color]}, mask),), size=None), maps={"subject": subject}
+    )
     np.testing.assert_allclose(out[subject == 1 - region], photo[subject == 1 - region], atol=1e-6)
     assert np.allclose(out[subject == region], filled)
 
 
 def test_steps_run_in_order(photo):
-    r = Recipe("o", (Step("fill", {"color": "#ff0000"}), Step("grade", {"exposure": -1.0})), size=None)
+    r = Recipe("o", (Step("gradient", {"colors": ["#ff0000"]}), Step("grade", {"exposure": -1.0})), size=None)
     np.testing.assert_allclose(render(photo, r)[0, 0], [0.5, 0, 0], atol=1e-5)
 
 
 def test_opacity_blends_the_step_in_partway(photo):
-    half = Recipe("h", (Step("fill", {"color": "#000000"}, None, 0.5),), size=None)
+    half = Recipe("h", (Step("gradient", {"colors": ["#000000"]}, None, 0.5),), size=None)
     np.testing.assert_allclose(render(photo, half), photo * 0.5, atol=1e-6)
-    off = Recipe("o", (Step("fill", {"color": "#000000"}, None, 0.0),), size=None)
+    off = Recipe("o", (Step("gradient", {"colors": ["#000000"]}, None, 0.0),), size=None)
     np.testing.assert_allclose(render(photo, off), photo, atol=1e-6)
 
 
 def test_opacity_combines_with_a_mask(photo, subject):
-    r = Recipe("b", (Step("fill", {"color": "#000000"}, "background", 0.5),), size=None)
+    r = Recipe("b", (Step("gradient", {"colors": ["#000000"]}, "background", 0.5),), size=None)
     out = render(photo, r, maps={"subject": subject})
     np.testing.assert_allclose(out[subject == 0], photo[subject == 0] * 0.5, atol=1e-6)
     np.testing.assert_allclose(out[subject == 1], photo[subject == 1], atol=1e-6)
@@ -122,7 +129,7 @@ ORANGE = np.array([1.0, 0.5, 0.0], np.float32)  # "#ff8000" to within 1/510
 
 
 def fill(color: str, **keys) -> Recipe:
-    return Recipe("b", (Step("fill", {"color": color}, **keys),), size=None)
+    return Recipe("b", (Step("gradient", {"colors": [color]}, **keys),), size=None)
 
 
 @pytest.mark.parametrize(
@@ -202,7 +209,9 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
 
 def test_size_scales_photo_and_matte_together(photo, subject):
     out = render(
-        photo, Recipe("s", (Step("fill", {"color": "#000000"}, "background"),), size=64), maps={"subject": subject}
+        photo,
+        Recipe("s", (Step("gradient", {"colors": ["#000000"]}, "background"),), size=64),
+        maps={"subject": subject},
     )
     assert out.shape == (48, 64, 3)
 
@@ -226,7 +235,7 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
-    masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
+    masked = Recipe("m", (Step("gradient", {"colors": ["#000000"]}, "background"),), size=None)
     alpha = subject_matte(photo)
     expected = runner.render(photo, masked, maps={"subject": alpha})
     assert not np.array_equal(
@@ -238,17 +247,17 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
 
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):
-    masked = Recipe("m", (Step("fill", {"color": "#000000"}, "background"),), size=None)
+    masked = Recipe("m", (Step("gradient", {"colors": ["#000000"]}, "background"),), size=None)
     found = facade.render(photo, masked, finders={"subject": Finder("stand-in", lambda rgb: 1.0 - subject)})
     np.testing.assert_array_equal(found, runner.render(photo, masked, maps={"subject": 1.0 - subject}))
     assert not np.array_equal(found, runner.render(photo, masked, maps={"subject": subject}))
 
 
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
-MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
+MASKED = Recipe("masked", (Step("gradient", {"colors": ["#000000"]}, "background"),), size=None)
 PIECE_BY_PIECE = Recipe(
     "pieces",
-    (Step("fill", {"color": "#000000"}, "found"),),
+    (Step("gradient", {"colors": ["#000000"]}, "found"),),
     size=None,
     regions={"cells": Grid(columns=2), "found": Subject(per="cells")},
 )
@@ -279,7 +288,7 @@ def test_the_default_finder_is_built_only_when_a_recipe_asks_for_the_subject(
 
 DEEP = Recipe(
     "deep",
-    (Step("fill", {"color": "#000000"}, "near"),),
+    (Step("gradient", {"colors": ["#000000"]}, "near"),),
     size=None,
     regions={"near": Band(of="depth", low=0.5, high=1.0)},
 )

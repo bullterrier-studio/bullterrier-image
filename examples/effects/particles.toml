@@ -1,12 +1,12 @@
-# A night sky behind the dog with sparks rising: the presets `stars` (over a dark `fill`, on the background only) and
+# A night sky behind the dog with sparks rising: the presets `stars` (over a dark one-colour `gradient`, on the background only) and
 # `embers`. Rain, snow and dust are the presets `rain`, `snow` and `dust`, each at its usual opacity.
 # It also makes the effect's picture in the catalogue.
 name = "particles"
 size = 480
 
 [[step]]
-effect = "fill"
-color = "#04060f"
+effect = "gradient"
+colors = ["#04060f"]
 mask = "background"
 
 [[step]]

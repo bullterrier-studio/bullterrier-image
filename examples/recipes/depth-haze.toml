@@ -25,8 +25,8 @@ saturation = 0.6
 mask = "far"
 
 [[step]]
-effect = "fill"
-color = "#dde5ee"
+effect = "gradient"
+colors = ["#dde5ee"]
 mask = "far"
 opacity = 0.5
 

@@ -386,9 +386,11 @@ def test_a_steps_opacity_is_a_number_of_the_step_at_its_own_or_its_effects_defau
 
 
 def test_an_effect_the_recipe_uses_once_is_addressed_by_its_name_and_one_it_uses_twice_by_its_number(gain):
-    once = Recipe("once", [Step("gain_probe", {"gain": 2.0}), Step("fill")], size=None)
+    once = Recipe("once", [Step("gain_probe", {"gain": 2.0}), Step("gradient", {"colors": ["#000000"]})], size=None)
     assert "gain_probe.gain" in once.parameters()
-    twice = Recipe("twice", [Step("gain_probe"), Step("fill"), Step("gain_probe")], size=None)
+    twice = Recipe(
+        "twice", [Step("gain_probe"), Step("gradient", {"colors": ["#000000"]}), Step("gain_probe")], size=None
+    )
     assert "gain_probe#1.gain" in twice.parameters()
     assert "gain_probe#2.gain" in twice.parameters()
     assert "gain_probe.gain" not in twice.parameters()
@@ -493,7 +495,7 @@ def test_an_address_or_value_that_is_wrong_is_refused_naming_the_address_and_wha
 
 
 def test_a_step_that_has_a_name_can_still_be_reached_by_its_effect_when_it_is_the_only_one_of_it(gain):
-    named = Recipe("look", [Step("gain_probe", name="pulse"), Step("fill")], size=None)
+    named = Recipe("look", [Step("gain_probe", name="pulse"), Step("gradient", {"colors": ["#000000"]})], size=None)
     assert named.with_values({"gain_probe.gain": 1.5}).parameters()["pulse.gain"].value == 1.5
 
 
@@ -551,7 +553,9 @@ def test_numbers_from_numpy_are_taken_as_the_python_numbers_they_hold(pulse):
 
 
 def test_an_effect_the_recipe_uses_twice_cannot_be_named_without_its_number(gain):
-    twice = Recipe("twice", [Step("gain_probe"), Step("fill"), Step("gain_probe")], size=None)
+    twice = Recipe(
+        "twice", [Step("gain_probe"), Step("gradient", {"colors": ["#000000"]}), Step("gain_probe")], size=None
+    )
     with pytest.raises(
         RecipeError, match=r"'gain_probe\.gain'.*2 'gain_probe' steps.*gain_probe#1\.gain.*gain_probe#2\.gain"
     ):

@@ -234,8 +234,8 @@ class Step(_Layer):
         return [*super().references(), *driving, *working, *drawn]
 
     def describe(self, width: int = 56) -> str:
-        """A short readable form, e.g. `fill(color='#000000') on background` or `bloom() screen x0.8` (the blend mode,
-        then the opacity), cut to `width` characters."""
+        """A short readable form, e.g. `gradient(colors=['#000000']) on background` or `bloom() screen x0.8` (the
+        blend mode, then the opacity), cut to `width` characters."""
         shown = ", ".join(f"{k}={_short(v)}" for k, v in self.params.items())
         return _described(f"{self.effect}({shown})", self, width)
 

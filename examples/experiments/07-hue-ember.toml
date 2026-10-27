@@ -12,6 +12,6 @@ contrast = 1.12
 saturation = 1.15
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"

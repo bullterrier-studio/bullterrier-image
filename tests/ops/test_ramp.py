@@ -11,6 +11,8 @@ RED, GREEN, BLUE = (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)
 @pytest.mark.parametrize(
     ("stops", "t", "expected"),
     [
+        pytest.param([GREEN], 0.0, GREEN, id="a single stop is its colour at 0"),
+        pytest.param([GREEN], 0.7, GREEN, id="a single stop is its colour everywhere"),
         pytest.param([RED, BLUE], 0.0, RED, id="0 is the first stop"),
         pytest.param([RED, BLUE], 1.0, BLUE, id="1 is the last stop"),
         pytest.param([RED, BLUE], 0.5, (0.5, 0.0, 0.5), id="halfway between two stops is their mean"),

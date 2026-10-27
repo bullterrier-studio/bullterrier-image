@@ -156,7 +156,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   brightness 1 - `brightness_falloff` x (1 - d). *Reason:* the five effects differed only in these terms; snow's full-
   range size with its half-range brightness is why the two falloffs are separate. A preset cannot set `opacity` (a step
   key), so a look's usual opacity (embers 0.9, dust 0.55, rain 0.7, snow 0.8, stars 1) is written in the step.
-  *Consequence:* the stars of `starfield` (now `fill` and the preset `stars`) take the common depth direction, so the
+  *Consequence:* the stars of `starfield` (now a one-colour `gradient` and the preset `stars`) take the common depth direction, so the
   same seed gives the same star positions with other sizes and brightnesses; counts became `density`.
 - **`glitch` is a recipe: `slice_shift(preset="glitch")` then `rgb_split(angle=0, edge="wrap")`.** *Reason:* it was a
   band slide followed by a red/blue roll, each already an effect; the two steps are as short to write and sweep as the

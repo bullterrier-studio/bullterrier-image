@@ -9,6 +9,6 @@ angle = 45
 ink = "#fff1de"
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"           # the subject on black

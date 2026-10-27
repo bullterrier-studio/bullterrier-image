@@ -3,8 +3,8 @@ name = "glitch-subtle-neon"
 size = 1024
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]

@@ -23,8 +23,8 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     ink = "#00ff9c"
 
     [[step]]
-    effect = "fill"
-    color = "#000000"
+    effect = "gradient"
+    colors = ["#000000"]
     mask = "background"            # "subject", "background", "depth", "light" or a region that is a selection
     opacity = 0.3                  # optional, 0..1: mix the effect in partway (default 1 = fully)
 

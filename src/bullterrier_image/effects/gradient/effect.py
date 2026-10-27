@@ -1,4 +1,4 @@
-"""The `gradient` effect: a colour gradient (linear, radial or conic) in place of the picture."""
+"""The `gradient` effect: a colour gradient (linear, radial or conic), or one flat colour, in place of the picture."""
 
 from typing import Literal
 
@@ -20,9 +20,10 @@ class GradientParams(EffectParams):
     )
     colors: tuple[Color, ...] = param(
         ("#12002b", "#ff2bd6"),
-        doc="The gradient's colours in order, evenly spaced; at least two. Linear: from the start of the band to its "
-        "end. Radial: from the centre outwards. Conic: round the turn.",
-        min_length=2,
+        doc="The gradient's colours in order, evenly spaced; at least one. Linear: from the start of the band to its "
+        "end. Radial: from the centre outwards. Conic: round the turn. One colour is a flat fill of the whole "
+        "picture, and every other parameter is then ignored.",
+        min_length=1,
     )
     angle: float = param(
         90.0,
@@ -76,11 +77,12 @@ class GradientParams(EffectParams):
 
 @effect(category="backgrounds", params=GradientParams)
 def gradient(rgb: np.ndarray, params: GradientParams) -> np.ndarray:
-    """Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep.
+    """Replace the picture with a gradient (linear, radial or conic) or a flat colour fill, through `colors`.
 
     A generated background: the input is used only for its height and width, its content is ignored. Sizes in
     fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
-    "#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet.
+    "#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill (preset
+    `fill`); masked to the background it removes the background.
     """
     height, width = rgb.shape[:2]
     angle = np.radians(np.float32(params.angle))

@@ -10,8 +10,8 @@ radius = 14
 amount = 0.3
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]

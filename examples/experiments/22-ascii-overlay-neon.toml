@@ -16,8 +16,8 @@ highlights = "#00f0ff"
 amount = 0.4
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"
 
 [[step]]

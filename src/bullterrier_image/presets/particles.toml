@@ -35,7 +35,7 @@ layers = 4
 size_falloff = 1
 
 [stars]
-description = "Small crisp stars of several sizes and brightnesses. Put a dark `fill` step before it for a night sky."
+description = "Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."
 density = 7.324
 size = 3
 softness = 0

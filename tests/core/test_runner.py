@@ -17,7 +17,7 @@ from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
 from bullterrier_image.recipe import Band, Bands, Combine, Finder, Given, Grid, Pick, Shards, Subject
 
-MASKED = Recipe("masked", (Step("fill", {"color": "#000000"}, "background"),), size=None)
+MASKED = Recipe("masked", (Step("gradient", {"colors": ["#000000"]}, "background"),), size=None)
 PLAIN = Recipe("plain", (Step("grade", {"exposure": 0.5}),), size=None)
 
 
@@ -137,7 +137,7 @@ def deep(**keys) -> Recipe:
 
 FRONT = Recipe(  # paints red only the front quarter of the depth scale
     "front",
-    [Step("fill", {"color": "#ff0000"}, mask="near")],
+    [Step("gradient", {"colors": ["#ff0000"]}, mask="near")],
     size=None,
     regions={"near": Band(of="depth", low=0.75, feather=0)},
 )
@@ -297,7 +297,7 @@ def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, s
 # --- a given map: any name a recipe declares, handed in or found like the subject and the depth -----------------------
 
 STAR_RED = Recipe(  # paints red where the `star` map is
-    "star-red", [Step("fill", {"color": "#ff0000"}, mask="star")], size=None, regions={"star": Given()}
+    "star-red", [Step("gradient", {"colors": ["#ff0000"]}, mask="star")], size=None, regions={"star": Given()}
 )
 # a hard-edged star-like mask, off-centre and asymmetric, so that a flip, a crop or a turn that missed it shows
 STAR = np.zeros((96, 128), np.float32)
@@ -403,7 +403,7 @@ def test_a_missing_subject_or_depth_is_caught_as_a_map_error(photo, recipe):
 LUMA = np.asarray([0.2126, 0.7152, 0.0722])  # Rec. 709, written here again so that the test does not use the code's
 DARK = Recipe(  # paints red where the picture is no brighter than half
     "dark",
-    [Step("fill", {"color": "#ff0000"}, mask="dark")],
+    [Step("gradient", {"colors": ["#ff0000"]}, mask="dark")],
     size=None,
     regions={"dark": Band(of="light", low=0, high=0.5, feather=0)},
 )
@@ -441,7 +441,7 @@ def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(pho
     # are made once for the picture the recipe receives
     recipe = Recipe(
         "after",
-        [Step("fill", {"color": "#000000"}), *DARK.steps],
+        [Step("gradient", {"colors": ["#000000"]}), *DARK.steps],
         size=None,
         regions=DARK.regions,
     )
@@ -453,7 +453,7 @@ def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(pho
 def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subject):
     lit_subject = Recipe(
         "lit-subject",
-        [Step("fill", {"color": "#ff0000"}, mask="lit_subject")],
+        [Step("gradient", {"colors": ["#ff0000"]}, mask="lit_subject")],
         size=None,
         regions={
             "bright": Band(of="light", low=0.5, high=1, feather=0),
@@ -872,7 +872,7 @@ RGB = {RED: (1.0, 0.0, 0.0), GREEN: (0.0, 1.0, 0.0), BLUE: (0.0, 0.0, 1.0), WHIT
 
 
 def fill(color: str, **keys) -> Step:
-    return Step("fill", {"color": color}, **keys)
+    return Step("gradient", {"colors": [color]}, **keys)
 
 
 def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo):
@@ -1194,7 +1194,7 @@ def test_trace_still_ends_in_what_render_returns_when_regions_are_drawn(photo):
 def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
     each = Each("panes", [fill(RED), "none"], mask="head")
     labels = [stage.label for stage in runner.trace(photo, Recipe("t", [each], size=None, regions=TRACED))]
-    assert labels[-1].startswith("1. each panes [fill(color='#ff0000'), none]")
+    assert labels[-1].startswith("1. each panes [gradient(colors=['#ff0000']), none]")
 
 
 def test_a_feather_is_a_share_of_the_long_side_so_the_blend_is_the_same_at_two_resolutions():
@@ -1402,6 +1402,6 @@ def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(pho
     ],
 )
 def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_background_everything(photo, mask, expected):
-    recipe = Recipe("masked", (Step("fill", {"color": "#000000"}, mask),), size=None)
+    recipe = Recipe("masked", (Step("gradient", {"colors": ["#000000"]}, mask),), size=None)
     out = runner.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
     np.testing.assert_array_equal(out, expected(photo))

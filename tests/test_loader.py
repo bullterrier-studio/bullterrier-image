@@ -80,12 +80,14 @@ def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "format = 3\nname = 'd'\n" + STEP, "d.toml")).name == "d"
 
 
-GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'fill'\nmask = 'star'\n"
+GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'gradient'\ncolors = ['#000000']\nmask = 'star'\n"
 
 
 def test_a_given_region_loads_in_format_3_as_the_recipe_written_in_python(tmp_path):
     loaded = load_recipe(_write(tmp_path, "format = 3\nname = 'g'\nsize = 64\n" + GIVEN))
-    assert loaded == Recipe("g", [Step("fill", mask="star")], size=64, regions={"star": Given()})
+    assert loaded == Recipe(
+        "g", [Step("gradient", {"colors": ["#000000"]}, mask="star")], size=64, regions={"star": Given()}
+    )
     assert loaded.maps_needed == frozenset({"star"})
 
 
@@ -284,13 +286,13 @@ context = 0.3
 threshold = 0.8
 
 [[step]]
-effect = "fill"
-color = "#ff0000"
+effect = "gradient"
+colors = ["#ff0000"]
 mask = "head"
 
 [[step]]
-effect = "fill"
-color = "#0000ff"
+effect = "gradient"
+colors = ["#0000ff"]
 mask = "found"
 
 [[step]]
@@ -298,7 +300,7 @@ each = "glass"
 looks = [
     { effect = "grade", exposure = 0.5, opacity = 0.7 },
     "none",
-    { effect = "fill", color = "#00ff00", blend_mode = "multiply" },
+    { effect = "gradient", colors = ["#00ff00"], blend_mode = "multiply" },
 ]
 assign = "random"
 seed = 4
@@ -317,14 +319,14 @@ REGIONS_RECIPE = Recipe(
         "found": Subject(per="panes", context=0.3, threshold=0.8),
     },
     steps=[
-        Step("fill", {"color": "#ff0000"}, mask="head"),
-        Step("fill", {"color": "#0000ff"}, mask="found"),
+        Step("gradient", {"colors": ["#ff0000"]}, mask="head"),
+        Step("gradient", {"colors": ["#0000ff"]}, mask="found"),
         Each(
             "glass",
             [
                 Step("grade", {"exposure": 0.5}, opacity=0.7),
                 "none",
-                Step("fill", {"color": "#00ff00"}, blend_mode="multiply"),
+                Step("gradient", {"colors": ["#00ff00"]}, blend_mode="multiply"),
             ],
             mask="subject",
             opacity=0.9,
@@ -371,8 +373,8 @@ each = "bands"
 looks = [{ effect = "grade", exposure = 0.5 }, "none"]
 
 [[step]]
-effect = "fill"
-color = "#ff0000"
+effect = "gradient"
+colors = ["#ff0000"]
 mask = "near"
 """
 
@@ -383,7 +385,7 @@ def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
         regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
             Each("bands", [Step("grade", {"exposure": 0.5}), "none"]),
-            Step("fill", {"color": "#ff0000"}, mask="near"),
+            Step("gradient", {"colors": ["#ff0000"]}, mask="near"),
         ],
     )
     assert load_recipe(_write(tmp_path, FIELDS_FILE)) == written
@@ -415,13 +417,13 @@ of = "shapes"
 pieces = ["ring", 0]
 
 [[step]]
-effect = "fill"
-color = "#ff0000"
+effect = "gradient"
+colors = ["#ff0000"]
 mask = "ring"
 
 [[step]]
 each = "halves"
-looks = ["none", { effect = "fill", color = "#00ff00" }]
+looks = ["none", { effect = "gradient", colors = ["#00ff00"] }]
 mask = "blob"
 """
 
@@ -451,8 +453,8 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
             "ring": Pick(of="shapes", pieces=["ring", 0]),
         },
         steps=[
-            Step("fill", {"color": "#ff0000"}, mask="ring"),
-            Each("halves", ["none", Step("fill", {"color": "#00ff00"})], mask="blob"),
+            Step("gradient", {"colors": ["#ff0000"]}, mask="ring"),
+            Each("halves", ["none", Step("gradient", {"colors": ["#00ff00"]})], mask="blob"),
         ],
     )
     assert loaded == written

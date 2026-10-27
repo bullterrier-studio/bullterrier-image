@@ -94,7 +94,7 @@ MISTAKES = {
     "an effect number beyond the steps": (("grain#3.amount", 0, 0.2, 5), "#3"),
     "an effect number of zero": (("grain#0.amount", 0, 0.2, 5), "#0"),
     "a parameter the effect does not have": (("grain#1.amoun", 0, 0.2, 5), "amoun"),
-    "a parameter that is not a number": (("fill.color", 0, 1, 5), "color"),
+    "a parameter that is not a number": (("gradient.colors", 0, 1, 5), "color"),
     "a value above the parameter's range": (("grain#1.amount", 0, 5, 5), "amount"),
     "a value below the parameter's range": (("grain#1.amount", -1, 0.2, 5), "amount"),
     "one tile": (("grain#1.amount", 0, 0.2, 1), "count"),
@@ -105,7 +105,7 @@ MISTAKES = {
 
 @pytest.mark.parametrize(("arguments", "offender"), MISTAKES.values(), ids=MISTAKES.keys())
 def test_a_sweep_that_cannot_be_made_is_refused_naming_the_offender(arguments, offender):
-    recipe = Recipe("twice", [*TWICE.steps, Step("fill", {"color": "#000000"})], size=48)
+    recipe = Recipe("twice", [*TWICE.steps, Step("gradient", {"colors": ["#000000"]})], size=48)
     with pytest.raises(RecipeError, match=offender):
         sweep(recipe, *arguments)
 

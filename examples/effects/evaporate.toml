@@ -9,8 +9,8 @@ gamma = 0.5
 photo = 0.35
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"           # the subject on black
 
 [[step]]

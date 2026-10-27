@@ -4,7 +4,7 @@
 
     look = Recipe("neon-glitch", size=1024, steps=[
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
-        fx.fill("#000000", mask="background"),                  # only where the photo's background is
+        fx.gradient(colors=["#000000"], mask="background"),                  # only where the photo's background is
         fx.slice_shift(preset="glitch", bands=8, seed=4),
         fx.rgb_split(angle=0, amount=12, edge="wrap"),
         fx.bloom(radius=26, amount=0.65, opacity=0.8),           # mixed in at 80%

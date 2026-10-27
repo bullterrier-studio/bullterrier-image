@@ -16,8 +16,8 @@ effect = "gradient_map"           # a fire palette
 stops = ["#0a0000", "#e0261b", "#ffb347", "#fff3d6"]
 
 [[step]]
-effect = "fill"
-color = "#000000"
+effect = "gradient"
+colors = ["#000000"]
 mask = "background"               # "subject", "background" or a region: apply only there
 
 [[step]]
@@ -39,7 +39,7 @@ blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
 ```
 
-Remove background = `fill` step masked to background. Unknown effects, misspelt parameters, bad values fail at load, naming
+Remove background = `gradient` step with one colour (preset `fill`) masked to background. Unknown effects, misspelt parameters, bad values fail at load, naming
 file and step.
 
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each

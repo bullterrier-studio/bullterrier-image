@@ -283,7 +283,7 @@ def disc_matte(shape=(96, 128), radius=30):
 def masked_recipes(folder) -> list[str]:
     """Two recipes that use the subject; returns their names."""
     for name in ("cut1", "cut2"):
-        write_recipe(folder, name, 'effect = "fill"\nmask = "background"')
+        write_recipe(folder, name, 'effect = "gradient"\ncolors = ["#000000"]\nmask = "background"')
     return ["cut1", "cut2"]
 
 
@@ -299,7 +299,7 @@ def star_recipes(folder) -> list[str]:
     for name in ("star1", "star2"):
         (folder / "recipes" / f"{name}.toml").write_text(
             f'format = 3\nname = "{name}"\nsize = 64\n[region.star]\nkind = "given"\n'
-            '[[step]]\neffect = "fill"\nmask = "star"\n',
+            '[[step]]\neffect = "gradient"\ncolors = ["#000000"]\nmask = "star"\n',
             encoding="utf-8",
         )
     return ["star1", "star2"]
@@ -595,7 +595,7 @@ def test_a_cutout_that_covers_too_little_of_the_photo_is_flagged_not_stopped(fol
 
 
 def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):
-    write_recipe(folder, "black", 'effect = "fill"\ncolor = "#000000"')
+    write_recipe(folder, "black", 'effect = "gradient"\ncolors = ["#000000"]')
     flagged = [i for i in run(load_project(folder / "bt-image.toml")) if i.recipe == "black"]
     assert all(i.warnings and "blank" in i.warnings[0] for i in flagged)
     assert "blank" in (folder / "out" / "index.html").read_text(encoding="utf-8")
@@ -840,7 +840,8 @@ per = "cells"
 context = 0
 
 [[step]]
-effect = "fill"
+effect = "gradient"
+colors = ["#000000"]
 mask = "found"
 """
 

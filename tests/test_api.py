@@ -153,7 +153,7 @@ def test_fx_refuses_a_bad_step_key_naming_it_and_the_value(keys, complaint):
 
 
 def test_fx_takes_a_region_name_as_mask_and_the_recipe_that_holds_the_step_declares_it():
-    step = fx.fill("#ff0000", mask="glass")
+    step = fx.gradient(colors=["#ff0000"], mask="glass")
     assert Recipe("r", [step], regions={"glass": Pick(of="panes"), "panes": Grid()}).steps == (step,)
     with pytest.raises(RecipeError, match=r"step 1: `mask` names 'glass'.*subject, background.*declares no regions"):
         Recipe("r", [step])  # fx declares no regions: by itself it knows the built-in ones only
@@ -166,7 +166,7 @@ def test_the_fx_signature_offers_partition_only_to_an_effect_that_takes_it(parti
 
 
 def test_a_step_describes_itself_briefly_for_labels():
-    assert str(fx.fill("#000000", mask="background")) == "fill(color='#000000') on background"
+    assert str(fx.gradient(colors=["#000000"], mask="background")) == "fill(color='#000000') on background"
     assert str(fx.grade(exposure=0.5, opacity=0.3)) == "grade(exposure=0.5) x0.3"
     assert str(fx.bloom(radius=26, blend_mode="screen")) == "bloom(radius=26) screen"
     assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
@@ -178,7 +178,9 @@ def test_a_step_describes_itself_briefly_for_labels():
 
 def test_fx_builds_steps_from_keyword_or_positional_arguments():
     assert fx.rgb_split(amount=3, angle=2) == Step("rgb_split", {"amount": 3, "angle": 2})
-    assert fx.fill("#fff") == Step("fill", {"color": "#fff"})  # positional: the first parameter after the image
+    assert fx.gradient(colors=["#fff"]) == Step(
+        "gradient", {"colors": ["#fff"]}
+    )  # positional: the first parameter after the image
     assert fx.grain() == Step("grain", {})
 
 
@@ -386,8 +388,8 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
     ("toml", "python"),
     [
         pytest.param(
-            'effect = "fill"\ncolor = "#000000"\nmask = "background"',
-            lambda: fx.fill("#000000", mask="background"),
+            'effect = "gradient"\ncolors = ["#000000"]\nmask = "background"',
+            lambda: fx.gradient(colors=["#000000"], mask="background"),
             id="mask",
         ),
         pytest.param(
@@ -422,7 +424,11 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
 
 
 def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject):
-    steps = [fx.gradient_map(), fx.fill("#102030", mask="background"), fx.bloom(opacity=0.7, blend_mode="screen")]
+    steps = [
+        fx.gradient_map(),
+        fx.gradient(colors=["#102030"], mask="background"),
+        fx.bloom(opacity=0.7, blend_mode="screen"),
+    ]
     look = Recipe("t", size=64, steps=steps)
     np.testing.assert_array_equal(
         trace(photo, look, maps={"subject": subject})[-1].image, render(photo, look, maps={"subject": subject})
@@ -431,7 +437,9 @@ def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject
 
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, subject):
     stages = trace(
-        photo, Recipe("t", size=None, steps=[fx.fill("#000000", mask="background")]), maps={"subject": subject}
+        photo,
+        Recipe("t", size=None, steps=[fx.gradient(colors=["#000000"], mask="background")]),
+        maps={"subject": subject},
     )
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], subject)  # white where the subject is

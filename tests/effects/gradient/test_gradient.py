@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from bullterrier_image import RecipeError
+from bullterrier_image import Recipe, RecipeError, Step
+from bullterrier_image import render as render_recipe
 from bullterrier_image.core import registry
 
 NAME = "gradient"
@@ -137,6 +138,28 @@ def test_repeat_on_a_radial_gradient_ends_on_the_last_colour_beyond_the_radius()
     np.testing.assert_allclose(out[0, 0], BLUE, atol=1e-6)
 
 
-def test_a_gradient_needs_two_colours() -> None:
+@pytest.mark.parametrize(
+    "settings",
+    [
+        pytest.param({"kind": "linear", "angle": 30}, id="linear"),
+        pytest.param({"kind": "radial", "x": 0.2, "y": 0.8, "radius": 0.3}, id="radial"),
+        pytest.param({"kind": "conic", "angle": 200, "repeat": 3, "reflect": True}, id="conic"),
+    ],
+)
+def test_one_colour_is_a_flat_fill_whatever_the_layout(settings: dict) -> None:
+    out = render((37, 53), colors=(GREEN,), **settings)
+    np.testing.assert_array_equal(out, np.broadcast_to(np.array(GREEN, np.float32), (37, 53, 3)))
+
+
+def test_a_gradient_needs_at_least_one_colour() -> None:
     with pytest.raises(RecipeError, match="colors"):
-        registry.apply(NAME, np.zeros((4, 4, 3), np.float32), colors=["#ff0000"])
+        registry.apply(NAME, np.zeros((4, 4, 3), np.float32), colors=[])
+
+
+def test_the_fill_preset_is_a_flat_black_picture_that_ignores_the_input() -> None:
+    """Preset `fill` keeps the old `fill` effect findable: black by default, any one colour with `colors`."""
+    photo = np.random.default_rng(0).random((20, 30, 3), dtype=np.float32)
+    black = render_recipe(photo, Recipe("t", [Step("gradient", preset="fill")], size=None))
+    np.testing.assert_array_equal(black, np.zeros((20, 30, 3), np.float32))
+    green = render_recipe(photo, Recipe("t", [Step("gradient", {"colors": ["#00ff00"]}, preset="fill")], size=None))
+    np.testing.assert_array_equal(green, np.broadcast_to(np.array(GREEN, np.float32), (20, 30, 3)))
