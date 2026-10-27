@@ -314,46 +314,6 @@ soft_focus : Orton soft focus: a blurred copy of the whole picture, half-strengt
 halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base."""
     ...
 
-def bump_light(angle: float = 315.0, elevation: float = 45.0, height: float = 8.0, blur: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Light the picture's brightness, read as a relief `height` px tall, from `angle` at `elevation`.
-
-The height is the Rec. 709 luminance smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its
-length with the slopes taken per pixel by central differences. The light's strength is the normal's dot product
-with the light's direction in proportion to what a flat surface gets, so flat areas are unchanged and a slope is
-brightened or darkened. All channels are multiplied by that one grey gain, so the picture's colour ratios are
-kept, and the result is clipped to 0..1.
-
-Parameters
-----------
-angle : number (cyclic), degrees, 0 to 360, default 315.0
-    Where the light comes from, in degrees clockwise from the top of the picture: 0 =
-    above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Slopes
-    that face it are brightened, those that face away darkened.
-elevation : number, degrees, 1 to 90, default 45.0
-    How high the light stands above the picture's plane, in degrees: 90 = straight above
-    (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 =
-    grazing, so the relief is dramatic and the lit side is clipped to white.
-height : number, px, 0 to 100, default 8.0
-    How tall the relief is: a white pixel stands this many px above a black one, so the
-    slope between neighbours is their brightness difference times this. 0 = flat (the
-    picture is unchanged), larger = steeper relief and stronger lighting.
-blur : number, px, 0 to 20, default 1.0
-    Gaussian sigma in px with which the brightness is smoothed before it is read as
-    height: 0 = every pixel is a bump (noise and grain shows), larger = broader, softer
-    swells.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0).
-    Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
-    edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
-    pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a
-    seam)."""
-    ...
-
 def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'monochrome'] | None = None) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
 
@@ -1200,40 +1160,6 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the
     other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror'
     mirrors it about the edge line."""
-    ...
-
-def emboss(angle: float = 315.0, height: float = 6.0, saturation: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Read the brightness as a relief `height` px tall and light it from `angle`.
-
-The shade is 0.5 + 0.5 x the cosine between the surface normal and a horizontal light, so a flat surface is mid
-grey, one facing the light edge-on 1 and one facing away 0, and the shade never leaves 0..1. `saturation` mixes in
-the picture multiplied by twice the shade (flat areas keep their colour), clipped to 0..1.
-
-Parameters
-----------
-angle : number (cyclic), degrees, 0 to 360, default 315.0
-    Where the light comes from, in degrees clockwise from the top of the picture: 0 =
-    above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left (the usual
-    choice: it reads as raised). Surfaces that rise away from the light are brighter
-    than mid grey and those that rise towards it darker; turning the light by 180
-    inverts the picture around mid grey.
-height : number, px, 0 to 50, default 6.0
-    How tall the relief is: a white pixel stands this many px above a black one, so the
-    slope between neighbours is their brightness difference times this. 0 = a flat
-    surface (mid grey), larger = steeper relief and stronger shading, up to full black
-    and white at sharp edges.
-saturation : number, fraction, 0 to 1, default 0.0
-    How much of the picture's colour comes back: 0 = a grey emboss on mid grey, 1 = the
-    picture itself shaded by the relief (flat areas keep their colour), in between a mix
-    of the two.
-
-Advanced parameters
--------------------
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the slope sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge, so a tileable picture embosses without a
-    seam)."""
     ...
 
 def equalize(tiles: int = 8, limit: float = 3.0, bins: int = 256, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3367,38 +3293,49 @@ Step opacity
 0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
     ...
 
-def relight(angle: float = 315.0, elevation: float = 45.0, height: float = 200.0, blur: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Light the picture's depth, read as a relief `height` px tall, from `angle` at `elevation`.
+def relight(field: str = 'depth', angle: float = 225.0, elevation: float = 45.0, height: float = 200.0, blur: float = 2.0, saturation: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['bump_light', 'emboss'] | None = None) -> Step:
+    """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`.
 
-The lighting comes from the shape of the depth, not from the picture's brightness: the height is the depth
-smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its length with the slopes taken per pixel by
-central differences. The light's strength is the normal's dot product with the light's direction in proportion to
-what a flat surface gets, so flat areas are unchanged and a slope is brightened or darkened. All channels are
-multiplied by that one grey gain, so the picture's colour ratios are kept, and the result is clipped to 0..1.
-A sharp step in depth (a subject's outline) lights as a steep cliff and can leave a dark or bright fringe on the
-background beside it; raise `blur` or lower `height` to soften it.
-`depth` is filled in by the recipe from the depth model (never set it in a recipe file): float32 (h, w), 0..1,
-1 = nearest. Without a depth the picture is unchanged.
+The lighting comes from the shape of `field`, not from the picture's brightness unless that is the field: the
+height is the field smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its length with the slopes
+taken per pixel by central differences. The light's strength is the normal's dot product with the light's direction
+in proportion to what a flat surface gets, so flat areas are unchanged and a slope is brightened or darkened. The
+lit surface is the picture mixed into mid grey by `saturation`; all channels are multiplied by the one grey gain,
+so the colour ratios are kept, and the result is clipped to 0..1. A low `elevation` with `saturation` 0 is an
+emboss: the relief in grey. A sharp step in the field (a subject's outline in depth) lights as a steep cliff and
+can leave a dark or bright fringe beside it; raise `blur` or lower `height` to soften it.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
 Parameters
 ----------
-angle : number (cyclic), degrees, 0 to 360, default 315.0
-    Where the light comes from, in degrees clockwise from the top of the picture: 0 =
-    above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that
+field : field name, default 'depth'
+    The field read as the relief, the higher the value the higher the ground: `depth`
+    (the nearest stands highest; the subject rises from its background), `light` (the
+    picture's own brightness: bright parts stand proud), `subject`, or a region the
+    recipe declares.
+angle : number (cyclic), degrees, 0 to 360, default 225.0
+    Where the light comes from, in degrees clockwise from pointing right, on screen: 0 =
+    the right, 90 = below, 180 = the left, 225 = the upper left, 270 = above. Sides that
     face it are brightened, those that face away darkened.
 elevation : number, degrees, 1 to 90, default 45.0
     How high the light stands above the picture's plane, in degrees: 90 = straight above
     (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 =
     grazing, so the shapes are dramatic and the lit side is clipped to white.
 height : number, px, 0 to 1000, default 200.0
-    How tall the whole depth range stands as a relief, in px at the recipe's size: the
-    nearest depth (1) stands this many px above the farthest (0), so the slope between
-    neighbours is their depth difference times this. 0 = flat (the picture is
-    unchanged), larger = steeper shapes that catch more of the light.
+    How tall the whole range of the field stands as a relief, in px at the recipe's
+    size: a field value of 1 stands this many px above 0, so the slope between
+    neighbours is their difference times this. 0 = flat (the relief is nothing: the
+    picture at `saturation` 1, mid grey at 0), larger = steeper shapes that catch more
+    of the light. A field of the picture's own brightness wants far less (about 8) than
+    a depth (about 200).
 blur : number, px, 0 to 50, default 2.0
-    Gaussian sigma in px with which the depth is smoothed before its slopes are taken: 0
-    = every ripple of the depth map is lit (its noise shows), larger = softer lighting
-    that follows only the broad shapes.
+    Gaussian sigma in px with which the field is smoothed before its slopes are taken: 0
+    = every ripple of the field is lit (its noise shows), larger = softer lighting that
+    follows only the broad shapes.
+saturation : number, fraction, 0 to 1, default 1.0
+    How much of the picture's colour is lit: 1 = the picture itself, lit; 0 = the relief
+    alone, a grey surface lit (a flat field is mid grey); between, the picture mixed
+    into mid grey.
 
 Advanced parameters
 -------------------
@@ -3409,7 +3346,12 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
     edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
     pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a
-    seam)."""
+    seam).
+
+Presets
+-------
+bump_light : The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left.
+emboss : An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees."""
     ...
 
 def rgb_split(pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

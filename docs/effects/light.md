@@ -20,7 +20,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/light_rays.jpg" width="160" alt="light_rays"> | `light_rays` | God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`. | `x=0.5` `y=0.3` `length=0.5` `threshold=0.7` `amount=2.5` `decay=0.9` +3 advanced | [light_rays.toml](../../examples/effects/light_rays.toml) |
 | <img src="../gallery/motion_blur.jpg" width="160" alt="motion_blur"> | `motion_blur` | Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would. | `angle=0.0` `length=24.0` +1 advanced | [motion_blur.toml](../../examples/effects/motion_blur.toml) |
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
-| <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture's depth, read as a relief `height` px tall, from `angle` at `elevation`. | `angle=315.0` `elevation=45.0` `height=200.0` `blur=2.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
+| <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`. | `field='depth'` `angle=225.0` `elevation=45.0` `height=200.0` `blur=2.0` `saturation=1.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
 | <img src="../gallery/shadows_highlights.jpg" width="160" alt="shadows_highlights"> | `shadows_highlights` | Lighten the dark areas and darken the bright ones of the picture, as judged by an edge-aware local brightness. | `shadows=0.5` `highlights=0.0` `radius=30.0` +1 advanced | [shadows_highlights.toml](../../examples/effects/shadows_highlights.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
 | <img src="../gallery/starburst.jpg" width="160" alt="starburst"> | `starburst` | Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. | `rays=4` `length=0.1` `threshold=0.95` `limit=1.0` `amount=0.8` `angle=0.0` `color='#ffffff'` | [starburst.toml](../../examples/effects/starburst.toml) |
@@ -283,10 +283,12 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number (cyclic) | degrees | 0 to 360 | `315.0` | Where the light comes from, in degrees clockwise from the top of the picture: 0 = above, 90 = the right, 180 = below, 270 = the left, 315 = the upper left. Sides that face it are brightened, those that face away darkened. |
+| `field` | field name |  |  | `'depth'` | The field read as the relief, the higher the value the higher the ground: `depth` (the nearest stands highest; the subject rises from its background), `light` (the picture's own brightness: bright parts stand proud), `subject`, or a region the recipe declares. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `225.0` | Where the light comes from, in degrees clockwise from pointing right, on screen: 0 = the right, 90 = below, 180 = the left, 225 = the upper left, 270 = above. Sides that face it are brightened, those that face away darkened. |
 | `elevation` | number | degrees | 1 to 90 | `45.0` | How high the light stands above the picture's plane, in degrees: 90 = straight above (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 = grazing, so the shapes are dramatic and the lit side is clipped to white. |
-| `height` | number | px | 0 to 1000 | `200.0` | How tall the whole depth range stands as a relief, in px at the recipe's size: the nearest depth (1) stands this many px above the farthest (0), so the slope between neighbours is their depth difference times this. 0 = flat (the picture is unchanged), larger = steeper shapes that catch more of the light. |
-| `blur` | number | px | 0 to 50 | `2.0` | Gaussian sigma in px with which the depth is smoothed before its slopes are taken: 0 = every ripple of the depth map is lit (its noise shows), larger = softer lighting that follows only the broad shapes. |
+| `height` | number | px | 0 to 1000 | `200.0` | How tall the whole range of the field stands as a relief, in px at the recipe's size: a field value of 1 stands this many px above 0, so the slope between neighbours is their difference times this. 0 = flat (the relief is nothing: the picture at `saturation` 1, mid grey at 0), larger = steeper shapes that catch more of the light. A field of the picture's own brightness wants far less (about 8) than a depth (about 200). |
+| `blur` | number | px | 0 to 50 | `2.0` | Gaussian sigma in px with which the field is smoothed before its slopes are taken: 0 = every ripple of the field is lit (its noise shows), larger = softer lighting that follows only the broad shapes. |
+| `saturation` | number | fraction | 0 to 1 | `1.0` | How much of the picture's colour is lit: 1 = the picture itself, lit; 0 = the relief alone, a grey surface lit (a flat field is mid grey); between, the picture mixed into mid grey. |
 
 <details><summary>Advanced parameters (2)</summary>
 
@@ -296,6 +298,13 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a seam). |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `bump_light` | The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left. |
+| `emboss` | An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees. |
 
 ### `shadows_highlights`
 
