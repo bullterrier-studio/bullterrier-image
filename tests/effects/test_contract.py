@@ -20,7 +20,7 @@ from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Finder, Given, Grid
+from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
 
 ALL = sorted(registry.describe())
 
@@ -1003,8 +1003,14 @@ def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
 
 # --- one convention for directions and lengths -------------------------------------------------------------------
 # A field is a direction (cyclic degrees, 0 to 360, clockwise from the right), a rotation amount (cyclic, signed
-# -180 to 180), a length (px, in design pixels) or a share of something named; the tables below hold every field that
-# breaks the convention by its name, each with the reason.
+# -180 to 180, clockwise when positive), a length (px, in design pixels) or a share of something named; the tables
+# below hold every field that breaks the convention by its name, each with the reason. They hold for the parameters of
+# every effect and for the models of the recipe's regions and its frame, by owner: the effect's name, or the model's
+# class name (`Line`, `Edge`, `Framing`...).
+MODELS: dict[str, type[EffectParams]] = {
+    **{name: registry.parameters(name) for name in ALL},
+    **{cls.__name__: cls for cls in (*typing.get_args(Kind), Line, Curve, Edge, Framing)},
+}
 
 # Degrees fields that are no direction and no rotation: the reason each is none.
 NOT_A_DIRECTION = {
@@ -1021,22 +1027,28 @@ NOT_A_DIRECTION = {
     ("shatter", "angle"): "the most a piece is turned, an amount",
     ("swirl", "angle"): "how far the centre is turned, an amount of several turns",
 }
+# Fields named `angle` that are how far something is turned, not a direction: the reason each is a rotation.
+ROTATIONS = {
+    ("Framing", "angle"): "how far the photo is turned before the steps, as perspective.rotate turns the picture",
+}
 ROTATION_WORDS = {"turn", "rotate", "rotation"}  # a field named so is how far something is turned, not a direction
 DIRECTION_WORDS = {"angle", "direction"}
 
 
-def _degree_problems(name: str) -> list[str]:
-    """What is wrong with each degrees field of the effect `name`: a direction is cyclic 0..360 and its doc says
-    clockwise, a rotation is cyclic -180..180, any other field must be on `NOT_A_DIRECTION`."""
+def _degree_problems(name: str, model: type[EffectParams]) -> list[str]:
+    """What is wrong with each degrees field of `model`, owned by `name`: a direction is cyclic 0..360 and a rotation
+    cyclic -180..180, each with a doc that says clockwise; any other field must be on `NOT_A_DIRECTION`."""
     problems = []
-    for doc in registry.parameters(name).fields_doc():
+    for doc in model.fields_doc():
         words = set(doc.name.split("_"))
         if doc.unit != "degrees" or (name, doc.name) in NOT_A_DIRECTION:
             continue
         where = f"{name}.{doc.name}"
-        if words & ROTATION_WORDS:
+        if words & ROTATION_WORDS or (name, doc.name) in ROTATIONS:
             if not doc.cyclic or (doc.minimum, doc.maximum) != (-180, 180):
                 problems.append(f"{where} is a rotation: cyclic, -180 to 180, not {doc.minimum} to {doc.maximum}")
+            if not re.search(r"(?<![a-z-])clockwise", doc.doc, re.I):
+                problems.append(f"{where} is a rotation: its doc must say it runs clockwise")
         elif words & DIRECTION_WORDS:
             if not doc.cyclic or (doc.minimum, doc.maximum) != (0, 360):
                 problems.append(f"{where} is a direction: cyclic, 0 to 360, not {doc.minimum} to {doc.maximum}")
@@ -1047,16 +1059,14 @@ def _degree_problems(name: str) -> list[str]:
     return problems
 
 
-@pytest.mark.parametrize("name", ALL)
+@pytest.mark.parametrize("name", MODELS)
 def test_every_direction_is_cyclic_degrees_clockwise_from_the_right_and_every_rotation_signed(name):
-    assert _degree_problems(name) == []
+    assert _degree_problems(name, MODELS[name]) == []
 
 
-def test_the_direction_table_names_only_degrees_fields_that_exist():
-    known = {
-        (name, doc.name) for name in ALL for doc in registry.parameters(name).fields_doc() if doc.unit == "degrees"
-    }
-    assert set(NOT_A_DIRECTION) - known == set()
+def test_the_direction_tables_name_only_degrees_fields_that_exist():
+    known = {(name, doc.name) for name, model in MODELS.items() for doc in model.fields_doc() if doc.unit == "degrees"}
+    assert (set(NOT_A_DIRECTION) | set(ROTATIONS)) - known == set()
 
 
 class _Heading(EffectParams):
@@ -1095,6 +1105,12 @@ class _Turn(EffectParams):
     turn: float = param(0.0, unit="degrees", min=-180, max=180, cyclic=True, doc="Clockwise when positive.")
 
 
+class _TurnAnticlockwise(EffectParams):
+    """A rotation that runs the other way."""
+
+    turn: float = param(0.0, unit="degrees", min=-180, max=180, cyclic=True, doc="Counter-clockwise when positive.")
+
+
 class _TurnUnsigned(EffectParams):
     """A rotation over a turn from zero."""
 
@@ -1115,20 +1131,14 @@ DEGREE_PROBES: dict[str, tuple[type[EffectParams], str | None]] = {
     "a direction whose doc says anticlockwise": (_HeadingAnticlockwise, "must say it runs clockwise"),
     "a direction named `direction` that is narrow and not cyclic": (_HeadingNamedDirection, "direction is a direction"),
     "a rotation over 0..360": (_TurnUnsigned, "rotate is a rotation"),
+    "a rotation whose doc says counter-clockwise": (_TurnAnticlockwise, "must say it runs clockwise"),
     "an unlisted degrees field": (_Lean, "lean is in degrees"),
 }
 
 
 @pytest.mark.parametrize(("params", "wanted"), DEGREE_PROBES.values(), ids=DEGREE_PROBES.keys())
-def test_the_direction_check_flags_what_breaks_the_convention_and_passes_what_keeps_it(
-    params, wanted, throwaway_effects
-):
-    @effect(category="light", params=params)
-    def degree_probe(rgb, params):
-        """Has one degrees field."""
-        return rgb
-
-    problems = _degree_problems("degree_probe")
+def test_the_direction_check_flags_what_breaks_the_convention_and_passes_what_keeps_it(params, wanted):
+    problems = _degree_problems("probe", params)
     assert len(problems) == (wanted is not None)
     assert all(wanted in problem for problem in problems if wanted)
 
@@ -1154,6 +1164,10 @@ LENGTHS_AS_SHARES = {
     ("fog", "feather"): "the range of the noise that makes the clouds",
     ("disperse", "flare_span"): "a piece's flight",
     ("disperse", "reach"): "the figure, in the order its pieces leave",
+    ("RadialGradient", "radius"): "the picture's shorter side",
+    ("Band", "feather"): "the field's range of values",
+    ("Framing", "margin"): "the longer side of the subject's box",
+    ("Framing", "corner_radius"): "the picture's shorter side",
 }
 LENGTH_WORDS = {
     "length", "width", "size", "offset", "height", "spacing", "radius", "span", "gap", "cell", "thickness",
@@ -1162,12 +1176,12 @@ LENGTH_WORDS = {
 POSITIONS = {"x", "y", "at", "base"}  # a position is a fraction of each axis, not a length
 
 
-def _length_shares(name: str) -> list[tuple[str, str]]:
-    """(effect, field) for each field of `name` that is a share of something and either is named for a length (the
-    last word of its name, leaving out a trailing x, y, min or max, is a length word) or says in its doc that it is a
-    share of the long side (a distance called `amount`, say)."""
+def _length_shares(name: str, model: type[EffectParams]) -> list[tuple[str, str]]:
+    """(owner, field) for each field of `model`, owned by `name`, that is a share of something and either is named for
+    a length (the last word of its name, leaving out a trailing x, y, min or max, is a length word) or says in its doc
+    that it is a share of the long side (a distance called `amount`, say)."""
     found = []
-    for doc in registry.parameters(name).fields_doc():
+    for doc in model.fields_doc():
         words = [word for word in doc.name.split("_") if word not in {"x", "y", "min", "max"}] or [doc.name]
         named = words[-1] in LENGTH_WORDS and doc.name not in POSITIONS
         if doc.unit == "fraction" and (named or "long side" in doc.doc):
@@ -1175,21 +1189,21 @@ def _length_shares(name: str) -> list[tuple[str, str]]:
     return found
 
 
-def _length_problems(name: str) -> list[str]:
+def _length_problems(name: str, model: type[EffectParams]) -> list[str]:
     return [
         f"{where[0]}.{where[1]} is a length in a share: give it in px, or list it in LENGTHS_AS_SHARES"
-        for where in _length_shares(name)
+        for where in _length_shares(name, model)
         if where not in LENGTHS_AS_SHARES
     ]
 
 
-@pytest.mark.parametrize("name", ALL)
+@pytest.mark.parametrize("name", MODELS)
 def test_every_length_is_in_px_unless_it_is_a_share_of_a_named_reference(name):
-    assert _length_problems(name) == []
+    assert _length_problems(name, MODELS[name]) == []
 
 
 def test_the_length_table_names_only_fields_that_are_still_lengths_in_shares():
-    still = {where for name in ALL for where in _length_shares(name)}
+    still = {where for name, model in MODELS.items() for where in _length_shares(name, model)}
     assert set(LENGTHS_AS_SHARES) - still == set()
 
 
@@ -1234,15 +1248,8 @@ LENGTH_PROBES: dict[str, tuple[type[EffectParams], int]] = {
 
 
 @pytest.mark.parametrize(("params", "problems"), LENGTH_PROBES.values(), ids=LENGTH_PROBES.keys())
-def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_strengths(
-    params, problems, throwaway_effects
-):
-    @effect(category="light", params=params)
-    def length_probe(rgb, params):
-        """Has one length-like field."""
-        return rgb
-
-    assert len(_length_problems("length_probe")) == problems
+def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_strengths(params, problems):
+    assert len(_length_problems("probe", params)) == problems
 
 
 # --- the same look at the design size and at twice it --------------------------------------------------------
