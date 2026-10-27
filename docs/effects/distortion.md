@@ -20,7 +20,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/polar.jpg" width="160" alt="polar"> | `polar` | Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from'). | `mode='to'` `x=0.5` `y=0.5` +2 advanced | [polar.toml](../../examples/effects/polar.toml) |
 | <img src="../gallery/ripple.jpg" width="160" alt="ripple"> | `ripple` | Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`. | `wavelength=40.0` `amplitude=6.0` `phase=0.0` `angle=0.0` +2 advanced | [ripple.toml](../../examples/effects/ripple.toml) |
 | <img src="../gallery/shatter.jpg" width="160" alt="shatter"> | `shatter` | Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px lines between them. | `pieces=24` `shape='voronoi'` `detail=0.0` `fill=0.0` `offset=10.0` `angle=5.0` `gap=0.0` `color='#000000'` `seed=0` +2 advanced | [shatter.toml](../../examples/effects/shatter.toml) |
-| <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance. | `slices=30` `amount=0.05` `seed=0` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
+| <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. | `slices=30` `amount=0.05` `seed=0` `bands=0` `band_min_height=0.01` `band_max_height=0.06` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
 | <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
 | <img src="../gallery/swirl.jpg" width="160" alt="swirl"> | `swirl` | Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`. | `angle=90.0` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [swirl.toml](../../examples/effects/swirl.toml) |
 | <img src="../gallery/tile.jpg" width="160" alt="tile"> | `tile` | Repeat the whole picture, scaled down, in a grid of `columns` by `rows`. | `columns=3` `rows=3` | [tile.toml](../../examples/effects/tile.toml) |
@@ -282,9 +282,18 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `slices` | whole number | count | 1 to 500 | `30` | How many horizontal strips the picture is cut into, 1 to 500 (never more than it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides the whole picture as one. More strips make a finer, busier tear. |
-| `amount` | number | fraction | 0 to 1 | `0.05` | The furthest a strip slides, as a fraction 0 to 1 of the picture's width: each strip slides by a random whole number of pixels between that far left and that far right, so a strip may also stay put. 0 leaves the picture unchanged; 1 can slide a strip by a whole picture width. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the cuts fall and how far each strip slides: the same seed always gives the same tear, any other seed gives a different one. |
+| `slices` | whole number | count | 0 to 500 | `30` | How many horizontal strips the whole picture is cut into, 0 to 500 (never more than it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides the whole picture as one; 0 = no tear, only the bands move. More strips make a finer, busier tear. |
+| `amount` | number | fraction | 0 to 1 | `0.05` | The furthest a strip or band slides, as a fraction 0 to 1 of the picture's width: each slides by a random whole number of pixels between that far left and that far right, so one may also stay put. 0 leaves the picture unchanged; 1 can slide one by a whole picture width. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the cuts and the bands fall and how far each slides: the same seed always gives the same tear, any other seed gives a different one. |
+| `bands` | whole number | count | 0 to 500 | `0` | How many extra strips slide, 0 to 500, on top of the tear: each is placed at a random row, so they may overlap (a row in two slides by both) and the rest of the picture stays; 0 = none. A few bands with `slices` 0 make a corrupted video frame. |
+| `band_min_height` | number | fraction | 0 to 1 | `0.01` | The lowest a band can be, as a fraction 0 to 1 of the picture's height (never below 1 px). Each band's height is drawn at random between this and `band_max_height`, which it may not exceed. |
+| `band_max_height` | number | fraction | 0 to 1 | `0.06` | The tallest a band can be, as a fraction 0 to 1 of the picture's height. Raising it gives taller bands. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `glitch` | A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes. |
 
 ### `stretch`
 

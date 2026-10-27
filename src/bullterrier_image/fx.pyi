@@ -1547,35 +1547,6 @@ constant_value : number, fraction, 0 to 1, default 0.0
     'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
-def glitch(split: int = 10, bands: int = 7, shift: float = 0.06, seed: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """`bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed
-`split` px apart.
-
-The same `seed` always gives the same damage. The colour split runs last, so the bands get the same red and blue
-fringes as the rest of the picture.
-
-Parameters
-----------
-split : whole number, px, -500 to 500, default 10
-    How far red is pushed right and blue left, -500 to 500 px (negative swaps the
-    directions); 0 = no colour split. The picture wraps around at the edges.
-bands : whole number, count, 0 to 500, default 7
-    How many random horizontal strips slide sideways, 0 to 500; 0 = none.
-shift : number, fraction, 0 to 1, default 0.06
-    The furthest a strip slides, as a fraction 0 to 1 of the picture's width; each strip
-    slides a random distance up to this, left or right, wrapping around.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same damage; any other gives different
-    strips.
-band_min_height : number, fraction, 0 to 1, default 0.01
-    The lowest a strip can be, as a fraction 0 to 1 of the picture's height (never below
-    1 px). Each strip's height is drawn at random between this and `band_max_height`,
-    which it may not exceed.
-band_max_height : number, fraction, 0 to 1, default 0.06
-    The tallest a strip can be, as a fraction 0 to 1 of the picture's height. Raising it
-    gives taller strips."""
-    ...
-
 def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`.
 
@@ -3694,27 +3665,44 @@ dropout_height : whole number, px, 1 to 100, default 2
     px high. A streak that would cross the bottom edge is cut there."""
     ...
 
-def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance.
+def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, bands: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
+    """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide
+`bands` more strips of random height placed at random rows.
 
 A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip
-moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts and the
-slides depend only on `seed`, `slices`, `amount` and the picture's size.
+moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the
+bands and the slides depend only on `seed`, `slices`, `bands`, `amount` and the picture's size.
 
 Parameters
 ----------
-slices : whole number, count, 1 to 500, default 30
-    How many horizontal strips the picture is cut into, 1 to 500 (never more than it has
-    rows). The cuts fall at random rows, so the strips differ in height; 1 slides the
-    whole picture as one. More strips make a finer, busier tear.
+slices : whole number, count, 0 to 500, default 30
+    How many horizontal strips the whole picture is cut into, 0 to 500 (never more than
+    it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides
+    the whole picture as one; 0 = no tear, only the bands move. More strips make a
+    finer, busier tear.
 amount : number, fraction, 0 to 1, default 0.05
-    The furthest a strip slides, as a fraction 0 to 1 of the picture's width: each strip
-    slides by a random whole number of pixels between that far left and that far right,
-    so a strip may also stay put. 0 leaves the picture unchanged; 1 can slide a strip by
+    The furthest a strip or band slides, as a fraction 0 to 1 of the picture's width:
+    each slides by a random whole number of pixels between that far left and that far
+    right, so one may also stay put. 0 leaves the picture unchanged; 1 can slide one by
     a whole picture width.
 seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for where the cuts fall and how far each strip slides: the same seed
-    always gives the same tear, any other seed gives a different one."""
+    Random seed for where the cuts and the bands fall and how far each slides: the same
+    seed always gives the same tear, any other seed gives a different one.
+bands : whole number, count, 0 to 500, default 0
+    How many extra strips slide, 0 to 500, on top of the tear: each is placed at a
+    random row, so they may overlap (a row in two slides by both) and the rest of the
+    picture stays; 0 = none. A few bands with `slices` 0 make a corrupted video frame.
+band_min_height : number, fraction, 0 to 1, default 0.01
+    The lowest a band can be, as a fraction 0 to 1 of the picture's height (never below
+    1 px). Each band's height is drawn at random between this and `band_max_height`,
+    which it may not exceed.
+band_max_height : number, fraction, 0 to 1, default 0.06
+    The tallest a band can be, as a fraction 0 to 1 of the picture's height. Raising it
+    gives taller bands.
+
+Presets
+-------
+glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
     ...
 
 def solarize(threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

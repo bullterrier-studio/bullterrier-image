@@ -8,7 +8,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/dead_pixels.jpg" width="160" alt="dead_pixels"> | `dead_pixels` | Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black. | `count=120` `size=4` `stuck=0.5` `color='#ffffff'` `seed=0` | [dead_pixels.toml](../../examples/effects/dead_pixels.toml) |
 | <img src="../gallery/echo.jpg" width="160" alt="echo"> | `echo` | Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`. | `copies=4` `dx=14.0` `dy=0.0` `fade=0.5` +1 advanced | [echo.toml](../../examples/effects/echo.toml) |
-| <img src="../gallery/glitch.jpg" width="160" alt="glitch"> | `glitch` | `bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed `split` px apart. | `split=10` `bands=7` `shift=0.06` `seed=0` `band_min_height=0.01` `band_max_height=0.06` | [glitch.toml](../../examples/effects/glitch.toml) |
 | <img src="../gallery/hologram.jpg" width="160" alt="hologram"> | `hologram` | Show the picture as light of `color`, outlined where its brightness changes, with scanlines and a flicker. | `color='#30e0ff'` `tint=0.85` `glow=5.0` `scanlines=0.35` `flicker=0.3` `phase=0.0` +5 advanced | [hologram.toml](../../examples/effects/hologram.toml) |
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
@@ -44,17 +43,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a copy shows where it has moved off the picture's edge: 'nearest' repeats the picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror' mirrors it about the edge line. |
 
 </details>
-
-### `glitch`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `split` | whole number | px | -500 to 500 | `10` | How far red is pushed right and blue left, -500 to 500 px (negative swaps the directions); 0 = no colour split. The picture wraps around at the edges. |
-| `bands` | whole number | count | 0 to 500 | `7` | How many random horizontal strips slide sideways, 0 to 500; 0 = none. |
-| `shift` | number | fraction | 0 to 1 | `0.06` | The furthest a strip slides, as a fraction 0 to 1 of the picture's width; each strip slides a random distance up to this, left or right, wrapping around. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same damage; any other gives different strips. |
-| `band_min_height` | number | fraction | 0 to 1 | `0.01` | The lowest a strip can be, as a fraction 0 to 1 of the picture's height (never below 1 px). Each strip's height is drawn at random between this and `band_max_height`, which it may not exceed. |
-| `band_max_height` | number | fraction | 0 to 1 | `0.06` | The tallest a strip can be, as a fraction 0 to 1 of the picture's height. Raising it gives taller strips. |
 
 ### `hologram`
 
