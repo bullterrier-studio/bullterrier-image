@@ -1571,12 +1571,12 @@ white_balance : White balance: corrects a warm (orange) cast and a slight magent
     ...
 
 def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fill'] | None = None) -> Step:
-    """Replace the picture with a gradient (linear, radial or conic) or a flat colour fill, through `colors`.
+    """Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black;
+set colors for another); to replace the background: mask = "background".
 
 A generated background: the input is used only for its height and width, its content is ignored. Sizes in
 fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
-"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill (preset
-`fill`); masked to the background it removes the background.
+"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill.
 
 Parameters
 ----------
@@ -1615,7 +1615,7 @@ reflect : true or false, default False
 
 Presets
 -------
-fill : Flat colour fill: the whole picture one black; set `colors` to another single colour. Masked to the background, it removes the background."""
+fill : Flat colour fill (black; set colors for another). To replace the background: mask = "background"."""
     ...
 
 def gradient_map(stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:

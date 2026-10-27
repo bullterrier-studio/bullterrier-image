@@ -9,7 +9,7 @@ Generated or replaced backgrounds behind the subject.
 | <img src="../gallery/aurora.jpg" width="160" alt="aurora"> | `aurora` | Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky. | `colors=('#2bff9a', '#7a2cff')` `sky='#02050f'` `base=0.75` `height=0.7` `waviness=40.0` `rays=0.7` `octaves=3` `seed=0` +5 advanced | [aurora.toml](../../examples/effects/aurora.toml) |
 | <img src="../gallery/flow_lines.jpg" width="160" alt="flow_lines"> | `flow_lines` | Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow. | `density=0.002` `length=120` `thickness=1.5` `scale=120.0` `octaves=2` `twist=180.0` `seed=0` `line='#ffd84a'` `background='#12002b'` +3 advanced | [flow_lines.toml](../../examples/effects/flow_lines.toml) |
 | <img src="../gallery/fractal.jpg" width="160" alt="fractal"> | `fractal` | Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes. | `kind='julia'` `zoom=1.0` `x=0.0` `y=0.0` `c_real=-0.8` `c_imag=0.156` `iterations=64` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [fractal.toml](../../examples/effects/fractal.toml) |
-| <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient (linear, radial or conic) or a flat colour fill, through `colors`. | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
+| <img src="../gallery/gradient.jpg" width="160" alt="gradient"> | `gradient` | Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black; set colors for another); to replace the background: mask = "background". | `kind='linear'` `colors=('#12002b', '#ff2bd6')` `angle=90.0` `x=0.5` `y=0.5` `radius=0.75` `repeat=1` `reflect=False` | [gradient.toml](../../examples/effects/gradient.toml) |
 | <img src="../gallery/noise_field.jpg" width="160" alt="noise_field"> | `noise_field` | Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine, the classic plasma), coloured through `colors`. | `kind='perlin'` `scale=120.0` `octaves=4` `persistence=0.5` `lacunarity=2.0` `warp=0.0` `colors=('#0b1d3a', '#2a7f9e', '#f4e9c8')` `seed=0` | [noise_field.toml](../../examples/effects/noise_field.toml) |
 | <img src="../gallery/pattern.jpg" width="160" alt="pattern"> | `pattern` | Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours. | `kind='grid'` `cell=32.0` `angle=0.0` `foreground='#ffffff'` `background='#101018'` `thickness=0.2` `radius=0.3` `feather=1.0` | [pattern.toml](../../examples/effects/pattern.toml) |
 
@@ -101,7 +101,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Preset | Description |
 | --- | --- |
-| `fill` | Flat colour fill: the whole picture one black; set `colors` to another single colour. Masked to the background, it removes the background. |
+| `fill` | Flat colour fill (black; set colors for another). To replace the background: mask = "background". |
 
 ### `noise_field`
 
