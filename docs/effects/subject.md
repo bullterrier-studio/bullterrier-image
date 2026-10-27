@@ -7,11 +7,9 @@ Effects that work on the cut-out subject, apart from its background.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished. | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
-| <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | A soft shadow of the subject cast on the picture behind it, moved by `dx`, `dy` and softened by `blur`. | `dx=12.0` `dy=18.0` `blur=24.0` `color='#000000'` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
+| <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`. | `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
 | <img src="../gallery/evaporate.jpg" width="160" alt="evaporate"> | `evaporate` | Dissolve the picture into pieces that float away, thin out and fade. | `cell=5` `start=0.6` `outline=0.0` `outward=0.0` `rise=0.3` `wind=0.0` `vanish=0.3` `seed=0` +14 advanced | [evaporate.toml](../../examples/effects/evaporate.toml) |
 | <img src="../gallery/fill.jpg" width="160" alt="fill"> | `fill` | Replace the whole picture with one colour. | `color='#000000'` | [fill.toml](../../examples/effects/fill.toml) |
-| <img src="../gallery/layered_cutouts.jpg" width="160" alt="layered_cutouts"> | `layered_cutouts` | Copies of the subject's silhouette stacked behind it, each `offset` px farther along `angle`, like cut paper. | `layers=4` `offset=14.0` `angle=45.0` `color='#ff8a5b'` `end_color='#3b1f6b'` `layer_opacity=1.0` +1 advanced | [layered_cutouts.toml](../../examples/effects/layered_cutouts.toml) |
-| <img src="../gallery/long_shadow.jpg" width="160" alt="long_shadow"> | `long_shadow` | A flat-design long shadow: the subject's silhouette repeated along `angle` for `length` px, behind it. | `angle=45.0` `length=300.0` `color='#000000'` `fade=1.0` +1 advanced | [long_shadow.toml](../../examples/effects/long_shadow.toml) |
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px. | `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth. | `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
 | <img src="../gallery/rim_light.jpg" width="160" alt="rim_light"> | `rim_light` | Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`. | `angle=40.0` `color='#ff9a4d'` `width=12.0` `amount=1.0` `falloff=1.5` +4 advanced | [rim_light.toml](../../examples/effects/rim_light.toml) |
@@ -72,21 +70,31 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `dx` | number | px | -500 to 500 | `12.0` | How far the shadow is moved to the right, in px at the recipe's size; negative moves it left. 0 with `dy` 0 hides the shadow behind the subject, leaving only what the blur spreads past its edge. |
-| `dy` | number | px | -500 to 500 | `18.0` | How far the shadow is moved down, in px at the recipe's size; negative moves it up. |
-| `blur` | number | px | 0 to 200 | `24.0` | Gaussian sigma of the shadow's soft edge in px: raising it makes the shadow larger and fainter at its edge; 0 = a hard-edged copy of the subject's silhouette. |
-| `color` | colour |  |  | `'#000000'` | The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the subject; another colour tints it. |
+| `copies` | whole number | count | 1 to 400 | `1` | How many copies of the silhouette are stacked behind the subject: 1 = a single shadow, more = a deeper stack of layers. |
+| `offset` | number | px | 0 to 1000 | `22.0` | How far each copy lies beyond the one before it, in px at the recipe's size: the first is `offset` from the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, leaving only what `blur` spreads past its edge. |
+| `angle` | number (cyclic) | degrees | -180 to 180 | `56.0` | The direction the copies step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. |
+| `blur` | number | px | 0 to 200 | `24.0` | Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger and fainter at their edge; 0 = hard-edged silhouettes. |
+| `color` | colour |  |  | `'#000000'` | The colour of the copy nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the subject; another colour tints it. |
+| `end_color` | colour |  |  | `'#000000'` | The colour of the farthest copy; the copies between step evenly from `color` to it. With one copy only `color` is used. |
+| `copy_opacity` | number | fraction | 0 to 1 | `1.0` | How much of what lies behind each copy it covers: 1 = fully, below 1 the copies show through each other and the picture; 0 = no copies. Overlapping copies compound (two copies at 0.5 cover 0.75); the step's `opacity` mixes the finished stack in once. |
+| `fade` | number | fraction | 0 to 1 | `0.0` | How much of `copy_opacity` the farthest copy loses, falling in a straight line along the copies: 0 = all copies alike, 0.5 = the farthest half as opaque, 1 = it vanishes. With one copy nothing fades. |
 
 <details><summary>Advanced parameters (2)</summary>
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the shadow's Gaussian is cut off, in sigmas: it reaches truncate x blur px. Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the shadow sees beyond the picture's edge, when it is moved and softened: 'nearest' (the outermost row repeated, so a subject cut off by the border casts its shadow on without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel) or 'wrap' (the opposite edge). |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where each copy's Gaussian is cut off, in sigmas: it reaches truncate x blur px. Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the copies see beyond the picture's edge, when moved and softened: 'nearest' (the outermost row repeated, so a subject cut off by the border casts its copies on without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel) or 'wrap' (the opposite edge). |
 
 </details>
 
 A step of `drop_shadow` has `opacity = 0.6` unless it sets its own.
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. |
 
 ### `evaporate`
 
@@ -135,44 +143,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `color` | colour |  |  | `'#000000'` | The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-
-### `layered_cutouts`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `layers` | whole number | count | 1 to 20 | `4` | How many copies of the silhouette are stacked behind the subject. Raising it makes a deeper stack. |
-| `offset` | number | px | 0 to 200 | `14.0` | How far each layer lies beyond the one before it, in px at the recipe's size: the first is `offset` from the subject, the last `layers` x `offset`. 0 = every layer hidden behind the subject. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `45.0` | The direction the layers step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. |
-| `color` | colour |  |  | `'#ff8a5b'` | The colour of the layer nearest the subject: '#rrggbb', '#rgb' or [r, g, b] 0..1. |
-| `end_color` | colour |  |  | `'#3b1f6b'` | The colour of the farthest layer; the layers between step evenly from `color` to it. With one layer only `color` is used. |
-| `layer_opacity` | number | fraction | 0 to 1 | `1.0` | How much of what lies behind each layer it covers: 1 = fully (paper), below 1 the layers show through each other and the picture; 0 = no layers. Not the step's `opacity`: each layer is laid at this over the ones beyond it, so where layers overlap they compound (two layers at 0.5 cover 0.75), while the step's `opacity` mixes the finished stack in once. |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the layers see beyond the picture's edge when the silhouette is moved: 'nearest' (the outermost row repeated, so a subject cut off by the border has layers that go on past it), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel) or 'wrap' (the opposite edge). |
-
-</details>
-
-### `long_shadow`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `45.0` | The direction the shadow is cast, clockwise as seen in the picture: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, -90 = up. Angles that are not a multiple of 45 leave the shadow's edges about a pixel soft. |
-| `length` | number | px | 0 to 5000 | `300.0` | How far the shadow reaches from the subject's outline, in px at the recipe's size; 0 = no shadow (the silhouette behind itself, which shows only as a faint fringe where the cut-out is soft). Raising it makes the shadow longer; the effect's time grows only with the logarithm of it. |
-| `color` | colour |  |  | `'#000000'` | The colour of the shadow: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens what lies behind the subject; another colour tints it. |
-| `fade` | number | fraction | 0 to 1 | `1.0` | How much of its opacity the shadow loses along its length, in a straight line: 0 = solid to the end, 0.5 = half as opaque at the end, 1 = fades out completely at `length`. |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the shadow sees beyond the picture's edge when the silhouette is moved: 'nearest' (the outermost row repeated, so a subject cut off by the border casts its shadow on without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel) or 'wrap' (the opposite edge). |
-
-</details>
-
-A step of `long_shadow` has `opacity = 0.5` unless it sets its own.
 
 ### `outline`
 
