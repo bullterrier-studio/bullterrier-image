@@ -703,7 +703,7 @@ size = 1600
 effect = "slice_shift"
 preset = "glitch"
 bands = 8
-amount = 0.015
+amount = 24
 seed = 4
 
 [[step]]
