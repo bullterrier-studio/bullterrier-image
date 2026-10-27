@@ -3986,11 +3986,12 @@ seed : whole number, count, 0 to 4294967295, default 0
     seed a different one."""
     ...
 
-def vhs(tracking: float = 0.06, bands: int = 3, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 0.04, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
+def vhs(tracking: float = 0.06, bands: int = 3, band_static: float | Drive = 0.0, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 0.04, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
     """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
 rows, bled colour and tape noise (static, snow).
 
-In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width; every row then drifts
+In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width and take `band_static` of
+grey static (solid bands of snow across a clean picture at 1); every row then drifts
 sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
 the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
 `noise` of grain is added to the brightness. The bands, dropouts, noise and wobble each draw from their own stream
@@ -4004,6 +4005,10 @@ tracking : number, fraction, 0 to 1, default 0.06
     left or right. 0 = the bands do not move.
 bands : whole number, count, 0 to 50, default 3
     How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.
+band_static : number (drivable), fraction, 0 to 1, default 0.0
+    How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the
+    share of every pixel in a band that becomes a random grey. 0 = none; 1 = bands of
+    pure static. Does nothing when `bands` is 0.
 dropouts : whole number, count, 0 to 2000, default 0
     How many dropout streaks, 0 to 2000: short white marks where the signal was lost,
     each as tall as a speck of tape noise (`noise_size`) and between half of `tracking`
@@ -4048,7 +4053,7 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
 
 Presets
 -------
-signal_noise : A failing analog signal: VHS static and snow with white tape dropouts, and a few bands torn sideways."""
+signal_noise : A bad analog signal: a clean picture crossed by solid bands of static (snow) and short white tape dropouts."""
     ...
 
 def vignette(amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

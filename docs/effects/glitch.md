@@ -13,7 +13,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
-| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
+| <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `band_static=0.0` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
 
 ### `dead_pixels`
 
@@ -136,6 +136,7 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | --- | --- | --- | --- | --- | --- |
 | `tracking` | number | fraction | 0 to 1 | `0.06` | How far a tracking band slides sideways, at most, as a fraction 0 to 1 of the picture's width: each band slides by a random whole number of pixels up to this, left or right. 0 = the bands do not move. |
 | `bands` | whole number | count | 0 to 50 | `3` | How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none. |
+| `band_static` | number (drivable) | fraction | 0 to 1 | `0.0` | How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the share of every pixel in a band that becomes a random grey. 0 = none; 1 = bands of pure static. Does nothing when `bands` is 0. |
 | `dropouts` | whole number | count | 0 to 2000 | `0` | How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` of the picture's width long. 0 = none; raising it covers more of the picture. |
 | `bleed` | number | px | 0 to 100 | `5.0` | How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a picture about 480 px high: colour lags the brightness by this many pixels and is blurred sideways by a Gaussian of this standard deviation. 0 = no bleed; raising it smears red and blue far past their edges. |
 | `noise` | number | fraction | 0 to 1 | `0.03` | The standard deviation of the tape noise added to brightness, 0 to 1 in picture units: 0 = none, 0.03 is visible, 0.1 is heavy. Colour is not touched. |
@@ -158,4 +159,4 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Preset | Description |
 | --- | --- |
-| `signal_noise` | A failing analog signal: VHS static and snow with white tape dropouts, and a few bands torn sideways. |
+| `signal_noise` | A bad analog signal: a clean picture crossed by solid bands of static (snow) and short white tape dropouts. |
