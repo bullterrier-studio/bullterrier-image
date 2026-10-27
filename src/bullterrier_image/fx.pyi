@@ -47,32 +47,6 @@ Step opacity
 0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
     ...
 
-def anaglyph(shift: float = 6.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Red from the brightness moved `shift` px left, green and blue from the brightness moved `shift` px right.
-
-The brightness is Rec. 709 luminance. The picture is grey (red = green = blue = luminance) with a red fringe on
-one side of every edge and a cyan one on the other, which red-cyan glasses show at different depths. A shift
-of 0 leaves only the grey picture; what a view shows beyond the picture's edge is set by `edge`.
-
-Parameters
-----------
-shift : number, px, 0 to 200, default 6.0
-    How far each eye's view is moved from the picture, in px tuned for a picture about
-    480 px high: the red (left) view moves this far to the left and the cyan (right)
-    view this far to the right, so they end up twice this far apart and objects seem to
-    float out of the screen through red-cyan glasses. 0 gives a grey picture, the
-    brightness in all three channels. A fraction of a pixel blends the two pixels it
-    lies between.
-
-Advanced parameters
--------------------
-edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
-    What a moved view shows where it has left the picture's edge: 'nearest' repeats the
-    view's edge pixels (a coloured smear along the edge), 'wrap' brings back what left
-    on the other side, 'reflect' mirrors the view (the edge line repeated once),
-    'mirror' mirrors it about the edge line."""
-    ...
-
 def anamorphic_streaks(length: float = 0.35, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
 screened over the picture by `amount`.
@@ -3567,25 +3541,31 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     seam)."""
     ...
 
-def rgb_split(angle: float = 30.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Push the red and blue channels `amount` px apart along `angle`, leaving green where it is.
+def rgb_split(pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way.
 
-Red moves `amount` px in the direction `angle` (degrees counter-clockwise from pointing right: 0 right, 90 up),
-blue moves `amount` px the opposite way, green stays: on a grey picture the three channels end up exactly `amount`
-px from each other in a row, which shows as a red fringe on one side of an edge and a blue one on the other. Whole
-or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
+Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves
+`amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the
+channels end up exactly `amount` px from each other in a row, which shows as a red fringe on one side of an edge and
+a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has
+left the picture is set by `edge`.
 
 Parameters
 ----------
-angle : number (cyclic), degrees, 0 to 360, default 30.0
-    The direction red moves, in degrees counter-clockwise from pointing right (as on a
-    protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the
-    opposite way.
+pair : one of 'red_blue', 'red_cyan', default 'red_blue'
+    Which channels part: 'red_blue' moves red one way and blue the other and leaves
+    green in place (colour fringes on a colour picture); 'red_cyan' moves red one way
+    and green and blue together the other, as in 3D glasses (grey the picture first,
+    e.g. with `grade` at saturation 0, for the classic anaglyph).
+angle : number (cyclic), degrees, 0 to 360, default 330.0
+    The direction red moves, in degrees clockwise from pointing right on the screen (as
+    CSS `rotate`), 0 to 360: 0 = right, 90 = down, 180 = left, 270 = up. Blue (and green
+    with 'red_cyan') moves the opposite way.
 amount : number, px, 0 to 500, default 8.0
-    How far red and blue each move from where they were, in pixels, 0 to 500; they end
-    up twice this far apart. 0 leaves the picture unchanged. A fraction of a pixel
-    blends the two pixels it lies between. Raising it pulls the colour fringes further
-    apart.
+    How far red and its opposite channels each move from where they were, in pixels, 0
+    to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction
+    of a pixel blends the two pixels it lies between. Raising it pulls the colour
+    fringes further apart.
 
 Advanced parameters
 -------------------

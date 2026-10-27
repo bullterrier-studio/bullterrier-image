@@ -6,7 +6,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/anaglyph.jpg" width="160" alt="anaglyph"> | `anaglyph` | Red from the brightness moved `shift` px left, green and blue from the brightness moved `shift` px right. | `shift=6.0` +1 advanced | [anaglyph.toml](../../examples/effects/anaglyph.toml) |
 | <img src="../gallery/dead_pixels.jpg" width="160" alt="dead_pixels"> | `dead_pixels` | Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black. | `count=120` `size=4` `stuck=0.5` `color='#ffffff'` `seed=0` | [dead_pixels.toml](../../examples/effects/dead_pixels.toml) |
 | <img src="../gallery/echo.jpg" width="160" alt="echo"> | `echo` | Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`. | `copies=4` `dx=14.0` `dy=0.0` `fade=0.5` +1 advanced | [echo.toml](../../examples/effects/echo.toml) |
 | <img src="../gallery/glitch.jpg" width="160" alt="glitch"> | `glitch` | `bands` random horizontal strips slide sideways by up to `shift` of the width, then red and blue are pushed `split` px apart. | `split=10` `bands=7` `shift=0.06` `seed=0` `band_min_height=0.01` `band_max_height=0.06` | [glitch.toml](../../examples/effects/glitch.toml) |
@@ -14,24 +13,10 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
-| <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push the red and blue channels `amount` px apart along `angle`, leaving green where it is. | `angle=30.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
+| <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
 | <img src="../gallery/scan_roll.jpg" width="160" alt="scan_roll"> | `scan_roll` | Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does. | `axis='vertical'` `offset=0.2` +1 advanced | [scan_roll.toml](../../examples/effects/scan_roll.toml) |
 | <img src="../gallery/signal_noise.jpg" width="160" alt="signal_noise"> | `signal_noise` | Mix random grey static into `bands` full-width bands, then stamp `dropouts` short streaks of `color` on top. | `bands=3` `band_height=0.04` `static=0.7` `dropouts=12` `color='#ffffff'` `seed=0` +2 advanced | [signal_noise.toml](../../examples/effects/signal_noise.toml) |
 | <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape: tracking bands, wobbling rows, bled colour and tape noise. | `tracking=0.06` `bands=3` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
-
-### `anaglyph`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `shift` | number | px | 0 to 200 | `6.0` | How far each eye's view is moved from the picture, in px tuned for a picture about 480 px high: the red (left) view moves this far to the left and the cyan (right) view this far to the right, so they end up twice this far apart and objects seem to float out of the screen through red-cyan glasses. 0 gives a grey picture, the brightness in all three channels. A fraction of a pixel blends the two pixels it lies between. |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a moved view shows where it has left the picture's edge: 'nearest' repeats the view's edge pixels (a coloured smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the view (the edge line repeated once), 'mirror' mirrors it about the edge line. |
-
-</details>
 
 ### `dead_pixels`
 
@@ -147,8 +132,9 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number (cyclic) | degrees | 0 to 360 | `30.0` | The direction red moves, in degrees counter-clockwise from pointing right (as on a protractor), 0 to 360: 0 = right, 90 = up, 180 = left, 270 = down. Blue moves the opposite way. |
-| `amount` | number | px | 0 to 500 | `8.0` | How far red and blue each move from where they were, in pixels, 0 to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction of a pixel blends the two pixels it lies between. Raising it pulls the colour fringes further apart. |
+| `pair` | one of 'red_blue', 'red_cyan' |  |  | `'red_blue'` | Which channels part: 'red_blue' moves red one way and blue the other and leaves green in place (colour fringes on a colour picture); 'red_cyan' moves red one way and green and blue together the other, as in 3D glasses (grey the picture first, e.g. with `grade` at saturation 0, for the classic anaglyph). |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `330.0` | The direction red moves, in degrees clockwise from pointing right on the screen (as CSS `rotate`), 0 to 360: 0 = right, 90 = down, 180 = left, 270 = up. Blue (and green with 'red_cyan') moves the opposite way. |
+| `amount` | number | px | 0 to 500 | `8.0` | How far red and its opposite channels each move from where they were, in pixels, 0 to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction of a pixel blends the two pixels it lies between. Raising it pulls the colour fringes further apart. |
 
 <details><summary>Advanced parameters (1)</summary>
 
