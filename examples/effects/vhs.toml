@@ -5,7 +5,7 @@ size = 480
 
 [[step]]
 effect = "vhs"
-tracking = 0.08
+tracking = 38.4
 seed = 4
 
 [[step]]

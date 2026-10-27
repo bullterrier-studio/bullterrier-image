@@ -66,17 +66,52 @@ def test_with_no_tracking_noise_or_wobble_the_colour_trails_the_brightness_by_th
 
 @pytest.mark.parametrize("seed", [0, 1, 2, 3])
 def test_a_tracking_band_slides_whole_rows_sideways_and_rows_outside_every_band_are_unchanged(photo, seed) -> None:
-    out = registry.apply(NAME, photo, **{**OFF, "tracking": 0.2}, bands=3, seed=seed, edge="wrap")
+    out = registry.apply(NAME, photo, **{**OFF, "tracking": 26}, bands=3, band_height=4, seed=seed, edge="wrap")
     changed = np.flatnonzero(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2)))
     assert 1 <= len(runs(changed)) <= 3
     for run in runs(changed):
         rolls = [set(rolled_by(photo[row], out[row])) for row in run]
         assert set.intersection(*rolls), "the rows of one band do not slide by the same whole number of pixels"
         slide = min(set.intersection(*rolls), key=lambda s: min(s, 128 - s))
-        assert min(slide, 128 - slide) <= round(0.2 * 128)
+        assert min(slide, 128 - slide) <= 26
 
 
-@pytest.mark.parametrize("settings", [{"bands": 0, "tracking": 0.3}, {"bands": 5, "tracking": 0.0}])
+@pytest.mark.parametrize("seed", [0, 1, 2, 3])
+def test_by_default_a_slid_band_repeats_its_edge_pixel_rather_than_bringing_the_far_side_round(seed) -> None:
+    """Every column of a ramp differs, so a row is a slide of the ramp that clamps at the edges or one that wraps."""
+    ramp = np.broadcast_to(np.linspace(0.1, 0.9, 64, dtype=np.float32)[None, :, None], (48, 64, 3)).copy()
+    out = registry.apply(NAME, ramp, **{**OFF, "tracking": 12}, bands=1, band_height=8, seed=seed)
+    row = np.flatnonzero(~np.isclose(out, ramp, atol=1e-5).all(axis=(1, 2)))[0]
+    columns = np.arange(64)
+    slides = [s for s in range(-12, 13) if s]
+    clamped = [np.allclose(out[row, :, 0], ramp[row, np.clip(columns - s, 0, 63), 0], atol=1e-5) for s in slides]
+    wrapped = [np.allclose(out[row, :, 0], ramp[row, (columns - s) % 64, 0], atol=1e-5) for s in slides]
+    assert any(clamped)
+    assert not any(wrapped)
+
+
+def test_bands_slide_nearly_as_far_as_tracking_and_no_further(photo) -> None:
+    slides = []
+    for seed in range(30):
+        out = registry.apply(NAME, photo, **{**OFF, "tracking": 26}, bands=1, band_height=4, seed=seed, edge="wrap")
+        row = np.flatnonzero(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2)))[0]
+        slides.append(min(rolled_by(photo[row], out[row]), key=lambda s: min(s, 128 - s)))
+    reach = [min(s, 128 - s) for s in slides]
+    assert max(reach) <= 26
+    assert max(reach) > 0.75 * 26
+
+
+def test_a_tracking_band_is_between_half_band_height_and_band_height_tall(photo) -> None:
+    """With static 1 the whole band is replaced, so the rows that changed are the band: 10 to 20 for 20 px."""
+    rows = []
+    for seed in range(30):
+        out = registry.apply(NAME, photo, **OFF, bands=1, band_height=20, band_static=1.0, seed=seed)
+        rows.append((~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2))).sum())
+    assert 10 <= min(rows) < 13
+    assert 17 < max(rows) <= 20
+
+
+@pytest.mark.parametrize("settings", [{"bands": 0, "tracking": 38}, {"bands": 5, "tracking": 0}])
 def test_no_bands_or_no_tracking_leaves_every_row_where_it_was(photo, settings) -> None:
     out = registry.apply(NAME, photo, **{**OFF, **settings})
     np.testing.assert_allclose(out, photo, atol=1e-5)
@@ -107,7 +142,7 @@ def test_tracking_bands_slide_both_ways_and_can_reach_the_first_and_the_last_row
     covered = np.zeros(photo.shape[0], bool)
     slides = []
     for seed in range(100):
-        out = registry.apply(NAME, photo, **{**OFF, "tracking": 0.3}, bands=4, band_height=0.5, seed=seed, edge="wrap")
+        out = registry.apply(NAME, photo, **{**OFF, "tracking": 38}, bands=4, band_height=48, seed=seed, edge="wrap")
         changed = ~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2))
         covered |= changed
         for run in runs(np.flatnonzero(changed)):
@@ -118,10 +153,8 @@ def test_tracking_bands_slide_both_ways_and_can_reach_the_first_and_the_last_row
 
 
 def test_a_tracking_band_is_at_least_one_row_tall_however_small_band_height_is(photo) -> None:
-    """On 96 rows `band_height` 0.0105 draws a thickness between 0.50 and 1.01 rows, which is one row every time."""
-    outs = [
-        registry.apply(NAME, photo, **{**OFF, "tracking": 0.5}, bands=1, band_height=0.0105, seed=s) for s in range(20)
-    ]
+    """`band_height` 1 px draws a thickness between 0.5 and 1 rows, which is one row every time."""
+    outs = [registry.apply(NAME, photo, **{**OFF, "tracking": 64}, bands=1, band_height=1, seed=s) for s in range(20)]
     rows = [(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2))).sum() for out in outs]
     assert max(rows) == 1
 
@@ -145,10 +178,10 @@ def test_wobble_is_a_drift_of_the_asked_deviation_that_is_smooth_over_the_asked_
 def test_band_static_mixes_grey_snow_into_whole_band_rows_and_leaves_the_other_rows_alone(photo, static) -> None:
     """In a band `out = (1 - static) * photo + static * grey`, one grey in 0..1 per pixel, so
     `(out - (1 - static) * photo) / static` has equal channels inside 0..1; rows outside the bands are the photo's."""
-    out = registry.apply(NAME, photo, **OFF, bands=1, band_height=0.2, band_static=static, seed=3)
+    out = registry.apply(NAME, photo, **OFF, bands=1, band_height=20, band_static=static, seed=3)
     rows = np.flatnonzero(~np.isclose(out, photo, atol=1e-5).all(axis=(1, 2)))  # the YIQ round trip is not exact
     assert len(runs(rows)) == 1
-    assert 96 * 0.2 / 2 <= len(rows) <= 96 * 0.2  # between half the tallest band and the tallest
+    assert 20 / 2 <= len(rows) <= 20  # between half the tallest band and the tallest
     inside = (out[rows] - (1 - static) * photo[rows]) / static
     np.testing.assert_allclose(inside, inside[..., :1].repeat(3, axis=-1), atol=1e-5)
     assert -1e-5 <= inside.min() <= inside.max() <= 1 + 1e-5
@@ -174,19 +207,18 @@ def white_changes(before: np.ndarray, after: np.ndarray) -> np.ndarray:
 def test_a_dropout_is_one_white_streak_as_tall_as_a_speck_of_noise_and_up_to_tracking_wide(
     photo, noise_size, rows
 ) -> None:
-    width = photo.shape[1]
-    out = registry.apply(NAME, photo, **{**OFF, "tracking": 0.5}, bands=0, dropouts=1, noise_size=noise_size, seed=2)
+    out = registry.apply(NAME, photo, **{**OFF, "tracking": 64}, bands=0, dropouts=1, noise_size=noise_size, seed=2)
     streak = white_changes(photo, out)
     assert streak.any()
     lines, columns = np.flatnonzero(streak.any(axis=1)), np.flatnonzero(streak.any(axis=0))
     assert len(lines) == min(rows, photo.shape[0] - lines[0])  # cut by the bottom edge
-    assert width * 0.5 / 2 - 1 <= len(columns) <= width * 0.5  # between half of tracking and tracking
+    assert 64 / 2 - 1 <= len(columns) <= 64  # between half of tracking and tracking
     assert np.array_equal(columns, np.arange(columns[0], columns[-1] + 1))
     np.testing.assert_allclose(out[~streak], photo[~streak], atol=1e-5)
 
 
 def test_more_dropouts_cover_more_of_the_picture(photo) -> None:
-    settings = {**OFF, "tracking": 0.2, "bands": 0, "seed": 5}
+    settings = {**OFF, "tracking": 26, "bands": 0, "seed": 5}
     few = white_changes(photo, registry.apply(NAME, photo, **settings, dropouts=3)).sum()
     many = white_changes(photo, registry.apply(NAME, photo, **settings, dropouts=40)).sum()
     assert 0 < few < many
@@ -194,7 +226,7 @@ def test_more_dropouts_cover_more_of_the_picture(photo) -> None:
 
 def test_the_dropouts_do_not_move_when_the_bands_change(photo) -> None:
     """Bands and dropouts draw from their own streams of one seed: more bands move no dropout."""
-    settings = {**OFF, "tracking": 0.3, "dropouts": 6, "seed": 4, "band_static": 1.0}
+    settings = {**OFF, "tracking": 38, "dropouts": 6, "seed": 4, "band_static": 1.0}
     without = registry.apply(NAME, photo, bands=0, **settings)
     with_bands = registry.apply(NAME, photo, bands=3, **settings)
     streak = white_changes(photo, without)

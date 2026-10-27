@@ -17,12 +17,13 @@ class VhsParams(EffectParams):
     """The settings of `vhs`: tracking bands, dropouts, bleed, tape noise, wobble and the random seed."""
 
     tracking: float = param(
-        0.06,
-        unit="fraction",
+        28.8,
+        unit="px",
         min=0,
-        max=1,
-        doc="How far a tracking band slides sideways, at most, as a fraction 0 to 1 of the picture's width: each band "
-        "slides by a random whole number of pixels up to this, left or right. 0 = the bands do not move.",
+        max=2000,
+        doc="How far a tracking band slides sideways, at most, in px, 0 to 2000, tuned for a picture about 480 px "
+        "high: each band slides by a random whole number of pixels up to this, left or right. 0 = the bands do not "
+        "move.",
     )
     bands: int = param(
         3,
@@ -46,8 +47,8 @@ class VhsParams(EffectParams):
         min=0,
         max=2000,
         doc="How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a "
-        "speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` of the picture's width "
-        "long. 0 = none; raising it covers more of the picture.",
+        "speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` px long. 0 = none; raising "
+        "it covers more of the picture.",
     )
     bleed: float = param(
         5.0,
@@ -83,12 +84,12 @@ class VhsParams(EffectParams):
         "damage, any other a different one.",
     )
     band_height: float = param(
-        0.04,
-        unit="fraction",
+        19.2,
+        unit="px",
         min=0,
-        max=1,
-        doc="The tallest a tracking band can be, as a fraction 0 to 1 of the picture's height; each band is between "
-        "half this and this tall (never under 1 px).",
+        max=2000,
+        doc="The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480 px high; each band "
+        "is between half this and this tall (never under 1 px, never taller than the picture).",
         advanced=True,
     )
     noise_size: float = param(
@@ -118,12 +119,12 @@ class VhsParams(EffectParams):
         "faster and gives slightly sharper tails.",
         advanced=True,
     )
-    edge: Literal["wrap", "nearest", "reflect", "mirror"] = param(
-        "wrap",
-        doc="What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'wrap' "
-        "the opposite side, 'nearest' the edge pixel repeated, 'reflect' the picture mirrored (edge pixel repeated "
-        "once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and "
-        "columns of their own fields.",
+    edge: Literal["nearest", "wrap", "reflect", "mirror"] = param(
+        "nearest",
+        doc="What lies beyond the picture's left and right edges for everything that moves or blurs sideways: "
+        "'nearest' the edge pixel repeated (a worn tape smears its edge rather than bringing the far side round), "
+        "'wrap' the opposite side, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored "
+        "about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields.",
         advanced=True,
     )
 
@@ -133,7 +134,7 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
     rows, bled colour and tape noise (static, snow).
 
-    In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width and take `band_static` of
+    In this order: `bands` horizontal bands slide sideways by up to `tracking` px and take `band_static` of
     grey static (solid bands of snow across a clean picture at 1); every row then drifts
     sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
     the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
@@ -148,9 +149,9 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     static_rng = np.random.default_rng(int(rng.integers(np.iinfo(np.uint32).max)))
     bands = []
     for _ in range(params.bands):
-        thickness = min(height, max(1, round(rng.uniform(params.band_height / 2, params.band_height) * height)))
+        thickness = min(height, max(1, round(rng.uniform(params.band_height / 2, params.band_height))))
         top = int(rng.integers(height - thickness + 1))
-        bands.append((top, thickness, round(rng.uniform(-params.tracking, params.tracking) * width)))
+        bands.append((top, thickness, round(rng.uniform(-params.tracking, params.tracking))))
     out = slide_bands(rgb, bands, edge=params.edge)
     for top, thickness, _ in bands:
         snow = static_rng.random(
@@ -166,7 +167,7 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     # as tall as a speck of noise, so grain and dropouts scale together
     streak_height = max(1, round(params.noise_size))
     for _ in range(params.dropouts):
-        length = min(width, max(1, round(dropout_rng.uniform(params.tracking / 2, params.tracking) * width)))
+        length = min(width, max(1, round(dropout_rng.uniform(params.tracking / 2, params.tracking))))
         row = int(dropout_rng.integers(height))
         start = int(dropout_rng.integers(width - length + 1))
         out[row : row + streak_height, start : start + length] = (

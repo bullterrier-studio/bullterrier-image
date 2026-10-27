@@ -2,7 +2,7 @@
 
 [signal_noise]
 description = "A bad analog signal: a clean picture crossed by solid bands of static (snow) and short white tape dropouts."
-tracking = 0.12
+tracking = 57.6
 bands = 3
 band_static = 1
 dropouts = 12
