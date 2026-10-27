@@ -744,11 +744,19 @@ def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
     assert "invalid choice" in capsys.readouterr().err
 
 
-def test_effects_naming_a_preset_says_which_effect_it_belongs_to(capsys):
-    assert cli("effects glitch") == 1
+@pytest.mark.parametrize(
+    ("name", "says"),
+    [
+        pytest.param("glitch", 'effect = "slice_shift", preset = "glitch"', id="a-preset"),
+        pytest.param("vibrance", "'vibrance' is a parameter of grade", id="a-parameter"),
+        pytest.param("depth_of_field", "see focus_blur", id="a-word-of-a-summary"),
+    ],
+)
+def test_effects_naming_something_that_is_no_effect_says_where_it_lives(name, says, capsys):
+    assert cli(f"effects {name}") == 1
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert 'effect = "slice_shift", preset = "glitch"' in captured.err
+    assert says in captured.err
 
 
 def test_effects_lists_every_look_with_its_description_after_the_effects(capsys):
