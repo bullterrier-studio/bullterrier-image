@@ -67,20 +67,23 @@ class DisperseParams(EffectParams):
         "1 = everything goes.",
     )
     wind: float = param(
-        0.2,
-        unit="fraction",
-        min=-1,
-        max=1,
-        doc="The farthest any piece is carried by the time it vanishes, as a fraction of the picture width: positive "
-        "blows right, negative left. Keep it under a third, or pieces cross too much of the picture in one go.",
+        96.0,
+        unit="px",
+        min=-480,
+        max=480,
+        doc="The farthest any piece is carried by the time it vanishes, in px: positive blows right, negative left. "
+        "Keep it under a third of the picture width (160 px at the design size 480), or pieces cross too much of the "
+        "picture in one go.",
     )
     angle: float = param(
-        10.0,
+        350.0,
         unit="degrees",
-        min=-180,
-        max=180,
+        min=0,
+        max=360,
         cyclic=True,
-        doc="Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward.",
+        doc="Direction the wind blows, in degrees clockwise from right: 0 = right, 90 = down, 180 = left, 270 = up "
+        "(the default 350 is 10 degrees above level). A negative `wind` mirrors it left to right: the same tilt, "
+        "blowing left.",
     )
     hover: float = param(
         0.0,
@@ -117,12 +120,12 @@ class DisperseParams(EffectParams):
         doc="Random seed: each piece's fate is fixed by it, so one seed always gives the same pieces the same fates.",
     )
     outline_depth: float = param(
-        0.15,
-        unit="fraction",
-        min=0.01,
-        max=1,
-        doc="Distance from the outline (fraction of the picture width) beyond which a piece counts as fully inside, "
-        "for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in.",
+        72.0,
+        unit="px",
+        min=5,
+        max=480,
+        doc="Distance from the outline, in px, beyond which a piece counts as fully inside, for `outline` and "
+        "`hover_spread`. Raising it makes closeness to the edge matter deeper in.",
         advanced=True,
     )
     jitter: float = param(
@@ -187,11 +190,11 @@ class DisperseParams(EffectParams):
         advanced=True,
     )
     bob: float = param(
-        0.004,
-        unit="fraction",
+        2.0,
+        unit="px",
         min=0,
-        max=0.05,
-        doc="Height of the gentle up-and-down of a hovering piece, as a fraction of the picture height.",
+        max=24,
+        doc="Height of the gentle up-and-down of a hovering piece, in px.",
         advanced=True,
     )
     bob_cycles: float = param(
@@ -207,7 +210,8 @@ class DisperseParams(EffectParams):
         unit="degrees",
         min=0,
         max=180,
-        doc="Range of each piece's own direction around the wind's `angle` (it differs by up to half of this).",
+        doc="Range of each piece's own direction around the wind's `angle`, in degrees (it differs by up to half of "
+        "this). Not a direction itself.",
         advanced=True,
     )
     distance_minimum: float = param(
@@ -219,12 +223,11 @@ class DisperseParams(EffectParams):
         advanced=True,
     )
     outward_distance: float = param(
-        0.12,
-        unit="fraction",
+        58.0,
+        unit="px",
         min=0,
-        max=1,
-        doc="How far `outward` 1 throws a piece away from its edge, as a fraction of the picture's width "
-        "(sideways) and height (up and down).",
+        max=480,
+        doc="How far `outward` 1 throws a piece away from its edge, in px.",
         advanced=True,
     )
     acceleration: float = param(
@@ -237,12 +240,11 @@ class DisperseParams(EffectParams):
         advanced=True,
     )
     sway: float = param(
-        0.012,
-        unit="fraction",
+        6.0,
+        unit="px",
         min=0,
-        max=0.2,
-        doc="Largest sideways wobble of a flying piece, as a fraction of the picture width; it grows during the "
-        "flight. 0 = none.",
+        max=96,
+        doc="Largest sideways wobble of a flying piece, in px; it grows during the flight. 0 = none.",
         advanced=True,
     )
     sway_cycles: float = param(
@@ -289,12 +291,11 @@ class DisperseParams(EffectParams):
         advanced=True,
     )
     ambient_wavelength: float = param(
-        0.2,
-        unit="fraction",
-        min=0.01,
-        max=2,
-        doc="Length of one shimmer wave as a fraction of the picture width; a shorter one packs more waves "
-        "across the picture.",
+        96.0,
+        unit="px",
+        min=5,
+        max=960,
+        doc="Length of one shimmer wave, in px; a shorter one packs more waves across the picture.",
         advanced=True,
     )
     open_bottom: bool = param(
@@ -393,10 +394,14 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     # Order of detaching: 0 = first, 1 = last.
     y = np.broadcast_to(((np.arange(rows) + 0.5) * cell_h / height)[:, None], (rows, cols))
     x = np.broadcast_to(((np.arange(cols) + 0.5) * cell_w / width)[None, :], (rows, cols))
-    depth = np.clip(inside / (p.outline_depth * width), 0.0, 1.0)  # 0 on the outline, 1 well inside
+    depth = np.clip(inside / p.outline_depth, 0.0, 1.0)  # 0 on the outline, 1 well inside
     factors = [(p.top, y), (p.outline, depth), (abs(p.sweep), x if p.sweep >= 0 else 1.0 - x)]
     total_weight = sum(weight for weight, _ in factors)
-    order = sum(weight * value for weight, value in factors) / total_weight if total_weight > 0 else np.zeros_like(y)
+    order = (
+        np.asarray(sum(weight * value for weight, value in factors) / total_weight)
+        if total_weight > 0
+        else np.zeros_like(y)
+    )
     if present.any():
         low, high = order[present].min(), order[present].max()
         order = (order - low) / max(high - low, 1e-6)  # constant: guards a flat order
@@ -421,7 +426,7 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     shimmer = np.ones((rows, cols))
     if p.ambient > 0.0:
         against = 1.0 if p.wind >= 0 else -1.0  # constant: the sign of a direction
-        phase = p.ambient_phase + against * x / p.ambient_wavelength
+        phase = p.ambient_phase + against * x * width / p.ambient_wavelength
         shimmer = 1.0 + p.ambient * np.sin(2.0 * np.pi * phase)
     out = np.where(staying[..., None, None, None], pieces * shimmer[..., None, None, None], 0.0)
 
@@ -430,12 +435,10 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     a = age[row, col]
     t = np.clip(a, 0.0, 1.0)  # how far through its flight
     speed = p.distance_minimum + (1 - p.distance_minimum) * speed_noise[row, col]
-    direction = np.radians(p.angle + (angle_noise[row, col] - 0.5) * p.angle_spread)
-    reach_px = abs(p.wind) * width * speed  # this piece's whole journey
-    journey_x = (
-        np.sign(p.wind) * reach_px * np.cos(direction) + p.outward * p.outward_distance * width * normal_x[row, col]
-    )
-    journey_y = -reach_px * np.sin(direction) + p.outward * p.outward_distance * height * normal_y[row, col]
+    direction = np.radians(p.angle + (0.5 - angle_noise[row, col]) * p.angle_spread)
+    reach_px = abs(p.wind) * speed  # this piece's whole journey
+    journey_x = np.sign(p.wind) * reach_px * np.cos(direction) + p.outward * p.outward_distance * normal_x[row, col]
+    journey_y = reach_px * np.sin(direction) + p.outward * p.outward_distance * normal_y[row, col]
     path = (t + p.acceleration * t * t) / (1 + p.acceleration)  # an exit: starts gently, speeds up, ends at 1
 
     # Before it goes: float slowly along the journey (hover), then ease back a little against it (anticipation).
@@ -447,12 +450,11 @@ def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | N
     along = np.where(a > 0.0, start + (1.0 - start) * path, settled - p.pullback * (1.0 - (1.0 - windup) ** 2))
     bob = (
         p.bob
-        * height
         * (1.0 if p.hover > 0.0 else 0.0)  # the bob only exists while pieces hover
         * np.sin(np.pi * floating)
         * np.sin(2.0 * np.pi * (p.bob_cycles * floating + phase_noise[row, col]))
     )
-    sway = p.sway * width * sway_noise[row, col] * t * np.sin(2.0 * np.pi * (p.sway_cycles * t + phase_noise[row, col]))
+    sway = p.sway * sway_noise[row, col] * t * np.sin(2.0 * np.pi * (p.sway_cycles * t + phase_noise[row, col]))
     dx = along * journey_x + sway
     dy = along * journey_y + np.where(a > 0.0, 0.0, bob)
 

@@ -32,7 +32,12 @@ ambient = 0.12
 sweep = -1.0                # the front starts at the right edge...
 top = 0
 outline = 0
-wind = 0.3                  # ...and every piece is blown right, at most 0.3 of the width,
-angle = 30                  # up at 30 degrees,
+wind = 307                  # ...and every piece is blown right, at most 307 px (0.3 of the width),
+angle = 330                 # up at 30 degrees (clockwise from right),
 hover = 0.25                # after the outline has floated a little first
 seed = 4
+# the px values below are the defaults (tuned for 480) written for this recipe's size, 1024
+sway = 12
+bob = 4
+ambient_wavelength = 205
+outline_depth = 154

@@ -1,5 +1,6 @@
 # Looks that are one disperse step, frozen part-way through (`progress` 0.55). They leave `cell` at its default, 5: give
 # the ascii step before it the same.
+# Wind and distances are px at the design size 480; `angle` runs clockwise from right (270 = up).
 
 [evaporate]
 description = "The top of the figure dissolves into pieces that rise like smoke, thin out and fade."
@@ -8,8 +9,8 @@ top = 1.0
 outline = 0.1
 reach = 0.55
 jitter = 0.4
-wind = 0.3
-angle = 90
+wind = 144
+angle = 270
 angle_spread = 40
 flight = 0.35
 falloff = 0.8
@@ -22,8 +23,8 @@ outline = 0.8
 reach = 0.6
 jitter = 0.4
 outward = 0.6
-wind = 0.2
-angle = 90
+wind = 96
+angle = 270
 angle_spread = 40
 flight = 0.35
 falloff = 0.8
@@ -36,8 +37,8 @@ outline = 0.8
 reach = 0.6
 jitter = 0.4
 outward = 0.4
-wind = 0.35
-angle = 25
+wind = 168
+angle = 335
 angle_spread = 20
 flight = 0.35
 falloff = 0.8
@@ -50,9 +51,9 @@ outline = 2.0
 reach = 0.85
 jitter = 0.5
 outward = 0.9
-outward_distance = 0.2
-wind = 0.3
-angle = 90
+outward_distance = 96
+wind = 144
+angle = 270
 angle_spread = 120
 flight = 0.4
 falloff = 0.8
