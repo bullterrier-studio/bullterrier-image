@@ -1362,38 +1362,53 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated) or 'wrap' (the opposite edge)."""
     ...
 
-def fog(density: float | Drive = 0.8, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, patchiness: float = 0.6, scale: float = 150.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def fog(amount: float | Drive = 0.77, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, coverage: float = 0.93, feather: float = 1.0, floor: float = 0.5, scale: float = 150.0, rise: float = 1.0, turbulence: float = 0.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['smoke'] | None = None) -> Step:
     """Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom.
 
-The opacity at a pixel is `density` x (1 - `gradient` x (1 - t)) x (1 - `patchiness` x (1 - c)), where t is how
-far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge) and c in 0..1 is the
-cloud: fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`) passed through the normal
-cumulative distribution, so c is spread evenly over 0..1 whatever the noise settings. Each pixel becomes
+The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
+when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`
+(so the clouds are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more
+noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u
+spread evenly over 0..1; the cloud shape is smoothstep((u - (1 - `coverage`)) / `feather`), so about `coverage` of
+the picture has cloud and the shape climbs from 0 to 1 across the `feather` share of pixels above the cut. The
+opacity at a pixel is `amount` x (1 - `gradient` x (1 - t)) x (`floor` + (1 - `floor`) x shape), where t is how
+far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge). Each pixel becomes
 picture + opacity x (color - picture), so the fog lowers contrast as well as tinting.
 
 Parameters
 ----------
-density : number (drivable), fraction, 0 to 1, default 0.8
-    How thick the fog is where it is thickest (the bottom of the frame, in the densest
-    cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.8 =
-    a heavy haze, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
+amount : number (drivable), fraction, 0 to 1, default 0.77
+    How opaque the fog is where it is thickest (the bottom of the frame, in the densest
+    cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.5 =
+    see-through, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
     since every pixel moves toward the same colour.
 color : colour, default '#cfd8e3'
     The colour of the fog: '#rrggbb', '#rgb' or [r, g, b] 0..1. A pale blue-grey is a
-    cool morning mist, white a thick cloud, a warm grey smog.
+    cool morning mist, white a thick cloud, a warm grey smog, a dark grey or black a
+    heavy, sooty plume.
 gradient : number, fraction, 0 to 1, default 0.7
     How much thicker the fog is at the bottom of the frame than at the top, as a share
-    of its density: the opacity falls in a straight line from the bottom row up, to 1 -
+    of its opacity: the opacity falls in a straight line from the bottom row up, to 1 -
     gradient of its value at the top row. 0 = the same all the way up, 1 = no fog at the
     very top, as for mist lying on the ground.
-patchiness : number, fraction, 0 to 1, default 0.6
-    How cloudy the fog is: 0 = an even veil, 1 = drifts with clear gaps, where the noise
-    is lowest the fog thins to nothing. The cloud shapes come from fractal noise
-    (`scale`, `octaves`, `persistence`, `lacunarity`, `seed`).
+coverage : number, fraction, 0 to 1, default 0.93
+    About the share of the picture that has any cloud in it: 0 = none, 0.45 = clouds
+    with clear air between them, 1 = cloud everywhere, in thicker and thinner places.
+    The clouds are the highest parts of a noise field, so raising it widens them and
+    joins them up.
 scale : number, px, 1 to 1024, default 150.0
-    Size of the biggest clouds in pixels, the spacing of the first noise lattice; tuned
-    for a picture about 480 px high. Larger = broad banks of fog; small = fine, wispy
-    mottling.
+    Size of the biggest clouds across, in pixels, the spacing of the first noise lattice
+    before `rise` stretches it; tuned for a picture about 480 px high. Larger = broad
+    banks of fog; small = fine, wispy mottling.
+rise : number, ratio, 1 to 8, default 1.0
+    How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round
+    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
+turbulence : number, px, 0 to 500, default 0.0
+    How far in pixels two more noise fields (with the same `scale`, `octaves`,
+    `persistence` and `lacunarity`) push the clouds sideways and up and down: the
+    typical displacement (their standard deviation). 0 = smooth, regular clouds; larger
+    = twisting, curling smoke; much larger than `scale` tears the clouds into scattered
+    wisps.
 octaves : whole number, count, 1 to 8, default 4
     How many layers of noise are summed to make the clouds, each finer than the last (by
     `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
@@ -1404,14 +1419,38 @@ seed : whole number, count, 0 to 4294967295, default 0
 
 Advanced parameters
 -------------------
+feather : number, fraction, 0.01 to 1, default 1.0
+    How soft the edge of a cloud is, as the share of the picture over which the fog
+    thickens from its thinnest to full `amount` just above the coverage cut. Small =
+    crisp, billowing outlines; 1 = clouds that melt into the air with no clear outline.
+floor : number, fraction, 0 to 1, default 0.5
+    How much of the `amount` is left between the clouds, as a share: the opacity where
+    there is no cloud is `amount` x `floor`. 0 = open gaps of clear air, like plumes of
+    smoke; 1 = an even veil with no clouds at all; 0.5 = a haze that thins between
+    drifts but never clears.
 persistence : number, ratio, 0 to 1, default 0.5
-    How much weaker each finer layer of cloud is than the one before: each layer's
-    weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
-    layer equally strong (very rough).
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very rough).
 lacunarity : number, ratio, 1 to 4, default 2.0
-    How much finer each layer of cloud is than the one before: the lattice spacing is
-    divided by this per layer. 1 = every layer the same size, 2 = each half as coarse,
-    larger = detail drops off faster in size."""
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How the noise is read where `rise` and `turbulence` have moved it between pixels:
+    'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the
+    four around it (smooth), 'bicubic' fits a cubic spline through the neighbours
+    (smoothest, a little slower). It matters only where something moves. Named
+    `resampling`, not `interpolation`, because it reads a generated noise field, never
+    the picture.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the noise is beyond the picture's border when `turbulence` pushes a cloud in
+    from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+
+Presets
+-------
+smoke : Plumes of smoke or steam: clear air between soft-edged columns that rise from the bottom edge and curl."""
     ...
 
 def fractal(kind: Literal['mandelbrot', 'julia'] = 'julia', zoom: float = 1.0, x: float = 0.0, y: float = 0.0, c_real: float = -0.8, c_imag: float = 0.156, iterations: int = 64, period: float = 24.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), interior: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3740,79 +3779,6 @@ amount : number, fraction, 0 to 1, default 0.05
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed for where the cuts fall and how far each strip slides: the same seed
     always gives the same tear, any other seed gives a different one."""
-    ...
-
-def smoke(amount: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#e6e6e6', coverage: float = 0.45, feather: float = 0.25, scale: float = 100.0, rise: float = 2.0, turbulence: float = 30.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Mix soft-edged plumes of `color` into the picture, up to `amount` thick.
-
-The plumes are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
-when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`
-(so the plumes are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more
-noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u
-spread evenly over 0..1; the opacity is `amount` x smoothstep((u - (1 - `coverage`)) / `feather`), so about
-`coverage` of the picture has smoke and the opacity climbs from 0 to `amount` across the `feather` share of
-pixels above the cut. Each pixel becomes picture + opacity x (color - picture).
-
-Parameters
-----------
-amount : number, fraction, 0 to 1, default 0.5
-    How opaque the smoke is at the heart of a plume: the share of the smoke colour mixed
-    into the picture there. 0 = no smoke, 0.5 = see-through smoke, 1 = solid colour
-    hiding the picture.
-color : colour, default '#e6e6e6'
-    The colour of the smoke: '#rrggbb', '#rgb' or [r, g, b] 0..1. Pale grey is steam or
-    light smoke, a dark grey or black a heavy, sooty plume.
-coverage : number, fraction, 0 to 1, default 0.45
-    About the share of the picture that has any smoke in it: 0 = none, 0.45 = plumes
-    with clear air between them, 1 = smoke everywhere, in thicker and thinner places.
-    The plumes are the highest parts of a noise field, so raising it widens them and
-    joins them up.
-scale : number, px, 1 to 1024, default 100.0
-    Size of the biggest plumes across, in pixels, the spacing of the first noise lattice
-    before `rise` stretches it; tuned for a picture about 480 px high. Larger = a few
-    big clouds; small = many small wisps.
-rise : number, ratio, 1 to 8, default 2.0
-    How much the plumes are drawn out upward, anchored at the bottom edge: 1 = round
-    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
-turbulence : number, px, 0 to 500, default 30.0
-    How far in pixels two more noise fields (with the same `scale`, `octaves`,
-    `persistence` and `lacunarity`) push the plumes sideways and up and down: the
-    typical displacement (their standard deviation). 0 = smooth, regular plumes; larger
-    = twisting, curling smoke; much larger than `scale` tears the plumes into scattered
-    wisps.
-octaves : whole number, count, 1 to 8, default 4
-    How many layers of noise are summed to make the plumes, each finer than the last (by
-    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
-    detail. Layers finer than one pixel are dropped.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same smoke, another seed different
-    plumes.
-
-Advanced parameters
--------------------
-feather : number, fraction, 0.01 to 1, default 0.25
-    How soft the edge of a plume is, as the share of the picture over which the smoke
-    fades from nothing to full `amount` just above the coverage cut. Small = crisp,
-    billowing outlines; large = plumes that melt into the air with no clear outline.
-persistence : number, ratio, 0 to 1, default 0.5
-    How much weaker each finer layer is than the one before: each layer's weight is this
-    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
-    strong (very rough).
-lacunarity : number, ratio, 1 to 4, default 2.0
-    How much finer each layer is than the one before: the lattice spacing is divided by
-    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-    detail drops off faster in size.
-resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-    How the noise is read where `rise` and `turbulence` have moved it between pixels:
-    'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the
-    four around it (smooth), 'bicubic' fits a cubic spline through the neighbours
-    (smoothest, a little slower). It matters only where something moves. Named
-    `resampling`, not `interpolation`, because it reads a generated noise field, never
-    the picture.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the noise is beyond the picture's border when `turbulence` pushes a plume in
-    from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
-    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 def solarize(threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
