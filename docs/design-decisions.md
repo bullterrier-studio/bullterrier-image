@@ -307,22 +307,23 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
   `BT_IMAGE_DEPTH_MODEL`.
 
-- **Pixel values are design pixels.** A recipe's numbers with the unit `px` are written for its `size` (for 480 when it
-  has none: the size every effect's defaults are tuned for, so a recipe pasted onto a 4000 px photo gives the same look; a
-  recipe's own size still wins), and a render multiplies them by the working size over that (`render(..., size=)` sets the
-  working size; else the recipe's size, else the framed photo's longest side), in the one
-  place a step's values reach its effect (`EffectParams.scaled`, from the parameter description: no per-effect code). A
-  whole number is rounded; a value shrinks no further than its field's `min` and grows without a ceiling, because a range
-  is in design pixels. *Reason:* the README promised a look that matches at any resolution, but with `size=None` a draft at
-  half size meant scaling every radius by hand, and with a size the output was always rescaled to it; and without a size the design size was the photo's own long side, so
-  the defaults (tuned for 480) came out tiny on a large photo. *Consequence:* the
-  scaled values are not checked against the range (the model is copied, not rebuilt); regions and the framing hold no
-  pixel values (shares and angles), so only effects scale; noise and random placements keep their character at another
-  size, not their exact positions. An effect whose light or density is per working pixel (`starburst` with every bright pixel
-  radiating) declares `size_ratio`, an injected input (working px per design px; 1.0 outside a recipe), and gives each
-  pixel its share, so the total stays the same; `jpeg_crush` crushes the picture shrunk to design size and adds only the damage back (repeated, hard-edged), so its 8 px blocks are design px and fine detail stays. *Reason:* a value on the frozen parameters was hidden render context that
-  dumps, equality and fingerprints could miss. Lengths in `px` are written for a picture whose long side is the design size, so
-  a portrait photo gets the same values as a landscape one: a reach follows the long side, never the width or the height.
+- **Pixel values are design pixels.** A `px` value is a length on a picture whose long side is 480, always:
+  `recipe.size` is only how big the output is (the working size: `render(..., size=)`, else the recipe's size, else the
+  framed photo's longest side). A render multiplies the values by the working size over 480, in the one place a step's
+  values reach its effect (`EffectParams.scaled`, from the parameter description: no per-effect code). A whole number is
+  rounded; a value shrinks no further than its field's `min` and grows without a ceiling, because a range is in design
+  pixels. *Reason:* the README promised a look that matches at any resolution, but with `size=None` a draft at half size
+  meant scaling every radius by hand, and with a size the output was always rescaled to it; defaults and presets are
+  tuned for 480, so a `size` that also set what the numbers meant made one preset look different in every recipe it sat
+  in, and a photo's own long side made them tiny on a large photo. *Consequence:* the scaled values are not checked
+  against the range (the model is copied, not rebuilt); regions and the framing hold no pixel values (shares and
+  angles), so only effects scale; noise and random placements keep their character at another size, not their exact
+  positions. An effect whose light or density is per working pixel (`starburst` with every bright pixel radiating)
+  declares `size_ratio`, an injected input (working px per design px; 1.0 outside a recipe), and gives each pixel its
+  share, so the total stays the same; `jpeg_crush` crushes the picture shrunk to design size and adds only the damage
+  back (repeated, hard-edged), so its 8 px blocks are design px and fine detail stays. *Reason:* a value on the frozen
+  parameters was hidden render context that dumps, equality and fingerprints could miss. A reach follows the long side,
+  never the width or the height, so a portrait photo gets the same values as a landscape one.
 
 - **Marks: a count or a density.** A few marks (`dead_pixels.count`, `lens_drops.count`, `scratches`, `pieces`, `bands`)
   are a `count`: it reads naturally, and the marks' sizes are `px`, so the same count covers the same share at any size.

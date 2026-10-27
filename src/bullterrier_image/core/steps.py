@@ -467,9 +467,9 @@ class Recipe(ValidatedModel):
         `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked here, and
         made for each picture only when a step uses them.
     size: longest side of the working image in px, >= 1; None (the default) keeps the photo's own size. The photo
-        is framed first (flip, turn, crop, borders) and then scaled. The recipe's pixel values (a radius, a cell) are
-        written for this size, or for 480 when None (the size the effects' defaults are tuned for, so the same look
-        results on a photo of any size); `render(..., size=)` renders at another size.
+        is framed first (flip, turn, crop, borders) and then scaled. It only sets how big the result is: the recipe's
+        pixel values (a radius, a cell) are always written for a picture whose longest side is 480, so the same look
+        results at any size; `render(..., size=)` renders at another size.
     frame: a `Framing` (default: none): flips, turns, crops and pads the photo and its maps (the subject, the depth,
         any map handed in) together before the first step, and may cut the finished picture out (a circle, rounded
         corners, the subject) after the last, so the render has an alpha channel.
@@ -489,8 +489,8 @@ class Recipe(ValidatedModel):
         None,
         ge=1,
         strict=True,
-        description="The longest side in px the recipe's px values are written for, and the size it renders at; None: "
-        "written for 480, rendered at the photo's own size.",
+        description="The longest side in px the recipe renders at; None: the photo's own. Its px values are always "
+        "written for 480.",
     )
     frame: Framing = Field(
         default_factory=Framing, description="How the photo is framed before the steps and cut out after them."

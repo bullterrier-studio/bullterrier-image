@@ -16,9 +16,9 @@ per render, even when a `subject` map was given (a map of the whole photo does n
 a file or looks for a map on its own; `bullterrier_image.recipe` binds the default finders for users. The maps are
 found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
 move with the photo; the framed photo and maps are then scaled to the `size` a render is asked for, else the
-recipe's size, else kept. A recipe's pixel values (the fields with the unit `px`) are written for its size, or for 480
-when it has none (the size the effects' defaults are tuned for); a render multiplies them by the working size over
-that (`EffectParams.scaled`), so the look is the same at any size. The recipe's regions are made once per render, for
+recipe's size, else kept. Every pixel value (the fields with the unit `px`) is written for a picture whose longest side
+is 480, whatever the recipe's size; a render multiplies them by the working size over 480 (`EffectParams.scaled`), so
+the look is the same at any size. The recipe's regions are made once per render, for
 that scaled picture, and only as steps ask for them.
 
 Dependency direction: imports `steps`, `regions`, the effect registry and `ops` (to scale the photo and blend a step);
@@ -56,9 +56,7 @@ from .regions import (
 )
 from .steps import Each, Recipe, Step
 
-_DESIGN_SIZE = (
-    480  # px: the longest side the effects' px defaults are tuned for; a recipe with no size is written for it
-)
+_DESIGN_SIZE = 480  # px: the longest side every px value is written for (the effects' defaults are tuned for it)
 
 
 @dataclass(frozen=True)
@@ -116,9 +114,9 @@ def render(
     crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a subject that is not there.
 
     size: the longest side of the result in px, 1 or more (the recipe's own size when None; RecipeError for anything
-    else). The recipe's pixel values are multiplied by the result's longest side over the recipe's size (over 480
-    when the recipe has no size), so one recipe gives the same look at any size; a value stops at its minimum when
-    shrinking and has no ceiling when growing.
+    else). The recipe's pixel values are written for 480 and multiplied by the result's longest side over 480, so one
+    recipe gives the same look at any size; a value stops at its minimum when shrinking and has no ceiling when
+    growing.
     """
     _check_size(size)
     found = _maps(rgb, [recipe], maps, finders)
@@ -326,9 +324,8 @@ def _prepare(
     """Frame the photo and the maps the recipe needs together, scale them all to `size` (else the recipe's size) and
     set up the recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its
     maps by name (those the recipe needs), its regions and the factor for the recipe's pixel values: the working
-    size over the size they are written for (the recipe's, else `_DESIGN_SIZE`): the one decision of the design size."""
+    size over `_DESIGN_SIZE`, the one decision of the design size."""
     rgb, maps = recipe.frame.apply(rgb, {name: found[name] for name in sorted(recipe.maps_needed)})
-    designed = recipe.size or _DESIGN_SIZE
     working = size or recipe.size
     if working:
         rgb = resize(rgb, working)
@@ -337,7 +334,7 @@ def _prepare(
         working = max(rgb.shape[:2])
     maps |= {name: DERIVED[name](rgb) for name in sorted(recipe.derived_maps)}  # made from the picture as it is worked
     find = _finder_in(rgb, (finders or {}).get("subject"))
-    scale = working / designed
+    scale = working / _DESIGN_SIZE
     return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find), scale
 
 

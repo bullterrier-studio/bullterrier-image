@@ -173,6 +173,15 @@ def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_t
     np.testing.assert_array_equal(out[rows.max(), columns.min()], [1, 0, 0])  # shown as it is: the normal mode
 
 
+@pytest.mark.parametrize("size", [480, 1024], ids=["size 480", "size 1024"])
+def test_the_logo_preset_keeps_the_same_margin_relative_to_the_frame_whatever_the_recipes_size(photo, size):
+    step = fx.blend(image=Picture(logo_pixels()), preset="overlay")
+    out = render(photo, Recipe("logo", size=size, steps=[step]))
+    _, columns = np.nonzero(np.all(np.isclose(out, (0, 0, 1), atol=0.01), axis=2))  # the logo's blue half
+    margin = out.shape[1] - 1 - columns.max()
+    assert abs(margin / size - 12 / 480) <= 1.5 / size  # the preset's 12 px of a 480 px frame
+
+
 def test_a_parameter_given_beside_the_logo_preset_wins(photo):
     _, _rows, columns = logo_corner(photo, preset="overlay", scale=0.01)
     assert columns.max() - columns.min() + 1 <= 2  # 1 % of 128 px

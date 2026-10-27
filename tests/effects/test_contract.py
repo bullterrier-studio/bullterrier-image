@@ -857,12 +857,12 @@ FIELD_EFFECTS = [(name, field) for name in ALL for field in registry.parameters(
 @pytest.mark.parametrize(("name", "field"), FIELD_EFFECTS, ids=[f"{n}-{f}" for n, f in FIELD_EFFECTS])
 @pytest.mark.parametrize("selection", ["depth", "light", "subject", "background", "g", "middle"])
 def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name_and_for_the_equal_array(
-    name, field, selection, photo, subject
+    name, field, selection, photo, subject, apply_as_rendered
 ):
     maps = field_maps(photo, subject)
     recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
-    direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
+    direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     assert_a_picture_like(named, photo)
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
 
@@ -884,12 +884,12 @@ FIELD_PARAMETERS = [(name, field) for name in ALL for field in registry.paramete
 # (topographic) amplify past any tolerance worth having; the probe test above covers `light`.
 @pytest.mark.parametrize("selection", ["depth", "subject", "background", "g", "middle"])
 def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_field_and_the_equal_array(
-    name, field, selection, photo, subject
+    name, field, selection, photo, subject, apply_as_rendered
 ):
     maps = field_maps(photo, subject)
     recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
-    direct = registry.apply(name, photo, **{field: the_field(selection, photo, maps)})
+    direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
 
 
@@ -1245,10 +1245,10 @@ def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_
     assert len(_length_problems("length_probe")) == problems
 
 
-# --- the same look at the design size and at four times it --------------------------------------------------------
+# --- the same look at the design size and at twice it --------------------------------------------------------
 
-DESIGN_SIZE = 240  # the recipe's size: the px its numbers are written for
-LARGE_SIZE = 960  # the size rendered again, four times as many px along each side
+DESIGN_SIZE = 480  # the size the px numbers are written for
+LARGE_SIZE = 960  # the size rendered again, twice as many px along each side
 LOOK_TOLERANCE = 0.02  # the most the mean of any colour may differ: 2% of the range
 CHANGE_SHARE = 0.2  # the most the mean change of any colour may differ: 20% of its value at the design size ...
 CHANGE_FLOOR = 0.001  # ... or this, when that is less: a tenth of a percent of the range
@@ -1260,8 +1260,8 @@ SIZE_EXCEPTIONS: dict[str, str] = {}
 
 @pytest.fixture(scope="module")
 def design_photo() -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    """A 960 x 720 picture (smooth colour with some fine detail) and the subject and depth maps for it: a recipe of
-    size 240 renders it four times smaller, one of size 960 as it is."""
+    """A 960 x 720 picture (smooth colour with some fine detail) and the subject and depth maps for it: rendered at
+    size 480 it is shrunk to half, at size 960 as it is."""
     rng = np.random.default_rng(1)
     height, width = 720, 960
     y, x = np.mgrid[0:height, 0:width].astype(np.float32)
@@ -1283,11 +1283,11 @@ def design_photo() -> tuple[np.ndarray, dict[str, np.ndarray]]:
 
 
 def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dict[int, tuple[np.ndarray, np.ndarray]]:
-    """For the sizes 240 and 960: the picture at that size and the effect `name` at its defaults applied to it, in a
-    recipe of size 240. The picture is the same photo scaled the same way (a step with no opacity leaves it be)."""
+    """For the sizes 480 and 960: the picture at that size and the effect `name` at its defaults applied to it. The
+    picture is the same photo scaled the same way (a step with no opacity leaves it be)."""
     step = Step(name, partition="subject") if "partition" in registry.inputs(name) else Step(name)
-    untouched = Recipe("untouched", [Step("grade", opacity=0)], size=DESIGN_SIZE)
-    look = Recipe(name, [step], size=DESIGN_SIZE)
+    untouched = Recipe("untouched", [Step("grade", opacity=0)])
+    look = Recipe(name, [step])
     return {
         size: (
             runner.render(picture, untouched, maps=maps, size=size),
@@ -1298,8 +1298,8 @@ def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dic
 
 
 def _mean_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> float:
-    """How far the mean colour of the effect `name` differs between the render at 240 and the render at 960 shrunk
-    back to 240 by averaging each 4 x 4 block: the largest difference of the three channels. Blind to marks that
+    """How far the mean colour of the effect `name` differs between the render at 480 and the render at 960 shrunk
+    back to 480 by averaging each 2 x 2 block: the largest difference of the three channels. Blind to marks that
     lighten as much as they darken."""
     renders = _renders(name, picture, maps)
     at_design, at_large = renders[DESIGN_SIZE][1], renders[LARGE_SIZE][1]
@@ -1310,8 +1310,8 @@ def _mean_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> 
 
 
 def _change_agrees(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> bool:
-    """Whether the effect `name` changes the picture as much at 960 as at 240: per colour, the mean of |output - input|
-    at 960 is within `CHANGE_SHARE` of its value at 240 (at least `CHANGE_FLOOR`). It ignores where the changes are,
+    """Whether the effect `name` changes the picture as much at 960 as at 480: per colour, the mean of |output - input|
+    at 960 is within `CHANGE_SHARE` of its value at 480 (at least `CHANGE_FLOOR`). It ignores where the changes are,
     so marks drawn at other places at each size agree, and it sees marks become smaller or fewer, which the mean
     does not when light marks and dark marks cancel."""
     change = {size: np.abs(out - rgb).mean(axis=(0, 1)) for size, (rgb, out) in _renders(name, picture, maps).items()}
@@ -1325,7 +1325,7 @@ def _looks_alike(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) ->
 
 
 @pytest.mark.parametrize("name", [name for name in ALL if name not in SIZE_EXCEPTIONS])
-def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_four_times_it(name, design_photo):
+def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_twice_it(name, design_photo):
     assert _mean_drift(name, *design_photo) <= LOOK_TOLERANCE
     assert _change_agrees(name, *design_photo)
 

@@ -271,11 +271,11 @@ def test_raising_spacing_only_drops_points_and_the_seed_picks_which() -> None:
 
 def count_glints(size: int, seed: int) -> int:
     """The separate lit patches the preset `sparkle` (spacing 70) leaves round a bright block, the middle third of a
-    `size` px square picture, in a recipe of design size 240."""
+    `size` px square picture."""
     block = np.zeros((size, size, 3), np.float32)
     block[size // 3 : 2 * size // 3, size // 3 : 2 * size // 3] = 0.9
     glitter = fx.starburst(preset="sparkle", spacing=70.0, seed=seed, threshold=0.5, variation=0.0)
-    lit = (render(block, Recipe("glints", size=240, steps=[glitter]), size=size) - block).max(axis=-1)
+    lit = (render(block, Recipe("glints", steps=[glitter]), size=size) - block).max(axis=-1)
     return int(ndimage.label(lit > 0.02)[1])
 
 
@@ -290,22 +290,22 @@ def test_the_number_of_glints_does_not_grow_with_the_resolution() -> None:
 
 
 def square_light(size: int) -> float:
-    """The light a small bright square (6 design px wide, in a recipe of design size 240) adds, summed over the picture
-    rendered at `size` px, per design px squared (the sum divided by (size / 240)^2)."""
-    side, middle = round(6 * size / 240), size // 2
+    """The light a small bright square (6 design px wide) adds, summed over the picture rendered at `size` px, per
+    design px squared (the sum divided by (size / 480)^2)."""
+    side, middle = round(6 * size / 480), size // 2
     picture = np.zeros((size, size, 3), np.float32)
     picture[middle : middle + side, middle : middle + side] = 0.52
     # a faint highlight and a low amount keep the light far from white, where screening stops being proportional
     glow = fx.starburst(rays=4, length=30.0, width=3.0, threshold=0.5, amount=0.1)
-    out = render(picture, Recipe("square", size=240, steps=[glow]), size=size)
-    return float((out - picture).sum() / (size / 240) ** 2)
+    out = render(picture, Recipe("square", steps=[glow]), size=size)
+    return float((out - picture).sum() / (size / 480) ** 2)
 
 
-@pytest.mark.parametrize("size", [120, 720, 960], ids=["half", "three times", "four times"])
+@pytest.mark.parametrize("size", [240, 720, 960], ids=["half", "one and a half", "twice"])
 def test_the_light_of_a_bright_area_does_not_grow_with_the_resolution(size: int) -> None:
     """Every pixel of a bright area radiates, and the area has more pixels the higher the resolution: the same
     recipe lights the same total (per design px squared) at any size."""
-    assert square_light(size) == pytest.approx(square_light(240), rel=0.05)
+    assert square_light(size) == pytest.approx(square_light(480), rel=0.05)
 
 
 def test_variation_dims_points_by_a_random_share_between_one_minus_variation_and_one() -> None:
@@ -335,12 +335,12 @@ def test_the_preset_sparkle_scatters_glints_over_a_bright_area_where_plain_spike
 
 @pytest.mark.parametrize(("spacing", "design_spacing"), [(0.0, 0.0), (25.8, 12.9)], ids=["every point", "a random few"])
 def test_a_call_with_size_ratio_equals_the_recipe_rendered_at_that_ratio(spacing: float, design_spacing: float) -> None:
-    """A recipe written for 240 px and rendered at 480 hands the effect `size_ratio` 2 and doubles its px values;
-    calling the effect directly with those values and `size_ratio=2` gives the same picture."""
-    picture = np.zeros((480, 480, 3), np.float32)
-    picture[150:330, 150:330] = 0.9
+    """A recipe rendered at 960 hands the effect `size_ratio` 2 and doubles its px values; calling the effect directly
+    with those values and `size_ratio=2` gives the same picture."""
+    picture = np.zeros((960, 960, 3), np.float32)
+    picture[300:660, 300:660] = 0.9
     step = fx.starburst(length=15.0, width=1.0, threshold=0.5, spacing=design_spacing, seed=3, variation=0.3)
-    by_recipe = render(picture, Recipe("two", size=240, steps=[step]), size=480)
+    by_recipe = render(picture, Recipe("two", steps=[step]), size=960)
     by_call = registry.apply(
         NAME, picture, length=30.0, width=2.0, threshold=0.5, spacing=spacing, seed=3, variation=0.3, size_ratio=2.0
     )

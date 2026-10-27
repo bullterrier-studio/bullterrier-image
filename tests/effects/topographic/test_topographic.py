@@ -1,5 +1,6 @@
 """Behaviour of the `topographic` effect: contour lines where a field crosses a level."""
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -191,13 +192,13 @@ def test_the_lines_follow_the_field_given_whatever_the_picture_looks_like(photo:
     ],
 )
 def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_passed_directly(
-    step_params: dict, field: str, photo: np.ndarray
+    step_params: dict, field: str, photo: np.ndarray, apply_as_rendered: Callable[..., np.ndarray]
 ) -> None:
     depth = depth_ramp(photo)
     settings: dict[str, Any] = {"levels": 6, "fill": "bands", "smoothing": 2.0}
     recipe = Recipe("named", [Step(NAME, {**settings, **step_params})], size=max(photo.shape[:2]))
     named = runner.render(photo, recipe, maps={"depth": depth})
-    expected = contours(photo, depth if field == "depth" else light(photo), **settings)
+    expected = apply_as_rendered(NAME, photo, field=depth if field == "depth" else light(photo), **settings)
     # the hand-made brightness differs from the library's in the last float32 digit, which a line's edge magnifies
     np.testing.assert_allclose(named, expected, atol=1e-3, rtol=0)
     assert np.abs(contours(photo, depth, **settings) - contours(photo, **settings)).max() > 0.05  # fields differ

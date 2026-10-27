@@ -131,8 +131,7 @@ def test_constant_value_is_the_highlight_assumed_beyond_the_edge() -> None:
 
 
 def with_preset(preset: str, picture: np.ndarray, **values: float) -> np.ndarray:
-    size = picture.shape[1]  # the recipe is as wide as the picture, so its px are the picture's px
-    return render(picture, Recipe("preset", size=size, steps=[fx.bloom(preset=preset, **values)]))
+    return render(picture, Recipe("preset", steps=[fx.bloom(preset=preset, **values)]))
 
 
 # What each preset is, as a light: the sigma of its one Gaussian and its strength per channel on a white spot
@@ -148,7 +147,7 @@ def test_a_preset_spreads_a_white_spot_as_one_gaussian_of_its_sigma_in_its_light
     """The impulse response worked out here: a lone white pixel on black becomes, in each channel, the preset's
     strength times a 2-D Gaussian of its sigma (a single octave)."""
     sigma, strengths = PRESET_LIGHT[preset]
-    size = 2 * round(4 * sigma) + 1
+    size = 480  # the preset's px are design px: on a picture 480 px wide they are the picture's px
     centre = size // 2
     picture = flat(0.0, size)
     picture[centre, centre] = 1.0

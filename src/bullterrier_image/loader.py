@@ -6,8 +6,8 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
     format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
     name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
     description = "Green text."    # optional, one sentence; a built-in look must have one (see "Looks" below)
-    size = 1024                    # optional: longest side in px the recipe is written for; absent = tuned for
-                                   # 480, rendered at the photo's own size
+    size = 1024                    # optional: longest side in px of the result; absent = the photo's own. The
+                                   # recipe's px values are always written for 480, whatever the size
 
     [frame]                        # optional: frame the photo before the steps, cut it out after them (see below)
     aspect = 1                     # crop to this width over height...

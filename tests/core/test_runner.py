@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
-from bullterrier_image.core import runner
+from bullterrier_image.core import registry, runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
@@ -1296,58 +1296,68 @@ def blur(radius, size=64, **recipe) -> Recipe:
 
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
 @pytest.mark.parametrize(
-    ("designed", "size", "by_hand"),
+    ("designed", "size", "effect_name", "by_hand"),
     [
-        pytest.param(blur(4.0), 128, blur(8.0, 128), id="twice the size: twice the radius"),
-        pytest.param(blur(4.0), 32, blur(2.0, 32), id="half the size: half the radius"),
-        pytest.param(blur(4.0), 64, blur(4.0, 64), id="the recipe's own size: nothing scaled"),
-        pytest.param(blur(24.0, None), 64, blur(3.2, 64), id="a recipe without a size is written for 480: 24 x 64/480"),
+        pytest.param(blur(30.0, 64), None, "gaussian_blur", {"radius": 4.0}, id="rendered at 64: 30 x 64/480"),
+        pytest.param(blur(30.0, 1024), 64, "gaussian_blur", {"radius": 4.0}, id="the recipe's size changes no number"),
+        pytest.param(blur(30.0, None), 64, "gaussian_blur", {"radius": 4.0}, id="a recipe without a size alike"),
+        pytest.param(blur(60.0, 64), 32, "gaussian_blur", {"radius": 4.0}, id="half the size: half the radius"),
+        pytest.param(blur(15.0, 64), 128, "gaussian_blur", {"radius": 4.0}, id="twice the size: twice the radius"),
         pytest.param(
-            Recipe("grid", [Step("pixel_grid", {"cell": 4})], size=64),
+            Recipe("grid", [Step("pixel_grid", {"cell": 30})], size=1024),
             128,
-            Recipe("grid", [Step("pixel_grid", {"cell": 8})], size=128),
-            id="a whole number of pixels",
+            "pixel_grid",
+            {"cell": 8},
+            id="a whole number",
         ),
         pytest.param(
-            Recipe("grid", [Step("pixel_grid", {"cell": 4})], size=64),
+            Recipe("grid", [Step("pixel_grid", {"cell": 30})], size=1024),
             16,
-            Recipe("grid", [Step("pixel_grid", {"cell": 3})], size=16),
+            "pixel_grid",
+            {"cell": 3},
             id="a whole number stops at its minimum of 3",
         ),
+    ],
+)
+def test_a_pixel_value_is_written_for_480_and_scaled_by_the_working_size_over_480(
+    photo, picture_of, designed, size, effect_name, by_hand
+):
+    working = size or designed.size
+    expected = registry.apply(effect_name, resize(photo, working), **by_hand)
+    np.testing.assert_array_equal(picture_of(photo, designed, size=size), expected)
+
+
+@pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
+@pytest.mark.parametrize(
+    ("compound", "plain"),
+    [
         pytest.param(
             Recipe(
                 "driven",
-                [Step("gaussian_blur", {"radius": Drive(by="f", start=2.0, end=6.0)})],
-                size=64,
+                [Step("gaussian_blur", {"radius": Drive(by="f", start=7.5, end=45.0)})],
+                size=1024,
                 regions={"f": Given()},
             ),
-            128,
-            Recipe("plain", [Step("gaussian_blur", {"radius": 12.0})], size=128),
+            blur(45.0),
             id="both ends of a driven number (a field of 1 takes the end)",
         ),
         pytest.param(
             Recipe(
                 "each",
-                [Each("g", [Step("gaussian_blur", {"radius": 4.0}), "none"])],
-                size=64,
+                [Each("g", [Step("gaussian_blur", {"radius": 45.0}), Step("gaussian_blur", {"radius": 45.0})])],
+                size=1024,
                 regions={"g": Grid(columns=2)},
             ),
-            128,
-            Recipe(
-                "each",
-                [Each("g", [Step("gaussian_blur", {"radius": 8.0}), "none"])],
-                size=128,
-                regions={"g": Grid(columns=2)},
-            ),
+            blur(45.0),
             id="the looks of an each step",
         ),
     ],
 )
-def test_a_look_at_another_size_has_its_pixel_values_scaled_by_the_ratio_of_the_sizes(
-    photo, picture_of, designed, size, by_hand
-):
-    maps = {"f": np.ones(photo.shape[:2], np.float32)} if "f" in designed.regions else None
-    np.testing.assert_array_equal(picture_of(photo, designed, size=size, maps=maps), picture_of(photo, by_hand))
+def test_the_ends_of_a_drive_and_the_looks_of_an_each_scale_like_a_plain_step(photo, picture_of, compound, plain):
+    maps = {"f": np.ones(photo.shape[:2], np.float32)} if "f" in compound.regions else None
+    np.testing.assert_allclose(
+        picture_of(photo, compound, size=128, maps=maps), picture_of(photo, plain, size=128), atol=1e-6
+    )
 
 
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
@@ -1391,10 +1401,15 @@ def test_a_recipe_without_a_size_gives_the_same_look_on_a_photo_of_any_size(pict
     assert np.abs(small - scene(480)).mean() > 0.01  # and the look is there to compare
 
 
-def test_a_recipe_with_a_size_keeps_it_as_the_size_its_pixel_values_are_written_for():
-    own = Recipe("own", [Step("gaussian_blur", {"radius": 6.0})], size=960)
-    unsized = Recipe("unsized", [Step("gaussian_blur", {"radius": 3.0})], size=None)  # 3 x 960/480 = 6
-    np.testing.assert_array_equal(runner.render(scene(1920), own), runner.render(resize(scene(1920), 960), unsized))
+@pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
+def test_a_recipe_with_a_size_is_the_same_picture_as_the_recipe_at_480_rendered_at_that_size(picture_of):
+    step = Step("drop_shadow", {"offset": 34.0, "angle": 45.0, "blur": 12.0})
+    sized = Recipe("sized", [step], size=960)
+    unsized = Recipe("plain", [step], size=480)
+    maps = {"subject": disc(1920)}
+    np.testing.assert_array_equal(
+        picture_of(scene(1920), sized, maps=maps), picture_of(scene(1920), unsized, maps=maps, size=960)
+    )
 
 
 @pytest.mark.parametrize("effect_name", ["gaussian_blur", "pixel_grid"])
@@ -1413,26 +1428,27 @@ def test_a_size_that_is_not_a_whole_number_of_pixels_is_refused_naming_it(photo,
 
 
 @pytest.mark.parametrize(
-    "step",
+    "step_at",
     [
-        pytest.param(Step("gaussian_blur", {"radius": 6.0}), id="a blur"),
-        pytest.param(Step("bloom", {"radius": 24.0}), id="a bloom"),
-        pytest.param(Step("sharpen", {"radius": 30.0}), id="a local contrast"),
+        pytest.param(lambda f: Step("gaussian_blur", {"radius": 12.0 * f}), id="a blur"),
+        pytest.param(lambda f: Step("bloom", {"radius": 48.0 * f}), id="a bloom"),
+        pytest.param(lambda f: Step("sharpen", {"radius": 60.0 * f}), id="a local contrast"),
         pytest.param(
-            Step("drop_shadow", {"offset": 22.0, "angle": 56.0, "blur": 24.0}), id="a shadow offset and blurred"
+            lambda f: Step("drop_shadow", {"offset": 44.0 * f, "angle": 56.0, "blur": 48.0 * f}),
+            id="a shadow offset and blurred",
         ),
-        pytest.param(Step("pixel_grid", {"cell": 4}), id="a grid of whole pixels"),
+        pytest.param(lambda f: Step("pixel_grid", {"cell": int(8 * f)}), id="a grid of whole pixels"),
     ],
 )
-def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(photo, subject, step):
+def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(photo, subject, step_at):
     """The promise of a size: shrunk back, the large render is the small one (to a small mean difference), and far
-    closer to it than the same pixel values left unscaled at the large size."""
+    closer to it than the large render of the pixel values the small one had to use (half of the designed ones)."""
     maps = {"subject": subject}
-    small = runner.render(photo, Recipe("look", (step,), size=64), maps=maps)
-    large = runner.render(photo, Recipe("look", (step,), size=64), maps=maps, size=128)
-    unscaled = runner.render(photo, Recipe("look", (step,), size=128), maps=maps)
-    scaled_error = np.abs(resize(large, 64) - small).mean()
-    unscaled_error = np.abs(resize(unscaled, 64) - small).mean()
+    small = runner.render(photo, Recipe("look", (step_at(1),), size=240), maps=maps)
+    large = runner.render(photo, Recipe("look", (step_at(1),), size=240), maps=maps, size=480)
+    unscaled = runner.render(photo, Recipe("look", (step_at(0.5),), size=480), maps=maps)
+    scaled_error = np.abs(resize(large, 240) - small).mean()
+    unscaled_error = np.abs(resize(unscaled, 240) - small).mean()
     assert scaled_error < 0.02
     assert scaled_error * 3 < unscaled_error
 
@@ -1474,7 +1490,7 @@ def test_a_density_puts_the_same_share_of_marks_on_the_picture_at_any_size(marks
 
 
 def ratio_looks() -> dict[str, Recipe]:
-    """Recipes of the probe, written for 64 px: plain, driven by a field, and as the looks of an `Each`."""
+    """Recipes of the probe: plain, driven by a field, and as the looks of an `Each`."""
     drive = Drive(by="f", start=0.0, end=1.0)
     return {
         "a plain step": Recipe("plain", [Step("ratio_probe", {})], size=64),
@@ -1504,7 +1520,7 @@ def ratio_probe(throwaway_effects):
 
 
 @pytest.mark.parametrize("look", ["a plain step", "a driven step", "the looks of an each"])
-@pytest.mark.parametrize(("size", "ratio"), [(64, 1.0), (128, 2.0), (32, 0.5)], ids=["as designed", "twice", "half"])
+@pytest.mark.parametrize(("size", "ratio"), [(480, 1.0), (960, 2.0), (240, 0.5)], ids=["as designed", "twice", "half"])
 def test_an_effect_that_declares_size_ratio_gets_working_px_per_design_px(photo, ratio_probe, look, size, ratio):
     recipe = ratio_looks()[look]
     maps = {"f": np.full(photo.shape[:2], 0.3, np.float32)} if "f" in recipe.regions else None

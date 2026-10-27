@@ -192,10 +192,11 @@ def test_a_grey_relief_from_a_grazing_light_spans_black_to_white(photo: np.ndarr
 
 
 def test_the_light_field_lights_the_pictures_own_brightness_as_a_relief() -> None:
-    """A grey picture rising 0.005 per px to the right, lit from the left (0.005 x 100 px = a slope of 1/2)."""
-    x = np.arange(40, dtype=np.float64)
-    picture = np.broadcast_to((0.2 + 0.005 * x)[None, :, None], (40, 40, 3)).astype(np.float32)
-    recipe = Recipe("lit", [Step(NAME, {"field": "light", "angle": 180, "height": 100, "blur": 0})], size=40)
+    """A grey picture 480 px wide (so its px are the design px) rising 0.001 per px to the right, lit from the left
+    (0.001 x 500 px = a slope of 1/2)."""
+    x = np.arange(480, dtype=np.float64)
+    picture = np.broadcast_to((0.2 + 0.001 * x)[None, :, None], (12, 480, 3)).astype(np.float32)
+    recipe = Recipe("lit", [Step(NAME, {"field": "light", "angle": 180, "height": 500, "blur": 0})])
     out = runner.render(picture, recipe)
     gain = hand_gain(0.5, 0, 180, 45)
     np.testing.assert_allclose(out[:, 2:-2], picture[:, 2:-2] * gain, atol=2e-4)

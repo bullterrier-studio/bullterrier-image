@@ -7,7 +7,7 @@ import pytest
 
 from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
 from bullterrier_image import recipe as facade
-from bullterrier_image.core import looks, runner
+from bullterrier_image.core import looks, registry, runner
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
@@ -219,15 +219,15 @@ def test_size_scales_photo_and_matte_together(photo, subject):
 BLUR = '[[step]]\neffect = "gaussian_blur"\nradius = 3\n'
 
 
-def test_a_file_without_size_is_tuned_for_480_and_rendered_at_the_photos_own_size(tmp_path, photo):
+def test_a_file_without_size_is_rendered_at_the_photos_own_size_with_its_numbers_still_written_for_480(tmp_path, photo):
     big = resize(photo, 960)
     unset = load_recipe(write(tmp_path, BLUR, "unset.toml"))
     at_480 = load_recipe(write(tmp_path, "size = 480\n" + BLUR, "at480.toml"))
     out = render(big, unset)
     assert out.shape == big.shape
-    # a radius of 3 design pixels is 6 px on a 960 px picture, whichever way the recipe says it was tuned for 480
+    # a radius of 3 design pixels is 6 px on a 960 px picture, whatever size the recipe says it renders at
     np.testing.assert_allclose(out, render(big, at_480, size=960), atol=1e-6)
-    assert not np.allclose(out, render(big, Recipe("one", (Step("gaussian_blur", {"radius": 3.0}),), size=960)))
+    np.testing.assert_allclose(out, registry.apply("gaussian_blur", big, radius=6.0), atol=1e-6)
 
 
 def test_a_file_with_a_size_scales_the_photo_to_it(tmp_path, photo):
@@ -350,10 +350,10 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     ],
 )
 def test_a_look_is_rendered_at_the_size_asked_with_its_pixel_values_scaled_to_it(photo, picture_of):
-    """The public renderers take `size`: a blur of 4 px designed for 64 px wide is 8 px at 128 (by hand)."""
-    designed = Recipe("blur", (Step("gaussian_blur", {"radius": 4.0}),), size=64)
-    by_hand = Recipe("blur", (Step("gaussian_blur", {"radius": 8.0}),), size=128)
-    np.testing.assert_array_equal(picture_of(photo, designed, size=128), picture_of(photo, by_hand))
+    """The public renderers take `size`: a blur of 30 px designed for 480 px wide is 8 px at 128 (by hand)."""
+    designed = Recipe("blur", (Step("gaussian_blur", {"radius": 30.0}),), size=64)
+    by_hand = registry.apply("gaussian_blur", resize(photo, 128), radius=8.0)
+    np.testing.assert_array_equal(picture_of(photo, designed, size=128), by_hand)
 
 
 # --- the built-in looks --------------------------------------------------------------------------------------------
