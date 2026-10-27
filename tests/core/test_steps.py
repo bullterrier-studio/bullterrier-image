@@ -730,10 +730,16 @@ def test_the_fx_signature_shows_the_effects_default_opacity(faint):
 # --- the recipe objects are validated, frozen models -----------------------------------------------------------------
 
 
-def test_a_recipe_needs_a_positive_size_or_none():
-    assert Recipe("r", [Step("grade")], size=None).size is None
+def test_a_recipe_without_a_size_has_none_and_renders_at_the_photos_own_size(photo):
+    assert Recipe("r", [Step("grade")]).size is None
+    assert render(photo, Recipe("r", [Step("grade")])).shape == photo.shape
+    assert render(photo, Recipe("r", [Step("grade")], size=64)).shape == (48, 64, 3)
+
+
+@pytest.mark.parametrize("size", [0, -5, 64.0, "64"], ids=["zero", "negative", "float", "text"])
+def test_a_recipe_size_must_be_a_positive_whole_number(size):
     with pytest.raises(ValueError, match="size"):
-        Recipe("r", [Step("grade")], size=0)
+        Recipe("r", [Step("grade")], size=size)
 
 
 # A recipe's name becomes an output file name, and recipes are shared as data: a name that could leave the output folder

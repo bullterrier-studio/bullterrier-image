@@ -44,7 +44,7 @@ file and step.
 
 `size`: longest side in px the recipe is written for. Absent (the default for a file), the pixel values are tuned for 480 (the size
 effect defaults are tuned for) and the picture renders at the photo's own size, so a 4000 px photo multiplies them by 4000/480.
-A Python `Recipe(size=None)` is the same.
+A Python `Recipe` without `size` (its default, `size=None`) is the same.
 
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each
 step is a layer over picture below, as in image editor. Result combined by blend mode, mixed by opacity, only where mask says.

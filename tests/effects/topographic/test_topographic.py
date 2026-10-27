@@ -110,7 +110,7 @@ def test_a_recipe_step_without_a_field_contours_the_picture_s_brightness(
     """With 10 levels the band is floor(10 x luminance): 0.2126 -> 2, 0.7152 -> 7, 0.0722 -> 0, 1 -> the last, 9."""
     flat = np.broadcast_to(np.array(colour, np.float32), (8, 8, 3)).copy()
     step = Step(NAME, {"levels": 10, "fill": "bands", "colors": ["#000000", "#ffffff"], "smoothing": 0.0})
-    out = runner.render(flat, Recipe("bands", [step], size=None))
+    out = runner.render(flat, Recipe("bands", [step], size=8))
     np.testing.assert_allclose(out, band / 9, atol=1e-6)
 
 
@@ -195,7 +195,7 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
 ) -> None:
     depth = depth_ramp(photo)
     settings: dict[str, Any] = {"levels": 6, "fill": "bands", "smoothing": 2.0}
-    recipe = Recipe("named", [Step(NAME, {**settings, **step_params})], size=None)
+    recipe = Recipe("named", [Step(NAME, {**settings, **step_params})], size=max(photo.shape[:2]))
     named = runner.render(photo, recipe, maps={"depth": depth})
     expected = contours(photo, depth if field == "depth" else light(photo), **settings)
     # the hand-made brightness differs from the library's in the last float32 digit, which a line's edge magnifies
