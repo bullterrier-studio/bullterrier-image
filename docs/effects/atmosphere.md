@@ -69,7 +69,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `density` | number | count | 0 to 100 | `1.0` | How many particles there are: particles per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars. |
+| `density` | number | count | 0 to 300 | `1.0` | How many particles there are: particles per 1000 square px of picture (a 32 x 32 px area), so the same density looks alike on any picture size. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense field of tiny ones. |
 | `size` | number | px | 1 to 200 | `6.0` | The width in px of the nearest, largest particles; farther ones are narrower by `size_falloff`. Tuned for a picture about 480 px high. Larger = bigger dots and thicker streaks. |
 | `length` | number | px | 0 to 200 | `0.0` | The length in px of the streak each nearest particle draws from its head along `angle`; farther ones are shorter by `size_falloff`. Tuned for a picture about 480 px high. 0 = round dots, larger = longer streaks, as with a slower shutter. |
 | `angle` | number (cyclic) | degrees | 0 to 360 | `90.0` | The direction a streak runs from its head, in degrees clockwise from pointing right, as seen on screen: 0 = right, 90 = down, 180 = left, 270 = up. Only streaks show it: with a `length` of 0 it changes nothing. |

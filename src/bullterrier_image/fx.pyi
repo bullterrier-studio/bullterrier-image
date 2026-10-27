@@ -2640,10 +2640,11 @@ gives the same particles.
 
 Parameters
 ----------
-density : number, count, 0 to 100, default 1.0
+density : number, count, 0 to 300, default 1.0
     How many particles there are: particles per 1000 square px of picture (a 32 x 32 px
     area), so the same density looks alike on any picture size. 0 = none (the picture
-    unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars.
+    unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense
+    field of tiny ones.
 size : number, px, 1 to 200, default 6.0
     The width in px of the nearest, largest particles; farther ones are narrower by
     `size_falloff`. Tuned for a picture about 480 px high. Larger = bigger dots and
