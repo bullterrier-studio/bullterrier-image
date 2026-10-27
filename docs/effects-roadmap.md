@@ -78,7 +78,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
 | `crt` ✓ (a recipe, [crt.toml](../examples/recipes/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
-| `vhs` ✓ | Tracking bands, chroma bleed, tape noise, wobble. | `fx.vhs(tracking=0.06, bleed=5)` |
+| `vhs` ✓ | Tracking bands, dropouts, chroma bleed, tape noise, wobble; preset `signal_noise` (analog static, white dropouts). | `fx.vhs(tracking=0.06, bleed=5)` |
 | `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
 
@@ -178,7 +178,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `jpeg_crush` ✓ | Re-encode at very low quality (the JPEG algorithm as maths: blocks, chroma bleed). | `fx.jpeg_crush(quality=6)`; with `hits`, damaged coefficients: smears and colour blocks, `fx.jpeg_crush(quality=20, hits=40, seed=2)` |
 | `scan_roll` ✓ | Vertical or horizontal sync roll. | `fx.scan_roll(offset=0.2)` |
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
-| `signal_noise` ✓ | Static bands and dropouts. | `fx.signal_noise(bands=3, seed=1)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
 | `hologram` ✓ | Cyan scanlines, flicker, edge glow. | `fx.hologram(color="#30e0ff", phase=0.3)` |

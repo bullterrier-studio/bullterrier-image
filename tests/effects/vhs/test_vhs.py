@@ -139,3 +139,44 @@ def test_wobble_is_a_drift_of_the_asked_deviation_that_is_smooth_over_the_asked_
     np.testing.assert_allclose(slides.std(), wobble, rtol=0.05 if smooth else 0.25)
     correlation = np.corrcoef(slides[:-1], slides[1:])[0, 1]
     assert (correlation > 0.8) == smooth
+
+
+def test_the_failing_signal_look_is_a_preset_of_vhs() -> None:
+    """The cut effect `signal_noise` lives on as a preset: a name a person can still look up."""
+    assert "signal_noise" in registry.presets(NAME)
+
+
+def white_changes(before: np.ndarray, after: np.ndarray) -> np.ndarray:
+    """Where `after` is white and `before` was not (the dropouts, with every other damage off)."""
+    return np.isclose(after, 1, atol=1e-4).all(axis=2) & ~np.isclose(before, 1, atol=1e-4).all(axis=2)
+
+
+@pytest.mark.parametrize(("noise_size", "rows"), [(1.0, 1), (3.0, 3)])
+def test_a_dropout_is_one_white_streak_as_tall_as_a_speck_of_noise_and_up_to_tracking_wide(
+    photo, noise_size, rows
+) -> None:
+    width = photo.shape[1]
+    out = registry.apply(NAME, photo, **{**OFF, "tracking": 0.5}, bands=0, dropouts=1, noise_size=noise_size, seed=2)
+    streak = white_changes(photo, out)
+    assert streak.any()
+    lines, columns = np.flatnonzero(streak.any(axis=1)), np.flatnonzero(streak.any(axis=0))
+    assert len(lines) == min(rows, photo.shape[0] - lines[0])  # cut by the bottom edge
+    assert width * 0.5 / 2 - 1 <= len(columns) <= width * 0.5  # between half of tracking and tracking
+    assert np.array_equal(columns, np.arange(columns[0], columns[-1] + 1))
+    np.testing.assert_allclose(out[~streak], photo[~streak], atol=1e-5)
+
+
+def test_more_dropouts_cover_more_of_the_picture(photo) -> None:
+    settings = {**OFF, "tracking": 0.2, "bands": 0, "seed": 5}
+    few = white_changes(photo, registry.apply(NAME, photo, **settings, dropouts=3)).sum()
+    many = white_changes(photo, registry.apply(NAME, photo, **settings, dropouts=40)).sum()
+    assert 0 < few < many
+
+
+def test_the_dropouts_do_not_move_when_the_bands_change(photo) -> None:
+    """Bands and dropouts draw from their own streams of one seed: more bands move no dropout."""
+    settings = {**OFF, "tracking": 0.3, "dropouts": 6, "seed": 4}
+    without = registry.apply(NAME, photo, bands=0, **settings)
+    with_bands = registry.apply(NAME, photo, bands=3, **settings)
+    streak = white_changes(photo, without)
+    np.testing.assert_allclose(with_bands[streak], 1, atol=1e-4)

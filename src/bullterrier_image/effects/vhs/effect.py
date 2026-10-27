@@ -1,4 +1,5 @@
-"""The `vhs` effect: a worn videotape, with tracking bands, colour bleed, tape noise and wobble."""
+"""The `vhs` effect: a worn videotape or failing analog signal, with tracking bands, tape dropouts, colour bleed, noise
+(static, snow) and wobble."""
 
 from typing import Literal
 
@@ -13,7 +14,7 @@ from bullterrier_image.ops.shift import Edge, shift, slide_bands
 
 
 class VhsParams(EffectParams):
-    """The settings of `vhs`: tracking bands, bleed, tape noise, wobble and the random seed."""
+    """The settings of `vhs`: tracking bands, dropouts, bleed, tape noise, wobble and the random seed."""
 
     tracking: float = param(
         0.06,
@@ -29,6 +30,15 @@ class VhsParams(EffectParams):
         min=0,
         max=50,
         doc="How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.",
+    )
+    dropouts: int = param(
+        0,
+        unit="count",
+        min=0,
+        max=2000,
+        doc="How many dropout streaks, 0 to 2000: short white marks where the signal was lost, each as tall as a "
+        "speck of tape noise (`noise_size`) and between half of `tracking` and `tracking` of the picture's width "
+        "long. 0 = none; raising it covers more of the picture.",
     )
     bleed: float = param(
         5.0,
@@ -60,8 +70,8 @@ class VhsParams(EffectParams):
         unit="count",
         min=0,
         max=2**32 - 1,
-        doc="Random seed for the bands, the noise and the wobble: the same seed always gives the same damage, any "
-        "other a different one.",
+        doc="Random seed for the bands, the dropouts, the noise and the wobble: the same seed always gives the same "
+        "damage, any other a different one.",
     )
     band_height: float = param(
         0.04,
@@ -111,18 +121,20 @@ class VhsParams(EffectParams):
 
 @effect(category="glitch", params=VhsParams)
 def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
-    """Make the picture look like a worn videotape: tracking bands, wobbling rows, bled colour and tape noise.
+    """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling
+    rows, bled colour and tape noise (static, snow).
 
     In this order: `bands` horizontal bands slide sideways by up to `tracking` of the width; every row then drifts
-    sideways by a slow random wander of about `wobble` px; in YIQ (as `ntsc`) the colour is moved `bleed` px right and
-    blurred sideways by that much, as colour on tape lags and smears; and `noise` of grain is added to the brightness.
-    The bands, the noise and the wobble draw from `seed`, so the same seed gives the same damage; changing the number
-    of bands moves neither noise nor wobble.
+    sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`)
+    the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and
+    `noise` of grain is added to the brightness. The bands, dropouts, noise and wobble each draw from their own stream
+    of `seed`, so the same seed gives the same damage; changing the number of bands moves no dropout, noise or wobble.
     """
     height, width = rgb.shape[:2]
     rng = np.random.default_rng(params.seed)
     noise_seed = int(rng.integers(np.iinfo(np.uint32).max))
     wobble_seed = int(rng.integers(np.iinfo(np.uint32).max))
+    dropout_rng = np.random.default_rng(int(rng.integers(np.iinfo(np.uint32).max)))
     bands = []
     for _ in range(params.bands):
         thickness = min(height, max(1, round(rng.uniform(params.band_height / 2, params.band_height) * height)))
@@ -135,6 +147,13 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
     )
     for row in range(height):
         out[row] = _slid(out[row : row + 1], float(wander[row, 0]), params.edge)[0]
+    # as tall as a speck of noise, so grain and dropouts scale together
+    streak_height = max(1, round(params.noise_size))
+    for _ in range(params.dropouts):
+        length = min(width, max(1, round(dropout_rng.uniform(params.tracking / 2, params.tracking) * width)))
+        row = int(dropout_rng.integers(height))
+        start = int(dropout_rng.integers(width - length + 1))
+        out[row : row + streak_height, start : start + length] = 1.0  # a dropout is white
     signal = rgb_to_yiq(out)
     sigmas = np.zeros(signal.ndim)  # a sigma of 0 leaves a direction alone: only the columns (axis 1) are blurred
     sigmas[1] = params.bleed

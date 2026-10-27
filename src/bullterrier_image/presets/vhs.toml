@@ -1,0 +1,9 @@
+# Looks that are one vhs step.
+
+[signal_noise]
+description = "A failing analog signal: VHS static and snow with white tape dropouts, and a few bands torn sideways."
+tracking = 0.1
+bands = 3
+dropouts = 24
+noise = 0.1
+noise_size = 1

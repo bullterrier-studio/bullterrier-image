@@ -1,9 +1,0 @@
-# A failing signal: bands of static cross the picture and white dropout streaks flick across it.
-name = "signal_noise"
-size = 480
-
-[[step]]
-effect = "signal_noise"
-bands = 4
-dropouts = 20
-seed = 2
