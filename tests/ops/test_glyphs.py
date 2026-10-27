@@ -208,7 +208,7 @@ def test_the_environment_cannot_change_what_is_drawn(monkeypatch):
     assert np.flatnonzero(letter.max(axis=1) > 0.5).max() + 1 in {f.getmetrics()[0] for f in _real_font_sizes(cell)}
 
 
-@pytest.mark.parametrize("effect", ["ascii", "disperse", "evaporate"])
+@pytest.mark.parametrize("effect", ["ascii", "disperse"])
 def test_a_glyph_effect_takes_no_font_so_an_old_recipe_naming_one_is_refused(effect):
     with pytest.raises(RecipeError, match="font"):
         getattr(fx, effect)(font="/Library/Fonts/Menlo.ttc")

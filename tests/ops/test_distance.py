@@ -92,7 +92,7 @@ def test_anisotropic_sampling_doubles_vertical_distances_only():
     ],
 )
 def test_normals_point_out_of_the_shape_on_each_side(row, col, expected_x, expected_y, sampling):
-    # Stretched elements (the disperse/evaporate case: characters are taller than wide) must not turn the normals.
+    # Stretched elements (the disperse case: characters are taller than wide) must not turn the normals.
     field = field_of(rectangle(), sampling)
     assert field.normal_x[row, col] == pytest.approx(expected_x, abs=0.1)
     assert field.normal_y[row, col] == pytest.approx(expected_y, abs=0.1)

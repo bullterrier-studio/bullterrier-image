@@ -102,15 +102,14 @@ def test_a_recipe_of_two_effects_is_not_a_combination(tmp_path):
 
 
 def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the_text_they_move():
-    """disperse/evaporate move whole characters, so their cell must equal the ascii step's cell."""
+    """disperse moves whole characters, so their cell must equal the ascii step's cell."""
     checked = []
     examples = [gallery.effect_files(name).example for name in registry.describe()]
     for path in [*(EXAMPLES / "recipes").glob("*.toml"), *examples]:
         steps = {run.effect: run.params for step in load_recipe(path).steps for run in step.runs}
-        for mover in ("disperse", "evaporate"):
-            if mover in steps and "ascii" in steps:
-                assert steps[mover]["cell"] == steps["ascii"]["cell"], path.name
-                checked.append(path.name)
+        if "disperse" in steps and "ascii" in steps:
+            assert steps["disperse"]["cell"] == steps["ascii"]["cell"], path.name
+            checked.append(path.name)
     assert checked, "no demo recipe moves ascii text, so nothing was checked"
 
 

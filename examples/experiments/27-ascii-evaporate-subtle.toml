@@ -23,11 +23,8 @@ colors = ["#000000"]
 mask = "background"
 
 [[step]]
-effect = "evaporate"
+effect = "disperse"
+preset = "evaporate"
 cell = 4                     # same as the ascii step, so whole characters fly away
-start = 0.34
-ramp = 0.22
-rise = 0.16
-wind = 0.3
-vanish = 0.25
+reach = 0.4
 seed = 1

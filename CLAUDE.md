@@ -262,7 +262,7 @@ Writing a test file (model: `src/bullterrier_image/effects/_template/test_effect
 Installed globally: `superpowers:writing-plans`, `superpowers:test-driven-development`,
 `superpowers:verification-before-completion` (process); `testing-best-practices` (tests); `software-design-philosophy` (deep
 modules, no pass-throughs, no information leakage; interface docstrings state promises); `motion-design` (effects depicting
-motion: `disperse`, `evaporate`).
+motion: `disperse`).
 `superpowers:*` skills are process aids, not authority: they tend to verbose, over-engineered, over-defensive output. Where one
 asks for more validation, layers, documents or steps than this file, follow this file. Tests follow this file (no goldens); fixes
 follow "Fixing defects"; design follows the skill (no shallow wrappers; per-effect boilerplate is the price of uniformity, so keep

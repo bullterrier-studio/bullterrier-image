@@ -12,7 +12,7 @@ Everything here uses one photo, `photos/bullterrier.jpeg`.
 | `transparent/` | recipes whose picture is cut out (a circle, rounded corners, the subject): their render has an alpha channel, so it is a PNG, and a project that exports `jpg` refuses them; the picture is made with the command below, not by the demo project |
 | `assets/` | pictures that recipes use as a second picture (a texture, a logo), made by the library itself, so they carry no licence (the commands are below), and `mosaic.svg`, a drawing of closed shapes made for the examples, also free of licence |
 | `effects/` | one short recipe per effect, the source of its catalogue picture in `docs/gallery/` |
-| `experiments/` | older recipes, mostly variants of glitch, ASCII and evaporate; not part of the demo |
+| `experiments/` | older recipes, mostly variants of glitch, ASCII and disperse; not part of the demo |
 | `python_api.py` | the same pipeline driven from Python |
 
 ```bash

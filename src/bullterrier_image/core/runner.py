@@ -95,7 +95,7 @@ def render(
     selection its `mask` names (the subject, the background or a region of the recipe), so only that changes. An
     `Each` step renders each of its looks once over the whole picture and shows it through the pieces of its
     partition that have it, blending the looks across the borders.
-    Effects that declare a `subject` parameter (see `evaporate`) get the subject's silhouette automatically, and those
+    Effects that declare a `subject` parameter (see `disperse`) get the subject's silhouette automatically, and those
     that declare `depth` the depth map. After the last step a recipe whose framing is `transparent` is cut out: the
     result then has four channels, RGB and straight alpha (h, w, 4), instead of three.
 

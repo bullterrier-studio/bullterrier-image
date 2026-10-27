@@ -109,7 +109,7 @@ def test_effect_queries_live_only_in_the_registry(name):
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
-        (lambda: Step("evaporate", {"subject": 1}), "subject"),
+        (lambda: Step("disperse", {"subject": 1}), "subject"),
         (lambda: Step("grain", {"opacity": 0.5}), "`opacity` is a key of the step"),
     ],
 )
@@ -194,7 +194,7 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
     signature = inspect.signature(fx.rgb_split)
     assert list(signature.parameters)[:3] == ["pair", "angle", "amount"]  # no image parameter, no subject
-    assert "subject" not in inspect.signature(fx.evaporate).parameters
+    assert "subject" not in inspect.signature(fx.disperse).parameters
     assert "along `angle`" in str(fx.rgb_split.__doc__)
     assert fx.rgb_split.__name__ == "rgb_split"
     assert {"ascii", "rgb_split", "disperse"} <= set(dir(fx))

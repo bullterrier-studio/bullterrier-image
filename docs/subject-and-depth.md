@@ -68,5 +68,5 @@ photo as given. Name no recipe declares (`maps={"strar": ...}`) -> refused, vali
 -> `MapNotFoundError` (`SubjectNotFoundError`, `DepthNotFoundError` for subject, depth). A project (`bt-image run`) holds no
 maps of its own: a recipe with a `given` region needs `finders=` in `bullterrier_image.run`.
 
-**Glyph effects** (`ascii`, `evaporate`, `disperse`) draw with bundled monospaced font (JetBrains Mono, SIL OFL 1.1, licence in
+**Glyph effects** (`ascii`, `disperse`) draw with bundled monospaced font (JetBrains Mono, SIL OFL 1.1, licence in
 the wheel), not a system font: same look on every machine.

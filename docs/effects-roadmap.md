@@ -87,7 +87,6 @@ belong to a layout package, not here.
 | --- | --- | --- |
 | `halftone` ✓ | Dot screen. | `fx.halftone(cell=10, angle=45)` |
 | `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=0.0016)` |
-| `evaporate` ✓ | A still of pieces peeling off the top or outline. | `fx.evaporate(start=0.4, outline=0.1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=0.2, min_cell=0.012)` |
 | `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
@@ -282,7 +281,7 @@ no time of its own.
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `disperse` ✓ | Pieces detach, drift on the wind and fade. | `fx.disperse(progress=0.45, wind=0.3)` |
+| `disperse` ✓ | Pieces detach, drift on the wind and fade. Presets `evaporate`, `halo`, `windblown`, `disintegrate` are stills part-way through. | `fx.disperse(progress=0.45, wind=0.3)` |
 | `dissolve` | Pixels or blocks of `cell` px vanish in noise order, with a burning edge (covers the old `pixel_dissolve`). | `fx.dissolve(progress=0.5, cell=16, edge="#ff7a2b")` |
 | burst (planned, on `disperse`) | Pieces burst outward from a point (`x`, `y`) as well as drifting on the wind. Replaces `explode`. | `fx.disperse(progress=0.5, burst=1, x=0.5, y=0.4)` |
 | `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=0.03, focus=0.5)` |
@@ -347,7 +346,6 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `hologram` | a recipe (needs `edges`; `scanlines` has `softness`) |
 | `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |
 | `overlay` | `blend` + `fit="width"` |
-| `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |
 
 **Conventions, applied with the merges:**
 - Angles of a direction are measured clockwise from pointing right.

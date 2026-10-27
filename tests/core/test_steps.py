@@ -810,7 +810,7 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
             lambda: [Each("g", [Step("grade"), Step("depth_probe")])], (False, True), id="a look whose effect takes it"
         ),
         pytest.param(
-            lambda: [Step("grade", mask="subject"), Each("g", [Step("evaporate"), "none"])],
+            lambda: [Step("grade", mask="subject"), Each("g", [Step("disperse"), "none"])],
             (True, False),
             id="steps and looks on the subject need no depth",
         ),
@@ -1092,7 +1092,7 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
             True,
             id="through two regions",
         ),
-        pytest.param([Each("g", [Step("evaporate"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"),
+        pytest.param([Each("g", [Step("disperse"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"),
         pytest.param([Each("g", [Step("grade"), "none"])], {"g": Grid()}, False, id="looks that do not"),
         pytest.param([Each("g", ["none"], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"),
     ],

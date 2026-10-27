@@ -1,0 +1,59 @@
+# Looks that are one disperse step, frozen part-way through (`progress` 0.55). They leave `cell` at its default, 5: give
+# the ascii step before it the same.
+
+[evaporate]
+description = "The top of the figure dissolves into pieces that rise like smoke, thin out and fade."
+progress = 0.55
+top = 1.0
+outline = 0.1
+reach = 0.55
+jitter = 0.4
+wind = 0.3
+angle = 90
+angle_spread = 40
+flight = 0.35
+falloff = 0.8
+seed = 3
+
+[halo]
+description = "The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces."
+progress = 0.55
+outline = 0.8
+reach = 0.6
+jitter = 0.4
+outward = 0.6
+wind = 0.2
+angle = 90
+angle_spread = 40
+flight = 0.35
+falloff = 0.8
+seed = 3
+
+[windblown]
+description = "The edges dissolve and everything is blown to the right, like dust in a wind."
+progress = 0.55
+outline = 0.8
+reach = 0.6
+jitter = 0.4
+outward = 0.4
+wind = 0.35
+angle = 25
+angle_spread = 20
+flight = 0.35
+falloff = 0.8
+seed = 9
+
+[disintegrate]
+description = "Heavy: the whole outline and the top come apart, in long plumes in every direction."
+progress = 0.6
+outline = 2.0
+reach = 0.85
+jitter = 0.5
+outward = 0.9
+outward_distance = 0.2
+wind = 0.3
+angle = 90
+angle_spread = 120
+flight = 0.4
+falloff = 0.8
+seed = 7

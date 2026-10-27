@@ -64,7 +64,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   history (before the "remove animation" commits) for when video is built.
 - **Typesetting belongs to bullterrier-vector; image keeps glyphs as texture.** Shaping, layout and text as outlines are
   vector's. A caption in image is an `svg` region (vector's outlines) plus `fill`, `outline` or `drop_shadow`; there is no
-  `text` effect. Effects that draw glyphs as texture (`ascii`, `evaporate`, `disperse`, later `braille`) stay, on image's
+  `text` effect. Effects that draw glyphs as texture (`ascii`, `disperse`, later `braille`) stay, on image's
   own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
   drift apart. *Consequence:* `text` and `type_on` leave the roadmap.
 - **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1),

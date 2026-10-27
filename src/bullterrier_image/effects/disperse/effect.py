@@ -354,9 +354,11 @@ class DisperseParams(EffectParams):
 
 @effect(category="subject", params=DisperseParams)
 def disperse(rgb: np.ndarray, params: DisperseParams, *, subject: np.ndarray | None = None) -> np.ndarray:
-    """The picture at one moment of its dispersal: `progress` 0 = untouched, 1 = finished.
+    """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
-    The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece
+    `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
+    of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it
+    on a cut-out on black. Each piece
     has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
     fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
 
