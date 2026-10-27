@@ -1217,15 +1217,6 @@ windblown : The edges dissolve and everything is blown to the right, like dust i
 disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
-def fill(color: str | list[float] | tuple[float, float, float] = '#000000', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the whole picture with one colour. Masked to the background, this is 'remove the background'.
-
-Parameters
-----------
-color : colour, default '#000000'
-    The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
-    ...
-
 def flow_lines(density: float = 0.002, length: int = 120, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
 
@@ -1605,12 +1596,13 @@ Presets
 white_balance : White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."""
     ...
 
-def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with a gradient through `colors`: a straight band, rings round a centre or a sweep.
+def gradient(kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fill'] | None = None) -> Step:
+    """Replace the picture with a gradient (linear, radial or conic) or a flat colour fill, through `colors`.
 
 A generated background: the input is used only for its height and width, its content is ignored. Sizes in
 fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
-"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet.
+"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill (preset
+`fill`); masked to the background it removes the background.
 
 Parameters
 ----------
@@ -1620,8 +1612,10 @@ kind : one of 'linear', 'radial', 'conic', default 'linear'
     or 'conic' (a clockwise sweep round the centre, starting at `angle`; the last colour
     meets the first at a hard seam).
 colors : list of colours, default ('#12002b', '#ff2bd6')
-    The gradient's colours in order, evenly spaced; at least two. Linear: from the start
-    of the band to its end. Radial: from the centre outwards. Conic: round the turn.
+    The gradient's colours in order, evenly spaced; at least one. Linear: from the start
+    of the band to its end. Radial: from the centre outwards. Conic: round the turn. One
+    colour is a flat fill of the whole picture, and every other parameter is then
+    ignored.
 angle : number (cyclic), degrees, 0 to 360, default 90.0
     Linear: the direction the colours run, measured clockwise on screen from the right:
     0 = left to right, 90 = top to bottom. Conic: where the sweep starts, on the same
@@ -1643,7 +1637,11 @@ repeat : whole number, count, 1 to 64, default 1
 reflect : true or false, default False
     Run every second repeat backwards, so neighbouring repeats meet on the same colour
     instead of jumping from the last colour back to the first. Has no effect with
-    `repeat` 1."""
+    `repeat` 1.
+
+Presets
+-------
+fill : Flat colour fill: the whole picture one black; set `colors` to another single colour. Masked to the background, it removes the background."""
     ...
 
 def gradient_map(stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:
@@ -2740,7 +2738,7 @@ embers : Glowing orange sparks rising and drifting right, each trailing a short 
 dust : Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam.
 rain : Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint.
 snow : Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter.
-stars : Small crisp stars of several sizes and brightnesses. Put a dark `fill` step before it for a night sky."""
+stars : Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."""
     ...
 
 def pattern(kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

@@ -97,4 +97,4 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `dust` | Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam. |
 | `rain` | Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint. |
 | `snow` | Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter. |
-| `stars` | Small crisp stars of several sizes and brightnesses. Put a dark `fill` step before it for a night sky. |
+| `stars` | Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky. |
