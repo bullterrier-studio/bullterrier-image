@@ -121,12 +121,12 @@ photo : number, fraction, 0 to 1, default 0.0
     the untouched photo."""
     ...
 
-def aurora(colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 0.7, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def aurora(colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 336.0, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.
 
 A generated background: the input is used only for its height and width, its content is ignored. In column x the
 curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit
-deviation along the picture (`scale`). A pixel d = (rows above the base) / (`height` x picture height) up the
+deviation along the picture (`scale`). A pixel d = (rows above the base) / `height` up the
 curtain has brightness (1 - d)**`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the
 column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture
 (`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
@@ -144,9 +144,10 @@ base : number, fraction, 0 to 1, default 0.75
     Where the curtain's bright lower edge lies, as a fraction of the picture's height
     from the top (0 = the top edge, 1 = the bottom edge). Below it the sky is dark.
     Waviness moves it up and down along the picture.
-height : number, fraction, 0.05 to 1, default 0.7
-    How far up from its base the curtain reaches before it has faded out completely, as
-    a fraction of the picture's height. Larger = a taller curtain.
+height : number, px, 1 to 4000, default 336.0
+    How far up from its base the curtain reaches before it has faded out completely, in
+    pixels; tuned for a picture about 480 px high (the default is 0.7 of that). Larger =
+    a taller curtain.
 waviness : number, px, 0 to 500, default 40.0
     How far the curtain's base wanders up and down across the picture, in pixels: the
     typical distance from the `base` line (the standard deviation of the ripple); tuned
@@ -616,11 +617,12 @@ transmission_floor : number, fraction, 0.01 to 1, default 0.1
     all.
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What the darkest-value search sees beyond the picture's edge, which sets the haze
-    estimate along the border: 'nearest' (the edge pixel repeated) and 'reflect'
-    (mirrored, edge pixel repeated) look only at pixels of the patch inside the picture
-    and give the same result; 'mirror' (mirrored about the edge pixel) also looks at
-    pixels up to half a patch from the border; 'wrap' (the opposite edge) lets the far
-    side's darkest values set the haze at the border."""
+    estimate along the border (dehaze filters by local darkest values rather than
+    warping, so the default is 'nearest', not 'reflect'): 'nearest' (the edge pixel
+    repeated) and 'reflect' (mirrored, edge pixel repeated) look only at pixels of the
+    patch inside the picture and give the same result; 'mirror' (mirrored about the edge
+    pixel) also looks at pixels up to half a patch from the border; 'wrap' (the opposite
+    edge) lets the far side's darkest values set the haze at the border."""
     ...
 
 def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
@@ -1268,9 +1270,9 @@ octaves : whole number, count, 1 to 8, default 3
     ragged detail. Layers finer than one pixel are dropped.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same flow, another seed a different one.
-angle : number (cyclic), degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction the flow runs in on average, in degrees clockwise from pointing right:
-    0 carries the picture to the right, 90 down, -90 up, 180 to the left. With
+    0 carries the picture to the right, 90 down, 180 to the left, 270 up. With
     `variation` 0 the whole picture is carried this way.
 variation : number, degrees, 0 to 360, default 60.0
     How far the noise turns the flow away from `angle`: the typical turn, in degrees,
@@ -1723,10 +1725,10 @@ Parameters
 cell : whole number, px, 1 to 200, default 14
     Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
     bigger dots, a coarser print.
-angle : number (cyclic), degrees, -180 to 180, default 45.0
+angle : number (cyclic), degrees, 0 to 360, default 45.0
     Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many
-    degrees below the x axis (negative = above). The grid is square, so 90 degrees on
-    looks the same; 45 is the classic screen angle for one ink.
+    degrees below the x axis (340 tilts them 20 degrees above it). The grid is square,
+    so 90 degrees on looks the same; 45 is the classic screen angle for one ink.
 ink : colour or none, default None
     The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave
     it out to give each dot the colour of the photo under it, brightened so small dots
@@ -1889,7 +1891,7 @@ segments : whole number, count, 1 to 64, default 6
     made symmetric, a reflection in water); 2 = mirrored across that line and again
     across the line at right angles (the kept quarter copied into the other three);
     raising it makes more, narrower wedges.
-angle : number (cyclic), degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     Where the pattern starts, as the direction in degrees, clockwise from pointing right
     (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts
     an axis along the line right of the centre; turning it turns the mirror axes, and
@@ -2716,9 +2718,10 @@ cell : number, px, 2 to 512, default 32.0
     a check, a dot or a grid square. Tuned for a picture about 480 px high; larger = a
     coarser pattern.
 angle : number (cyclic), degrees, 0 to 360, default 0.0
-    Turns the pattern clockwise on screen about the picture's top-left corner. At 0 the
+    The direction the pattern varies along, in degrees clockwise from pointing right,
+    about the picture's top-left corner: at 0 it changes from left to right, so the
     stripes are vertical and the checks, dots and grid lines are aligned with the
-    picture's edges; at 90 the stripes are horizontal.
+    picture's edges; at 90 it changes downward and the stripes are horizontal.
 foreground : colour, default '#ffffff'
     The colour of the stripes, the dark checks, the dots and the grid lines.
 background : colour, default '#101018'
@@ -2944,9 +2947,10 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre
     planet leaves it in 'from' (the angle itself never has an edge; it wraps round):
-    'nearest' (the edge pixel repeated: the sky stays one flat tone of the top row),
-    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-    'wrap' (the opposite edge)."""
+    'nearest' (the default, unlike other warps' 'reflect': the edge pixel repeated, so
+    the sky stays one flat tone of the top row and the rim stays clean), 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap'
+    (the opposite edge)."""
     ...
 
 def quadtree(threshold: float = 0.06, max_cell: float = 0.125, min_cell: float = 0.01, gap: float = 0.002, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3301,7 +3305,7 @@ phase : number (cyclic), degrees, -180 to 180, default 0.0
     line through the picture's centre and rising away from it in the wave's direction,
     90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it
     slides the wave along.
-angle : number (cyclic), degrees, -180 to 180, default 0.0
+angle : number (cyclic), degrees, 0 to 360, default 0.0
     The direction the wave travels in, in degrees clockwise from pointing right: 0 sends
     the wave along the picture's width, so each column is moved up or down and the
     crests are horizontal ripples running across; 90 sends it down the picture, so each
@@ -3526,9 +3530,9 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What lies beyond the picture's edge, for a moved piece that reads from there and for
     the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite
-    sides counts as an edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
-    (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the
-    opposite edge)."""
+    sides counts as an edge): 'reflect' (the default, as for warps: mirrored, edge pixel
+    repeated, so a moved piece shows no gap at the border), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, bands: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:

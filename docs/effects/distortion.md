@@ -76,7 +76,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `scale` | number | px | 1 to 1024 | `80.0` | Size of the coarsest swirls of the flow in pixels, the spacing of the first noise lattice. Larger = broad, sweeping currents; small = fine, busy eddies. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed to make the flow, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth currents, more = more fine, ragged detail. Layers finer than one pixel are dropped. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same flow, another seed a different one. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | The direction the flow runs in on average, in degrees clockwise from pointing right: 0 carries the picture to the right, 90 down, -90 up, 180 to the left. With `variation` 0 the whole picture is carried this way. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction the flow runs in on average, in degrees clockwise from pointing right: 0 carries the picture to the right, 90 down, 180 to the left, 270 up. With `variation` 0 the whole picture is carried this way. |
 | `variation` | number | degrees | 0 to 360 | `60.0` | How far the noise turns the flow away from `angle`: the typical turn, in degrees, either way (the noise's standard deviation). 0 = one straight current; 60 = streaks that wander about the angle; 360 = currents running every way, with eddies where they meet. |
 
 <details><summary>Advanced parameters (5)</summary>
@@ -96,7 +96,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `segments` | whole number | count | 1 to 64 | `6` | How many times the pattern repeats round the centre: the full circle is cut into this many equal sectors, each holding a wedge of the picture (half a sector wide) and its mirror image, so every wedge borders its own reflection and the seams between them do not show. 1 = one line through the centre: the half of the picture clockwise from `angle` is kept and its reflection replaces the other half (a face made symmetric, a reflection in water); 2 = mirrored across that line and again across the line at right angles (the kept quarter copied into the other three); raising it makes more, narrower wedges. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90 the left, 180 the top and -90 the right. The pattern repeats every 360 / segments degrees. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns the mirror axes, and shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90 the left, 180 the top and -90 the right. The pattern repeats every 360 / segments degrees. |
 | `x` | number | fraction | 0 to 1 | `0.5` | The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. |
 | `y` | number | fraction | 0 to 1 | `0.5` | The centre's vertical position as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
 
@@ -257,7 +257,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but the middle of a planet turns blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre planet leaves it in 'from' (the angle itself never has an edge; it wraps round): 'nearest' (the edge pixel repeated: the sky stays one flat tone of the top row), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the opposite edge). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre planet leaves it in 'from' (the angle itself never has an edge; it wraps round): 'nearest' (the default, unlike other warps' 'reflect': the edge pixel repeated, so the sky stays one flat tone of the top row and the rim stays clean), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the opposite edge). |
 
 </details>
 
@@ -268,7 +268,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `wavelength` | number | px | 2 to 4000 | `40.0` | The distance in pixels from one crest of the wave to the next, along the wave's direction. Raising it gives long, lazy swells; lowering it gives tight, fine ripples (below about 4 px the wave is too fine for the pixels to show it). |
 | `amplitude` | number | px | 0 to 500 | `6.0` | How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the picture unchanged. |
 | `phase` | number (cyclic) | degrees | -180 to 180 | `0.0` | Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the line through the picture's centre and rising away from it in the wave's direction, 90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it slides the wave along. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `0.0` | The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to this direction. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction the wave travels in, in degrees clockwise from pointing right: 0 sends the wave along the picture's width, so each column is moved up or down and the crests are horizontal ripples running across; 90 sends it down the picture, so each row is moved left or right. Pixels are always moved at a right angle to this direction. |
 
 <details><summary>Advanced parameters (2)</summary>
 
@@ -298,7 +298,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but turned pieces turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What lies beyond the picture's edge, for a moved piece that reads from there and for the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite sides counts as an edge): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What lies beyond the picture's edge, for a moved piece that reads from there and for the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite sides counts as an edge): 'reflect' (the default, as for warps: mirrored, edge pixel repeated, so a moved piece shows no gap at the border), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
 
