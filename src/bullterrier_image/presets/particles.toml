@@ -1,0 +1,10 @@
+# Looks that are one particles step. They leave the step's opacity to the recipe: embers 0.9, rain 0.7 are usual.
+
+[embers]
+description = "Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left."
+density = 1.465
+size = 7
+length = 8
+angle = 105
+softness = 1
+color = "#ff8a2b"

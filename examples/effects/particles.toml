@@ -1,0 +1,10 @@
+# Sparks, snow and stars: the presets `embers`, `snow` and `stars`, each at its usual opacity.
+# It also makes the effect's picture in the catalogue.
+name = "particles"
+size = 480
+
+[[step]]
+effect = "particles"
+preset = "embers"
+opacity = 0.9
+seed = 1

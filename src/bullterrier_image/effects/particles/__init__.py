@@ -1,4 +1,4 @@
-"""The `embers` effect's code: importing this package registers the effect.
+"""The `particles` effect's code: importing this package registers the effect.
 
 Its tests, example recipe and gallery picture carry its name in tests/effects/, examples/effects/ and docs/gallery/.
 """

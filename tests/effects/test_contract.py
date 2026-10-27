@@ -539,18 +539,19 @@ def test_the_seed_check_flags_an_effect_that_ignores_its_seed_or_is_not_determin
 
 # effect: the settings that make it draw many white particles (snow has no colour of its own)
 PARTICLES: dict[str, dict[str, Any]] = {
-    "embers": {"count": 300, "color": "#ffffff"},
+    "particles": {"density": 3.0, "color": "#ffffff"},
     "floating_dust": {"count": 300, "color": "#ffffff"},
     "rain": {"density": 3.0, "color": "#ffffff"},
     "snow": {"density": 3.0},
 }
-TINTED = ["embers", "floating_dust", "rain"]
+TINTED = ["particles", "floating_dust", "rain"]
 
 
 @pytest.mark.parametrize(
     ("name", "none"),
     [
-        pytest.param("embers", {"count": 0}, id="embers"),
+        pytest.param("particles", {"density": 0.0}, id="particles"),
+        pytest.param("particles", {"density": 0.0, "color": "#e6eefa"}, id="particles, tinted"),
         pytest.param("floating_dust", {"count": 0}, id="floating_dust"),
         pytest.param("rain", {"density": 0.0}, id="rain"),
         pytest.param("rain", {"density": 0.0, "color": "#e6eefa"}, id="rain, tinted"),
@@ -588,7 +589,6 @@ def test_particles_are_spread_over_the_whole_of_a_wide_or_a_tall_picture(name, s
 
 # well separated particles, each big and sharp enough to reach full brightness at its middle (snow: its layers 1/4..1)
 SEPARATE = {
-    "embers": {"count": 40, "size": 8.0, "length": 0.0, "softness": 0.0},
     "floating_dust": {"count": 40, "size": 8.0, "softness": 0.0},
     "rain": {"density": 0.3, "length": 8.0, "thickness": 8.0},
     "snow": {"density": 0.1, "size": 40.0, "layers": 4, "softness": 0.0},
@@ -782,6 +782,7 @@ def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_i
 # What an effect needs for its angle to show: at its defaults it changes nothing, so any angle would look cyclic.
 CYCLIC_NEEDS = {
     ("disperse", "angle"): {"progress": 0.5},
+    ("particles", "angle"): {"length": 40.0},
     ("selective_color", "hue"): {"hue_shift": 90.0, "width": 120.0},
 }
 

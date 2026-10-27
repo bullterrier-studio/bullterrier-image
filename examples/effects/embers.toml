@@ -1,9 +1,0 @@
-# Embers: glowing orange sparks rising and drifting a little to the right.
-# It also makes the effect's picture in the catalogue.
-name = "embers"
-size = 480
-
-[[step]]
-effect = "embers"
-count = 120
-seed = 1

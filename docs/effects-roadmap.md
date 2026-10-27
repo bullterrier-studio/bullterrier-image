@@ -202,7 +202,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
 | `floating_dust` ✓ | Slow bokeh particles. | `fx.floating_dust(count=80, seed=1)` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
-| `embers` ✓ | Rising sparks. | `fx.embers(count=120, seed=1)` |
+| `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `dust`, `stars`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
 
 ## Driving a number by a field
 
@@ -328,10 +328,10 @@ What combining effects can give, once the pieces exist:
 - **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
-- **Turn to dust**: ASCII, disperse, embers (one moment of it; a video tool animates it)
+- **Turn to dust**: ASCII, disperse, `particles` (preset `embers`) (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs inks on `halftone` or `dither`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `embers` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs inks on `halftone` or `dither`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
 
 ## Planned consolidation (before 1.0; breaking, no aliases)
 
