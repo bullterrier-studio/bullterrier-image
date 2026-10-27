@@ -1,0 +1,22 @@
+# A spotlight on the subject: the background dims and falls into shadow toward the corners, the subject stays lit and crisp.
+name = "spotlight"
+size = 480
+
+[[step]]
+effect = "grade"
+exposure = -0.7
+saturation = 0.8
+mask = "background"
+
+[[step]]
+effect = "vignette"
+amount = 0.85
+radius = 0.1
+feather = 0.55
+mask = "background"
+
+[[step]]
+effect = "sharpen"
+preset = "clarity"
+amount = 0.4
+mask = "subject"

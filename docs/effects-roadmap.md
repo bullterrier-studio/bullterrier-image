@@ -229,7 +229,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `sticker` ✓ | White border and shadow: a die-cut sticker. A recipe: `outline` then `drop_shadow` (examples/recipes/sticker.toml). | `outline(width=14) + drop_shadow` |
 | `silhouette` ✓ | Flat colour subject. A recipe: `gradient` with one colour masked to the subject, then to the background. | `gradient(colors=["#000"]) mask = "subject"` |
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="monochrome")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "monochrome", mask = "background"` |
-| `spotlight` ✓ | Light the subject, darken the rest. | `fx.spotlight(falloff=0.6)` |
+| `spotlight` ✓ | Light the subject, darken the rest. A recipe: `vignette` with `mask = "background"` (examples/recipes/spotlight.toml). | `vignette mask = "background"` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
 | decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
