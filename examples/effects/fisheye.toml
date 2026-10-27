@@ -1,9 +1,0 @@
-# A wide-angle lens on the dog: the face swells toward the camera and the room bends away around it.
-name = "fisheye"
-size = 480
-
-[[step]]
-effect = "fisheye"
-amount = 0.7
-x = 0.5
-y = 0.4

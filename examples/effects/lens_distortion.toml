@@ -1,8 +1,15 @@
-# A cheap wide-angle barrel: straight lines bow outward and the dog's face fills the frame.
+# A cheap wide-angle barrel, then a fisheye on the dog's face: straight lines bow outward and the face swells.
 name = "lens_distortion"
 size = 480
 
 [[step]]
 effect = "lens_distortion"
-distortion = 0.5
+amount = 0.3
 fit = "frame"
+
+[[step]]
+effect = "lens_distortion"
+model = "fisheye"
+amount = 0.6
+x = 0.5
+y = 0.4

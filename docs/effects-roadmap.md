@@ -141,8 +141,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `pinch_bulge` ✓ | Push in or out. | `fx.pinch_bulge(amount=0.5)` |
 | `ripple` ✓ | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
 | `displace` ✓ | Move pixels by noise or a map; at `scale=1` with `interpolation="nearest"` each pixel moves on its own (frosted glass). | `fx.displace(amount=12, scale=80, seed=1)` |
-| `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
-| `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
+| `lens_distortion` ✓ | Barrel or pincushion; `model` 'fisheye' is a wide-angle bulge. | `fx.lens_distortion(amount=0.2)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
 | `mirror` ✓ (`kaleidoscope` with 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
 | `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
@@ -360,7 +359,6 @@ tilt look = a linear-gradient field), and gives `topographic` depth contours.
 | `sparkle` | `starburst` + `count`, `dot` |
 | `fog`, `smoke` | one, with presets |
 | `crt`, `hologram` | recipes (`scanlines` gains `softness`; `lens_distortion` gains a border colour; needs `edges`) |
-| `fisheye` | `lens_distortion` + `model` |
 | `split_tone`, `color_balance` | one three-range tool |
 | `overlay` | `blend` + `fit="width"` |
 | `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |

@@ -1,4 +1,4 @@
-"""The `lens_distortion` effect: barrel or pincushion distortion of a lens, with the picture scaled back to fit."""
+"""The `lens_distortion` effect: barrel or pincushion distortion, or a fisheye, with the picture scaled back."""
 
 from typing import Literal
 
@@ -10,20 +10,29 @@ from bullterrier_image.ops.warp import Centre, remap
 
 
 class LensDistortionParams(EffectParams):
-    """Lens distortion: the picture bent about the lens axis by the radial polynomial of the Brown-Conrady model, so
-    straight lines bow outward (barrel) or inward (pincushion)."""
+    """Lens distortion: the picture bent about the lens axis, by the radial polynomial of the Brown-Conrady model or
+    as through a fisheye lens, so straight lines bow outward (barrel) or inward (pincushion)."""
 
-    distortion: float = param(
+    model: Literal["brown_conrady", "fisheye"] = param(
+        "brown_conrady",
+        doc="The curve of the bend, with the same `amount` giving the same stretch at the farthest corner: "
+        "'brown_conrady' is the radial polynomial of the Brown-Conrady lens model (k1 only), which bends evenly "
+        "from the axis out, as an ordinary lens does; 'fisheye' is an equidistant fisheye, a pixel's distance from "
+        "the axis proportional to the angle it sees, which keeps the middle almost flat and bends the edges "
+        "hardest, and for a negative `amount` is its inverse, an arctangent curve.",
+    )
+    amount: float = param(
         0.2,
         unit="ratio",
         min=-0.3,
-        max=1,
-        doc="The lens's radial distortion coefficient (the k1 of the Brown-Conrady model), with the distance from the "
-        "axis measured in units of the farthest corner's. Positive is barrel distortion: straight lines bow "
-        "outward and the picture looks wrapped around a ball. Negative is pincushion: lines bow inward and the "
-        "corners are pulled out. The size is how much farther from the axis than its own place each pixel's source "
-        "lies at the farthest corner: 0.2 is 20% farther. -0.3 is the most pincushion that does not fold the "
-        "picture over, 1 the strongest barrel; 0 leaves the picture unchanged.",
+        max=3.5,
+        doc="How strongly the lens bends: at the farthest corner each pixel's source lies 1 + amount times as far "
+        "from the axis as the pixel's own place, where at the axis it lies at its own place (0.2 is 20% farther; "
+        "'fit' then scales it back). The distance from the axis is measured in units of the farthest corner's. "
+        "Positive is barrel: straight lines bow outward, the middle swells and the picture looks wrapped around a "
+        "ball. Negative is pincushion: lines bow inward and the corners are pulled out; -0.3 is the most the "
+        "'brown_conrady' curve can have without folding the picture over. 0 leaves the picture unchanged. For a "
+        "fisheye, 0.4 is about a 103 degree lens, 1 a 134 degree one and 3.5 a 162 degree one.",
     )
     fit: Literal["frame", "centre"] = param(
         "frame",
@@ -66,23 +75,48 @@ class LensDistortionParams(EffectParams):
     )
 
 
+def _fisheye_reach(amount: float) -> float:
+    """The `u` for which the fisheye curve stretches the farthest corner by `amount`: tan(u) / u = 1 + amount for a
+    positive amount, atan(u) / u = 1 + amount for a negative one. Tangent rises and arctangent falls steadily in
+    u, so halving a bracket finds it."""
+    law = np.tan if amount > 0 else np.arctan
+    low, high = 0.0, (np.pi / 2 if amount > 0 else 2 / (1 + amount))  # constant: tan reaches infinity at pi / 2
+    for _ in range(60):  # constant: 60 halvings shrink a bracket of a few radians below double precision
+        middle = (low + high) / 2
+        stretch = law(middle) / middle  # rises with u for tan, falls for atan
+        if (stretch < 1 + amount) == (amount > 0):
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2
+
+
 @effect(category="distortion", params=LensDistortionParams)
 def lens_distortion(rgb: np.ndarray, params: LensDistortionParams) -> np.ndarray:
-    """Bend the picture as a lens with radial distortion `distortion` about the axis `x`, `y` does.
+    """Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does.
 
-    Each pixel at distance d from the axis shows the picture on the same ray at d x (1 + distortion x (d / R)^2), R the
-    distance of the farthest corner (the Brown-Conrady radial term, k1 only), divided by 1 + distortion for `fit`
-    'frame' so that the corner stays put (a barrel then reads only inside the picture). The axis never moves, and the
-    result never leaves 0..1.
+    Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the
+    farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x
+    (d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant
+    fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is
+    divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never
+    moves, and the result never leaves 0..1.
     """
     height, width = rgb.shape[:2]
     # the farthest corner, in pixels: where the radius is 1
     farthest = np.hypot(max(params.y, 1 - params.y) * (height - 1), max(params.x, 1 - params.x) * (width - 1))
-    if params.distortion == 0 or farthest == 0:
+    if params.amount == 0 or farthest == 0:
         return rgb.copy()
     centre = Centre(height, width, x=params.x, y=params.y)
-    scale = 1 + params.distortion * (centre.distance / farthest) ** 2
+    radius = centre.distance / farthest
+    if params.model == "brown_conrady":
+        scale = 1 + params.amount * radius**2
+    else:
+        law = np.tan if params.amount > 0 else np.arctan
+        angle = _fisheye_reach(params.amount) * radius
+        # at the axis itself, the limit 1 of law(angle) / angle
+        scale = np.divide(law(angle), angle, out=np.ones_like(angle), where=angle > 0)
     if params.fit == "frame":
-        scale = scale / (1 + params.distortion)
+        scale = scale / (1 + params.amount)
     rows, cols = centre.sources(scale=scale)
     return remap(rgb, rows, cols, interpolation=params.interpolation, edge=params.edge)
