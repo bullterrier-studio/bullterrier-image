@@ -47,19 +47,19 @@ Step opacity
 0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
     ...
 
-def anamorphic_streaks(length: float = 0.35, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def anamorphic_streaks(length: float = 168.0, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
 screened over the picture by `amount`.
 
-The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` x the picture's width, scaled to add
+The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` px, scaled to add
 up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far
 enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's
 edge. The picture only ever gets brighter, and black stays black.
 
 Parameters
 ----------
-length : number, fraction, 0.001 to 1, default 0.35
-    How far the streaks reach sideways, as a fraction of the picture's width: the
+length : number, px, 0.5 to 480, default 168.0
+    How far the streaks reach sideways, in px tuned for a picture about 480 px high: the
     distance over which a streak fades to 37% of its brightness (the faint tail runs on,
     to the picture's edge). Raising it makes longer, fainter streaks.
 threshold : number, fraction, 0 to 0.99, default 0.7
@@ -2083,13 +2083,13 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def lens_flare(x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 0.05, halo: float = 0.2, ring: float = 0.12, ring_width: float = 0.02, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def lens_flare(x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 30.0, halo: float = 120.0, ring: float = 72.0, ring_width: float = 12.0, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A lens flare: a halo and a ring round the light at (`x`, `y`) and `ghosts` discs along the line through the
 picture's centre, tinted `color` and screened over the picture by `amount`.
 
 Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its
-radius (`halo`, `size`) or half-width (`ring_width`), drawn straight from its formula with no blur or warp. Ghost
-i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
+radius (`halo`, `size`) or half-width (`ring_width`), in px, drawn straight from its formula with no blur or warp.
+Ghost i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
 ghosts. The picture only ever gets brighter.
 
 Parameters
@@ -2104,17 +2104,17 @@ ghosts : whole number, count, 0 to 12, default 5
     How many ghosts (soft discs, the lens's reflections of the light) lie along the line
     from the light through the picture's centre; each is dimmer than the one before, the
     last 1/ghosts as bright as the first. 0 = none.
-size : number, fraction, 0.002 to 0.5, default 0.05
-    The radius of each ghost as a fraction of the picture's diagonal: the disc is
+size : number, px, 1 to 300, default 30.0
+    The radius in px of each ghost, tuned for a picture about 480 px high: the disc is
     brightest at its middle and falls smoothly to nothing at this distance. Raising it
     makes bigger, softer ghosts.
-halo : number, fraction, 0 to 1, default 0.2
-    The radius of the soft glow round the light, as a fraction of the picture's
-    diagonal: brightest at the light and falling smoothly to nothing at this distance. 0
-    = no halo.
-ring : number, fraction, 0 to 1, default 0.12
-    The radius of the thin ring round the light, as a fraction of the picture's
-    diagonal: the distance from the light at which the ring is brightest. 0 = no ring.
+halo : number, px, 0 to 600, default 120.0
+    The radius in px of the soft glow round the light, tuned for a picture about 480 px
+    high: brightest at the light and falling smoothly to nothing at this distance. 0 =
+    no halo.
+ring : number, px, 0 to 600, default 72.0
+    The radius in px of the thin ring round the light, tuned for a picture about 480 px
+    high: the distance from the light at which the ring is brightest. 0 = no ring.
 amount : number, ratio, 0 to 10, default 0.8
     How strongly the flare is screened over the picture: 0 = off, 1 = the light at full
     brightness where it is brightest (the light itself and the first ghost); above 1 it
@@ -2131,10 +2131,10 @@ spacing : number, ratio, 0 to 3, default 0.45
     toward the centre. 1 puts the first on the centre, 2 mirrors the light through it,
     more goes beyond; 0 piles them on the light. A light at the centre gives them no
     line, so they sit on it.
-ring_width : number, fraction, 0.002 to 0.5, default 0.02
-    How far each side of its radius the ring reaches, as a fraction of the picture's
-    diagonal: it falls smoothly from full brightness on the radius to nothing this far
-    off. Raising it makes a wider, softer ring."""
+ring_width : number, px, 1 to 300, default 12.0
+    How far each side of its radius the ring reaches, in px tuned for a picture about
+    480 px high: it falls smoothly from full brightness on the radius to nothing this
+    far off. Raising it makes a wider, softer ring."""
     ...
 
 def lenticular(strip: int = 6, shift: float = 5.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2199,12 +2199,12 @@ invert : The photographic negative: every channel value v becomes 1 - v, so each
 fade : A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky."""
     ...
 
-def light_leak(color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 0.25, angle: float = 0.0, blobs: int = 3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def light_leak(color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 150.0, angle: float = 0.0, blobs: int = 3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Warm washes of light coming in from the side `angle` points to: `blobs` seeded patches, tinted `color` and
 screened over the picture by `amount`.
 
-Each patch is a Gaussian bump, centred a random depth (up to `size` x the diagonal) in from that side and a random
-place along it, with a random width of half to all of `size` x the diagonal, stretched along the edge by up to
+Each patch is a Gaussian bump, centred a random depth (up to `size` px) in from that side and a random
+place along it, with a random width of half to all of `size` px, stretched along the edge by up to
 twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so
 overlaps never clip into flat plateaus. The picture only ever gets brighter.
 
@@ -2216,15 +2216,15 @@ color : colour, default '#ff8a3d'
 amount : number, ratio, 0 to 2, default 0.8
     How strongly the light is screened over the picture: 0 = off, 1 = the brightest
     patch at full brightness in `color`; above 1 it saturates to white sooner.
-size : number, fraction, 0.01 to 1, default 0.25
-    How big the patches are and how deep they reach into the picture, as a fraction of
-    its diagonal: each patch is a soft bump whose width is between half of this and all
-    of it, centred between the edge and this far in. Raising it floods more of the
-    picture.
+size : number, px, 6 to 600, default 150.0
+    How big the patches are and how deep they reach into the picture, in px tuned for a
+    picture about 480 px high: each patch is a soft bump whose width is between half of
+    this and all of it, centred between the edge and this far in. Raising it floods more
+    of the picture.
 angle : number (cyclic), degrees, 0 to 360, default 0.0
-    The side the light comes in from, as the direction from the picture's centre,
-    counterclockwise as seen on it: 0 = the right edge, 90 = the top, 180 = the left,
-    270 = the bottom; in between, the corner.
+    The side the light comes in from, as the direction from the picture's centre, in
+    degrees clockwise from pointing right, as seen on screen: 0 = the right edge, 90 =
+    the bottom, 180 = the left, 270 = the top; in between, the corner.
 blobs : whole number, count, 1 to 16, default 3
     How many patches of light there are, at random places along that side (each brighter
     or fainter and stretched along the edge by chance). Overlapping patches merge into
@@ -2609,8 +2609,9 @@ model (never set it in a recipe file): float32 (h, w), 0..1, 1 = nearest. Withou
 Parameters
 ----------
 angle : number (cyclic), degrees, 0 to 360, default 0.0
-    The direction the nearest layers move, counter-clockwise as seen in the picture: 0 =
-    right, 90 = up, 180 = left. Layers farther than the focus move the opposite way.
+    The direction the nearest layers move, in degrees clockwise from pointing right, as
+    seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move
+    the opposite way.
 amount : number, fraction, 0 to 0.1, default 0.02
     How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a
     fraction of the picture's long side: a layer moves amount x (its depth - focus) of
@@ -3236,7 +3237,7 @@ Presets
 anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."""
     ...
 
-def rim_light(angle: float = 40.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def rim_light(angle: float = 320.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`.
 
 Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
@@ -3249,10 +3250,10 @@ with a subject that has no edge (empty or full), there is nothing to light and t
 
 Parameters
 ----------
-angle : number (cyclic), degrees, -180 to 180, default 40.0
-    The direction the light comes from, counter-clockwise from the right: 0 = from the
-    right, 90 = from above, 180 or -180 = from the left, -90 = from below. Only edges
-    whose outward direction faces it are lit.
+angle : number (cyclic), degrees, 0 to 360, default 320.0
+    The direction the light comes from, in degrees clockwise from pointing right, as
+    seen on screen: 0 = from the right, 90 = from below, 180 = from the left, 270 = from
+    above. Only edges whose outward direction faces it are lit.
 color : colour, default '#ff9a4d'
     The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
     orange.
@@ -3578,25 +3579,24 @@ Presets
 glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
     ...
 
-def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, density: float = 1.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
+def starburst(rays: int = 4, length: float = 60.0, width: float = 1.0, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, spacing: float = 0.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
     """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
-tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density`
-picks a random share of them, `variation` dims each by a random amount (both from `seed`).
+tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing`
+thins them to a random few, `variation` dims each by a random amount (both from `seed`).
 
-Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
-picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by
-0 or 1 (`density`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the
-picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from
-points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black
-stays black.
+Each spike is `width` px wide, starts at the point at full brightness and fades linearly to nothing at `length` px;
+they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`spacing`)
+and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a
+point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
+nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
 
 Parameters
 ----------
 rays : whole number, count, 1 to 32, default 4
     How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a
     six-pointed star, 1 = a single comet tail. Raising it makes a denser star.
-length : number, fraction, 0.001 to 1, default 0.1
-    How far each spike reaches, as a fraction of the picture's diagonal: it fades
+length : number, px, 0.5 to 600, default 60.0
+    How far each spike reaches, in px tuned for a picture about 480 px high: it fades
     linearly from the point to nothing at this distance. Raising it makes longer,
     fainter-tipped spikes.
 threshold : number, fraction, 0 to 0.99, default 0.95
@@ -3610,20 +3610,25 @@ amount : number, ratio, 0 to 10, default 0.8
     bright as the point that makes it, at the point; above 1 it saturates to white
     sooner.
 angle : number (cyclic), degrees, 0 to 360, default 0.0
-    The direction of the first spike, counterclockwise as seen on the picture: 0 = to
-    the right, 90 = up. The other spikes follow at equal angles, so with 4 spikes 45
-    turns the cross into an X.
-density : number, fraction, 0 to 1, default 1.0
-    The share of the bright points that send out spikes, picked at random (the same ones
-    for the same `seed`; raising it only adds points): 1 = all of them, 0.01 = one in a
-    hundred, scattered over the bright areas, 0 = none. Lower it to turn a bright area
-    into separate glints.
+    The direction of the first spike, in degrees clockwise from pointing right, as seen
+    on screen: 0 = to the right, 90 = down. The other spikes follow at equal angles, so
+    with 4 spikes 45 turns the cross into an X.
+spacing : number, px, 0 to 200, default 0.0
+    The average distance in px, tuned for a picture about 480 px high, between the
+    points that send out spikes inside a bright area: each bright pixel sends them with
+    the chance 1 / spacing^2 (the same ones for the same `seed`; raising it only drops
+    points), so the glints keep their number per area of the picture at any size. 0, or
+    anything below 1, = every bright point. Raise it to turn a bright area into separate
+    glints; 13 gives a scatter of glitter.
 color : colour, default '#ffffff'
     The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
     of the light that makes them.
 
 Advanced parameters
 -------------------
+width : number, px, 1 to 20, default 1.0
+    The thickness in px of each spike, tuned for a picture about 480 px high, with a
+    soft edge one px wide: 1 = a hairline. Raising it makes bolder spikes.
 limit : number, fraction, 0 to 1, default 1.0
     The most pixels that send out spikes, as a share of all the picture's pixels, the
     brightest first: the threshold is raised just enough to keep to it (never above
@@ -3635,7 +3640,7 @@ variation : number, fraction, 0 to 1, default 0.0
     one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
     = from full down to nothing.
 seed : whole number, count, 0 to 4294967295, default 0
-    Random seed for `density` and `variation`: the same seed picks the same points of
+    Random seed for `spacing` and `variation`: the same seed picks the same points of
     the same picture, another seed others.
 
 Presets

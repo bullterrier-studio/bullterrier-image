@@ -177,7 +177,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction the nearest layers move, counter-clockwise as seen in the picture: 0 = right, 90 = up, 180 = left. Layers farther than the focus move the opposite way. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The direction the nearest layers move, in degrees clockwise from pointing right, as seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move the opposite way. |
 | `amount` | number | fraction | 0 to 0.1 | `0.02` | How far the nearest layer (depth 1) moves when the focus is the farthest depth, as a fraction of the picture's long side: a layer moves amount x (its depth - focus) of it. Raising it exaggerates the shift; 0 leaves the picture unchanged. |
 | `focus` | number | fraction | 0 to 1 | `0.5` | The depth that stays still, as a fraction of the picture's depth range: 1 = the nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the opposite way; raising it moves more of the picture against `angle`. |
 
