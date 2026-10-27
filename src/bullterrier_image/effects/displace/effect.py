@@ -28,7 +28,8 @@ class DisplaceParams(EffectParams):
         min=1,
         max=1024,
         doc="Size of the coarsest waves of the displacement in pixels, the spacing of the first noise lattice. Larger "
-        "= broad, slow wobbles that bend the picture; small = fine, jittery tearing.",
+        "= broad, slow wobbles that bend the picture; small = fine, jittery tearing; 1 (with 1 octave and 'nearest') = "
+        "every pixel moves on its own, frosted glass, most by about a quarter of `amount`.",
     )
     octaves: int = param(
         3,

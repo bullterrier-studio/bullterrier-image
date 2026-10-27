@@ -111,3 +111,30 @@ def test_the_edge_rule_only_matters_within_amount_of_the_border(edge: str) -> No
     out = registry.apply(NAME, ramps(), **SETTINGS, edge=edge)
     np.testing.assert_allclose(interior(out), interior(reference), atol=1e-5)
     assert edge == "reflect" or np.abs(out - reference).max() > 1e-3  # a ramp changes 0.005 per px
+
+
+FROSTED = {"amount": 8.0, "scale": 1.0, "octaves": 1, "interpolation": "nearest", "seed": 3}
+
+
+def neighbour_correlation(shift: np.ndarray) -> float:
+    """How alike each pixel's move is to the move of the pixel to its right: the correlation of a field with itself
+    shifted by one column (1 = moves in step, 0 = independent)."""
+    return float(np.corrcoef(shift[:, :-1].ravel(), shift[:, 1:].ravel())[0, 1])
+
+
+def test_at_scale_one_every_pixel_moves_independently_of_its_neighbours() -> None:
+    """Frosted glass: at scale 1 the lattice is the pixel grid, so neighbours share nothing; at scale 12 they do."""
+    frosted = offsets(registry.apply(NAME, ramps(), **FROSTED))[1]
+    smooth = offsets(registry.apply(NAME, ramps(), **{**FROSTED, "scale": 12.0}))[1]
+    assert abs(neighbour_correlation(interior(frosted))) < 0.1
+    assert neighbour_correlation(interior(smooth)) > 0.8
+
+
+def test_frosted_pixels_are_whole_pixel_moves_no_longer_than_amount_that_spread_both_ways() -> None:
+    """With 'nearest' no colours are blended: each output pixel is an input pixel, a whole number of pixels away."""
+    shift_rows, shift_cols = (interior(o) for o in offsets(registry.apply(NAME, ramps(), **FROSTED)))
+    for shift in (shift_rows, shift_cols):
+        np.testing.assert_allclose(shift, np.rint(shift), atol=1e-3)
+        assert np.abs(shift).max() <= 8
+        assert shift.min() < -3 < 3 < shift.max()  # moves go both ways, not one-sided
+        assert shift.std() > 1.0

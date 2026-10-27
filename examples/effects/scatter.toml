@@ -1,8 +1,0 @@
-# Frosted glass: every pixel is swapped for a neighbour up to four pixels away.
-name = "scatter"
-size = 480
-
-[[step]]
-effect = "scatter"
-radius = 4
-seed = 2

@@ -142,7 +142,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `swirl` ✓ | Twist around a point. | `fx.swirl(angle=120, radius=0.5)` |
 | `pinch_bulge` ✓ | Push in or out. | `fx.pinch_bulge(amount=0.5)` |
 | `ripple` ✓ | Travelling wave displacement. | `fx.ripple(wavelength=40, amplitude=6, phase=0)` |
-| `displace` ✓ | Move pixels by noise or a map. | `fx.displace(amount=12, scale=80, seed=1)` |
+| `displace` ✓ | Move pixels by noise or a map; at `scale=1` with `interpolation="nearest"` each pixel moves on its own (frosted glass). | `fx.displace(amount=12, scale=80, seed=1)` |
 | `lens_distortion` ✓ | Barrel or pincushion. | `fx.lens_distortion(distortion=0.2)` |
 | `fisheye` ✓ | Wide-angle bulge. | `fx.fisheye(amount=0.6)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
@@ -154,7 +154,6 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `melt` ✓ | Brightness-driven drips running down. | `fx.melt(amount=40, seed=1)` |
 | `flow_warp` ✓ | Smeared by a noise flow field. | `fx.flow_warp(scale=80, amount=20, seed=1)` |
 | `stretch` ✓ | Smear one pixel row or column outward. | `fx.stretch(axis="vertical", at=0.5)` |
-| `scatter` ✓ | Random pixel displacement. | `fx.scatter(radius=4, seed=1)` |
 | `shatter` ✓ | Cracked-glass pieces, slightly offset and rotated; or flat stained glass and low-poly triangles (`fill`, `detail`, `shape`). | `fx.shatter(pieces=24, gap=1.5, seed=1)` |
 | `droste` ✓ | Recursive picture-in-picture spiral. | `fx.droste(scale=0.5)` |
 | `slice_shift` ✓ | Horizontal slices slide (a subset of `glitch`). | `fx.slice_shift(slices=30, amount=0.05)` |
@@ -369,7 +368,6 @@ band), resolved like a `Drive`'s `by`; only named fields are built. This merges 
 | `fog`, `smoke` | one, with presets |
 | `crt`, `hologram` | recipes (`scanlines` gains `softness`; `lens_distortion` gains a border colour; needs `edges`) |
 | `fisheye` | `lens_distortion` + `model` |
-| `scatter` | `displace` |
 | `split_tone`, `color_balance` | one three-range tool |
 | `overlay` | `blend` + `fit="width"` |
 | `evaporate` | `disperse`, if its looks are reachable at a fixed `progress` |
