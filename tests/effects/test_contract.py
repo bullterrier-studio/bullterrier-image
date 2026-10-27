@@ -269,7 +269,7 @@ def _small(photo: np.ndarray) -> np.ndarray:
 def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
     """The injected inputs the effect declares, made for `photo`: a soft disc as the subject map, a cone as its
     depth (1, nearest, at the centre, falling to 0 at the corners), the four quarters of the picture as its
-    partition."""
+    partition, and that cone again as the array of each of its field parameters."""
     height, width = photo.shape[:2]
     y, x = np.mgrid[0:height, 0:width].astype(np.float32)
     off_centre = np.hypot(x - width / 2, y - height / 2)
@@ -281,7 +281,8 @@ def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
         "depth": cone.astype(np.float32),
         "partition": quarters.astype(np.int32),
     }
-    return {key: value for key, value in made.items() if key in registry.inputs(name)}
+    fields = dict.fromkeys(registry.parameters(name).field_name_fields(), made["depth"])
+    return {**fields, **{key: value for key, value in made.items() if key in registry.inputs(name)}}
 
 
 def _bounds() -> list[tuple[str, str, str]]:
@@ -381,8 +382,9 @@ def _cyclic() -> list[tuple[str, str]]:
     ids=lambda value: str(value),
 )
 def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, photo):
+    small = _small(photo)
     with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(name, _small(photo), **{field: _bound_value(name, field, side, beyond=True)})
+        registry.apply(name, small, **{field: _bound_value(name, field, side, beyond=True)}, **_inputs(name, small))
 
 
 @pytest.mark.parametrize(("name", "field", "choice"), _choices())
@@ -393,21 +395,23 @@ def test_every_effect_works_with_each_choice_it_offers(name, field, choice, phot
 
 @pytest.mark.parametrize(("name", "field"), sorted({(name, field) for name, field, _ in _choices()}))
 def test_a_choice_that_is_not_offered_is_refused(name, field, photo):
+    small = _small(photo)
     with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(name, _small(photo), **{field: "not_a_choice"})
+        registry.apply(name, small, **{field: "not_a_choice"}, **_inputs(name, small))
 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_refuses_an_unknown_parameter(name, photo):
+    small = _small(photo)
     with pytest.raises(ValueError, match="not_a_parameter"):
-        registry.apply(name, _small(photo), not_a_parameter=1)
+        registry.apply(name, small, not_a_parameter=1, **_inputs(name, small))
 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     small, model = _small(photo), registry.parameters(name)
     inputs = _inputs(name, small)
-    defaults = {field: info.default for field, info in model.model_fields.items()}
+    defaults = {field: info.default for field, info in model.model_fields.items() if field not in inputs}
     by_model = registry.get(name)(small, model(), **inputs)
     np.testing.assert_array_equal(registry.get(name)(small, **inputs), by_model)
     np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)

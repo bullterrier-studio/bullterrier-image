@@ -1,7 +1,14 @@
-# Contour lines of the photo's brightness, drawn over the photo.
+# Contour lines of the photo's brightness, then of its depth in a scanner's cyan: a LiDAR look.
 # It also makes the effect's picture in the catalogue.
 name = "topographic"
 size = 480
 
 [[step]]
 effect = "topographic"
+
+[[step]]
+effect = "topographic"
+field = "depth"
+levels = 16
+line = "#2be3ff"
+thickness = 2.5

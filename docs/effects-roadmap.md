@@ -228,7 +228,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `split_tone` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light the depth, read as a relief, from a direction (Lambert on normals of the smoothed depth); flat areas are unchanged. | `fx.relight(angle=270, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
-| depth contours (planned, on `topographic`) | Contour lines of the depth instead of brightness, with a `band` of depth that video sweeps: a LiDAR or scanner look. Needs field parameters ("Planned consolidation"). | `fx.topographic(field="depth", levels=24)` |
+| depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 | `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
 
@@ -281,7 +281,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
 | `starfield` ✓ | Stars with depth. | `fx.starfield(count=600, seed=1)` |
 | `voronoi_cells` ✓ | Cell pattern. | `fx.voronoi_cells(cells=200, seed=1)` |
-| `topographic` ✓ | Contour lines of luminance or noise. | `fx.topographic(levels=14)` |
+| `topographic` ✓ | Contour lines of luminance, depth or any field. | `fx.topographic(levels=14)` |
 | `flow_lines` ✓ | Streamlines through a noise flow field. | `fx.flow_lines(density=0.004, seed=1)` |
 | `aurora` ✓ | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |
 | `fractal` ✓ | Mandelbrot or Julia sets with smooth colouring. | `fx.fractal(kind="julia", zoom=1.5, iterations=64)` |
