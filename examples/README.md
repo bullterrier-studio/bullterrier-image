@@ -39,8 +39,9 @@ Recipes name a second picture by a path relative to the recipe file (`image = ".
 The assets here were made with the library, so none carries a licence; run these from the repository root to make them again:
 
 ```bash
-# bullterrier-cutout.png: the dog on a transparent background (the alpha channel is kept)
-uv run bt-image cutout examples/photos/bullterrier.jpeg -o examples/assets/bullterrier-cutout.png --feather 1
+# bullterrier-cutout.png: the dog on a transparent background (the alpha channel is kept); cut with Apple Vision
+# (`--segmenter vision`), so a render with the portable model (the default) does not match it
+uv run bt-image cutout examples/photos/bullterrier.jpeg -o examples/assets/bullterrier-cutout.png --feather 1 --segmenter vision
 
 # grain-texture.png: paper fibres around mid grey (assets/grain-texture.toml), made from a flat grey picture
 uv run python -c "import numpy as np; from bullterrier_image import imageio; imageio.save(np.full((512, 512, 3), 0.5, np.float32), 'out/grey.png')"
