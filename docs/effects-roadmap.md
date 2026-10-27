@@ -10,9 +10,9 @@ watercolor, woodcut, pop art, film emulation, pixel and brick novelties, novelty
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
 `src/bullterrier_image/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
-it becomes a new effect only when it is a new idea. Planned merges of today's effects: "Planned consolidation", at the end.
+it becomes a new effect only when it is a new idea. The effect set is consolidated: a name that is no longer an effect is a preset, a look or a parameter of the effect that took it over (`bt-image effects NAME` finds it).
 
-**Next:** `edges`. After them, effects are added only when a video look needs one.
+**Next:** none scheduled. Effects are added only when a video look needs one. Open: "Still planned", at the end.
 
 ## Colour and tone
 
@@ -55,7 +55,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `motion_blur` ✓ | Directional blur. | `fx.motion_blur(angle=30, length=40)` |
 | `radial_blur` ✓ | Spin or zoom blur from a point. | `fx.radial_blur(mode="zoom", amount=0.1)` |
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
-| `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; presets `soft_focus` (Orton glow of the whole picture) and `halation` (film's red-orange glow). | `fx.bloom(radius=40, threshold=0.7)` |
+| `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; presets `soft_focus` (Orton glow of the whole picture), `halation` (film's red-orange glow) and `glow`. | `fx.bloom(radius=40, threshold=0.7)` |
 | `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=144)` |
 | `starburst` ✓ | Diffraction spikes on bright points; `spacing` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=90)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
@@ -73,7 +73,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `pixel_grid` ✓ | LCD sub-pixel grid; `keep_brightness` for a shadow mask that does not dim. | `fx.pixel_grid(cell=4)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
-| `crt` ✓ (a recipe, [crt.toml](../examples/recipes/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
+| `crt` ✓ (a look, [crt.toml](../src/bullterrier_image/looks/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
 | `vhs` ✓ | Tracking bands, dropouts, chroma bleed, tape noise, wobble; preset `signal_noise` (analog static, white dropouts). | `fx.vhs(tracking=0.06, bleed=5)` |
 | `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
@@ -90,13 +90,13 @@ belong to a layout package, not here.
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=96, min_cell=5.75)` |
 | `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=4)` |
-| `edges` (next) | Outlines by Sobel, Canny or difference of Gaussians; on the existing `ops.edges`. | `fx.edges(method="dog", width=2)` |
+| `edges` ✓ | Edge lines by Sobel, Canny or difference of Gaussians, in `color` on `background`; screened over the picture they light up the edges, in a dark `color` on light they are line art. | `fx.edges(method="dog", radius=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | line and CMYK screens (planned, on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none or cmyk (four inks at the screen angles). Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", cell=9)` |
 | `engraving` | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
-| `voronoi_mosaic` ✓ (`shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Recipe](../examples/recipes/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
-| `low_poly` ✓ (`shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Recipe](../examples/recipes/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
+| `voronoi_mosaic` ✓ (the look `stained-glass`: `shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Look](../src/bullterrier_image/looks/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
+| `low_poly` ✓ (the look `low-poly`: `shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Look](../src/bullterrier_image/looks/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
 | `risograph` (a recipe, planned) | Spot-colour layers, misregistration, grain: `dither` or `halftone` with inks, each offset, then `grain`. Needs inks with a per-ink offset on those two. | `fx.halftone(inks=["#ff4d6d","#2b59ff"], ...)` |
 
 ## Computational and experimental
@@ -134,7 +134,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 | `displace` ✓ | Move pixels by noise or a map; at `scale=1` with `interpolation="nearest"` each pixel moves on its own (frosted glass). | `fx.displace(amount=12, scale=80, seed=1)` |
 | `lens_distortion` ✓ | Barrel or pincushion; `model` 'fisheye' is a wide-angle bulge. | `fx.lens_distortion(amount=0.2)` |
 | `polar` ✓ | To or from polar coordinates (tiny planet). | `fx.polar(mode="to")` |
-| `mirror` ✓ (`kaleidoscope` with 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
+| `mirror` ✓ (preset of `kaleidoscope`: 1 segment; 2 for four-way) | Symmetry on an axis. | `fx.kaleidoscope(segments=1, angle=90)` |
 | `kaleidoscope` ✓ | N mirrored segments. | `fx.kaleidoscope(segments=8, angle=15)` |
 | `tile` ✓ | Repeat the picture in a grid; slide it around (rolling scan, wrap-around shift). | `fx.tile(columns=3, rows=3, offset_y=0.2)` |
 | `perspective` ✓ | Keystone, skew, turn and zoom. | `fx.perspective(vertical=0.3, shear_x=0.2, rotate=-3, scale=0.2)` |
@@ -182,7 +182,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | --- | --- | --- |
 | `fog` ✓ | Noise-shaped haze, thicker toward the bottom; preset `smoke`. | `fx.fog(amount=0.4, color="#cfd8e3")` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
-| `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `dust`, `stars`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
+| `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `floating_dust`, `starfield`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
 
 ## Driving a number by a field
 
@@ -191,11 +191,11 @@ varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gauss
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
 `grain`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`, `vibrance`, `temperature`, `tint`; `levels`' `output_black`;
-`selective_color`'s `hue_shift`; `fog`'s `amount`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
+`selective_color`'s `hue_shift`; `fog`'s, `lut`'s and `color_balance`'s `amount`; `color_balance`'s `balance`; `grain`'s `balance`; `vhs`'s `band_static`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
 
-Effects and recipes that read the injected depth (`docs/design-decisions.md`, "Depth is injected like the subject") and,
+Effects and recipes that read the depth (`docs/design-decisions.md`, "Depth is injected like the subject") and,
 from it, the surface's shape, so light and atmosphere follow the scene's geometry instead of the subject's silhouette. A
 model only estimates the map; every effect is plain, deterministic maths on the photo's own pixels, never a generative
 model that repaints them. Why: grading the background apart from the subject makes it look pasted in (a sticker); depth
@@ -239,7 +239,7 @@ Combine the photo with an asset (a picture that is part of the look, given as a 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture); `fit="width"` places a logo or watermark (preset `logo`). | `fx.blend(image="tex.png", mode="soft_light")` |
+| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture); `fit="width"` places a logo or watermark (preset `overlay`). | `fx.blend(image="tex.png", mode="soft_light")` |
 | `gradient_overlay` ✓ (a recipe step) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear", blend_mode="screen")` |
 
 Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a
@@ -298,10 +298,10 @@ control packages.
 
 What combining effects can give, once the pieces exist:
 
-- **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): split tone, chromatic aberration, scanlines, bloom, rain, CRT glass
+- **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): colour balance, chromatic aberration, scanlines, bloom, `particles` rain, CRT glass
 - **Risograph poster**: levels, risograph inks (`halftone` or `dither` with inks), paper texture
 - **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml)): green ASCII on a curved CRT screen with shadow mask, scanlines and glow
-- **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, glitch
+- **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, colour split
 - **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `halftone` has CMYK separation; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
@@ -311,44 +311,9 @@ What combining effects can give, once the pieces exist:
 
 A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs inks on `halftone` or `dither`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
 
-## Planned consolidation (before 1.0; breaking, no aliases)
+## Still planned
 
-Fewer effects, each fully customisable and distinct. A merged effect has fewer parameters than the effects it replaces,
-and each parameter matters for every look. About 128 effects become about 94. The ✓ rows above stay until each merge
-lands.
-
-**Core: field parameters.** An effect may name a field (`depth`, `light`, `subject`, a region such as a gradient or a
-band), resolved like a `Drive`'s `by`; only named fields are built. This merged `relight`, `bump_light` and `emboss`
-(`relight`'s `field`; presets `bump_light` and `emboss`) and `depth_of_field` with `tilt_shift` (`focus_blur`; the tilt
-look = a linear-gradient field), and gives `topographic` depth contours.
-
-**Merges that change no picture:**
-
-| Goes | Into |
-| --- | --- |
-| `fade` | `levels(output_black)` |
-| `invert` | a `levels` preset |
-| `noise`, `film_grain` | `grain` (`shadows`, `highlights`, `color`, `distribution`) |
-| `black_and_white` | a `channel_mixer` preset |
-| `vibrance` | `grade` + `vibrance` |
-| `mirror` | `kaleidoscope(segments=1)` |
-| `plasma` | `noise_field(kind="sine")` + `warp` |
-
-**Family merges:**
-
-| Goes | Into |
-| --- | --- |
-| `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
-| `layered_cutouts`, `long_shadow` | `drop_shadow` + `copies`, `end_color`, `copy_opacity`, `fade`; preset `long_shadow` (done) |
-| `glitch` | a recipe: `slice_shift` + `rgb_split` |
-| `sparkle` | a `starburst` preset + `spacing`, `variation`, `seed` |
-| `fog`, `smoke` | one, with presets |
-| `hologram` | a look (done) |
-| `split_tone`, `color_balance` | `color_balance`: shadows, midtones, highlights colours, `amount`, `balance`, `softness`; presets `teal_orange`, `split_tone`, `color_balance` (done) |
-| `overlay` | `blend` + `fit="width"` |
-
-**Conventions, applied with the merges:**
-- Angles of a direction are measured clockwise from pointing right.
-- The size of a mark is in px (tuned for 480); placement and reach are a share of the long side.
-- Scattered marks use `density`.
-- `edge` defaults to 'reflect' for blurs and warps, and to 'nearest' for shifts and copies.
+**Field parameters for the remaining injected inputs.** `relight`, `focus_blur` and `topographic` take a `field` parameter
+(`depth`, `light`, `subject`, a region), resolved like a `Drive`'s `by`. `ambient_occlusion` and `parallax` still take the
+injected `depth`; `disperse`, `drop_shadow`, `outline`, `reflection` and `rim_light` the injected `subject`. Moving them
+onto `field` leaves one mechanism; the owner schedules it.
