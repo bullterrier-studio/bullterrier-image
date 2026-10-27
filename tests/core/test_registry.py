@@ -456,6 +456,11 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
         pytest.param("glitch", ['"slice_shift"', 'preset = "glitch"'], id="a-preset-names-its-effect-and-itself"),
         pytest.param("sepia", ['"gradient_map"', 'preset = "sepia"'], id="a-preset-of-another-effect"),
         pytest.param("crt", ["look", 'load_recipe("crt")'], id="a-look-says-how-to-load-it"),
+        pytest.param("vibrance", ["is a parameter of grade"], id="a-parameter-names-its-effect"),
+        pytest.param("temperature", ["is a parameter of grade"], id="a-parameter-of-one-effect"),
+        pytest.param("radius", ["is a parameter of", "gaussian_blur", "more"], id="a-parameter-of-many-lists-some"),
+        pytest.param("depth_of_field", ["see focus_blur", "depth of field"], id="a-summary-mention-with-underscores"),
+        pytest.param("Tilt-Shift", ["see focus_blur", "tilt-shift"], id="a-summary-mention-ignores-case-and-hyphens"),
         pytest.param("glich", ["did you mean", "glitch", "slice_shift"], id="a-misspelt-preset-offers-the-close-match"),
         pytest.param("gradient_mapp", ["did you mean", "gradient_map"], id="a-misspelt-effect-offers-the-close-match"),
     ],
@@ -467,6 +472,20 @@ def test_an_unknown_effect_name_says_where_the_name_lives(name, says):
     assert repr(name) in message
     for text in says:
         assert text in message
+
+
+def test_a_parameter_is_preferred_to_a_summary_mention_and_a_preset_to_a_parameter():
+    with pytest.raises(UnknownEffectError, match="is a parameter of") as raised:
+        registry.get("saturation")  # grade's summary names it too
+    assert "see " not in str(raised.value)
+    with pytest.raises(UnknownEffectError, match="is a preset") as raised:
+        registry.get("sepia")
+    assert "parameter" not in str(raised.value)
+
+
+def test_a_name_that_is_both_a_preset_and_a_look_names_both():
+    with pytest.raises(UnknownEffectError, match=r'preset = "anaglyph".*look.*load_recipe\("anaglyph"\)'):
+        registry.get("anaglyph")
 
 
 def test_a_name_that_is_nothing_gets_no_location_and_no_close_match():

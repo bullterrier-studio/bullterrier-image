@@ -191,9 +191,17 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
         fx.no_such_effect  # noqa: B018  (the lookup itself is what must raise)
 
 
-def test_fx_says_where_the_name_of_a_preset_lives():
-    with pytest.raises(AttributeError, match=r"'glitch' is a preset.*effect = \"slice_shift\", preset = \"glitch\""):
-        fx.glitch  # noqa: B018  (the lookup itself is what must raise)
+@pytest.mark.parametrize(
+    ("name", "says"),
+    [
+        pytest.param("glitch", r"'glitch' is a preset.*effect = \"slice_shift\", preset = \"glitch\"", id="a-preset"),
+        pytest.param("temperature", r"'temperature' is a parameter of grade", id="a-parameter"),
+        pytest.param("depth_of_field", r"'depth_of_field': see focus_blur", id="a-word-of-a-summary"),
+    ],
+)
+def test_fx_says_where_a_name_that_is_no_effect_lives(name, says):
+    with pytest.raises(AttributeError, match=says):
+        getattr(fx, name)
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
