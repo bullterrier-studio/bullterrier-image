@@ -1480,43 +1480,6 @@ color : colour, default '#000000'
     The colour that fills the whole picture: '#rrggbb', '#rgb' or [r, g, b] 0..1."""
     ...
 
-def film_grain(shadows: float = 0.1, highlights: float = 0.03, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white.
-
-Each channel gets its own noise (clumped to `size` px, deviation 1) multiplied by the deviation at the pixel's
-brightness, its Rec. 709 luminance, `shadows` + (`highlights` - `shadows`) x luminance. The result is clipped to
-0..1; the same `seed` always gives the same grain.
-
-Parameters
-----------
-shadows : number, fraction, 0 to 1, default 0.1
-    Standard deviation of the grain at black, in 0..1 picture units: 0 = none, 0.1 is
-    visible, 0.25 is heavy. Real film is grainiest in the shadows.
-highlights : number, fraction, 0 to 1, default 0.03
-    Standard deviation of the grain at white, in 0..1 picture units. The grain between
-    black and white runs linearly from `shadows` to this, by the pixel's brightness; set
-    equal to `shadows` for an even grain, above it for grain that grows toward the
-    highlights.
-size : number, px, 0 to 50, default 1.0
-    Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is
-    blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its
-    standard deviation. Larger = coarser, softer grain.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same grain (a different one in each
-    channel), another seed a different pattern.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1).
-    Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the clumping blur sees beyond the picture's edge (only when size > 1):
-    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
-    seamlessly)."""
-    ...
-
 def fisheye(amount: float = 0.6, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Bend the picture as a fisheye lens with its axis at `x`, `y` would, magnifying the middle.
 
@@ -1959,21 +1922,38 @@ night_vision : Green phosphor monochrome, as a night-vision scope shows it (no n
 xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
     ...
 
-def grain(amount: float | Drive = 0.08, size: float = 1.0, seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px.
+def grain(amount: float | Drive = 0.08, balance: float | Drive = 0.0, size: float = 1.0, color: bool = False, distribution: Literal['gaussian', 'uniform'] = 'gaussian', seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.
 
-The same noise is added to every channel, so the grain is monochrome; the result is clipped to 0..1. The same
-`seed` always gives the same grain, so renders are repeatable.
+The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied
+by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It
+is the same in all channels (grey grain) unless `color`, which gives each channel its own. The result is clipped
+to 0..1; the same `seed` always gives the same grain.
 
 Parameters
 ----------
 amount : number (drivable), fraction, 0 to 1, default 0.08
-    Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is
-    visible, 0.2 is heavy.
+    Standard deviation of the grain at mid-grey, in 0..1 picture units: 0 = none, 0.08
+    is visible, 0.2 is heavy. With `balance` the grain at black and at white is up to 2
+    x this.
+balance : number (drivable), ratio, -1 to 1, default 0.0
+    Where the grain is heavier, from -1 to 1: -1 = only in the shadows, 0 = even, 1 =
+    only in the highlights. The grain at brightness L (0 black, 1 white) is `amount` x
+    (1 + `balance` x (2 L - 1)), so the shadows get `amount` x (1 - `balance`) and the
+    highlights `amount` x (1 + `balance`). Real film is grainiest in the shadows (a
+    negative balance).
 size : number, px, 0 to 50, default 1.0
     Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is
     blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its
     standard deviation. Larger = coarser, softer grain.
+color : true or false, default False
+    True gives every channel its own grain (coloured speckle, like a high-ISO sensor);
+    False adds the same grain to all three (brightness only, grey speckle).
+distribution : one of 'gaussian', 'uniform', default 'gaussian'
+    Where the noise values come from: 'gaussian' (bell curve: most values small, a few
+    large) or 'uniform' (every value up to a limit of about 1.7 x the deviation equally
+    likely: an even, bounded speckle). Both have the standard deviation set by `amount`
+    and `balance`, and both are clumped by `size`.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same grain, another seed a different
     pattern.
@@ -2799,30 +2779,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge)."""
-    ...
-
-def noise(amount: float | Drive = 0.06, distribution: Literal['gaussian', 'uniform'] = 'gaussian', color: bool = True, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Add noise of standard deviation `amount` (0.06 visible, 0.2 heavy) to every pixel, grey or per channel.
-
-Each pixel gets an independent value, Gaussian or uniform by `distribution` (zero mean, standard deviation
-`amount` either way), the same in all channels unless `color`. The result is clipped to 0..1; the same `seed`
-always gives the same noise.
-
-Parameters
-----------
-amount : number (drivable), fraction, 0 to 1, default 0.06
-    Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is
-    visible, 0.2 is heavy.
-distribution : one of 'gaussian', 'uniform', default 'gaussian'
-    Where the noise values come from: 'gaussian' (bell curve: most values small, a few
-    large) or 'uniform' (every value up to a limit of about 1.7 x `amount` equally
-    likely: an even, bounded speckle). Both have the standard deviation `amount`.
-color : true or false, default True
-    True gives every channel its own noise (coloured speckle); False adds the same noise
-    to all three (brightness-only, grey speckle).
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same noise, another seed a different
-    pattern."""
     ...
 
 def noise_field(kind: Literal['value', 'perlin', 'worley'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

@@ -10,9 +10,7 @@ Grain and other surface texture laid over the picture.
 | <img src="../gallery/crt.jpg" width="160" alt="crt"> | `crt` | Show the picture on a CRT: bulged glass, a glow, scanlines, a shadow mask, a dim edge and the bezel `border`. | `curve=0.15` `shadow_mask=0.35` `scanlines=0.3` `bloom=0.3` `vignette=0.35` +8 advanced | [crt.toml](../../examples/effects/crt.toml) |
 | <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places over the picture. | `density=0.6` `size=8.0` `scratches=2` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
 | <img src="../gallery/emboss.jpg" width="160" alt="emboss"> | `emboss` | Read the brightness as a relief `height` px tall and light it from `angle`. | `angle=315.0` `height=6.0` `saturation=0.0` +1 advanced | [emboss.toml](../../examples/effects/emboss.toml) |
-| <img src="../gallery/film_grain.jpg" width="160" alt="film_grain"> | `film_grain` | Film grain: noise per channel whose deviation runs from `shadows` at black to `highlights` at white. | `shadows=0.1` `highlights=0.03` `size=1.0` `seed=0` +2 advanced | [film_grain.toml](../../examples/effects/film_grain.toml) |
-| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Film grain: brightness noise of standard deviation `amount` (0.08 visible, 0.2 heavy), clumped to `size` px. | `amount=0.08` `size=1.0` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
-| <img src="../gallery/noise.jpg" width="160" alt="noise"> | `noise` | Add noise of standard deviation `amount` (0.06 visible, 0.2 heavy) to every pixel, grey or per channel. | `amount=0.06` `distribution='gaussian'` `color=True` `seed=0` | [noise.toml](../../examples/effects/noise.toml) |
+| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says. | `amount=0.08` `balance=0.0` `size=1.0` `color=False` `distribution='gaussian'` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
 | <img src="../gallery/paper_texture.jpg" width="160" alt="paper_texture"> | `paper_texture` | Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture. | `kind='paper'` `amount=0.1` `scale=6.0` `octaves=3` `spacing=6.0` `seed=0` +3 advanced | [paper_texture.toml](../../examples/effects/paper_texture.toml) |
 | <img src="../gallery/pixel_grid.jpg" width="160" alt="pixel_grid"> | `pixel_grid` | The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between. | `cell=4` `gap=0.15` `amount=0.4` | [pixel_grid.toml](../../examples/effects/pixel_grid.toml) |
 | <img src="../gallery/scanlines.jpg" width="160" alt="scanlines"> | `scanlines` | Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`. | `spacing=3.0` `thickness=0.5` `darkness=0.35` `offset=0.0` | [scanlines.toml](../../examples/effects/scanlines.toml) |
@@ -100,30 +98,15 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 
 </details>
 
-### `film_grain`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `shadows` | number | fraction | 0 to 1 | `0.1` | Standard deviation of the grain at black, in 0..1 picture units: 0 = none, 0.1 is visible, 0.25 is heavy. Real film is grainiest in the shadows. |
-| `highlights` | number | fraction | 0 to 1 | `0.03` | Standard deviation of the grain at white, in 0..1 picture units. The grain between black and white runs linearly from `shadows` to this, by the pixel's brightness; set equal to `shadows` for an even grain, above it for grain that grows toward the highlights. |
-| `size` | number | px | 0 to 50 | `1.0` | Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its standard deviation. Larger = coarser, softer grain. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same grain (a different one in each channel), another seed a different pattern. |
-
-<details><summary>Advanced parameters (2)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1). Larger is more exact and slower. |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles seamlessly). |
-
-</details>
-
 ### `grain`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number (drivable) | fraction | 0 to 1 | `0.08` | Standard deviation of the added brightness, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is heavy. |
+| `amount` | number (drivable) | fraction | 0 to 1 | `0.08` | Standard deviation of the grain at mid-grey, in 0..1 picture units: 0 = none, 0.08 is visible, 0.2 is heavy. With `balance` the grain at black and at white is up to 2 x this. |
+| `balance` | number (drivable) | ratio | -1 to 1 | `0.0` | Where the grain is heavier, from -1 to 1: -1 = only in the shadows, 0 = even, 1 = only in the highlights. The grain at brightness L (0 black, 1 white) is `amount` x (1 + `balance` x (2 L - 1)), so the shadows get `amount` x (1 - `balance`) and the highlights `amount` x (1 + `balance`). Real film is grainiest in the shadows (a negative balance). |
 | `size` | number | px | 0 to 50 | `1.0` | Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its standard deviation. Larger = coarser, softer grain. |
+| `color` | true or false |  |  | `False` | True gives every channel its own grain (coloured speckle, like a high-ISO sensor); False adds the same grain to all three (brightness only, grey speckle). |
+| `distribution` | one of 'gaussian', 'uniform' |  |  | `'gaussian'` | Where the noise values come from: 'gaussian' (bell curve: most values small, a few large) or 'uniform' (every value up to a limit of about 1.7 x the deviation equally likely: an even, bounded speckle). Both have the standard deviation set by `amount` and `balance`, and both are clumped by `size`. |
 | `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same grain, another seed a different pattern. |
 
 <details><summary>Advanced parameters (2)</summary>
@@ -134,15 +117,6 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles seamlessly). |
 
 </details>
-
-### `noise`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `amount` | number (drivable) | fraction | 0 to 1 | `0.06` | Standard deviation of the added noise, in 0..1 picture units: 0 = none, 0.06 is visible, 0.2 is heavy. |
-| `distribution` | one of 'gaussian', 'uniform' |  |  | `'gaussian'` | Where the noise values come from: 'gaussian' (bell curve: most values small, a few large) or 'uniform' (every value up to a limit of about 1.7 x `amount` equally likely: an even, bounded speckle). Both have the standard deviation `amount`. |
-| `color` | true or false |  |  | `True` | True gives every channel its own noise (coloured speckle); False adds the same noise to all three (brightness-only, grey speckle). |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same noise, another seed a different pattern. |
 
 ### `paper_texture`
 
