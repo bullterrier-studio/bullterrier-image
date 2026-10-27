@@ -297,12 +297,14 @@ resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
     'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking."""
     ...
 
-def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation'] | None = None) -> Step:
     """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
 
 The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
-`persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens, keeps
-the colour of the light (each channel blooms on its own) and leaves black black.
+`persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and
+leaves black black. Each channel blooms on its own, so the light keeps its colour; with `color` the brightest
+channel sets the strength and the halo takes that colour instead, as film halation does: light that bounces back
+through the film base exposes one layer whatever the colour of the highlight.
 
 Parameters
 ----------
@@ -311,15 +313,21 @@ radius : number (drivable), px, 0 to 500, default 32.0
     light further; 0 keeps the light on the highlights themselves. Each further octave
     is half as wide.
 threshold : number, fraction, 0 to 0.99, default 0.6
-    The brightness (0..1, per channel) where the bloom starts: only values above it give
-    light, rising to full at 1. Raising it limits the bloom to the brightest highlights.
+    The brightness (0..1) where the bloom starts, judged on each channel on its own (on
+    the brightest of the three when `color` is set): only values above it give light,
+    rising to full at 1. Raising it limits the bloom to the brightest highlights.
 amount : number (drivable), ratio, 0 to 10, default 0.7
     How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
     brightness; above 1 it saturates to white sooner.
+color : colour or none, default None
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default)
+    lets each highlight keep its own colour. A colour makes every highlight bloom in it,
+    whatever its own colour is, with the strength of its brightest channel: '#ff4a14' is
+    the red-orange of film halation, white a neutral glow.
 octaves : whole number, count, 1 to 8, default 4
     How many scales the halo is built from: octave 1 has the sigma `radius`, each next
-    one half of the one before (radius / 2, radius / 4...). 1 = a single Gaussian, as in
-    glow; more adds a tighter, brighter core around the highlights.
+    one half of the one before (radius / 2, radius / 4...). 1 = a single Gaussian; more
+    adds a tighter, brighter core around the highlights.
 persistence : number, ratio, 0 to 1, default 0.5
     How much weight each octave gets relative to the wider one before it (the weights
     are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave
@@ -331,10 +339,19 @@ Advanced parameters
 truncate : number, ratio, 1 to 10, default 4.0
     Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma
     px. Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated) or 'wrap' (the opposite edge)."""
+    repeated), 'wrap' (the opposite edge) or 'constant' (constant_value, so the bloom
+    fades toward the edge when it is 0).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored
+    otherwise.
+
+Presets
+-------
+soft_focus : Orton soft focus: a blurred copy of the whole picture, half-strength, screened over the sharp one.
+halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base."""
     ...
 
 def bump_light(angle: float = 315.0, elevation: float = 45.0, height: float = 8.0, blur: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -1862,40 +1879,6 @@ band_max_height : number, fraction, 0 to 1, default 0.06
     gives taller strips."""
     ...
 
-def glow(radius: float | Drive = 24.0, amount: float | Drive = 0.6, threshold: float = 0.55, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Soft bloom around the bright parts: what is brighter than `threshold` is blurred by `radius` px and screened
-over the picture by `amount`.
-
-Glow only ever brightens, and keeps the colour of the light: each channel glows on its own.
-
-Parameters
-----------
-radius : number (drivable), px, 0 to 500, default 24.0
-    Gaussian sigma of the halo in px at the recipe's size: larger spreads the light
-    further and softer; 0 keeps the light on the bright parts themselves.
-amount : number (drivable), ratio, 0 to 10, default 0.6
-    How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
-    brightness; above 1 it saturates to white sooner.
-threshold : number, fraction, 0 to 0.99, default 0.55
-    The brightness (0..1, per channel) where the glow starts: only values above it light
-    the halo, rising to full at 1. Raising it limits the glow to the brightest
-    highlights.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the halo's Gaussian is cut off, in sigmas: the halo reaches truncate x radius
-    px. Larger is more exact and slower.
-edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the glow fades
-    toward the edge when it is 0).
-constant_value : number, fraction, 0 to 1, default 0.0
-    The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored
-    otherwise."""
-    ...
-
 def grade(exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`.
 
@@ -2025,41 +2008,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
     seamlessly)."""
-    ...
-
-def halation(radius: float = 30.0, threshold: float = 0.5, amount: float | Drive = 1.8, color: str | list[float] | tuple[float, float, float] = '#ff4a14', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A coloured glow around the highlights: where the brightest channel is above `threshold` it is blurred by
-`radius` px, tinted `color` and screened over the picture by `amount`.
-
-Real halation comes from light that passes through the film base and bounces back, exposing the red-sensitive
-layer around bright spots, so the glow takes the tint whatever the colour of the highlight itself. It only ever
-brightens and leaves black black.
-
-Parameters
-----------
-radius : number, px, 0 to 500, default 30.0
-    Gaussian sigma of the glow in px at the recipe's size: larger spreads the glow
-    further from the highlights; 0 keeps it on the highlights themselves.
-threshold : number, fraction, 0 to 0.99, default 0.5
-    The brightness (0..1) where the glow starts, judged on the brightest of a pixel's
-    three channels: only values above it glow, rising to full at 1. Raising it limits
-    the halation to the brightest highlights.
-amount : number (drivable), ratio, 0 to 10, default 1.8
-    How strongly the tinted glow is screened over the picture: 0 = off, 1 = the glow at
-    full brightness; above 1 it saturates sooner.
-color : colour, default '#ff4a14'
-    The colour of the glow: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the red-
-    orange of film's red-sensitive layer; white makes a neutral glow.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the glow's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
-    Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the glow's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -4283,35 +4231,6 @@ seed : whole number, count, 0 to 4294967295, default 0
 Step opacity
 ------------
 0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this."""
-    ...
-
-def soft_focus(radius: float | Drive = 12.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 0.5, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A dreamy glow over the whole picture: a copy blurred by `radius` px is screened over the sharp one.
-
-This is the Orton effect of film photography (a sharp and a blurred exposure of the same scene stacked). The
-picture only ever gets brighter, detail stays under the glow, and black stays black; the step's `opacity` mixes
-in less of it.
-
-Parameters
-----------
-radius : number (drivable), px, 0 to 500, default 12.0
-    Gaussian sigma of the blurred copy in px at the recipe's size: larger is dreamier
-    and softer; 0 blurs nothing, so the picture is only brightened by screening it with
-    itself.
-
-Advanced parameters
--------------------
-truncate : number, ratio, 1 to 10, default 4.0
-    Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x radius px.
-    Larger is more exact and slower.
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated) or 'wrap' (the opposite edge).
-
-Step opacity
-------------
-0.5: a step of this effect is mixed in at 0.5 unless it sets its own `opacity`, which replaces this."""
     ...
 
 def solarize(threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
