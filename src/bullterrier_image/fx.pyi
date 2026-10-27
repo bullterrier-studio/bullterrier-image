@@ -210,8 +210,8 @@ mode : one of 'linked', 'per_channel', default 'per_channel'
     Contrast)."""
     ...
 
-def blend(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch or tile.
+def blend(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['logo'] | None = None) -> Step:
+    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch, width or tile.
 
 Parameters
 ----------
@@ -226,28 +226,35 @@ mode : one of 'normal', 'multiply', 'screen', 'overlay', 'soft_light', 'differen
     'difference' subtracts, 'color' gives the photo the picture's hue and saturation and
     keeps its brightness. Mid grey leaves the photo unchanged under 'overlay' and
     'soft_light'.
-fit : one of 'cover', 'contain', 'stretch', 'tile', default 'cover'
+fit : one of 'cover', 'contain', 'stretch', 'width', 'tile', default 'cover'
     How the picture is fitted to the photo: 'cover' fills it keeping the aspect and
     crops the overhang, 'contain' fits inside it keeping the aspect (the rest of the
-    photo is untouched), 'stretch' fills it ignoring the aspect, 'tile' repeats the
-    picture, one tile as wide as the photo times `scale`.
+    photo is untouched), 'stretch' fills it ignoring the aspect, 'width' keeps the
+    aspect and makes the picture as wide as the photo times `scale` (a logo or sticker),
+    'tile' repeats that picture over the photo.
 at : one of 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right', default 'center'
     Where the fitted picture sits, or which tile sits there: 'top_left', 'top',
     'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom' or 'bottom_right'.
     It decides what 'cover' crops.
-scale : number, ratio, 0.05 to 2, default 1.0
+scale : number, ratio, 0.01 to 2, default 1.0
     The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5
-    half as wide and tall. With 'tile', 0.25 puts four tiles across the photo.
+    half as wide and tall. With 'width' it is the picture's width as a share of the
+    photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo.
+margin : number, fraction, 0 to 0.45, default 0.0
+    Space kept clear around the fitted picture, as a share of the photo's long side, 0
+    to 0.45 (never more than leaves a pixel of the shorter side). Raising it shrinks
+    what 'cover', 'contain' and 'stretch' fill and moves a smaller picture at an edge or
+    corner inward.
 
 Advanced parameters
 -------------------
-margin : number, fraction, 0 to 0.45, default 0.0
-    Space kept clear around the fitted picture, as a share of the photo's shorter side,
-    0 to 0.45. Raising it shrinks what 'cover', 'contain' and 'stretch' fill and moves
-    the picture inward.
 resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
     The filter that sizes the picture: 'nearest' keeps hard pixels, 'bilinear' is soft,
-    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking."""
+    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking.
+
+Presets
+-------
+logo : A logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."""
     ...
 
 def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation'] | None = None) -> Step:
@@ -2855,32 +2862,6 @@ subject_threshold : number, fraction, 0 to 1, default 0.5
     The subject's value, 0 to 1, from which a pixel belongs to the subject whose edge is
     outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
     (hair, fur), raising it less."""
-    ...
-
-def overlay(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#ffffff', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'bottom_right', scale: float = 0.2, margin: float = 0.03, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Put a logo on the photo at one of nine anchors, sized as a share of the photo's width, with its alpha.
-
-Parameters
-----------
-image : picture, default '#ffffff'
-    The picture put on the photo (a logo, a sticker): a path in a recipe file (relative
-    to the file; a PNG with transparency keeps its cut-out shape), a colour such as
-    '#ffffff' (a flat square) or, in Python, a Picture or an array.
-at : one of 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right', default 'bottom_right'
-    Where the image sits: 'top_left', 'top', 'top_right', 'left', 'center', 'right',
-    'bottom_left', 'bottom' or 'bottom_right'.
-scale : number, fraction, 0.01 to 1, default 0.2
-    The image's width as a share of the photo's width, 0.01 to 1; its height follows its
-    aspect. Raising it makes the image larger.
-margin : number, fraction, 0 to 0.45, default 0.03
-    Space between the image and the photo's edge, as a share of the photo's shorter
-    side, 0 to 0.45. Raising it moves an image at an edge or corner inward.
-
-Advanced parameters
--------------------
-resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
-    The filter that sizes the image: 'nearest' keeps hard pixels, 'bilinear' is soft,
-    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking."""
     ...
 
 def paper_texture(kind: Literal['paper', 'canvas', 'linen'] = 'paper', amount: float = 0.1, scale: float = 6.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, spacing: float = 6.0, fibre: float = 0.3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
