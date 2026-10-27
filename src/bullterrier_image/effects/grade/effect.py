@@ -1,14 +1,36 @@
-"""The `grade` effect: basic tone controls (exposure, contrast around a pivot, saturation, vibrance)."""
+"""The `grade` effect: colour balance, exposure, contrast around a pivot, saturation and vibrance."""
 
 import numpy as np
 
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.color import luminance
+from bullterrier_image.ops.colorspace import linear_to_srgb, srgb_to_linear
 
 
 class GradeParams(EffectParams):
-    """Basic tone controls: exposure, then contrast, then saturation, then vibrance."""
+    """Colour balance (temperature, tint), then exposure, contrast, saturation and vibrance."""
+
+    temperature: float = param(
+        0.0,
+        unit="stops",
+        min=-2,
+        max=2,
+        drivable=True,
+        doc="Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared "
+        "evenly (red up and blue down by half of it each). Positive warms the picture (more orange), negative cools "
+        "it (more blue), 0 leaves the colour balance alone. Use a negative value to correct a picture shot under warm "
+        "light.",
+    )
+    tint: float = param(
+        0.0,
+        unit="stops",
+        min=-1,
+        max=1,
+        drivable=True,
+        doc="Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. "
+        "Positive adds magenta (less green), negative adds green, 0 leaves the balance alone.",
+    )
 
     exposure: float = param(
         0.0,
@@ -55,7 +77,14 @@ class GradeParams(EffectParams):
 
 @effect(category="colour", params=GradeParams)
 def grade(rgb: np.ndarray, params: GradeParams) -> np.ndarray:
-    """Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`.
+    """White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first.
+
+    Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.
+
+    The colour balance is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel
+    is multiplied by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue
+    2**(-temperature/2), divided by the largest of the three, so the balance never brightens or clips and white keeps
+    one full channel instead of turning into a cast. Temperature and tint at 0 leave the picture as it was.
 
     The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the
     saturation (before the vibrance) and at the end.
@@ -65,7 +94,12 @@ def grade(rgb: np.ndarray, params: GradeParams) -> np.ndarray:
     other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey,
     whose saturation is 0, is unchanged.
     """
-    out = rgb * np.float32(2.0**params.exposure)  # a stop is a factor of 2 (photographic definition)
+    out = rgb
+    if params.temperature or params.tint:
+        half = params.temperature / 2  # constant: the temperature stops are shared evenly between red and blue
+        gains = np.exp2(np.array([half, -params.tint, -half], dtype=np.float32))
+        out = linear_to_srgb(srgb_to_linear(rgb) * (gains / gains.max()))
+    out = out * np.float32(2.0**params.exposure)  # a stop is a factor of 2 (photographic definition)
     out = params.pivot + (out - params.pivot) * np.float32(params.contrast)
     grey = luminance(np.clip(out, 0, 1))[..., None]
     out = np.clip(grey + (out - grey) * np.float32(params.saturation), 0.0, 1.0)

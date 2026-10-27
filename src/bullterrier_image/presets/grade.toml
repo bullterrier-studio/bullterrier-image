@@ -1,0 +1,6 @@
+# Looks that are one colour grade.
+
+[white_balance]
+description = "White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."
+temperature = -0.3
+tint = -0.05

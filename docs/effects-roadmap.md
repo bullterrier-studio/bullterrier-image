@@ -18,13 +18,12 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `grade` ✓ | Exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5)` |
+| `grade` ✓ | Colour balance (temperature, tint), exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5, temperature=-0.2)` |
 | `gradient_map` ✓ | Recolour by brightness with any gradient. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points; preset `solarize` folds the highlights back dark. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
 | `equalize` ✓ | Adaptive histogram equalisation (CLAHE-style). | `fx.equalize(tiles=8, limit=2.0)` |
-| `white_balance` ✓ | Fix colour cast by temperature/tint or a grey point. | `fx.white_balance(temperature=-0.2)` |
 | `selective_color` ✓ | Shift hue/saturation/lightness of one colour range or, with preset `hue_shift`, of every colour. | `fx.selective_color(hue=30, saturation=0.6)` |
 | `color_balance` ✓ | A colour pushed into the shadows, midtones and highlights: split toning, duotone, teal and orange (presets `split_tone`, `color_balance`, `teal_orange`). | `fx.color_balance(shadows="#3a1bff", highlights="#ff2bd6")` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
@@ -194,7 +193,7 @@ Any number an effect marks `(drivable)` can vary across the picture by a field (
 varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gaussian_blur` step. Drivable today: the
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
 `grain`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
-`grade`'s `exposure`, `contrast`, `saturation`, `vibrance`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
+`grade`'s `exposure`, `contrast`, `saturation`, `vibrance`, `temperature`, `tint`; `levels`' `output_black`;
 `selective_color`'s `hue_shift`; `fog`'s `amount`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
@@ -208,7 +207,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: `fill` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | `fill` with `mask` = a `band` of `depth` region |
-| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `white_balance`, `color_balance` and `grade` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
+| `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `grade`, `color_balance` and `gaussian_blur` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
+from bullterrier_image.core.steps import Step
 
 FLOAT32_TOLERANCE = 2 * float(np.finfo(np.float32).eps)  # 2 x float32 epsilon: what grade's rounding may move a value
 FIVE_DECIMALS = 1e-5  # the expected values in the table above are written to five decimals
@@ -116,3 +117,114 @@ def test_vibrance_has_nothing_to_lift_once_saturation_is_zero(photo: np.ndarray)
 
 def test_the_default_leaves_a_photo_unchanged(photo: np.ndarray) -> None:
     np.testing.assert_allclose(registry.apply("grade", photo), photo, atol=FLOAT32_TOLERANCE)
+
+
+# The sRGB transfer function (IEC 61966-2-1), written out here so the expectations do not use the library's code.
+def decode(value: float) -> float:
+    return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+
+def encode(value: float) -> float:
+    return value * 12.92 if value <= 0.0031308 else 1.055 * value ** (1 / 2.4) - 0.055
+
+
+def balanced(pixel: tuple[float, float, float], red: float, green: float, blue: float) -> list[float]:
+    """The pixel after scaling its linear-light channels by the given gains (hand-worked von Kries)."""
+    return [encode(decode(value) * gain) for value, gain in zip(pixel, (red, green, blue), strict=True)]
+
+
+def grey_pixel(value: float) -> np.ndarray:
+    return np.full((1, 1, 3), value, np.float32)
+
+
+@pytest.mark.parametrize(
+    ("settings", "gains"),
+    [
+        # The largest gain is scaled to 1 so nothing brightens: temperature 1 stop = red x 2**0.5, blue x 2**-0.5.
+        pytest.param({"temperature": 1.0}, (1.0, 2**-0.5, 0.5), id="warmer: red up and blue down by a stop together"),
+        pytest.param({"temperature": -1.0}, (0.5, 2**-0.5, 1.0), id="cooler: blue up and red down"),
+        pytest.param({"temperature": 2.0}, (1.0, 0.5, 0.25), id="two stops warmer"),
+        pytest.param({"tint": 1.0}, (1.0, 0.5, 1.0), id="magenta tint takes a stop out of green"),
+        pytest.param({"tint": -1.0}, (0.5, 1.0, 0.5), id="green tint takes a stop out of red and blue"),
+        pytest.param({"temperature": 1.0, "tint": 1.0}, (1.0, 0.5 * 2**-0.5, 0.5), id="temperature and tint combine"),
+    ],
+)
+def test_temperature_and_tint_scale_the_channels_in_linear_light_by_the_documented_gains(
+    settings: dict[str, float], gains: tuple[float, float, float]
+) -> None:
+    out = registry.apply("grade", grey_pixel(0.5), **settings)
+    np.testing.assert_allclose(out[0, 0], balanced((0.5, 0.5, 0.5), *gains), atol=1e-6)
+
+
+def test_the_gains_act_on_each_channel_of_a_coloured_pixel() -> None:
+    pixel = (0.8, 0.4, 0.2)
+    out = registry.apply("grade", np.array([[pixel]], np.float32), temperature=1.0)
+    np.testing.assert_allclose(out[0, 0], balanced(pixel, 1.0, 2**-0.5, 0.5), atol=1e-6)
+
+
+def test_the_colour_balance_is_set_before_exposure() -> None:
+    pixel = (0.8, 0.4, 0.2)
+    out = registry.apply("grade", np.array([[pixel]], np.float32), temperature=1.0, exposure=-1.0)
+    expected = np.array(balanced(pixel, 1.0, 2**-0.5, 0.5)) * 0.5  # exposure -1 stop halves the balanced values
+    np.testing.assert_allclose(out[0, 0], expected, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("temperature", "red_over_blue"),
+    [pytest.param(0.5, 1, id="positive temperature warms a grey"), pytest.param(-0.5, -1, id="negative cools a grey")],
+)
+def test_temperature_moves_a_grey_along_the_red_blue_axis_and_leaves_green_between(
+    temperature: float, red_over_blue: int
+) -> None:
+    red, green, blue = registry.apply("grade", grey_pixel(0.6), temperature=temperature)[0, 0]
+    assert np.sign(red - blue) == red_over_blue
+    assert min(red, blue) < green < max(red, blue)
+
+
+@pytest.mark.parametrize(
+    ("tint", "green_against_red_and_blue"),
+    [(0.5, -1), (-0.5, 1)],
+    ids=["positive tint is magenta: green falls", "negative tint is green: green leads"],
+)
+def test_tint_moves_a_grey_along_the_green_magenta_axis(tint: float, green_against_red_and_blue: int) -> None:
+    out = registry.apply("grade", grey_pixel(0.6), tint=tint)[0, 0]
+    assert np.sign(out[1] - out[0]) == green_against_red_and_blue
+    assert out[0] == pytest.approx(out[2], abs=1e-6)
+
+
+@pytest.mark.parametrize("settings", [{"temperature": 2.0}, {"temperature": -2.0}, {"tint": 1.0}, {"tint": -1.0}])
+def test_the_colour_balance_never_brightens_a_channel_and_keeps_black_black(
+    settings: dict[str, float], photo: np.ndarray
+) -> None:
+    assert (registry.apply("grade", photo, **settings) <= photo + 1e-6).all()
+    np.testing.assert_array_equal(registry.apply("grade", np.zeros((2, 2, 3), np.float32), **settings), 0.0)
+
+
+def test_white_keeps_its_strongest_channel_so_it_never_turns_into_a_cast() -> None:
+    white = np.ones((1, 1, 3), np.float32)
+    np.testing.assert_allclose(registry.apply("grade", white, temperature=1.0)[0, 0, 0], 1.0, atol=1e-6)
+    np.testing.assert_allclose(registry.apply("grade", white, temperature=-1.0)[0, 0, 2], 1.0, atol=1e-6)
+    np.testing.assert_allclose(registry.apply("grade", white, tint=1.0)[0, 0, 1], encode(0.5), atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("settings", "match"),
+    [
+        pytest.param({"temperature": 2.5}, "temperature", id="temperature above the maximum"),
+        pytest.param({"temperature": -2.5}, "temperature", id="temperature below the minimum"),
+        pytest.param({"tint": 1.5}, "tint", id="tint above the maximum"),
+        pytest.param({"kelvin": 5000}, "kelvin", id="there is no kelvin setting"),
+    ],
+)
+def test_a_colour_balance_setting_out_of_range_or_unknown_is_refused(
+    settings: dict[str, float], match: str, photo: np.ndarray
+) -> None:
+    with pytest.raises(ValueError, match=match):
+        registry.apply("grade", photo, **settings)
+
+
+def test_the_white_balance_preset_takes_the_orange_out_of_a_warm_grey() -> None:
+    assert "white_balance" in registry.presets("grade")
+    warm = np.array([[[0.7, 0.6, 0.5]]], np.float32)
+    out = registry.apply("grade", warm, **Step("grade", preset="white_balance").params)[0, 0]
+    assert out[0] - out[2] < warm[0, 0, 0] - warm[0, 0, 2]  # red over blue shrinks: a warm cast is corrected

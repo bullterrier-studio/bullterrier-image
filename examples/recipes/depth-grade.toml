@@ -1,5 +1,5 @@
-# A grade per distance: the front warm and a little brighter, the middle two bands (the dog) as they are, the back cool
-# and muted.
+# A grade per distance: the front warm and a little brighter, the middle two bands (the dog) as they are, the back cool,
+# muted and a little soft.
 # Needs recipe format 3 and the depth.
 format = 3
 name = "depth-grade"
@@ -13,7 +13,7 @@ count = 4
 [[step]]
 each = "bands"
 looks = [
-    { effect = "white_balance", temperature = 0.7 },
+    { effect = "grade", temperature = 0.7 },
     "none",
     "none",
     { effect = "color_balance", shadows = "#1b3a6b", midtones = "#627fa6", highlights = "#a9c4e0", amount = 0.45 },
@@ -27,3 +27,7 @@ looks = [
     "none",
     { effect = "grade", saturation = 0.5, contrast = 0.85 },
 ]
+
+[[step]]
+each = "bands"
+looks = ["none", "none", "none", { effect = "gaussian_blur", radius = 3 }]

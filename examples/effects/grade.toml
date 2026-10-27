@@ -1,4 +1,4 @@
-# Brighter, punchier and more colourful: exposure, contrast and saturation, then a lift for the muted colours.
+# Brighter, punchier and more colourful, then warmed with a touch of magenta, as if shot with an 85 filter.
 name = "grade"
 size = 480
 
@@ -8,3 +8,8 @@ exposure = 0.3
 contrast = 1.25
 saturation = 1.2
 vibrance = 0.8
+
+[[step]]
+effect = "grade"
+temperature = 0.8
+tint = 0.15

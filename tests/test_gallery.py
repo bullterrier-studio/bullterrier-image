@@ -213,7 +213,7 @@ def test_an_effect_with_presets_lists_them_under_its_parameter_table():
     table = page[page.index("### `gradient_map`") :].split("\n### ")[0]
     for name, preset in registry.presets("gradient_map").items():
         assert f"| `{name}` | {preset.description} |" in table
-    assert "Presets" not in page[page.index("### `grade`") :].split("\n### ")[0]
+    assert "Presets" not in page[page.index("### `equalize`") :].split("\n### ")[0]
 
 
 def test_an_effect_that_sets_its_steps_opacity_says_so_under_its_parameter_table(throwaway_effects):

@@ -14,9 +14,9 @@ each = "tones"
 name = "tones"
 feather = 0.004                # a soft border between the tones, so no hard contour shows
 looks = [
-    { effect = "white_balance", temperature = 0.8 },
+    { effect = "grade", temperature = 0.8 },
     "none",
-    { effect = "white_balance", temperature = -0.8 },
+    { effect = "grade", temperature = -0.8 },
 ]
 
 [[step]]
