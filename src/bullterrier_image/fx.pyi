@@ -627,7 +627,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     edge) lets the far side's darkest values set the haze at the border."""
     ...
 
-def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 0.2, angle: float = 10.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 0.15, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 0.004, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 0.12, acceleration: float = 0.5, sway: float = 0.012, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 0.2, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
+def disperse(cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 96.0, angle: float = 350.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 72.0, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 2.0, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 58.0, acceleration: float = 0.5, sway: float = 6.0, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 96.0, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, background_threshold: float = 0.02, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
 `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
@@ -662,13 +662,14 @@ sweep : number, ratio, -1 to 1, default 0.0
 reach : number, fraction, 0 to 1, default 1.0
     How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses
     and the rest stays, 1 = everything goes.
-wind : number, fraction, -1 to 1, default 0.2
-    The farthest any piece is carried by the time it vanishes, as a fraction of the
-    picture width: positive blows right, negative left. Keep it under a third, or pieces
-    cross too much of the picture in one go.
-angle : number (cyclic), degrees, -180 to 180, default 10.0
-    Direction of the wind above the horizontal (on the side `wind` blows to); negative
-    blows downward.
+wind : number, px, -480 to 480, default 96.0
+    The farthest any piece is carried by the time it vanishes, in px: positive blows
+    right, negative left. Keep it under a third of the picture width (160 px at the
+    design size 480), or pieces cross too much of the picture in one go.
+angle : number (cyclic), degrees, 0 to 360, default 350.0
+    Direction the wind blows, in degrees clockwise from right: 0 = right, 90 = down, 180
+    = left, 270 = up (the default 350 is 10 degrees above level). A negative `wind`
+    mirrors it left to right: the same tilt, blowing left.
 seed : whole number, count, 0 to 2147483647, default 0
     Random seed: each piece's fate is fixed by it, so one seed always gives the same
     pieces the same fates.
@@ -686,10 +687,10 @@ outward : number, fraction, 0 to 1, default 0.0
 ambient : number, ratio, 0 to 1, default 0.0
     Depth of the slow shimmer of the pieces that stay, as a share of their brightness
     (about 0..0.1 looks right; brightening stops at white). 0 = off.
-outline_depth : number, fraction, 0.01 to 1, default 0.15
-    Distance from the outline (fraction of the picture width) beyond which a piece
-    counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness
-    to the edge matter deeper in.
+outline_depth : number, px, 5 to 480, default 72.0
+    Distance from the outline, in px, beyond which a piece counts as fully inside, for
+    `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper
+    in.
 jitter : number, fraction, 0 to 1, default 0.2
     Random share of each piece's place in the leaving order: 0 = a clean front, raising
     it makes it ragged.
@@ -714,26 +715,24 @@ finish : number, fraction, 0.5 to 1, default 0.98
 hover_spread : number, fraction, 0 to 1, default 0.45
     With `hover`: how far into `progress` a piece `outline_depth` inside starts to float
     (the outline starts at 0). 0 = everything floats at once.
-bob : number, fraction, 0 to 0.05, default 0.004
-    Height of the gentle up-and-down of a hovering piece, as a fraction of the picture
-    height.
+bob : number, px, 0 to 24, default 2.0
+    Height of the gentle up-and-down of a hovering piece, in px.
 bob_cycles : number, cycles, 0 to 20, default 3.0
     Number of ups and downs while a piece hovers.
 angle_spread : number, degrees, 0 to 180, default 12.0
-    Range of each piece's own direction around the wind's `angle` (it differs by up to
-    half of this).
+    Range of each piece's own direction around the wind's `angle`, in degrees (it
+    differs by up to half of this). Not a direction itself.
 distance_minimum : number, fraction, 0 to 1, default 0.35
     The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all
     travel equally far.
-outward_distance : number, fraction, 0 to 1, default 0.12
-    How far `outward` 1 throws a piece away from its edge, as a fraction of the
-    picture's width (sideways) and height (up and down).
+outward_distance : number, px, 0 to 480, default 58.0
+    How far `outward` 1 throws a piece away from its edge, in px.
 acceleration : number, ratio, 0 to 10, default 0.5
     How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration
     times as fast as it starts. 0 = steady speed.
-sway : number, fraction, 0 to 0.2, default 0.012
-    Largest sideways wobble of a flying piece, as a fraction of the picture width; it
-    grows during the flight. 0 = none.
+sway : number, px, 0 to 96, default 6.0
+    Largest sideways wobble of a flying piece, in px; it grows during the flight. 0 =
+    none.
 sway_cycles : number, cycles, 0 to 20, default 1.5
     Number of wobbles during a piece's flight.
 falloff : number, ratio, 0 to 10, default 1.5
@@ -748,9 +747,9 @@ ambient_phase : number, cycles, 0 to 1, default 0.0
     Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a
     cycle on. Raising it moves the wave against the wind; with `ambient` at 0 it does
     nothing.
-ambient_wavelength : number, fraction, 0.01 to 2, default 0.2
-    Length of one shimmer wave as a fraction of the picture width; a shorter one packs
-    more waves across the picture.
+ambient_wavelength : number, px, 5 to 960, default 96.0
+    Length of one shimmer wave, in px; a shorter one packs more waves across the
+    picture.
 open_bottom : true or false, default True
     True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut
     off there). False: it counts like the other borders.

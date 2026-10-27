@@ -6,7 +6,7 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo). | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
+| <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo). | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=96.0` `angle=350.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
 | <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`: a drop shadow, layered paper cutouts or a long shadow. | `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px. | `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth. | `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
@@ -22,8 +22,8 @@ Effects that work on the cut-out subject, apart from its background.
 | `outline` | number | ratio | 0 to 10 | `1.0` | Weight of closeness to the outline (and the left, right and top borders) in the order: pieces near the edge go before the middle. 0 = closeness does not matter. |
 | `sweep` | number | ratio | -1 to 1 | `0.0` | Weight of side in the order: positive starts at the left, negative at the right; its size is how much it matters next to `top` and `outline`. |
 | `reach` | number | fraction | 0 to 1 | `1.0` | How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses and the rest stays, 1 = everything goes. |
-| `wind` | number | fraction | -1 to 1 | `0.2` | The farthest any piece is carried by the time it vanishes, as a fraction of the picture width: positive blows right, negative left. Keep it under a third, or pieces cross too much of the picture in one go. |
-| `angle` | number (cyclic) | degrees | -180 to 180 | `10.0` | Direction of the wind above the horizontal (on the side `wind` blows to); negative blows downward. |
+| `wind` | number | px | -480 to 480 | `96.0` | The farthest any piece is carried by the time it vanishes, in px: positive blows right, negative left. Keep it under a third of the picture width (160 px at the design size 480), or pieces cross too much of the picture in one go. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `350.0` | Direction the wind blows, in degrees clockwise from right: 0 = right, 90 = down, 180 = left, 270 = up (the default 350 is 10 degrees above level). A negative `wind` mirrors it left to right: the same tilt, blowing left. |
 | `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: each piece's fate is fixed by it, so one seed always gives the same pieces the same fates. |
 
 <details><summary>Advanced parameters (30)</summary>
@@ -33,7 +33,7 @@ Effects that work on the cut-out subject, apart from its background.
 | `hover` | number | fraction | 0 to 1 | `0.0` | Share of its journey a piece floats slowly along the wind before it goes (about 0..0.3 looks right). The outline starts at once, deeper pieces later (see `hover_spread`). 0 = off. |
 | `outward` | number | fraction | 0 to 1 | `0.0` | How much a piece is also thrown away from the edge it came from (by up to `outward_distance`); pieces then fly in different directions, so leave it at 0 when everything should travel together on the wind. |
 | `ambient` | number | ratio | 0 to 1 | `0.0` | Depth of the slow shimmer of the pieces that stay, as a share of their brightness (about 0..0.1 looks right; brightening stops at white). 0 = off. |
-| `outline_depth` | number | fraction | 0.01 to 1 | `0.15` | Distance from the outline (fraction of the picture width) beyond which a piece counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in. |
+| `outline_depth` | number | px | 5 to 480 | `72.0` | Distance from the outline, in px, beyond which a piece counts as fully inside, for `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper in. |
 | `jitter` | number | fraction | 0 to 1 | `0.2` | Random share of each piece's place in the leaving order: 0 = a clean front, raising it makes it ragged. |
 | `anticipation` | number | fraction | 0.01 to 0.2 | `0.06` | Wind-up time before a piece goes, as a share of `progress`: it eases back by `pullback` over this time. The first piece goes only after it, so every piece has one. |
 | `pullback` | number | fraction | 0 to 1 | `0.15` | How far a piece eases back against its journey before it goes (anticipation), as a share of the journey. 0 = no wind-up. |
@@ -41,19 +41,19 @@ Effects that work on the cut-out subject, apart from its background.
 | `flight_variation` | number | fraction | 0 to 0.9 | `0.4` | How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all the same. |
 | `finish` | number | fraction | 0.5 to 1 | `0.98` | The progress by which the last piece has vanished (a little under 1 leaves nothing behind at the end). If `anticipation` and the longest flight do not fit before it, all pieces go at once. |
 | `hover_spread` | number | fraction | 0 to 1 | `0.45` | With `hover`: how far into `progress` a piece `outline_depth` inside starts to float (the outline starts at 0). 0 = everything floats at once. |
-| `bob` | number | fraction | 0 to 0.05 | `0.004` | Height of the gentle up-and-down of a hovering piece, as a fraction of the picture height. |
+| `bob` | number | px | 0 to 24 | `2.0` | Height of the gentle up-and-down of a hovering piece, in px. |
 | `bob_cycles` | number | cycles | 0 to 20 | `3.0` | Number of ups and downs while a piece hovers. |
-| `angle_spread` | number | degrees | 0 to 180 | `12.0` | Range of each piece's own direction around the wind's `angle` (it differs by up to half of this). |
+| `angle_spread` | number | degrees | 0 to 180 | `12.0` | Range of each piece's own direction around the wind's `angle`, in degrees (it differs by up to half of this). Not a direction itself. |
 | `distance_minimum` | number | fraction | 0 to 1 | `0.35` | The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all travel equally far. |
-| `outward_distance` | number | fraction | 0 to 1 | `0.12` | How far `outward` 1 throws a piece away from its edge, as a fraction of the picture's width (sideways) and height (up and down). |
+| `outward_distance` | number | px | 0 to 480 | `58.0` | How far `outward` 1 throws a piece away from its edge, in px. |
 | `acceleration` | number | ratio | 0 to 10 | `0.5` | How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration times as fast as it starts. 0 = steady speed. |
-| `sway` | number | fraction | 0 to 0.2 | `0.012` | Largest sideways wobble of a flying piece, as a fraction of the picture width; it grows during the flight. 0 = none. |
+| `sway` | number | px | 0 to 96 | `6.0` | Largest sideways wobble of a flying piece, in px; it grows during the flight. 0 = none. |
 | `sway_cycles` | number | cycles | 0 to 20 | `1.5` | Number of wobbles during a piece's flight. |
 | `falloff` | number | ratio | 0 to 10 | `1.5` | How a flying piece fades: brightness is (1 - share of flight)^falloff. 0 = no fade (it just vanishes at the end), 1 = even, above 1 fades quickly at first. |
 | `flare` | number | ratio | 0 to 2 | `0.4` | Extra brightness at the peak of the glow as a piece leaves (0.4 = 1.4x); brightening stops at white. 0 = no glow. |
 | `flare_span` | number | fraction | 0.01 to 1 | `0.2` | Share of a piece's flight that the glow lasts; it peaks halfway through that. |
 | `ambient_phase` | number | cycles | 0 to 1 | `0.0` | Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a cycle on. Raising it moves the wave against the wind; with `ambient` at 0 it does nothing. |
-| `ambient_wavelength` | number | fraction | 0.01 to 2 | `0.2` | Length of one shimmer wave as a fraction of the picture width; a shorter one packs more waves across the picture. |
+| `ambient_wavelength` | number | px | 5 to 960 | `96.0` | Length of one shimmer wave, in px; a shorter one packs more waves across the picture. |
 | `open_bottom` | true or false |  |  | `True` | True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut off there). False: it counts like the other borders. |
 | `normal_smoothing` | number | count | 0 to 10 | `1.0` | Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its direction: raising it makes neighbouring pieces fly in more similar directions; 0 uses the raw outline. |
 | `normal_truncate` | number | ratio | 1 to 10 | `4.0` | Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times `normal_smoothing` characters from the outline, so the pieces' direction `outward` is read from that far out. Larger is more exact and slower, smaller shortens the reach. Nothing changes with `normal_smoothing` at 0. |
