@@ -109,8 +109,8 @@ class ShatterParams(EffectParams):
 
 @effect(category="distortion", params=ShatterParams)
 def shatter(rgb: np.ndarray, params: ShatterParams) -> np.ndarray:
-    """Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px
-    lines between them.
+    """Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its
+    mean colour (stained glass, low-poly), and draw `gap` px lines between them.
 
     The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
     or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to

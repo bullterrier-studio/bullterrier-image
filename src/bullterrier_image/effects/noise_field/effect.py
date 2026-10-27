@@ -196,9 +196,11 @@ def _noise(shape: tuple[int, int], params: NoiseFieldParams, seed: int | Sequenc
 
 @effect(category="backgrounds", params=NoiseFieldParams)
 def noise_field(rgb: np.ndarray, params: NoiseFieldParams) -> np.ndarray:
-    """Replace the picture with a noise field of `kind` (value, perlin, worley or sine), coloured through `colors`.
+    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine),
+    coloured through `colors`.
 
-    A generated background: the input is used only for its height and width, its content is ignored. The noise is
+    A generated background: the input is used only for its height and width, its content is ignored. Followed by
+    `shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is
     standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
     distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
     noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with

@@ -1,9 +1,0 @@
-# Stained-glass cells in a neon ramp, with thin dark borders, behind the dog.
-name = "voronoi_cells"
-size = 480
-
-[[step]]
-effect = "voronoi_cells"
-cells = 200
-seed = 1
-mask = "background"

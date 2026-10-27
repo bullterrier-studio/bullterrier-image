@@ -1,0 +1,29 @@
+# Voronoi cells: neon noise cut into flat, leaded cells behind the dog.
+name = "voronoi-cells"
+size = 480
+
+[[step]]
+effect = "noise_field"
+kind = "value"
+scale = 50
+octaves = 3
+colors = ["#12002b", "#6a1bff", "#ff2bd6", "#ffb347"]
+seed = 1
+mask = "background"
+
+[[step]]
+effect = "shatter"
+pieces = 200
+fill = 1
+offset = 0
+angle = 0
+gap = 1.5
+color = "#0a0014"
+seed = 1
+mask = "background"
+
+[[step]]
+effect = "bloom"
+radius = 14
+amount = 0.3
+mask = "background"
