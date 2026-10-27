@@ -34,12 +34,12 @@ class AuroraParams(EffectParams):
         "top edge, 1 = the bottom edge). Below it the sky is dark. Waviness moves it up and down along the picture.",
     )
     height: float = param(
-        0.7,
-        unit="fraction",
-        min=0.05,
-        max=1,
-        doc="How far up from its base the curtain reaches before it has faded out completely, as a fraction of the "
-        "picture's height. Larger = a taller curtain.",
+        336.0,
+        unit="px",
+        min=1,
+        max=4000,
+        doc="How far up from its base the curtain reaches before it has faded out completely, in pixels; tuned for a "
+        "picture about 480 px high (the default is 0.7 of that). Larger = a taller curtain.",
     )
     falloff: float = param(
         0.8,
@@ -129,7 +129,7 @@ def aurora(rgb: np.ndarray, params: AuroraParams) -> np.ndarray:
 
     A generated background: the input is used only for its height and width, its content is ignored. In column x the
     curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit
-    deviation along the picture (`scale`). A pixel d = (rows above the base) / (`height` x picture height) up the
+    deviation along the picture (`scale`). A pixel d = (rows above the base) / `height` up the
     curtain has brightness (1 - d)**`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the
     column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture
     (`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
@@ -143,7 +143,7 @@ def aurora(rgb: np.ndarray, params: AuroraParams) -> np.ndarray:
     # constant: stream 1 of the seed, independent of the ripple's stream 0 (the seed itself)
     rank = ndtr(noise(scale=params.ray_width, seed=[params.seed, 1]))[0]
     above = (params.base * rows + params.waviness * ripple)[None, :] - np.arange(rows)[:, None]  # px above the base
-    up = above / (params.height * rows)  # 0 at the base, 1 at the curtain's top
+    up = above / params.height  # 0 at the base, 1 at the curtain's top
     brightness = np.clip(above + 0.5, 0.0, 1.0) * np.clip(1 - up, 0.0, 1.0) ** params.falloff
     brightness = brightness * (1 - params.rays * (1 - rank))[None, :]
     colour = ramp(np.clip(up, 0.0, 1.0).astype(np.float32), params.colors)
