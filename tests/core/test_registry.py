@@ -103,6 +103,18 @@ def test_an_effect_that_declares_the_subject_gets_it_and_says_so(throwaway_effec
     np.testing.assert_array_equal(probe(GREY), GREY)  # without a subject the effect decides what to do
 
 
+def test_an_effect_that_declares_size_ratio_gets_it_by_keyword_and_1_when_a_call_gives_none(throwaway_effects):
+    def ratio_probe(rgb: np.ndarray, params: GainParams, *, size_ratio: float = 1.0) -> np.ndarray:
+        """Fills the picture with its size ratio over 10."""
+        return np.full_like(rgb, size_ratio / 10)
+
+    probe = effect(category="light", params=GainParams)(ratio_probe)
+    np.testing.assert_allclose(probe(GREY, size_ratio=2.0), 0.2)
+    np.testing.assert_allclose(registry.apply("ratio_probe", GREY, size_ratio=3.0, gain=2.0), 0.3)
+    np.testing.assert_allclose(probe(GREY), 0.1)
+    assert registry.inputs("ratio_probe") == ("size_ratio",)
+
+
 # --- registration rules: each raises and registers nothing -----------------------------------------------------------
 
 
@@ -201,7 +213,20 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
 
 
 @pytest.mark.parametrize(
-    "name", ["subject", "depth", "partition", "effect", "mask", "opacity", "blend_mode", "preset", "each", "looks"]
+    "name",
+    [
+        "subject",
+        "depth",
+        "partition",
+        "size_ratio",
+        "effect",
+        "mask",
+        "opacity",
+        "blend_mode",
+        "preset",
+        "each",
+        "looks",
+    ],
 )
 def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
     field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")

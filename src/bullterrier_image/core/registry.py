@@ -72,11 +72,12 @@ CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 # `finders=`, `--map`), named by a region (`mask = "subject"`) and taken by an effect.
 MAP_INPUTS = ("subject", "depth")
 
-# What a recipe hands an effect besides the image and its parameters, by name: the maps above and `partition`, the
+# What a recipe hands an effect besides the image and its parameters, by name: the maps above; `partition`, the
 # pieces of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading
-# order, `bands` highest first). An effect declares the ones it needs as keyword-only parameters after `params`,
-# each with a default.
-INPUTS = (*MAP_INPUTS, "partition")
+# order, `bands` highest first); and `size_ratio`, a float: working px per design px (1.0 for a call outside a recipe),
+# for an effect whose light or density is per working pixel. An effect declares the ones it needs as keyword-only
+# parameters after `params`, each with a default.
+INPUTS = (*MAP_INPUTS, "partition", "size_ratio")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the
@@ -465,7 +466,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
             raise ValueError(f"effect {name!r}: {parameter.name!r} is not an input ({', '.join(INPUTS)}); {shape}")
         if parameter.default is inspect.Parameter.empty:
             raise ValueError(
-                f"effect {name!r}: the input `{parameter.name}` needs a default (None), so that {name}(rgb) works"
+                f"effect {name!r}: the input `{parameter.name}` needs a default, so that {name}(rgb) works"
             )
         declared.append(parameter.name)
     if unused := [field for field in fields if field not in taken]:

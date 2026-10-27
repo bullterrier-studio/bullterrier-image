@@ -1471,3 +1471,42 @@ def test_a_density_puts_the_same_share_of_marks_on_the_picture_at_any_size(marks
     black = np.zeros((190, 240, 3), np.float32)
     covered = [runner.render(black, recipe, size=size).mean() for size in (240, 960)]
     assert covered[1] == pytest.approx(covered[0], rel=0.25)
+
+
+def ratio_looks() -> dict[str, Recipe]:
+    """Recipes of the probe, written for 64 px: plain, driven by a field, and as the looks of an `Each`."""
+    drive = Drive(by="f", start=0.0, end=1.0)
+    return {
+        "a plain step": Recipe("plain", [Step("ratio_probe", {})], size=64),
+        "a driven step": Recipe("driven", [Step("ratio_probe", {"level": drive})], size=64, regions={"f": Given()}),
+        "the looks of an each": Recipe(
+            "each",
+            [Each("g", [Step("ratio_probe", {}), Step("ratio_probe", {})], feather=0)],
+            size=64,
+            regions={"g": Grid(columns=2)},
+        ),
+    }
+
+
+@pytest.fixture
+def ratio_probe(throwaway_effects):
+    """`ratio_probe`: a picture of the `size_ratio` it was given, as that over 10 in every value."""
+
+    class RatioParams(EffectParams):
+        """The probe that reads the size ratio."""
+
+        level: float = param(0.5, unit="fraction", min=0, max=1, drivable=True, doc="Drivable, and not used.")
+
+    @effect(category="light", params=RatioParams)
+    def ratio_probe(rgb, params, *, size_ratio=1.0):
+        """Fills the picture with its size ratio over 10."""
+        return np.full_like(rgb, size_ratio / 10)
+
+
+@pytest.mark.parametrize("look", ["a plain step", "a driven step", "the looks of an each"])
+@pytest.mark.parametrize(("size", "ratio"), [(64, 1.0), (128, 2.0), (32, 0.5)], ids=["as designed", "twice", "half"])
+def test_an_effect_that_declares_size_ratio_gets_working_px_per_design_px(photo, ratio_probe, look, size, ratio):
+    recipe = ratio_looks()[look]
+    maps = {"f": np.full(photo.shape[:2], 0.3, np.float32)} if "f" in recipe.regions else None
+    out = runner.render(photo, recipe, size=size, maps=maps)
+    np.testing.assert_allclose(out, ratio / 10, atol=1e-6)  # every Drive level and every look gets the same ratio

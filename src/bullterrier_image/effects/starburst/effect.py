@@ -116,7 +116,12 @@ class StarburstParams(EffectParams):
 
 
 @effect(category="light", params=StarburstParams)
-def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
+def starburst(
+    rgb: np.ndarray,
+    params: StarburstParams,
+    *,
+    size_ratio: float = 1.0,  # constant: a call outside a recipe is at its design size
+) -> np.ndarray:
     """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
     tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing`
     thins them to a random few, `variation` dims each by a random amount (both from `seed`).
@@ -126,6 +131,9 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a
     point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
     nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
+
+    `size_ratio` (injected: working px per design px, 1 outside a recipe) keeps the light of a bright area, and the
+    number of glints, the same at any resolution.
     """
     if params.amount == 0 or params.limit == 0:
         return rgb.copy()
@@ -151,9 +159,9 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     rng = np.random.default_rng(params.seed)
     # More than one design px apart: a chance of 1 / spacing^2 per pixel. Else every bright pixel, each with its share
     # of the design pixel's light, so that a bright area keeps its total light at any size.
-    sparse = params.spacing > params.size_ratio
+    sparse = params.spacing > size_ratio
     chance = 1 / params.spacing**2 if sparse else 1  # constant: a chance of 1 is every pixel
-    weight = 1 if sparse else 1 / params.size_ratio**2  # constant: a weight of 1 leaves a point's light as it is
+    weight = 1 if sparse else 1 / size_ratio**2  # constant: a weight of 1 leaves a point's light as it is
     chosen = rng.random(bright.shape[:2]) < chance
     scale = 1.0 - params.variation * rng.random(bright.shape[:2])
     bright *= (weight * chosen * scale).astype(np.float32)[..., None]

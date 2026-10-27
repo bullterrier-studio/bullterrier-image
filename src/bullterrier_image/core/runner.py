@@ -381,7 +381,7 @@ def _effect(before: np.ndarray, step: Step, maps: dict[str, np.ndarray], regions
     """The step's effect run on `before`, given the inputs it declares: the maps `_prepare` made for every step that
     takes one, and the pieces of the step's partition. A step with driven parameters is run once for each level of
     its drives, and each pixel takes the two renders either side of its field value (see `_driven`)."""
-    extra = {name: maps[name] for name in registry.inputs(step.effect) if name != "partition"}
+    extra = {name: maps[name] for name in registry.inputs(step.effect) if name in registry.MAP_INPUTS}
     extra |= {parameter: regions.selection(field).alpha for parameter, field in step.named_fields.items()}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
@@ -395,9 +395,12 @@ def _run(
     effect: str, before: np.ndarray, params: Mapping[str, Any], extra: Mapping[str, np.ndarray], scale: float
 ) -> np.ndarray:
     """The effect `effect` run on `before` with `params` (their pixel values multiplied by `scale`) and its injected
-    inputs `extra`; RuntimeError if it changed the image's shape."""
+    inputs `extra` (and `size_ratio`, `scale`, if it declares it); RuntimeError if it changed the image's shape."""
     function = registry.get(effect)
-    result = function(before, function.validate(params).scaled(scale), **extra)
+    given: dict[str, np.ndarray | float] = {**extra}
+    if "size_ratio" in function.inputs:
+        given["size_ratio"] = scale
+    result = function(before, function.validate(params).scaled(scale), **given)
     if result.shape != before.shape:
         raise RuntimeError(f"effect {effect!r} changed the image shape {before.shape} -> {result.shape}")
     return result

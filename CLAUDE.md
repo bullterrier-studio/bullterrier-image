@@ -114,7 +114,8 @@ def bloom(rgb: np.ndarray, params: BloomParams, *, subject: np.ndarray | None = 
 ```
 It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
 and maximum. `subject` (subject cut-out, `(h, w)` 0..1) is an injected input: declare it only if needed; so are `depth` (how near,
-`(h, w)` float32 0..1, 1 = nearest) and `partition` (piece labels of a region, `(h, w)` int32). Contract tests check all of this
+`(h, w)` float32 0..1, 1 = nearest), `partition` (piece labels of a region, `(h, w)` int32) and `size_ratio` (float, working px per design px, default 1.0:
+declare it only if light or density is per working pixel). Contract tests check all of this
 for every effect.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
 (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`, `name`) or an injected input; registering one fails. An effect whose natural
