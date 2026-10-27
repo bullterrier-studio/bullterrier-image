@@ -213,3 +213,58 @@ def test_limit_lets_only_that_share_of_the_pixels_radiate_the_brightest_first(li
     for index, row in enumerate(rows):
         spike = out[row, 35:45, 0]  # to the right of the point
         assert bool(spike.min() > 0.02) is (index in shining)
+
+
+LATTICE = np.arange(10, SIZE - 10, 9)  # points 9 px apart: spikes of length 8 px never reach the next point
+FIELD = {"rays": 4, "length": 0.028, "amount": 0.5, "threshold": 0.5}
+
+
+def lattice_gains(**settings: float) -> np.ndarray:
+    """A lattice of grey 0.6 points; the light each one gets as a share of the full light a lone point gets (0.1,
+    see `test_the_point_itself_is_lit_once_however_many_spikes_cross_it`), one entry per point, row by row."""
+    picture = np.zeros((SIZE, SIZE, 3), np.float32)
+    picture[np.ix_(LATTICE, LATTICE)] = 0.6
+    out = registry.apply(NAME, picture, **FIELD, **settings)
+    return ((out[np.ix_(LATTICE, LATTICE)][..., 0] - 0.6) / 0.4 / 0.1).ravel()
+
+
+@pytest.mark.parametrize("density", [0.0, 0.2, 0.5, 0.9, 1.0])
+def test_density_is_the_share_of_the_bright_points_that_radiate(density: float) -> None:
+    gains = lattice_gains(density=density, seed=3)
+    share = float((gains > 0.5).mean())  # each point is lit fully (variation 0) or not at all
+    assert share == pytest.approx(density, abs=0.08)  # 441 points: binomial spread under 0.025
+    assert set(np.round(gains, 3)) <= {0.0, 1.0}
+
+
+def test_raising_density_only_adds_points_and_the_seed_picks_which() -> None:
+    few = lattice_gains(density=0.2, seed=3) > 0.5
+    many = lattice_gains(density=0.6, seed=3) > 0.5
+    other = lattice_gains(density=0.2, seed=4) > 0.5
+    assert (many | ~few).all()  # every point of the thinner pick is in the fuller one
+    assert many.sum() > few.sum()
+    assert (few != other).any()
+
+
+def test_variation_dims_points_by_a_random_share_between_one_minus_variation_and_one() -> None:
+    alike = lattice_gains(variation=0.0, seed=2)
+    varied = lattice_gains(variation=0.5, seed=2)
+    np.testing.assert_allclose(alike, 1.0, atol=1e-4)
+    assert varied.min() >= 0.5 - 1e-3
+    assert varied.max() <= 1.0 + 1e-3
+    assert varied.min() < 0.6  # and it uses the range
+    assert varied.max() > 0.9
+    assert varied.std() > 0.1
+
+
+def test_the_preset_sparkle_scatters_glints_over_a_bright_area_where_plain_spikes_flood_it() -> None:
+    """A bright block: the preset's spikes without its density wrap the whole block in light; with it a few small
+    separate glints are lit."""
+    picture = np.zeros((SIZE, SIZE, 3), np.float32)
+    picture[60:140, 60:140] = 0.95
+    sparkle = registry.presets(NAME)["sparkle"].params
+    glitter = registry.apply(NAME, picture, **sparkle, seed=1)
+    flood = registry.apply(NAME, picture, **{**sparkle, "density": 1.0})
+    lit_glitter = (glitter - picture).max(axis=-1) > 0.02
+    lit_flood = (flood - picture).max(axis=-1) > 0.02
+    assert lit_glitter.any()
+    assert lit_glitter.sum() < lit_flood.sum() / 4

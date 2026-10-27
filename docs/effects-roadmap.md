@@ -64,7 +64,7 @@ it becomes a new effect only when it is a new idea. Planned merges of today's ef
 | `lens_blur` ✓ | Disc-shaped bokeh blur. | `fx.lens_blur(radius=12, highlights=0.6)` |
 | `bloom` ✓ | Multi-scale glow; `octaves=1` is a single soft halo; presets `soft_focus` (Orton glow of the whole picture) and `halation` (film's red-orange glow). | `fx.bloom(radius=40, threshold=0.7)` |
 | `anamorphic_streaks` ✓ | Horizontal flare streaks off highlights. | `fx.anamorphic_streaks(length=0.3)` |
-| `starburst` ✓ | Diffraction spikes on bright points. | `fx.starburst(rays=6, length=0.15)` |
+| `starburst` ✓ | Diffraction spikes on bright points; `density` scatters them over bright areas (preset `sparkle`: glitter). | `fx.starburst(rays=6, length=0.15)` |
 | `lens_flare` ✓ | Flare with ghost reflections. | `fx.lens_flare(x=0.8, y=0.2)` |
 | `light_rays` ✓ | God rays from a point or the highlights. | `fx.light_rays(x=0.7, y=0.1, length=0.5)` |
 | `chromatic_aberration` ✓ | Radial red/blue fringing; `samples` fans it into a rainbow (preset `prism`). | `fx.chromatic_aberration(amount=4)` |
@@ -192,7 +192,6 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `fog` ✓ | Noise-shaped haze, thicker toward the bottom; preset `smoke`. | `fx.fog(amount=0.4, color="#cfd8e3")` |
-| `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
 | `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `dust`, `stars`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
 
@@ -353,7 +352,7 @@ look = a linear-gradient field), and gives `topographic` depth contours.
 | `embers`, `floating_dust`, `rain`, `snow`, `starfield` | `particles`, with presets |
 | `layered_cutouts`, `long_shadow` | `drop_shadow` + `copies`, `end_color`, `copy_opacity`, `fade`; preset `long_shadow` (done) |
 | `glitch` | a recipe: `slice_shift` + `rgb_split` |
-| `sparkle` | `starburst` + `count`, `dot` |
+| `sparkle` | a `starburst` preset + `density`, `variation`, `seed` |
 | `fog`, `smoke` | one, with presets |
 | `hologram` | a recipe (needs `edges`; `scanlines` has `softness`) |
 | `split_tone`, `color_balance` | one three-range tool |

@@ -492,6 +492,7 @@ def test_each_interpolation_reads_the_picture_its_own_way(name):
 SEED_NEEDS: dict[str, dict[str, float]] = {  # at their defaults nothing is random yet, whatever the seed
     "disperse": {"progress": 0.5},
     "jpeg_crush": {"hits": 40},
+    "starburst": {"density": 0.5},
 }
 
 
@@ -543,7 +544,6 @@ TINTED = ["particles"]
     [
         pytest.param("particles", {"density": 0.0}, id="particles"),
         pytest.param("particles", {"density": 0.0, "color": "#e6eefa"}, id="particles, tinted"),
-        pytest.param("sparkle", {"count": 0, "threshold": 0.0}, id="sparkle"),
         pytest.param("lens_drops", {"count": 0}, id="lens_drops"),
     ],
 )

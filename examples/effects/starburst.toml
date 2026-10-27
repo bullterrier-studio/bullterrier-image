@@ -1,4 +1,4 @@
-# Eyes and glints turn into four-pointed stars, tilted into an X.
+# Eyes and glints turn into four-pointed stars, tilted into an X; then scattered glitter on the bright areas.
 name = "starburst"
 size = 480
 
@@ -10,3 +10,8 @@ length = 0.1
 threshold = 0.96
 amount = 0.8
 limit = 0.002
+
+[[step]]
+effect = "starburst"
+preset = "sparkle"
+seed = 1

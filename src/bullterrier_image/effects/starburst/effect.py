@@ -46,6 +46,7 @@ class StarburstParams(EffectParams):
         unit="fraction",
         min=0,
         max=1,
+        advanced=True,
         doc="The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the "
         "threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share "
         "of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. "
@@ -68,6 +69,33 @@ class StarburstParams(EffectParams):
         doc="The direction of the first spike, counterclockwise as seen on the picture: 0 = to the right, 90 = up. "
         "The other spikes follow at equal angles, so with 4 spikes 45 turns the cross into an X.",
     )
+    density: float = param(
+        1.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        doc="The share of the bright points that send out spikes, picked at random (the same ones for the same "
+        "`seed`; raising it only adds points): 1 = all of them, 0.01 = one in a hundred, scattered over the bright "
+        "areas, 0 = none. Lower it to turn a bright area into separate glints.",
+    )
+    variation: float = param(
+        0.0,
+        unit="fraction",
+        min=0,
+        max=1,
+        advanced=True,
+        doc="How much the points differ in brightness, and so in how far their spikes show: each one's light is "
+        "scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1 = from full down to nothing.",
+    )
+    seed: int = param(
+        0,
+        unit="count",
+        min=0,
+        max=2**32 - 1,
+        advanced=True,
+        doc="Random seed for `density` and `variation`: the same seed picks the same points of the same picture, "
+        "another seed others.",
+    )
     color: Color = param(
         "#ffffff",
         doc="The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that "
@@ -78,12 +106,15 @@ class StarburstParams(EffectParams):
 @effect(category="light", params=StarburstParams)
 def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
     """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-    screened over the picture by `amount`. `limit` caps how many pixels count as bright.
+    screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density` picks a random
+    share of them, `variation` dims each by a random amount (both from `seed`).
 
     Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
-    picture's diagonal; they leave the point at equal angles, the first at `angle`. Light is only drawn from points
-    inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays
-    black.
+    picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by
+    0 or 1 (`density`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the
+    picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from
+    points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black
+    stays black.
     """
     if params.amount == 0 or params.limit == 0:
         return rgb.copy()
@@ -107,6 +138,10 @@ def starburst(rgb: np.ndarray, params: StarburstParams) -> np.ndarray:
         brightest = np.partition(rgb.max(axis=-1).ravel(), -(allowed + 1))[-(allowed + 1)]
         threshold = min(max(threshold, float(brightest)), MAX_THRESHOLD)
     bright = highlights(rgb, threshold)
+    rng = np.random.default_rng(params.seed)
+    chosen = rng.random(bright.shape[:2]) < params.density
+    scale = 1.0 - params.variation * rng.random(bright.shape[:2])
+    bright *= (chosen * scale).astype(np.float32)[..., None]
     # One px of black round the picture, so that `convolve`'s 'nearest' edge extends black and not the picture's own
     # border: no light comes in from beyond the edge.
     framed = np.pad(bright, ((1, 1), (1, 1), (0, 0)))
