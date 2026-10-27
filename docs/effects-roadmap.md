@@ -260,8 +260,7 @@ Combine the photo with an asset (a picture that is part of the look, given as a 
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture). | `fx.blend(image="tex.png", mode="soft_light")` |
-| `overlay` ✓ | Place an image, logo or watermark. | `fx.overlay(image="logo.png", at="bottom_right", scale=0.2)` |
+| `blend` ✓ | Combine with another layer in any blend mode (masked to the background, it replaces the background with a picture); `fit="width"` places a logo or watermark (preset `logo`). | `fx.blend(image="tex.png", mode="soft_light")` |
 | `gradient_overlay` ✓ (a recipe step) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear", blend_mode="screen")` |
 
 Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a

@@ -24,7 +24,7 @@ on each other; only video knows the others.
 | Rendering one look many times with different values cheaply | Layered layouts, posters, multi-element canvases → video |
 
 **No time:** no seconds, frames, clips, easing or fps in code, parameters or docs. A parameter is a *state* (`progress`, `phase`,
-`seed`, `offset`); whoever animates it sets it per frame. Filter-shaped compositing (text as an `svg` region, overlay, blend,
+`seed`, `offset`); whoever animates it sets it per frame. Filter-shaped compositing (text as an `svg` region, blend, a logo or
 sticker) stays here; anything needing a canvas of its own or several inputs does not.
 
 ## Names

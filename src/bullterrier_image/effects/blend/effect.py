@@ -1,4 +1,5 @@
-"""The `blend` effect: lay a second picture over the photo with a blend mode (multiply a texture, screen a light...)."""
+"""The `blend` effect: lay a second picture over the photo with a blend mode (multiply a texture, screen a light, put
+a logo on it...)."""
 
 from typing import Literal
 
@@ -27,11 +28,12 @@ class BlendParams(EffectParams):
         "hue and saturation and keeps its brightness. Mid grey leaves the photo unchanged under 'overlay' and "
         "'soft_light'.",
     )
-    fit: Literal["cover", "contain", "stretch", "tile"] = param(
+    fit: Literal["cover", "contain", "stretch", "width", "tile"] = param(
         "cover",
         doc="How the picture is fitted to the photo: 'cover' fills it keeping the aspect and crops the overhang, "
         "'contain' fits inside it keeping the aspect (the rest of the photo is untouched), 'stretch' fills it "
-        "ignoring the aspect, 'tile' repeats the picture, one tile as wide as the photo times `scale`.",
+        "ignoring the aspect, 'width' keeps the aspect and makes the picture as wide as the photo times `scale` (a "
+        "logo or sticker), 'tile' repeats that picture over the photo.",
     )
     at: Anchor = param(
         "center",
@@ -41,19 +43,20 @@ class BlendParams(EffectParams):
     scale: float = param(
         1.0,
         unit="ratio",
-        min=0.05,
+        min=0.01,
         max=2,
         doc="The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5 half as wide and "
-        "tall. With 'tile', 0.25 puts four tiles across the photo.",
+        "tall. With 'width' it is the picture's width as a share of the photo's (0.2 a fifth); with 'tile', 0.25 "
+        "puts four tiles across the photo.",
     )
     margin: float = param(
         0.0,
         unit="fraction",
         min=0,
         max=0.45,
-        advanced=True,
-        doc="Space kept clear around the fitted picture, as a share of the photo's shorter side, 0 to 0.45. Raising "
-        "it shrinks what 'cover', 'contain' and 'stretch' fill and moves the picture inward.",
+        doc="Space kept clear around the fitted picture, as a share of the photo's long side, 0 to 0.45 (never more "
+        "than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain' and 'stretch' fill and "
+        "moves a smaller picture at an edge or corner inward.",
     )
     resample: Resample = param(
         "lanczos",
@@ -65,7 +68,7 @@ class BlendParams(EffectParams):
 
 @effect(category="compositing", params=BlendParams)
 def blend(rgb: np.ndarray, params: BlendParams) -> np.ndarray:
-    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch or tile."""
+    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch, width or tile."""
     layer = place(
         params.image.pixels,
         rgb.shape[:2],

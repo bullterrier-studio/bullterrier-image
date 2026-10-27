@@ -1,4 +1,5 @@
-# A grain texture laid over the photo with the soft light blend mode: it adds grain and keeps the photo's brightness.
+# A grain texture laid over the photo with the soft light blend mode (it adds grain and keeps the photo's brightness),
+# then a logo (here the dog's own cut-out) in the bottom right corner, keeping its transparency.
 name = "blend"
 size = 480
 
@@ -6,3 +7,9 @@ size = 480
 effect = "blend"
 image = "../assets/grain-texture.png"
 mode = "soft_light"
+
+[[step]]
+effect = "blend"
+preset = "logo"
+image = "../assets/bullterrier-cutout.png"
+scale = 0.3

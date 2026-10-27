@@ -305,7 +305,7 @@ never JPEG: project exporting it to `jpg` fails before anything renders.
 **`bt-image cutout` or `transparent = "background"`?** Both cut the subject out, for different jobs. `bt-image cutout photo.jpg
 -o dog.png` makes a cut-out *file*: photo at its own size with subject's alpha, optional edge clean-up (`--shrink` pulls in,
 `--feather` softens), no recipe. Make one when cut-out is an input you reuse and check once: `--map subject=` of a later run
-(`maps={"subject": ...}`), so subject is not found again, or a picture parameter such as `overlay`'s `image`
+(`maps={"subject": ...}`), so subject is not found again, or a picture parameter such as `blend`'s `image`
 (`examples/assets/bullterrier-cutout.png` is one). `transparent = "background"` in `[frame]` ends a *look*: finished picture,
 recipe's size, after every step, cut out around subject (sticker, avatar).
 

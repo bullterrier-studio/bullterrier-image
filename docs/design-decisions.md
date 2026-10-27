@@ -120,10 +120,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   contract's "a constant picture stays constant under every interpolation" does not hold for them. *Reason:* the contract
   rule is about warping the photo; a second name keeps it simple instead of an exemption list. *Consequence:* a field
   named `interpolation` promises that rule; use `resampling` when the effect does not.
-- **The picture an effect takes is called `image`.** `blend` and `overlay` both take a
-  `Picture` and place it with the same `at`, `scale` and `margin`; their pictures were `texture` and `logo`. *Reason:*
-  the same kind of parameter has the same name, so a developer who has used one picture effect knows the next.
-  *Consequence:* a later effect with one picture names it `image`; one with several names each for its role.
+- **The picture an effect takes is called `image`.** `blend` takes a `Picture` and places it with `fit`, `at`, `scale` and
+  `margin`; its picture was `texture`, and the logo of the folded-in `overlay` was `logo`. *Reason:* the same kind of
+  parameter has the same name, so a developer who has used one picture effect knows the next. *Consequence:* a later
+  effect with one picture names it `image`; one with several names each for its role.
+- **A logo is `blend` with `fit="width"`, not an effect of its own.** `overlay` was `blend` in the `normal` mode with the
+  picture sized by the photo's width; folding it leaves one placement model and seven parameters instead of twelve, and
+  the preset `logo` keeps the short way to write it. `margin` is a share of the long side (the lengths rule), not of the
+  shorter one.
 - **An effect's controls are named scalars; a list of numbers is for data, not for controls.** `channel_mixer` takes
   nine fields (`red_from_green`...) and `curves` a parametric curve (shadows, midtones, highlights, per master and
   channel), not a `matrix` or a `points` list. *Reason:* only scalars can be driven by a control signal from outside, become a slider

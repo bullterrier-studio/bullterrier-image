@@ -52,10 +52,10 @@ def test_a_picture_sits_at_one_of_nine_anchors_in_the_free_space(at, top, left):
     assert box(fit(SQUARE, (20, 20), at=at, scale=0.5)) == (top, left, 10, 10)
 
 
-def test_the_margin_is_a_share_of_the_shorter_side_kept_clear_of_the_picture():
-    placed = fit(SQUARE, (40, 60), margin=0.1)  # 4 px of 40; the area is 32 x 52, so a square picture is 32 x 32
-    assert box(placed) == (4, 14, 32, 32)
-    assert box(fit(SQUARE, (40, 60), margin=0.1, at="top_left")) == (4, 4, 32, 32)
+def test_the_margin_is_a_share_of_the_long_side_kept_clear_of_the_picture():
+    placed = fit(SQUARE, (40, 60), margin=0.1)  # 6 px of 60; the area is 28 x 48, so a square picture is 28 x 28
+    assert box(placed) == (6, 16, 28, 28)
+    assert box(fit(SQUARE, (40, 60), margin=0.1, at="top_left")) == (6, 6, 28, 28)
 
 
 def test_contain_keeps_the_aspect_and_leaves_the_rest_transparent():

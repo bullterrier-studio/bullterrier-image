@@ -1,0 +1,9 @@
+# Looks that are one blend step.
+
+[logo]
+description = "A logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."
+mode = "normal"
+fit = "width"
+at = "bottom_right"
+scale = 0.2
+margin = 0.025
