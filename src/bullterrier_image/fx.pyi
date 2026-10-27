@@ -3355,35 +3355,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def scan_roll(axis: Literal['vertical', 'horizontal'] = 'vertical', offset: float = 0.2, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'wrap', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does.
-
-Every line moves by the same distance, by whole or fractional pixels (a fraction blends the two lines it lies
-between). What comes into view where the picture left is set by `edge`: with 'wrap' it is the part that left on the
-other side, so nothing is lost and a whole-picture roll is the picture itself.
-
-Parameters
-----------
-axis : one of 'vertical', 'horizontal', default 'vertical'
-    The direction of the roll: 'vertical' slides the picture up or down, as a television
-    whose vertical hold slipped; 'horizontal' slides it left or right, as a horizontal
-    hold would.
-offset : number, fraction, -1 to 1, default 0.2
-    How far the picture rolls, as a fraction of its height ('vertical') or width
-    ('horizontal'), -1 to 1: positive moves it down or to the right, negative up or to
-    the left, 0 leaves it where it is. A whole picture (1 or -1) with 'wrap' brings it
-    back to where it was. A distance that ends between two pixels blends the two (linear
-    interpolation along the roll).
-
-Advanced parameters
--------------------
-edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'wrap'
-    What fills the gap the roll opens: 'wrap' brings back what left on the other side, a
-    true roll; 'nearest' holds the picture's first or last line there (a smear);
-    'reflect' mirrors the picture (the edge line repeated once); 'mirror' mirrors it
-    about the edge line."""
-    ...
-
 def scanlines(spacing: float = 3.0, thickness: float = 0.5, darkness: float = 0.35, offset: float = 0.0, softness: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.
 
@@ -3849,14 +3820,16 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     edge)."""
     ...
 
-def tile(columns: int = 3, rows: int = 3, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Repeat the whole picture, scaled down, in a grid of `columns` by `rows`.
+def tile(columns: int = 3, rows: int = 3, offset_x: float = 0.0, offset_y: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scan_roll'] | None = None) -> Step:
+    """Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift.
 
 The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a
-pixel counted in part) to a cell of whole pixels, width // columns by height // rows and at least 1 px each, and the
-cell is repeated across the picture. When the grid does not divide the picture, the leftover pixels
-(width mod columns on the right, height mod rows at the bottom) show the start of the next copy, cut off. One
-column and one row give the picture itself.
+pixel counted in part) to a cell of whole pixels, width // columns by height // rows and at least 1 px each. The
+cell is slid by `offset_x` and `offset_y` of its size, wrapping around within the cell (a fraction of a pixel
+blends the two pixels it lies between), and repeated across the picture. When the grid does not divide the
+picture, the leftover pixels (width mod columns on the right, height mod rows at the bottom) show the start of the
+next copy, cut off. One column and one row give the picture itself, or with an offset the picture rolled around, as
+on a television whose sync slipped (the `scan_roll` preset).
 
 Parameters
 ----------
@@ -3867,7 +3840,21 @@ columns : whole number, count, 1 to 100, default 3
 rows : whole number, count, 1 to 100, default 3
     How many copies sit one above another, 1 to 100; 1 keeps the picture whole down.
     Each copy is the height of the picture divided by this, rounded down (at least 1
-    px)."""
+    px).
+offset_x : number, fraction, -1 to 1, default 0.0
+    How far the copies slide sideways, as a fraction of one copy's width, -1 to 1:
+    positive moves them to the right, negative to the left, and what leaves one side of
+    a copy comes back on the other; 0 leaves them where they are, and so does a whole
+    copy (1 or -1). A distance that ends between two pixels blends the two.
+offset_y : number, fraction, -1 to 1, default 0.0
+    How far the copies slide vertically, as a fraction of one copy's height, -1 to 1:
+    positive moves them down, negative up, and what leaves the bottom of a copy comes
+    back at its top; 0 leaves them where they are, and so does a whole copy (1 or -1). A
+    distance that ends between two pixels blends the two.
+
+Presets
+-------
+scan_roll : A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways."""
     ...
 
 def tone_map(contrast: float = 0.5, amount: float = 0.5, radius: float = 30.0, edge_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:

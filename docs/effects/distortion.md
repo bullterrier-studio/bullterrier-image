@@ -23,7 +23,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. | `slices=30` `amount=0.05` `seed=0` `bands=0` `band_min_height=0.01` `band_max_height=0.06` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
 | <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
 | <img src="../gallery/swirl.jpg" width="160" alt="swirl"> | `swirl` | Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`. | `angle=90.0` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [swirl.toml](../../examples/effects/swirl.toml) |
-| <img src="../gallery/tile.jpg" width="160" alt="tile"> | `tile` | Repeat the whole picture, scaled down, in a grid of `columns` by `rows`. | `columns=3` `rows=3` | [tile.toml](../../examples/effects/tile.toml) |
+| <img src="../gallery/tile.jpg" width="160" alt="tile"> | `tile` | Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift. | `columns=3` `rows=3` `offset_x=0.0` `offset_y=0.0` | [tile.toml](../../examples/effects/tile.toml) |
 
 ### `displace`
 
@@ -328,3 +328,11 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `columns` | whole number | count | 1 to 100 | `3` | How many copies of the picture sit side by side, 1 to 100; 1 keeps the picture whole across. Each copy is the width of the picture divided by this, rounded down (at least 1 px). |
 | `rows` | whole number | count | 1 to 100 | `3` | How many copies sit one above another, 1 to 100; 1 keeps the picture whole down. Each copy is the height of the picture divided by this, rounded down (at least 1 px). |
+| `offset_x` | number | fraction | -1 to 1 | `0.0` | How far the copies slide sideways, as a fraction of one copy's width, -1 to 1: positive moves them to the right, negative to the left, and what leaves one side of a copy comes back on the other; 0 leaves them where they are, and so does a whole copy (1 or -1). A distance that ends between two pixels blends the two. |
+| `offset_y` | number | fraction | -1 to 1 | `0.0` | How far the copies slide vertically, as a fraction of one copy's height, -1 to 1: positive moves them down, negative up, and what leaves the bottom of a copy comes back at its top; 0 leaves them where they are, and so does a whole copy (1 or -1). A distance that ends between two pixels blends the two. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `scan_roll` | A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways. |

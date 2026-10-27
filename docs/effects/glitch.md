@@ -13,7 +13,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
 | <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
-| <img src="../gallery/scan_roll.jpg" width="160" alt="scan_roll"> | `scan_roll` | Roll the picture by `offset` of its height (`axis` 'vertical') or width ('horizontal'), as a slipped sync does. | `axis='vertical'` `offset=0.2` +1 advanced | [scan_roll.toml](../../examples/effects/scan_roll.toml) |
 | <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
 
 ### `dead_pixels`
@@ -128,21 +127,6 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a moved channel shows where it has left the picture's edge: 'nearest' repeats the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the channel (the edge line repeated once), 'mirror' mirrors it about the edge line. |
-
-</details>
-
-### `scan_roll`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `axis` | one of 'vertical', 'horizontal' |  |  | `'vertical'` | The direction of the roll: 'vertical' slides the picture up or down, as a television whose vertical hold slipped; 'horizontal' slides it left or right, as a horizontal hold would. |
-| `offset` | number | fraction | -1 to 1 | `0.2` | How far the picture rolls, as a fraction of its height ('vertical') or width ('horizontal'), -1 to 1: positive moves it down or to the right, negative up or to the left, 0 leaves it where it is. A whole picture (1 or -1) with 'wrap' brings it back to where it was. A distance that ends between two pixels blends the two (linear interpolation along the roll). |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge` | one of 'wrap', 'nearest', 'reflect', 'mirror' |  |  | `'wrap'` | What fills the gap the roll opens: 'wrap' brings back what left on the other side, a true roll; 'nearest' holds the picture's first or last line there (a smear); 'reflect' mirrors the picture (the edge line repeated once); 'mirror' mirrors it about the edge line. |
 
 </details>
 
