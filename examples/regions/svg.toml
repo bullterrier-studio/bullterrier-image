@@ -33,5 +33,5 @@ looks = [
 [[step]]
 effect = "seams"
 partition = "leaf"
-width = 0.004
+width = 4
 color = "#ffffff"

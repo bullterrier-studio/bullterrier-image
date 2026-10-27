@@ -27,29 +27,29 @@ class QuadtreeParams(EffectParams):
         "cells and a coarser picture.",
     )
     max_cell: float = param(
-        0.125,
-        unit="fraction",
-        min=0.005,
-        max=1,
-        doc="The largest a cell can be, as a share of the picture's long side: the picture starts as an even grid of "
-        "cells at most this size. Raising it makes the flat parts coarser.",
+        60.0,
+        unit="px",
+        min=2,
+        max=480,
+        doc="The largest a cell can be, in px at the recipe's size: the picture starts as an even grid of cells at "
+        "most this wide. Raising it makes the flat parts coarser.",
     )
     min_cell: float = param(
-        0.01,
-        unit="fraction",
-        min=0.002,
-        max=1,
-        doc="The smallest a cell can be, as a share of the picture's long side, never above `max_cell`. A cell does "
-        "not split into halves smaller than this. Lowering it keeps finer detail at edges.",
+        5.0,
+        unit="px",
+        min=1,
+        max=480,
+        doc="The smallest a cell can be, in px at the recipe's size, never above `max_cell`. A cell does not split "
+        "into halves smaller than this. Lowering it keeps finer detail at edges.",
     )
     gap: float = param(
-        0.002,
-        unit="fraction",
+        1.0,
+        unit="px",
         min=0,
-        max=0.05,
-        doc="Width of the line between neighbouring cells, as a share of the picture's long side: 0 = cells touch, "
-        "about 0.002 a thin grid, 0.01 or more visible tiles. The picture's own edge gets no line. A cell no wider "
-        "than the line is all line, so keep it below `min_cell`.",
+        max=24,
+        doc="Width of the line between neighbouring cells, in px at the recipe's size: 0 = cells touch, 1 a thin "
+        "grid, 5 or more visible tiles. The picture's own edge gets no line. A cell no wider than the line is all "
+        "line, so keep it below `min_cell`.",
     )
     gap_color: Color = param(
         "#000000",
@@ -85,14 +85,13 @@ def quadtree(rgb: np.ndarray, params: QuadtreeParams) -> np.ndarray:
     `max_cell` wide. `gap` draws a line between cells and `rounding` rounds their corners.
     """
     height, width = rgb.shape[:2]
-    long_side = max(height, width)
     found = leaves(
         rgb,
         threshold=params.threshold,
-        max_cell=max(1, round(params.max_cell * long_side)),
-        min_cell=max(1, round(params.min_cell * long_side)),
+        max_cell=max(1, round(params.max_cell)),
+        min_cell=max(1, round(params.min_cell)),
     )
-    half_gap = params.gap * long_side / 2
+    half_gap = params.gap / 2
     line = np.asarray(params.gap_color, np.float32)
     x = (np.arange(width, dtype=np.float32) + 0.5)[None, :]
     out = np.empty_like(rgb)

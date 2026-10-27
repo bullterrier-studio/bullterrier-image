@@ -86,10 +86,10 @@ belong to a layout package, not here.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `halftone` ✓ | Dot screen. | `fx.halftone(cell=10, angle=45)` |
-| `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=0.0016)` |
+| `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
-| `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=0.2, min_cell=0.012)` |
-| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=0.008)` |
+| `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=96, min_cell=5.75)` |
+| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own, on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette=["#0b1026", "#ff5a36", "#f7e7c6"], cell=4)` |
 | `edges` (next) | Outlines by Sobel, Canny or difference of Gaussians; on the existing `ops.edges`. | `fx.edges(method="dog", width=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | line and CMYK screens (planned, on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none or cmyk (four inks at the screen angles). Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", cell=9)` |

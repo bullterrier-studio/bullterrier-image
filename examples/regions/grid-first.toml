@@ -38,5 +38,5 @@ looks = [
 effect = "seams"
 partition = "shards"
 mask = "found"
-width = 0.0016
+width = 1.6
 color = "#ffffff"

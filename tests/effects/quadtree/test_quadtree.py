@@ -11,7 +11,7 @@ from bullterrier_image.errors import RecipeError
 
 NAME = "quadtree"
 RED = "#ff0000"
-CELLS_OF_32_DOWN_TO_8 = {"max_cell": 0.5, "min_cell": 0.125}  # on a 64 px picture
+CELLS_OF_32_DOWN_TO_8 = {"max_cell": 32, "min_cell": 8}
 
 
 def edge_at_column_40() -> np.ndarray:
@@ -31,7 +31,7 @@ def test_a_picture_whose_edges_fall_on_cell_borders_comes_back_unchanged() -> No
 def test_a_cell_that_straddles_the_edge_is_the_average_of_both_sides() -> None:
     """With cells that cannot split below 16 px, the cell over columns 32..48 holds 8 black and 8 white columns."""
     out = registry.apply(
-        NAME, edge_at_column_40(), threshold=0.5, gap=0.0, max_cell=0.25, min_cell=0.25
+        NAME, edge_at_column_40(), threshold=0.5, gap=0.0, max_cell=16, min_cell=16
     )  # 0.5 is the most a cell can spread and does not split: a plain grid of 16 px cells
     np.testing.assert_allclose(out[:, 32:48], 0.5, atol=1e-6)
     np.testing.assert_array_equal(out[:, :32], 0.0)
@@ -40,14 +40,14 @@ def test_a_cell_that_straddles_the_edge_is_the_average_of_both_sides() -> None:
 
 def test_the_average_colour_of_the_picture_is_kept(photo: np.ndarray) -> None:
     """The cells tile the picture and each holds its own average, so the picture's average cannot change."""
-    out = registry.apply(NAME, photo, threshold=0.05, gap=0.0, max_cell=0.2, min_cell=0.02)
+    out = registry.apply(NAME, photo, threshold=0.05, gap=0.0, max_cell=26, min_cell=3)
     np.testing.assert_allclose(out.mean(axis=(0, 1)), photo.mean(axis=(0, 1)), atol=1e-5)
 
 
 def test_a_lower_threshold_never_follows_the_picture_less_closely(photo: np.ndarray) -> None:
     """Splitting a cell replaces its average by the averages of its parts, which never fits the pixels worse."""
     errors = [
-        float(((registry.apply(NAME, photo, threshold=t, gap=0.0, max_cell=0.5, min_cell=0.02) - photo) ** 2).mean())
+        float(((registry.apply(NAME, photo, threshold=t, gap=0.0, max_cell=64, min_cell=3) - photo) ** 2).mean())
         for t in (0.0, 0.05, 0.1, 0.2, 0.5)
     ]
     assert errors == sorted(errors)
@@ -62,7 +62,7 @@ def two_by_two_cells() -> np.ndarray:
 
 def test_the_gap_is_a_line_centred_on_every_border_between_cells(two_by_two_cells: np.ndarray) -> None:
     """A 2 px gap on the border at 32 takes columns 31 and 32 and rows 31 and 32 whole, and nothing else."""
-    out = registry.apply(NAME, two_by_two_cells, gap=2 / 64, gap_color=RED, max_cell=0.5, min_cell=0.5)
+    out = registry.apply(NAME, two_by_two_cells, gap=2, gap_color=RED, max_cell=32, min_cell=32)
     line = np.zeros((64, 64), bool)
     line[31:33, :] = True
     line[:, 31:33] = True
@@ -74,7 +74,7 @@ def test_the_gap_lines_fall_on_the_cell_borders_all_down_a_wide_picture() -> Non
     """A flat 200 x 1000 picture in cells of 100 px has borders at row 100 and at every hundredth column; a 2 px gap
     covers the two rows or columns beside each (99 and 100, 199 and 200, ...) and nothing else."""
     flat = np.full((200, 1000, 3), 0.5, np.float32)
-    out = registry.apply(NAME, flat, gap=0.002, gap_color=RED, max_cell=0.1, min_cell=0.1)
+    out = registry.apply(NAME, flat, gap=2, gap_color=RED, max_cell=100, min_cell=100)
     line = np.zeros((200, 1000), bool)
     line[99:101, :] = True
     line[:, [c for border in range(100, 1000, 100) for c in (border - 1, border)]] = True
@@ -82,7 +82,7 @@ def test_the_gap_lines_fall_on_the_cell_borders_all_down_a_wide_picture() -> Non
 
 
 def test_the_gap_does_not_draw_along_the_picture_edge(two_by_two_cells: np.ndarray) -> None:
-    out = registry.apply(NAME, two_by_two_cells, gap=3 / 64, gap_color=RED, max_cell=0.5, min_cell=0.5)
+    out = registry.apply(NAME, two_by_two_cells, gap=3, gap_color=RED, max_cell=32, min_cell=32)
     np.testing.assert_array_equal(out[0, :20], 0.5)  # the top row, away from the border at column 32
     np.testing.assert_array_equal(out[:20, 0], 0.5)
     np.testing.assert_array_equal(out[-1, -20:], 0.5)
@@ -91,7 +91,7 @@ def test_the_gap_does_not_draw_along_the_picture_edge(two_by_two_cells: np.ndarr
 
 def test_full_rounding_turns_each_square_cell_into_a_disc_in_gap_colour(two_by_two_cells: np.ndarray) -> None:
     """A disc fills pi / 4 of its square. The soft rim of a one-pixel ramp moves that by about a pixel in 32."""
-    out = registry.apply(NAME, two_by_two_cells, gap=0.0, rounding=1.0, gap_color=RED, max_cell=0.5, min_cell=0.5)
+    out = registry.apply(NAME, two_by_two_cells, gap=0.0, rounding=1.0, gap_color=RED, max_cell=32, min_cell=32)
     grey_share = float((out[..., 1] > 0.25).mean())
     assert grey_share == pytest.approx(math.pi / 4, abs=0.03)
     assert tuple(out[16, 16]) == (0.5, 0.5, 0.5)  # a cell's centre is the cell's colour
@@ -102,7 +102,7 @@ def test_rounding_cuts_more_of_the_corners_the_higher_it_is(two_by_two_cells: np
     shares = [
         float(
             (
-                registry.apply(NAME, two_by_two_cells, gap=0.0, rounding=r, gap_color=RED, max_cell=0.5, min_cell=0.5)[
+                registry.apply(NAME, two_by_two_cells, gap=0.0, rounding=r, gap_color=RED, max_cell=32, min_cell=32)[
                     ..., 1
                 ]
                 > 0.25
@@ -114,14 +114,22 @@ def test_rounding_cuts_more_of_the_corners_the_higher_it_is(two_by_two_cells: np
     assert shares == sorted(shares, reverse=True)
 
 
+def test_the_first_grid_has_the_fewest_equal_cells_no_larger_than_max_cell() -> None:
+    """On 64 px, cells of at most 21 px take four cells of 16 (three would be 21.3 px)."""
+    noise = np.random.default_rng(5).random((64, 64, 3), dtype=np.float32)
+    out = registry.apply(NAME, noise, threshold=0.5, gap=0.0, max_cell=21, min_cell=21)
+    starts = np.flatnonzero((out[0, 1:] != out[0, :-1]).any(axis=1)) + 1
+    assert starts.tolist() == [16, 32, 48]
+
+
 def test_cells_larger_than_the_picture_make_one_cell() -> None:
     rgb = np.random.default_rng(2).random((20, 30, 3), dtype=np.float32)
-    out = registry.apply(NAME, rgb, threshold=0.5, gap=0.0, max_cell=1.0, min_cell=0.5)
+    out = registry.apply(NAME, rgb, threshold=0.5, gap=0.0, max_cell=30, min_cell=15)
     np.testing.assert_allclose(out, np.broadcast_to(rgb.mean(axis=(0, 1)), out.shape), atol=1e-6)
 
 
 def test_a_smallest_cell_above_the_largest_is_refused_naming_both() -> None:
     with pytest.raises(RecipeError, match="min_cell") as raised:
-        fx.quadtree(min_cell=0.2, max_cell=0.1)
+        fx.quadtree(min_cell=20, max_cell=10)
     assert "max_cell" in str(raised.value)
-    assert fx.quadtree(min_cell=0.1, max_cell=0.1).params["min_cell"] == 0.1  # equal is a range: a plain grid
+    assert fx.quadtree(min_cell=10, max_cell=10).params["min_cell"] == 10  # equal is a range: a plain grid

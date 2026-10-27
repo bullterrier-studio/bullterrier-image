@@ -12,6 +12,7 @@ from bullterrier_image.recipe import Grid, Pick
 
 NAME = "seams"
 RED = (1.0, 0.0, 0.0)
+WHITE = (1.0, 1.0, 1.0)
 
 
 def columns(widths: list[int], rows: int = 1, height: int = 96) -> np.ndarray:
@@ -50,9 +51,7 @@ def covered(widths: list[int], rows: int, line: float, height: int = 96) -> np.n
     ],
 )
 def test_the_line_is_drawn_as_wide_as_asked_along_every_border_and_nowhere_else(photo, widths, rows, line):
-    out = registry.apply(
-        NAME, photo, width=line / 128, color=RED, partition=columns(widths, rows)
-    )  # 128 px, the long side
+    out = registry.apply(NAME, photo, width=line, color=RED, partition=columns(widths, rows))
     cover = covered(widths, rows, line)[..., None]
     expected = photo * (1 - cover) + np.array(RED, np.float32) * cover
     np.testing.assert_allclose(out, expected, atol=1e-5)
@@ -60,12 +59,13 @@ def test_the_line_is_drawn_as_wide_as_asked_along_every_border_and_nowhere_else(
     np.testing.assert_array_equal(out[(cover == 0)[..., 0]], photo[(cover == 0)[..., 0]])  # not a pixel elsewhere
 
 
-def test_the_width_is_a_share_of_the_long_side_so_the_same_look_fits_any_size(photo):
-    big = np.repeat(np.repeat(photo, 2, axis=0), 2, axis=1)
-    small_out = registry.apply(NAME, photo, width=2 / 128, partition=columns([64, 64]))
-    big_out = registry.apply(NAME, big, width=2 / 128, partition=np.repeat(np.repeat(columns([64, 64]), 2, 0), 2, 1))
-    assert (small_out != photo).any(axis=2).sum(axis=1)[0] == 2  # 2 px of 128
-    assert (big_out != big).any(axis=2).sum(axis=1)[0] == 4  # 4 px of 256: the same share
+@pytest.mark.parametrize(("size", "painted"), [(128, 2), (256, 4), (512, 8)], ids=lambda v: str(v))
+def test_the_width_is_in_px_of_the_recipes_size_so_the_same_look_fits_any_render_size(photo, size, painted):
+    """A 2 px line in a recipe of size 128 is 4 px when rendered at 256 and 8 px at 512."""
+    look = Recipe("seams", [Step(NAME, {"width": 2}, partition="panes")], size=128, regions=REGIONS)
+    out = render(photo, look, size=size)
+    row = np.abs(out[0].astype(np.float64) - np.array(WHITE)).max(axis=1) < 1e-6  # the line is solid white
+    assert row.sum() == painted
 
 
 @pytest.mark.parametrize(
@@ -86,7 +86,7 @@ def test_a_width_of_nothing_draws_nothing(photo):
 
 
 def test_the_line_is_the_colour_asked_for_and_solid_where_it_covers_a_whole_pixel(photo):
-    out = registry.apply(NAME, photo, width=4 / 128, color="#336699", partition=columns([64, 64]))
+    out = registry.apply(NAME, photo, width=4, color="#336699", partition=columns([64, 64]))
     inside = out[:, 62:66]
     np.testing.assert_allclose(inside, np.broadcast_to(np.array([0x33, 0x66, 0x99]) / 255, inside.shape), atol=1e-6)
 
@@ -96,9 +96,7 @@ def test_any_size_and_any_pieces_give_a_picture_in_range_and_a_hairline_touches_
     rng = np.random.default_rng(3)
     rgb = rng.random((*size, 3), dtype=np.float32)
     labels = rng.integers(0, 4, size).astype(np.int32)
-    out = registry.apply(
-        NAME, rgb, width=min(0.1, 0.5 / max(size)), color=RED, partition=labels
-    )  # at most half a pixel wide
+    out = registry.apply(NAME, rgb, width=0.5, color=RED, partition=labels)  # half a pixel wide
     assert out.shape == rgb.shape
     assert out.min() >= 0
     assert out.max() <= 1
@@ -124,7 +122,7 @@ def run(steps, **keys):
 
 
 def test_a_step_draws_the_borders_of_the_region_it_names():
-    photo, out = run([Step(NAME, {"width": 2 / 128, "color": "#ff0000"}, partition="panes")])
+    photo, out = run([Step(NAME, {"width": 2, "color": "#ff0000"}, partition="panes")])
     assert (out[:, 63:65] == RED).all()
     np.testing.assert_array_equal(out[:, :63], photo[:, :63])
     np.testing.assert_array_equal(out[:, 65:], photo[:, 65:])
@@ -132,7 +130,7 @@ def test_a_step_draws_the_borders_of_the_region_it_names():
 
 def test_a_selection_counts_as_a_partition_of_two_pieces_so_a_hard_edge_gets_a_line(subject):
     photo = np.random.default_rng(1).random((96, 128, 3), dtype=np.float32)
-    step = Step(NAME, {"width": 2 / 128, "color": "#ff0000"}, partition="subject")
+    step = Step(NAME, {"width": 2, "color": "#ff0000"}, partition="subject")
     out = render(photo, Recipe("outline", [step], size=None), maps={"subject": subject})
     painted = (out != photo).any(axis=2)
     inside = subject > 0.5
@@ -143,13 +141,13 @@ def test_a_selection_counts_as_a_partition_of_two_pieces_so_a_hard_edge_gets_a_l
 
 
 def test_a_mask_limits_the_seams_like_any_step():
-    photo, out = run([Step(NAME, {"width": 2 / 128, "color": "#ff0000"}, partition="panes", mask="head")])
+    photo, out = run([Step(NAME, {"width": 2, "color": "#ff0000"}, partition="panes", mask="head")])
     assert (out[:, 63] == RED).all()  # the left piece, where the mask is
     np.testing.assert_array_equal(out[:, 64:], photo[:, 64:])
 
 
 def test_as_the_look_of_an_each_step_only_the_pieces_with_that_look_show_the_line():
-    step = Each("panes", [Step(NAME, {"width": 2 / 128, "color": "#ff0000"}, partition="panes"), "none"], feather=0)
+    step = Each("panes", [Step(NAME, {"width": 2, "color": "#ff0000"}, partition="panes"), "none"], feather=0)
     photo, out = run([step])
     assert (out[:, 63] == RED).all()  # the left piece has the seams look, so its side of the border is drawn
     np.testing.assert_array_equal(out[:, 64:], photo[:, 64:])  # the right piece is left as it was

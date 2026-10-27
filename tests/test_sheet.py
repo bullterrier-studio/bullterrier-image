@@ -184,9 +184,9 @@ def test_write_stages_names_each_stage_and_saves_one_with_transparency_as_png_an
 
 
 def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps_of_the_recipe():
-    seams = Step("seams", {"width": 0.01}, partition="panes")
+    seams = Step("seams", {"width": 0.5}, partition="panes")
     look = Recipe("panes", [Each("panes", ["none"]), seams], size=48, regions={"panes": Grid(columns=2)})
-    tiles = sweep(look, "seams.width", 0.002, 0.02, 3)
+    tiles = sweep(look, "seams.width", 0.1, 1, 3)
     assert [tile.steps[1].partition for _, tile in tiles] == ["panes"] * 3  # type: ignore[union-attr]
     assert all(tile.steps[0] == look.steps[0] and tile.regions == look.regions for _, tile in tiles)
 

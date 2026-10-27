@@ -18,5 +18,5 @@ mask = "blob"
 [[step]]
 effect = "seams"
 partition = "blob"
-width = 0.005
+width = 5
 color = "#ffd600"

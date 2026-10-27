@@ -5,7 +5,7 @@ size = 480
 [[step]]
 effect = "quadtree"
 threshold = 0.09
-max_cell = 0.2
-min_cell = 0.012
-gap = 0.003
+max_cell = 96
+min_cell = 5.75
+gap = 1.5
 gap_color = "#0b0b10"

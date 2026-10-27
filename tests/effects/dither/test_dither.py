@@ -234,9 +234,7 @@ def test_a_given_palette_ignores_the_settings_for_finding_colours(photo: np.ndar
 
 @pytest.mark.parametrize("method", METHODS)
 @pytest.mark.parametrize("value", [0.0, 1.0], ids=["black stays black", "white stays white"])
-@pytest.mark.parametrize(
-    ("size", "cell"), [(64, 0.0005), (42, 0.1)], ids=["one pixel dots", "4 px dots, the last ones 2 px"]
-)
+@pytest.mark.parametrize(("size", "cell"), [(64, 1), (42, 4)], ids=["one pixel dots", "4 px dots, the last ones 2 px"])
 def test_a_picture_already_in_the_palette_comes_back_unchanged(
     method: str, value: float, size: int, cell: float
 ) -> None:
@@ -247,17 +245,17 @@ def test_a_picture_already_in_the_palette_comes_back_unchanged(
 
 @pytest.mark.parametrize("method", METHODS)
 def test_dots_are_hard_squares_of_the_asked_size(method: str, photo: np.ndarray) -> None:
-    """On a 128 x 96 picture a `cell` of 8 / 128 is 8 px: every aligned 8 x 8 block is one colour."""
-    out = registry.apply(NAME, photo, method=method, cell=8 / 128, **BLACK_WHITE)
+    """On a 128 x 96 picture a `cell` of 8 is 8 px: every aligned 8 x 8 block is one colour."""
+    out = registry.apply(NAME, photo, method=method, cell=8, **BLACK_WHITE)
     blocks = out.reshape(12, 8, 16, 8, 3)
     assert (blocks == blocks[:, :1, :, :1]).all()
 
 
 @pytest.mark.parametrize("method", METHODS)
 def test_a_size_that_is_not_whole_pixels_is_rounded_and_the_last_dots_are_cut_short(method: str) -> None:
-    """0.090625 of a 128 px side is 11.6 px, so 12 px dots: ten whole ones across 128 px (120 px) and a last of 8."""
+    """A `cell` of 11.6 px is rounded to 12 px dots: ten whole ones across 128 px (120 px) and a last of 8."""
     noise = np.random.default_rng(4).random((96, 128, 3), dtype=np.float32)  # mid tones everywhere: dots keep changing
-    out = registry.apply(NAME, noise, method=method, cell=0.090625, **BLACK_WHITE)
+    out = registry.apply(NAME, noise, method=method, cell=11.6, **BLACK_WHITE)
     changes = np.flatnonzero((out[:, 1:] != out[:, :-1]).any(axis=(0, 2))) + 1  # the columns where a new dot starts
     assert changes.tolist() == list(range(12, 128, 12))
     changes = np.flatnonzero((out[1:] != out[:-1]).any(axis=(1, 2))) + 1
@@ -267,8 +265,8 @@ def test_a_size_that_is_not_whole_pixels_is_rounded_and_the_last_dots_are_cut_sh
 def test_the_dots_are_the_dithered_average_of_each_square(photo: np.ndarray) -> None:
     """Dithering with 8 px dots is dithering the picture of the squares' averages, one pixel per square."""
     squares = photo.reshape(12, 8, 16, 8, 3).mean(axis=(1, 3)).astype(np.float32)
-    big = registry.apply(NAME, photo, cell=8 / 128, **BLACK_WHITE)
-    small = registry.apply(NAME, squares, cell=1 / 16, **BLACK_WHITE)  # one px of a 16 px long side
+    big = registry.apply(NAME, photo, cell=8, **BLACK_WHITE)
+    small = registry.apply(NAME, squares, cell=1, **BLACK_WHITE)
     np.testing.assert_array_equal(big[::8, ::8], small)
 
 
@@ -282,7 +280,7 @@ def test_a_flat_grey_lights_the_share_of_white_dots_its_oklab_lightness_asks_for
     when the share of white is that lightness. Ordered patterns mix in sixteenths and error diffusion drops what falls
     off the edge, so a sixteenth is the tolerance."""
     wanted = float(oklab(np.full((1, 3), tone, np.float32))[0, 0])
-    out = registry.apply(NAME, flat(tone, 128), method=method, cell=1 / 128, **BLACK_WHITE)
+    out = registry.apply(NAME, flat(tone, 128), method=method, cell=1, **BLACK_WHITE)
     assert out[..., 0].mean() == pytest.approx(wanted, abs=1 / 16)
 
 
@@ -298,8 +296,8 @@ def test_atkinson_clears_the_highlights_floyd_steinberg_keeps_as_dots() -> None:
     """A quarter of Atkinson's error is dropped, so near white it gives plain white where Floyd-Steinberg still scatters
     dark dots."""
     near_white = flat(0.97, 128)
-    atkinson = registry.apply(NAME, near_white, method="atkinson", cell=1 / 128, **BLACK_WHITE)[..., 0].mean()
-    floyd = registry.apply(NAME, near_white, method="floyd_steinberg", cell=1 / 128, **BLACK_WHITE)[..., 0].mean()
+    atkinson = registry.apply(NAME, near_white, method="atkinson", cell=1, **BLACK_WHITE)[..., 0].mean()
+    floyd = registry.apply(NAME, near_white, method="floyd_steinberg", cell=1, **BLACK_WHITE)[..., 0].mean()
     assert atkinson > floyd
 
 
@@ -329,7 +327,7 @@ def test_a_weaker_pattern_leaves_fewer_dots_that_differ_from_the_nearest_colour(
 @pytest.mark.parametrize("method", METHODS)
 def test_a_ramp_goes_through_every_colour_of_a_three_colour_palette_from_dark_to_light(method: str) -> None:
     ramp = np.broadcast_to(np.linspace(0, 1, 96, dtype=np.float32)[None, :, None], (32, 96, 3)).copy()
-    out = registry.apply(NAME, ramp, method=method, palette=["#000000", "#808080", "#ffffff"], cell=1 / 96)
+    out = registry.apply(NAME, ramp, method=method, palette=["#000000", "#808080", "#ffffff"], cell=1)
     assert len(colours_of(out)) == 3
     thirds = out[..., 0].reshape(32, 3, 32).mean(axis=(0, 2))
     assert thirds[0] < thirds[1] < thirds[2]  # darker on the left, lighter on the right
@@ -347,7 +345,7 @@ def test_tiny_pictures_still_come_out_in_palette_colours(method: str, shape: tup
 def test_a_hue_only_palette_dithers_a_grey_into_all_of_its_colours() -> None:
     """Red, green and blue are no brightness ramp; a grey must still come out mixed, not as one colour."""
     for method in ("bayer", "blue_noise", "floyd_steinberg"):
-        out = registry.apply(NAME, flat(0.33), method=method, palette=["#ff0000", "#00ff00", "#0000ff"], cell=1 / 64)
+        out = registry.apply(NAME, flat(0.33), method=method, palette=["#ff0000", "#00ff00", "#0000ff"], cell=1)
         assert len(colours_of(out)) == 3, method
 
 

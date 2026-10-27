@@ -28,5 +28,5 @@ looks = [
 effect = "seams"
 partition = "glass"
 mask = "subject"
-width = 0.0016
+width = 1.6
 color = "#ffffff"

@@ -642,7 +642,7 @@ def rich(**changed: float) -> Recipe:
                 blend_mode="screen",
                 name="a",
             ),
-            Step("seams", {"width": changed.get("width", 0.01), "color": "#ff0000"}, partition="s"),
+            Step("seams", {"width": changed.get("width", 0.5), "color": "#ff0000"}, partition="s"),
             Each(
                 "s",
                 [
@@ -670,7 +670,7 @@ def rich(**changed: float) -> Recipe:
 
 RICH_CASES = {
     "a number of a step": ("a.gain", 3.0, {"gain": 3.0}),
-    "a number of a step with a partition": ("seams.width", 0.02, {"width": 0.02}),
+    "a number of a step with a partition": ("seams.width", 1.0, {"width": 1.0}),
     "the feather of an each": ("p.feather", 0.004, {"feather": 0.004}),
     "a number of a look": ("p.looks[0].offset", 0.3, {"offset": 0.3}),
     "a whole number of a region with a preset and a torn edge": ("region.s.count", 40, {"count": 40}),

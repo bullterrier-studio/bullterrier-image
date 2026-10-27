@@ -166,7 +166,7 @@ mask = "subject"
 [[step]]
 effect = "seams"
 partition = "glass"
-width = 0.0016
+width = 1
 ```
 
 Python:
@@ -185,7 +185,7 @@ glass = Recipe(
             seed=4,
             mask="subject",
         ),
-        fx.seams(partition="glass", width=0.0016),
+        fx.seams(partition="glass", width=1),
     ],
 )
 ```

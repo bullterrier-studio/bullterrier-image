@@ -69,14 +69,13 @@ class DitherParams(EffectParams):
         "'blue_noise' take longer with more colours.",
     )
     cell: float = param(
-        0.0005,
-        unit="fraction",
-        min=0.0005,
-        max=0.1,
-        doc="The size of one dot, as a share of the picture's long side (at least one pixel): the picture is dithered "
-        "on a grid of this size and shown with hard square dots. The default is one pixel on a picture up to 2000 px "
-        "wide; about 0.004 is two pixels on a 480 px picture and 0.02 or more a chunky pixel look. Raising it gives "
-        "coarser, larger dots.",
+        1.0,
+        unit="px",
+        min=1,
+        max=48,
+        doc="The size of one dot in px at the recipe's size (rounded to whole pixels, at least 1): the picture is "
+        "dithered on a grid of this size and shown with hard square dots. The default is one pixel; 4 is a chunky "
+        "dot on a 480 px picture and 10 or more a pixel-art look. Raising it gives coarser, larger dots.",
     )
     pattern: float = param(
         1.0,
@@ -182,7 +181,7 @@ def dither(rgb: np.ndarray, params: DitherParams) -> np.ndarray:
     plain flat colours. Colours are matched, and errors measured, in `space`.
     """
     height, width = rgb.shape[:2]
-    cell = max(1, round(params.cell * max(height, width)))
+    cell = max(1, round(params.cell))
     row_starts, column_starts = np.arange(height)[::cell], np.arange(width)[::cell]
     row_sizes, column_sizes = np.diff(row_starts, append=height), np.diff(column_starts, append=width)
     sums = np.add.reduceat(np.add.reduceat(rgb, row_starts, axis=0), column_starts, axis=1)

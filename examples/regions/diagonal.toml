@@ -15,5 +15,5 @@ looks = ["none", { effect = "gradient_map", preset = "thermal" }]
 [[step]]
 effect = "seams"
 partition = "halves"
-width = 0.003
+width = 3
 color = "#ffffff"

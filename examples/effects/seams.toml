@@ -11,5 +11,5 @@ preset = "glass"
 [[step]]
 effect = "seams"
 partition = "glass"
-width = 0.004
+width = 2
 color = "#ffffff"

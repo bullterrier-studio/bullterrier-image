@@ -12,12 +12,12 @@ class SeamsParams(EffectParams):
     """The settings of `seams`: how wide the line is and what colour."""
 
     width: float = param(
-        0.004,
-        unit="fraction",
+        2.0,
+        unit="px",
         min=0,
-        max=0.1,
-        doc="Width of the line as a share of the picture's long side (0 to 0.1), centred on each border: 0 draws "
-        "nothing, about 0.002 is a hairline, 0.02 or more a band. Raising it widens the line.",
+        max=48,
+        doc="Width of the line in px at the recipe's size, centred on each border: 0 draws nothing, 1 is a hairline, "
+        "10 or more a band. Raising it widens the line.",
     )
     color: Color = param(
         "#ffffff",
@@ -39,6 +39,5 @@ def seams(rgb: np.ndarray, params: SeamsParams, *, partition: np.ndarray | None 
     """
     if partition is None:
         return rgb.copy()
-    line = params.width * max(rgb.shape[:2])
-    cover = line_coverage(border_distance(partition), line).astype(np.float32)[..., None]
+    cover = line_coverage(border_distance(partition), params.width).astype(np.float32)[..., None]
     return (rgb + (np.asarray(params.color, np.float32) - rgb) * cover).astype(np.float32)

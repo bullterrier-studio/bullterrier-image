@@ -25,5 +25,5 @@ looks = [
 effect = "seams"
 partition = "scraps"
 mask = "subject"
-width = 0.007                  # a solid band: no generated paper fibres
+width = 7                  # a solid band: no generated paper fibres
 color = "#f6f1e6"
