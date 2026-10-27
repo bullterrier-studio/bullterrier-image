@@ -82,9 +82,9 @@ selection):
 ```toml
 format = 2
 
-[region.diagonal]                  # a straight cut: through (x, y) at an angle in degrees, counter-clockwise from horizontal
+[region.diagonal]                  # a straight cut: through (x, y) at an angle in degrees, clockwise from the right
 kind = "cuts"
-lines = [{ x = 0.5, y = 0.5, angle = 62 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]  # and a curve
+lines = [{ x = 0.5, y = 0.5, angle = 298 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]  # and a curve
 
 [region.blob]                      # a selection: inside a closed path (M L H V C S Q T A Z, absolute or relative)
 kind = "path"
@@ -135,7 +135,7 @@ map you hand in does not stand in for the finder here (a cell is a part of the p
 both (shares of field's 0..1 scale; `low` above `high` = error). `bands` = partition into `count` equal ranges, numbered
 **highest first** (only exception to reading order): piece 0 = nearest of depth, brightest of light; empty range dropped,
 rest renumbered. `combine` = product (`multiply`, all), least (`min`), greatest (`max`, any). `linear_gradient` rises across
-the picture along `angle` (counter-clockwise from right: 90 rises upward), 0 at one edge, 1 at other. `radial_gradient` rises
+the picture along `angle` (clockwise from right: 90 rises downward), 0 at one edge, 1 at other. `radial_gradient` rises
 from centre (`x`, `y`, shares) to 1 at `radius`, share of long side. Band of gradient = tilt-shift zone or vignette ring; band
 of light = shadows or highlights; subject combined with shadows = shadows on subject.
 

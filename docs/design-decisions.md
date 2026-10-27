@@ -556,7 +556,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   first run uses the kept value, so the first and later runs give the same pixels.
 - **Cuts, paths and SVG shapes are drawn in the frame's units and filled by one scanline fill.** A path's coordinates
   (`Cuts` curves, `Path.d`) are shares of the frame, and the unit square is stretched to it, so an arc is a circle only
-  in a square frame; a straight cut's `angle` is measured on the picture's pixels, counter-clockwise from horizontal.
+  in a square frame; a straight cut's `angle` is measured on the picture's pixels, clockwise from the right like every direction.
   `ops/raster` fills outlines by the nonzero or even-odd rule a few rows at a time (no supersampled picture, so 4K costs
   about 1 s torn and 0.1 s straight): exactly across a pixel, `Path.samples` scanlines down it (advanced, default 4).
   A cut curve is closed along the frame's border and its inside read as one side; an end not on the border is carried

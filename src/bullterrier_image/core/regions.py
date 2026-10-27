@@ -359,10 +359,12 @@ class Line(_Model):
         0.0,
         unit="degrees",
         min=0,
-        max=180,
-        doc="The direction of the line, in degrees counter-clockwise from horizontal as seen on the picture (0 to "
-        "180): 0 and 180 run left to right, 90 straight up and down, 45 rises to the right. The angle is measured on "
-        "the picture's pixels, whatever the frame's shape.",
+        max=360,
+        cyclic=True,
+        doc="The direction of the line, in degrees clockwise from the right as seen on the picture (0 to 360; any "
+        "other angle is the same direction inside that range): 0 and 180 run left to right, 90 and 270 straight up "
+        "and down, 45 falls to the right, 315 rises to the right. A line has no head, so an angle and the one 180 "
+        "further cut alike. The angle is measured on the picture's pixels, whatever the frame's shape.",
     )
 
 
@@ -587,13 +589,13 @@ class LinearGradient(_Model):
     """A selection that rises evenly across the picture in one direction: 0 at one edge, 1 at the opposite one."""
 
     angle: float = param(
-        90.0,
+        270.0,
         unit="degrees",
         min=0,
         max=360,
         cyclic=True,
-        doc="The direction in which the value rises, counter-clockwise from the right (0 to 360): 0 rises to the "
-        "right, 90 upward, 180 to the left, 270 downward. The value is a share of the picture's extent along that "
+        doc="The direction in which the value rises, clockwise from the right (0 to 360): 0 rises to the "
+        "right, 90 downward, 180 to the left, 270 upward. The value is a share of the picture's extent along that "
         "direction, so the far corners are 0 and 1 at any aspect ratio.",
     )
 
@@ -810,10 +812,10 @@ def _cut(
     for bit, cut in enumerate(kind.lines):
         if isinstance(cut, Line):
             angle = math.radians(cut.angle)
-            # the line runs along (cos, -sin) on the screen, so the normal is (sin, cos)
-            side = (x - (left + cut.x * (right - left))) * math.sin(angle) + (
-                y - (top + cut.y * (bottom - top))
-            ) * math.cos(angle) > 0
+            # the line runs along (cos, sin) on the screen (y points down), so the normal is (-sin, cos)
+            side = (y - (top + cut.y * (bottom - top))) * math.cos(angle) - (
+                x - (left + cut.x * (right - left))
+            ) * math.sin(angle) > 0
         else:
             (curve,) = path_outlines(cut.path, box)
             side = _sample(_beyond(curve, box, shape), x, y)
@@ -877,7 +879,7 @@ def _linear(kind: LinearGradient, shape: tuple[int, int]) -> Selection:
     x, y = centres(shape)
     angle = math.radians(kind.angle)
     extent = width * abs(math.cos(angle)) + height * abs(math.sin(angle))
-    along = ((x - width / 2) * math.cos(angle) - (y - height / 2) * math.sin(angle)) / extent + _HALF
+    along = ((x - width / 2) * math.cos(angle) + (y - height / 2) * math.sin(angle)) / extent + _HALF
     return Selection(_frozen(np.clip(along, 0, 1).astype(np.float32)))
 
 

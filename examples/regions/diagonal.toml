@@ -6,7 +6,7 @@ size = 1024
 
 [region.halves]
 kind = "cuts"
-lines = [{ x = 0.5, y = 0.5, angle = 62 }]   # through the middle of the picture, counter-clockwise from horizontal
+lines = [{ x = 0.5, y = 0.5, angle = 298 }]   # through the middle of the picture, clockwise from the right (298 = 62 above horizontal)
 
 [[step]]
 each = "halves"

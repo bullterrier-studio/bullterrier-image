@@ -5,7 +5,7 @@ size = 480
 
 [region.across]                # 0 at the top of the picture, 1 at the bottom
 kind = "linear_gradient"
-angle = 270
+angle = 90
 
 [region.sharp]                 # 1 across the band (focus 0.4, width 0.18), fading to 0 over the feather 0.3
 kind = "band"

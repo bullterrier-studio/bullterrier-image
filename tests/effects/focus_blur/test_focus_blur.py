@@ -142,13 +142,13 @@ def test_the_blur_never_leaves_the_range_of_the_picture(noise: np.ndarray) -> No
 
 
 def test_a_linear_gradient_makes_a_sharp_band_across_the_picture(noise: np.ndarray) -> None:
-    """The gradient at 270 degrees is 0 at the top and 1 at the bottom, row r at (r + 0.5) / 100; a band 0.3 wide
+    """The gradient at 90 degrees is 0 at the top and 1 at the bottom, row r at (r + 0.5) / 100; a band 0.3 wide
     around 0.5 holds the rows from 35 to 64, the closest rows beyond it are blurred."""
     across = recipe.Recipe(
         "band",
         [recipe.Step(NAME, {"field": "across", "focus": 0.5, "width": 0.3, "feather": 0.2, "radius": 6})],
         size=None,
-        regions={"across": recipe.LinearGradient(angle=270)},
+        regions={"across": recipe.LinearGradient(angle=90)},
     )
     out = recipe.render(noise, across)
     np.testing.assert_array_equal(out[35:65], noise[35:65])
@@ -157,14 +157,14 @@ def test_a_linear_gradient_makes_a_sharp_band_across_the_picture(noise: np.ndarr
 
 
 def test_a_band_along_a_tilted_gradient_keeps_its_own_line_sharp() -> None:
-    """The gradient at 315 degrees rises towards the lower right; a picture as wide as it is tall has the middle of
+    """The gradient at 45 degrees rises towards the lower right; a picture as wide as it is tall has the middle of
     its range on the line row + column = 119, and the pixels on that line are untouched, those far from it are not."""
     noise = np.random.default_rng(6).random((120, 120, 3), dtype=np.float32)
     tilted = recipe.Recipe(
         "tilted",
         [recipe.Step(NAME, {"field": "across", "focus": 0.5, "width": 0.1, "feather": 0.2, "radius": 5})],
         size=None,
-        regions={"across": recipe.LinearGradient(angle=315)},
+        regions={"across": recipe.LinearGradient(angle=45)},
     )
     out = recipe.render(noise, tilted)
     rows, cols = np.mgrid[0:120, 0:120]
@@ -188,7 +188,7 @@ def test_a_driven_grade_adds_colour_only_where_the_picture_is_blurred() -> None:
         ],
         size=None,
         regions={
-            "across": recipe.LinearGradient(angle=270),
+            "across": recipe.LinearGradient(angle=90),
             "sharp": recipe.Band(of="across", low=0.0, high=0.05, feather=0.2),
         },
     )

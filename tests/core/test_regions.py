@@ -115,11 +115,11 @@ def declared() -> dict[str, Kind]:
         "subject_whole": Subject(),
         "subject_per_grid": Subject(per="grid"),
         "subject_per_shards": Subject(per="glass", context=0.5),
-        "cut": Cuts(lines=[Line(x=0.5, y=0.5, angle=62)]),
-        "crossing_cuts": Cuts(lines=[Line(angle=30), Line(x=0.3, y=0.6, angle=120)]),
+        "cut": Cuts(lines=[Line(x=0.5, y=0.5, angle=298)]),
+        "crossing_cuts": Cuts(lines=[Line(angle=330), Line(x=0.3, y=0.6, angle=240)]),
         "curve": Cuts(lines=[Curve(path=WAVE)]),
-        "torn_cut": Cuts(lines=[Line(angle=84)], edge=Edge(style="torn")),
-        "cuts_on_subject": Cuts(lines=[Line(angle=10), Curve(path=WAVE)], fit="subject"),
+        "torn_cut": Cuts(lines=[Line(angle=276)], edge=Edge(style="torn")),
+        "cuts_on_subject": Cuts(lines=[Line(angle=350), Curve(path=WAVE)], fit="subject"),
         "blob": Path(d=BLOB),
         "torn_blob": Path(d=BLOB, edge=Edge(style="torn")),
         "blob_on_subject": Path(d=BLOB, fit="subject"),
@@ -233,7 +233,7 @@ AT_THE_LIMITS: dict[str, Kind] = {
     **{f"edge {id_}": Shards(edge=Edge(style="torn", **values)) for id_, values in extremes(Edge)},
     **{f"line {id_}": Cuts(lines=[Line(**values)]) for id_, values in extremes(Line)},
     **{f"path {id_}": Path(d=BLOB, **values) for id_, values in extremes(Path)},
-    "cuts of most": Cuts(lines=[Line(x=i / 31, y=1 - i / 31, angle=5.5 * i) for i in range(32)]),
+    "cuts of most": Cuts(lines=[Line(x=i / 31, y=1 - i / 31, angle=11 * i) for i in range(32)]),
     "a cut torn at the limit": Cuts(lines=[Curve(path=WAVE)], edge=Edge(style="torn", amount=0.1, scale=1)),
     "a path torn at the limit": Path(d=BLOB, edge=Edge(style="torn", amount=0.1, scale=0.01)),
     "shards impact at one corner": Shards(impact=(0, 0)),
@@ -291,7 +291,7 @@ def test_a_selection_of_a_picture_with_fewer_pieces_than_picked_selects_what_exi
         Shards(count=12, edge=Edge(style="torn", amount=0.08, scale=0.3, seed=5)),
         Shards(preset="torn"),
         Shards(preset="stone"),
-        Cuts(lines=[Line(angle=30), Line(x=0.3, y=0.6, angle=120)]),
+        Cuts(lines=[Line(angle=330), Line(x=0.3, y=0.6, angle=240)]),
         Cuts(lines=[Curve(path=WAVE)]),
         Svg(file=MOSAIC),
     ],
@@ -489,7 +489,7 @@ def test_a_straight_edge_ignores_the_other_edge_settings_and_a_torn_one_with_no_
     [
         Grid(columns=3, rows=3),
         Shards(count=12),
-        Cuts(lines=[Line(angle=84)]),
+        Cuts(lines=[Line(angle=276)]),
         Cuts(lines=[Curve(path=WAVE)]),
         Svg(file=MOSAIC),
     ],
@@ -1265,20 +1265,20 @@ def side_of(shape: Shape, start: tuple[float, float], end: tuple[float, float]) 
 
 def line_through(shape: Shape, x: float, y: float, angle: float, box: tuple[int, int, int, int] | None = None):
     """The same line as `Line(x, y, angle)`: through the point at shares (x, y) of `box` (left, top, right, bottom px),
-    running `angle` degrees counter-clockwise from horizontal as seen on the screen, so the direction is (cos, -sin)."""
+    running `angle` degrees clockwise from the right as seen on the screen (rows run down): direction (cos, sin)."""
     left, top, right, bottom = box or (0, 0, shape[1], shape[0])
     point = (left + x * (right - left), top + y * (bottom - top))
-    return point, (point[0] + math.cos(math.radians(angle)), point[1] - math.sin(math.radians(angle)))
+    return point, (point[0] + math.cos(math.radians(angle)), point[1] + math.sin(math.radians(angle)))
 
 
 STRAIGHT_CUTS = {
     "horizontal through the middle": (0.5, 0.5, 0),
-    "vertical off centre": (0.3, 0.5, 90),
-    "diagonal": (0.5, 0.5, 62),
-    "steep, high on the right": (0.8, 0.1, 150),
-    "through a corner": (0, 0, 45),
+    "vertical off centre": (0.3, 0.5, 270),
+    "diagonal": (0.5, 0.5, 298),
+    "steep, high on the right": (0.8, 0.1, 210),
+    "through a corner": (0, 0, 315),
     "along the top edge": (0.5, 0, 0),
-    "past the picture": (1, 1, 10),
+    "past the picture": (1, 1, 350),
 }
 
 
@@ -1293,8 +1293,8 @@ def test_cuts_laid_over_a_selection_take_their_positions_as_shares_of_its_box():
     shape = (96, 128)
     inside = np.argwhere(disc(shape) > 0.5)
     (top, left), (bottom, right) = inside.min(axis=0), inside.max(axis=0) + 1
-    got = labels_of({"c": Cuts(lines=[Line(x=0.25, y=0.6, angle=35)], fit="subject")}, "c", shape)
-    np.testing.assert_array_equal(got, side_of(shape, *line_through(shape, 0.25, 0.6, 35, (left, top, right, bottom))))
+    got = labels_of({"c": Cuts(lines=[Line(x=0.25, y=0.6, angle=325)], fit="subject")}, "c", shape)
+    np.testing.assert_array_equal(got, side_of(shape, *line_through(shape, 0.25, 0.6, 325, (left, top, right, bottom))))
 
 
 def arrangement(shape: Shape, lines: list[tuple[tuple[float, float], tuple[float, float]]]) -> np.ndarray:
@@ -1311,13 +1311,13 @@ def arrangement(shape: Shape, lines: list[tuple[tuple[float, float], tuple[float
 
 def test_several_cuts_make_the_pieces_of_their_arrangement_numbered_in_reading_order():
     shape = (30, 40)
-    lines = [(0.5, 0.5, 20), (0.3, 0.6, 110), (0.9, 0.2, 70)]
+    lines = [(0.5, 0.5, 340), (0.3, 0.6, 250), (0.9, 0.2, 290)]
     got = labels_of({"c": Cuts(lines=[Line(x=x, y=y, angle=a) for x, y, a in lines])}, "c", shape)
     np.testing.assert_array_equal(got, arrangement(shape, [line_through(shape, *line) for line in lines]))
 
 
 def test_parallel_cuts_make_one_piece_more_than_there_are_cuts():
-    cuts = Cuts(lines=[Line(x=x, y=0.5, angle=90) for x in (0.2, 0.5, 0.8)])
+    cuts = Cuts(lines=[Line(x=x, y=0.5, angle=270) for x in (0.2, 0.5, 0.8)])
     assert labels_of({"c": cuts}, "c", (20, 30)).max() + 1 == 4
 
 
@@ -1471,8 +1471,14 @@ def test_a_path_that_is_not_path_data_is_refused_when_it_is_declared_naming_the_
 
 @pytest.mark.parametrize(
     "lines",
-    [[{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}], [{"x": 0.5, "path": "M 0 0 L 1 1"}], [{"x": 2}], [{"angle": 181}], []],
-    ids=["two subpaths", "a line and a curve at once", "a position outside the frame", "an angle past 180", "no lines"],
+    [[{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}], [{"x": 0.5, "path": "M 0 0 L 1 1"}], [{"x": 2}], [{"angle": "up"}], []],
+    ids=[
+        "two subpaths",
+        "a line and a curve at once",
+        "a position outside the frame",
+        "an angle that is not a number",
+        "no lines",
+    ],
 )
 def test_cuts_that_are_not_cuts_are_refused_when_declared(lines):
     with pytest.raises(RecipeError, match=r"lines|path|x|angle"):
@@ -1480,8 +1486,8 @@ def test_cuts_that_are_not_cuts_are_refused_when_declared(lines):
 
 
 def test_values_written_as_a_recipe_file_writes_the_cuts_are_the_same_as_the_models():
-    from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 30}, {"path": WAVE}], edge={"style": "torn"})
-    assert from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=30), Curve(path=WAVE)], edge=Edge(style="torn"))
+    from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 330}, {"path": WAVE}], edge={"style": "torn"})
+    assert from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=330), Curve(path=WAVE)], edge=Edge(style="torn"))
 
 
 # ---- svg -----------------------------------------------------------------------------------------------------------
@@ -1803,7 +1809,7 @@ def test_a_gradient_rising_to_the_right_is_the_share_of_the_width_at_each_pixels
     [
         pytest.param(0, lambda alpha: alpha[:, ::-1], id="rising to the right is the mirror of rising to the left"),
         pytest.param(180, lambda alpha: alpha[:, ::-1], id="a half turn"),
-        pytest.param(90, lambda alpha: alpha[::-1], id="rising upward is the mirror of rising downward"),
+        pytest.param(90, lambda alpha: alpha[::-1], id="rising downward is the mirror of rising upward"),
     ],
 )
 def test_opposite_directions_make_mirror_gradients(angle, by_hand):
@@ -1815,15 +1821,16 @@ def test_opposite_directions_make_mirror_gradients(angle, by_hand):
 
 
 def test_a_gradient_rising_upward_is_1_at_the_top_and_0_at_the_bottom():
-    alpha = resolve({"g": LinearGradient(angle=90)}, (8, 3), maps={}).selection("g").alpha
+    alpha = resolve({"g": LinearGradient(angle=270)}, (8, 3), maps={}).selection("g").alpha
     np.testing.assert_allclose(alpha[:, 0], 1 - (np.arange(8) + 0.5) / 8, atol=1e-6)
     np.testing.assert_allclose(alpha, np.tile(alpha[:, :1], (1, 3)))  # constant along each row
 
 
 def test_an_oblique_gradient_on_a_wide_picture_has_the_values_worked_out_by_hand():
-    # 45 degrees on 40 columns x 10 rows: the extent that way is 40 cos 45 + 10 sin 45 = 50 cos 45, and a pixel centre
-    # (x, y) is ((x - 20) cos 45 - (y - 5) sin 45) / (50 cos 45) + 0.5, where cos 45 = sin 45 cancels
-    alpha = resolve({"g": LinearGradient(angle=45)}, (10, 40), maps={}).selection("g").alpha
+    # 315 degrees (clockwise from the right: up and to the right) on 40 columns x 10 rows: the extent that way is
+    # 40 cos 45 + 10 sin 45 = 50 cos 45, and a pixel centre (x, y) is ((x - 20) cos 45 - (y - 5) sin 45) / (50 cos 45) +
+    # 0.5, where cos 45 = sin 45 cancels
+    alpha = resolve({"g": LinearGradient(angle=315)}, (10, 40), maps={}).selection("g").alpha
     assert alpha[0, 39] == pytest.approx((19.5 + 4.5) / 50 + 0.5, abs=1e-6)  # 0.98: top right
     assert alpha[9, 0] == pytest.approx((-19.5 - 4.5) / 50 + 0.5, abs=1e-6)  # 0.02: bottom left
     assert alpha[2, 30] == pytest.approx((10.5 + 2.5) / 50 + 0.5, abs=1e-6)  # 0.76
@@ -1831,15 +1838,15 @@ def test_an_oblique_gradient_on_a_wide_picture_has_the_values_worked_out_by_hand
 
 
 def test_a_diagonal_gradient_reaches_0_and_1_at_the_far_corners_whatever_the_aspect():
-    alpha = resolve({"g": LinearGradient(angle=45)}, (10, 40), maps={}).selection("g").alpha
+    alpha = resolve({"g": LinearGradient(angle=315)}, (10, 40), maps={}).selection("g").alpha
     assert alpha[-1, 0] < 0.03  # bottom left: the start of a rise towards the top right
     assert alpha[0, -1] > 0.97
     assert alpha[5, 20] == pytest.approx(0.5, abs=0.02)  # the middle of the picture is half way
 
 
 def test_the_same_gradient_has_the_same_shape_at_two_sizes():
-    small = resolve({"g": LinearGradient(angle=30)}, (20, 30), maps={}).selection("g").alpha
-    large = resolve({"g": LinearGradient(angle=30)}, (80, 120), maps={}).selection("g").alpha
+    small = resolve({"g": LinearGradient(angle=330)}, (20, 30), maps={}).selection("g").alpha
+    large = resolve({"g": LinearGradient(angle=330)}, (80, 120), maps={}).selection("g").alpha
     np.testing.assert_allclose(large[2::4, 2::4], small, atol=0.03)  # a share of the frame, not of a pixel count
 
 
@@ -1873,7 +1880,7 @@ def test_a_radial_gradient_follows_its_centre_and_scales_with_the_picture():
 
 def test_a_tilt_is_a_band_of_a_gradient_and_a_vignette_is_a_gradient_beyond_a_radius():
     regions = resolve(
-        {"rise": LinearGradient(angle=90), "middle": Band(of="rise", low=0.4, high=0.6, feather=0)},
+        {"rise": LinearGradient(angle=270), "middle": Band(of="rise", low=0.4, high=0.6, feather=0)},
         (10, 4),
         maps={},
     )

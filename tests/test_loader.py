@@ -421,7 +421,7 @@ size = 64
 
 [region.halves]
 kind = "cuts"
-lines = [{ x = 0.5, y = 0.5, angle = 62 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]
+lines = [{ x = 0.5, y = 0.5, angle = 298 }, { path = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1" }]
 edge = { style = "torn", amount = 0.01 }
 
 [region.blob]
@@ -468,7 +468,7 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
         size=64,
         regions={
             "halves": Cuts(
-                lines=[Line(x=0.5, y=0.5, angle=62), Curve(path="M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1")],
+                lines=[Line(x=0.5, y=0.5, angle=298), Curve(path="M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1")],
                 edge=Edge(style="torn", amount=0.01),
             ),
             "blob": PathRegion(d="M 0.1 0.1 H 0.6 V 0.7 Z", samples=8),

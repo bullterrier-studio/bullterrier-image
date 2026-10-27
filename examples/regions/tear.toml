@@ -6,7 +6,7 @@ size = 1024
 
 [region.tear]
 kind = "cuts"
-lines = [{ x = 0.6, y = 0.5, angle = 84 }]
+lines = [{ x = 0.6, y = 0.5, angle = 276 }]
 edge = { style = "torn", amount = 0.01, scale = 0.12, seed = 2 }   # bends the cut by 1% of the long side, in slow wanders
 
 [[step]]

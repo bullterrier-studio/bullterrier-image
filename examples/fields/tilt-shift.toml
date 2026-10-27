@@ -7,7 +7,7 @@ size = 1024
 
 [region.rise]                  # 0 at the bottom of the picture, 1 at the top
 kind = "linear_gradient"
-angle = 90
+angle = 270
 
 [region.focus]                 # 1 across the middle band, fading to 0 over a third of the height either side of it
 kind = "band"
