@@ -248,7 +248,7 @@ def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, dep
     [
         pytest.param({"frame": Framing(flip="x")}, lambda a: a[:, ::-1], id="a flip"),
         pytest.param({"frame": Framing(aspect=1.0)}, lambda a: a[:, 16:112], id="a square crop"),
-        pytest.param({"frame": Framing(angle=90, fit="expand")}, np.rot90, id="a quarter turn"),
+        pytest.param({"frame": Framing(angle=-90, fit="expand")}, np.rot90, id="a quarter turn"),
         pytest.param(
             {"frame": Framing(pad_top=0.5)},
             lambda a: np.concatenate([np.zeros((48, 128), np.float32), a]),
@@ -327,7 +327,7 @@ def test_a_given_map_limits_a_step_to_where_it_is(photo, given):
     [
         pytest.param(Framing(flip="x"), lambda a: a[:, ::-1], id="a flip"),
         pytest.param(Framing(aspect=1.0), lambda a: a[:, 16:112], id="a square crop"),
-        pytest.param(Framing(angle=90, fit="expand"), np.rot90, id="a quarter turn"),
+        pytest.param(Framing(angle=-90, fit="expand"), np.rot90, id="a quarter turn"),
     ],
 )
 def test_a_given_map_moves_with_the_photo_through_the_framing(photo, frame, by_hand):
@@ -681,7 +681,7 @@ def test_a_recipe_without_framing_runs_its_steps_on_the_photo_scaled_to_its_size
         pytest.param(Framing(aspect=1.0), lambda a: a[:, 16:112], id="a square crop"),
         pytest.param(Framing(aspect=1.0, anchor="left"), lambda a: a[:, :96], id="a square crop at the left"),
         pytest.param(Framing(flip="x"), lambda a: a[:, ::-1], id="a flip"),
-        pytest.param(Framing(angle=90, fit="expand"), lambda a: np.rot90(a), id="a quarter turn"),
+        pytest.param(Framing(angle=-90, fit="expand"), lambda a: np.rot90(a), id="a quarter turn"),
     ],
 )
 def test_the_steps_run_on_the_framed_photo_and_a_masked_step_still_finds_the_subject_where_it_moved(

@@ -256,7 +256,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Size changes frame the photo before the steps; transparency is cut after them.** A recipe's framing (`Framing`,
   `bullterrier_image.core.framing`: `[frame]` in a recipe file, `Recipe(..., frame=Framing(...))` in Python) is applied
   by the runner to the photo and its maps (the subject, the depth, any map handed in) together, before the first step, in one fixed order: `flip` (none, x,
-  y, both), `angle` (counter-clockwise degrees, with `fit` crop or expand and a `resample` filter), the crop (`aspect`
+  y, both), `angle` (clockwise degrees, with `fit` crop or expand and a `resample` filter), the crop (`aspect`
   as width over height, put at an `anchor`: center, top, bottom, left, right, or the subject with a `margin` around
   it), the `pad_top`, `pad_right`, `pad_bottom` and `pad_left` borders (shares of the picture's shorter side, in
   `fill`), and then the existing `size`. The subject is found on the photo as given, before any of it, so a crop can

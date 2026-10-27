@@ -45,10 +45,10 @@ def test_flip_is_numpys_flip(x, y, expected):
 
 @pytest.mark.parametrize(
     ("angle", "turns"),
-    [(90, 1), (180, 2), (270, 3), (-90, 3), (360, 0), (-270, 1)],
+    [(90, 3), (180, 2), (270, 1), (-90, 1), (360, 0), (-270, 3)],
     ids=lambda value: str(value),
 )
-def test_a_quarter_turn_expanded_moves_every_pixel_exactly_counter_clockwise(angle, turns):
+def test_a_quarter_turn_expanded_moves_every_pixel_exactly_clockwise(angle, turns):
     picture = numbered(2, 3)
     turned = frame.rotate(picture, angle, fit="expand", fill=RED, resample="bicubic")
     np.testing.assert_array_equal(turned, np.rot90(picture, turns))
@@ -59,7 +59,7 @@ def test_a_quarter_turn_cropped_keeps_the_original_aspect_around_the_centre():
     # wide and 4 tall, in the middle
     picture = numbered(8, 4)
     turned = frame.rotate(picture, 90, fit="crop", fill=RED, resample="bicubic")
-    np.testing.assert_array_equal(turned, np.rot90(picture)[:, 3:5])
+    np.testing.assert_array_equal(turned, np.rot90(picture, 3)[:, 3:5])
 
 
 @pytest.mark.parametrize(
@@ -92,14 +92,14 @@ def test_expanding_shows_the_fill_in_the_corners_and_the_picture_in_the_middle()
     assert covered == pytest.approx(40 * 60, rel=0.03)
 
 
-def test_a_positive_angle_turns_the_picture_counter_clockwise():
+def test_a_positive_angle_turns_the_picture_clockwise():
     picture = np.zeros((41, 41, 3), np.float32)
     picture[20, 30] = 1.0  # 10 px right of the centre
     turned = frame.rotate(picture, 30, fit="crop", fill=RED, resample="bilinear")
     centre = np.array(turned.shape[:2]) // 2
     row, column = np.unravel_index(np.argmax(turned[..., 0]), turned.shape[:2])
-    # a point 10 px to the right moves to 10*cos(30) = 8.66 right and 10*sin(30) = 5 up
-    assert (column - centre[1], centre[0] - row) == pytest.approx((8.66, 5.0), abs=1.0)
+    # a point 10 px to the right moves to 10*cos(30) = 8.66 right and 10*sin(30) = 5 down
+    assert (column - centre[1], row - centre[0]) == pytest.approx((8.66, 5.0), abs=1.0)
 
 
 @pytest.mark.parametrize("resample", ["nearest", "bilinear", "bicubic"])

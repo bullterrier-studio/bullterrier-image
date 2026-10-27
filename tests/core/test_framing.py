@@ -71,8 +71,8 @@ def test_the_default_framing_changes_nothing_and_returns_the_photo_and_maps_them
         pytest.param({"flip": "x"}, lambda a: a[:, ::-1], id="flip x"),
         pytest.param({"flip": "y"}, lambda a: a[::-1], id="flip y"),
         pytest.param({"flip": "both"}, lambda a: a[::-1, ::-1], id="flip both"),
-        pytest.param({"angle": 90, "fit": "expand"}, lambda a: np.rot90(a), id="a quarter turn"),
-        pytest.param({"angle": -90, "fit": "expand"}, lambda a: np.rot90(a, 3), id="a quarter turn clockwise"),
+        pytest.param({"angle": -90, "fit": "expand"}, lambda a: np.rot90(a), id="a quarter turn counter-clockwise"),
+        pytest.param({"angle": 90, "fit": "expand"}, lambda a: np.rot90(a, 3), id="a quarter turn clockwise"),
         pytest.param({"aspect": 1.0}, lambda a: a[:, 1:5], id="a square crop in the middle"),
         pytest.param({"aspect": 1.0, "anchor": "left"}, lambda a: a[:, :4], id="a square crop at the left"),
         pytest.param({"aspect": 1.0, "anchor": "right"}, lambda a: a[:, 2:], id="a square crop at the right"),
@@ -106,7 +106,7 @@ def test_a_border_is_a_share_of_the_shorter_side_in_the_fill_and_is_zero_in_ever
 
 def test_the_steps_run_in_the_order_flip_turn_crop_pad(small):
     photo, maps = small
-    framing = Framing(flip="x", angle=90, fit="expand", aspect=1.0, anchor="top", pad_bottom=0.5, fill="#0000ff")
+    framing = Framing(flip="x", angle=-90, fit="expand", aspect=1.0, anchor="top", pad_bottom=0.5, fill="#0000ff")
     framed_photo, framed = framing.apply(photo, maps)
     turned = np.rot90(photo[:, ::-1])  # 6 rows by 4 columns
     cropped = turned[:4]  # a square at the top

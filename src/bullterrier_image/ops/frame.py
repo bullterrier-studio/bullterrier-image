@@ -2,7 +2,7 @@
 
 Every function takes pixels (the caller turns shares of the picture into pixels) and works on float32 pictures of any
 number of channels, so a subject matte can travel as a fourth channel and move with the photo. Rotation is
-counter-clockwise for a positive angle, as on a clock seen in a mirror: it is the direction `numpy.rot90` turns.
+clockwise for a positive angle, as on a clock face: the opposite of the direction `numpy.rot90` turns.
 """
 
 import math
@@ -48,7 +48,7 @@ def flip(array: np.ndarray, *, x: bool, y: bool) -> np.ndarray:
 
 
 def rotate(array: np.ndarray, angle: float, *, fit: Fit, fill: Sequence[float], resample: Resample) -> np.ndarray:
-    """`array` (rows, columns, channels) turned by `angle` degrees about its centre, counter-clockwise when positive.
+    """`array` (rows, columns, channels) turned by `angle` degrees about its centre, clockwise when positive.
 
     `fit="expand"` makes the picture as large as the whole turned picture needs, `fill` (one value per channel) showing
     in the corners; `fit="crop"` keeps the largest rectangle of the original's aspect that the turned picture covers
@@ -63,13 +63,13 @@ def rotate(array: np.ndarray, angle: float, *, fit: Fit, fill: Sequence[float], 
         scale = min(1 / (cos + height / width * sin), 1 / (width / height * sin + cos))
         size = (max(1, _down(width * scale)), max(1, _down(height * scale)))
     if angle % _QUARTER == 0:
-        turned = np.rot90(array, round(angle / _QUARTER))
+        turned = np.rot90(array, -round(angle / _QUARTER))  # rot90 turns counter-clockwise
         top, left = (turned.shape[0] - size[1]) // 2, (turned.shape[1] - size[0]) // 2
         return turned if fit == "expand" else np.ascontiguousarray(Box(top, left, size[1], size[0]).of(turned))
 
     # PIL maps each output pixel's position to the input's: x_in = a x + b y + c, y_in = d x + e y + f, positions in
     # pixel-corner coordinates, so the middles are half the sizes
-    radians = math.radians(angle)
+    radians = -math.radians(angle)  # the matrix turns counter-clockwise by `radians`
     a, b, d, e = math.cos(radians), -math.sin(radians), math.sin(radians), math.cos(radians)
     centre = (size[0] / 2, size[1] / 2)
     matrix = (a, b, width / 2 - a * centre[0] - b * centre[1], d, e, height / 2 - d * centre[0] - e * centre[1])
