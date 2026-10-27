@@ -13,7 +13,6 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | Basic tone controls: `exposure` in stops, then `contrast` around `pivot`, then `saturation`, then `vibrance`. | `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
-| <img src="../gallery/hue_shift.jpg" width="160" alt="hue_shift"> | `hue_shift` | Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme. | `hue=90.0` | [hue_shift.toml](../../examples/effects/hue_shift.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
 | <img src="../gallery/posterize.jpg" width="160" alt="posterize"> | `posterize` | Reduce every colour channel to `levels` evenly spaced tones, each value snapping to the nearest one. | `levels=256` | [posterize.toml](../../examples/effects/posterize.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
@@ -148,12 +147,6 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `night_vision` | Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette). |
 | `xray` | Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest). |
 
-### `hue_shift`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `hue` | number (drivable) (cyclic) | degrees | -180 to 180 | `90.0` | The turn around the colour wheel: 120 sends red to green, 360 is a full turn (unchanged). |
-
 ### `levels`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -183,9 +176,15 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `hue` | number (cyclic) | degrees | 0 to 360 | `0.0` | Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120 green, 180 cyan, 240 blue, 300 magenta; 360 is red again. |
 | `width` | number | degrees | 0 to 360 | `60.0` | Full width of the range, 0..360 degrees, centred on `hue`; colours inside it are changed at full strength. 360 takes in every colour; raising it widens the range. |
 | `feather` | number | degrees | 0 to 180 | `30.0` | How far beyond each edge of the range the change fades out, 0..180 degrees: the weight falls in a straight line from full at the edge to none that far away. 0 gives a hard edge; raising it blends the range into its neighbours. |
-| `hue_shift` | number | degrees | -180 to 180 | `0.0` | How far the selected hues are turned round the colour wheel, -180..180 degrees; positive goes red toward yellow, green, blue. 0 keeps the hue. |
+| `hue_shift` | number (drivable) | degrees | -180 to 180 | `0.0` | How far the selected hues are turned round the colour wheel, -180..180 degrees; positive goes red toward yellow, green, blue. 0 keeps the hue. With `width` 360 and `feather` 0 every colour turns (preset `hue_shift`). |
 | `saturation` | number | ratio | 0 to 3 | `1.0` | Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above 1 makes them more vivid (stopping at full saturation). |
 | `lightness` | number | fraction | -1 to 1 | `0.0` | Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the gap in that direction. |
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `hue_shift` | Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay. |
 
 ### `split_tone`
 

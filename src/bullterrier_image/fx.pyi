@@ -1846,19 +1846,6 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     brightness there makes an edge)."""
     ...
 
-def hue_shift(hue: float | Drive = 90.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Rotate every hue around the colour wheel by `hue` degrees: the quickest way to try another colour scheme.
-
-Brightness is preserved (as `luminance` measures it), so the picture keeps its lighting while colours change,
-except for very saturated colours whose rotated version cannot be displayed and gets clipped.
-
-Parameters
-----------
-hue : number (drivable) (cyclic), degrees, -180 to 180, default 90.0
-    The turn around the colour wheel: 120 sends red to green, 360 is a full turn
-    (unchanged)."""
-    ...
-
 def interlace(offset: float = 6.0, field: Literal['odd', 'even'] = 'odd', edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched.
 
@@ -3442,7 +3429,7 @@ color : colour, default '#ffffff'
     Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1."""
     ...
 
-def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float = 0.0, saturation: float = 1.0, lightness: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float | Drive = 0.0, saturation: float = 1.0, lightness: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['hue_shift'] | None = None) -> Step:
     """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched.
 
 Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the
@@ -3464,16 +3451,21 @@ feather : number, degrees, 0 to 180, default 30.0
     How far beyond each edge of the range the change fades out, 0..180 degrees: the
     weight falls in a straight line from full at the edge to none that far away. 0 gives
     a hard edge; raising it blends the range into its neighbours.
-hue_shift : number, degrees, -180 to 180, default 0.0
+hue_shift : number (drivable), degrees, -180 to 180, default 0.0
     How far the selected hues are turned round the colour wheel, -180..180 degrees;
-    positive goes red toward yellow, green, blue. 0 keeps the hue.
+    positive goes red toward yellow, green, blue. 0 keeps the hue. With `width` 360 and
+    `feather` 0 every colour turns (preset `hue_shift`).
 saturation : number, ratio, 0 to 3, default 1.0
     Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above
     1 makes them more vivid (stopping at full saturation).
 lightness : number, fraction, -1 to 1, default 0.0
     Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
     black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
-    gap in that direction."""
+    gap in that direction.
+
+Presets
+-------
+hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay."""
     ...
 
 def shadows_highlights(shadows: float = 0.5, highlights: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.1, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
