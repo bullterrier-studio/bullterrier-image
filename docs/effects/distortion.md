@@ -20,7 +20,6 @@ Warps that bend, ripple or displace the picture's geometry.
 | <img src="../gallery/pixel_sort.jpg" width="160" alt="pixel_sort"> | `pixel_sort` | Sort every run of pixels whose key lies between `low` and `high` along the rows (or columns) by that key. | `by='brightness'` `low=0.25` `high=0.75` `axis='horizontal'` `order='ascending'` | [pixel_sort.toml](../../examples/effects/pixel_sort.toml) |
 | <img src="../gallery/polar.jpg" width="160" alt="polar"> | `polar` | Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from'). | `mode='to'` `x=0.5` `y=0.5` +2 advanced | [polar.toml](../../examples/effects/polar.toml) |
 | <img src="../gallery/ripple.jpg" width="160" alt="ripple"> | `ripple` | Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`. | `wavelength=40.0` `amplitude=6.0` `phase=0.0` `angle=0.0` +2 advanced | [ripple.toml](../../examples/effects/ripple.toml) |
-| <img src="../gallery/scatter.jpg" width="160" alt="scatter"> | `scatter` | Replace every pixel by one picked at random from within `radius` px of it. | `radius=4` `seed=0` +1 advanced | [scatter.toml](../../examples/effects/scatter.toml) |
 | <img src="../gallery/shatter.jpg" width="160" alt="shatter"> | `shatter` | Break the picture into pieces, move and turn each, optionally flatten each to its mean colour, and draw `gap` px lines between them. | `pieces=24` `shape='voronoi'` `detail=0.0` `fill=0.0` `offset=10.0` `angle=5.0` `gap=0.0` `color='#000000'` `seed=0` +2 advanced | [shatter.toml](../../examples/effects/shatter.toml) |
 | <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance. | `slices=30` `amount=0.05` `seed=0` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
 | <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
@@ -32,7 +31,7 @@ Warps that bend, ripple or displace the picture's geometry.
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `amount` | number (drivable) | px | 0 to 500 | `12.0` | The farthest any pixel's move is, in pixels: the moves are scaled so that the largest one, wherever the noise is strongest, is exactly this far. Raising it tears the picture up more; 0 leaves it unchanged. |
-| `scale` | number | px | 1 to 1024 | `80.0` | Size of the coarsest waves of the displacement in pixels, the spacing of the first noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine, jittery tearing. |
+| `scale` | number | px | 1 to 1024 | `80.0` | Size of the coarsest waves of the displacement in pixels, the spacing of the first noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine, jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own, frosted glass, most by about a quarter of `amount`. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers finer than one pixel are dropped. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
@@ -268,21 +267,6 @@ Warps that bend, ripple or displace the picture's geometry.
 | --- | --- | --- | --- | --- | --- |
 | `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the wave sees beyond the picture's edge (it moves pixels in from outside along the edges): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
-
-</details>
-
-### `scatter`
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `radius` | whole number | px | 0 to 500 | `4` | How far a pixel may be moved, in whole pixels, up or down and left or right: each pixel shows the one up to this many pixels away along each direction, picked at random. 0 leaves the picture unchanged; a few pixels give frosted glass, tens of pixels dissolve the picture into confetti. Tuned for a picture about 480 px high. |
-| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same scatter, another seed a different one. |
-
-<details><summary>Advanced parameters (1)</summary>
-
-| Parameter | Type | Unit | Range | Default | Description |
-| --- | --- | --- | --- | --- | --- |
-| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when its move reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
 

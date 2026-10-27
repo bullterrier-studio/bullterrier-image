@@ -932,7 +932,8 @@ amount : number (drivable), px, 0 to 500, default 12.0
 scale : number, px, 1 to 1024, default 80.0
     Size of the coarsest waves of the displacement in pixels, the spacing of the first
     noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine,
-    jittery tearing.
+    jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own,
+    frosted glass, most by about a quarter of `amount`.
 octaves : whole number, count, 1 to 8, default 3
     How many layers of noise are summed, each finer than the last (by `lacunarity`) and
     weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers
@@ -3671,32 +3672,6 @@ darkness : number, fraction, 0 to 1, default 0.35
 offset : number, px, 0 to 64, default 0.0
     How far down in px the first line starts from the top of the picture. Offsets of
     more than `spacing` repeat the pattern: the lines are at offset + k x spacing."""
-    ...
-
-def scatter(radius: int = 4, seed: int = 0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace every pixel by one picked at random from within `radius` px of it.
-
-Each pixel reads the picture at its own place moved by a random whole number of pixels, between -`radius` and
-`radius`, down and right, drawn independently for every pixel from `seed`. No colours are blended, so every output
-pixel is exactly an input pixel; `edge` says what a move that leaves the picture reads.
-
-Parameters
-----------
-radius : whole number, px, 0 to 500, default 4
-    How far a pixel may be moved, in whole pixels, up or down and left or right: each
-    pixel shows the one up to this many pixels away along each direction, picked at
-    random. 0 leaves the picture unchanged; a few pixels give frosted glass, tens of
-    pixels dissolve the picture into confetti. Tuned for a picture about 480 px high.
-seed : whole number, count, 0 to 4294967295, default 0
-    Random seed: the same seed always gives the same scatter, another seed a different
-    one.
-
-Advanced parameters
--------------------
-edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-    What a pixel near the border sees when its move reads from beyond the picture:
-    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 def seams(width: float = 0.004, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:
