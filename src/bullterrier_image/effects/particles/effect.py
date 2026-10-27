@@ -13,11 +13,11 @@ class ParticlesParams(EffectParams):
 
     density: float = param(
         1.0,
-        unit="count",
+        unit="density",
         min=0,
         max=300,
-        doc="How many particles there are: particles per 1000 square px of picture (a 32 x 32 px area), so the same "
-        "density looks alike on any picture size. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a "
+        doc="How many particles there are: particles per 1000 design px² (a 32 x 32 px area at the recipe's size), "
+        "so any picture size looks alike. 0 = none (the picture unchanged), 1 is a steady shower of rain, 7 a "
         "clear night sky of stars, 244 a dense field of tiny ones.",
     )
     size: float = param(

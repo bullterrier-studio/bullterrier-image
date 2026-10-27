@@ -11,20 +11,21 @@ class FlowLinesParams(EffectParams):
     """Streamlines of a flow field made of fractal noise: lines that start at random points and follow the flow."""
 
     density: float = param(
-        0.002,
-        unit="fraction",
+        2.0,
+        unit="density",
         min=0,
-        max=0.05,
-        doc="How many lines: the share of the picture's pixels that start one, so a 480 x 384 picture at 0.002 has "
-        "about 370. 0 draws none. More = a denser weave; lines cross freely.",
+        max=50,
+        doc="How many lines: lines started per 1000 design px² (a 32 x 32 px area at the recipe's size), so any "
+        "picture size looks alike; a 480 x 384 picture at 2 has about 370. 0 draws none. More = a denser weave; "
+        "lines cross freely.",
     )
-    length: int = param(
-        120,
-        unit="count",
+    length: float = param(
+        120.0,
+        unit="px",
         min=1,
         max=2000,
-        doc="How many steps each line follows the flow; with `step` it sets the line's length in px. A line also "
-        "ends where it reaches the edge of the picture.",
+        doc="How far each line follows the flow, in px along the line, tuned for a picture about 480 px high. It is "
+        "drawn in steps of `step`. A line also ends where it reaches the edge of the picture.",
     )
     step: float = param(
         1.0,
@@ -101,14 +102,17 @@ def flow_lines(rgb: np.ndarray, params: FlowLinesParams) -> np.ndarray:
     """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
 
     A generated background: the input is used only for its height and width, its content is ignored. The flow's
-    direction at each pixel is `twist` times a fractal noise field. Each of the `density` x pixels lines starts at a
-    random point and takes `length` steps of `step` px along the flow (the direction read at the pixel the line is
-    in), ending early where it would leave the picture. A soft disc `thickness` px across is stamped at every
-    point; where discs overlap the strongest counts, so lines stay as bold as one.
+    direction at each pixel is `twist` times a fractal noise field. Each of the `density` per 1000 px² lines starts at
+    a random point and follows the flow for `length` px in steps of `step` px (the direction read at the pixel the
+    line is in; the steps are `length` / `step` rounded), ending early where it would leave the picture. A soft disc
+    `thickness` px across is stamped at every point; where discs overlap the strongest counts, so lines stay as bold
+    as one.
     """
     height, width = rgb.shape[:2]
     rng = np.random.default_rng(params.seed)
-    lines = round(params.density * height * width)
+    # constant: density is counted per 1000 square px
+    lines = round(params.density * height * width / 1000)
+    moves = round(params.length / params.step)
     extent = np.array([width, height])  # x then y
     where = rng.random((lines, len(extent))) * extent  # px
     # constant: stream 1 of the seed, independent of the starts' stream 0 (the seed itself)
@@ -121,10 +125,10 @@ def flow_lines(rgb: np.ndarray, params: FlowLinesParams) -> np.ndarray:
         seed=[params.seed, 1],
     )
     # follow all the lines together; `running` marks those that have not left the picture
-    trail = np.empty((params.length, *where.shape))
-    running = np.ones((params.length, lines), bool)
+    trail = np.empty((moves + 1, *where.shape))  # the start and each move
+    running = np.ones((moves + 1, lines), bool)
     on_picture = np.ones(lines, bool)
-    for k in range(params.length):
+    for k in range(moves + 1):
         on_picture &= (where[:, 0] >= 0) & (where[:, 0] < width) & (where[:, 1] >= 0) & (where[:, 1] < height)
         trail[k], running[k] = where, on_picture
         moving = np.flatnonzero(on_picture)

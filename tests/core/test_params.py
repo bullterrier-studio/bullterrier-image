@@ -783,6 +783,20 @@ class Sized(EffectParams):
     shift: int = param(-10, unit="px", min=-500, max=500, doc="Sideways shift. Negative goes left.")
     amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of it.")
     count: int = param(4, unit="count", min=1, max=9, doc="How many.")
+    rate: float = param(2.0, unit="density", min=0, max=50, doc="Marks per 1000 design px squared.")
+
+
+@pytest.mark.parametrize(
+    ("factor", "rate"),
+    [
+        pytest.param(1, 2.0, id="by 1 nothing changes"),
+        pytest.param(2, 0.5, id="doubled size: a quarter of the density, the same marks in the same picture"),
+        pytest.param(0.5, 8.0, id="halved size: four times the density"),
+        pytest.param(0.01, 20000.0, id="below the design size the density grows, with no ceiling"),
+    ],
+)
+def test_a_density_scales_with_the_inverse_of_the_area(factor, rate):
+    assert Sized().scaled(factor).rate == pytest.approx(rate)
 
 
 @pytest.mark.parametrize(

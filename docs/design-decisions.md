@@ -321,6 +321,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   pixel values (shares and angles), so only effects scale; noise and random placements keep their character at another
   size, not their exact positions.
 
+- **Marks: a count or a density.** A few marks (`dead_pixels.count`, `lens_drops.count`, `scratches`, `pieces`, `bands`)
+  are a `count`: it reads naturally, and the marks' sizes are `px`, so the same count covers the same share at any size.
+  Numerous marks (`particles`, `dust_scratches`, `flow_lines`) take a `density`, marks per 1000 design px², the same
+  everywhere; `EffectParams.scaled` divides it by the size ratio squared, so the count of marks over the picture stays the
+  same at any size. *Reason:* a density counted on the working pixels grew sixteen-fold in count at four times the size
+  while each mark grew sixteen-fold in area, so a 1920 px render was far denser than a 480 px one. `flow_lines.length` is
+  px along the line (steps = length / step), not a number of steps, so it scales with the picture like every length.
+
 ## Errors and I/O
 
 - **One error hierarchy.** Library code raises `BullterrierImageError` subclasses (`RecipeError`, `UnknownEffectError`,

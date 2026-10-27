@@ -66,7 +66,7 @@ from bullterrier_image.errors import LutError, RecipeError
 
 from .types import Color as ColorForms
 
-UNITS = ("px", "fraction", "degrees", "stops", "count", "ratio", "cycles")
+UNITS = ("px", "fraction", "degrees", "stops", "count", "ratio", "cycles", "density")
 
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
 
@@ -542,18 +542,22 @@ class EffectParams(ValidatedModel):
         return frozenset(name for name in cls.model_fields if hints[name] is Lut)
 
     def scaled(self, factor: float) -> Self:
-        """A copy with every pixel value (a field with the unit `px`) multiplied by `factor`: the same look at another
-        size. A whole number is rounded. When shrinking (`factor` below 1) a value stops at the field's `min`, which
-        keeps a small picture valid (a cell of at least 3 pixels); growing has no ceiling, as a range is in design
-        pixels and the copy is not checked against it. Other units are unchanged."""
+        """A copy with every pixel value (a field with the unit `px`) multiplied by `factor` and every `density` (marks
+        per 1000 design px²) divided by `factor` squared: the same look at another size. A whole number is rounded.
+        When shrinking (`factor` below 1) a pixel value stops at the field's `min`, which keeps a small picture valid
+        (a cell of at least 3 pixels); growing has no ceiling, as a range is in design pixels and the copy is not
+        checked against it. Other units are unchanged."""
         whole = self.whole_number_fields()
         changes = {}
         for name, info in type(self).model_fields.items():
-            if unit_of(info) != "px":
-                continue
-            value = getattr(self, name) * factor
-            value = round(value) if name in whole else value
-            changes[name] = max(bounds(info)[0], value) if factor < 1 else value
+            unit = unit_of(info)
+            if unit == "density":
+                # marks per area: an area grows with the square of a length
+                changes[name] = getattr(self, name) / factor**2
+            elif unit == "px":
+                value = getattr(self, name) * factor
+                value = round(value) if name in whole else value
+                changes[name] = max(bounds(info)[0], value) if factor < 1 else value
         return self.model_copy(update=changes)
 
     @classmethod

@@ -1452,3 +1452,22 @@ def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_backg
     recipe = Recipe("masked", (Step("gradient", {"colors": ["#000000"]}, mask),), size=None)
     out = runner.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
     np.testing.assert_array_equal(out, expected(photo))
+
+
+@pytest.mark.parametrize(
+    "marks",
+    [
+        pytest.param(Step("particles", {"density": 3.0, "length": 12.0, "color": "#ffffff"}), id="streaks"),
+        pytest.param(Step("particles", {"density": 3.0, "size": 12.0}), id="dots"),
+        pytest.param(
+            Step("dust_scratches", {"density": 3.0, "scratches": 0, "dark": "#000000", "light": "#ffffff"}), id="dust"
+        ),
+    ],
+)
+def test_a_density_puts_the_same_share_of_marks_on_the_picture_at_any_size(marks):
+    """Marks grow with the picture (their sizes are in design px) and their count is per design area, so what they
+    cover stays the same share of the picture."""
+    recipe = Recipe("marks", (marks,), size=240)
+    black = np.zeros((190, 240, 3), np.float32)
+    covered = [runner.render(black, recipe, size=size).mean() for size in (240, 960)]
+    assert covered[1] == pytest.approx(covered[0], rel=0.25)

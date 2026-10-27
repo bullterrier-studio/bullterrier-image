@@ -4,6 +4,6 @@ size = 480
 
 [[step]]
 effect = "flow_lines"
-density = 0.004
+density = 4
 seed = 1
 mask = "background"

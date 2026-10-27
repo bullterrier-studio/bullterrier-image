@@ -11,11 +11,11 @@ class DustScratchesParams(EffectParams):
 
     density: float = param(
         0.6,
-        unit="count",
+        unit="density",
         min=0,
         max=5,
-        doc="How many specks and hairs there are: marks per 1000 square px of picture (a 32 x 32 px area), so the "
-        "same density looks alike on any picture size. 0 = none, 0.6 is a light dusting, 3 is filthy.",
+        doc="How many specks and hairs there are: marks per 1000 design px² (a 32 x 32 px area at the recipe's size), "
+        "so any picture size looks alike. 0 = none, 0.6 is a light dusting, 3 is filthy.",
     )
     size: float = param(
         8.0,
@@ -40,7 +40,8 @@ class DustScratchesParams(EffectParams):
         min=0,
         max=100,
         doc="How many scratches: thin, long, nearly vertical lines, each running over half to all of the picture's "
-        "height. 0 = none.",
+        "height. 0 = none. A count, not a density: their width is in design px, so the same count looks alike at any "
+        "picture size.",
     )
     angle: float = param(
         4.0,

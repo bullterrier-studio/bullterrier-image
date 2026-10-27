@@ -17,7 +17,9 @@ class DeadPixelsParams(EffectParams):
         max=100000,
         doc="How many faulty pixels there are, each a square of `size` px: 0 leaves the picture unchanged. They lie on "
         "a grid of `size` px cells, so none overlaps another, and each is a different one. A count larger than the "
-        "number of cells fills every cell. Raising it adds faulty pixels and never moves one already there.",
+        "number of cells fills every cell. Raising it adds faulty pixels and never moves one already there. "
+        "A count, not a density: the pixels' size is in design px, so the same count covers the same share of any "
+        "picture size.",
     )
     size: int = param(
         4,

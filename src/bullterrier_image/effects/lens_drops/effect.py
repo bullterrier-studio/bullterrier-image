@@ -18,8 +18,8 @@ class LensDropsParams(EffectParams):
         unit="count",
         min=0,
         max=200,
-        doc="How many drops there are, whatever the size of the picture (a number, not a density). 0 = none (the "
-        "picture unchanged).",
+        doc="How many drops there are, whatever the size of the picture (a number, not a density: the drops' size is "
+        "in design px, so the same count looks alike at any size). 0 = none (the picture unchanged).",
     )
     radius: float = param(
         24.0,

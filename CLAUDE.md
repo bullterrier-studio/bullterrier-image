@@ -125,8 +125,11 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict),
 each field `param(default, doc=...)`. Every field has a default and a description (what it does, unit and range in words, what
 raising it does).
-- **Numeric** (`int`, `float`): also a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`, `ratio`, `cycles`) and inclusive
+- **Numeric** (`int`, `float`): also a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`, `ratio`, `cycles`, `density`) and inclusive
   `min`/`max` that hold the default.
+- **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
+  size). Numerous marks take `density`: marks per 1000 design px², the one meaning everywhere (`EffectParams.scaled`
+  divides it by the size ratio squared).
 - **Other** fields take no unit/min/max: `bool`, `Literal[...]` (the doc mentions every choice), `str`, `Color` (`'#rrggbb'`,
   `'#rgb'`, or three numbers 0..1), lists of those.
 - **Basic and advanced:** `advanced=True` marks a field that tunes the technique rather than chooses the look; listed apart,
