@@ -191,8 +191,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| `fog` ✓ | Layered haze, gradient or noise-based. | `fx.fog(density=0.4, color="#cfd8e3")` |
-| `smoke` ✓ | Noise-driven smoke or steam. | `fx.smoke(amount=0.4, seed=1)` |
+| `fog` ✓ | Noise-shaped haze, thicker toward the bottom; preset `smoke`. | `fx.fog(amount=0.4, color="#cfd8e3")` |
 | `sparkle` ✓ | Twinkling points on highlights. | `fx.sparkle(count=60, seed=1)` |
 | `lens_drops` ✓ | Water drops on the lens. | `fx.lens_drops(count=14, highlight=0.5, seed=1)` |
 | `particles` ✓ | Dots and streaks of light at several depths; presets `embers`, `rain`, `snow`, `dust`, `stars`. | `fx.particles(density=1.5, size=7, length=8, angle=105)` |
@@ -204,7 +203,7 @@ varies a parameter"): `radius = { by = "far", start = 0, end = 12 }` on a `gauss
 radius of `gaussian_blur`, `bloom`; `motion_blur`'s `length`; the amounts of `bloom`,
 `grain`, `sharpen`, `chromatic_aberration`, `displace`, `vignette`;
 `grade`'s `exposure`, `contrast`, `saturation`, `vibrance`; `levels`' `output_black`; `white_balance`'s `temperature` and `tint`;
-`hue_shift`'s `hue`; `fog`'s `density`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
+`hue_shift`'s `hue`; `fog`'s `amount`. More follow when a look needs them; the rule is that the result changes smoothly with the number.
 
 ## Depth and light from geometry
 

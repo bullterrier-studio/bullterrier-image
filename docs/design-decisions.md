@@ -116,7 +116,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   by an effect's own choice (`radial_blur`: spin or zoom). *Consequence:* a contract test fails an effect field whose
   choices are edge rules but whose name is not `edge`.
 - **`interpolation` is how an effect reads the picture between pixels; `resampling` is the same choice for a generated field.**
-  `smoke` and `reaction_diffusion` warp or upsample a field they made themselves, then colour or blend it, so the
+  `fog` and `reaction_diffusion` warp or upsample a field they made themselves, then colour or blend it, so the
   contract's "a constant picture stays constant under every interpolation" does not hold for them. *Reason:* the contract
   rule is about warping the photo; a second name keeps it simple instead of an exemption list. *Consequence:* a field
   named `interpolation` promises that rule; use `resampling` when the effect does not.

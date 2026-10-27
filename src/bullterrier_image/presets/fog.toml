@@ -1,0 +1,13 @@
+# Looks that are one fog step.
+
+[smoke]
+description = "Plumes of smoke or steam: clear air between soft-edged columns that rise from the bottom edge and curl."
+amount = 0.5
+color = "#e6e6e6"
+gradient = 0
+coverage = 0.45
+feather = 0.25
+floor = 0
+scale = 100
+rise = 2
+turbulence = 30

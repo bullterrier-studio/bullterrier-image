@@ -1,4 +1,4 @@
-# A pale morning mist over the photo, thickening toward the bottom.
+# A pale morning mist over the photo, thickening toward the bottom, then plumes of smoke rising from the bottom edge.
 # It also makes the effect's picture in the catalogue.
 name = "fog"
 size = 480
@@ -6,3 +6,9 @@ size = 480
 [[step]]
 effect = "fog"
 seed = 5
+
+[[step]]
+effect = "fog"
+preset = "smoke"
+seed = 4
+opacity = 0.7
