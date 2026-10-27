@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pytest
+from scipy import ndimage
 
 from bullterrier_image import fx
 from bullterrier_image.core import registry, runner
@@ -1244,3 +1245,96 @@ def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_
         return rgb
 
     assert len(_length_problems("length_probe")) == problems
+
+
+# --- the same look at the design size and at four times it --------------------------------------------------------
+
+DESIGN_SIZE = 240  # the recipe's size: the px its numbers are written for
+LARGE_SIZE = 960  # the size rendered again, four times as many px along each side
+LOOK_TOLERANCE = 0.02  # the most the mean of any colour may differ: 2% of the range
+
+# Effects whose default look legitimately differs between the two sizes, each with the reason; "BUG: ..." marks a
+# defect waiting for its fix (remove the entry with the fix: a test fails while a passing effect is listed).
+SIZE_EXCEPTIONS: dict[str, str] = {}
+
+
+@pytest.fixture(scope="module")
+def design_photo() -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """A 960 x 720 picture (smooth colour with some fine detail) and the subject and depth maps for it: a recipe of
+    size 240 renders it four times smaller, one of size 960 as it is."""
+    rng = np.random.default_rng(1)
+    height, width = 720, 960
+    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
+    ramp = np.stack([x / (width - 1), y / (height - 1), (x + y) / (width + height - 2)], axis=-1)
+    blobs = ndimage.zoom(rng.random((9, 12, 3)), (height / 9, width / 12, 1), order=3)
+    fine = ndimage.zoom(rng.random((72, 96, 3)), (10, 10, 1), order=1)
+    lights = np.zeros(
+        (height, width), np.float32
+    )  # a few white highlights, for the effects that pick out bright points
+    lights[rng.integers(0, height, 24), rng.integers(0, width, 24)] = 1
+    lights = ndimage.gaussian_filter(lights, 14) * 14 * 14 * 2 * np.pi
+    picture = np.clip(ramp * 0.5 + blobs * 0.35 + fine * 0.15 + lights[..., None], 0, 1).astype(np.float32)
+    off_centre = np.hypot(x - width / 2, y - height / 2)
+    maps = {
+        "subject": np.clip((height / 3 - off_centre) / 2, 0, 1).astype(np.float32),
+        "depth": (1 - off_centre / off_centre.max()).astype(np.float32),
+    }
+    return picture, maps
+
+
+def _size_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> float:
+    """How far the mean colour of the effect `name` at its defaults, in a recipe of size 240, differs between the
+    render at 240 and the render at 960 shrunk back to 240 by averaging each 4 x 4 block: the largest difference of
+    the three channels."""
+    step = Step(name, partition="subject") if "partition" in registry.inputs(name) else Step(name)
+    look = Recipe(name, [step], size=DESIGN_SIZE)
+    at_design = runner.render(picture, look, maps=maps)
+    at_large = runner.render(picture, look, maps=maps, size=LARGE_SIZE)
+    ratio = LARGE_SIZE // DESIGN_SIZE
+    height, width = at_design.shape[:2]
+    shrunk = at_large.reshape(height, ratio, width, ratio, 3).mean(axis=(1, 3))
+    return float(np.abs(shrunk.mean(axis=(0, 1)) - at_design.mean(axis=(0, 1))).max())
+
+
+@pytest.mark.parametrize("name", [name for name in ALL if name not in SIZE_EXCEPTIONS])
+def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_four_times_it(name, design_photo):
+    assert _size_drift(name, *design_photo) <= LOOK_TOLERANCE
+
+
+def test_the_size_exceptions_name_only_effects_that_still_differ(design_photo):
+    assert set(SIZE_EXCEPTIONS) - set(ALL) == set()
+    assert [name for name in SIZE_EXCEPTIONS if _size_drift(name, *design_photo) <= LOOK_TOLERANCE] == []
+
+
+class _DotsInPx(EffectParams):
+    """Dots whose size and spacing are both design pixels."""
+
+    size: float = param(4.0, unit="px", min=1, max=64, doc="Width of a dot, in px.")
+    spacing: float = param(8.0, unit="px", min=2, max=64, doc="Distance between dot centres, in px.")
+
+
+class _DotsSpacedInCount(EffectParams):
+    """The spacing is declared as a count, so it is not scaled with the size."""
+
+    size: float = param(4.0, unit="px", min=1, max=64, doc="Width of a dot, in px.")
+    spacing: float = param(8.0, unit="count", min=2, max=64, doc="Distance between dot centres, in px.")
+
+
+@pytest.mark.parametrize(
+    ("params", "same_look"),
+    [
+        pytest.param(_DotsInPx, True, id="dots whose size and spacing are px"),
+        pytest.param(_DotsSpacedInCount, False, id="dots whose spacing is not scaled: 16 times as many at 4 times"),
+    ],
+)
+def test_the_size_check_flags_marks_that_do_not_scale_and_passes_marks_that_do(
+    params, same_look, design_photo, throwaway_effects
+):
+    @effect(category="light", params=params)
+    def dot_probe(rgb, params):
+        """White dots on a grid."""
+        y, x = np.mgrid[0 : rgb.shape[0], 0 : rgb.shape[1]]
+        dots = (y % params.spacing < params.size) & (x % params.spacing < params.size)
+        return np.where(dots[..., None], np.float32(1), rgb)
+
+    assert (_size_drift("dot_probe", *design_photo) <= LOOK_TOLERANCE) == same_look
