@@ -8,7 +8,7 @@ from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.cutout import put_behind
-from bullterrier_image.ops.shift import shift
+from bullterrier_image.ops.shift import BoxedImage
 
 
 class DropShadowParams(EffectParams):
@@ -116,13 +116,20 @@ def drop_shadow(rgb: np.ndarray, params: DropShadowParams, *, subject: np.ndarra
     # Laying the copies over the picture, the farthest first, is the same as walking them from the nearest: each takes
     # its opacity of what the nearer ones left clear, and its colour, which is `near` plus `along` of the way to `far`,
     # is summed as `near` and the `along`-weighted share, so every copy costs one-channel arrays, not three.
+    # Every copy is a shift of the one silhouette, which is zero outside a box: it is read and laid on only where the
+    # copy is not zero (the whole picture, once softened).
+    silhouette = BoxedImage(subject, edge=params.edge)
     clear = np.ones(subject.shape, np.float32)
     along_share = np.zeros(subject.shape, np.float32)
     for number in range(1, params.copies + 1):
-        cover = shift(subject, *(step * number), edge=params.edge)
-        cover = gaussian_blur(cover, params.blur, truncate=params.truncate, edge=params.edge)
-        taken = clear * (opacity[number - 1] * cover)
-        clear -= taken
-        along_share += taken * along[number - 1]
+        rows, cols, cover = silhouette.shifted(*(step * number))
+        if params.blur > 0:
+            whole = np.zeros(subject.shape, np.float32)
+            whole[rows, cols] = cover
+            cover = gaussian_blur(whole, params.blur, truncate=params.truncate, edge=params.edge)
+            rows = cols = slice(None)
+        taken = clear[rows, cols] * (opacity[number - 1] * cover)
+        clear[rows, cols] -= taken
+        along_share[rows, cols] += taken * along[number - 1]
     behind = rgb * clear[..., None] + near * (1 - clear)[..., None] + (far - near) * along_share[..., None]
     return put_behind(rgb, subject, 1, behind)  # constant: the copies' own opacity is already in `behind`

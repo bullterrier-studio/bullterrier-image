@@ -9,7 +9,7 @@ from typing import Literal
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.shift import Edge, shift, slide_bands
+from bullterrier_image.ops.shift import BoxedImage, Edge, shift, slide_bands
 
 EDGES: list[Edge] = ["wrap", "nearest", "reflect", "mirror"]
 # numpy's names for the same rules: its 'symmetric' repeats the edge pixel (our 'reflect'), its 'reflect' does not
@@ -136,3 +136,45 @@ def test_bands_are_applied_in_order_each_to_what_the_earlier_ones_left(edge: Edg
     in_both = shift(shift(image[3:5], 0, 4, edge=edge), 0, -4, edge=edge)
     np.testing.assert_array_equal(out[3:5], in_both)
     assert comes_back == np.array_equal(in_both, image[3:5])
+
+
+def boxed(rows: slice, cols: slice, shape: tuple[int, int] = (40, 50)) -> np.ndarray:
+    image = np.zeros(shape, np.float32)
+    image[rows, cols] = noise((len(range(*rows.indices(shape[0]))), len(range(*cols.indices(shape[1])))), seed=3) + 0.1
+    return image
+
+
+@pytest.mark.parametrize("edge", EDGES)
+@pytest.mark.parametrize(
+    ("dy", "dx"),
+    [(0, 0), (3, -4), (0, 7.5), (-2.25, 0), (5.5, -3.75), (13, 17), (-60.5, 123.25), (39.9, 0.1)],
+    ids=lambda value: str(value),
+)
+@pytest.mark.parametrize(
+    "image",
+    [
+        pytest.param(boxed(slice(10, 14), slice(20, 27)), id="a box in the middle"),
+        pytest.param(boxed(slice(0, 5), slice(0, 9)), id="a box in the corner"),
+        pytest.param(boxed(slice(0, 40), slice(0, 50)), id="a box that is the whole picture"),
+        pytest.param(boxed(slice(7, 8), slice(8, 9)), id="one pixel"),
+        pytest.param(np.zeros((40, 50), np.float32), id="nothing"),
+    ],
+)
+def test_a_boxed_image_shifts_to_the_pixels_shift_gives_and_zero_elsewhere(image, dy, dx, edge: Edge) -> None:
+    rows, cols, block = BoxedImage(image, edge=edge).shifted(dy, dx)
+    expected = shift(image, dy, dx, edge=edge)
+    placed = np.zeros_like(expected)
+    placed[rows, cols] = block
+    np.testing.assert_array_equal(placed, expected)
+
+
+@pytest.mark.parametrize("edge", EDGES)
+def test_the_block_of_a_small_box_is_small_so_the_cost_follows_the_box(edge: Edge) -> None:
+    rows, cols, block = BoxedImage(boxed(slice(10, 14), slice(20, 27)), edge=edge).shifted(5.5, -3.75)
+    assert block.shape == (len(range(*rows.indices(40))), len(range(*cols.indices(50))))
+    assert block.shape[0] <= 4 + 1
+    assert block.shape[1] <= 7 + 1
+
+
+def test_the_block_of_an_image_that_is_all_zero_is_empty() -> None:
+    assert BoxedImage(np.zeros((8, 9), np.float32), edge="wrap").shifted(2.5, 1.0)[2].size == 0
