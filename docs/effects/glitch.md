@@ -10,9 +10,9 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | <img src="../gallery/echo.jpg" width="160" alt="echo"> | `echo` | Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`. | `copies=4` `dx=14.0` `dy=0.0` `fade=0.5` +1 advanced | [echo.toml](../../examples/effects/echo.toml) |
 | <img src="../gallery/hologram.jpg" width="160" alt="hologram"> | `hologram` | Show the picture as light of `color`, outlined where its brightness changes, with scanlines and a flicker. | `color='#30e0ff'` `tint=0.85` `glow=5.0` `scanlines=0.35` `flicker=0.3` `phase=0.0` +5 advanced | [hologram.toml](../../examples/effects/hologram.toml) |
 | <img src="../gallery/interlace.jpg" width="160" alt="interlace"> | `interlace` | Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched. | `offset=6.0` `field='odd'` +1 advanced | [interlace.toml](../../examples/effects/interlace.toml) |
-| <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
+| <img src="../gallery/jpeg_crush.jpg" width="160" alt="jpeg_crush"> | `jpeg_crush` | Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it. | `quality=6` `hits=0` `seed=0` +2 advanced | [jpeg_crush.toml](../../examples/effects/jpeg_crush.toml) |
 | <img src="../gallery/ntsc.jpg" width="160" alt="ntsc"> | `ntsc` | Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal. | `sigma=4.0` `crawl=0.3` `phase=0.0` +2 advanced | [ntsc.toml](../../examples/effects/ntsc.toml) |
-| <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
+| <img src="../gallery/rgb_split.jpg" width="160" alt="rgb_split"> | `rgb_split` | Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph. | `pair='red_blue'` `angle=330.0` `amount=8.0` +1 advanced | [rgb_split.toml](../../examples/effects/rgb_split.toml) |
 | <img src="../gallery/vhs.jpg" width="160" alt="vhs"> | `vhs` | Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow). | `tracking=0.06` `bands=3` `band_static=0.0` `dropouts=0` `bleed=5.0` `noise=0.03` `wobble=1.5` `seed=0` +5 advanced | [vhs.toml](../../examples/effects/vhs.toml) |
 
 ### `dead_pixels`
@@ -97,6 +97,12 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 
 </details>
 
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `byte_corrupt` | A corrupted JPEG: a moderate-quality picture with 40 damaged coefficients, showing as smeared blocks, colour streaks and stripes. |
+
 ### `ntsc`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -129,6 +135,12 @@ Digital-error looks: displaced slices, colour splits and corrupted blocks.
 | `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What a moved channel shows where it has left the picture's edge: 'nearest' repeats the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what left on the other side, 'reflect' mirrors the channel (the edge line repeated once), 'mirror' mirrors it about the edge line. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `anaglyph` | A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look. |
 
 ### `vhs`
 

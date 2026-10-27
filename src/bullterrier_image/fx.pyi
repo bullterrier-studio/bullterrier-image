@@ -210,8 +210,9 @@ mode : one of 'linked', 'per_channel', default 'per_channel'
     Contrast)."""
     ...
 
-def blend(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['logo'] | None = None) -> Step:
-    """Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch, width or tile.
+def blend(image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['overlay'] | None = None) -> Step:
+    """Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover,
+contain, stretch, width or tile.
 
 Parameters
 ----------
@@ -254,11 +255,12 @@ resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
 
 Presets
 -------
-logo : A logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."""
+overlay : An overlay: a logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."""
     ...
 
-def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation'] | None = None) -> Step:
-    """Light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.
+def bloom(radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation', 'glow'] | None = None) -> Step:
+    """Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at
+`octaves` scales and screened over the picture.
 
 The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
 `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and
@@ -311,11 +313,13 @@ constant_value : number, fraction, 0 to 1, default 0.0
 Presets
 -------
 soft_focus : Orton soft focus: a blurred copy of the whole picture, half-strength, screened over the sharp one.
-halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base."""
+halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base.
+glow : A glow: the bright parts blurred into one soft halo and screened over the sharp picture."""
     ...
 
-def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'monochrome'] | None = None) -> Step:
-    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights.
+def channel_mixer(red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'black_and_white'] | None = None) -> Step:
+    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights:
+black and white, infrared, colour swaps.
 
 The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
 matrix (the `<output>_from_<input>` weights) is output channel i, so
@@ -354,11 +358,12 @@ blue_from_blue : number, ratio, -3 to 3, default 1.0
 Presets
 -------
 infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale.
-monochrome : Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."""
+black_and_white : Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."""
     ...
 
 def chromatic_aberration(amount: float | Drive = 4.0, samples: int = 3, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['prism'] | None = None) -> Step:
-    """Add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.
+    """Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y`
+and coloured as a spectrum.
 
 Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre
 read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red
@@ -458,7 +463,8 @@ color_balance : A starting point for colour balancing: cool shadows, untouched m
     ...
 
 def curves(black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
-    """Bend tones along smooth curves through control points: a master curve, then one per colour channel.
+    """Bend tones along smooth curves through control points: a master curve, then one per colour channel
+(cross process, solarize).
 
 The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
 `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed
@@ -778,8 +784,9 @@ windblown : The edges dissolve and everything is blown to the right, like dust i
 disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
-def displace(amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px.
+def displace(amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scatter'] | None = None) -> Step:
+    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp,
+tearing, scatter, frosted glass.
 
 Each pixel shows the picture at its own place plus a move (rows, columns) from two fractal noise fields of the
 same `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. The moves
@@ -824,12 +831,16 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when its move reads from beyond the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+
+Presets
+-------
+scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."""
     ...
 
-def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold'] | None = None) -> Step:
+def dither(method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Union[Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6'], collections.abc.Sequence[str | list[float] | tuple[float, float, float]]] = 'photo', colors: int = 8, cell: float = 0.0005, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['k-means++', 'random'] = 'k-means++', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither,
-1-bit black and white, retro palettes, and the presets `posterize` and `threshold`.
+1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.
 
 The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from
 afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours
@@ -905,11 +916,13 @@ seed : whole number, count, 0 to 4294967295, default 0
 Presets
 -------
 posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
-threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks."""
+threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `palette` for other inks.
+palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."""
     ...
 
-def drop_shadow(copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow'] | None = None) -> Step:
-    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`.
+def drop_shadow(copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', *, mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
+    """Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`:
+a drop shadow, layered paper cutouts or a long shadow.
 
 One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
 at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
@@ -966,7 +979,8 @@ Step opacity
 
 Presets
 -------
-long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px."""
+long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px.
+layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."""
     ...
 
 def droste(scale: float = 0.5, turn: float = 20.0, repeats: int = 4, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -1239,9 +1253,9 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 def focus_blur(field: str = 'depth', focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A shallow depth of field, or a miniature: each pixel is blurred by w x `radius`, w = clip((|field - focus| -
-width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as
-they are.
+    """A shallow depth of field, or a tilt-shift miniature: each pixel is blurred by w x `radius`,
+w = clip((|field - focus| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of
+`focus` are returned exactly as they are.
 
 The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
 sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a
@@ -1288,7 +1302,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 def fog(amount: float | Drive = 0.77, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, coverage: float = 0.93, feather: float = 1.0, floor: float = 0.5, scale: float = 150.0, rise: float = 1.0, turbulence: float = 0.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['smoke'] | None = None) -> Step:
-    """Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom.
+    """Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom.
 
 The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
 when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`
@@ -1453,7 +1467,7 @@ constant_value : number, fraction, 0 to 1, default 0.0
     ...
 
 def grade(temperature: float | Drive = 0.0, tint: float | Drive = 0.0, exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['white_balance'] | None = None) -> Step:
-    """White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first.
+    """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.
 
 Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.
 
@@ -1590,8 +1604,9 @@ night_vision : Green phosphor monochrome, as a night-vision scope shows it (no n
 xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
     ...
 
-def grain(amount: float | Drive = 0.08, balance: float | Drive = 0.0, size: float = 1.0, color: bool = False, distribution: Literal['gaussian', 'uniform'] = 'gaussian', seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.
+def grain(amount: float | Drive = 0.08, balance: float | Drive = 0.0, size: float = 1.0, color: bool = False, distribution: Literal['gaussian', 'uniform'] = 'gaussian', seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['film_grain', 'noise'] | None = None) -> Step:
+    """Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier
+where `balance` says.
 
 The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied
 by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It
@@ -1635,7 +1650,12 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the clumping blur sees beyond the picture's edge (only when size > 1):
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
-    seamlessly)."""
+    seamlessly).
+
+Presets
+-------
+film_grain : Film grain: grey speckle that is heaviest in the shadows and lightest in the highlights, as on a photographic negative.
+noise : Plain sensor noise: independent colour speckle of the same strength in shadows and highlights."""
     ...
 
 def halftone(cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -1804,8 +1824,9 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
     (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
     ...
 
-def jpeg_crush(quality: int = 6, hits: int = 0, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it.
+def jpeg_crush(quality: int = 6, hits: int = 0, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['byte_corrupt'] | None = None) -> Step:
+    """Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`,
+damage `hits` coefficients, and decode it.
 
 The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction
 (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all
@@ -1846,11 +1867,16 @@ dc_share : number, fraction, 0 to 1, default 0.3
 magnitude : whole number, count, 1 to 100, default 8
     The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each
     hit adds or subtracts a whole number of steps between 1 and this. Raising it makes
-    the damage louder."""
+    the damage louder.
+
+Presets
+-------
+byte_corrupt : A corrupted JPEG: a moderate-quality picture with 40 damaged coefficients, showing as smeared blocks, colour streaks and stripes."""
     ...
 
-def kaleidoscope(segments: int = 6, angle: float = 0.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror.
+def kaleidoscope(segments: int = 6, angle: float = 0.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['mirror'] | None = None) -> Step:
+    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a
+kaleidoscope, or with one segment a plain mirror.
 
 A pixel at angle a about the centre (clockwise from pointing right) and distance d shows the picture at the same
 distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that
@@ -1899,7 +1925,11 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the
     corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
     pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge)."""
+    repeated), 'wrap' (the opposite edge).
+
+Presets
+-------
+mirror : A mirror: the left half copied, reflected, onto the right (a symmetric face). Turn `angle` to keep another half."""
     ...
 
 def lens_blur(radius: float = 8.0, highlights: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -1928,8 +1958,9 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     repeated), 'wrap' (the opposite edge)."""
     ...
 
-def lens_distortion(model: Literal['brown_conrady', 'fisheye'] = 'brown_conrady', amount: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, border: str | list[float] | tuple[float, float, float] | None = None, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does.
+def lens_distortion(model: Literal['brown_conrady', 'fisheye'] = 'brown_conrady', amount: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, border: str | list[float] | tuple[float, float, float] | None = None, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fisheye'] | None = None) -> Step:
+    """Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength
+`amount` about the axis `x`, `y`.
 
 Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the
 farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x
@@ -1991,7 +2022,11 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
     edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a
     `border`, only what the bend reads from within a pixel of the edge, which blends
-    into the border."""
+    into the border.
+
+Presets
+-------
+fisheye : A fisheye lens: the middle swells and the edges squeeze in, like a 108 degree equidistant lens."""
     ...
 
 def lens_drops(count: int = 14, radius: float = 24.0, size_variation: float = 0.5, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2131,8 +2166,9 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
     column)."""
     ...
 
-def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float | Drive = 0.0, output_white: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['invert'] | None = None) -> Step:
-    """Remap tones with an input black point, white point and midtone `gamma`, then an output range.
+def levels(black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float | Drive = 0.0, output_white: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['invert', 'fade'] | None = None) -> Step:
+    """Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch,
+faded blacks, or the negative (invert).
 
 Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
 between `output_black` and `output_white`. The defaults change nothing.
@@ -2159,7 +2195,8 @@ output_white : number, fraction, 0 to 1, default 1.0
 
 Presets
 -------
-invert : The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement."""
+invert : The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement.
+fade : A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky."""
     ...
 
 def light_leak(color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 0.25, angle: float = 0.0, blobs: int = 3, seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2360,8 +2397,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 def noise_field(kind: Literal['value', 'perlin', 'worley', 'sine'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 0.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['plasma'] | None = None) -> Step:
-    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine),
-coloured through `colors`.
+    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine,
+the classic plasma), coloured through `colors`.
 
 A generated background: the input is used only for its height and width, its content is ignored. Followed by
 `shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is
@@ -2579,8 +2616,9 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
-def particles(density: float = 1.0, size: float = 6.0, length: float = 0.0, angle: float = 90.0, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', layers: int = 0, size_falloff: float = 0.5, brightness_falloff: float = 0.5, seed: int = 0, *, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['embers', 'dust', 'rain', 'snow', 'stars'] | None = None) -> Step:
-    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`.
+def particles(density: float = 1.0, size: float = 6.0, length: float = 0.0, angle: float = 90.0, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', layers: int = 0, size_falloff: float = 0.5, brightness_falloff: float = 0.5, seed: int = 0, *, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['embers', 'floating_dust', 'rain', 'snow', 'starfield'] | None = None) -> Step:
+    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow,
+rain, embers, floating dust, stars.
 
 Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n.
 Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens
@@ -2642,10 +2680,10 @@ Step opacity
 Presets
 -------
 embers : Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left.
-dust : Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam.
+floating_dust : Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam.
 rain : Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint.
 snow : Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter.
-stars : Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."""
+starfield : Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."""
     ...
 
 def pattern(kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -2686,8 +2724,8 @@ feather : number, px, 0 to 32, default 1.0
     linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
     ...
 
-def perspective(vertical: float = 0.25, horizontal: float = 0.0, shear_x: float = 0.0, shear_y: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, skew, turn and zoom it.
+def perspective(vertical: float = 0.25, horizontal: float = 0.0, shear_x: float = 0.0, shear_y: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shear'] | None = None) -> Step:
+    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.
 
 The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the
 vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the
@@ -2744,7 +2782,11 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What fills the margins the keystone, skew, turn and zoom uncover around the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-    'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge)."""
+    'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge).
+
+Presets
+-------
+shear : A shear: rows slid sideways in proportion to their height, so the picture leans like italic type."""
     ...
 
 def pinch_bulge(amount: float = 0.5, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3073,7 +3115,8 @@ Step opacity
     ...
 
 def relight(field: str = 'depth', angle: float = 225.0, elevation: float = 45.0, height: float = 200.0, blur: float = 2.0, saturation: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['bump_light', 'emboss'] | None = None) -> Step:
-    """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`.
+    """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump
+lighting, emboss, relighting by depth.
 
 The lighting comes from the shape of `field`, not from the picture's brightness unless that is the field: the
 height is the field smoothed by `blur`; the surface normal is (-slope_x, -slope_y, 1) / its length with the slopes
@@ -3133,8 +3176,9 @@ bump_light : The picture's own brightness read as a fine relief (8 px tall) and 
 emboss : An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees."""
     ...
 
-def rgb_split(pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way.
+def rgb_split(pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['anaglyph'] | None = None) -> Step:
+    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch
+fringe or a red-cyan 3D anaglyph.
 
 Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves
 `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the
@@ -3165,7 +3209,11 @@ edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
     What a moved channel shows where it has left the picture's edge: 'nearest' repeats
     the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
     left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
-    'mirror' mirrors it about the edge line."""
+    'mirror' mirrors it about the edge line.
+
+Presets
+-------
+anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."""
     ...
 
 def rim_light(angle: float = 40.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', subject_threshold: float = 0.5, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
@@ -3319,7 +3367,8 @@ color : colour, default '#ffffff'
     ...
 
 def selective_color(hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float | Drive = 0.0, saturation: float = 1.0, lightness: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['hue_shift'] | None = None) -> Step:
-    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched.
+    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a
+range as wide as the wheel is a hue shift.
 
 Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the
 `hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a
@@ -3358,7 +3407,8 @@ hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully
     ...
 
 def sharpen(radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['clarity'] | None = None) -> Step:
-    """Sharpen with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur removes.
+    """Sharpen, or add clarity, with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur
+removes.
 
 Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
 kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local
@@ -3470,8 +3520,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 def slice_shift(slices: int = 30, amount: float = 0.05, seed: int = 0, bands: int = 0, band_min_height: float = 0.01, band_max_height: float = 0.06, *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
-    """Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide
-`bands` more strips of random height placed at random rows.
+    """Glitch tearing: cut the picture into horizontal strips at random rows and slide each sideways by a random
+distance, then slide `bands` more strips of random height placed at random rows.
 
 A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip
 moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the
@@ -3510,9 +3560,9 @@ glitch : A corrupted video frame: seven bands at random rows slide sideways, the
     ...
 
 def starburst(rays: int = 4, length: float = 0.1, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, density: float = 1.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', *, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
-    """Diffraction spikes: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and
-screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density` picks a random
-share of them, `variation` dims each by a random amount (both from `seed`).
+    """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
+tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `density`
+picks a random share of them, `variation` dims each by a random amount (both from `seed`).
 
 Each spike is one px wide, starts at the point at full brightness and fades linearly to nothing at `length` x the
 picture's diagonal; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by

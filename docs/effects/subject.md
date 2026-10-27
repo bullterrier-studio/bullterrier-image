@@ -7,7 +7,7 @@ Effects that work on the cut-out subject, apart from its background.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo). | `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=0.2` `angle=10.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
-| <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`. | `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
+| <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of the subject's silhouette behind it, each `offset` px farther along `angle` and softened by `blur`: a drop shadow, layered paper cutouts or a long shadow. | `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around the subject's silhouette, with an optional soft halo of `glow` px. | `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above the subject's lowest row is mirrored about it, softened and fading with depth. | `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
 | <img src="../gallery/rim_light.jpg" width="160" alt="rim_light"> | `rim_light` | Light along the subject's edge from one side: a band of `width` px inside the edge, tinted `color`. | `angle=40.0` `color='#ff9a4d'` `width=12.0` `amount=1.0` `falloff=1.5` +4 advanced | [rim_light.toml](../../examples/effects/rim_light.toml) |
@@ -101,6 +101,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. |
+| `layered_cutouts` | Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple. |
 
 ### `outline`
 

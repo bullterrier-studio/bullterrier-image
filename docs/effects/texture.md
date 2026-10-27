@@ -7,7 +7,7 @@ Grain and other surface texture laid over the picture.
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/dust_scratches.jpg" width="160" alt="dust_scratches"> | `dust_scratches` | Draw light and dark specks, hairs and scratches at random places over the picture. | `density=0.6` `size=8.0` `scratches=2` `light='#ffffff'` `dark='#000000'` `seed=0` +3 advanced | [dust_scratches.toml](../../examples/effects/dust_scratches.toml) |
-| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Grain: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says. | `amount=0.08` `balance=0.0` `size=1.0` `color=False` `distribution='gaussian'` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
+| <img src="../gallery/grain.jpg" width="160" alt="grain"> | `grain` | Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says. | `amount=0.08` `balance=0.0` `size=1.0` `color=False` `distribution='gaussian'` `seed=0` +2 advanced | [grain.toml](../../examples/effects/grain.toml) |
 | <img src="../gallery/paper_texture.jpg" width="160" alt="paper_texture"> | `paper_texture` | Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture. | `kind='paper'` `amount=0.1` `scale=6.0` `octaves=3` `spacing=6.0` `seed=0` +3 advanced | [paper_texture.toml](../../examples/effects/paper_texture.toml) |
 | <img src="../gallery/pixel_grid.jpg" width="160" alt="pixel_grid"> | `pixel_grid` | The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between. | `cell=4` `gap=0.15` `amount=0.4` `keep_brightness=False` | [pixel_grid.toml](../../examples/effects/pixel_grid.toml) |
 | <img src="../gallery/scanlines.jpg" width="160" alt="scanlines"> | `scanlines` | Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`. | `spacing=3.0` `thickness=0.5` `darkness=0.35` `offset=0.0` `softness=0.0` | [scanlines.toml](../../examples/effects/scanlines.toml) |
@@ -55,6 +55,13 @@ A step of `dust_scratches` has `opacity = 0.8` unless it sets its own.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the clumping blur sees beyond the picture's edge (only when size > 1): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles seamlessly). |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `film_grain` | Film grain: grey speckle that is heaviest in the shadows and lightest in the highlights, as on a photographic negative. |
+| `noise` | Plain sensor noise: independent colour speckle of the same strength in shadows and highlights. |
 
 ### `paper_texture`
 

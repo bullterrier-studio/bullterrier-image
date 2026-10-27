@@ -7,14 +7,14 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
-| <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
+| <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black and white, infrared, colour swaps. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
 | <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading. | `shadows='#3a1bff'` `midtones='#808080'` `highlights='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=1.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
-| <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel. | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
+| <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize). | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
-| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
+| <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
 | <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
-| <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range. | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
-| <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
+| <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch, faded blacks, or the negative (invert). | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
+| <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a range as wide as the wheel is a hue shift. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
 
 ### `auto_levels`
 
@@ -42,7 +42,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `infrared` | False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale. |
-| `monochrome` | Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter. |
+| `black_and_white` | Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter. |
 
 ### `color_balance`
 
@@ -171,6 +171,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `invert` | The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement. |
+| `fade` | A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky. |
 
 ### `selective_color`
 

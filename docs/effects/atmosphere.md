@@ -6,9 +6,9 @@ Weather and air: fog, haze, rain and the like.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Mix the picture toward `color` by a fog opacity that is cloudy and heavier toward the bottom. | `amount=0.77` `color='#cfd8e3'` `gradient=0.7` `coverage=0.93` `scale=150.0` `seed=0` +9 advanced | [fog.toml](../../examples/effects/fog.toml) |
+| <img src="../gallery/fog.jpg" width="160" alt="fog"> | `fog` | Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom. | `amount=0.77` `color='#cfd8e3'` `gradient=0.7` `coverage=0.93` `scale=150.0` `seed=0` +9 advanced | [fog.toml](../../examples/effects/fog.toml) |
 | <img src="../gallery/lens_drops.jpg" width="160" alt="lens_drops"> | `lens_drops` | Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`. | `count=14` `radius=24.0` `size_variation=0.5` `refraction=1.5` `blur=1.5` `highlight=0.0` `seed=0` +3 advanced | [lens_drops.toml](../../examples/effects/lens_drops.toml) |
-| <img src="../gallery/particles.jpg" width="160" alt="particles"> | `particles` | Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`. | `density=1.0` `size=6.0` `length=0.0` `angle=90.0` `softness=0.5` `color='#ffffff'` `seed=0` +3 advanced | [particles.toml](../../examples/effects/particles.toml) |
+| <img src="../gallery/particles.jpg" width="160" alt="particles"> | `particles` | Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow, rain, embers, floating dust, stars. | `density=1.0` `size=6.0` `length=0.0` `angle=90.0` `softness=0.5` `color='#ffffff'` `seed=0` +3 advanced | [particles.toml](../../examples/effects/particles.toml) |
 
 ### `fog`
 
@@ -94,7 +94,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Preset | Description |
 | --- | --- |
 | `embers` | Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left. |
-| `dust` | Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam. |
+| `floating_dust` | Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam. |
 | `rain` | Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint. |
 | `snow` | Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter. |
-| `stars` | Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky. |
+| `starfield` | Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky. |

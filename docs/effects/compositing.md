@@ -6,7 +6,7 @@ Ways of combining the picture with other layers.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/blend.jpg" width="160" alt="blend"> | `blend` | Lay a second picture over the photo with a blend mode, fitted by cover, contain, stretch, width or tile. | `image='#808080'` `mode='multiply'` `fit='cover'` `at='center'` `scale=1.0` `margin=0.0` +1 advanced | [blend.toml](../../examples/effects/blend.toml) |
+| <img src="../gallery/blend.jpg" width="160" alt="blend"> | `blend` | Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover, contain, stretch, width or tile. | `image='#808080'` `mode='multiply'` `fit='cover'` `at='center'` `scale=1.0` `margin=0.0` +1 advanced | [blend.toml](../../examples/effects/blend.toml) |
 
 ### `blend`
 
@@ -31,4 +31,4 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Preset | Description |
 | --- | --- |
-| `logo` | A logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency. |
+| `overlay` | An overlay: a logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency. |

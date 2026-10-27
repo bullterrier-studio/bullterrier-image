@@ -6,21 +6,21 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), the longest move being `amount` px. | `amount=12.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
+| <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp, tearing, scatter, frosted glass. | `amount=12.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
 | <img src="../gallery/droste.jpg" width="160" alt="droste"> | `droste` | Show the picture again, `scale` times as large and turned by `turn`, in its own middle, up to `repeats` times. | `scale=0.5` `turn=20.0` `repeats=4` +2 advanced | [droste.toml](../../examples/effects/droste.toml) |
 | <img src="../gallery/flow_warp.jpg" width="160" alt="flow_warp"> | `flow_warp` | Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise. | `amount=20.0` `scale=80.0` `octaves=3` `seed=0` `angle=0.0` `variation=60.0` +5 advanced | [flow_warp.toml](../../examples/effects/flow_warp.toml) |
-| <img src="../gallery/kaleidoscope.jpg" width="160" alt="kaleidoscope"> | `kaleidoscope` | Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror. | `segments=6` `angle=0.0` `x=0.5` `y=0.5` +2 advanced | [kaleidoscope.toml](../../examples/effects/kaleidoscope.toml) |
-| <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens with the curve `model` and strength `amount` about the axis `x`, `y` does. | `model='brown_conrady'` `amount=0.2` `fit='frame'` `x=0.5` `y=0.5` `border=None` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
+| <img src="../gallery/kaleidoscope.jpg" width="160" alt="kaleidoscope"> | `kaleidoscope` | Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a kaleidoscope, or with one segment a plain mirror. | `segments=6` `angle=0.0` `x=0.5` `y=0.5` +2 advanced | [kaleidoscope.toml](../../examples/effects/kaleidoscope.toml) |
+| <img src="../gallery/lens_distortion.jpg" width="160" alt="lens_distortion"> | `lens_distortion` | Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength `amount` about the axis `x`, `y`. | `model='brown_conrady'` `amount=0.2` `fit='frame'` `x=0.5` `y=0.5` `border=None` +2 advanced | [lens_distortion.toml](../../examples/effects/lens_distortion.toml) |
 | <img src="../gallery/lenticular.jpg" width="160" alt="lenticular"> | `lenticular` | Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px. | `strip=6` `shift=5.0` +1 advanced | [lenticular.toml](../../examples/effects/lenticular.toml) |
 | <img src="../gallery/melt.jpg" width="160" alt="melt"> | `melt` | Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column. | `amount=40.0` `scale=12.0` `seed=0` +2 advanced | [melt.toml](../../examples/effects/melt.toml) |
 | <img src="../gallery/parallax.jpg" width="160" alt="parallax"> | `parallax` | Shift every layer of the picture by amount x long side x (depth - focus) px along `angle`, as a sideways camera move would. | `angle=0.0` `amount=0.02` `focus=0.5` +2 advanced | [parallax.toml](../../examples/effects/parallax.toml) |
-| <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, skew, turn and zoom it. | `vertical=0.25` `horizontal=0.0` `shear_x=0.0` `shear_y=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
+| <img src="../gallery/perspective.jpg" width="160" alt="perspective"> | `perspective` | Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it. | `vertical=0.25` `horizontal=0.0` `shear_x=0.0` `shear_y=0.0` `rotate=0.0` `scale=0.0` +2 advanced | [perspective.toml](../../examples/effects/perspective.toml) |
 | <img src="../gallery/pinch_bulge.jpg" width="160" alt="pinch_bulge"> | `pinch_bulge` | Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`. | `amount=0.5` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [pinch_bulge.toml](../../examples/effects/pinch_bulge.toml) |
 | <img src="../gallery/pixel_sort.jpg" width="160" alt="pixel_sort"> | `pixel_sort` | Sort every run of pixels whose key lies between `low` and `high` along the rows (or columns) by that key. | `by='brightness'` `low=0.25` `high=0.75` `axis='horizontal'` `order='ascending'` | [pixel_sort.toml](../../examples/effects/pixel_sort.toml) |
 | <img src="../gallery/polar.jpg" width="160" alt="polar"> | `polar` | Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from'). | `mode='to'` `x=0.5` `y=0.5` +2 advanced | [polar.toml](../../examples/effects/polar.toml) |
 | <img src="../gallery/ripple.jpg" width="160" alt="ripple"> | `ripple` | Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`. | `wavelength=40.0` `amplitude=6.0` `phase=0.0` `angle=0.0` +2 advanced | [ripple.toml](../../examples/effects/ripple.toml) |
 | <img src="../gallery/shatter.jpg" width="160" alt="shatter"> | `shatter` | Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its mean colour (stained glass, low-poly), and draw `gap` px lines between them. | `pieces=24` `shape='voronoi'` `detail=0.0` `fill=0.0` `offset=10.0` `angle=5.0` `gap=0.0` `color='#000000'` `seed=0` +2 advanced | [shatter.toml](../../examples/effects/shatter.toml) |
-| <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. | `slices=30` `amount=0.05` `seed=0` `bands=0` `band_min_height=0.01` `band_max_height=0.06` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
+| <img src="../gallery/slice_shift.jpg" width="160" alt="slice_shift"> | `slice_shift` | Glitch tearing: cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. | `slices=30` `amount=0.05` `seed=0` `bands=0` `band_min_height=0.01` `band_max_height=0.06` | [slice_shift.toml](../../examples/effects/slice_shift.toml) |
 | <img src="../gallery/stretch.jpg" width="160" alt="stretch"> | `stretch` | Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. | `axis='vertical'` `at=0.5` `span=0.15` `side='both'` | [stretch.toml](../../examples/effects/stretch.toml) |
 | <img src="../gallery/swirl.jpg" width="160" alt="swirl"> | `swirl` | Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`. | `angle=90.0` `radius=0.5` `x=0.5` `y=0.5` +2 advanced | [swirl.toml](../../examples/effects/swirl.toml) |
 | <img src="../gallery/tile.jpg" width="160" alt="tile"> | `tile` | Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift. | `columns=3` `rows=3` `offset_x=0.0` `offset_y=0.0` | [tile.toml](../../examples/effects/tile.toml) |
@@ -44,6 +44,12 @@ Warps that bend, ripple or displace the picture's geometry.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when its move reads from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `scatter` | Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass. |
 
 ### `droste`
 
@@ -103,6 +109,12 @@ Warps that bend, ripple or displace the picture's geometry.
 
 </details>
 
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `mirror` | A mirror: the left half copied, reflected, onto the right (a symmetric face). Turn `angle` to keep another half. |
+
 ### `lens_distortion`
 
 | Parameter | Type | Unit | Range | Default | Description |
@@ -122,6 +134,12 @@ Warps that bend, ripple or displace the picture's geometry.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What shows where the bend reads from beyond the picture (with fit 'centre', or a pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a `border`, only what the bend reads from within a pixel of the edge, which blends into the border. |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `fisheye` | A fisheye lens: the middle swells and the edges squeeze in, like a 108 degree equidistant lens. |
 
 ### `lenticular`
 
@@ -191,6 +209,12 @@ Warps that bend, ripple or displace the picture's geometry.
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What fills the margins the keystone, skew, turn and zoom uncover around the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge). |
 
 </details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `shear` | A shear: rows slid sideways in proportion to their height, so the picture leans like italic type. |
 
 ### `pinch_bulge`
 
