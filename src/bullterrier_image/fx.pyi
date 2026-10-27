@@ -3592,6 +3592,9 @@ and by a random number from 1 - `variation` to 1; the numbers depend on `seed` a
 point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
 nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
 
+`size_ratio` (injected: working px per design px, 1 outside a recipe) keeps the light of a bright area, and the
+number of glints, the same at any resolution.
+
 Parameters
 ----------
 rays : whole number, count, 1 to 32, default 4
