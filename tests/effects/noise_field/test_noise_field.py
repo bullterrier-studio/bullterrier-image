@@ -12,7 +12,6 @@ NAME = "noise_field"
 # kinds), so a merely small warp moves no pixel by more than this; a jump on leaving 0 does.
 TINY_WARP_MOVES_BY_AT_MOST = 0.005
 KINDS = ["value", "perlin", "worley", "sine"]
-LAYERED = ["value", "perlin", "sine"]  # the kinds built from octaves; worley is a single layer
 GREY = ["#000000", "#ffffff"]
 
 
@@ -62,7 +61,7 @@ def test_a_larger_scale_gives_broader_features(kind: str) -> None:
     assert fine < medium < coarse
 
 
-@pytest.mark.parametrize("kind", LAYERED)
+@pytest.mark.parametrize("kind", KINDS)
 @pytest.mark.parametrize(
     ("smoother", "rougher"),
     [
@@ -77,10 +76,20 @@ def test_the_layers_are_set_by_octaves_persistence_and_lacunarity(kind: str, smo
     assert autocorrelation(rough, lag=1) < autocorrelation(smooth, lag=1) - 0.01
 
 
-def test_worley_is_one_layer_whatever_the_octave_settings() -> None:
-    single = field({"kind": "worley", "octaves": 1, "persistence": 0.1, "lacunarity": 1.0})
+@pytest.mark.parametrize("kind", KINDS)
+def test_with_one_octave_persistence_and_lacunarity_change_nothing(kind: str) -> None:
+    """There is no second layer to weigh or to make finer."""
+    single = field({"kind": kind, "octaves": 1, "persistence": 0.1, "lacunarity": 1.0, "seed": 2})
     np.testing.assert_array_equal(
-        field({"kind": "worley", "octaves": 5, "persistence": 0.9, "lacunarity": 3.0}), single
+        field({"kind": kind, "octaves": 1, "persistence": 0.9, "lacunarity": 3.0, "seed": 2}), single
+    )
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_zero_persistence_leaves_only_the_first_layer(kind: str) -> None:
+    only_first = field({"kind": kind, "octaves": 1, "seed": 6})
+    np.testing.assert_allclose(
+        field({"kind": kind, "octaves": 4, "persistence": 0.0, "seed": 6}), only_first, atol=1e-5
     )
 
 
@@ -100,15 +109,16 @@ def test_worley_has_one_feature_point_per_cell() -> None:
     """Distance to the nearest feature point is 0 at the point and grows away from it, so the picture's local minima
     are the feature points: one in each 20 px cell. Away from the border (where the nearest point may lie outside the
     picture) the 180 x 180 px middle of 200 px holds 81 cells' worth, all equally dark (distance ~0)."""
-    grey = field({"kind": "worley", "scale": 20.0, "seed": 3}, shape=(200, 200))
+    grey = field({"kind": "worley", "scale": 20.0, "octaves": 1, "seed": 3}, shape=(200, 200))
     minima = (grey == ndimage.minimum_filter(grey, size=3))[10:-10, 10:-10]
     assert minima.sum() == pytest.approx(81, abs=10)
     assert grey[10:-10, 10:-10][minima].max() - grey.min() < 0.1
 
 
-@pytest.mark.parametrize("kind", ["value", "perlin"])
+@pytest.mark.parametrize("kind", ["value", "perlin", "worley"])
 def test_layers_finer_than_a_pixel_are_left_out(kind: str) -> None:
-    """Lattice spacings 3, 1.5, 0.75, ...: from the third layer on they are finer than the pixel grid: no effect."""
+    """Lattice spacings or cell sizes 3, 1.5, 0.75, ...: from the third layer on they are finer than the pixel grid, so
+    they add nothing."""
     two = field({"kind": kind, "scale": 3.0, "octaves": 2})
     np.testing.assert_array_equal(field({"kind": kind, "scale": 3.0, "octaves": 8}), two)
 
@@ -129,13 +139,14 @@ def test_perlin_bends_smoothly_across_the_lattice_lines() -> None:
 
 
 def test_worley_has_feature_points_just_beyond_the_border_too() -> None:
-    """The nearest point to a pixel at the edge can lie outside the picture, so over many seeds the top and left 3 px
-    bands are as dark as the middle on average (without points beyond the edge they are about 0.2 brighter)."""
+    """The nearest point to a pixel at the edge can lie outside the picture, so over many seeds the 3 px bands along
+    all four edges are as dark as the middle on average (without points beyond the edge they are about 0.2 brighter)."""
     excess = []
     for seed in range(10):
-        grey = field({"kind": "worley", "scale": 20.0, "seed": seed}, shape=(200, 200))
+        grey = field({"kind": "worley", "scale": 20.0, "octaves": 1, "seed": seed}, shape=(200, 200))
         middle = grey[40:-40, 40:-40].mean()
-        excess += [grey[:3, 40:-40].mean() - middle, grey[40:-40, :3].mean() - middle]
+        bands = [grey[:3, 40:-40], grey[-3:, 40:-40], grey[40:-40, :3], grey[40:-40, -3:]]
+        excess += [band.mean() - middle for band in bands]
     assert np.mean(excess) == pytest.approx(0.0, abs=0.08)
 
 
@@ -159,13 +170,6 @@ def test_sine_layers_finer_than_two_pixels_are_left_out() -> None:
     cannot show, so they add nothing."""
     two = field({"kind": "sine", "scale": 5.0, "octaves": 2, "seed": 2})
     np.testing.assert_array_equal(field({"kind": "sine", "scale": 5.0, "octaves": 8, "seed": 2}), two)
-
-
-def test_sine_zero_persistence_leaves_only_the_first_layer() -> None:
-    only_first = field({"kind": "sine", "octaves": 1, "seed": 6})
-    np.testing.assert_allclose(
-        field({"kind": "sine", "octaves": 4, "persistence": 0.0, "seed": 6}), only_first, atol=1e-5
-    )
 
 
 def test_sine_warp_needs_a_layer_before_to_push_by() -> None:

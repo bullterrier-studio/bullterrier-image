@@ -1,11 +1,13 @@
-# Warped Perlin noise in a deep-blue to cream ramp behind the dog, then a plasma over it, on the background only.
+# Warped fractal Worley cells in a deep-blue to cream ramp behind the dog, then a plasma over it, on the background only.
 name = "noise_field"
 size = 480
 
 [[step]]
 effect = "noise_field"
+kind = "worley"
+scale = 90
+warp = 30
 seed = 2
-warp = 40
 mask = "background"
 
 [[step]]

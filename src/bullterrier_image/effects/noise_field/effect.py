@@ -24,8 +24,8 @@ class NoiseFieldParams(EffectParams):
         doc="The noise: 'value' (random values on a lattice, smoothly interpolated: soft blotches), 'perlin' "
         "(gradient noise: random slopes on a lattice, finer and more even, zero at the lattice points) or 'worley' "
         "(cellular noise: the distance to the nearest of a scatter of random points, one per cell of `scale` px, "
-        "dark at each point and brightening away from it; a single layer, so it ignores `octaves`, `persistence` "
-        "and `lacunarity`) or 'sine' (crossed sine waves: smooth, regular swirls; the classic plasma).",
+        "dark at each point and brightening away from it; each layer is a finer scatter) or 'sine' (crossed sine "
+        "waves: smooth, regular swirls; the classic plasma).",
     )
     scale: float = param(
         120.0,
@@ -41,7 +41,7 @@ class NoiseFieldParams(EffectParams):
         unit="count",
         min=1,
         max=8,
-        doc="How many layers of noise are summed (value, perlin, sine), each finer than the last (by `lacunarity`) and "
+        doc="How many layers of noise are summed (all kinds), each finer than the last (by `lacunarity`) and "
         "weaker (by `persistence`). 1 = smooth, more = more fine detail. Each sine layer is two waves crossing at "
         "random angles. Layers finer than one pixel (sine: two pixels) are dropped.",
     )
@@ -50,7 +50,7 @@ class NoiseFieldParams(EffectParams):
         unit="ratio",
         min=0,
         max=1,
-        doc="How much weaker each finer layer is than the one before (value, perlin, sine): each layer's weight is "
+        doc="How much weaker each finer layer is than the one before (all kinds): each layer's weight is "
         "this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough).",
     )
     lacunarity: float = param(
@@ -58,9 +58,9 @@ class NoiseFieldParams(EffectParams):
         unit="ratio",
         min=1,
         max=4,
-        doc="How much finer each layer is than the one before (value, perlin, sine): the lattice spacing or wavelength "
-        "is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops "
-        "off faster.",
+        doc="How much finer each layer is than the one before (all kinds): the lattice spacing, cell size or "
+        "wavelength is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = "
+        "detail drops off faster.",
     )
     warp: float = param(
         0.0,
@@ -124,18 +124,23 @@ def _perlin(shape: tuple[int, int], params: NoiseFieldParams, seed: int | Sequen
 
 
 def _worley(shape: tuple[int, int], params: NoiseFieldParams, seed: int | Sequence[int]) -> np.ndarray:
-    """Distance in px from every pixel to the nearest of a jittered grid of feature points, one per `scale` px cell."""
+    """Seeded fractal F1 of `shape`, layered like `fractal`: per layer the distance to the nearest point of a jittered
+    grid, in cells (so every layer has the same range whatever its cell size)."""
     height, width = shape
-    rows, cols = math.ceil(height / params.scale) + 2, math.ceil(width / params.scale) + 2  # a ring of cells around
     rng = np.random.default_rng(seed)
-    cell_y, cell_x = np.indices((rows, cols)) - 1
-    point_y = (cell_y + rng.random((rows, cols))) * params.scale
-    point_x = (cell_x + rng.random((rows, cols))) * params.scale
-    pixel_y, pixel_x = np.indices(shape)
-    distance, _ = cKDTree(np.column_stack((point_y.ravel(), point_x.ravel()))).query(
-        np.column_stack((pixel_y.ravel(), pixel_x.ravel()))
-    )
-    return standardise(distance.reshape(shape))
+    pixels = np.column_stack([axis.ravel() for axis in np.indices(shape)])
+    field = np.zeros(shape, np.float32)
+    for octave in range(params.octaves):
+        cell = params.scale / params.lacunarity**octave
+        if cell < 1:
+            break
+        rows, cols = math.ceil(height / cell) + 2, math.ceil(width / cell) + 2  # a ring of cells around
+        cell_y, cell_x = np.indices((rows, cols)) - 1
+        point_y = (cell_y + rng.random((rows, cols))) * cell
+        point_x = (cell_x + rng.random((rows, cols))) * cell
+        distance, _ = cKDTree(np.column_stack((point_y.ravel(), point_x.ravel()))).query(pixels)
+        field += params.persistence**octave * (distance / cell).reshape(shape)
+    return standardise(field)
 
 
 def _wave(
@@ -197,8 +202,9 @@ def noise_field(rgb: np.ndarray, params: NoiseFieldParams) -> np.ndarray:
     standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
     distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
     noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
-    Perlin's fade curve); 'worley' is the distance to the nearest feature point (F1); 'sine' sums octaves of two
-    plane sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
+    Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the nearest feature point, one point per cell
+    of `scale` / `lacunarity`**i, measured in those cells), weight `persistence`**i; 'sine' sums octaves of two plane
+    sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
     directions a and phases p, weight `persistence`**i, layer i evaluated at positions pushed along x and y by `warp`
     px times the two waves of layer i - 1.
 
