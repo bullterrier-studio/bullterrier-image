@@ -185,7 +185,7 @@ def test_a_step_may_name_a_preset_and_its_own_keys_win_over_it(tmp_path):
     ("effect", "preset", "complaint"),
     [
         pytest.param("gradient_map", "sepya", r"gradient_map.*'sepya'.*sepia", id="a preset the effect lacks"),
-        pytest.param("grade", "sepia", r"grade.*'sepia'.*no presets", id="an effect without presets"),
+        pytest.param("equalize", "sepia", r"equalize.*'sepia'.*no presets", id="an effect without presets"),
     ],
 )
 def test_a_wrong_preset_in_a_file_names_the_file_the_step_and_the_preset(tmp_path, effect, preset, complaint):

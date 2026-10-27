@@ -17,7 +17,7 @@ def ramp(t: np.ndarray, colors: Sequence[tuple[float, float, float]]) -> np.ndar
     """
     stops = np.array(colors, dtype=np.float32)
     if len(stops) == 1:  # one colour is a flat ramp: the same colour at both ends
-        stops = np.repeat(stops, 2, axis=0)
+        stops = np.repeat(stops, 2, axis=0)  # constant: a ramp has two ends
     position = t * (len(stops) - 1)
     i = np.minimum(position.astype(int), len(stops) - 2)
     f = (position - i)[..., None]

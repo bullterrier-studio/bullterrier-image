@@ -153,7 +153,9 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
         bands.append((top, thickness, round(rng.uniform(-params.tracking, params.tracking) * width)))
     out = slide_bands(rgb, bands, edge=params.edge)
     for top, thickness, _ in bands:
-        snow = static_rng.random((thickness, width, 1), dtype=np.float32)  # one grey for each pixel
+        snow = static_rng.random(
+            (thickness, width, 1), dtype=np.float32
+        )  # constant: one grey for each pixel, a field one channel wide
         out[top : top + thickness] = out[top : top + thickness] * (1 - params.band_static) + snow * params.band_static
     # constant: the wander is one value for each row, a field one column wide
     wander = params.wobble * clumped_noise(
@@ -167,7 +169,9 @@ def vhs(rgb: np.ndarray, params: VhsParams) -> np.ndarray:
         length = min(width, max(1, round(dropout_rng.uniform(params.tracking / 2, params.tracking) * width)))
         row = int(dropout_rng.integers(height))
         start = int(dropout_rng.integers(width - length + 1))
-        out[row : row + streak_height, start : start + length] = 1.0  # a dropout is white
+        out[row : row + streak_height, start : start + length] = (
+            1.0  # constant: a dropout is white (the top of the 0..1 range)
+        )
     signal = rgb_to_yiq(out)
     sigmas = np.zeros(signal.ndim)  # a sigma of 0 leaves a direction alone: only the columns (axis 1) are blurred
     sigmas[1] = params.bleed

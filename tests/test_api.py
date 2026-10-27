@@ -166,7 +166,7 @@ def test_the_fx_signature_offers_partition_only_to_an_effect_that_takes_it(parti
 
 
 def test_a_step_describes_itself_briefly_for_labels():
-    assert str(fx.gradient(colors=["#000000"], mask="background")) == "fill(color='#000000') on background"
+    assert str(fx.gradient(colors=["#000000"], mask="background")) == "gradient(colors=['#000000']) on background"
     assert str(fx.grade(exposure=0.5, opacity=0.3)) == "grade(exposure=0.5) x0.3"
     assert str(fx.bloom(radius=26, blend_mode="screen")) == "bloom(radius=26) screen"
     assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
@@ -318,8 +318,8 @@ def test_a_preset_is_chosen_with_the_keyword_preset_and_the_other_values_win_ove
     assert fx.gradient_map(preset="sepia", shadow_clip=0.2).params["shadow_clip"] == 0.2
     with pytest.raises(ValueError, match=r"gradient_map.*'nope'.*sepia"):
         fx.gradient_map(preset="nope")
-    with pytest.raises(ValueError, match=r"grade.*'sepia'.*no presets"):
-        fx.grade(preset="sepia")
+    with pytest.raises(ValueError, match=r"equalize.*'sepia'.*no presets"):
+        fx.equalize(preset="sepia")
 
 
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
