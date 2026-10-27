@@ -28,6 +28,7 @@ takes the field's array, float32 (h, w) 0..1, as a keyword-only argument of the 
 array itself (`relight(rgb, field=array)`); the parameter's value, a name, is then not used.
 """
 
+import difflib
 import functools
 import inspect
 import os
@@ -43,6 +44,7 @@ import numpy as np
 from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
 from bullterrier_image.ops.maps import map_problem
 
+from . import looks as look_files
 from . import presets as preset_files
 from .params import EffectParams
 from .presets import Preset
@@ -224,12 +226,36 @@ def unregister(name: str) -> None:
 
 
 def get(name: str) -> ModelledEffect:
-    """The effect called `name`; UnknownEffectError (a KeyError) listing the available ones if there is none."""
+    """The effect called `name`. UnknownEffectError (a KeyError) if there is none: its message says where the name
+    lives when it is a preset ("'glitch' is a preset: effect = "slice_shift", preset = "glitch"") or a built-in look,
+    else offers the close matches among effects, presets and looks, then lists the effects. Recipes, `fx`, the
+    command line and the gallery all name effects through here, so they all give this message."""
     _load_effect_packages()
     try:
         return _EFFECTS[name]
     except KeyError:
-        raise UnknownEffectError(f"unknown effect {name!r}; available: {', '.join(sorted(_EFFECTS))}") from None
+        raise UnknownEffectError(_not_an_effect(name)) from None
+
+
+def _not_an_effect(name: str) -> str:
+    """Why `name` is no effect: it is a preset of some effects or a look, or it is near one of those names, or it is
+    nothing we know."""
+    homes = {effect: sorted(presets(effect)) for effect in _EFFECTS}  # effect -> its preset names
+    looks = look_files.read()
+    where = [f'effect = "{effect}", preset = "{name}"' for effect, names in homes.items() if name in names]
+    if where:
+        return f"{name!r} is a preset: {'; or '.join(where)}"
+    if name in looks:
+        return (
+            f"{name!r} is a look, a recipe of several steps, not an effect: {looks[name].description} "
+            f'Load it by name: load_recipe("{name}"), or `bt-image render PHOTO {name}`'
+        )
+    names = {**dict.fromkeys(_EFFECTS, "effect"), **dict.fromkeys(looks, "look")}
+    for effect, preset_names in homes.items():
+        names.update((preset, f"preset of {effect}") for preset in preset_names)
+    near = [f"{close} ({names[close]})" for close in difflib.get_close_matches(name, names)]
+    hint = f"; did you mean: {', '.join(near)}" if near else ""
+    return f"unknown effect {name!r}{hint}; available: {', '.join(sorted(_EFFECTS))}"
 
 
 def all_effects() -> dict[str, ModelledEffect]:

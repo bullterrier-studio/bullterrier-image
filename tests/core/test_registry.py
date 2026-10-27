@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.errors import MapNotFoundError
+from bullterrier_image.errors import MapNotFoundError, UnknownEffectError
 
 
 class GainParams(EffectParams):
@@ -445,3 +445,35 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
     assert len(seen) == 16
     assert {"bloom", "grade", "halftone"} <= set(seen[0])  # the real effects, loaded by the first query
     assert all(names == seen[0] for names in seen)
+
+
+# --- a name that is no effect says where it lives --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "says"),
+    [
+        pytest.param("glitch", ['"slice_shift"', 'preset = "glitch"'], id="a-preset-names-its-effect-and-itself"),
+        pytest.param("sepia", ['"gradient_map"', 'preset = "sepia"'], id="a-preset-of-another-effect"),
+        pytest.param("glich", ["did you mean", "glitch", "slice_shift"], id="a-misspelt-preset-offers-the-close-match"),
+        pytest.param("gradient_mapp", ["did you mean", "gradient_map"], id="a-misspelt-effect-offers-the-close-match"),
+    ],
+)
+def test_an_unknown_effect_name_says_where_the_name_lives(name, says):
+    with pytest.raises(UnknownEffectError) as raised:
+        registry.get(name)
+    message = str(raised.value)
+    assert repr(name) in message
+    for text in says:
+        assert text in message
+
+
+def test_a_name_that_is_nothing_gets_no_location_and_no_close_match():
+    with pytest.raises(UnknownEffectError) as raised:
+        registry.get("zzqxv")
+    message = str(raised.value)
+    assert "zzqxv" in message
+    assert "preset" not in message
+    assert "look" not in message
+    assert "did you mean" not in message
+    assert "grade" in message  # the effects are listed

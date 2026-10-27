@@ -191,6 +191,11 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
         fx.no_such_effect  # noqa: B018  (the lookup itself is what must raise)
 
 
+def test_fx_says_where_the_name_of_a_preset_lives():
+    with pytest.raises(AttributeError, match=r"'glitch' is a preset.*effect = \"slice_shift\", preset = \"glitch\""):
+        fx.glitch  # noqa: B018  (the lookup itself is what must raise)
+
+
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
     signature = inspect.signature(fx.rgb_split)
     assert list(signature.parameters)[:3] == ["pair", "angle", "amount"]  # no image parameter, no subject

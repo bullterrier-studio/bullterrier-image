@@ -51,10 +51,8 @@ def __getattr__(name: str) -> Callable[..., Step]:
         raise AttributeError(name)
     try:
         function = registry.get(name)
-    except KeyError:
-        raise AttributeError(
-            f"fx has no effect {name!r}; available: {', '.join(sorted(registry.describe()))}"
-        ) from None
+    except KeyError as error:  # the registry says where the name lives, if it is a preset or a look
+        raise AttributeError(str(error)) from None
     return _builder(name, function)
 
 

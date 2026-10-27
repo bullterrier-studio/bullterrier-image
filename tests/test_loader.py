@@ -12,7 +12,7 @@ from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
 from bullterrier_image.core.steps import Each, Recipe, Step
-from bullterrier_image.errors import ImageReadError, RecipeError
+from bullterrier_image.errors import ImageReadError, RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
     Band,
@@ -809,3 +809,17 @@ EACH_MISTAKES = {
 def test_a_mistake_in_an_each_step_names_the_file_the_step_and_the_problem(tmp_path, text, complaint):
     with pytest.raises(RecipeError, match=rf"^bad\.toml: .*{complaint}"):
         load_recipe(_write(tmp_path, "format = 2\n" + EACH + text, "bad.toml"))
+
+
+@pytest.mark.parametrize(
+    ("effect", "says"),
+    [
+        pytest.param("glitch", 'effect = "slice_shift", preset = "glitch"', id="known-good-a-preset-name"),
+        pytest.param("zzqxv", "unknown effect 'zzqxv'", id="known-bad-nonsense"),
+    ],
+)
+def test_a_step_naming_something_that_is_no_effect_says_where_the_name_lives(tmp_path, effect, says):
+    path = _write(tmp_path, f"[[step]]\neffect = '{effect}'\n")
+    with pytest.raises(UnknownEffectError, match=re.escape(says)) as raised:
+        load_recipe(path)
+    assert str(raised.value).startswith("look.toml: step 1")

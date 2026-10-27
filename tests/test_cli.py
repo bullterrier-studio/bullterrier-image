@@ -741,3 +741,10 @@ def test_developer_commands_are_not_part_of_the_installed_cli(command, capsys):
         cli(command)
     assert caught.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_effects_naming_a_preset_says_which_effect_it_belongs_to(capsys):
+    assert cli("effects glitch") == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert 'effect = "slice_shift", preset = "glitch"' in captured.err
