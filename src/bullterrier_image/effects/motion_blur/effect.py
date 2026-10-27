@@ -18,8 +18,9 @@ class MotionBlurParams(EffectParams):
         min=0,
         max=360,
         cyclic=True,
-        doc="The direction of the motion, counter-clockwise as seen in the picture: 0 = horizontal, 90 = vertical, "
-        "45 = rising to the right. Opposite directions (0 and 180) give the same blur.",
+        doc="The direction of the motion, in degrees clockwise from pointing right on the screen, 0 to 360: 0 = "
+        "horizontal, 90 = vertical, 45 = falling to the lower right. Opposite directions (0 and 180) give the same "
+        "blur.",
     )
     length: float = param(
         24.0,
@@ -27,8 +28,8 @@ class MotionBlurParams(EffectParams):
         min=0,
         max=500,
         drivable=True,
-        doc="How far the smear reaches along the line, end to end, in px at the recipe's size: larger is a faster "
-        "motion; 0 leaves the picture unchanged.",
+        doc="How far the smear reaches along the line, end to end, in px, tuned for a picture about 480 px high: "
+        "larger is a faster motion; 0 leaves the picture unchanged.",
     )
     edge: Literal["reflect", "nearest", "mirror", "wrap"] = param(
         "reflect",
@@ -41,10 +42,10 @@ class MotionBlurParams(EffectParams):
 def _line_kernel(angle: float, length: float) -> np.ndarray:
     """The weights of a straight line `length` px long through the middle of a (2r + 1) x (2r + 1) square, r = ceil(
     length / 2): each pixel weighs the length of line inside it (a 1 x 1 square), the weights summing to 1. Rows count
-    downwards, columns to the right; `angle` is counter-clockwise from the columns' direction."""
+    downwards, columns to the right; `angle` is clockwise from the columns' direction."""
     reach = int(np.ceil(length / 2))
     rows, cols = np.mgrid[-reach : reach + 1, -reach : reach + 1].astype(np.float64)
-    direction = (np.cos(np.radians(angle)), -np.sin(np.radians(angle)))  # (right, down)
+    direction = (np.cos(np.radians(angle)), np.sin(np.radians(angle)))  # (right, down)
     # the stretch of the line, as distance t from its middle, inside each pixel: where it is within half a pixel of the
     # pixel's centre along both axes; both limits of that stretch are found per axis and intersected
     low, high = np.full(rows.shape, -length / 2), np.full(rows.shape, length / 2)

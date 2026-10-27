@@ -60,8 +60,12 @@ def test_angle_90_averages_each_column_over_the_length(length: float) -> None:
         (0.0, 4.0, {(0, -2): 0.125, (0, -1): 0.25, (0, 0): 0.25, (0, 1): 0.25, (0, 2): 0.125}),
         (90.0, 3.0, {(-1, 0): 1 / 3, (0, 0): 1 / 3, (1, 0): 1 / 3}),
         (180.0, 3.0, {(0, -1): 1 / 3, (0, 0): 1 / 3, (0, 1): 1 / 3}),
-        (45.0, 2 * np.sqrt(2), {(1, -1): 0.25, (0, 0): 0.5, (-1, 1): 0.25}),  # counter-clockwise: up and to the right
-        (135.0, 2 * np.sqrt(2), {(-1, -1): 0.25, (0, 0): 0.5, (1, 1): 0.25}),
+        (
+            45.0,
+            2 * np.sqrt(2),
+            {(-1, -1): 0.25, (0, 0): 0.5, (1, 1): 0.25},
+        ),  # clockwise from right: down and to the right
+        (135.0, 2 * np.sqrt(2), {(1, -1): 0.25, (0, 0): 0.5, (-1, 1): 0.25}),
         (0.0, 0.0, {(0, 0): 1.0}),
         (30.0, 0.5, {(0, 0): 1.0}),
     ],
@@ -93,9 +97,9 @@ def test_the_line_has_the_length_and_direction_asked_for(angle: float) -> None:
     length = 20.0
     out = registry.apply(NAME, impulse(81), angle=angle, length=length)[..., 0].astype(np.float64)
     rows, cols = np.mgrid[0:81, 0:81] - 40
-    right, up = cols, -rows
-    along = right * np.cos(np.radians(angle)) + up * np.sin(np.radians(angle))
-    across = -right * np.sin(np.radians(angle)) + up * np.cos(np.radians(angle))
+    right, down = cols, rows
+    along = right * np.cos(np.radians(angle)) + down * np.sin(np.radians(angle))
+    across = -right * np.sin(np.radians(angle)) + down * np.cos(np.radians(angle))
     assert out.sum() == pytest.approx(1.0, abs=1e-5)
     assert (out * along).sum() == pytest.approx(0.0, abs=0.02)
     assert (out * along**2).sum() == pytest.approx(length**2 / 12, abs=0.5)

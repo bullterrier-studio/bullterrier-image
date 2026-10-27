@@ -4,5 +4,5 @@ size = 480
 
 [[step]]
 effect = "motion_blur"
-angle = 10
+angle = 350
 length = 9

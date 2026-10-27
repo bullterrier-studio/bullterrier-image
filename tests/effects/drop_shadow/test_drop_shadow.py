@@ -38,7 +38,7 @@ def stripe(out: np.ndarray, cols: slice) -> np.ndarray:
         pytest.param(5, 0, [(10, 17)], id="0 degrees is to the right"),
         pytest.param(5, 90, [(15, 12)], id="90 degrees is down"),
         pytest.param(5, 180, [(10, 7)], id="180 degrees is to the left"),
-        pytest.param(5, -90, [(5, 12)], id="-90 degrees is up"),
+        pytest.param(5, 270, [(5, 12)], id="270 degrees is up"),
         pytest.param(3 * 2**0.5, 45, [(13, 15)], id="45 degrees is the lower right; the offset is along the ray"),
         pytest.param(0.5, 90, [(10, 12), (11, 12)], id="half a pixel shares the shadow between two pixels"),
     ],
@@ -174,7 +174,7 @@ def test_a_single_copy_at_a_copy_opacity_is_the_shadow_at_that_opacity() -> None
         pytest.param(0, (0, 1), 3.0, id="0 degrees is to the right"),
         pytest.param(90, (1, 0), 3.0, id="90 degrees is down"),
         pytest.param(180, (0, -1), 3.0, id="180 degrees is to the left"),
-        pytest.param(-90, (-1, 0), 3.0, id="-90 degrees is up"),
+        pytest.param(270, (-1, 0), 3.0, id="270 degrees is up"),
         pytest.param(45, (1, 1), 3 * 2**0.5, id="45 degrees is the lower right; the offset is along the ray"),
     ],
 )

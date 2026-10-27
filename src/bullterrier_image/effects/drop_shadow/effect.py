@@ -27,18 +27,18 @@ class DropShadowParams(EffectParams):
         unit="px",
         min=0,
         max=1000,
-        doc="How far each copy lies beyond the one before it, in px at the recipe's size: the first is `offset` from "
-        "the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, leaving only what "
-        "`blur` spreads past its edge.",
+        doc="How far each copy lies beyond the one before it, in px, tuned for a picture about 480 px high: the first "
+        "is `offset` from the subject, the last `copies` x `offset`. 0 = every copy hidden behind the subject, "
+        "leaving only what `blur` spreads past its edge.",
     )
     angle: float = param(
         56.0,
         unit="degrees",
-        min=-180,
-        max=180,
+        min=0,
+        max=360,
         cyclic=True,
-        doc="The direction the copies step away in, clockwise as seen in the picture: 0 = to the right, 45 = to the "
-        "lower right, 90 = down, 180 = to the left, -90 = up.",
+        doc="The direction the copies step away in, in degrees clockwise from pointing right on the screen, 0 to "
+        "360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, 270 = up.",
     )
     blur: float = param(
         24.0,
