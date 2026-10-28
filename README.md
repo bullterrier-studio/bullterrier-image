@@ -43,6 +43,9 @@ pip install bullterrier-image
 bt-image effects        # the built-in looks (`bt-image render photo.jpg crt`), then one line per effect
 ```
 
+Ready-built for Linux (x86_64, aarch64; glibc 2.17+), macOS (Apple silicon, Intel) and Windows (x86_64). Elsewhere
+(Alpine and other musl Linux, Windows on Arm) pip builds it from source, which needs [Rust](https://rustup.rs/).
+
 ## Quick start
 
 Repo ships demo project: one photo, 16 recipes.

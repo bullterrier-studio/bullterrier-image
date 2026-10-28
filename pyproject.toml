@@ -71,6 +71,8 @@ python-source = "src"
 module-name = "bullterrier_image._native._core"
 # the files `poe new-effect` copies are for a source checkout, not part of the installed library
 exclude = [{ path = "src/bullterrier_image/effects/_template/**", format = "wheel" }]
+# a build from the sdist under rustup uses the toolchain CI tests and the wheels are built with
+include = [{ path = "rust-toolchain.toml", format = "sdist" }]
 
 # `uv sync` and `uv run` rebuild the extension when one of these changes (by default uv looks at pyproject.toml only)
 [tool.uv]

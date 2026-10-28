@@ -1,6 +1,11 @@
-# Build the sdist and wheel once, check them as PyPI would, keep them as the `dist` artifact (release.yml publishes
-# exactly these files), and prove the wheel works when installed on its own, away from the checkout. Called by ci.yml
-# once every check passed; can also be started by hand (only release.yml publishes, and only what its own CI built).
+# Build the distributions once, check them as PyPI would, keep them as the `dist` artifact (release.yml publishes
+# exactly these files), and prove each works when installed on its own, away from the checkout. Called by ci.yml once
+# every check passed; can also be started by hand (only release.yml publishes, and only what its own CI built).
+#
+# The sdist, and one abi3 wheel per platform (it serves every Python from 3.12): Linux x86_64 and aarch64 (manylinux2014,
+# glibc 2.17, the oldest the Rust toolchain supports), macOS arm64 and x86_64, Windows x86_64. No musllinux wheel
+# (onnxruntime publishes none) and no Windows arm64 wheel yet: there, and anywhere else, pip builds the sdist, which
+# needs Rust. No job here restores a build cache: what it builds may be published.
 name: Build
 
 on:
@@ -11,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  dist:
-    name: Build and check the distributions
+  sdist:
+    name: Build the sdist
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -22,23 +27,114 @@ jobs:
       - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           enable-cache: false # these files may be published: nothing restored from a cache goes into them
-      - name: Build the sdist and wheel and check them (twine, check-wheel-contents)
-        run: uv run --locked poe build-check
+      # maturin reads the crates' metadata with cargo, so the sdist is made with the toolchain rust-toolchain.toml pins
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && cargo --version
+      - name: Build the sdist
+        run: uv build --sdist --out-dir dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  wheels:
+    name: Build the wheel for ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false # one red platform must not hide the state of the others
+      matrix:
+        include:
+          # Linux: in the manylinux container of the runner's own architecture (maturin-action's), so nothing is
+          # cross-compiled; macOS x86_64 is cross-compiled on the arm64 runner
+          - { platform: linux-x86_64, runner: ubuntu-latest, target: x86_64, manylinux: "2014" }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64, manylinux: "2014" }
+          - { platform: macos-arm64, runner: macos-latest, target: aarch64 }
+          - { platform: macos-x86_64, runner: macos-latest, target: x86_64 }
+          - { platform: windows-x86_64, runner: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # the interpreter maturin builds the abi3 wheel for (the manylinux container has its own)
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.os != 'Linux'
+        with:
+          python-version: "3.12"
+      # maturin's version from [build-system] in pyproject.toml, the Rust toolchain from rust-toolchain.toml
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+          sccache: false # these files may be published: nothing restored from a cache goes into them
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  dist:
+    name: Check the distributions and keep them
+    needs: [sdist, wheels]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # the checkout is the package tree check-wheel-contents compares each wheel with; nothing is built here
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+      - name: Install the checking tools (twine, check-wheel-contents), not the package
+        run: uv sync --locked --no-install-project
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: wheel-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sdist
+          path: dist
+      - name: Metadata and description as PyPI renders them (twine)
+        run: uv run --no-sync twine check --strict 'dist/*'
+      # each wheel against the package tree as an install from it has it: the library's code and the extension built
+      # for its platform (a wheel without one fails to unzip it); anything else in the wheel, or code left out, fails
+      - name: Each wheel holds the library's code and its extension, nothing else (check-wheel-contents)
+        run: |
+          set -euo pipefail
+          native=src/bullterrier_image/_native
+          for wheel in dist/*.whl; do
+            unzip -q -j "$wheel" 'bullterrier_image/_native/_core.*' -x 'bullterrier_image/_native/_core.pyi' -d "$native"
+            uv run --no-sync check-wheel-contents "$wheel"
+            find "$native" -name '_core.*' ! -name '_core.pyi' -delete
+          done
+          ls -l dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
-          path: dist/check/
+          path: dist/
           if-no-files-found: error
 
   smoke:
-    name: Install the wheel on ${{ matrix.os }}
+    name: Install the ${{ matrix.from }} on ${{ matrix.os }}
     needs: dist
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, from: wheel } # Linux x86_64
+          - { os: ubuntu-24.04-arm, from: wheel } # Linux aarch64
+          - { os: macos-latest, from: wheel } # macOS arm64
+          - { os: macos-15-intel, from: wheel } # macOS x86_64
+          - { os: windows-latest, from: wheel } # Windows x86_64
+          - { os: ubuntu-latest, from: sdist } # built here with Rust, as on a platform without a wheel
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -48,21 +144,39 @@ jobs:
         with:
           enable-cache: false
           python-version: "3.12"
-      # no checkout: the environment has the wheel and its dependencies only. The recipe needs no subject, so no model
-      # is downloaded and no matte is given
-      - name: Install the wheel in a fresh environment and render a picture
+      # No checkout: the environment has the package and its dependencies only. A wheel comes from the artifact alone
+      # (`--no-index`: no release from PyPI; `--only-binary`: no sdist built on the fly), the platform's wheel chosen
+      # by uv, then its dependencies from the index; the wheel's tag names the artifact's file it was. The sdist is
+      # installed from its file and built here (rustup installs the toolchain its rust-toolchain.toml pins);
+      # direct_url.json names that file. The recipe needs no subject, so no model is downloaded and no matte is given;
+      # grade runs in the Rust core.
+      - name: Install the ${{ matrix.from }} in a fresh environment and render a picture
         shell: bash
+        env:
+          FROM: ${{ matrix.from }}
         run: |
           set -euo pipefail
-          wheel=$(ls "$GITHUB_WORKSPACE"/dist/*.whl)
+          dist="$GITHUB_WORKSPACE/dist"
           cd "$RUNNER_TEMP"
           uv venv --quiet smoke
-          uv pip install --quiet --python smoke "$wheel"
           if [ "$RUNNER_OS" = Windows ]; then bin=smoke/Scripts; else bin=smoke/bin; fi
+          if [ "$FROM" = wheel ]; then
+            uv pip install --python smoke --no-index --find-links "$dist" --only-binary bullterrier-image --no-deps \
+              bullterrier-image
+            "$bin/python" -c "from importlib.metadata import requires; print('\n'.join(requires('bullterrier-image')))" \
+              > requirements.txt
+            uv pip install --python smoke --requirement requirements.txt
+            tag=$("$bin/python" -c "from importlib.metadata import distribution as d; print(next(line[5:] for line in d('bullterrier-image').read_text('WHEEL').splitlines() if line.startswith('Tag: ')))")
+            ls "$dist"/bullterrier_image-*-"$tag"*.whl # the installed wheel (its first tag) is this file of the artifact
+          else
+            uv pip install --python smoke "$dist"/bullterrier_image-*.tar.gz
+            "$bin/python" -c "from importlib.metadata import distribution as d; print(d('bullterrier-image').read_text('direct_url.json'))"
+          fi
+          uv pip list --python smoke
           "$bin/bt-image" --version
           "$bin/bt-image" --help
           "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
           printf 'name = "smoke"\n\n[[step]]\neffect = "grade"\n\n[[step]]\neffect = "halftone"\n' > smoke.toml
           "$bin/bt-image" render photo.png smoke.toml -o out
           ls -l out
-          test -s out/photo__smoke.png && echo "rendered out/photo__smoke.png from the installed wheel"
+          test -s out/photo__smoke.png && echo "rendered out/photo__smoke.png from the installed $FROM"

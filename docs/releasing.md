@@ -7,12 +7,16 @@ How a change is checked on GitHub and how a version reaches PyPI. The short rule
 
 `.github/workflows/ci.yml` runs on every push to main, pull request and merge-queue entry, and by hand (Actions tab,
 *CI*, *Run workflow*). Stage 1 runs every check in parallel: `lint.yml` (format, lint, dead code, dependencies, types,
-workflows), `test.yml` (the suite on Linux, macOS and Windows, Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed
-dependencies), `security.yml` (pip-audit, CodeQL, and dependency review on pull requests) and `pre-commit.yml` (the
-commit hooks over every file). Stage 2, `build.yml`, builds and checks the distributions and installs the wheel on the
-three systems, only once every check passed. `ci-ok` waits for all of them and is the one required check. Each of
-these workflows can also be started by hand, and `security.yml` runs weekly on its own. A release runs the whole CI
-again and publishes only the files its build made, so nothing that fails a check can be built or published.
+workflows, each Rust gate a step of its own), `test.yml` (the Rust tests and the suite on Linux, macOS and Windows,
+Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed dependencies), `security.yml` (pip-audit and cargo-deny's
+advisories, CodeQL for Python and Rust, and dependency review on pull requests) and `pre-commit.yml` (the commit hooks
+over every file). Stage 2, `build.yml`, only once every check passed: the sdist and one abi3 wheel per platform (Linux
+x86_64 and aarch64 in manylinux2014 containers, macOS arm64 and x86_64, Windows x86_64; built with maturin-action),
+checked with twine and check-wheel-contents and kept as one `dist` artifact; then each wheel is installed from that
+artifact alone on its own platform, the sdist is built on Linux, and each renders a picture. `ci-ok` waits for all of
+them and is the one required check. Each of these workflows can also be started by hand, and `security.yml` runs
+weekly on its own. A release runs the whole CI again and publishes only the files its build made, so nothing that
+fails a check can be built or published.
 
 ## Releasing
 

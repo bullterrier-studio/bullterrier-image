@@ -10,6 +10,7 @@ way `uv run poe check` does, in a copy of the project into which one fault at a 
 import shutil
 import subprocess
 import sys
+import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
@@ -58,6 +59,9 @@ def test_the_project_as_it_is_builds_clean_distributions(project, uv_run_env):
     shipped = [entry for entry in zipfile.ZipFile(wheel).namelist() if entry.startswith(f"{native}_core.")]
     assert f"{native}_core.pyi" in shipped  # its types, for the package's own type checking
     assert len([entry for entry in shipped if entry.endswith((".so", ".pyd"))]) == 1, shipped
+    # built from the sdist with rustup, the extension is compiled by the toolchain CI tests, as the wheels are
+    with tarfile.open(sdist) as archive:
+        assert f"bullterrier_image-{version}/rust-toolchain.toml" in archive.getnames()
 
 
 def test_a_long_description_pypi_cannot_render_fails_the_gate(project, uv_run_env):

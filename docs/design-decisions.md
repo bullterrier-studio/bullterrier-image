@@ -458,6 +458,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `_native/_core.pyi`; cargo test (proptest for `ops`). The hidden-tunable scan, one config home and effect independence cover
   the Rust sources. Warnings are errors only in the gate, so a newer compiler never breaks a user's build. No
   `.cargo/config.toml` and no `target-cpu=native`: a wheel must run on every CPU of its platform.
+- **Wheels for five platforms, the sdist for the rest.** One abi3 wheel each for Linux x86_64 and aarch64
+  (manylinux2014, glibc 2.17, the oldest Rust supports), macOS arm64 and x86_64 and Windows x86_64, built by
+  maturin-action on GitHub's runners (Linux natively in the manylinux container of each architecture; macOS x86_64
+  cross-compiled). No musllinux wheel: onnxruntime publishes none, so the package could not install there anyway. No
+  Windows arm64 wheel yet: asked for by no one, and one more runner. Elsewhere pip builds the sdist, which needs Rust;
+  the sdist carries `rust-toolchain.toml`, so under rustup it builds with the compiler CI tests. Every wheel is
+  installed from the artifact alone and renders a picture on its own platform before anything is published.
+  *Reason:* a user should never need a compiler on a common platform, and nothing published goes untried.
 
 ## Effects
 
