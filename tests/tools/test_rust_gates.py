@@ -175,7 +175,7 @@ OFFENCES = {
         "rust-deny",
         CORE_MANIFEST,
         replaced("[dependencies]\n", "[dependencies]\npyo3.workspace = true\n"),
-        ["banned", "pyo3", "bullterrier-image-core"],
+        ["banned", "pyo3", "parent 'bullterrier-image = "],  # the core, by name
     ),
     "a licence outside the allow-list": (
         "rust-deny",

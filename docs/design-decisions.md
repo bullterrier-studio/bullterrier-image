@@ -426,9 +426,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## The Rust core
 
 - **The numeric work moves to Rust; Python stays the interface.** Two crates in a Cargo workspace beside `src/`:
-  `crates/core` (pure Rust, no PyO3, `#![forbid(unsafe_code)]`: `ops/` and one file per effect in `effects/`) and
-  `crates/python` (PyO3 bindings that build `bullterrier_image._native._core`, built by maturin). Each effect is ported once and
-  its Python body deleted; there is no second implementation. *Reason:* measured on a proof of concept, a Rust core
+  `crates/core` (the crate `bullterrier-image`, the PyPI name, for Rust users later; pure Rust, no PyO3,
+  `#![forbid(unsafe_code)]`: `ops/` and one file per effect in `effects/`) and `crates/python` (PyO3 bindings that
+  build `bullterrier_image._native._core`, built by maturin). Each effect is ported once and its Python body deleted;
+  there is no second implementation. *Reason:* measured on a proof of concept, a Rust core
   renders several times faster per thread, needs no pickling between worker processes, starts in milliseconds, and
   can serve a video API and live rendering later. *Consequence:* contributors need rustup (the toolchain file installs
   the rest), and wheels are per platform (abi3: one per platform for every Python from 3.12).

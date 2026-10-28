@@ -6,6 +6,7 @@ detector the rules use is shown a known-bad and a known-good input.
 """
 
 import itertools
+import json
 import re
 import shlex
 import shutil
@@ -201,3 +202,24 @@ def test_every_poe_command_the_documentation_mentions_is_a_task(pyproject, docum
     mentioned = set(re.findall(r"uv run poe ([a-z][a-z-]*)", (ROOT / document).read_text(encoding="utf-8")))
     assert mentioned, f"{document} should mention at least one poe task"
     assert mentioned <= pyproject["tool"]["poe"]["tasks"].keys()
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# names: the Rust crate a Rust user depends on is the Python package's twin
+
+
+def test_the_core_crate_is_named_as_the_package_is_on_pypi_and_imported(pyproject):
+    """Naming rule: crates.io and PyPI carry the same name, and the crate's library the import name (cargo reports
+    both, whether the manifest spells the library's name or leaves it to cargo's default)."""
+    result = subprocess.run(
+        ["cargo", "metadata", "--no-deps", "--offline", "--format-version", "1"],
+        cwd=ROOT,
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+    )
+    core = (ROOT / "crates" / "core" / "Cargo.toml").resolve()
+    [package] = [package for package in json.loads(result.stdout)["packages"] if Path(package["manifest_path"]) == core]
+    [library] = [target["name"] for target in package["targets"] if "lib" in target["kind"]]
+    import_name = pyproject["tool"]["maturin"]["module-name"].split(".")[0]
+    assert (package["name"], library) == (pyproject["project"]["name"], import_name)

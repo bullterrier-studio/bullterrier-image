@@ -70,7 +70,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   errors.py      errors    BullterrierImageError and subclasses: bottom layer, importable from every other
   _native/       errors    home of the Rust extension `_native._core` (crates/python; `_core.pyi` its stub), beside
                            errors: imports nothing
-crates/core/     the Rust core: ops/ (numeric primitives by concept) and effects/<name>.rs (one per ported effect)
+crates/core/     the Rust core, crate `bullterrier-image`: ops/ (primitives by concept), effects/<name>.rs (one per effect)
 crates/python/   the PyO3 bindings that build `bullterrier_image._native._core`; generic, names no effect
 examples/        demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/),
                  older experiments (experiments/), a Python example; see examples/README.md

@@ -1,6 +1,7 @@
-# The Rust core of bullterrier-image: `crates/core` (pure Rust: ops and effects) and `crates/python` (the bindings
-# that build `bullterrier_image._core`; maturin builds it, see [tool.maturin] in pyproject.toml). Rust settings live
-# here, except what a tool cannot read from this file: rust-toolchain.toml, rustfmt.toml, deny.toml.
+# The Rust core of bullterrier-image: `crates/core` (pure Rust: ops and effects; the crate `bullterrier-image`) and
+# `crates/python` (the bindings that build `bullterrier_image._native._core`; maturin builds it, see [tool.maturin] in
+# pyproject.toml). Rust settings live here, except what a tool cannot read from this file: rust-toolchain.toml,
+# rustfmt.toml, deny.toml.
 [workspace]
 resolver = "3"
 members = ["crates/core", "crates/python"]
@@ -14,7 +15,7 @@ repository = "https://github.com/bullterrier-studio/bullterrier-image"
 publish = false
 
 [workspace.dependencies]
-bullterrier-image-core = { path = "crates/core" }
+bullterrier-image = { path = "crates/core" }
 numpy = "0.30"
 proptest = "1.12"
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)

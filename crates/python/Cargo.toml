@@ -1,6 +1,6 @@
 [package]
 name = "bullterrier-image-python"
-description = "The Python bindings of bullterrier-image's Rust core: builds the extension `bullterrier_image._core`."
+description = "The Python bindings of bullterrier-image's Rust core: builds the extension `bullterrier_image._native._core`."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,7 +16,7 @@ test = false
 doctest = false
 
 [dependencies]
-bullterrier-image-core.workspace = true
+bullterrier-image.workspace = true
 numpy.workspace = true
 pyo3.workspace = true
 serde_json.workspace = true

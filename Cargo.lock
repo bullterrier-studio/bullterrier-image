@@ -58,7 +58,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bullterrier-image-core"
+name = "bullterrier-image"
 version = "0.0.0"
 dependencies = [
  "proptest",
@@ -70,7 +70,7 @@ dependencies = [
 name = "bullterrier-image-python"
 version = "0.0.0"
 dependencies = [
- "bullterrier-image-core",
+ "bullterrier-image",
  "numpy",
  "pyo3",
  "serde_json",

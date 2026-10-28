@@ -29,10 +29,10 @@ sticker) stays here; anything needing a canvas of its own or several inputs does
 
 ## Names
 
-`bullterrier-image` (PyPI, repository), `bullterrier_image` (import; docs alias `bti`), `bt-image` (command, `bt-image.toml`,
-cache folder), `BT_IMAGE_*` (env vars), `BullterrierImageError` (base exception), `bullterrier_image.effects` (plugin group).
-Full name for identity, `bt-` for what a person types. Names inside the package (`Recipe`, `fx`, `RecipeError`, effects,
-parameters) carry no prefix.
+`bullterrier-image` (PyPI, crates.io: the core crate, repository), `bullterrier_image` (import, Rust library; docs alias
+`bti`), `bt-image` (command, `bt-image.toml`, cache folder), `BT_IMAGE_*` (env vars), `BullterrierImageError` (base
+exception), `bullterrier_image.effects` (plugin group). Full name for identity, `bt-` for what a person types. Names
+inside the package (`Recipe`, `fx`, `RecipeError`, effects, parameters) carry no prefix.
 
 ## Architecture
 
@@ -53,8 +53,8 @@ ops        pure numeric primitives                                    (may impor
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
-**Rust core:** `crates/core` (pure Rust: `ops/` by concept, one `effects/<name>.rs` per ported effect, found by
-`build.rs`) and `crates/python` (PyO3 bindings building `bullterrier_image._native._core`; generic, names no effect). A
+**Rust core:** `crates/core` (crate `bullterrier-image`, pure Rust: `ops/` by concept, one `effects/<name>.rs` per
+ported effect, found by `build.rs`) and `crates/python` (PyO3 bindings building `bullterrier_image._native._core`; generic, names no effect). A
 ported effect keeps its Python model, docstring and `@effect`; its body is `_core.apply("<name>", rgb,
 params.model_dump())` (`from bullterrier_image._native import _core`). Its Rust file has `Params`
 (`#[serde(deny_unknown_fields)]`, no defaults) and `fn render(picture: &Picture, params: &Params) -> Image`. Rust effects

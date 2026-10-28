@@ -1,7 +1,7 @@
 //! `bullterrier_image._native._core`: runs the effects of the Rust core on numpy pictures. Generic: it names no effect, so
 //! porting one never changes it.
 
-use bullterrier_image_core::Picture;
+use bullterrier_image::Picture;
 use numpy::{PyArray1, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -38,7 +38,7 @@ fn apply<'py>(
     let picture = Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(value_error)?;
     let params = to_json(params.as_any())?;
     let image = py
-        .detach(|| bullterrier_image_core::apply(effect, &picture, params))
+        .detach(|| bullterrier_image::apply(effect, &picture, params))
         .map_err(value_error)?;
     let shape = [image.height(), image.width(), 3];
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
@@ -47,7 +47,7 @@ fn apply<'py>(
 /// The names of the effects the core implements, sorted.
 #[pyfunction]
 fn effects() -> Vec<&'static str> {
-    bullterrier_image_core::effects()
+    bullterrier_image::effects()
 }
 
 /// A `ValueError` carrying `error`'s message.
