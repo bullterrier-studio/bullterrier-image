@@ -78,19 +78,23 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     assert [step["effect"] for step in recipe["step"]] == ["lamp_probe"]
 
 
-def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported(checkout):
+def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported_documented_for_its_users(checkout):
     gallery.new_effect("lamp_probe", "light", checkout=checkout)
     code = (
         "import json, sys\n"
         "from bullterrier_image.core import registry\n"
-        "json.dump(registry.category('lamp_probe'), sys.stdout)\n"
+        "json.dump([registry.category('lamp_probe'), registry.documentation('lamp_probe')], sys.stdout)\n"
     )
     environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
     done = subprocess.run(
         [sys.executable, "-c", code], env=environment, capture_output=True, encoding="utf-8", check=False
     )
     assert done.returncode == 0, done.stderr
-    assert json.loads(done.stdout) == "light"
+    category, documentation = json.loads(done.stdout)
+    assert category == "light"
+    # what `help(fx.lamp_probe)` and the catalogue show, should its author forget to edit it: no note to the author
+    for note in ("Replace", "crates/", "uv sync", "Rust"):
+        assert note not in documentation, documentation
 
 
 @pytest.mark.parametrize(

@@ -27,18 +27,16 @@ class ${Name}Params(EffectParams):
     )
 
 
+# Replace the docstring with what the effect does, for its users (`help(fx.<name>)`, the catalogue): its first
+# sentence is the summary. An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of
+# the same shape and range out, the same for the same values, the input never modified. The work is done by its Rust
+# kernel, which `uv sync` rebuilds after a change; the core takes no map yet, so an effect that works from one (a
+# `FieldName` parameter) keeps a Python body for now. The kernel:
+# crates/core/src/effects/$name.rs
 @effect(category="$category", params=${Name}Params)
 def $name(
     rgb: np.ndarray,
     params: ${Name}Params,
 ) -> np.ndarray:
-    """Mix the picture toward its negative by `amount`. (Replace: this first sentence is the summary.)
-
-    An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of the same
-    shape and range out, the same for the same values, the input never modified. The work is done by its
-    Rust kernel, which `uv sync` rebuilds after a change:
-    crates/core/src/effects/$name.rs.
-    The core takes no map yet: an effect that works from one (a `FieldName` parameter) keeps a Python body
-    for now.
-    """
+    """Mix the picture toward its negative by `amount`."""
     return _core.apply("$name", rgb, params.model_dump())
