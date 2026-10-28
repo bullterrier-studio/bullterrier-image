@@ -147,7 +147,9 @@ class ModelledEffect[P: EffectParams]:
             raise TypeError(f"{self.__name__}(): give a {self.params_model.__name__} or keyword values, not both")
         elif not isinstance(params, self.params_model):
             raise TypeError(f"{self.__name__}() takes a {self.params_model.__name__}, not a {type(params).__name__}")
-        return self._function(rgb, params, **given)
+        # every effect gets the contract's picture, float32 and C-contiguous (a caller's float64 picture or sliced view
+        # is copied once, here): the Rust core reads it in place
+        return self._function(np.ascontiguousarray(rgb, dtype=np.float32), params, **given)
 
     def _field_array(self, name: str, rgb: np.ndarray, array: object) -> np.ndarray:
         """The array given for the field parameter `name`, as the float32 the effect receives; MapNotFoundError unless
@@ -162,7 +164,7 @@ class ModelledEffect[P: EffectParams]:
             raise MapNotFoundError(f"{where}: its array is {array.shape} but the picture is {rgb.shape[:2]}")
         if (problem := map_problem(array)) is not None:
             raise MapNotFoundError(f"{where}: its array has {problem}")
-        return array.astype(np.float32, copy=False)
+        return np.ascontiguousarray(array, dtype=np.float32)
 
     def fields_named(self, values: Mapping[str, object]) -> dict[str, str]:
         """The field each field parameter names in `values` (parameter name -> value, already validated), else its

@@ -77,6 +77,14 @@ def test_every_effect_of_the_rust_core_is_a_registered_effect():
 
 
 @pytest.mark.parametrize("name", ALL)
+def test_every_effect_takes_a_float64_picture_and_makes_the_float32_one_of_the_same_values(name, photo):
+    wide = photo.astype(np.float64)
+    out = registry.apply(name, wide, **_inputs(name, photo))
+    assert_a_picture_like(out, photo)
+    np.testing.assert_array_equal(out, registry.apply(name, photo, **_inputs(name, photo)))
+
+
+@pytest.mark.parametrize("name", ALL)
 def test_every_effect_documents_itself(name):
     assert registry.describe()[name]
 
