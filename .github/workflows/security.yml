@@ -37,8 +37,14 @@ jobs:
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: ${{ steps.cargo-tools.outputs.specs }}
+      # the tools only: the audit reads the lock files, so the package and its Rust extension are not built; cargo-deny
+      # still needs the toolchain above for `cargo metadata`. UV_NO_SYNC reaches the `uv run` poe runs each command with.
+      - name: Install the locked development tools, not the package
+        run: uv sync --locked --no-install-project
       - name: Python (pip-audit) and Rust (cargo-deny advisories) dependencies against known vulnerabilities
-        run: uv run --locked poe audit
+        run: uv run --no-sync poe audit
+        env:
+          UV_NO_SYNC: "1"
 
   codeql:
     name: CodeQL
