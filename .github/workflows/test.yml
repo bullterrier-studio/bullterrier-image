@@ -44,6 +44,10 @@ jobs:
       - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: ${{ steps.cargo-tools.outputs.specs }}
+      # every crate Cargo.lock names, for every platform and target: the dev-dependencies and the cargo-deny gate's
+      # metadata too, which building the extension does not download. The gates and tests below run cargo offline.
+      - name: Fetch the locked crates (cargo fetch)
+        run: cargo fetch --locked
       - name: Install the locked dependencies (builds the Rust extension)
         run: uv sync --locked
       - name: Rust tests (cargo test)
