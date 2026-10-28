@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .core import registry
+from .core.params import signature as parameter_signature
 from .errors import RecipeError
 from .loader import with_files
 from .recipe import Step  # the public home: importing it binds what `Step.apply` renders with
@@ -100,7 +101,7 @@ def _signature(name: str) -> inspect.Signature:
     declares them (`effect` is the builder's own name; `opacity` defaults to the effect's own, `registry.opacity`; a
     key that is also an injected input, `partition`, only for an effect that takes it), and `preset` (one of the
     names) if the effect has presets."""
-    signature = registry.parameters(name).signature()
+    signature = parameter_signature(registry.parameters(name))
     step = Step.model_fields
     defaults = {key: step[key].default for key in step} | {"opacity": registry.opacity(name)}
     keys = [

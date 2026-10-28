@@ -15,10 +15,19 @@ from scipy import ndimage
 from bullterrier_image import fx
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
 from bullterrier_image.core import registry, runner
-from bullterrier_image.core.params import UNITS, Drive, EffectParams, FieldName, param
+from bullterrier_image.core.params import (
+    UNITS,
+    Drive,
+    EffectParams,
+    FieldName,
+    drivable_fields,
+    field_name_fields,
+    param,
+)
+from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Each, Recipe, Step
+from bullterrier_image.core.steps import Each, Recipe, Step, drives
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
@@ -295,7 +304,7 @@ def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
         "depth": cone.astype(np.float32),
         "partition": quarters.astype(np.int32),
     }
-    fields = dict.fromkeys(registry.parameters(name).field_name_fields(), made["depth"])
+    fields = dict.fromkeys(field_name_fields(registry.parameters(name)), made["depth"])
     return {**fields, **{key: value for key, value in made.items() if key in registry.inputs(name)}}
 
 
@@ -675,7 +684,7 @@ def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwawa
 
 # --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
 
-DRIVABLE = sorted((name, field) for name in ALL for field in registry.parameters(name).drivable_fields())
+DRIVABLE = sorted((name, field) for name in ALL for field in drivable_fields(registry.parameters(name)))
 
 
 def _range(name: str, field: str) -> tuple[float, float]:
@@ -710,7 +719,7 @@ def test_some_parameters_are_drivable():
 @pytest.mark.parametrize(("name", "field"), DRIVABLE)
 def test_a_drivable_field_says_so_in_the_documentation_and_the_signature(name, field):
     assert f"{field} : number (drivable)" in registry.documentation(name)
-    assert Drive in typing.get_args(registry.parameters(name).signature().parameters[field].annotation)
+    assert Drive in typing.get_args(signature_of(registry.parameters(name)).parameters[field].annotation)
 
 
 @pytest.mark.parametrize("level", [0, 2, 4])
@@ -745,14 +754,14 @@ def test_a_drive_that_leaves_the_parameters_range_is_refused_naming_the_field(na
 def test_fx_builds_a_driven_step_from_a_drive(name, field):
     least, greatest = _range(name, field)
     step = getattr(fx, name)(**{field: Drive(by="depth", start=least, end=greatest)})
-    assert step.drives == {field: Drive(by="depth", start=least, end=greatest)}
+    assert drives(step) == {field: Drive(by="depth", start=least, end=greatest)}
 
 
 @pytest.mark.parametrize("name", [name for name in ALL if name not in {n for n, _ in DRIVABLE}])
 def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_it_has(name):
     fields = registry.parameters(name)
     numbers = [
-        doc.name for doc in fields.fields_doc() if doc.minimum is not None and doc.name not in fields.drivable_fields()
+        doc.name for doc in fields.fields_doc() if doc.minimum is not None and doc.name not in drivable_fields(fields)
     ]
     for field in numbers:
         with pytest.raises(RecipeError, match=rf"{name}.*`{field}` cannot be driven"):
@@ -864,7 +873,7 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
     assert np.abs(named - photo).max() > 0.01  # the field darkened something: this is not a comparison of two copies
 
 
-FIELD_EFFECTS = [(name, field) for name in ALL for field in registry.parameters(name).field_name_fields()]
+FIELD_EFFECTS = [(name, field) for name in ALL for field in field_name_fields(registry.parameters(name))]
 
 
 @pytest.mark.parametrize(("name", "field"), FIELD_EFFECTS, ids=[f"{n}-{f}" for n, f in FIELD_EFFECTS])
@@ -891,7 +900,7 @@ def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(f
     assert runner.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
 
 
-FIELD_PARAMETERS = [(name, field) for name in ALL for field in registry.parameters(name).field_name_fields()]
+FIELD_PARAMETERS = [(name, field) for name in ALL for field in field_name_fields(registry.parameters(name))]
 
 
 @pytest.mark.parametrize(("name", "field"), FIELD_PARAMETERS)

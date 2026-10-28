@@ -8,7 +8,20 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from bullterrier_image.core.params import Color, Drive, EffectParams, FieldName, Picture, describe_error, param
+from bullterrier_image.core.params import (
+    Color,
+    Drive,
+    EffectParams,
+    FieldName,
+    Picture,
+    describe_error,
+    drivable_fields,
+    field_name_fields,
+    param,
+    scaled,
+    whole_number_fields,
+)
+from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.errors import RecipeError
 
 
@@ -233,7 +246,7 @@ def test_the_json_schema_of_a_picture_is_a_path_or_a_colour():
 def test_a_picture_is_documented_as_a_picture_and_called_with_the_forms_a_caller_writes():
     (doc,) = Textured.fields_doc()
     assert (doc.type, doc.unit, doc.range, doc.default) == ("picture", None, "", "#808080")
-    text = str(Textured.signature())
+    text = str(signature_of(Textured))
     assert "Picture" in text
     assert "PathLike" in text
     assert "pydantic" not in text
@@ -260,13 +273,13 @@ class Lit(EffectParams):
 
 
 def test_a_model_names_its_field_parameters_apart_from_plain_text():
-    assert Lit.field_name_fields() == ("field",)
-    assert Probe.field_name_fields() == ()
+    assert field_name_fields(Lit) == ("field",)
+    assert field_name_fields(Probe) == ()
 
 
 def test_a_field_parameter_is_documented_as_a_field_name_and_called_with_text():
     assert [doc.type for doc in Lit.fields_doc()] == ["field name", "text"]
-    assert "field: str = 'light'" in str(Lit.signature())
+    assert "field: str = 'light'" in str(signature_of(Lit))
 
 
 @pytest.mark.parametrize("written", ["", 1, None], ids=["blank", "number", "none"])
@@ -359,7 +372,7 @@ def test_the_json_schema_carries_every_description_and_unit():
 
 
 def test_the_signature_lists_every_field_in_order_with_its_default_and_a_readable_type():
-    signature = Probe.signature()
+    signature = signature_of(Probe)
     assert list(signature.parameters) == ["radius", "count", "mode", "tint", "label"]
     assert [p.default for p in signature.parameters.values()] == [24.0, 3, "soft", "#ff8000", "probe"]
     assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in signature.parameters.values())
@@ -440,7 +453,7 @@ def test_the_json_schema_says_which_fields_are_advanced():
 
 
 def test_the_flag_does_not_reorder_the_signature_or_the_fields():
-    assert list(Tiered.signature().parameters) == ["amount", "edge", "angle", "softness"]
+    assert list(signature_of(Tiered).parameters) == ["amount", "edge", "angle", "softness"]
     assert list(Tiered.model_fields) == ["amount", "edge", "angle", "softness"]
 
 
@@ -511,8 +524,8 @@ def test_every_kind_of_field_refuses_values_of_another_kind(values, field):
 
 
 def test_whole_number_fields_are_the_int_fields():
-    assert Kinds.whole_number_fields() == frozenset({"count"})
-    assert Probe.whole_number_fields() == frozenset({"count"})
+    assert whole_number_fields(Kinds) == frozenset({"count"})
+    assert whole_number_fields(Probe) == frozenset({"count"})
 
 
 def test_the_published_colour_pattern_matches_a_whole_value_only():
@@ -582,12 +595,12 @@ class Drivable(EffectParams):
 
 
 def test_a_model_names_its_drivable_fields():
-    assert Drivable.drivable_fields() == frozenset({"radius"})
-    assert Probe.drivable_fields() == frozenset()
+    assert drivable_fields(Drivable) == frozenset({"radius"})
+    assert drivable_fields(Probe) == frozenset()
 
 
 def test_a_drivable_field_is_written_float_or_drive_in_the_signature_and_the_others_as_they_were():
-    text = str(Drivable.signature())
+    text = str(signature_of(Drivable))
     assert "radius: float | bullterrier_image.core.params.Drive = 24.0" in text
     assert "amount: float = 0.5" in text
     assert "count: int = 3" in text
@@ -796,7 +809,7 @@ class Sized(EffectParams):
     ],
 )
 def test_a_density_scales_with_the_inverse_of_the_area(factor, rate):
-    assert Sized().scaled(factor).rate == pytest.approx(rate)
+    assert scaled(Sized(), factor).rate == pytest.approx(rate)
 
 
 @pytest.mark.parametrize(
@@ -811,17 +824,17 @@ def test_a_density_scales_with_the_inverse_of_the_area(factor, rate):
     ],
 )
 def test_pixel_fields_scale_by_the_factor_and_nothing_else_does(factor, radius, cell, shift):
-    scaled = Sized().scaled(factor)
-    assert (scaled.radius, scaled.cell, scaled.shift) == pytest.approx((radius, cell, shift))
-    assert isinstance(scaled.cell, int)
-    assert (scaled.amount, scaled.count) == (0.5, 4)  # a fraction and a count are not pixels
+    sized = scaled(Sized(), factor)
+    assert (sized.radius, sized.cell, sized.shift) == pytest.approx((radius, cell, shift))
+    assert isinstance(sized.cell, int)
+    assert (sized.amount, sized.count) == (0.5, 4)  # a fraction and a count are not pixels
 
 
 def test_a_scaled_model_carries_no_size_ratio_because_the_runner_hands_it_to_the_effect():
-    assert not hasattr(Sized().scaled(2), "size_ratio")
+    assert not hasattr(scaled(Sized(), 2), "size_ratio")
 
 
 def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
     first = Sized()
-    assert first.scaled(2) is not first
+    assert scaled(first, 2) is not first
     assert first.radius == 24.0

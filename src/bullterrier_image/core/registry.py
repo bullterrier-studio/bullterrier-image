@@ -47,7 +47,7 @@ from bullterrier_image.ops.maps import map_problem
 
 from . import looks as look_files
 from . import presets as preset_files
-from .params import EffectParams
+from .params import EffectParams, field_name_fields, signature
 from .presets import Preset
 
 # The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
@@ -118,10 +118,10 @@ class ModelledEffect[P: EffectParams]:
         functools.update_wrapper(self, function)
         self._function = function
         self.params_model, self.category, self.inputs, self.opacity = params_model, category, inputs, opacity
-        named = params_model.field_name_fields()
+        named = field_name_fields(params_model)
         fields = [
             p.replace(annotation=np.ndarray, default=inspect.Parameter.empty) if p.name in named else p
-            for p in params_model.signature().parameters.values()
+            for p in signature(params_model).parameters.values()
         ]
         given = [p for p in inspect.signature(function).parameters.values() if p.name in inputs]
         self.__signature__ = inspect.Signature(
@@ -137,7 +137,7 @@ class ModelledEffect[P: EffectParams]:
     def __call__(self, rgb: np.ndarray, params: P | None = None, /, **values: Any) -> np.ndarray:
         """Run the effect on `rgb` (float32 (h, w, 3) 0..1) with a model, keyword values, or the defaults."""
         given = {name: values.pop(name) for name in self.inputs if name in values}
-        for name in self.params_model.field_name_fields():
+        for name in field_name_fields(self.params_model):
             given[name] = self._field_array(name, rgb, values.pop(name, None))
         if params is None:
             params = self.validate(values)
@@ -169,7 +169,7 @@ class ModelledEffect[P: EffectParams]:
         """The field each field parameter names in `values` (parameter name -> value, already validated), else its
         default: `{"field": "light"}`; empty for an effect with no field parameter."""
         model = self.params_model
-        return {name: str(values.get(name, model.model_fields[name].default)) for name in model.field_name_fields()}
+        return {name: str(values.get(name, model.model_fields[name].default)) for name in field_name_fields(model)}
 
     def validate(self, values: Mapping[str, object]) -> P:
         """The model for `values` (parameter name -> value); RecipeError naming the effect and every problem."""
@@ -449,7 +449,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     positional = [p for p in every if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     if len(positional) != 2 or any(p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD) for p in every):
         raise ValueError(f"effect {name!r}: {shape}")
-    fields = params.field_name_fields()
+    fields = field_name_fields(params)
     declared, taken = [], []
     for parameter in (p for p in every if p.kind is p.KEYWORD_ONLY):
         if parameter.name in fields:

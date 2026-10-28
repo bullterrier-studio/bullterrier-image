@@ -294,7 +294,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   region name is built in beside `subject` and `background`, so a `given` region cannot take it; `MapNotFoundError` is
   the base of `SubjectNotFoundError` and `DepthNotFoundError`; a project (`bt-image run`) holds no maps of its own, so a
   recipe with a `given` region needs a finder of that name. A map handed in is framed with the photo in one stack
-  (`Framing.apply`), so its geometry is the photo's and every map pads with 0.
+  (`framing.frame_photo`), so its geometry is the photo's and every map pads with 0.
 - **One reader for map files: transparency gives the alpha, anything else the brightness.** `imageio.load_map` replaces
   `load_matte` (alpha) and `load_depth` (brightness only). *Reason:* a cut-out PNG and a drawing carry the map in their
   alpha, a greyscale or black-and-white picture in its levels, and a depth map an editor saved with an opaque alpha
@@ -313,7 +313,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Pixel values are design pixels.** A `px` value is a length on a picture whose long side is 480, always:
   `recipe.size` is only how big the output is (the working size: `render(..., size=)`, else the recipe's size, else the
   framed photo's longest side). A render multiplies the values by the working size over 480, in the one place a step's
-  values reach its effect (`EffectParams.scaled`, from the parameter description: no per-effect code). A whole number is
+  values reach its effect (`params.scaled`, from the parameter description: no per-effect code). A whole number is
   rounded; a value shrinks no further than its field's `min` and grows without a ceiling, because a range is in design
   pixels. *Reason:* the README promised a look that matches at any resolution, but with `size=None` a draft at half size
   meant scaling every radius by hand, and with a size the output was always rescaled to it; defaults and presets are
@@ -331,7 +331,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Marks: a count or a density.** A few marks (`dead_pixels.count`, `lens_drops.count`, `scratches`, `pieces`, `bands`)
   are a `count`: it reads naturally, and the marks' sizes are `px`, so the same count covers the same share at any size.
   Numerous marks (`particles`, `dust_scratches`, `flow_lines`) take a `density`, marks per 1000 design px², the same
-  everywhere; `EffectParams.scaled` divides it by the size ratio squared, so the count of marks over the picture stays the
+  everywhere; `params.scaled` divides it by the size ratio squared, so the count of marks over the picture stays the
   same at any size. *Reason:* a density counted on the working pixels grew sixteen-fold in count at four times the size
   while each mark grew sixteen-fold in area, so a 1920 px render was far denser than a 480 px one. `flow_lines.length` is
   px along the line (steps = length / step), not a number of steps, so it scales with the picture like every length.

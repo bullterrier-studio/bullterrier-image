@@ -39,9 +39,20 @@ from bullterrier_image.ops.composite import BlendMode
 
 from . import registry
 from .framing import Framing
-from .params import Drive, EffectParams, ValidatedModel, bounds, cyclic_of, unit_of
-from .regions import Kind, check, maps_used, needs, needs_finder
-from .regions import derived_maps as _derived_maps
+from .framing import needs_subject as _framing_needs_subject
+from .params import (
+    Drive,
+    EffectParams,
+    ValidatedModel,
+    bounds,
+    cyclic_of,
+    drivable_fields,
+    unit_of,
+    whole_number_fields,
+)
+from .regions import Kind, check, maps_used, needs
+from .regions import derived_maps as _derived_from
+from .regions import needs_finder as _finds_pieces
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besides a step: a step cannot be called so
@@ -127,10 +138,6 @@ class _Layer(ValidatedModel):
             raise ValueError(f"{name!r} is reserved: an address starts with `region`, `frame` or `each`")
         return name
 
-    def references(self) -> list[Reference]:
-        """The regions this step names, as `(key, name, kind)`; the recipe checks them against its regions."""
-        return [] if self.mask is None else [("mask", self.mask, "selection")]
-
 
 class Step(_Layer):
     """One effect with its parameters, laid over the picture below it (the step's input) as a layer is in an image
@@ -213,37 +220,6 @@ class Step(_Layer):
         if self.partition is not None and not takes:
             raise RecipeError(f"effect {self.effect!r} takes no partition: remove `partition`")
         return self
-
-    @property
-    def runs(self) -> tuple["Step", ...]:
-        """The effect steps this step runs: itself."""
-        return (self,)
-
-    @property
-    def drives(self) -> dict[str, Drive]:
-        """The parameters a field varies across the picture, by name; empty for a step of plain values."""
-        return {name: value for name, value in self.params.items() if isinstance(value, Drive)}
-
-    @property
-    def fixed(self) -> dict[str, Any]:
-        """The parameters that are plain values, as written (the rest are `drives`)."""
-        return {name: value for name, value in self.params.items() if not isinstance(value, Drive)}
-
-    @property
-    def named_fields(self) -> dict[str, str]:
-        """The fields the effect works from, by the name of the parameter that names each, as written or by default
-        (`{"field": "light"}`); empty for an effect with no field parameter."""
-        return registry.get(self.effect).fields_named(self.params)
-
-    def references(self) -> list[Reference]:
-        """The regions this step names, as `(key, name, kind)`: its mask, the field that drives it (`by`, a selection),
-        the fields its effect works from (`<effect>.<parameter>`, selections) and the partition it draws."""
-        driving: list[Reference] = [("by", by, "selection") for by in dict.fromkeys(d.by for d in self.drives.values())]
-        working: list[Reference] = [
-            (f"{self.effect}.{parameter}", field, "selection") for parameter, field in self.named_fields.items()
-        ]
-        drawn: list[Reference] = [] if self.partition is None else [("partition", self.partition, None)]
-        return [*super().references(), *driving, *working, *drawn]
 
     def apply(
         self,
@@ -366,25 +342,6 @@ class Each(_Layer):
                 raise ValueError(f"a look takes no `name`: its numbers are addressed by place, `each.looks[{number}]`")
         return looks
 
-    def assignment(self, pieces: int) -> list[int]:
-        """The look (an index into `looks`) of each of `pieces` pieces, piece 0 first."""
-        if self.assign == "cycle":
-            return [piece % len(self.looks) for piece in range(pieces)]
-        return np.random.default_rng(self.seed).integers(0, len(self.looks), pieces).tolist()
-
-    @property
-    def runs(self) -> tuple[Step, ...]:
-        """The effect steps this step runs: its looks, but the "none" ones."""
-        return tuple(look for look in self.looks if isinstance(look, Step))
-
-    def references(self) -> list[Reference]:
-        """The regions this step names, as `(key, name, kind)`: its mask, its partition, and its looks' regions."""
-        return [
-            *super().references(),
-            ("each", self.each, "partition"),
-            *(reference for look in self.runs for reference in look.references()),
-        ]
-
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `each panes [grade(exposure=0.5), none] on subject x0.5`, cut to `width`."""
         looks = ", ".join(str(look) for look in self.looks)
@@ -393,6 +350,83 @@ class Each(_Layer):
     def __str__(self) -> str:
         """The short readable form (see `describe`)."""
         return self.describe()
+
+
+# What the runner (and the recipe's own checks) ask of steps and recipes, kept out of the public classes.
+
+
+def runs(step: Step | Each) -> tuple[Step, ...]:
+    """The effect steps `step` runs: a `Step` itself, an `Each` its looks but the "none" ones."""
+    return (step,) if isinstance(step, Step) else tuple(look for look in step.looks if isinstance(look, Step))
+
+
+def drives(step: Step) -> dict[str, Drive]:
+    """The parameters of `step` a field varies across the picture, by name; empty for a step of plain values."""
+    return {name: value for name, value in step.params.items() if isinstance(value, Drive)}
+
+
+def fixed(step: Step) -> dict[str, Any]:
+    """The parameters of `step` that are plain values, as written (the rest are `drives`)."""
+    return {name: value for name, value in step.params.items() if not isinstance(value, Drive)}
+
+
+def named_fields(step: Step) -> dict[str, str]:
+    """The fields the effect of `step` works from, by the name of the parameter that names each, as written or by
+    default (`{"field": "light"}`); empty for an effect with no field parameter."""
+    return registry.get(step.effect).fields_named(step.params)
+
+
+def references(step: Step | Each) -> list[Reference]:
+    """The regions `step` names, as `(key, name, kind)`, which the recipe checks against its regions: its mask; for a
+    `Step` the field that drives it (`by`, a selection), the fields its effect works from (`<effect>.<parameter>`,
+    selections) and the partition it draws; for an `Each` its partition and its looks' regions."""
+    masked: list[Reference] = [] if step.mask is None else [("mask", step.mask, "selection")]
+    if isinstance(step, Each):
+        looks = [reference for look in runs(step) for reference in references(look)]
+        return [*masked, ("each", step.each, "partition"), *looks]
+    driving: list[Reference] = [("by", by, "selection") for by in dict.fromkeys(d.by for d in drives(step).values())]
+    working: list[Reference] = [
+        (f"{step.effect}.{parameter}", field, "selection") for parameter, field in named_fields(step).items()
+    ]
+    drawn: list[Reference] = [] if step.partition is None else [("partition", step.partition, None)]
+    return [*masked, *driving, *working, *drawn]
+
+
+def assignment(each: Each, pieces: int) -> list[int]:
+    """The look (an index into `each.looks`) of each of `pieces` pieces, piece 0 first."""
+    if each.assign == "cycle":
+        return [piece % len(each.looks) for piece in range(pieces)]
+    return np.random.default_rng(each.seed).integers(0, len(each.looks), pieces).tolist()
+
+
+def maps_needed(recipe: "Recipe") -> frozenset[str]:
+    """The names of the maps of the photo that rendering `recipe` must be given or find: `subject` when the framing
+    crops around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it (the
+    built-in `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (the
+    built-in `depth` or a region made from it, however indirectly); and the name of every `Given` region a step uses.
+    Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map (see
+    `needs_finder`)."""
+    framed = {"subject"} if _framing_needs_subject(recipe.frame) else set()
+    return frozenset(framed | maps_used(recipe.regions, _names_used(recipe)))
+
+
+def derived_maps(recipe: "Recipe") -> frozenset[str]:
+    """The names of the maps a render of `recipe` makes from the working picture itself (`regions.DERIVED`: `light`,
+    the picture's brightness) because a region a step uses is made from them, however indirectly. Nobody supplies
+    these: they are not in `maps_needed`."""
+    return frozenset(_derived_from(recipe.regions, _names_used(recipe)))
+
+
+def needs_finder(recipe: "Recipe") -> bool:
+    """True if a region a step of `recipe` uses finds the subject piece by piece (a `Subject` with `per`): rendering
+    must be given a subject finder, whatever else it is given, because it is asked about parts of the working picture,
+    which no map of the whole photo answers."""
+    return _finds_pieces(recipe.regions, _names_used(recipe))
+
+
+def _names_used(recipe: "Recipe") -> list[str]:
+    """The names of the regions the steps of `recipe` refer to."""
+    return [name for step in recipe.steps for _, name, _ in references(step)]
 
 
 def _as_drive(effect: str, name: str, value: Any) -> Any:
@@ -418,7 +452,7 @@ def _check_drives(effect: str, params: Mapping[str, Any]) -> None:
     for name in drives:
         if name not in fields.model_fields:
             model.validate({name: 0})  # an unknown parameter: the model's own error, listing the valid ones
-        if name not in fields.drivable_fields():
+        if name not in drivable_fields(fields):
             raise RecipeError(_not_drivable(effect, name, fields))
     for what, kinds in (
         ("field", {d.by for d in drives.values()}),
@@ -436,12 +470,12 @@ def _not_drivable(effect: str, name: str, fields: type[EffectParams]) -> str:
     """Why the parameter `name` of `effect`, whose model is `fields`, cannot be driven, and which can."""
     why = (
         "it is a whole number"
-        if name in fields.whole_number_fields()
+        if name in whole_number_fields(fields)
         else "it is not a number"
         if _kind(fields, name) != "number"
         else "its effect does not declare it drivable"
     )
-    names = ", ".join(sorted(fields.drivable_fields())) or "none"
+    names = ", ".join(sorted(drivable_fields(fields))) or "none"
     return f"effect {effect!r}: `{name}` cannot be driven by a field ({why}); its drivable parameters: {names}"
 
 
@@ -585,7 +619,7 @@ class Recipe(ValidatedModel):
             raise RecipeError("a recipe needs at least one step")
         check(self.regions)
         for number, step in enumerate(self.steps, start=1):
-            for key, name, wanted in step.references():
+            for key, name, wanted in references(step):
                 needs(f"step {number}", key, name, wanted, self.regions)
         self._check_names()
         return self
@@ -605,35 +639,6 @@ class Recipe(ValidatedModel):
                     f"step {number}: `name` {step.name!r} is also an effect this recipe uses; choose another"
                 )
             first[step.name] = number
-
-    @property
-    def maps_needed(self) -> frozenset[str]:
-        """The names of the maps of the photo that rendering must be given or find: `subject` when the framing crops
-        around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it (the
-        built-in `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (the
-        built-in `depth` or a region made from it, however indirectly); and the name of every `Given` region a step
-        uses. Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map (see
-        `needs_finder`)."""
-        framed = {"subject"} if self.frame.needs_subject else set()
-        return frozenset(framed | maps_used(self.regions, self._names_used()))
-
-    @property
-    def derived_maps(self) -> frozenset[str]:
-        """The names of the maps the render makes from the working picture itself (`regions.DERIVED`: `light`, the
-        picture's brightness) because a region a step uses is made from them, however indirectly. Nobody supplies
-        these: they are not in `maps_needed`."""
-        return frozenset(_derived_maps(self.regions, self._names_used()))
-
-    @property
-    def needs_finder(self) -> bool:
-        """True if a region a step uses finds the subject piece by piece (a `Subject` with `per`): rendering must be
-        given a subject finder, whatever else it is given, because it is asked about parts of the working picture, which
-        no map of the whole photo answers."""
-        return needs_finder(self.regions, self._names_used())
-
-    def _names_used(self) -> list[str]:
-        """The names of the regions the steps refer to."""
-        return [name for step in self.steps for _, name, _ in step.references()]
 
     def parameters(self) -> dict[str, Parameter]:
         """Every number of the recipe that can be set, by address, in the order of the recipe: the numbers of each step
@@ -818,9 +823,9 @@ def _step_numbers(step: Step | Each) -> dict[str, Parameter]:
                 found |= {f"looks[{index}].{rest}": number for rest, number in _step_numbers(look).items()}
         return found
     found = {}
-    for name, number in _numbers(registry.get(step.effect).validate(step.fixed)).items():
-        if name in step.drives:
-            drive = step.drives[name]
+    for name, number in _numbers(registry.get(step.effect).validate(fixed(step))).items():
+        if name in drives(step):
+            drive = drives(step)[name]
             found[f"{name}.start"] = replace(number, value=drive.start)
             found[f"{name}.end"] = replace(number, value=drive.end)
             found[f"{name}.levels"] = _number(drive.levels, Drive.model_fields["levels"], whole=True)

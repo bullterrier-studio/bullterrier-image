@@ -7,6 +7,7 @@ import pytest
 
 from bullterrier_image import Finder, Recipe, Step, gallery, load_project, load_recipe, render
 from bullterrier_image.core import registry
+from bullterrier_image.core.steps import maps_needed, runs
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
@@ -19,7 +20,7 @@ def test_every_effect_has_a_short_example_recipe_that_shows_it(name):
     assert recipe.name == name
     assert recipe.size == 480
     assert 1 <= len(recipe.steps) <= 3
-    assert name in [run.effect for step in recipe.steps for run in step.runs]
+    assert name in [run.effect for step in recipe.steps for run in runs(step)]
 
 
 def test_every_example_recipe_belongs_to_an_effect():
@@ -34,12 +35,12 @@ def test_the_demo_project_loads_and_every_recipe_in_it_is_valid():
     assert len(files) == len(project.recipes)  # a project file names recipe files, never Recipe objects
     recipes = [load_recipe(f) for f in files]
     assert len({r.name for r in recipes}) == len(recipes)
-    assert any("subject" in r.maps_needed for r in recipes)
+    assert any("subject" in maps_needed(r) for r in recipes)
 
 
 def _is_a_combination(recipe: Recipe) -> bool:
     """A demo recipe combines effects: three different ones at least."""
-    return len({run.effect for step in recipe.steps for run in step.runs}) >= 3
+    return len({run.effect for step in recipe.steps for run in runs(step)}) >= 3
 
 
 def a_floor_rising_away(photo: np.ndarray) -> np.ndarray:
@@ -60,7 +61,7 @@ def test_every_demo_recipe_combines_effects_and_renders(path, photo, subject):
 def test_every_fields_example_needs_no_map_and_renders_to_something_other_than_the_photo(path, photo):
     recipe = load_recipe(path)
     assert recipe.name == path.stem
-    assert recipe.maps_needed == frozenset()  # made from a gradient or the picture's own light: no model, no cut-out
+    assert maps_needed(recipe) == frozenset()  # made from a gradient or the picture's own light: no model, no cut-out
     out = render(photo, recipe)
     assert max(out.shape[:2]) == recipe.size
     assert not np.array_equal(out, render(photo, Recipe([Step("grade")], name="plain", size=recipe.size)))
@@ -106,7 +107,7 @@ def test_the_text_effects_in_the_demo_recipes_use_the_same_character_size_as_the
     checked = []
     examples = [gallery.effect_files(name).example for name in registry.describe()]
     for path in [*(EXAMPLES / "recipes").glob("*.toml"), *examples]:
-        steps = {run.effect: run.params for step in load_recipe(path).steps for run in step.runs}
+        steps = {run.effect: run.params for step in load_recipe(path).steps for run in runs(step)}
         if "disperse" in steps and "ascii" in steps:
             assert steps["disperse"]["cell"] == steps["ascii"]["cell"], path.name
             checked.append(path.name)

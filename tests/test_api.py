@@ -17,6 +17,7 @@ import bullterrier_image.effects
 import bullterrier_image.plugin
 from bullterrier_image import (
     Each,
+    Framing,
     Grid,
     ImageReadError,
     Pick,
@@ -56,6 +57,24 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
     assert module.__all__, f"{module.__name__} exports nothing"
     missing = [name for name in module.__all__ if not hasattr(module, name)]
     assert missing == []
+
+
+# What only the runner (or the library's own modules) uses is no attribute of the public classes: their help and
+# completion show what a caller uses.
+@pytest.mark.parametrize(
+    ("cls", "name"),
+    [
+        *((Step, name) for name in ("references", "runs", "named_fields", "fixed", "drives")),
+        *((Each, name) for name in ("references", "runs", "assignment")),
+        *((Recipe, name) for name in ("maps_needed", "derived_maps", "needs_finder")),
+        *((Framing, name) for name in ("apply", "cut", "needs_subject")),
+        *((Grid, name) for name in ("scaled", "picture_fields", "signature", "lut_fields", "field_name_fields")),
+        *((Grid, name) for name in ("whole_number_fields", "drivable_fields")),
+    ],
+    ids=lambda value: getattr(value, "__name__", value),
+)
+def test_a_public_class_has_no_attribute_only_the_library_uses(cls, name):
+    assert not hasattr(cls, name)
 
 
 def test_a_recipe_is_framed_with_a_framing_from_the_public_names():

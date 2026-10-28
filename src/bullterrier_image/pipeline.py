@@ -57,7 +57,7 @@ from .core.outlines import svg_bytes
 from .core.params import Lut, Picture, describe_error
 from .core.regions import FOUND_MAPS, Svg
 from .core.runner import Finder, find_map, known_maps
-from .core.steps import file_name
+from .core.steps import file_name, maps_needed, needs_finder, runs
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .ops.maps import map_problem
 from .ops.resample import resize
@@ -308,7 +308,7 @@ def run(
             # picture is redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a
             # file or an object (repr: no pixels)
             uses = {
-                name: name in recipe.maps_needed or (name == "subject" and recipe.needs_finder) for name in found_by
+                name: name in maps_needed(recipe) or (name == "subject" and needs_finder(recipe)) for name in found_by
             }
             parts = (
                 photo_hash,
@@ -393,7 +393,7 @@ def _finders_of(given: dict[str, Finder], recipes: list[Recipe]) -> dict[str, Fi
         )
     finders = dict(given)
     for recipe in recipes:
-        for name in sorted(recipe.maps_needed | ({"subject"} if recipe.needs_finder else set())):
+        for name in sorted(maps_needed(recipe) | ({"subject"} if needs_finder(recipe) else set())):
             if name not in finders:
                 if name not in FOUND_MAPS:
                     raise ProjectError(
@@ -520,13 +520,13 @@ def _write_text(target: Path, text: str) -> None:
 def _process(project: Project, photo: _Photo, recipe: Recipe, stem: str, fingerprint: str) -> Item:
     """`recipe`, whose files are called `stem`, run on `photo` and exported: what happened, as an `Item`."""
     warnings: list[str] = []
-    maps = {name: photo.map(name) for name in sorted(recipe.maps_needed)}
+    maps = {name: photo.map(name) for name in sorted(maps_needed(recipe))}
     if "subject" in maps:
         warnings += matte_warnings(maps["subject"], project.subject_share)
     folder = _inside(project.output, project.output / photo.path.stem)
     folder.mkdir(parents=True, exist_ok=True)
     # the photo's own finder of pieces: its answers depend on the subject finder, as `found_by` says
-    pieces = {"subject": Finder(photo.found_by["subject"], photo.find_in_crop)} if recipe.needs_finder else None
+    pieces = {"subject": Finder(photo.found_by["subject"], photo.find_in_crop)} if needs_finder(recipe) else None
     stages = trace(photo.rgb(), recipe, maps=maps, finders=pieces) if project.steps else None
     # style (a trace ends in the render)
     image = stages[-1].image if stages else render(photo.rgb(), recipe, maps=maps, finders=pieces)
@@ -575,7 +575,7 @@ def _picture_digests(recipe: Recipe) -> list[str]:
     return [
         v.digest
         for step in recipe.steps
-        for run in step.runs
+        for run in runs(step)
         for v in run.params.values()
         if isinstance(v, Picture | Lut)
     ]

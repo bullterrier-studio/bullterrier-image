@@ -23,6 +23,7 @@ import numpy as np
 
 from . import fx, imageio
 from .core import registry
+from .core.steps import maps_needed
 from .errors import ProjectError
 from .finding.depth import depth_map
 from .finding.subject import subject_matte
@@ -105,7 +106,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
     for name in todo:
         files = effect_files(name, checkout=checkout)
         recipe = load_recipe(files.example)
-        for needed in recipe.maps_needed - maps.keys():
+        for needed in maps_needed(recipe) - maps.keys():
             maps[needed] = _FINDERS[needed](photo)  # once for all the recipes that need it
         picture = render(photo, recipe, maps=maps)
         files.picture.parent.mkdir(parents=True, exist_ok=True)

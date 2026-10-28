@@ -10,6 +10,7 @@ from bullterrier_image import recipe as facade
 from bullterrier_image.core import looks, registry, runner
 from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.steps import maps_needed, runs
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
@@ -36,11 +37,11 @@ def test_load_recipe_reads_steps_params_and_masks(tmp_path):
         write(tmp_path, 'name="x"\nsize=64\n[[step]]\neffect="gradient"\ncolors=["#fff"]\nmask="background"\n')
     )
     assert r == Recipe((Step("gradient", params={"colors": ["#fff"]}, mask="background"),), name="x", size=64)
-    assert "subject" in r.maps_needed
+    assert "subject" in maps_needed(r)
 
 
 def test_recipe_without_masks_does_not_need_a_matte(tmp_path):
-    assert "subject" not in load_recipe(write(tmp_path, '[[step]]\neffect="grain"\n')).maps_needed
+    assert "subject" not in maps_needed(load_recipe(write(tmp_path, '[[step]]\neffect="grain"\n')))
 
 
 def test_recipe_name_defaults_to_the_file_name(tmp_path):
@@ -74,7 +75,7 @@ def test_bad_recipes_fail_at_load_time_and_name_the_problem(tmp_path, text, expe
 def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_path, effect_name, old, new):
     """The old name is no alias: it is an unknown parameter."""
     (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{new}=0.5\n')).steps
-    assert step.runs[0].params == {new: 0.5}
+    assert runs(step)[0].params == {new: 0.5}
     with pytest.raises(RecipeError, match=rf"step 1.*`{old}` is not a parameter"):
         load_recipe(write(tmp_path, f'[[step]]\neffect="{effect_name}"\n{old}=0.5\n', "old.toml"))
 
@@ -123,7 +124,7 @@ def test_opacity_combines_with_a_mask(photo, subject):
 def test_a_step_key_is_read_from_the_file_onto_the_step_and_validated(tmp_path, key, good, bad):
     (step,) = load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(good)}\n')).steps
     assert getattr(step, key) == good
-    assert key not in step.runs[0].params
+    assert key not in runs(step)[0].params
     with pytest.raises(ValueError, match=rf"step 1.*{key}.*{bad}"):
         load_recipe(write(tmp_path, f'[[step]]\neffect="grain"\n{key}={json.dumps(bad)}\n', "bad.toml"))
 
@@ -198,7 +199,7 @@ def test_an_effect_whose_field_is_the_subject_gets_the_silhouette(photo, subject
         return rgb
 
     r = Recipe((Step("silhouette_probe"),), name="s", size=None)
-    assert "subject" in r.maps_needed  # a field that is the subject makes the recipe look for it
+    assert "subject" in maps_needed(r)  # a field that is the subject makes the recipe look for it
     render(photo, r, maps={"subject": subject})
     assert len(seen) == 1
     np.testing.assert_array_equal(seen[0], subject)

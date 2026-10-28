@@ -11,7 +11,7 @@ from PIL import Image
 from bullterrier_image.core import looks, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
-from bullterrier_image.core.steps import Each, Recipe, Step
+from bullterrier_image.core.steps import Each, Recipe, Step, drives, maps_needed, runs
 from bullterrier_image.errors import ImageReadError, RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
@@ -58,7 +58,7 @@ def test_a_recipe_keeps_the_description_its_file_gives_and_has_none_without_one(
 
 
 def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
-    assert load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0].runs[0].effect == "grade"
+    assert runs(load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0])[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
     assert load_recipe(_write(tmp_path, "format = 2\nname = 'c'\n" + STEP, "c.toml")).name == "c"
     assert load_recipe(_write(tmp_path, "format = 3\nname = 'd'\n" + STEP, "d.toml")).name == "d"
@@ -92,7 +92,7 @@ def test_a_given_region_loads_in_format_3_as_the_recipe_written_in_python(tmp_pa
     assert loaded == Recipe(
         [Step("gradient", params={"colors": ["#000000"]}, mask="star")], name="g", size=64, regions={"star": Given()}
     )
-    assert loaded.maps_needed == frozenset({"star"})
+    assert maps_needed(loaded) == frozenset({"star"})
 
 
 def test_a_given_region_in_format_2_is_refused_naming_the_region_and_format_3(tmp_path):
@@ -220,7 +220,7 @@ def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(la
     _logo(tmp_path / "assets")
     recipe = load_recipe(_layer(tmp_path / "recipes", "'../assets/logo.png'"))
     monkeypatch.chdir(tmp_path)  # the folder the process runs in does not matter
-    image = recipe.steps[1].runs[0].params["image"]
+    image = runs(recipe.steps[1])[0].params["image"]
     assert (image.width, image.height, image.label) == (2, 1, "../assets/logo.png")
     np.testing.assert_allclose(image.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
 
@@ -228,7 +228,7 @@ def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(la
 def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     logo = _logo(tmp_path / "elsewhere")
     recipe = load_recipe(_layer(tmp_path / "recipes", f"'{logo}'"))
-    assert recipe.steps[1].runs[0].params["image"].width == 2
+    assert runs(recipe.steps[1])[0].params["image"].width == 2
 
 
 @pytest.mark.parametrize(
@@ -237,7 +237,7 @@ def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     ids=["hex", "numbers"],
 )
 def test_a_picture_parameter_may_be_a_colour_and_no_file_is_read(layer_probe, tmp_path, written, pixel):
-    step = load_recipe(_layer(tmp_path, written)).steps[1].runs[0]
+    step = runs(load_recipe(_layer(tmp_path, written)).steps[1])[0]
     out = registry.apply("layer_probe", np.zeros((2, 3, 3), np.float32), **step.params)
     np.testing.assert_allclose(out, np.broadcast_to(pixel[:3], (2, 3, 3)), atol=1e-6)
 
@@ -396,7 +396,7 @@ def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
         ],
     )
     assert load_recipe(_write(tmp_path, FIELDS_FILE)) == written
-    assert "depth" in written.maps_needed
+    assert "depth" in maps_needed(written)
 
 
 SHAPES_FILE = """
@@ -479,7 +479,7 @@ def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_pr
         "looks = [{ effect = 'layer_probe', image = '../assets/logo.png' }]\n",
     )
     (each,) = load_recipe(path).steps
-    assert each.runs[0].params["image"].label == "../assets/logo.png"
+    assert runs(each)[0].params["image"].label == "../assets/logo.png"
 
 
 DRIVEN_FILE = """
@@ -515,7 +515,7 @@ def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_i
         ],
     )
     assert load_recipe(_write(tmp_path, DRIVEN_FILE)) == written
-    assert written.maps_needed == frozenset({"depth"})
+    assert maps_needed(written) == frozenset({"depth"})
 
 
 def test_a_look_of_an_each_can_be_driven_in_a_recipe_file(tmp_path):
@@ -524,8 +524,8 @@ def test_a_look_of_an_each_can_be_driven_in_a_recipe_file(tmp_path):
         'looks = [{ effect = "bloom", radius = { by = "depth", start = 0, end = 9, levels = 3 } }, "none"]\n'
     )
     recipe = load_recipe(_write(tmp_path, text))
-    (look,) = recipe.steps[0].runs
-    assert look.drives == {"radius": Drive(by="depth", start=0, end=9, levels=3)}
+    (look,) = runs(recipe.steps[0])
+    assert drives(look) == {"radius": Drive(by="depth", start=0, end=9, levels=3)}
 
 
 DRIVE_MISTAKES = {

@@ -53,7 +53,7 @@ from bullterrier_image.ops.raster import coverage, paint
 from bullterrier_image.ops.voronoi import centres, nearest
 
 from .outlines import path_outlines, read_svg
-from .params import EffectParams, design_scale, param
+from .params import EffectParams, design_scale, param, scaled
 from .presets import SHIPPED, read
 
 __all__ = [
@@ -707,7 +707,7 @@ def _coordinates(shape: tuple[int, int], edge: Edge) -> tuple[np.ndarray, np.nda
     x, y = centres(shape)
     if edge.style == "straight":
         return x, y
-    edge = edge.scaled(design_scale(shape))
+    edge = scaled(edge, design_scale(shape))
     long_side = max(shape)
     bend = [
         frame_fractal(

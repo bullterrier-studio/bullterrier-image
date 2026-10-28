@@ -119,7 +119,7 @@ from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutE
 from . import imageio
 from .core import looks, registry
 from .core.framing import Framing
-from .core.params import Lut, Picture
+from .core.params import Lut, Picture, lut_fields, picture_fields
 from .core.regions import (
     Band,
     Bands,
@@ -203,7 +203,7 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
     """
     model = registry.parameters(effect)
     resolved = dict(values)
-    for key in model.picture_fields() & values.keys():
+    for key in picture_fields(model) & values.keys():
         value = values[key]
         if isinstance(value, PathLike) or (isinstance(value, str) and not value.startswith("#")):
             try:
@@ -212,7 +212,7 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
                 raise ImageReadError(f"effect {effect!r}: `{key}`: {error}") from None
         elif isinstance(value, np.ndarray) and value.ndim == 3:
             resolved[key] = Picture(value)
-    for key in model.lut_fields() & values.keys():
+    for key in lut_fields(model) & values.keys():
         value = values[key]
         if isinstance(value, PathLike | str):
             try:

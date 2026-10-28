@@ -22,7 +22,7 @@ from bullterrier_image.core import registry, runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Each, Recipe, Step
+from bullterrier_image.core.steps import Each, Recipe, Step, derived_maps, maps_needed
 from bullterrier_image.ops.resample import resize
 from bullterrier_image.recipe import Band, Bands, Combine, Finder, Given, Grid, Pick, Shards, Subject
 
@@ -490,8 +490,8 @@ def red_where_dark(picture: np.ndarray) -> np.ndarray:
 
 
 def test_a_recipe_that_uses_light_needs_no_map_from_anyone(photo):
-    assert DARK.maps_needed == frozenset()
-    assert DARK.derived_maps == frozenset({"light"})
+    assert maps_needed(DARK) == frozenset()
+    assert derived_maps(DARK) == frozenset({"light"})
     np.testing.assert_array_equal(runner.render(photo, DARK), red_where_dark(photo))  # no maps, no finders
 
 
@@ -535,7 +535,7 @@ def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subj
             "lit_subject": Combine(of=("subject", "bright")),
         },
     )
-    assert lit_subject.maps_needed == frozenset({"subject"})
+    assert maps_needed(lit_subject) == frozenset({"subject"})
     bright = (photo @ LUMA > 0.5).astype(np.float64)
     weight = (subject * bright)[..., None]
     np.testing.assert_allclose(

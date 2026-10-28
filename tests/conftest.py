@@ -17,7 +17,7 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import EffectParams, FieldName, Picture, param
+from bullterrier_image.core.params import EffectParams, FieldName, Picture, param, scaled
 from bullterrier_image.core.registry import effect, unregister
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -177,7 +177,7 @@ def apply_as_rendered() -> Callable[..., np.ndarray]:
         function = registry.get(name)
         inputs = {key: value for key, value in values.items() if isinstance(value, np.ndarray)}
         params = function.validate({key: value for key, value in values.items() if key not in inputs})
-        out = function(rgb, params.scaled(max(rgb.shape[:2]) / 480), **inputs)
+        out = function(rgb, scaled(params, max(rgb.shape[:2]) / 480), **inputs)
         return rgb + np.float32(function.opacity) * (out - rgb)
 
     return apply

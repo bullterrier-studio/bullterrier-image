@@ -527,72 +527,6 @@ class EffectParams(ValidatedModel):
         cls.parse({}, f"the defaults of {cls.__name__!r}")
 
     @classmethod
-    def whole_number_fields(cls) -> frozenset[str]:
-        """The fields that hold a whole number (`int`): a range of values for one is rounded to whole numbers."""
-        return _whole_number_fields(cls)
-
-    @classmethod
-    def picture_fields(cls) -> frozenset[str]:
-        """The fields that hold a `Picture`: a recipe file writes a path for one, `fx` takes a path or an array."""
-        hints = typing.get_type_hints(cls)
-        return frozenset(name for name in cls.model_fields if hints[name] is Picture)
-
-    @classmethod
-    def field_name_fields(cls) -> tuple[str, ...]:
-        """The fields that name a field (`FieldName`), in declaration order: the effect receives the array of each."""
-        hints = typing.get_type_hints(cls, include_extras=True)
-        return tuple(name for name in cls.model_fields if hints[name] == FieldName)
-
-    @classmethod
-    def lut_fields(cls) -> frozenset[str]:
-        """The fields that hold a `Lut`: a recipe file writes a path to a `.cube` file, `fx` a path or an array."""
-        hints = typing.get_type_hints(cls)
-        return frozenset(name for name in cls.model_fields if hints[name] is Lut)
-
-    def scaled(self, factor: float) -> Self:
-        """A copy with every pixel value (a field with the unit `px`) multiplied by `factor` and every `density` (marks
-        per 1000 design px²) divided by `factor` squared: the same look at another size. A whole number is rounded.
-        When shrinking (`factor` below 1) a pixel value stops at the field's `min`, which keeps a small picture valid
-        (a cell of at least 3 pixels); growing has no ceiling, as a range is in design pixels and the copy is not
-        checked against it. Other units are unchanged."""
-        whole = self.whole_number_fields()
-        changes = {}
-        for name, info in type(self).model_fields.items():
-            unit = unit_of(info)
-            if unit == "density":
-                # marks per area: an area grows with the square of a length
-                changes[name] = getattr(self, name) / factor**2
-            elif unit == "px":
-                value = getattr(self, name) * factor
-                value = round(value) if name in whole else value
-                changes[name] = max(bounds(info)[0], value) if factor < 1 else value
-        return self.model_copy(update=changes)
-
-    @classmethod
-    def drivable_fields(cls) -> frozenset[str]:
-        """The fields a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
-        return frozenset(name for name, info in cls.model_fields.items() if _extra(info).get("drivable"))
-
-    @classmethod
-    def signature(cls) -> inspect.Signature:
-        """The fields as a call signature, in declaration order: each a keyword-only parameter with its default and the
-        type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable
-        field as `float | Drive`)."""
-        hints = typing.get_type_hints(cls, include_extras=True)
-        drivable = cls.drivable_fields()
-        return inspect.Signature(
-            [
-                inspect.Parameter(
-                    name,
-                    inspect.Parameter.KEYWORD_ONLY,
-                    default=info.default,
-                    annotation=_public(hints[name]) | Drive if name in drivable else _public(hints[name]),
-                )
-                for name, info in cls.model_fields.items()
-            ]
-        )
-
-    @classmethod
     def fields_doc(cls) -> tuple[FieldDoc, ...]:
         """Every field's documentation, in declaration order."""
         hints = typing.get_type_hints(cls, include_extras=True)
@@ -676,9 +610,76 @@ def cyclic_of(info: FieldInfo) -> bool:
     return bool(_extra(info).get("cyclic"))
 
 
-def _whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
+def whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
+    """The fields of `model` that hold a whole number (`int`): a range of values for one is rounded to whole numbers."""
     hints = typing.get_type_hints(model)
     return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})
+
+
+def picture_fields(model: type[EffectParams]) -> frozenset[str]:
+    """The fields of `model` that hold a `Picture`: a recipe file writes a path for one, `fx` takes a path or an
+    array."""
+    hints = typing.get_type_hints(model)
+    return frozenset(name for name in model.model_fields if hints[name] is Picture)
+
+
+def field_name_fields(model: type[EffectParams]) -> tuple[str, ...]:
+    """The fields of `model` that name a field (`FieldName`), in declaration order: the effect receives the array of
+    each."""
+    hints = typing.get_type_hints(model, include_extras=True)
+    return tuple(name for name in model.model_fields if hints[name] == FieldName)
+
+
+def lut_fields(model: type[EffectParams]) -> frozenset[str]:
+    """The fields of `model` that hold a `Lut`: a recipe file writes a path to a `.cube` file, `fx` a path or an
+    array."""
+    hints = typing.get_type_hints(model)
+    return frozenset(name for name in model.model_fields if hints[name] is Lut)
+
+
+def drivable_fields(model: type[EffectParams]) -> frozenset[str]:
+    """The fields of `model` a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
+    return frozenset(name for name, info in model.model_fields.items() if _extra(info).get("drivable"))
+
+
+def signature(model: type[EffectParams]) -> inspect.Signature:
+    """The fields of `model` as a call signature, in declaration order: each a keyword-only parameter with its default
+    and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable field as
+    `float | Drive`)."""
+    hints = typing.get_type_hints(model, include_extras=True)
+    drivable = drivable_fields(model)
+    return inspect.Signature(
+        [
+            inspect.Parameter(
+                name,
+                inspect.Parameter.KEYWORD_ONLY,
+                default=info.default,
+                annotation=_public(hints[name]) | Drive if name in drivable else _public(hints[name]),
+            )
+            for name, info in model.model_fields.items()
+        ]
+    )
+
+
+def scaled[P: EffectParams](params: P, factor: float) -> P:
+    """A copy of `params` with every pixel value (a field with the unit `px`) multiplied by `factor` and every
+    `density` (marks per 1000 design px²) divided by `factor` squared: the same look at another size. A whole number is
+    rounded. When shrinking (`factor` below 1) a pixel value stops at the field's `min`, which keeps a small picture
+    valid (a cell of at least 3 pixels); growing has no ceiling, as a range is in design pixels and the copy is not
+    checked against it. Other units are unchanged."""
+    whole = whole_number_fields(type(params))
+    changes = {}
+    for name, info in type(params).model_fields.items():
+        unit = unit_of(info)
+        if unit == "density":
+            # marks per area: an area grows with the square of a length
+            changes[name] = getattr(params, name) / factor**2
+        elif unit == "px":
+            value = getattr(params, name) * factor
+            value = round(value) if name in whole else value
+            changes[name] = max(bounds(info)[0], value) if factor < 1 else value
+    # pydantic's own copy, which checks nothing: a pixel value grown past its design range is meant (see above)
+    return BaseModel.model_copy(params, update=changes)
 
 
 def _range_problem(spec: _Spec) -> str | None:

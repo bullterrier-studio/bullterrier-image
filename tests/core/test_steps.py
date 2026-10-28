@@ -16,7 +16,17 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, Picture, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.core.steps import (
+    Recipe,
+    Step,
+    derived_maps,
+    drives,
+    fixed,
+    maps_needed,
+    needs_finder,
+    references,
+    runs,
+)
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Bands, Each, Edge, Given, Grid, Pick, Shards, Subject, render
@@ -85,8 +95,8 @@ def drive(**keys) -> Drive:
 def test_a_step_takes_a_drive_for_a_drivable_parameter_and_keeps_it_as_written(gain):
     step = Step("gain_probe", params={"gain": drive(), "offset": 0.1})
     assert step.params == {"gain": drive(), "offset": 0.1}
-    assert step.drives == {"gain": drive()}
-    assert step.fixed == {"offset": 0.1}
+    assert drives(step) == {"gain": drive()}
+    assert fixed(step) == {"offset": 0.1}
     assert step.describe() == "gain_probe(gain=by near 0..2, offset=0.1)"
 
 
@@ -97,7 +107,7 @@ def test_a_drive_written_as_a_table_is_the_drive_written_in_python(gain):
 
 def test_a_step_with_no_drive_has_none(gain):
     step = Step("gain_probe", params={"gain": 2})
-    assert (step.drives, step.fixed) == ({}, {"gain": 2})
+    assert (drives(step), fixed(step)) == ({}, {"gain": 2})
 
 
 DRIVEN_MISTAKES = {
@@ -158,9 +168,9 @@ def test_every_value_a_drive_goes_through_is_checked_not_only_its_ends(throwaway
         """Nothing."""
         return rgb
 
-    assert Step(
-        "gapped_probe", params={"level": Drive(by="near", start=0.0, end=0.4, levels=5)}
-    ).drives  # all clear of it
+    assert drives(
+        Step("gapped_probe", params={"level": Drive(by="near", start=0.0, end=0.4, levels=5)})
+    )  # all clear of it
     with pytest.raises(
         RecipeError, match=r"gapped_probe.*level 0\.5 is in the gap"
     ):  # both ends valid, a level between not
@@ -186,7 +196,7 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
         """Nothing."""
         return rgb
 
-    assert Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.8)}).drives
+    assert drives(Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.8)}))
     with pytest.raises(RecipeError, match=r"paired_probe.*low 0\.9.*above high 0\.8"):
         Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.9)})
 
@@ -196,7 +206,7 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
 def test_a_drive_from_one_end_of_the_range_to_the_other_is_valid_whatever_the_number_of_levels(
     gain, start, end, levels
 ):
-    assert Step("gain_probe", params={"gain": Drive(by="near", start=start, end=end, levels=levels)}).drives
+    assert drives(Step("gain_probe", params={"gain": Drive(by="near", start=start, end=end, levels=levels)}))
 
 
 def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_others_at_their_defaults(
@@ -224,7 +234,7 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
         "low": Drive(by="near", start=0.1, end=0.9, levels=3),
         "high": Drive(by="near", start=0.2, end=1.0, levels=3),
     }
-    assert Step("ordered_probe", params=both).drives.keys() == {
+    assert drives(Step("ordered_probe", params=both)).keys() == {
         "low",
         "high",
     }  # low 0.9 would be above the default high 0.8
@@ -257,7 +267,7 @@ def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway
     ok = Step(
         "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=1, end=0)}
     )
-    assert ok.drives.keys() == {"first", "second"}
+    assert drives(ok).keys() == {"first", "second"}
     with pytest.raises(RecipeError, match=r"two_probe.*one field.*'light' and 'near'"):
         Step(
             "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="light", start=0, end=1)}
@@ -271,8 +281,8 @@ def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway
 
 def test_a_step_names_the_field_that_drives_it_as_a_region_it_refers_to(gain):
     step = Step("gain_probe", params={"gain": drive()}, mask="subject")
-    assert step.references() == [("mask", "subject", "selection"), ("by", "near", "selection")]
-    assert Step("gain_probe", params={"gain": 2}).references() == []
+    assert references(step) == [("mask", "subject", "selection"), ("by", "near", "selection")]
+    assert references(Step("gain_probe", params={"gain": 2})) == []
 
 
 def test_a_recipe_refuses_a_field_that_is_no_region_or_not_a_selection_naming_the_step_and_the_valid_ones(gain):
@@ -312,8 +322,8 @@ def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed)
         regions={"near": NEAR, "star": Given()},
         size=None,
     )
-    assert recipe.maps_needed == frozenset(needed)
-    assert recipe.derived_maps == (frozenset({"light"}) if by == "light" else frozenset())
+    assert maps_needed(recipe) == frozenset(needed)
+    assert derived_maps(recipe) == (frozenset({"light"}) if by == "light" else frozenset())
 
 
 # --- addresses: every number of a recipe has a name, and a copy of the recipe can have any of them set ----------------
@@ -766,7 +776,7 @@ def faint(throwaway_effects):
 def recipe_step(folder, keys: str) -> Step:
     path = folder / "faint.toml"
     path.write_text(f"[[step]]\neffect = 'faint_probe'\n{keys}", encoding="utf-8")
-    return load_recipe(path).steps[0].runs[0]
+    return runs(load_recipe(path).steps[0])[0]
 
 
 @pytest.mark.parametrize(
@@ -851,7 +861,7 @@ def test_a_recipe_refuses_a_frame_that_is_not_a_framing():
     ],
 )
 def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame, needs_subject):
-    assert ("subject" in Recipe(steps, name="look", frame=frame).maps_needed) is needs_subject
+    assert ("subject" in maps_needed(Recipe(steps, name="look", frame=frame))) is needs_subject
 
 
 @pytest.mark.parametrize(
@@ -887,7 +897,7 @@ def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_
         "front": Pick(of="bands"),
     }
     recipe = Recipe(steps(), name="look", regions=regions)
-    assert ("subject" in recipe.maps_needed, "depth" in recipe.maps_needed) == needs
+    assert ("subject" in maps_needed(recipe), "depth" in maps_needed(recipe)) == needs
 
 
 @pytest.mark.parametrize(
@@ -919,7 +929,7 @@ def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_
 )
 def test_the_maps_a_recipe_needs_are_named(steps, regions, frame, expected):
     recipe = Recipe(steps, name="look", regions=regions, frame=frame)
-    assert recipe.maps_needed == frozenset(expected)
+    assert maps_needed(recipe) == frozenset(expected)
 
 
 def test_the_recipe_objects_are_frozen():
@@ -1159,14 +1169,14 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
     ],
 )
 def test_a_recipe_needs_the_subject_only_when_a_region_it_uses_does(steps, regions, needs_subject):
-    assert ("subject" in Recipe(steps, name="look", regions=regions).maps_needed) is needs_subject
+    assert ("subject" in maps_needed(Recipe(steps, name="look", regions=regions))) is needs_subject
 
 
 FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
 
 
 @pytest.mark.parametrize(
-    ("steps", "regions", "needs_subject", "needs_finder"),
+    ("steps", "regions", "subject_needed", "finder_needed"),
     [
         pytest.param([Step("grade", mask="found")], FOUND, False, True, id="a mask from the subject found by pieces"),
         pytest.param([Step("grade", mask="whole")], FOUND, True, False, id="the subject without per is the subject"),
@@ -1184,10 +1194,10 @@ FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
     ],
 )
 def test_a_recipe_needs_a_finder_for_pieces_only_when_a_region_it_uses_finds_the_subject_by_pieces(
-    steps, regions, needs_subject, needs_finder
+    steps, regions, subject_needed, finder_needed
 ):
     recipe = Recipe(steps, name="look", regions={**REGIONS, **regions})
-    assert ("subject" in recipe.maps_needed, recipe.needs_finder) == (needs_subject, needs_finder)
+    assert ("subject" in maps_needed(recipe), needs_finder(recipe)) == (subject_needed, finder_needed)
 
 
 def test_an_each_step_describes_itself_with_its_partition_and_looks():

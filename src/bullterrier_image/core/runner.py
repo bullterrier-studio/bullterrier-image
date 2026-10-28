@@ -9,7 +9,7 @@ every stage. The runner is given everything it uses: the photo and its maps by n
 value per pixel of the photo), each either handed in or found by a `Finder` of that name (`finders`). The names are
 `subject` (the subject's alpha), `depth` (how near, 1 = nearest) and the name of every `Given` region a recipe declares.
 It asks each finder at most once per render (once per photo in `render_all`) and only if the recipe needs its map
-(`Recipe.maps_needed`): the subject for a step on it, an effect that takes it, or a region in use made from it (regions
+(`steps.maps_needed`): the subject for a step on it, an effect that takes it, or a region in use made from it (regions
 declared but unused need nothing); the depth and a given map likewise. A region that finds the subject piece by piece
 (`Subject` with `per`) asks the `subject` finder about the crop of the working picture of each piece, once per piece
 per render, even when a `subject` map was given (a map of the whole photo does not answer for a part). It never loads
@@ -17,7 +17,7 @@ a file or looks for a map on its own; `bullterrier_image.recipe` binds the defau
 found on the photo as given, before the recipe's `Framing` is applied, so a crop can follow the subject and the maps
 move with the photo; the framed photo and maps are then scaled to the `size` a render is asked for, else the
 recipe's size, else kept. Every pixel value (the fields with the unit `px`) is written for a picture whose longest side
-is 480, whatever the recipe's size; a render multiplies them by the working size over 480 (`EffectParams.scaled`), so
+is 480, whatever the recipe's size; a render multiplies them by the working size over 480 (`params.scaled`), so
 the look is the same at any size. The recipe's regions are made once per render, for
 that scaled picture, and only as steps ask for them.
 
@@ -40,7 +40,8 @@ from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
 
 from . import registry
-from .params import Drive, design_scale
+from .framing import cut_out, frame_photo
+from .params import Drive, design_scale, scaled
 from .regions import (
     DERIVED,
     FOUND_MAPS,
@@ -56,7 +57,18 @@ from .regions import (
     resolve,
     used,
 )
-from .steps import Each, Recipe, Step
+from .steps import (
+    Each,
+    Recipe,
+    Step,
+    assignment,
+    derived_maps,
+    drives,
+    fixed,
+    maps_needed,
+    named_fields,
+    references,
+)
 
 
 @dataclass(frozen=True)
@@ -107,7 +119,7 @@ def render(
     with the photo's height and width, 0..1: `subject` (white = subject), `depth` (1 = nearest), and one for each
     `Given` region the recipe declares, under that region's name; None for none. A map given or found must be finite
     and within 0..1. finders: a `Finder` by map name, called with the photo as given (before it is framed or scaled)
-    once, when the recipe needs that map (`recipe.maps_needed`) and it was not handed in; the `subject` finder is also
+    once, when the recipe needs that map (`steps.maps_needed`) and it was not handed in; the `subject` finder is also
     called with the crop of the working picture of each piece for a `Subject` region with `per` (see `Finder`).
     Raises RecipeError for a name in `maps` or `finders` that is no map of the recipe (naming the ones it has);
     the map's error (SubjectNotFoundError for the subject, DepthNotFoundError for the depth, else MapNotFoundError),
@@ -144,7 +156,7 @@ def _render(
     stages = _stages(image, recipe.steps, regions, scale)
     del image  # the stages own the scaled photo now, and let it go once the first step has run
     result = _last(stages)
-    return recipe.frame.cut(result, maps.get("subject")) if recipe.frame.has_alpha else result
+    return cut_out(recipe.frame, result, maps.get("subject")) if recipe.frame.has_alpha else result
 
 
 @dataclass(frozen=True)
@@ -184,13 +196,13 @@ def trace(
         stages.append(Stage("subject matte (white = subject)", np.repeat(scaled["subject"][..., None], 3, axis=2)))
     if "depth" in scaled:
         stages.append(Stage("depth (white = nearest)", np.repeat(scaled["depth"][..., None], 3, axis=2)))
-    wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in step.references()))
+    wanted = used(recipe.regions, (name for step in recipe.steps for _, name, _ in references(step)))
     stages += [_region_stage(name, regions[name], rgb) for name in recipe.regions if name in wanted]
     for number, (step, image) in enumerate(_stages(rgb, recipe.steps, regions, scale), start=1):
         stages.append(Stage(f"{number}. {step.describe()}", image))
     if recipe.frame.has_alpha:
         label = f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})"
-        stages.append(Stage(label, recipe.frame.cut(stages[-1].image, scaled.get("subject"))))
+        stages.append(Stage(label, cut_out(recipe.frame, stages[-1].image, scaled.get("subject"))))
     return stages
 
 
@@ -248,13 +260,13 @@ def _maps(
                 '(`subject` and `depth` are built in; any other is a region with `kind = "given"`)'
             )
     found = {}
-    for name in sorted({name for recipe in recipes for name in recipe.maps_needed}):
+    for name in sorted({name for recipe in recipes for name in maps_needed(recipe)}):
         if name in maps:
             found[name] = _checked(name, maps[name], rgb)
         elif name in finders:
             found[name] = find_map(name, finders[name], rgb)
         else:
-            raise _missing(name, next(recipe for recipe in recipes if name in recipe.maps_needed))
+            raise _missing(name, next(recipe for recipe in recipes if name in maps_needed(recipe)))
     for name in maps.keys() - found.keys():  # handed in but unused: still held to the rule, so a wrong map shows up
         _checked(name, maps[name], rgb)
     return found
@@ -291,7 +303,7 @@ def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
         regions = [
             f"step {number} (its `{key}` {region!r}, a region made from depth)"
             for number, step in enumerate(recipe.steps, start=1)
-            for key, region, _ in step.references()
+            for key, region, _ in references(step)
             if "depth" in maps_used(recipe.regions, [region])
         ]
         return DepthNotFoundError(
@@ -330,12 +342,12 @@ def _prepare(
     set up the recipe's regions for that picture. The one place the photo is framed. Returns the working picture, its
     maps by name (those the recipe needs), its regions and the factor for the recipe's pixel values: the working
     size over the design size (`design_scale`)."""
-    rgb, maps = recipe.frame.apply(rgb, {name: found[name] for name in sorted(recipe.maps_needed)})
+    rgb, maps = frame_photo(recipe.frame, rgb, {name: found[name] for name in sorted(maps_needed(recipe))})
     working = size or recipe.size
     if working:
         rgb = resize(rgb, working)
         maps = {name: resize(layer, working) for name, layer in maps.items()}
-    maps |= {name: DERIVED[name](rgb) for name in sorted(recipe.derived_maps)}  # made from the picture as it is worked
+    maps |= {name: DERIVED[name](rgb) for name in sorted(derived_maps(recipe))}  # made from the picture as it is worked
     find = _finder_in(rgb, (finders or {}).get("subject"))
     scale = design_scale(rgb.shape[:2])
     return rgb, maps, resolve(recipe.regions, rgb.shape[:2], maps=maps, find=find), scale
@@ -376,13 +388,13 @@ def _effect(before: np.ndarray, step: Step, regions: Regions, scale: float) -> n
     """The step's effect run on `before`, given the fields it names and the pieces of the step's partition. A step
     with driven parameters is run once for each level of its drives, and each pixel takes the two renders either side
     of its field value (see `_driven`)."""
-    extra = {parameter: regions.selection(field).alpha for parameter, field in step.named_fields.items()}
+    extra = {parameter: regions.selection(field).alpha for parameter, field in named_fields(step).items()}
     if step.partition:
         extra["partition"] = regions.pieces(step.partition).labels
-    drives = step.drives
-    if not drives:
+    driven = drives(step)
+    if not driven:
         return _run(step.effect, before, step.params, extra, scale)
-    return _driven(before, step, drives, regions.selection(next(iter(drives.values())).by).alpha, extra, scale)
+    return _driven(before, step, driven, regions.selection(next(iter(driven.values())).by).alpha, extra, scale)
 
 
 def _run(
@@ -394,7 +406,7 @@ def _run(
     given: dict[str, np.ndarray | float] = {**extra}
     if "size_ratio" in function.inputs:
         given["size_ratio"] = scale
-    result = function(before, function.validate(params).scaled(scale), **given)
+    result = function(before, scaled(function.validate(params), scale), **given)
     if result.shape != before.shape:
         raise RuntimeError(f"effect {effect!r} changed the image shape {before.shape} -> {result.shape}")
     return result
@@ -418,7 +430,7 @@ def _driven(
     for level in range(levels):
         weight = level_weight(position, level)
         if weight.max() > 0:
-            values = {**step.fixed, **{name: drive.value(level) for name, drive in drives.items()}}
+            values = {**fixed(step), **{name: drive.value(level) for name, drive in drives.items()}}
             out += weight[..., None] * _run(step.effect, before, values, extra, scale)
     return out  # within 0..1 as the renders are: the weights of a pixel add up to exactly 1 in float32
 
@@ -428,8 +440,7 @@ def _each(before: np.ndarray, step: Each, regions: Regions, scale: float) -> np.
     once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
     pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
     partition = regions.partition(step.each)
-    assignment = step.assignment(partition.count)
-    weights = look_weights(partition, assignment, len(step.looks), feather=step.feather * scale)
+    weights = look_weights(partition, assignment(step, partition.count), len(step.looks), feather=step.feather * scale)
     out = before.copy()
     for look, weight in zip(step.looks, weights, strict=True):
         if isinstance(look, Step) and weight.any():  # a look no piece has is not rendered

@@ -39,7 +39,7 @@ from .core.regions import (
     Svg,
 )
 from .core.runner import Finder, Stage
-from .core.steps import Each, Parameter, Recipe, Step
+from .core.steps import Each, Parameter, Recipe, Step, maps_needed, needs_finder
 from .finding import subject
 from .finding.depth import depth_finder
 from .loader import load_recipe
@@ -125,8 +125,8 @@ def _finders(
     depth when a recipe needs it and no `depth` map is given. Each default is built only then, once per call."""
     maps, bound = maps or {}, dict(finders or {})
     for name in FOUND_MAPS:
-        asks = name not in maps and any(name in recipe.maps_needed for recipe in recipes)
-        asks = asks or (name == "subject" and any(recipe.needs_finder for recipe in recipes))
+        asks = name not in maps and any(name in maps_needed(recipe) for recipe in recipes)
+        asks = asks or (name == "subject" and any(needs_finder(recipe) for recipe in recipes))
         if name not in bound and asks:
             bound[name] = default_finder(name)
     return bound
