@@ -26,7 +26,7 @@ module and do not know each other.
 
 import difflib
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
@@ -62,6 +62,17 @@ class Parameter:
     doc: str
     whole: bool = False
     cyclic: bool = False
+
+
+# What `Step.apply` renders with: `bullterrier_image.recipe.render`, which binds the default finders of the subject and
+# the depth and so lives above the core. It binds itself here when imported (`bind_render`); every public way to a
+# step (`bullterrier_image.Step`, `fx`, `load_recipe`) imports it.
+_RENDER: dict[str, Callable[..., np.ndarray]] = {}
+
+
+def bind_render(render: Callable[..., np.ndarray]) -> None:
+    """Make `render` (called as `render(photo, step, maps=, finders=, size=)`) what `Step.apply` runs."""
+    _RENDER["render"] = render
 
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
@@ -233,6 +244,19 @@ class Step(_Layer):
         ]
         drawn: list[Reference] = [] if self.partition is None else [("partition", self.partition, None)]
         return [*super().references(), *driving, *working, *drawn]
+
+    def apply(
+        self,
+        photo: np.ndarray,
+        *,
+        maps: Mapping[str, np.ndarray] | None = None,
+        finders: Mapping[str, Any] | None = None,
+        size: int | None = None,
+    ) -> np.ndarray:
+        """This step alone on `photo`, without writing a recipe: exactly `bullterrier_image.render(photo,
+        Recipe([step]), maps=maps, finders=finders, size=size)`, which documents every argument (`finders` holds a
+        `Finder` by map name), including how the subject and the depth are found when the step needs them."""
+        return _RENDER["render"](photo, self, maps=maps, finders=finders, size=size)
 
     def replace(self, **changes: Any) -> "Step":
         """A copy with `changes`: what `fx.<effect>(...)` takes, the effect's parameters (laid over this step's) and the

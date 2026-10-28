@@ -38,9 +38,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .core import registry
-from .core.steps import Step
 from .errors import RecipeError
 from .loader import with_files
+from .recipe import Step  # the public home: importing it binds what `Step.apply` renders with
 
 # The effect builders are module attributes made on demand (`__getattr__`), one per registered effect.
 __all__ = ["stub_text"]

@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, imageio, load_recipe, render, trace
+from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, fx, imageio, load_recipe, render, trace
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import looks, registry, runner
 from bullterrier_image.core.params import EffectParams, FieldName, param
@@ -266,7 +266,8 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
-    masked = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="m", size=None)
+    masking = Step("gradient", params={"colors": ["#000000"]}, mask="background")
+    masked = Recipe((masking,), name="m", size=None)
     alpha = subject_matte(photo)
     expected = runner.render(photo, masked, maps={"subject": alpha})
     assert not np.array_equal(
@@ -275,6 +276,24 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     np.testing.assert_array_equal(facade.render(photo, masked), expected)
     np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
+    np.testing.assert_array_equal(masking.apply(photo), expected)  # one step alone, with the same finder
+    np.testing.assert_array_equal(facade.render(photo, masking), expected)
+
+
+STEP_ALONE = {
+    "an effect": (fx.bloom(radius=12, threshold=0.3), {}),
+    "at a size": (fx.slice_shift(seed=3, amount=20), {"size": 64}),
+    "masked, given the subject": (fx.gradient(colors=["#000000"], mask="background"), {"maps": "subject"}),
+}
+
+
+@pytest.mark.parametrize(("step", "given"), STEP_ALONE.values(), ids=STEP_ALONE.keys())
+def test_one_step_applied_alone_is_the_recipe_of_that_step_rendered(photo, subject, step, given):
+    options = {**given, "maps": {"subject": subject}} if "maps" in given else given
+    expected = render(photo, Recipe([step]), **options)
+    np.testing.assert_array_equal(step.apply(photo, **options), expected)
+    np.testing.assert_array_equal(render(photo, step, **options), expected)
+    np.testing.assert_array_equal(trace(photo, step, **options)[-1].image, expected)
 
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):

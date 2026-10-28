@@ -16,7 +16,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from .core import runner
+from .core import runner, steps
 from .core.framing import Framing
 from .core.params import Drive
 from .core.regions import (
@@ -78,7 +78,7 @@ __all__ = [
 
 def render(
     rgb: np.ndarray,
-    recipe: Recipe,
+    recipe: Recipe | Step,
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
@@ -86,12 +86,13 @@ def render(
 ) -> np.ndarray:
     """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders. `size` is the
     longest side of the result in px: the recipe's pixel values (written for 480) are scaled to it."""
+    recipe = Recipe([recipe]) if isinstance(recipe, Step) else recipe
     return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
 def trace(
     rgb: np.ndarray,
-    recipe: Recipe,
+    recipe: Recipe | Step,
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
@@ -99,6 +100,7 @@ def trace(
 ) -> list[Stage]:
     """Every stage of a render: `bullterrier_image.core.runner.trace` with the default finders; `size` as for
     `render`."""
+    recipe = Recipe([recipe]) if isinstance(recipe, Step) else recipe
     return runner.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
@@ -136,12 +138,18 @@ def default_finder(name: str) -> Finder:
     return {"subject": subject.subject_finder, "depth": depth_finder}[name]()
 
 
-# Each function above is the core's, with the default finders bound: its one-line docstring is replaced by the core's
-# full documentation, plus that.
+# Each function above is the core's, with the default finders bound (and, for one picture, a `Step` taken as the recipe
+# of that one step): its one-line docstring is replaced by the core's full documentation, plus that.
+_ONE_STEP = (
+    " A `Step` given as the recipe is the recipe of that one step: `render(photo, step)` is `step.apply(photo)`."
+)
 for _public in (render, trace, render_all):
     _public.__doc__ = (
         getattr(runner, _public.__name__).__doc__.rstrip()
         + "\n\n    Without a `subject` finder, the subject is found by `finding.subject.subject_finder()` if needed;"
-        + " without a `depth` map or finder, the depth by `finding.depth.depth_finder()`.\n    "
+        + " without a `depth` map or finder, the depth by `finding.depth.depth_finder()`."
+        + ("" if _public is render_all else _ONE_STEP)
+        + "\n    "
     )
 del _public
+steps.bind_render(render)
