@@ -230,6 +230,9 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     created = _scaffold_into(copy)
     python = [path for path in created if path.endswith(".py")]
+    # and an effect named like a crate the core's generated effect table uses: it must not hide that crate
+    shadowing = run_dev_script(copy, "new-effect", "serde_json", "--category", "utilities")
+    assert shadowing.returncode == 0, shadowing.stderr
     environment = {
         **os.environ,
         "PYTHONPATH": str(copy / "src"),  # the copy's bullterrier_image, not the installed one

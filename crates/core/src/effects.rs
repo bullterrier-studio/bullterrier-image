@@ -8,6 +8,7 @@
 use crate::{Error, Image, Picture};
 
 /// The function that runs one effect: reads its parameters, then renders the picture with them.
-pub(crate) type Run = fn(&Picture<'_>, serde_json::Value) -> Result<Image, Error>;
+// `::serde_json`, the crate, as in the generated table: an effect module named `serde_json` is in scope here
+pub(crate) type Run = fn(&Picture<'_>, ::serde_json::Value) -> Result<Image, Error>;
 
 include!(concat!(env!("OUT_DIR"), "/effects.rs"));

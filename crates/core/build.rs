@@ -47,7 +47,8 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     writeln!(code, "pub(crate) static EFFECTS: &[(&str, Run)] = &[")?;
     for (name, _) in files {
         writeln!(code, "    ({name:?}, |picture, params| {{")?;
-        writeln!(code, "        let params = serde_json::from_value(params)")?;
+        // `::serde_json`, the crate: an effect module named `serde_json` would otherwise stand in its place
+        writeln!(code, "        let params = ::serde_json::from_value(params)")?;
         writeln!(
             code,
             "            .map_err(|source| Error::Params {{ effect: {name:?}, source }})?;"
