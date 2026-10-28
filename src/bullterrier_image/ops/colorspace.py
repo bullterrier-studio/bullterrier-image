@@ -13,7 +13,6 @@ import numpy as np
 
 # sRGB transfer function, IEC 61966-2-1.
 _SRGB_ENCODED_BREAK = 0.04045  # constant: encoded value where the sRGB linear segment ends (IEC 61966-2-1)
-_SRGB_LINEAR_BREAK = 0.0031308  # constant: the same point in linear light (IEC 61966-2-1)
 
 
 def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
@@ -34,26 +33,6 @@ def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
         ((magnitude + 0.055) / 1.055) ** 2.4,  # constant: sRGB power-law segment (IEC 61966-2-1)
     )
     return np.copysign(linear, rgb).astype(np.float32)
-
-
-def linear_to_srgb(rgb: np.ndarray) -> np.ndarray:
-    """Encode linear light as gamma-encoded sRGB; the exact inverse of `srgb_to_linear`.
-
-    Args:
-        rgb: linear-light values, last axis length 3, nominally 0..1. Values outside 0..1 are mirrored around zero, so
-            negative inputs give negative outputs instead of NaN.
-
-    Returns:
-        float32 array of the same shape holding sRGB values, 0..1 for in-range input.
-    """
-    rgb = np.asarray(rgb, dtype=np.float32)
-    magnitude = np.abs(rgb)
-    encoded = np.where(
-        magnitude <= _SRGB_LINEAR_BREAK,
-        magnitude * 12.92,  # constant: slope of the sRGB linear segment (IEC 61966-2-1)
-        1.055 * magnitude ** (1 / 2.4) - 0.055,  # constant: sRGB power-law segment (IEC 61966-2-1)
-    )
-    return np.copysign(encoded, rgb).astype(np.float32)
 
 
 def rgb_to_hsv(rgb: np.ndarray) -> np.ndarray:

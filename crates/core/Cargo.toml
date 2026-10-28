@@ -12,8 +12,15 @@ publish.workspace = true
 name = "bullterrier_image_core"
 
 [dependencies]
+serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
 
 [lints]
 workspace = true
 
+# the effect files are compiled in by the build script's generated `mod` declarations, which cargo-shear cannot see
+[package.metadata.cargo-shear]
+ignored-paths = ["src/effects/*.rs"]

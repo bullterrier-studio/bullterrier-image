@@ -2,10 +2,9 @@
 
 import numpy as np
 
+from bullterrier_image._native import _core
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.ops.color import luminance
-from bullterrier_image.ops.colorspace import linear_to_srgb, srgb_to_linear
 
 
 class GradeParams(EffectParams):
@@ -94,17 +93,4 @@ def grade(rgb: np.ndarray, params: GradeParams) -> np.ndarray:
     other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey,
     whose saturation is 0, is unchanged.
     """
-    out = rgb
-    if params.temperature or params.tint:
-        half = params.temperature / 2  # constant: the temperature stops are shared evenly between red and blue
-        gains = np.exp2(np.array([half, -params.tint, -half], dtype=np.float32))
-        out = linear_to_srgb(srgb_to_linear(rgb) * (gains / gains.max()))
-    out = out * np.float32(2.0**params.exposure)  # a stop is a factor of 2 (photographic definition)
-    out = params.pivot + (out - params.pivot) * np.float32(params.contrast)
-    grey = luminance(np.clip(out, 0, 1))[..., None]
-    out = np.clip(grey + (out - grey) * np.float32(params.saturation), 0.0, 1.0)
-    strongest = out.max(axis=-1, keepdims=True)
-    weakest = out.min(axis=-1, keepdims=True)
-    chroma = np.where(strongest > 0, (strongest - weakest) / np.where(strongest > 0, strongest, 1.0), 0.0)
-    spread = 1.0 + np.float32(params.vibrance) * (1.0 - chroma)  # the factor by which saturation grows
-    return np.clip(strongest - spread * (strongest - out), 0.0, 1.0).astype(np.float32)
+    return _core.apply("grade", rgb, params.model_dump())

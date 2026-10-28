@@ -54,3 +54,12 @@ def test_an_unused_function_and_an_unused_class_fail_the_gate_by_name(checkout, 
     assert "leftover.py" in result.stdout
     assert "'never_called_helper'" in result.stdout
     assert "'NeverUsedThing'" in result.stdout
+
+
+def test_without_the_whitelist_the_fields_only_rust_reads_would_be_reported(checkout):
+    # vulture alone, as before the whitelist: grade's `temperature` is read nowhere in Python
+    result = subprocess.run(
+        [sys.executable, "-m", "vulture"], cwd=checkout, capture_output=True, encoding="utf-8", check=False
+    )
+    assert result.returncode != 0
+    assert "'temperature'" in result.stdout

@@ -17,6 +17,28 @@ def test_grade_exposure_one_stop_doubles_brightness() -> None:
     assert np.allclose(registry.apply("grade", dark, exposure=1.0, contrast=1.0), 0.4, atol=1e-5)
 
 
+@pytest.mark.parametrize(
+    ("pixel", "grey"),
+    [
+        # Rec. 709 brightness, by hand: 0.2126 r + 0.7152 g + 0.0722 b
+        pytest.param((0.8, 0.4, 0.2), 0.4706, id="orange: 0.17008 + 0.28608 + 0.01444"),
+        pytest.param((0.1, 0.2, 0.9), 0.22928, id="blue: 0.02126 + 0.14304 + 0.06498"),
+    ],
+)
+def test_saturation_zero_turns_a_colour_into_the_grey_of_its_rec_709_brightness(
+    pixel: tuple[float, float, float], grey: float
+) -> None:
+    out = registry.apply("grade", np.array([[pixel]], np.float32), saturation=0.0)
+    np.testing.assert_allclose(out[0, 0], [grey] * 3, atol=FIVE_DECIMALS)
+
+
+def test_the_brightness_saturation_keeps_is_measured_after_the_contrast_is_clipped() -> None:
+    # contrast 2 around 0.5 takes (0.9, 0.5, 0.3) to (1.3, 0.5, 0.1), clipped to (1.0, 0.5, 0.1); its Rec. 709 grey is
+    # 0.2126 * 1.0 + 0.7152 * 0.5 + 0.0722 * 0.1 = 0.57742 (unclipped it would be 0.64120)
+    out = registry.apply("grade", np.array([[[0.9, 0.5, 0.3]]], np.float32), contrast=2.0, saturation=0.0)
+    np.testing.assert_allclose(out[0, 0], [0.57742] * 3, atol=FIVE_DECIMALS)
+
+
 def test_grade_contrast_turns_around_its_pivot() -> None:
     grey = np.array([[[0.3, 0.3, 0.3], [0.4, 0.4, 0.4], [0.5, 0.5, 0.5]]], np.float32)
     pivoted = registry.apply("grade", grey, contrast=2.0, pivot=0.3)

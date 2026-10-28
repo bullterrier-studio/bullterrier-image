@@ -561,6 +561,11 @@ def _allowed_in_rust(value: float, line: str, match: re.Match[str]) -> bool:
     return abs(value) in TRIVIAL and not bound
 
 
+def test_the_rust_scan_covers_the_core_effects_and_ops():
+    names = {path.relative_to(CORE).as_posix() for path in RUST_SCANNED}
+    assert {"effects/grade.rs", "ops/colorspace.rs"} <= names
+
+
 @pytest.mark.parametrize("path", RUST_SCANNED, ids=[path.relative_to(CORE).as_posix() for path in RUST_SCANNED])
 def test_every_number_in_the_rust_core_is_a_parameter_or_a_cited_constant(path, rust_code):
     source = path.read_text(encoding="utf-8")
