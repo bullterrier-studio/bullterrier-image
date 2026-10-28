@@ -28,7 +28,10 @@ bullterrier-image is before 1.0: only the latest release receives security fixes
 - **Cached data** is read without pickle, so a planted cache file cannot run code.
 - **Outputs** carry no EXIF or GPS data from the input photo.
 - **Audited code and dependencies.** ruff's security rules (flake8-bandit) are part of every `poe check`, and
-  `uv run poe audit` checks every release pinned in `uv.lock` with pip-audit. No known advisory is open; one that has no
-  fixed release yet would be listed here by its id.
+  `uv run poe audit` checks every release pinned in `uv.lock` with pip-audit and every crate pinned in `Cargo.lock`
+  against the RustSec advisory database with cargo-deny; CI runs it on every change and weekly. No known advisory is
+  open; one that has no fixed release yet would be listed here by its id (and, for a crate, in `deny.toml`).
+- **The Rust core** is safe Rust (`#![forbid(unsafe_code)]`), and cargo-deny admits only crates from crates.io under
+  permissive licences, with no PyO3 in the core (`deny.toml`, in every `poe check`).
 - **Plugins** are Python packages: installing one runs its code, as with any package. `BT_IMAGE_PLUGINS=builtin` loads
   only bullterrier-image's own effects.

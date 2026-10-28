@@ -107,8 +107,8 @@ Python one; delete it with its last Python user.
 - Output files carry no EXIF or GPS data from the input.
 - Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
 - Security: ruff `S`, `PGH`, `LOG` run in `poe check` (a subprocess call carries `# noqa: S603  <why its argv is safe>`).
-  `uv run poe audit` (pip-audit on `uv.lock`, needs network) runs before a release and in CI, which uses
-  `uv run --locked poe check`.
+  `uv run poe audit` (pip-audit on `uv.lock`, cargo-deny advisories on `Cargo.lock`; needs network) runs before a
+  release and in CI, which uses `uv run --locked poe check`.
 - Versions are SemVer (a 0.x minor may break the API), changed only by `uv run poe release VERSION` (the owner picks it: checks,
   shows the plan, asks, bumps, writes CHANGELOG.md with git-cliff, commits, tags, pushes main and the tag; `docs/releasing.md`).
   Tests read the version from `pyproject.toml`, never write it.

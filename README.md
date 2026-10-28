@@ -48,7 +48,8 @@ Ready-built for Linux (x86_64, aarch64; glibc 2.17+), macOS (Apple silicon, Inte
 
 ## Quick start
 
-Repo ships demo project: one photo, 16 recipes.
+Repo ships demo project: one photo, 16 recipes. A checkout builds the Rust core, so it needs
+[rustup](https://rustup.rs/) besides uv.
 
 ```bash
 git clone https://github.com/bullterrier-studio/bullterrier-image.git
