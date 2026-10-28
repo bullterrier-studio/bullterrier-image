@@ -84,7 +84,7 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
    (`RecipeError`, `UnknownEffectError`, `MapNotFoundError` with `SubjectNotFoundError` and `DepthNotFoundError`,
-   `BackendUnavailableError`, `ImageReadError`, `LutError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
+   `BackendUnavailableError`, `ImageReadError`, `LutError`, `InvalidImageError` with `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
    each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
    `ValueError`/`TypeError`.
 

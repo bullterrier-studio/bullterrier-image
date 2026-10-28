@@ -147,8 +147,9 @@ class ModelledEffect[P: EffectParams]:
             raise TypeError(f"{self.__name__}(): give a {self.params_model.__name__} or keyword values, not both")
         elif not isinstance(params, self.params_model):
             raise TypeError(f"{self.__name__}() takes a {self.params_model.__name__}, not a {type(params).__name__}")
-        # every effect gets the contract's picture, float32 and C-contiguous (a caller's float64 picture or sliced view
-        # is copied once, here): the Rust core reads it in place
+        # every effect gets the contract's picture, float32 and C-contiguous, which the Rust core reads in place: the
+        # values were checked where the photo entered (`ops.image.as_image`); only the layout is made here, for the
+        # output of a step before (a view, or float64) or a direct call
         return self._function(np.ascontiguousarray(rgb, dtype=np.float32), params, **given)
 
     def _field_array(self, name: str, rgb: np.ndarray, array: object) -> np.ndarray:

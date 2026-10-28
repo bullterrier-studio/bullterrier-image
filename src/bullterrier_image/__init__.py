@@ -37,6 +37,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         BullterrierImageError,
         DepthNotFoundError,
         ImageReadError,
+        InvalidImageError,
         LutError,
         MapNotFoundError,
         NonFiniteImageError,
@@ -87,9 +88,9 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "DepthNotFoundError", "ImageReadError", "LutError", "MapNotFoundError",
-        "NonFiniteImageError",
-        "BullterrierImageError", "ProjectError", "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
+        "BackendUnavailableError", "BullterrierImageError", "DepthNotFoundError", "ImageReadError", "InvalidImageError",
+        "LutError", "MapNotFoundError", "NonFiniteImageError", "ProjectError", "RecipeError", "SubjectNotFoundError",
+        "UnknownEffectError",
     ),
     ".core.params": ("Lut", "Picture"),
     ".finding.depth": ("depth_finder", "depth_map", "inverse_depth"),
@@ -148,6 +149,7 @@ __all__ = [
     "Given",
     "Grid",
     "ImageReadError",
+    "InvalidImageError",
     "Line",
     "LinearGradient",
     "Lut",

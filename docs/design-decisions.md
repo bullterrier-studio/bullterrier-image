@@ -339,7 +339,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Errors and I/O
 
 - **One error hierarchy.** Library code raises `BullterrierImageError` subclasses (`RecipeError`, `UnknownEffectError`,
-  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `LutError`, `NonFiniteImageError`), each also inheriting the builtin it replaces.
+  `SubjectNotFoundError`, `BackendUnavailableError`, `ImageReadError`, `LutError`, `InvalidImageError` with `NonFiniteImageError`), each also inheriting the builtin it replaces.
   *Reason:* callers catch one type; `except ValueError` keeps working. *Consequence:* the CLI catches them and prints a
   message, never a traceback, for a user's mistake; a broken effect definition is a programming error (plain
   `ValueError`/`TypeError` at import).

@@ -14,6 +14,7 @@ __all__ = [
     "BullterrierImageError",
     "DepthNotFoundError",
     "ImageReadError",
+    "InvalidImageError",
     "LutError",
     "MapNotFoundError",
     "NonFiniteImageError",
@@ -67,8 +68,14 @@ class DepthNotFoundError(MapNotFoundError):
     found nothing, or a map of another size than the photo."""
 
 
-class NonFiniteImageError(BullterrierImageError, ValueError):
-    """A picture to write holds NaN or an infinity, which is no colour: the message names the first such pixel."""
+class InvalidImageError(BullterrierImageError, ValueError):
+    """A picture handed in (to render, trace, apply or save) is not one: not an array, not (h, w, 3) (or (h, w, 4) to
+    save), a type that is no colour level (bool, signed integers) or float values outside 0..1. The message names
+    what was found and the fix."""
+
+
+class NonFiniteImageError(InvalidImageError):
+    """A picture handed in holds NaN or an infinity, which is no colour: the message names the first such pixel."""
 
 
 class BackendUnavailableError(BullterrierImageError, NotImplementedError):

@@ -16,7 +16,8 @@ import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
 from bullterrier_image.core.params import Lut
-from bullterrier_image.errors import BackendUnavailableError, ImageReadError, LutError, NonFiniteImageError
+from bullterrier_image.errors import BackendUnavailableError, ImageReadError, LutError
+from bullterrier_image.ops.image import as_image
 
 __all__ = ["from_pil", "load", "load_lut", "load_map", "load_picture", "save", "to_pil"]
 
@@ -175,9 +176,11 @@ def _picture(path: str | Path) -> Iterator[Image.Image]:
 def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
     """Write `image` to `path`; the extension picks the format.
 
-    `image` is float (height, width, 3) RGB, or (height, width, 4) RGB with straight alpha as the last channel, which
+    `image` is (height, width, 3) RGB, or (height, width, 4) RGB with straight alpha as the last channel, which
     gives the file a transparency channel, so use .png or .webp (a JPEG cannot hold one: BackendUnavailableError).
-    Values outside 0..1 are clipped; NaN or an infinity raises NonFiniteImageError, naming the first such pixel.
+    Its levels are floats 0..1 or unsigned integers (uint8 over 255, uint16 over 65535); anything else is an
+    InvalidImageError naming what was found (values outside 0..1 are not clipped), NaN or an infinity a
+    NonFiniteImageError naming the first such pixel.
     `quality` (1..100, default 95) sets JPEG and WebP compression; JPEGs keep full-resolution colour (4:4:4, no chroma
     subsampling) and PNG is lossless. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows the
     colours the effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and no GPS
@@ -188,10 +191,11 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
         raise BackendUnavailableError(
             f"cannot write {suffix or 'a file with no extension'!r} pictures: use .png, .jpg or .webp"
         )
+    image = as_image(image, alpha=True)
     jpeg = suffix in {".jpg", ".jpeg"}
     if jpeg and image.shape[2] == _RGBA:
         raise BackendUnavailableError(f"cannot write {suffix!r} pictures with transparency: use .png or .webp")
-    img = to_pil(image)
+    img = _pil(image)
     if jpeg:
         img.save(path, quality=quality, subsampling=0, icc_profile=_SRGB_ICC)
     elif suffix == ".webp":
@@ -201,19 +205,14 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
 
 
 def to_pil(image: np.ndarray) -> Image.Image:
-    """Convert to a Pillow image: RGB for (height, width, 3), RGBA (straight alpha last) for (height, width, 4)."""
-    return Image.fromarray(_to_uint8(image))
+    """Convert to a Pillow image: RGB for (height, width, 3), RGBA (straight alpha last) for (height, width, 4). The
+    picture is checked as `save` checks it."""
+    return _pil(as_image(image, alpha=True))
 
 
-def _to_uint8(data: np.ndarray) -> np.ndarray:
-    """0..1 floats to 8-bit levels, rounded; out-of-range values clip. NonFiniteImageError for NaN or infinity."""
-    finite = np.isfinite(data)
-    if not finite.all():
-        row, column = np.argwhere(~finite)[0][:2]
-        raise NonFiniteImageError(
-            f"cannot write a picture with NaN or infinite values: the first is at row {row}, column {column}"
-        )
-    return (np.clip(data, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+def _pil(image: np.ndarray) -> Image.Image:
+    """The checked picture `image` (see `as_image`) as a Pillow image of 8-bit levels, rounded."""
+    return Image.fromarray((image * _EIGHT_BIT + 0.5).astype(np.uint8))
 
 
 def from_pil(img: Image.Image) -> np.ndarray:

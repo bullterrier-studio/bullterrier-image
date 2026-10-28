@@ -34,6 +34,7 @@ import numpy as np
 
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.composite import composite
+from bullterrier_image.ops.image import as_image
 from bullterrier_image.ops.levels import level_weight
 from bullterrier_image.ops.pieces import number_pieces
 from bullterrier_image.ops.resample import resize
@@ -100,7 +101,9 @@ def render(
     the depth map). After the last step a recipe whose framing is `transparent` is cut out: the
     result then has four channels, RGB and straight alpha (h, w, 4), instead of three.
 
-    rgb: the photo, float32 (h, w, 3) in 0..1. recipe: what to run. maps: the photo's maps by name, each float32 (h, w)
+    rgb: the photo, a numpy array (h, w, 3): floats in 0..1, or unsigned integer levels (uint8 over 255, uint16 over
+    65535); anything else is an InvalidImageError naming what was found and the fix (NaN or an infinity a
+    NonFiniteImageError). recipe: what to run. maps: the photo's maps by name, each float32 (h, w)
     with the photo's height and width, 0..1: `subject` (white = subject), `depth` (1 = nearest), and one for each
     `Given` region the recipe declares, under that region's name; None for none. A map given or found must be finite
     and within 0..1. finders: a `Finder` by map name, called with the photo as given (before it is framed or scaled)
@@ -117,6 +120,7 @@ def render(
     recipe gives the same look at any size; a value stops at its minimum when shrinking and has no ceiling when
     growing.
     """
+    rgb = as_image(rgb)
     _check_size(size)
     found = _maps(rgb, [recipe], maps, finders)
     return _render(rgb, recipe, found, finders, size)
@@ -171,6 +175,7 @@ def trace(
 
     rgb, recipe, maps, finders, size: as for `render`.
     """
+    rgb = as_image(rgb)
     _check_size(size)
     found = _maps(rgb, [recipe], maps, finders)
     rgb, scaled, regions, scale = _prepare(rgb, recipe, found, finders, size)
@@ -214,6 +219,7 @@ def render_all(
     if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
     `render`. A name that is no map of any recipe is a RecipeError. size: as for `render`, for every recipe.
     """
+    rgb = as_image(rgb)
     _check_size(size)
     found = _maps(rgb, recipes, maps, finders)
     return [_render(rgb, recipe, found, finders, size) for recipe in recipes]

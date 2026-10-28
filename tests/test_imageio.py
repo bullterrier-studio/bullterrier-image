@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from PIL import Image, ImageCms
 
-from bullterrier_image import BackendUnavailableError, ImageReadError, NonFiniteImageError, imageio
+from bullterrier_image import BackendUnavailableError, ImageReadError, InvalidImageError, NonFiniteImageError, imageio
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -363,6 +363,36 @@ def test_save_names_a_file_type_it_cannot_write_and_writes_a_known_one(tmp_path)
     assert not (tmp_path / "a.xyz").exists()
     imageio.save(rgb, tmp_path / "a.png")  # the known-good side
     assert imageio.load(tmp_path / "a.png").shape == (4, 5, 3)
+
+
+@pytest.mark.parametrize(
+    ("levels", "top"),
+    [
+        pytest.param(np.uint8, 255, id="8-bit levels are divided by 255"),
+        pytest.param(np.uint16, 65535, id="16-bit levels are divided by 65535"),
+    ],
+)
+def test_a_picture_of_whole_levels_saves_as_its_levels_over_the_types_largest(tmp_path, levels, top):
+    picture = (np.arange(4 * 5 * 3).reshape(4, 5, 3) * (top // 59)).astype(levels)
+    imageio.save(picture, tmp_path / "levels.png")
+    imageio.save((picture / np.float64(top)).astype(np.float32), tmp_path / "floats.png")
+    np.testing.assert_array_equal(imageio.load(tmp_path / "levels.png"), imageio.load(tmp_path / "floats.png"))
+
+
+@pytest.mark.parametrize(
+    ("picture", "complaint"),
+    [
+        pytest.param(np.full((2, 3, 3), 1.25, np.float32), r"max 1\.25", id="above 1 names the largest, not clipped"),
+        pytest.param(np.full((2, 3, 3), -0.5, np.float32), r"min -0\.5", id="below 0 names the least, not clipped"),
+        pytest.param(np.zeros((2, 3), np.float32), r"np\.dstack", id="greyscale names the fix"),
+        pytest.param(np.zeros((2, 3, 3), bool), "bool", id="bool is no colour level"),
+        pytest.param(Image.new("RGB", (3, 2)), r"np\.asarray", id="a Pillow image names the fix"),
+    ],
+)
+def test_saving_refuses_what_is_no_picture_naming_it_and_writes_nothing(tmp_path, picture, complaint):
+    with pytest.raises(InvalidImageError, match=complaint):
+        imageio.save(picture, tmp_path / "bad.png")
+    assert not (tmp_path / "bad.png").exists()
 
 
 @pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf], ids=["nan", "infinity", "negative infinity"])

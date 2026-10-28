@@ -7,8 +7,17 @@ from contextlib import nullcontext
 
 import numpy as np
 import pytest
+from PIL import Image
 
-from bullterrier_image import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
+import bullterrier_image
+from bullterrier_image import (
+    DepthNotFoundError,
+    InvalidImageError,
+    MapNotFoundError,
+    NonFiniteImageError,
+    RecipeError,
+    SubjectNotFoundError,
+)
 from bullterrier_image.core import registry, runner
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, param
@@ -119,6 +128,69 @@ def test_a_finder_that_finds_nothing_is_an_error_naming_it(run, photo):
     broken = Finder("stand-in", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
     with pytest.raises(SubjectNotFoundError, match="finder of 'subject' returned None"):
         run(photo, MASKED, finders={"subject": broken})
+
+
+# --- the photo: checked once, where it enters ------------------------------------------------------------------------
+
+PUBLIC_RUNS = {
+    "render": lambda photo, recipe: bullterrier_image.render(photo, recipe),
+    "trace": lambda photo, recipe: bullterrier_image.trace(photo, recipe)[-1].image,
+    "render_all": lambda photo, recipe: bullterrier_image.render_all(photo, [recipe])[0],
+}
+
+
+@pytest.mark.parametrize("run", PUBLIC_RUNS.values(), ids=PUBLIC_RUNS.keys())
+@pytest.mark.parametrize(
+    ("dtype", "top"),
+    [
+        pytest.param(np.uint8, 255, id="8-bit levels are divided by 255"),
+        pytest.param(np.uint16, 65535, id="16-bit levels are divided by 65535"),
+    ],
+)
+def test_a_photo_of_whole_levels_renders_as_its_levels_over_the_types_largest(run, dtype, top):
+    levels = np.arange(4 * 6 * 3).reshape(4, 6, 3).astype(dtype) * (top // 71)  # 0 .. 71 x top // 71, spread out
+    as_floats = (levels / np.float64(top)).astype(np.float32)  # the oracle: the level over the type's largest
+    np.testing.assert_array_equal(run(levels, PLAIN), run(as_floats, PLAIN))
+
+
+@pytest.mark.parametrize("run", PUBLIC_RUNS.values(), ids=PUBLIC_RUNS.keys())
+def test_a_photo_of_float64_renders_as_the_same_values_in_float32(run, photo):
+    np.testing.assert_array_equal(run(photo.astype(np.float64), PLAIN), run(photo, PLAIN))
+
+
+def _with(value: float, at: tuple[int, int, int] = (2, 3, 1)) -> np.ndarray:
+    """A grey 4 x 6 float32 photo with one value set."""
+    photo = np.full((4, 6, 3), 0.5, np.float32)
+    photo[at] = value
+    return photo
+
+
+@pytest.mark.parametrize("run", PUBLIC_RUNS.values(), ids=PUBLIC_RUNS.keys())
+@pytest.mark.parametrize(
+    ("photo", "error", "complaint"),
+    [
+        pytest.param(_with(np.nan), NonFiniteImageError, "row 2, column 3", id="NaN names the pixel"),
+        pytest.param(_with(np.inf), NonFiniteImageError, "row 2, column 3", id="infinity names the pixel"),
+        pytest.param(_with(1.5), InvalidImageError, r"max 1\.5", id="above 1 names the largest"),
+        pytest.param(_with(-0.25), InvalidImageError, r"min -0\.25", id="below 0 names the least"),
+        pytest.param(np.zeros((4, 6), np.float32), InvalidImageError, r"np\.dstack", id="greyscale names the fix"),
+        pytest.param(np.zeros((4, 6, 4), np.float32), InvalidImageError, "alpha", id="RGBA names the fix"),
+        pytest.param(np.zeros((4, 6, 2), np.float32), InvalidImageError, r"\(4, 6, 2\)", id="two channels: the shape"),
+        pytest.param(np.zeros((4, 6, 3), bool), InvalidImageError, "bool", id="bool is no colour level"),
+        pytest.param(np.zeros((4, 6, 3), np.int16), InvalidImageError, "int16", id="a signed type is refused"),
+        pytest.param(Image.new("RGB", (6, 4)), InvalidImageError, r"np\.asarray", id="a Pillow image names the fix"),
+        pytest.param([[[0.5] * 3] * 6] * 4, InvalidImageError, r"np\.asarray", id="a list names the fix"),
+    ],
+)
+def test_a_photo_that_is_no_picture_is_refused_naming_what_was_found_and_the_fix(run, photo, error, complaint):
+    with pytest.raises(error, match=complaint):
+        run(photo, PLAIN)
+
+
+def test_a_photo_at_both_ends_of_the_range_is_a_picture():
+    photo = _with(1.0)
+    photo[0, 0, 0] = 0.0
+    assert bullterrier_image.render(photo, PLAIN).shape == (4, 6, 3)
 
 
 # --- depth: a second map, given or found like the subject ------------------------------------------------------------
