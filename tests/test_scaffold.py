@@ -251,7 +251,17 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
         [sys.executable, "-m", "ruff", "check", "--no-cache", *python],
         ["cargo", "fmt", "--all", "--check"],
         ["cargo", "clippy", *clippy],
-        [sys.executable, "-m", "pytest", "-q", "-rA", "-p", "no:cacheprovider", *scans],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "-rA",
+            "-p",
+            "no:cacheprovider",
+            f"--basetemp={tmp_path / 'tmp'}",
+            *scans,
+        ],
     ]
     for command in checks:
         done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
@@ -282,7 +292,7 @@ def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_exte
     commands = [
         ["uv", "sync", "--locked", "--quiet", "--python", sys.executable],
         ["uv", "run", "--no-sync", "pytest", "-q", "-rA", "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly",
-         f"tests/effects/{PROBE}", "tests/effects/test_contract.py", "-k", PROBE],
+         f"--basetemp={tmp_path / 'tmp'}", f"tests/effects/{PROBE}", "tests/effects/test_contract.py", "-k", PROBE],
     ]  # fmt: skip
     for command in commands:
         done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
