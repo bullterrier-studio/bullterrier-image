@@ -178,11 +178,16 @@ PROBE = "zz_scaffold_probe_with_a_rather_long_name"  # long, so the template's l
 
 def _copy_of_the_tree(destination: Path, tracked_files: list[str]) -> Path:
     """A copy, at `destination`, of every file git tracks, has staged or does not know yet (unless .gitignore excludes
-    it), as it is in the working tree: a change or a new file not yet committed is in it, so is a new ops module."""
+    it), as it is in the working tree: a change or a new file not yet committed is in it, so is a new ops module. The
+    built Rust extension, which git ignores, is copied too: it is built from the tracked crates."""
     for relative in tracked_files:
         if (ROOT / relative).is_file():  # a file deleted but not yet staged is listed too
             (destination / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, destination / relative)
+    native = Path(bullterrier_image.__file__).parent / "_native"
+    for built in native.glob("_core.*"):
+        if built.suffix != ".pyi":
+            shutil.copy2(built, destination / "src" / "bullterrier_image" / "_native" / built.name)
     return destination
 
 

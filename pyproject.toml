@@ -60,13 +60,28 @@ bt-image = "bullterrier_image.cli:main"
 [project.entry-points."bullterrier_image.effects"]
 bullterrier_image = "bullterrier_image.effects"
 
+# maturin builds the Rust extension `bullterrier_image._native._core` (crates/python) and packs it with the Python code of src/
 [build-system]
-requires = ["uv_build>=0.13.0,<0.14.0"]
-build-backend = "uv_build"
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
 
-[tool.uv.build-backend]
+[tool.maturin]
+manifest-path = "crates/python/Cargo.toml"
+python-source = "src"
+module-name = "bullterrier_image._native._core"
 # the files `poe new-effect` copies are for a source checkout, not part of the installed library
-wheel-exclude = ["bullterrier_image/effects/_template"]
+exclude = [{ path = "src/bullterrier_image/effects/_template/**", format = "wheel" }]
+
+# `uv sync` and `uv run` rebuild the extension when one of these changes (by default uv looks at pyproject.toml only)
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "crates/**/*.rs" },
+    { file = "crates/**/Cargo.toml" },
+    { file = "crates/core/build.rs" },
+]
 
 # Read by `check-wheel-contents` in `poe build-check`: the wheel holds exactly src/bullterrier_image minus these, so a shipped
 # template, picture or test fails (W102), and so does library code left out of the wheel (W101).
@@ -188,6 +203,7 @@ select = [
     "PLW1514",  # text files opened without `encoding=` use the locale's, which breaks non-ASCII names on Windows (preview)
     "BLE",  # `except Exception` hides bugs; catch what can happen, or say why everything must be caught
     "PTH",  # pathlib, not os.path / open() / glob: one way to handle paths
+    "PYI",  # type stubs (the Rust extension's, `_core.pyi`) written as stubs: no bodies, no docstrings
 ]
 # Deliberately NOT enabled: TRY003 / EM (message-style noise); the docstring style rules D2xx / D4xx beyond D419 (we
 # enforce presence, not formatting); PLR2004 magic numbers and PLR0913 argument counts (numeric code and
@@ -331,7 +347,9 @@ layers = [
     "plugin",  # the effect-author API for other packages: core's names, so bullterrier-image's own effects may use it too
     "core",  # may import ops
     "ops",
-    "errors",  # the exceptions: they import nothing, so every layer may raise them
+    # the exceptions, and the home of the Rust extension (`_native._core`): they import nothing, so every layer may use
+    # them
+    "errors | _native",
 ]
 
 [[tool.importlinter.contracts]]

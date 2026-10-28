@@ -23,3 +23,8 @@ examples/output/python-api/
 
 # agent worktrees (created by the harness)
 .claude/
+
+# Rust: the build folder, and the extension an editable install (`uv sync`) builds into the source tree
+target/
+src/bullterrier_image/_native/_core*.so
+src/bullterrier_image/_native/_core*.pyd

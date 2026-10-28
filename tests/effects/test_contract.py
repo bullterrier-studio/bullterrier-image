@@ -13,6 +13,7 @@ import pytest
 from scipy import ndimage
 
 from bullterrier_image import fx
+from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
 from bullterrier_image.core import registry, runner
 from bullterrier_image.core.params import UNITS, Drive, EffectParams, FieldName, param
 from bullterrier_image.core.regions import Kind
@@ -69,6 +70,10 @@ def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, 
     before = rgb.copy()
     assert_a_picture_like(registry.apply(name, rgb, **_inputs(name, rgb)), rgb)
     np.testing.assert_array_equal(rgb, before)
+
+
+def test_every_effect_of_the_rust_core_is_a_registered_effect():
+    assert set(_core.effects()) <= set(ALL)
 
 
 @pytest.mark.parametrize("name", ALL)

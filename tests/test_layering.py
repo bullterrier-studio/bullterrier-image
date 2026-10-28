@@ -7,6 +7,7 @@ import sees. Each layer may import only the layers below it:
     core       runner > steps > framing | registry | regions > presets | outlines > params | vocabulary > types
     ops        may import errors
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
+    _native    the home of the Rust extension (`_native._core`), beside errors: imports nothing either
 
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
 unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
@@ -122,6 +123,30 @@ FORBIDDEN = {
         "bullterrier_image.core.params",
         CORE_ORDER,
     ),
+    "ops to the package root": (
+        "ops/cells.py",
+        "from bullterrier_image import Recipe",
+        "bullterrier_image.ops.cells",
+        LAYERS,
+    ),
+    "ops to the package root, relatively": (
+        "ops/cells.py",
+        "from .. import Recipe",
+        "bullterrier_image.ops.cells",
+        LAYERS,
+    ),
+    "the Rust extension's home to ops": (
+        "_native/__init__.py",
+        "import bullterrier_image.ops.cells",
+        "bullterrier_image._native",
+        LAYERS,
+    ),
+    "errors to the Rust extension's home": (
+        "errors.py",
+        "from bullterrier_image._native import _core",
+        "bullterrier_image.errors",
+        LAYERS,
+    ),
 }
 
 
@@ -137,6 +162,8 @@ ALLOWED = {
     "core to ops": ("core/steps.py", "import bullterrier_image.ops.cells"),
     "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
     "ops to errors": ("ops/cells.py", "import bullterrier_image.errors"),
+    "ops to the Rust extension": ("ops/cells.py", "from bullterrier_image._native import _core"),
+    "an effect to the Rust extension": ("effects/vhs/effect.py", "from bullterrier_image._native import _core"),
 }
 
 
@@ -207,3 +234,32 @@ def test_the_recipe_namespace_is_reachable_from_a_fresh_import_of_the_package():
     )
     result = fresh_python(code)
     assert result.returncode == 0, result.stderr
+
+
+# --- the Rust extension and the Rust core ----------------------------------------------------------------------------
+
+
+def package_modules_loaded_by(module: str) -> list[str]:
+    """The modules of bullterrier_image a fresh interpreter has loaded after importing `module`, besides `module` and
+    the packages holding it."""
+    code = (
+        f"import json, sys\nimport {module}\n"
+        f"loaded = [m for m in sys.modules if m.startswith('bullterrier_image.') and not {module!r}.startswith(m)]\n"
+        "json.dump(sorted(loaded), sys.stdout)\n"
+    )
+    result = fresh_python(code)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize(
+    ("module", "leaf"),
+    [
+        pytest.param("bullterrier_image._native._core", True, id="the extension is a leaf"),
+        pytest.param("bullterrier_image.core.params", False, id="a module that imports others is not"),
+    ],
+)
+def test_the_rust_extension_imports_nothing_from_the_package(module, leaf):
+    """The import linter checks the extension's home (`_native`) but cannot read the compiled module in it: importing
+    the module shows that it loads nothing else of the package either."""
+    assert (package_modules_loaded_by(module) == []) == leaf

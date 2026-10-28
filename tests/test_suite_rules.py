@@ -17,7 +17,12 @@ import pytest
 TESTS = Path(__file__).parent
 
 # (file relative to tests/, the offending name) -> why it is allowed. Every entry needs a reason a reviewer accepts.
-ALLOWED: dict[tuple[str, str], str] = {}
+ALLOWED: dict[tuple[str, str], str] = {
+    ("effects/test_contract.py", "bullterrier_image._native"): (
+        "the contract test checks that every effect the Rust core implements is a registered effect; only the core "
+        "can say which it implements"
+    ),
+}
 
 _PATCHERS = ("monkeypatch.setattr", "monkeypatch.delattr", "monkeypatch.setitem", "monkeypatch.delitem")
 

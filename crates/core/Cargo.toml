@@ -1,0 +1,19 @@
+[package]
+name = "bullterrier-image-core"
+description = "The numeric core of bullterrier-image: its effects and the primitives they share, in pure Rust."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+name = "bullterrier_image_core"
+
+[dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
