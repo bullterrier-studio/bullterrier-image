@@ -458,14 +458,18 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `_native/_core.pyi`; cargo test (proptest for `ops`). The hidden-tunable scan, one config home and effect independence cover
   the Rust sources. Warnings are errors only in the gate, so a newer compiler never breaks a user's build. No
   `.cargo/config.toml` and no `target-cpu=native`: a wheel must run on every CPU of its platform.
-- **Wheels for five platforms, the sdist for the rest.** One abi3 wheel each for Linux x86_64 and aarch64
-  (manylinux2014, glibc 2.17, the oldest Rust supports), macOS arm64 and x86_64 and Windows x86_64, built by
-  maturin-action on GitHub's runners (Linux natively in the manylinux container of each architecture; macOS x86_64
-  cross-compiled). No musllinux wheel: onnxruntime publishes none, so the package could not install there anyway. No
-  Windows arm64 wheel yet: asked for by no one, and one more runner. Elsewhere pip builds the sdist, which needs Rust;
-  the sdist carries `rust-toolchain.toml`, so under rustup it builds with the compiler CI tests. Every wheel is
-  installed from the artifact alone and renders a picture on its own platform before anything is published.
-  *Reason:* a user should never need a compiler on a common platform, and nothing published goes untried.
+- **Platforms: wheels for five, the sdist for Windows on Arm, none for musl.** One abi3 wheel each (every Python
+  from 3.12) for Linux x86_64 and aarch64 with glibc 2.28 or newer (manylinux_2_28), macOS arm64 and x86_64, and
+  Windows x86_64, built by maturin-action on GitHub's runners (Linux natively in the manylinux container of each
+  architecture; macOS x86_64 cross-compiled). Windows on Arm installs from the sdist, which needs Rust (rustup; the
+  sdist carries `rust-toolchain.toml`, so it builds with the compiler CI tests). Not supported: musl Linux (Alpine)
+  and glibc older than 2.28. Every wheel is installed from the artifact alone, and the sdist built, on its own
+  platform, each rendering a picture and importing onnxruntime, before anything is published. *Reason:* onnxruntime,
+  a dependency, sets the floor: its wheels need glibc 2.28 (manylinux2014, glibc 2.17, would promise an install that
+  fails; it is also end-of-life), it publishes neither a musl wheel nor an sdist, and its newest releases have no
+  macOS x86_64 wheel, so on Intel Macs pip picks an older onnxruntime (1.23.2 when this was written). A Windows arm64
+  wheel waits for someone to ask. A user on a common platform never needs a compiler, and nothing published goes
+  untried.
 
 ## Effects
 

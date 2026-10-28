@@ -2,10 +2,8 @@
 # exactly these files), and prove each works when installed on its own, away from the checkout. Called by ci.yml once
 # every check passed; can also be started by hand (only release.yml publishes, and only what its own CI built).
 #
-# The sdist, and one abi3 wheel per platform (it serves every Python from 3.12): Linux x86_64 and aarch64 (manylinux2014,
-# glibc 2.17, the oldest the Rust toolchain supports), macOS arm64 and x86_64, Windows x86_64. No musllinux wheel
-# (onnxruntime publishes none) and no Windows arm64 wheel yet: there, and anywhere else, pip builds the sdist, which
-# needs Rust. No job here restores a build cache: what it builds may be published.
+# The sdist and one abi3 wheel per platform; which platforms, and why: docs/design-decisions.md, "Platforms". No job
+# here restores a build cache: what it builds may be published.
 name: Build
 
 on:
@@ -48,8 +46,8 @@ jobs:
         include:
           # Linux: in the manylinux container of the runner's own architecture (maturin-action's), so nothing is
           # cross-compiled; macOS x86_64 is cross-compiled on the arm64 runner
-          - { platform: linux-x86_64, runner: ubuntu-latest, target: x86_64, manylinux: "2014" }
-          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64, manylinux: "2014" }
+          - { platform: linux-x86_64, runner: ubuntu-latest, target: x86_64, manylinux: "2_28" }
+          - { platform: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64, manylinux: "2_28" }
           - { platform: macos-arm64, runner: macos-latest, target: aarch64 }
           - { platform: macos-x86_64, runner: macos-latest, target: x86_64 }
           - { platform: windows-x86_64, runner: windows-latest, target: x64 }
