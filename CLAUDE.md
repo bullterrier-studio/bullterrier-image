@@ -170,13 +170,16 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 ## Adding an effect
 
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
-defines the shape; `effects/grade/`, `effects/sharpen/` are worked examples.
+defines the shape; `grade` (`effects/grade/`, `crates/core/src/effects/grade.rs`) is the worked example. An effect that
+works from a map keeps a Python body until the core takes maps (`effects/relight/`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with one
-   example field), `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. It passes the gate as written.
-2. **Fill in:** replace the example field with the effect's own and the body with the effect (docstring's first sentence is its
-   summary); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the
-   example recipe, 1 to 3 steps at `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes
-   nothing else.
+   example field, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`Params`, `render`),
+   `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. After `uv sync` (it rebuilds the extension
+   with the kernel) it passes the gate as written.
+2. **Fill in:** replace the example field with the effect's own, in the model and in `Params`, and the kernel with the
+   effect (the Python docstring documents it; its first sentence is the summary); in the test file, the behaviour's
+   properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
+   `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.
 

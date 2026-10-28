@@ -1,0 +1,23 @@
+//! The Rust kernel of `$name`: <replace with what it does, in one line>.
+//! What it does is documented once, on the Python effect, whose body calls `render`:
+//! `src/bullterrier_image/effects/$name/effect.py`.
+
+use serde::Deserialize;
+
+use crate::{Image, Picture};
+
+/// The parameters of the effect, validated by its Python model, `${Name}Params`.
+/// The same fields, every one required, so a struct that drifts from the model fails its first call. Replace the
+/// example field with the effect's own.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Params {
+    amount: f32,
+}
+
+/// The picture mixed toward its negative by `amount`. Replace with the effect: pixel by pixel as here, or over the
+/// whole picture. Every number is a `Params` field, a trivial operand, or carries `// constant: <reason>`; what two
+/// effects share goes in `crate::ops`, never in another effect's file.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
+    picture.map(|pixel| pixel.map(|value| value * (1.0 - params.amount) + (1.0 - value) * params.amount))
+}

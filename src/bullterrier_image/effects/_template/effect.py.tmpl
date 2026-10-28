@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from bullterrier_image._native import _core
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 
@@ -15,7 +16,8 @@ class ${Name}Params(EffectParams):
     # bool, Literal[...], str and Color fields take no unit, min or max. Options of every library call are fields
     # too; constants are allowed only for standards (Rec. 709, sRGB...) and pure guards (an epsilon), each with a
     # `# constant: <citation or reason>` comment ending its statement or on the line above it (a test fails on any
-    # other number, and on any number given to a library call as an option).
+    # other number, and on any number given to a library call as an option). The kernel's `Params`
+    # (crates/core/src/effects/$name.rs) has the same fields, by name.
     amount: float = param(
         1.0,
         unit="fraction",
@@ -33,7 +35,10 @@ def $name(
     """Mix the picture toward its negative by `amount`. (Replace: this first sentence is the summary.)
 
     An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of the same
-    shape and range out, the same for the same values, the input never modified. To work from a map (the
-    subject's cut-out, the depth), add a `FieldName` parameter and a keyword-only argument of its name.
+    shape and range out, the same for the same values, the input never modified. The work is done by its
+    Rust kernel, which `uv sync` rebuilds after a change:
+    crates/core/src/effects/$name.rs.
+    The core takes no map yet: an effect that works from one (a `FieldName` parameter) keeps a Python body
+    for now.
     """
-    return (rgb * (1 - params.amount) + (1 - rgb) * params.amount).astype(np.float32)
+    return _core.apply("$name", rgb, params.model_dump())

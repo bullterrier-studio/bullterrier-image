@@ -355,6 +355,7 @@ def test_an_effects_files_are_found_by_its_name_in_the_layout_that_mirrors_the_p
     assert files.tests == checkout / "tests" / "effects" / "lamp" / "test_lamp.py"
     assert files.example == checkout / "examples" / "effects" / "lamp.toml"
     assert files.picture == checkout / "docs" / "gallery" / "lamp.jpg"
+    assert files.kernel == checkout / "crates" / "core" / "src" / "effects" / "lamp.rs"
 
 
 def test_every_row_of_the_real_pages_links_to_its_effects_own_picture_and_recipe():

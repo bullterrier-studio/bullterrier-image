@@ -37,9 +37,11 @@ means in practice.
 uv run poe new-effect my_effect --category light
 ```
 
-This writes the effect's package (`src/bullterrier_image/effects/my_effect/`), its tests, and its example recipe from the
-template, working as written. Replace the example parameter and the body with your effect, describe its properties in
-the tests, then `uv run poe gallery --only my_effect` renders its picture. Adding an effect edits no existing file; if
+This writes the effect's package (`src/bullterrier_image/effects/my_effect/`), its Rust kernel
+(`crates/core/src/effects/my_effect.rs`), its tests and its example recipe from the template; after `uv sync` rebuilds
+the extension, it works as written. Replace the example parameter (in the Python model and the kernel's `Params`) and
+the kernel's body with your effect, describe its properties in the tests, then `uv run poe gallery --only my_effect`
+renders its picture. Adding an effect edits no existing file; if
 `git status` shows anything else, something is wrong. Every value that shapes the result is a documented parameter
 (see "Parameters" in CLAUDE.md), and effects never import each other: shared code goes to `src/bullterrier_image/ops/`.
 

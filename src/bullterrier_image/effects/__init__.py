@@ -9,7 +9,8 @@ An effect's code is one folder of this package, named like the effect, holding c
 model and its function, registered with `@effect(category=..., params=...)` from `bullterrier_image.core.registry`; the
 only module of the folder that registers anything) and `__init__.py` (imports `effect.py`). Its tests, example recipe
 and gallery picture live outside the package under the same name (`tests/effects/<name>/`,
-`examples/effects/<name>.toml`, `docs/gallery/<name>.jpg`; see `bullterrier_image.gallery.effect_files`). `uv run poe
+`examples/effects/<name>.toml`, `docs/gallery/<name>.jpg`), and so does its Rust kernel once ported
+(`crates/core/src/effects/<name>.rs`); see `bullterrier_image.gallery.effect_files`. `uv run poe
 new-effect <name> --category <category>` writes all of them from the template in `_template/`. Nothing else needs
 editing: importing this package imports every folder whose name does not start with `_`, in sorted order. A folder that
 registers no effect, or another number, or an effect named otherwise or registered outside `effect.py`, a folder without

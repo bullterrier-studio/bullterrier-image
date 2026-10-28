@@ -2,12 +2,13 @@
 `docs/effects/`, `fx.pyi`) and the files of a new effect (`new_effect`, from the template).
 
 Everything about an effect is found by its name, in a layout that mirrors the package: its code in
-`src/bullterrier_image/effects/<name>/`, its tests in `tests/effects/<name>/`, its example recipe in `examples/effects/`
-and its gallery picture in `docs/gallery/`. `effect_files` is the one place that says so; everything else asks it.
-Effects carry their own documentation (category, docstring, signature), so nothing here is written by hand and no effect
-needs a shared file edited. The shared files (`docs/effects/`, `fx.pyi`) are regenerated deliberately, once, at
-integration (`poe regenerate`), not on every branch: that is what keeps parallel work free of merge conflicts. These are
-developer commands; they need a source checkout of bullterrier-image.
+`src/bullterrier_image/effects/<name>/`, its Rust kernel in `crates/core/src/effects/`, its tests in
+`tests/effects/<name>/`, its example recipe in `examples/effects/` and its gallery picture in `docs/gallery/`.
+`effect_files` is the one place that says so; everything else asks it. Effects carry their own documentation
+(category, docstring, signature), so nothing here is written by hand and no effect needs a shared file edited. The
+shared files (`docs/effects/`, `fx.pyi`) are regenerated deliberately, once, at integration (`poe regenerate`), not on
+every branch: that is what keeps parallel work free of merge conflicts. These are developer commands; they need a
+source checkout of bullterrier-image.
 """
 
 import ast
@@ -40,6 +41,14 @@ _FINDERS: dict[str, Callable[[np.ndarray], np.ndarray]] = {
     "depth": depth_map,
 }
 _INDEX = "README.md"  # the catalogue's index page: GitHub shows it when the folder is opened
+# the lowercase strict and reserved keywords of Rust (the Rust Reference, "Keywords", edition 2024): none can name a
+# module, so none can name an effect
+_RUST_KEYWORDS = frozenset({
+    "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate", "do", "dyn", "else",
+    "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in", "let", "loop", "macro", "match", "mod",
+    "move", "mut", "override", "priv", "pub", "ref", "return", "self", "static", "struct", "super", "trait", "true",
+    "try", "type", "typeof", "unsafe", "unsized", "use", "virtual", "where", "while", "yield",
+})  # fmt: skip
 
 
 def render_effects_pages() -> dict[str, str]:
@@ -63,6 +72,7 @@ class EffectFiles(NamedTuple):
     tests: Path  # tests/effects/<name>/test_<name>.py: its behaviour tests
     example: Path  # examples/effects/<name>.toml: the short recipe that shows it, rendered for its picture
     picture: Path  # docs/gallery/<name>.jpg: its gallery picture (JPEG, longest side 480 px), shown by the catalogue
+    kernel: Path  # crates/core/src/effects/<name>.rs: its Rust kernel, which its Python body calls (once ported)
 
 
 def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
@@ -72,6 +82,7 @@ def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
         tests=checkout / "tests" / "effects" / name / f"test_{name}.py",
         example=checkout / "examples" / "effects" / f"{name}.toml",
         picture=checkout / "docs" / "gallery" / f"{name}.jpg",
+        kernel=checkout / "crates" / "core" / "src" / "effects" / f"{name}.rs",
     )
 
 
@@ -146,21 +157,27 @@ def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
 def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
     """Write the files of a new effect called `name`, in `category` (one of `registry.CATEGORIES`), into `checkout`,
     each made from the template in `src/bullterrier_image/effects/_template/` and placed where `effect_files` says: its
-    package (`__init__.py`, and `effect.py` with a parameter model with one documented example field and a working
-    effect), its tests (`test_<name>.py`) and its example recipe. Returns the files written, sorted.
+    package (`__init__.py`, and `effect.py` with a parameter model with one documented example field and a body that
+    calls the core), its Rust kernel (`Params` with the same field, and `render`), its tests (`test_<name>.py`) and its
+    example recipe. Returns the files written, sorted.
 
-    The effect is registered whenever bullterrier_image is imported, and as written it passes the contract tests and its
-    own; replacing the example with the real effect is the author's part. Its gallery picture is rendered later, from
-    its example recipe, by `poe gallery --only <name>` (or at integration). Raises `ProjectError`, writing nothing, when
-    `name` is not a lowercase Python identifier (a letter, then letters, digits and _) or is a Python keyword, is a
-    name the template's `effect.py` already uses (its imports) or one `fx` defines for itself (so `fx.<name>` would not
-    be the effect), the category is unknown, an effect of that name exists or any of its files, or `checkout` holds no
-    template.
+    The effect is registered whenever bullterrier_image is imported; once the extension is rebuilt with its kernel
+    (`uv sync`, which a Rust file's change triggers), it passes the contract tests and its own as written. Replacing the
+    example with the real effect is the author's part. Its gallery picture is rendered later, from its example recipe,
+    by `poe gallery --only <name>` (or at integration). Raises `ProjectError`, writing nothing, when `name` is not a
+    lowercase Python identifier (a letter, then letters, digits and _) or is a Python or Rust keyword (the kernel is a
+    Rust module of that name), is a name the template's `effect.py` already uses (its imports) or one `fx` defines for
+    itself (so `fx.<name>` would not be the effect), the category is unknown, an effect of that name exists or any of
+    its files, or `checkout` holds no template.
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or keyword.iskeyword(name):
         raise ProjectError(
             f"{name!r} cannot name an effect: use lowercase letters, digits and _, starting with a letter, and no "
             f"Python keyword"
+        )
+    if name in _RUST_KEYWORDS:
+        raise ProjectError(
+            f"{name!r} cannot name an effect: it is a Rust keyword, and the effect's kernel is a Rust module"
         )
     if category not in registry.CATEGORIES:
         raise ProjectError(f"unknown category {category!r}; choose one of: {', '.join(registry.CATEGORIES)}")
@@ -185,6 +202,7 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
         "effect.py.tmpl": files.package / "effect.py",
         "test_effect.py.tmpl": files.tests,
         "example.toml.tmpl": files.example,
+        "kernel.rs.tmpl": files.kernel,
     }
     words = _words(name, category)
     for template, target in targets.items():

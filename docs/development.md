@@ -21,10 +21,12 @@ a `commit-msg` hook checks ([CLAUDE.md](../CLAUDE.md#git-conventions)). Contribu
 ## Adding an effect
 
 Adding an effect adds files named for it and edits none. `uv run poe new-effect my_effect --category light` writes, working
-as written: `src/bullterrier_image/effects/my_effect/effect.py` (+ `__init__.py`; parameter model and pure function
-`def my_effect(rgb, params) -> rgb` under `@effect(category="...", params=...)`, docstring = its documentation),
-`tests/effects/my_effect/test_my_effect.py`, `examples/effects/my_effect.toml` (example recipe, size 480, makes its picture
-`docs/gallery/my_effect.jpg` via `uv run poe gallery --only my_effect`). Effects never import each other: shared code goes
+as written once `uv sync` has rebuilt the extension: `src/bullterrier_image/effects/my_effect/effect.py` (+ `__init__.py`;
+parameter model and pure function `def my_effect(rgb, params) -> rgb` under `@effect(category="...", params=...)`,
+docstring = its documentation, body `_core.apply("my_effect", rgb, params.model_dump())`),
+`crates/core/src/effects/my_effect.rs` (the kernel: `Params` with the model's fields, `render`; the build script finds
+it), `tests/effects/my_effect/test_my_effect.py`, `examples/effects/my_effect.toml` (example recipe, size 480, makes
+its picture `docs/gallery/my_effect.jpg` via `uv run poe gallery --only my_effect`). Effects never import each other: shared code goes
 to `src/bullterrier_image/ops/`. Shared tests then check shape, range, determinism, no input mutation, category, docstring,
 defaults, example recipe, shared parameter names (`amount`, not `strength`).
 
