@@ -27,7 +27,10 @@ jobs:
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Install the locked dependencies
+      # rustup is on every runner; with no argument it installs the toolchain rust-toolchain.toml pins
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && cargo --version
+      - name: Install the locked dependencies (builds the Rust extension)
         run: uv sync --locked
       # ruff-format and ruff-check are the first two steps of the lint job; running them here too would do it twice
       - name: Commit hooks on every file

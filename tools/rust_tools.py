@@ -3,12 +3,14 @@
 Their versions are written once, in `[workspace.metadata.tools]` of Cargo.toml. `check` (in `poe check`, before the
 first of them runs) fails naming the install command when one is missing or at another version; `install` (in
 `poe setup`) installs what `check` would report, with cargo-binstall when it is installed (a download) and with
-`cargo install --locked` otherwise (a build from source).
+`cargo install --locked` otherwise (a build from source); `specs` prints the pins as `tool@version,...`, the line CI
+gives taiki-e/install-action (prebuilt, checksum-verified downloads).
 
 Interface:
     pinned(root)             -> tool name -> version, from root/Cargo.toml
     problems(pins)           -> one sentence per tool that is missing or at another version (empty when all are right)
-    main(argv)               -> exit code: 0 all right (or installed), 1 a problem `check` reports or a failed install
+    main(argv)               -> exit code: 0 all right (or installed, or printed), 1 a problem `check` reports or a
+                                failed install
 """
 
 import argparse
@@ -59,12 +61,16 @@ def problems(pins: dict[str, str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """`check` the tools against Cargo.toml, or `install` the ones that are missing or at another version."""
-    parser = argparse.ArgumentParser(description="Check or install the cargo tools the gate runs, at their versions.")
-    parser.add_argument("action", choices=["check", "install"])
+    """`check` the tools against Cargo.toml, `install` the ones that are missing or at another version, or print their
+    `specs`."""
+    parser = argparse.ArgumentParser(description="Check, install or list the cargo tools the gate runs.")
+    parser.add_argument("action", choices=["check", "install", "specs"])
     parser.add_argument("--root", type=Path, default=ROOT, help="the repository (default: this script's)")
     arguments = parser.parse_args(argv)
     pins = pinned(arguments.root)
+    if arguments.action == "specs":
+        print(",".join(f"{tool}@{version}" for tool, version in pins.items()))
+        return 0
     if arguments.action == "check":
         found = problems(pins)
         for problem in found:
