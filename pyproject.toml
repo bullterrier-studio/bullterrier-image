@@ -121,13 +121,13 @@ dev = [
 [tool.poe.tasks]
 # PYTHONWARNDEFAULTENCODING makes the interpreter, and every xdist worker it starts, report text IO without an
 # encoding (EncodingWarning), which `filterwarnings` below turns into a failure; an -X flag would not reach the workers
-test = { cmd = "pytest -q -n auto", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
+test = { cmd = "pytest -q -n auto -m 'not rebuild'", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
 # Not part of `check`: the suite on the oldest Python and the lowest release each direct dependency's floor allows, in a
 # throwaway environment (uv.lock and the project environment stay as they are; the first run downloads the old
 # releases). It is for CI. tests/tools/test_lint_and_type_gate.py is left out because mypy's verdict on our source
 # depends on numpy's own type annotations, which are not what this checks. No PYTHONWARNDEFAULTENCODING here: numpy 1.26
 # runs a text-mode subprocess when numpy.testing is imported, and the encoding of our own IO is `poe test`'s concern.
-check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto --ignore=tests/tools/test_lint_and_type_gate.py", help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
+check-min-deps = { cmd = "uv run --isolated --python 3.12 --resolution lowest-direct pytest -q -n auto -m 'not rebuild' --ignore=tests/tools/test_lint_and_type_gate.py", help = "Run the suite on Python 3.12 against the lowest allowed release of every dependency" }
 # Not part of `check`: it asks the PyPI vulnerability database about every locked package (runtime, extras and dev
 # tools, pinned by hash), so it needs the network and its verdict changes as advisories are published. For CI and
 # before a release; an advisory with no fixed release is ignored with `--ignore-vuln ID` and listed in SECURITY.md.
@@ -155,6 +155,10 @@ rust-test = { cmd = "cargo test --workspace --locked --quiet", help = "Run the R
 # vulture over src, plus a whitelist of the parameter fields only the Rust core reads (tools/vulture_whitelist.py)
 dead-code = { sequence = ["uv run python tools/vulture_whitelist.py dist/vulture/whitelist.py", "vulture src dist/vulture/whitelist.py"], default_item_type = "cmd", help = "Find dead code in src (vulture), the fields the Rust core reads excepted" }
 check = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-shear" }, { ref = "rust-deny" }, { ref = "build-check" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }], default_item_type = "cmd", help = "The full gate, Python and Rust (format, lint, workflows, dead code, docs, dependencies, distributions, types, tests); stops at the first failure" }
+# Not part of `check` (about 30 s, and a project environment of its own): `poe new-effect` end to end in a copy of the
+# tree, through `uv sync` and the new effect's own and contract tests (the `rebuild` test of tests/test_scaffold.py).
+# CI runs it on Linux.
+check-scaffold = { cmd = "pytest -q -n 0 -p no:randomly -m rebuild tests/test_scaffold.py", help = "Scaffold an effect in a copy of the tree, rebuild the extension, run its tests and the contract tests" }
 # Developer commands that need a source checkout (tools/dev.py); extra arguments go to the script, e.g. `poe gallery --only grain`.
 gallery = { cmd = "uv run python tools/dev.py gallery", help = "Render the missing gallery pictures and write the catalogue in docs/effects/ (--only NAME..., --force)" }
 regenerate = { cmd = "uv run python tools/dev.py regenerate", help = "After adding or changing effects: write fx.pyi and the catalogue in docs/effects/, render missing pictures" }
@@ -178,6 +182,9 @@ testpaths = ["tests"]
 # a misspelt marker or option is an error, not a silently ignored typo
 # with xdist (`-n`), tests marked `xdist_group` stay on one worker, so an expensive module fixture is built once
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "--dist=loadgroup"]
+markers = [
+    "rebuild: builds a project environment of its own around a rebuilt extension (about 30 s); `poe test` leaves it out, `poe check-scaffold` runs it",
+]
 # an xfail that starts passing fails the run, so the marker cannot outlive the bug it names
 xfail_strict = true
 # Every warning fails the test that raised it: a leaked file or process (ResourceWarning), a deprecated call, and, when

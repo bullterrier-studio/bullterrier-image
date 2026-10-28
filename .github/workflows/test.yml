@@ -55,3 +55,7 @@ jobs:
       # -ra lists every skipped or expected-failing test with its reason; --durations shows what makes the run slow
       - name: Tests (pytest; skips and the 10 slowest tests are listed)
         run: uv run --locked poe test -ra --durations=10
+      # `poe new-effect` end to end, with a project environment of its own (out of `poe test`): once, on Linux
+      - name: A scaffolded effect passes its tests after a rebuild (poe check-scaffold)
+        if: runner.os == 'Linux' && matrix.python == '3.12'
+        run: uv run --locked poe check-scaffold

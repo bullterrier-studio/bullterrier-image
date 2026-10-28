@@ -7,8 +7,8 @@ The scaffold always writes into the checkout it runs from, so these tests run it
 `gallery.new_effect(checkout=...)`, or as the command, in a fresh interpreter importing the copy. The last two prove
 rule 4 of CLAUDE.md on a copy of the whole tree: adding an effect creates files and changes none, and they pass the
 gates that need no new build of the extension (ruff; the core compiled with the kernel under clippy; the Rust rules).
-Running the new effect needs the extension rebuilt (`uv sync`), minutes on a CI runner, so its own tests and the
-contract tests run on it when its author runs `poe check`, not here.
+Running the new effect needs the extension rebuilt in an environment of the copy's own (`uv sync`, about 30 s): that
+test is marked `rebuild`, left out of `poe test` and run by `poe check-scaffold` (CI runs it on Linux).
 """
 
 import hashlib
@@ -225,8 +225,9 @@ def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_exi
 
 def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tmp_path, tracked_files):
     """Bounded on purpose, to keep the suite fast: in the copy, ruff on the new Python files; rustfmt, and clippy on the
-    core crate with the new kernel compiled in (the core alone builds in seconds, the extension would take minutes);
-    then the scans of the new files (no hidden tunables, no Rust effect referring to another), selected by name."""
+    core crate with the new kernel compiled in (the core alone builds in seconds; the rebuilt extension is the next
+    test's); then the scans of the new files (no hidden tunables, no Rust effect referring to another), selected by
+    name."""
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     created = _scaffold_into(copy)
     python = [path for path in created if path.endswith(".py")]
@@ -258,6 +259,33 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
         f"test_every_number_in_the_rust_core_is_a_parameter_or_a_cited_constant[effects/{PROBE}.rs]",
         f"test_no_rust_effect_refers_to_another[{PROBE}.rs]",
     } <= passed, done.stdout[-4000:]
+
+
+@pytest.mark.rebuild
+def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_extension_is_rebuilt(
+    tmp_path, tracked_files
+):
+    """What its author does, end to end: in a copy of the tree, scaffold PROBE, `uv sync` (a project environment of the
+    copy's own, with the extension rebuilt around the new kernel, from the caches only), then the probe's own tests
+    and the contract tests over it. A Python model and a Rust `Params` that disagree fail here."""
+    copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
+    _scaffold_into(copy)
+    outside = ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "PYTHONPATH")  # this environment's: the copy makes its own
+    environment = {name: value for name, value in os.environ.items() if name not in outside} | {
+        "UV_OFFLINE": "1",  # every release uv.lock pins is in uv's cache already
+        "CARGO_NET_OFFLINE": "true",  # and every crate in cargo's (CI runs `cargo fetch` first)
+    }
+    commands = [
+        ["uv", "sync", "--locked", "--quiet", "--python", sys.executable],
+        ["uv", "run", "--no-sync", "pytest", "-q", "-rA", "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly",
+         f"tests/effects/{PROBE}", "tests/effects/test_contract.py", "-k", PROBE],
+    ]  # fmt: skip
+    for command in commands:
+        done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
+        assert done.returncode == 0, f"{' '.join(command[:3])} failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
+    passed = [line for line in done.stdout.splitlines() if line.startswith("PASSED ")]
+    assert any(f"tests/effects/{PROBE}/test_{PROBE}.py::" in line for line in passed), done.stdout[-4000:]
+    assert any(line.startswith("PASSED tests/effects/test_contract.py::") for line in passed), done.stdout[-4000:]
 
 
 # --- the files a copy of the tree is made from ---------------------------------------------------------------------

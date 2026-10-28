@@ -175,7 +175,7 @@ works from a map keeps a Python body until the core takes maps (`effects/relight
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with one
    example field, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`Params`, `render`),
    `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. After `uv sync` (it rebuilds the extension
-   with the kernel) it passes the gate as written.
+   with the kernel) it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
 2. **Fill in:** replace the example field with the effect's own, in the model and in `Params`, and the kernel with the
    effect (the Python docstring documents it; its first sentence is the summary); in the test file, the behaviour's
    properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at

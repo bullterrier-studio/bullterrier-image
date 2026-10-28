@@ -7,6 +7,7 @@ uv sync                # builds the Rust extension too; uv rebuilds it when a Ru
 uv run poe setup       # once per clone: the git hooks, the commit-message template, the pinned cargo tools
 uv run poe check       # before every push or merge: every gate, Python and Rust
 uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
+uv run poe check-scaffold   # for CI: a scaffolded effect, after `uv sync` in a copy, passes its tests (about 30 s)
 uv run poe fix         # applies the automatic lint and format fixes
 uv run poe new-effect my_effect --category light   # a new effect's files, from the template
 uv run bt-image render examples/photos/bullterrier.jpeg examples/effects/my_effect.toml   # look at it, in out/
