@@ -161,7 +161,7 @@ def logo_corner(photo, **settings):
     """The photo with the logo laid by a `blend` step, drawn for 480 px and rendered at the photo's 128 px, and the
     rows and columns the logo changed."""
     step = fx.blend(image=Picture(logo_pixels()), **settings)
-    out = render(photo, Recipe("logo", size=480, steps=[step]), size=128)
+    out = render(photo, Recipe(name="logo", size=480, steps=[step]), size=128)
     return out, *np.nonzero(np.any(out != photo, axis=2))
 
 
@@ -176,7 +176,7 @@ def test_the_logo_preset_puts_an_opaque_picture_a_fifth_of_the_photos_width_in_t
 @pytest.mark.parametrize("size", [480, 1024], ids=["size 480", "size 1024"])
 def test_the_logo_preset_keeps_the_same_margin_relative_to_the_frame_whatever_the_recipes_size(photo, size):
     step = fx.blend(image=Picture(logo_pixels()), preset="overlay")
-    out = render(photo, Recipe("logo", size=size, steps=[step]))
+    out = render(photo, Recipe(name="logo", size=size, steps=[step]))
     _, columns = np.nonzero(np.all(np.isclose(out, (0, 0, 1), atol=0.01), axis=2))  # the logo's blue half
     margin = out.shape[1] - 1 - columns.max()
     assert abs(margin / size - 12 / 480) <= 1.5 / size  # the preset's 12 px of a 480 px frame

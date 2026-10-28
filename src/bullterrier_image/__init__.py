@@ -3,11 +3,11 @@
     from bullterrier_image import Recipe, fx, render, imageio
 
     photo = imageio.load("dog.jpg")
-    look = Recipe("neon", size=1024, steps=[
+    look = Recipe([
         fx.gradient_map(stops=["#12002b", "#ff2bd6", "#00f0ff"]),
         fx.gradient(colors=["#000000"], mask="background"),
         fx.bloom(radius=12.2),
-    ])
+    ], name="neon", size=1024)
     imageio.save(render(photo, look), "dog-neon.jpg")
 
     from bullterrier_image import trace                       # what did each step do?

@@ -63,7 +63,7 @@ def test_every_fields_example_needs_no_map_and_renders_to_something_other_than_t
     assert recipe.maps_needed == frozenset()  # made from a gradient or the picture's own light: no model, no cut-out
     out = render(photo, recipe)
     assert max(out.shape[:2]) == recipe.size
-    assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
+    assert not np.array_equal(out, render(photo, Recipe([Step("grade")], name="plain", size=recipe.size)))
 
 
 def a_disc_in_every_view(view: np.ndarray) -> np.ndarray:
@@ -82,7 +82,7 @@ def test_every_regions_example_declares_regions_and_renders_to_something_other_t
         photo, recipe, maps={"subject": subject}, finders={"subject": Finder("stand-in", a_disc_in_every_view)}
     )
     assert max(out.shape[:2]) == recipe.size
-    assert not np.array_equal(out, render(photo, Recipe("plain", [Step("grade")], size=recipe.size)))
+    assert not np.array_equal(out, render(photo, Recipe([Step("grade")], name="plain", size=recipe.size)))
 
 
 def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, subject):

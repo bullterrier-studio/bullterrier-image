@@ -159,9 +159,11 @@ def test_a_gradient_needs_at_least_one_colour() -> None:
 def test_the_fill_preset_is_a_flat_black_picture_that_ignores_the_input() -> None:
     """Preset `fill` keeps the old `fill` effect findable: black by default, any one colour with `colors`."""
     photo = np.random.default_rng(0).random((20, 30, 3), dtype=np.float32)
-    black = render_recipe(photo, Recipe("t", [Step("gradient", preset="fill")], size=None))
+    black = render_recipe(photo, Recipe([Step("gradient", preset="fill")], name="t", size=None))
     np.testing.assert_array_equal(black, np.zeros((20, 30, 3), np.float32))
-    green = render_recipe(photo, Recipe("t", [Step("gradient", {"colors": ["#00ff00"]}, preset="fill")], size=None))
+    green = render_recipe(
+        photo, Recipe([Step("gradient", {"colors": ["#00ff00"]}, preset="fill")], name="t", size=None)
+    )
     np.testing.assert_array_equal(green, np.broadcast_to(np.array(GREEN, np.float32), (20, 30, 3)))
 
 
@@ -169,7 +171,7 @@ def test_the_fill_preset_masked_to_the_background_blacks_out_only_the_background
     photo = np.random.default_rng(1).random((20, 30, 3), dtype=np.float32) * 0.5 + 0.25
     subject = np.zeros((20, 30), np.float32)
     subject[:, 15:] = 1
-    recipe = Recipe("t", [Step("gradient", preset="fill", mask="background")], size=None)
+    recipe = Recipe([Step("gradient", preset="fill", mask="background")], name="t", size=None)
     out = render_recipe(photo, recipe, maps={"subject": subject})
     np.testing.assert_array_equal(out[:, 15:], photo[:, 15:])
     np.testing.assert_array_equal(out[:, :15], np.zeros((20, 15, 3), np.float32))

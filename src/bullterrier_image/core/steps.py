@@ -1,5 +1,5 @@
 """The data model of a look: a `Step` (one effect, its parameters, and how it is laid over the picture below it: a
-mask, an opacity and a blend mode), an `Each` (a look for each piece of a partition) and a `Recipe` (a named, ordered
+mask, an opacity and a blend mode), an `Each` (a look for each piece of a partition) and a `Recipe` (an ordered
 tuple of steps with the regions they name, an output size and a `Framing`).
 
 Promises:
@@ -428,40 +428,51 @@ def _short(value: object) -> str:
     return text if len(text) <= 18 else text[:15] + "..."
 
 
-# A recipe name becomes a file name and recipes are shared as data, so it holds nothing that could leave the output
-# folder or hide a file (CWE-22), on any operating system.
+# The file name a recipe's name gives holds nothing that could leave the output folder or hide a file (CWE-22), on any
+# operating system.
 _NAME_CHARACTERS = "A-Za-z0-9._-"
 _NAME_LENGTH = 64
-_NAME_PATTERN = rf"^[A-Za-z0-9][{_NAME_CHARACTERS}]{{0,{_NAME_LENGTH - 1}}}$"
 # Windows keeps these names for devices, in any case and whatever the extension: such a file cannot be made there.
 _WINDOWS_DEVICES = frozenset(
     {"CON", "PRN", "AUX", "NUL", *(f"COM{digit}" for digit in range(1, 10)), *(f"LPT{digit}" for digit in range(1, 10))}
 )
 
 
-def _a_device(name: str) -> bool:
-    return name.split(".", 1)[0].upper() in _WINDOWS_DEVICES
-
-
 def safe_name(text: str) -> str:
-    """`text` (e.g. a file name without its extension) made into a valid recipe name, or "" when none is left.
+    """`text` (a recipe's name, a file name without its extension) made into a safe file name, or "" when none is left.
 
-    Every run of characters a name may not hold becomes one `-`, repeated `-` collapse into one, anything before the
-    first letter or digit is dropped, the result is cut to 64 characters and a trailing `-` or `.` is trimmed: "my
-    look" gives "my-look". "" when nothing remains or the result is a name Windows reserves for a device ("con")."""
+    Every run of characters other than letters, digits, `.`, `_` and `-` becomes one `-`, repeated `-` collapse into
+    one, anything before the first letter or digit is dropped, the result is cut to 64 characters and a trailing `-` or
+    `.` is trimmed: "my look" gives "my-look". "" when nothing remains or the result is a name Windows reserves for a
+    device ("con")."""
     name = re.sub(r"-{2,}", "-", re.sub(rf"[^{_NAME_CHARACTERS}]+", "-", text))
     name = re.sub(r"^[^A-Za-z0-9]+", "", name)[:_NAME_LENGTH].rstrip("-.")
-    return "" if not name or _a_device(name) else name
+    return "" if not name or name.split(".", 1)[0].upper() in _WINDOWS_DEVICES else name
+
+
+def file_name(recipe: "Recipe") -> str:
+    """The name the files of `recipe` are given: its `name` made safe (`safe_name`). RecipeError naming the fix when
+    the recipe has no name or its name leaves no safe file name."""
+    if recipe.name is None:
+        raise RecipeError('a recipe needs a name to name its files: give one, Recipe(steps, name="my-look")')
+    stem = safe_name(recipe.name)
+    if not stem:
+        raise RecipeError(
+            f"recipe {recipe.name!r}: its name leaves no file name (letters, digits, . _ - and not a device name "
+            'Windows keeps, such as "con"): give another, name="my-look"'
+        )
+    return stem
 
 
 class Recipe(ValidatedModel):
-    """A named look: ordered steps, how the photo is framed before them and the size it is scaled to.
+    """A look: ordered steps, how the photo is framed before them and the size it is scaled to, and optionally a name
+    and a description.
 
-    name: used for output file names, so it must be a safe one: 1 to 64 letters, digits, `.`, `_` or `-`, starting with
-        a letter or digit (no folders, no hidden files), and not a device name Windows reserves (CON, PRN, AUX, NUL,
-        COM1-9, LPT1-9, in any case, with or without an extension); anything else is a RecipeError. `safe_name` makes
-        a valid one from any text.
-    steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple).
+    steps: at least one `Step` or `Each`, run in order (a list is accepted and kept as a tuple). The only argument
+        given by position; the rest are keywords.
+    name: free text naming the look, or None. Whoever writes files for it (the command line, a project) makes a safe
+        file name of it.
+    description: what the look looks like, in a sentence, or None.
     regions: the regions the steps can name besides the built-in `subject`, `background`, `depth` and `light`: a name
         for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`,
         `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked here, and
@@ -475,11 +486,9 @@ class Recipe(ValidatedModel):
         corners, the subject) after the last, so the render has an alpha channel.
     """
 
-    name: str = Field(
-        pattern=_NAME_PATTERN,
-        description="Used for output file names: 1 to 64 of A-Z a-z 0-9 . _ -, starting with a letter or digit.",
-    )
     steps: tuple[Step | Each, ...] = Field(description="The steps, run in order, each on the previous one's output.")
+    name: str | None = Field(None, description="What the look is called, free text; None: unnamed.")
+    description: str | None = Field(None, description="What the look looks like, in a sentence; None: undescribed.")
     regions: dict[str, Kind] = Field(
         default_factory=dict,
         description="The regions the steps name, by name, besides the built-in 'subject', 'background', 'depth' and "
@@ -498,8 +507,10 @@ class Recipe(ValidatedModel):
 
     def __init__(
         self,
-        name: str,
         steps: Sequence[Step | Each],
+        *,
+        name: str | None = None,
+        description: str | None = None,
         size: int | None = None,
         frame: Framing | None = None,
         regions: Mapping[str, Kind] | None = None,
@@ -510,19 +521,15 @@ class Recipe(ValidatedModel):
         by name; every region a step names must be among them or built in, and of the kind its key takes."""
         given = {} if frame is None else {"frame": frame}
         self._init_checked(
-            "", name=name, steps=tuple(steps), size=size, regions=dict(regions or {}), **given, **unknown
+            "",
+            steps=tuple(steps),
+            name=name,
+            description=description,
+            size=size,
+            regions=dict(regions or {}),
+            **given,
+            **unknown,
         )
-
-    @field_validator("name")
-    @classmethod
-    def _not_a_device(cls, name: str) -> str:
-        """After the pattern: a name Windows keeps for a device is refused too, on every system."""
-        if _a_device(name):
-            raise RecipeError(
-                f"{name!r} is reserved: Windows keeps CON, PRN, AUX, NUL, COM1-9 and LPT1-9 (with any extension) for "
-                "devices; choose another name"
-            )
-        return name
 
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":
@@ -639,7 +646,7 @@ class Recipe(ValidatedModel):
                 raise RecipeError(
                     f"{', '.join(repr(address) for address in blamed or where[target].values())}: {error}"
                 ) from None
-        return Recipe(self.name, steps, self.size, frame, regions)
+        return Recipe(steps, name=self.name, description=self.description, size=self.size, frame=frame, regions=regions)
 
     def _heads(self) -> list[str]:
         """What each step's address starts with, in order: its name, else its effect (`each` for an `Each`) when it is

@@ -691,14 +691,14 @@ def _driven_and_plain(name: str, field: str, levels: int, photo: np.ndarray):
     a function that makes the plain recipe at one value; the maps the effect takes are made as for the other tests."""
     least, greatest = _range(name, field)
     driven = Recipe(
-        "driven",
         [Step(name, {field: Drive(by="f", start=least, end=greatest, levels=levels)})],
+        name="driven",
         size=None,
         regions={"f": Given()},
     )
 
     def plain(value: float) -> Recipe:
-        return Recipe("plain", [Step(name, {field: value})], size=None)
+        return Recipe([Step(name, {field: value})], name="plain", size=None)
 
     return driven, plain, _inputs(name, photo)
 
@@ -796,15 +796,15 @@ def test_a_drive_of_a_cyclic_angle_may_run_past_the_turn_each_level_being_the_pl
 ):
     least, _ = _range(name, field)
     driven = Recipe(
-        "driven",
         [Step(name, {field: Drive(by="f", start=least, end=least + 720, levels=5)})],
+        name="driven",
         size=None,
         regions={"f": Given()},
     )
     maps = _inputs(name, photo)
     for level, written in enumerate([least, least + 180, least + 360, least + 540, least + 720]):
         got = runner.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
-        plain = Recipe("plain", [Step(name, {field: written})], size=None)
+        plain = Recipe([Step(name, {field: written})], name="plain", size=None)
         np.testing.assert_allclose(got, runner.render(photo, plain, maps=maps), atol=1e-6, rtol=0)
 
 
@@ -857,7 +857,7 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
     name, field_probe, photo, subject
 ):
     maps = field_maps(photo, subject)
-    recipe = Recipe("named", [Step("field_probe", {"field": name})], size=None, regions=FIELD_REGIONS)
+    recipe = Recipe([Step("field_probe", {"field": name})], name="named", size=None, regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
     direct = registry.apply("field_probe", photo, field=the_field(name, photo, maps))
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
@@ -873,7 +873,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name
     name, field, selection, photo, subject, apply_as_rendered
 ):
     maps = field_maps(photo, subject)
-    recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
+    recipe = Recipe([Step(name, {field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
     direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     assert_a_picture_like(named, photo)
@@ -885,7 +885,7 @@ def test_some_effects_have_a_field_parameter():
 
 
 def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(field_probe, photo, subject):
-    recipe = Recipe("small", [Step("field_probe", {"field": "g"})], size=48, regions=FIELD_REGIONS)
+    recipe = Recipe([Step("field_probe", {"field": "g"})], name="small", size=48, regions=FIELD_REGIONS)
     assert runner.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
 
 
@@ -900,7 +900,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_
     name, field, selection, photo, subject, apply_as_rendered
 ):
     maps = field_maps(photo, subject)
-    recipe = Recipe("named", [Step(name, {field: selection})], size=max(photo.shape[:2]), regions=FIELD_REGIONS)
+    recipe = Recipe([Step(name, {field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS)
     named = runner.render(photo, recipe, maps=maps)
     direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
@@ -927,7 +927,7 @@ def test_the_runner_builds_only_the_fields_a_step_names(step_params, asked, fiel
 
         return Finder(f"{map_name} stand-in", find)
 
-    recipe = Recipe("only", [Step("field_probe", step_params)], size=None, regions=FIELD_REGIONS)
+    recipe = Recipe([Step("field_probe", step_params)], name="only", size=None, regions=FIELD_REGIONS)
     runner.render(photo, recipe, finders={"depth": stand_in("depth"), "subject": stand_in("subject")})
     assert calls == asked
 
@@ -946,13 +946,13 @@ def test_a_field_that_is_no_selection_fails_when_the_recipe_is_made_naming_effec
     step_params, regions, parts, field_probe
 ):
     with pytest.raises(RecipeError) as raised:
-        Recipe("bad", [Step("field_probe", step_params)], size=None, regions=regions)
+        Recipe([Step("field_probe", step_params)], name="bad", size=None, regions=regions)
     for part in parts:
         assert part in str(raised.value)
 
 
 def test_a_field_parameter_is_not_a_number_of_the_recipe_and_cannot_be_driven(field_probe):
-    recipe = Recipe("plain", [Step("field_probe", {"field": "light", "gain": 2.0})], size=None)
+    recipe = Recipe([Step("field_probe", {"field": "light", "gain": 2.0})], name="plain", size=None)
     assert "field_probe.field" not in recipe.parameters()
     assert "field_probe.gain" in recipe.parameters()
     with pytest.raises(RecipeError, match="field"):
@@ -965,8 +965,8 @@ def test_a_field_and_a_drive_on_another_parameter_equal_the_mix_of_two_renders_a
 ):
     maps = field_maps(photo, subject)
     recipe = Recipe(
-        "both",
         [Step("field_probe", {"field": "depth", "gain": Drive(by=by, start=0.5, end=2.0, levels=2)})],
+        name="both",
         size=None,
         regions={"g": Given()},
     )
@@ -987,7 +987,7 @@ def test_a_field_and_a_drive_on_another_parameter_equal_the_mix_of_two_renders_a
     ids=["depth", "subject", "a given map"],
 )
 def test_a_field_whose_map_nobody_gave_is_a_map_not_found_error_naming_the_map(name, error, naming, field_probe, photo):
-    recipe = Recipe("lost", [Step("field_probe", {"field": name})], size=None, regions=FIELD_REGIONS)
+    recipe = Recipe([Step("field_probe", {"field": name})], name="lost", size=None, regions=FIELD_REGIONS)
     with pytest.raises(error, match=naming):
         runner.render(photo, recipe)
 
@@ -1004,8 +1004,8 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
 def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
     maps = field_maps(photo, subject)
     recipe = Recipe(
-        "pieces",
         [Each("halves", [Step("field_probe", {"field": "g"}), "none"], feather=0)],
+        name="pieces",
         size=None,
         regions={"halves": Grid(columns=2), "g": Given()},
     )
@@ -1306,8 +1306,8 @@ def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dic
     """For the sizes 480 and 960: the picture at that size and the effect `name` at its defaults applied to it. The
     picture is the same photo scaled the same way (a step with no opacity leaves it be)."""
     step = Step(name, partition="subject") if "partition" in registry.inputs(name) else Step(name)
-    untouched = Recipe("untouched", [Step("grade", opacity=0)])
-    look = Recipe(name, [step])
+    untouched = Recipe([Step("grade", opacity=0)], name="untouched")
+    look = Recipe([step], name=name)
     return {
         size: (
             runner.render(picture, untouched, maps=maps, size=size),

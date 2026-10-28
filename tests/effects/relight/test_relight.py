@@ -181,8 +181,8 @@ def test_saturation_0_is_the_relief_alone_so_the_picture_does_not_show(photo: np
 def test_a_grey_relief_from_a_grazing_light_spans_black_to_white(photo: np.ndarray) -> None:
     """The emboss look: the picture's brightness as the field, no colour, a low light."""
     recipe = Recipe(
-        "emboss",
         [Step(NAME, {"field": "light", "saturation": 0, "elevation": 5, "height": 20, "blur": 0})],
+        name="emboss",
         size=max(photo.shape[:2]),
     )
     out = runner.render(photo, recipe)
@@ -196,7 +196,7 @@ def test_the_light_field_lights_the_pictures_own_brightness_as_a_relief() -> Non
     (0.001 x 500 px = a slope of 1/2)."""
     x = np.arange(480, dtype=np.float64)
     picture = np.broadcast_to((0.2 + 0.001 * x)[None, :, None], (12, 480, 3)).astype(np.float32)
-    recipe = Recipe("lit", [Step(NAME, {"field": "light", "angle": 180, "height": 500, "blur": 0})])
+    recipe = Recipe([Step(NAME, {"field": "light", "angle": 180, "height": 500, "blur": 0})], name="lit")
     out = runner.render(picture, recipe)
     gain = hand_gain(0.5, 0, 180, 45)
     np.testing.assert_allclose(out[:, 2:-2], picture[:, 2:-2] * gain, atol=2e-4)

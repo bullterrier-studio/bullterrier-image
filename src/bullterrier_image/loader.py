@@ -4,7 +4,7 @@ Promises: every error is a `RecipeError` that starts with the file's name, then 
 (a TOML syntax error keeps its line and column); nothing is read except that one file. The format (UTF-8 TOML):
 
     format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
-    name = "green-terminal"        # optional (default: the file name, made safe): letters, digits, . _ -
+    name = "green terminal"        # optional, free text (default: the file name without `.toml`)
     description = "Green text."    # optional, one sentence; a built-in look must have one (see "Looks" below)
     size = 1024                    # optional: longest side in px of the result; absent = the photo's own. The
                                    # recipe's px values are always written for 480, whatever the size
@@ -136,7 +136,7 @@ from .core.regions import (
     Svg,
 )
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
-from .core.steps import Each, Recipe, Step, safe_name
+from .core.steps import Each, Recipe, Step
 
 __all__ = ["load_recipe", "with_files"]
 
@@ -250,22 +250,15 @@ def _read(path: Path) -> dict:
 def load_recipe(path: str | Path) -> Recipe:
     """Read a recipe file, or a built-in look by name, and return the validated `Recipe`.
 
-    path: a TOML file in the format above, or a `str` that is exactly the name of a built-in look ("crt"). A `name` the
-    file sets is used as written (and refused if it is not a safe file name); without one the recipe is named after
-    the file, made safe (see `steps.safe_name`: "my look.toml" gives "my-look"), and a file name that leaves nothing
-    usable ("日本.toml", "con.toml") is refused, asking for a `name`.
+    path: a TOML file in the format above, or a `str` that is exactly the name of a built-in look ("crt"). The recipe
+    takes the file's `name`, else the file's name without `.toml` ("my look.toml" gives "my look"), and its
+    `description`.
     Raises RecipeError (a ValueError; an unknown effect is an UnknownEffectError) for anything invalid, starting with
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
     shipped = looks.read()
     path = shipped[path].file if isinstance(path, str) and path in shipped else Path(path)
     raw = _read(path)
-    recipe_name = raw["name"] if "name" in raw else safe_name(path.stem)
-    if not recipe_name:
-        raise RecipeError(
-            f'{path.name}: the file name gives no usable recipe name: add name = "..." (letters, digits, . _ -) or '
-            "rename the file"
-        )
     table = raw.get("frame", {})
     if not isinstance(table, dict):
         raise RecipeError(
@@ -304,7 +297,14 @@ def load_recipe(path: str | Path) -> Recipe:
         except (RecipeError, ImageReadError, LutError) as error:
             raise _located(error, where) from None
     try:
-        return Recipe(recipe_name, tuple(steps), raw.get("size"), frame, regions)
+        return Recipe(
+            steps,
+            name=raw.get("name", path.stem),
+            description=raw.get("description"),
+            size=raw.get("size"),
+            frame=frame,
+            regions=regions,
+        )
     except RecipeError as error:
         raise _located(error, path.name) from None
 

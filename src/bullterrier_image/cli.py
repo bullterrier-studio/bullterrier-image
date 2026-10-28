@@ -357,12 +357,13 @@ def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[
 
 def _render(args: argparse.Namespace) -> int:
     from . import imageio
+    from .core.steps import file_name
 
     recipes, results = _render_all(args)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for recipe, image in zip(recipes, results, strict=True):
-        target = out / f"{Path(args.photo).stem}__{recipe.name}.{args.format}"
+        target = out / f"{Path(args.photo).stem}__{file_name(recipe)}.{args.format}"
         imageio.save(image, target)
         print(target)
     return 0
@@ -370,12 +371,14 @@ def _render(args: argparse.Namespace) -> int:
 
 def _sheet(args: argparse.Namespace) -> int:
     from . import imageio
+    from .core.steps import file_name
     from .sheet import contact_sheet
 
     recipes, results = _render_all(args)
     target = Path(args.out)
     target.parent.mkdir(parents=True, exist_ok=True)
-    imageio.save(contact_sheet([(r.name, img) for r, img in zip(recipes, results, strict=True)], args.columns), target)
+    tiles = [(file_name(r), img) for r, img in zip(recipes, results, strict=True)]  # labelled as `render` names files
+    imageio.save(contact_sheet(tiles, args.columns), target)
     print(target)
     return 0
 
@@ -455,11 +458,12 @@ def _run(args: argparse.Namespace) -> int:
 
 def _steps(args: argparse.Namespace) -> int:
     from . import imageio
+    from .core.steps import file_name
     from .recipe import load_recipe, trace
     from .sheet import write_stages
 
     recipe = load_recipe(args.recipe)
-    folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{recipe.name}"
+    folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{file_name(recipe)}"
     maps, finders = _maps(args)
     stages = trace(imageio.load(args.photo), recipe, maps=maps, finders=finders)
     for stage in stages:

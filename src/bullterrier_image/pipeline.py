@@ -57,6 +57,7 @@ from .core.outlines import svg_bytes
 from .core.params import Lut, Picture, describe_error
 from .core.regions import FOUND_MAPS, Svg
 from .core.runner import Finder, find_map, known_maps
+from .core.steps import file_name
 from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
 from .ops.maps import map_problem
 from .ops.resample import resize
@@ -238,8 +239,9 @@ def run(
     Pairs whose photo, recipe, export settings and the tool's own code are unchanged since the last run, and whose
     files still exist, are skipped unless `force`. `only` is a file-name pattern selecting some of the photos.
     `dry_run` reports what would be done and writes nothing. Recipes are validated first, so a typo fails at once
-    (RecipeError); two recipes with one name, an `only` that matches no photo, or a recipe that cuts the picture out
-    (a framing with `transparent`) exported to jpg, raise ProjectError.
+    (RecipeError, as for a recipe without a name or whose name leaves no file name: its files are called by its name
+    made safe, `safe_name`); two recipes whose names give one file name, an `only` that matches no photo, or a recipe
+    that cuts the picture out (a framing with `transparent`) exported to jpg, raise ProjectError.
     `finders` has a `Finder` by map name, finding that map of a photo for the recipes that need it. The `subject` one,
     when none is given, is `bullterrier_image.finding.subject.subject_finder()` (the segmenter the environment chooses,
     else Apple Vision on macOS and the portable model elsewhere) and the `depth` one
@@ -257,11 +259,14 @@ def run(
     naming the recipe and the map), and a finder named for no map of the recipes is a ProjectError too.
     The record (`manifest.json`) is updated after every pair, so an interrupted run keeps what it finished.
     """
-    recipes = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
-    names = [recipe.name for _, recipe in recipes]
+    loaded = [(r, r if isinstance(r, Recipe) else load_recipe(r)) for r in project.recipes]
+    recipes = [(path, recipe, file_name(recipe)) for path, recipe in loaded]  # each with the name of its files
+    names = [name for _, _, name in recipes]
     if len(set(names)) != len(names):
-        raise ProjectError(f"two recipes are called the same: {sorted({n for n in names if names.count(n) > 1})}")
-    for _, recipe in recipes:
+        raise ProjectError(
+            f"two recipes are called the same (as file names): {sorted({n for n in names if names.count(n) > 1})}"
+        )
+    for _, recipe, _ in recipes:
         if recipe.frame.has_alpha and "jpg" in project.formats:
             raise ProjectError(
                 f"recipe {recipe.name!r} cuts the picture out (transparent = {recipe.frame.transparent!r}), which a "
@@ -284,7 +289,7 @@ def run(
     code = _fingerprint(_source_digest(Path(__file__).parent), _library_versions())
     # the finder of each map a recipe needs: each default is built only then, so a setting nobody uses cannot stop the
     # project
-    finders = _finders_of(dict(finders or {}), [recipe for _, recipe in recipes])
+    finders = _finders_of(dict(finders or {}), [recipe for _, recipe, _ in recipes])
     # What a remembered map depends on besides the photo: which map it is (one finder may find both), its finder's
     # identity, the finding code (the subject's edge clean-up is part of what is remembered) and the libraries.
     finding_code = _source_digest(Path(finding.__file__).parent)
@@ -296,8 +301,8 @@ def run(
     for photo in photos:
         photo_hash = hashlib.sha256(photo.read_bytes()).hexdigest()
         state = _Photo(photo, photo_hash, project, finders, found_by)
-        for path, recipe in recipes:
-            label = f"[{len(items) + 1}/{total}] {photo.name} x {recipe.name}"
+        for path, recipe, name in recipes:
+            label = f"[{len(items) + 1}/{total}] {photo.name} x {name}"
             recipe_text = repr(path) if isinstance(path, Recipe) else path.read_text(encoding="utf-8")
             # a recipe that uses a map is redone when another finder would find it, and only then; one that uses a
             # picture is redone when that picture's pixels (or an svg file's bytes) change, whether the recipe is a
@@ -315,7 +320,7 @@ def run(
                 *(key for name, key in found_by.items() if uses[name]),
             )
             fingerprint = _fingerprint(*parts)
-            old = previous.get((photo.name, recipe.name))
+            old = previous.get((photo.name, name))
             if (
                 not force
                 and old
@@ -326,18 +331,18 @@ def run(
                 items.append(replace(old, status="skipped", seconds=0.0))
                 log(f"{label}: up to date")
             elif dry_run:
-                items.append(Item(photo.name, recipe.name, "would-run", fingerprint=fingerprint))
+                items.append(Item(photo.name, name, "would-run", fingerprint=fingerprint))
                 log(f"{label}: would run")
             else:
                 started = time.perf_counter()
                 try:
-                    item = _process(project, state, recipe, fingerprint)
+                    item = _process(project, state, recipe, name, fingerprint)
                 # one bad photo or recipe must not stop the batch: whatever a photo, a recipe, the finder or
                 # the disk can raise fails this pair (a photo too large for memory included); a bug still stops it
                 except (BullterrierImageError, OSError, ValueError, RuntimeError, MemoryError) as error:
                     item = Item(
                         photo.name,
-                        recipe.name,
+                        name,
                         "failed",
                         error=f"{type(error).__name__}: {error}",
                         fingerprint=fingerprint,
@@ -512,7 +517,8 @@ def _write_text(target: Path, text: str) -> None:
     _write_atomically(target, text.encode("utf-8", "surrogateescape"))
 
 
-def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) -> Item:
+def _process(project: Project, photo: _Photo, recipe: Recipe, stem: str, fingerprint: str) -> Item:
+    """`recipe`, whose files are called `stem`, run on `photo` and exported: what happened, as an `Item`."""
     warnings: list[str] = []
     maps = {name: photo.map(name) for name in sorted(recipe.maps_needed)}
     if "subject" in maps:
@@ -525,17 +531,15 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, fingerprint: str) 
     # style (a trace ends in the render)
     image = stages[-1].image if stages else render(photo.rgb(), recipe, maps=maps, finders=pieces)
     warnings += still_warnings(image)  # check
-    outputs = _export_still(project, image, recipe.name, folder)  # export
+    outputs = _export_still(project, image, stem, folder)  # export
     sheet = None
     if stages:
-        sheet = write_stages(stages, _inside(project.output, folder / "steps" / recipe.name), project.quality)
+        sheet = write_stages(stages, _inside(project.output, folder / "steps" / stem), project.quality)
         outputs.append(sheet)
     # relative and with `/` on every system: they are the report's links (a `\` breaks an href) and the record's paths
     relative = tuple(Path(o).relative_to(project.output).as_posix() for o in outputs)
     sheet_path = sheet.relative_to(project.output).as_posix() if sheet else None
-    return Item(
-        photo.path.name, recipe.name, "done", relative, tuple(warnings), steps=sheet_path, fingerprint=fingerprint
-    )
+    return Item(photo.path.name, stem, "done", relative, tuple(warnings), steps=sheet_path, fingerprint=fingerprint)
 
 
 def _inside(output: Path, target: Path) -> Path:

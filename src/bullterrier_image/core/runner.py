@@ -280,9 +280,10 @@ def _checked(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
 
 def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
     """The error for the map `name` that `recipe` needs and neither it nor a finder was given for."""
+    who = "the recipe" if recipe.name is None else f"recipe {recipe.name!r}"
     if name == "subject":
         return SubjectNotFoundError(
-            f"recipe {recipe.name!r} uses the subject (a mask, a field or a region made from it), so "
+            f"{who} uses the subject (a mask, a field or a region made from it), so "
             "it needs the subject: pass `maps={'subject': alpha}` (the subject's alpha) "
             "or `finders={'subject': Finder}` (e.g. bullterrier_image.finding.subject.subject_finder())"
         )
@@ -294,12 +295,12 @@ def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
             if "depth" in maps_used(recipe.regions, [region])
         ]
         return DepthNotFoundError(
-            f"recipe {recipe.name!r} needs depth for {', '.join(regions)}: pass `maps={{'depth': depth}}` "
+            f"{who} needs depth for {', '.join(regions)}: pass `maps={{'depth': depth}}` "
             "(float32 (h, w), 0..1, 1 = nearest, e.g. from bullterrier_image.imageio.load_map) or "
             "`finders={'depth': Finder}`"
         )
     return MapNotFoundError(
-        f'recipe {recipe.name!r} uses the map {name!r} (a region with `kind = "given"`), so it needs it: pass '
+        f'{who} uses the map {name!r} (a region with `kind = "given"`), so it needs it: pass '
         f"`maps={{{name!r}: values}}` (float32 (h, w), 0..1, the photo's size) or `finders={{{name!r}: Finder}}`"
     )
 

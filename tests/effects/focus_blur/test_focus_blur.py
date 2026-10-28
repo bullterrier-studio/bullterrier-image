@@ -145,8 +145,8 @@ def test_a_linear_gradient_makes_a_sharp_band_across_the_picture(noise: np.ndarr
     """The gradient at 90 degrees is 0 at the top and 1 at the bottom, row r at (r + 0.5) / 100; a band 0.3 wide
     around 0.5 holds the rows from 35 to 64, the closest rows beyond it are blurred."""
     across = recipe.Recipe(
-        "band",
         [recipe.Step(NAME, {"field": "across", "focus": 0.5, "width": 0.3, "feather": 0.2, "radius": 6})],
+        name="band",
         size=None,
         regions={"across": recipe.LinearGradient(angle=90)},
     )
@@ -161,8 +161,8 @@ def test_a_band_along_a_tilted_gradient_keeps_its_own_line_sharp() -> None:
     its range on the line row + column = 119, and the pixels on that line are untouched, those far from it are not."""
     noise = np.random.default_rng(6).random((120, 120, 3), dtype=np.float32)
     tilted = recipe.Recipe(
-        "tilted",
         [recipe.Step(NAME, {"field": "across", "focus": 0.5, "width": 0.1, "feather": 0.2, "radius": 5})],
+        name="tilted",
         size=None,
         regions={"across": recipe.LinearGradient(angle=45)},
     )
@@ -181,11 +181,11 @@ def test_a_driven_grade_adds_colour_only_where_the_picture_is_blurred() -> None:
     boost and the rows in it have none."""
     flat = np.tile(np.array([0.8, 0.4, 0.2], np.float32), (HEIGHT, WIDTH, 1))
     miniature = recipe.Recipe(
-        "miniature",
         [
             recipe.Step(NAME, {"field": "across", "focus": 0.0, "width": 0.1, "feather": 0.2, "radius": 3}),
             recipe.Step("grade", {"saturation": recipe.Drive(by="sharp", start=1.5, end=1.0)}),
         ],
+        name="miniature",
         size=None,
         regions={
             "across": recipe.LinearGradient(angle=90),

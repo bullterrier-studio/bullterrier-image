@@ -120,7 +120,7 @@ def test_a_recipe_reads_the_cube_relative_to_its_own_folder_whatever_the_working
 def test_fx_takes_the_path_of_a_cube_file(photo, tmp_path, monkeypatch):
     write_cube(tmp_path / "negative.cube", negative)
     monkeypatch.chdir(tmp_path)
-    out = recipe.render(photo, recipe.Recipe("look", [fx.lut(file="negative.cube", amount=0.5)], size=128))
+    out = recipe.render(photo, recipe.Recipe([fx.lut(file="negative.cube", amount=0.5)], name="look", size=128))
     np.testing.assert_allclose(out, 0.5 * photo + 0.5 * (1 - photo), atol=1e-5)
 
 

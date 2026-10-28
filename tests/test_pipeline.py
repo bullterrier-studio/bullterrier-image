@@ -12,7 +12,7 @@ from PIL import Image
 from bullterrier_image import Each, Finder, Grid, Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.errors import BackendUnavailableError, ProjectError, SubjectNotFoundError
+from bullterrier_image.errors import BackendUnavailableError, ProjectError, RecipeError, SubjectNotFoundError
 from bullterrier_image.finding.subject import subject_finder
 from bullterrier_image.pipeline import init_project, load_project, run
 
@@ -229,7 +229,7 @@ def test_changing_an_svg_file_a_recipe_reads_redoes_that_recipe_and_nothing_else
 )
 def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe, layer):
     def project_with(image: Picture) -> Project:
-        recipe = Recipe("layered", [layer(image)], size=64, regions={"panes": Grid(columns=2)})
+        recipe = Recipe([layer(image)], name="layered", size=64, regions={"panes": Grid(columns=2)})
         return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out")
 
     dark = Picture(np.full((4, 4, 3), 0.25, np.float32), "tex")
@@ -273,6 +273,33 @@ def test_two_recipes_with_the_same_name_are_refused(folder):
     write_recipe(folder, "warm", 'effect = "grain"', file="again")
     with pytest.raises(ProjectError, match="same"):
         run(load_project(folder / "bt-image.toml"))
+
+
+def code_project(folder: Path, *recipes: Recipe) -> Project:
+    return Project(photos=(folder / "photos" / "a.png",), recipes=recipes, output=folder / "out")
+
+
+def test_a_recipe_name_gives_its_files_a_safe_name(folder):
+    run(code_project(folder, Recipe([fx.grade(exposure=0.2)], name="my warm look!", size=64)))
+    assert [p.name for p in (folder / "out" / "a").glob("*.*")] == ["my-warm-look.jpg"]
+
+
+@pytest.mark.parametrize(
+    ("names", "error", "complaint"),
+    [
+        pytest.param([None], RecipeError, r"name=", id="a recipe without a name"),
+        pytest.param(["日本"], RecipeError, r"'日本'.*name=", id="a name with no character a file name may hold"),
+        pytest.param(["con"], RecipeError, r"'con'", id="a name Windows keeps for a device"),
+        pytest.param(["my look", "my-look"], ProjectError, "same", id="two names that give one file name"),
+    ],
+)
+def test_a_recipe_whose_name_gives_no_file_name_of_its_own_is_refused_before_anything_runs(
+    folder, names, error, complaint
+):
+    recipes = [Recipe([fx.grade(exposure=0.2)], name=name, size=64) for name in names]
+    with pytest.raises(error, match=complaint):
+        run(code_project(folder, *recipes))
+    assert not (folder / "out").exists()
 
 
 def disc_matte(shape=(96, 128), radius=30):
@@ -786,7 +813,7 @@ def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, 
 
 
 def circle_project(folder, **settings) -> Project:
-    recipe = Recipe("round", [fx.grade(exposure=0.3)], size=64, frame=Framing(transparent="circle"))
+    recipe = Recipe([fx.grade(exposure=0.3)], name="round", size=64, frame=Framing(transparent="circle"))
     return Project(photos=(folder / "photos" / "a.png",), recipes=(recipe,), output=folder / "out", **settings)
 
 

@@ -275,7 +275,7 @@ def count_glints(size: int, seed: int) -> int:
     block = np.zeros((size, size, 3), np.float32)
     block[size // 3 : 2 * size // 3, size // 3 : 2 * size // 3] = 0.9
     glitter = fx.starburst(preset="sparkle", spacing=70.0, seed=seed, threshold=0.5, variation=0.0)
-    lit = (render(block, Recipe("glints", steps=[glitter]), size=size) - block).max(axis=-1)
+    lit = (render(block, Recipe(name="glints", steps=[glitter]), size=size) - block).max(axis=-1)
     return int(ndimage.label(lit > 0.02)[1])
 
 
@@ -297,7 +297,7 @@ def square_light(size: int) -> float:
     picture[middle : middle + side, middle : middle + side] = 0.52
     # a faint highlight and a low amount keep the light far from white, where screening stops being proportional
     glow = fx.starburst(rays=4, length=30.0, width=3.0, threshold=0.5, amount=0.1)
-    out = render(picture, Recipe("square", steps=[glow]), size=size)
+    out = render(picture, Recipe(name="square", steps=[glow]), size=size)
     return float((out - picture).sum() / (size / 480) ** 2)
 
 
@@ -340,7 +340,7 @@ def test_a_call_with_size_ratio_equals_the_recipe_rendered_at_that_ratio(spacing
     picture = np.zeros((960, 960, 3), np.float32)
     picture[300:660, 300:660] = 0.9
     step = fx.starburst(length=15.0, width=1.0, threshold=0.5, spacing=design_spacing, seed=3, variation=0.3)
-    by_recipe = render(picture, Recipe("two", steps=[step]), size=960)
+    by_recipe = render(picture, Recipe(name="two", steps=[step]), size=960)
     by_call = registry.apply(
         NAME, picture, length=30.0, width=2.0, threshold=0.5, spacing=spacing, seed=3, variation=0.3, size_ratio=2.0
     )

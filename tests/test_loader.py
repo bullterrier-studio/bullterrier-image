@@ -47,30 +47,14 @@ def test_a_file_that_is_not_utf8_names_the_file(tmp_path):
         load_recipe(path)
 
 
-# Without `name`, a recipe is named after its file: every run of characters a name may not hold becomes one `-`, and the
-# ends are trimmed so that the name starts with a letter or digit (expected values worked out by hand).
-@pytest.mark.parametrize(
-    ("file", "name"),
-    [
-        ("my look.toml", "my-look"),
-        ("  --Holiday  (2024)!!.toml", "Holiday-2024"),
-        ("v1.2 final.toml", "v1.2-final"),
-        ("rock - roll.toml", "rock-roll"),  # the `-` already there joins the two replaced spaces: one `-`
-        ("café au lait.toml", "caf-au-lait"),
-        ("_draft_.toml", "draft_"),
-        ("plain.toml", "plain"),
-        ("a" * 63 + " b.toml", "a" * 63),  # cut to 64 characters, then the dangling `-` trimmed
-        ("b" * 80 + ".toml", "b" * 64),
-    ],
-)
-def test_a_recipe_without_a_name_is_named_after_its_file_made_safe(tmp_path, file, name):
-    assert load_recipe(_write(tmp_path, STEP, file)).name == name
+@pytest.mark.parametrize("file", ["my look.toml", "日本.toml", "con.toml", "_draft_.toml"])
+def test_a_recipe_without_a_name_is_named_after_its_file_as_it_is(tmp_path, file):
+    assert load_recipe(_write(tmp_path, STEP, file)).name == file.removesuffix(".toml")
 
 
-@pytest.mark.parametrize("file", ["日本.toml", "---.toml", "con.toml", "LPT1 .toml"])
-def test_a_file_name_that_leaves_no_usable_name_asks_for_a_name_or_a_new_file_name(tmp_path, file):
-    with pytest.raises(RecipeError, match=rf"^{re.escape(file)}: .*name = .*rename"):
-        load_recipe(_write(tmp_path, STEP, file))
+def test_a_recipe_keeps_the_description_its_file_gives_and_has_none_without_one(tmp_path):
+    assert load_recipe(_write(tmp_path, 'description = "Warmer."\n' + STEP)).description == "Warmer."
+    assert load_recipe(_write(tmp_path, STEP)).description is None
 
 
 def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
@@ -106,7 +90,7 @@ GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'gradient'\ncolors = 
 def test_a_given_region_loads_in_format_3_as_the_recipe_written_in_python(tmp_path):
     loaded = load_recipe(_write(tmp_path, "format = 3\nname = 'g'\nsize = 64\n" + GIVEN))
     assert loaded == Recipe(
-        "g", [Step("gradient", {"colors": ["#000000"]}, mask="star")], size=64, regions={"star": Given()}
+        [Step("gradient", {"colors": ["#000000"]}, mask="star")], name="g", size=64, regions={"star": Given()}
     )
     assert loaded.maps_needed == frozenset({"star"})
 
@@ -332,7 +316,7 @@ opacity = 0.9
 """
 
 REGIONS_RECIPE = Recipe(
-    "look",
+    name="look",
     size=64,
     regions={
         "panes": Grid(columns=[0.2, 0.17, 0.63], rows=2),
@@ -403,7 +387,7 @@ mask = "near"
 
 def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
     written = Recipe(
-        "look",
+        name="look",
         size=None,
         regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
@@ -464,7 +448,7 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
     (tmp_path / "recipes").mkdir()
     loaded = load_recipe(_write(tmp_path / "recipes", SHAPES_FILE))
     written = Recipe(
-        "look",
+        name="look",
         size=64,
         regions={
             "halves": Cuts(
@@ -516,7 +500,7 @@ threshold = 0.6
 
 def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_in_python(tmp_path):
     written = Recipe(
-        "look",
+        name="look",
         size=None,
         regions={"near": Band(of="depth", low=0.5)},
         steps=[

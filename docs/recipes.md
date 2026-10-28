@@ -175,9 +175,7 @@ Python:
 from bullterrier_image import Each, Recipe, Shards, fx
 
 glass = Recipe(
-    "glass",
-    regions={"glass": Shards(preset="glass", fit="subject")},
-    steps=[
+    [
         Each(
             "glass",
             [fx.halftone(cell=8), "none", fx.gradient_map(preset="cyanotype")],
@@ -187,6 +185,8 @@ glass = Recipe(
         ),
         fx.seams(partition="glass", width=1),
     ],
+    name="glass",
+    regions={"glass": Shards(preset="glass", fit="subject")},
 )
 ```
 

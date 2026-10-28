@@ -268,7 +268,9 @@ def test_a_size_that_is_not_whole_pixels_is_rounded_and_the_last_dots_are_cut_sh
 def test_the_default_cell_stays_one_dot_per_pixel_when_the_render_is_larger_than_the_recipe() -> None:
     """A cell of 0 is not scaled up with the render size: a recipe of size 32 rendered at 128 still recolours pixels."""
     picture = np.random.default_rng(6).random((128, 128, 3), dtype=np.float32)
-    out = render(picture, Recipe("t", size=32, steps=[fx.dither(palette="cube3", space="rgb", pattern=0.0)]), size=128)
+    out = render(
+        picture, Recipe(name="t", size=32, steps=[fx.dither(palette="cube3", space="rgb", pattern=0.0)]), size=128
+    )
     np.testing.assert_allclose(out.reshape(-1, 3), closest(picture.reshape(-1, 3), cube(3), rgb_distance), atol=1e-6)
 
 
@@ -364,7 +366,7 @@ def test_a_hue_only_palette_dithers_a_grey_into_all_of_its_colours() -> None:
 
 def with_preset(photo: np.ndarray, *steps) -> np.ndarray:
     """The photo through the given steps as one recipe, at its own size."""
-    return render(photo, Recipe("t", size=None, steps=list(steps)))
+    return render(photo, Recipe(name="t", size=None, steps=list(steps)))
 
 
 CUBES = range(2, 7)

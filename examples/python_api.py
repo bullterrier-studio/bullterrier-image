@@ -17,9 +17,7 @@ PHOTO = HERE / "photos" / "bullterrier.jpeg"
 # A look is a list of steps. Each step is checked the moment you write it: try misspelling a parameter,
 # e.g. fx.rgb_split(amnt=8), and Python tells you at once what the valid ones are.
 TOXIC_NEON = Recipe(
-    "toxic-neon",
-    size=1024,
-    steps=[
+    [
         fx.sharpen(radius=18.75, amount=0.6),
         fx.gradient_map(stops=["#021a0b", "#00ff88", "#d8ffe8"]),
         fx.gradient(colors=["#000000"], mask="background"),  # only the background; the subject is found automatically
@@ -27,6 +25,8 @@ TOXIC_NEON = Recipe(
         fx.rgb_split(angle=0, amount=3.75, edge="wrap"),
         fx.bloom(radius=11.25, amount=0.7, threshold=0.55, octaves=1, opacity=0.9),  # mixed in at 90%
     ],
+    name="toxic-neon",
+    size=1024,
 )
 
 

@@ -131,7 +131,7 @@ def test_constant_value_is_the_highlight_assumed_beyond_the_edge() -> None:
 
 
 def with_preset(preset: str, picture: np.ndarray, **values: float) -> np.ndarray:
-    return render(picture, Recipe("preset", steps=[fx.bloom(preset=preset, **values)]))
+    return render(picture, Recipe(name="preset", steps=[fx.bloom(preset=preset, **values)]))
 
 
 # What each preset is, as a light: the sigma of its one Gaussian and its strength per channel on a white spot

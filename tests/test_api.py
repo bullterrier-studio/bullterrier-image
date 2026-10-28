@@ -59,7 +59,7 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
 
 def test_a_recipe_is_framed_with_a_framing_from_the_public_names():
     framing = bullterrier_image.Framing(aspect=1.0, transparent="circle")
-    assert bullterrier_image.Recipe("look", [fx.grade()], frame=framing).frame is framing
+    assert bullterrier_image.Recipe([fx.grade()], name="look", frame=framing).frame is framing
     assert bullterrier_image.recipe.Framing is bullterrier_image.Framing
 
 
@@ -120,8 +120,8 @@ def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
 
 def test_a_recipe_built_in_code_is_checked_too():
     with pytest.raises(ValueError, match="at least one step"):
-        Recipe("empty", [])
-    assert Recipe("ok", [fx.grain()]).steps == (fx.grain(),)  # a list is fine; it becomes a tuple
+        Recipe([], name="empty")
+    assert Recipe([fx.grain()], name="ok").steps == (fx.grain(),)  # a list is fine; it becomes a tuple
 
 
 @pytest.mark.parametrize(
@@ -154,9 +154,9 @@ def test_fx_refuses_a_bad_step_key_naming_it_and_the_value(keys, complaint):
 
 def test_fx_takes_a_region_name_as_mask_and_the_recipe_that_holds_the_step_declares_it():
     step = fx.gradient(colors=["#ff0000"], mask="glass")
-    assert Recipe("r", [step], regions={"glass": Pick(of="panes"), "panes": Grid()}).steps == (step,)
+    assert Recipe([step], name="r", regions={"glass": Pick(of="panes"), "panes": Grid()}).steps == (step,)
     with pytest.raises(RecipeError, match=r"step 1: `mask` names 'glass'.*subject, background.*declares no regions"):
-        Recipe("r", [step])  # fx declares no regions: by itself it knows the built-in ones only
+        Recipe([step], name="r")  # fx declares no regions: by itself it knows the built-in ones only
 
 
 def test_the_fx_signature_offers_partition_only_to_an_effect_that_takes_it(partition_probe):
@@ -430,7 +430,7 @@ def test_a_step_is_written_with_the_same_keys_in_a_recipe_file_and_in_fx(tmp_pat
 
 
 def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
-    look = Recipe("t", size=None, steps=[fx.grade(exposure=0.5), fx.slice_shift(seed=1), fx.grain(seed=2)])
+    look = Recipe(name="t", size=None, steps=[fx.grade(exposure=0.5), fx.slice_shift(seed=1), fx.grain(seed=2)])
     stages = trace(photo, look)
     assert [s.label.split("(")[0] for s in stages] == ["input", "1. grade", "2. slice_shift", "3. grain"]
     np.testing.assert_array_equal(stages[0].image, photo)
@@ -444,7 +444,7 @@ def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject
         fx.gradient(colors=["#102030"], mask="background"),
         fx.bloom(opacity=0.7, blend_mode="screen"),
     ]
-    look = Recipe("t", size=64, steps=steps)
+    look = Recipe(name="t", size=64, steps=steps)
     np.testing.assert_array_equal(
         trace(photo, look, maps={"subject": subject})[-1].image, render(photo, look, maps={"subject": subject})
     )
@@ -453,12 +453,12 @@ def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, subject):
     stages = trace(
         photo,
-        Recipe("t", size=None, steps=[fx.gradient(colors=["#000000"], mask="background")]),
+        Recipe(name="t", size=None, steps=[fx.gradient(colors=["#000000"], mask="background")]),
         maps={"subject": subject},
     )
     assert [s.label.split(" (")[0] for s in stages][:2] == ["input", "subject matte"]
     np.testing.assert_allclose(stages[1].image[..., 0], subject)  # white where the subject is
-    assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe("t", [fx.grain()], size=None)))
+    assert "subject matte" not in " ".join(s.label for s in trace(photo, Recipe([fx.grain()], name="t", size=None)))
 
 
 # --- Python recipes and per-step output in the pipeline ---------------------------------------------------------
@@ -473,17 +473,17 @@ def make_project(tmp_path, photo, recipes, **options):
 
 
 def test_the_pipeline_runs_recipes_defined_in_code_and_notices_when_they_change(tmp_path, photo):
-    a = Recipe("a", size=64, steps=[fx.grain(seed=1)])
+    a = Recipe(name="a", size=64, steps=[fx.grain(seed=1)])
     project = make_project(tmp_path, photo, [a])
     assert [i.status for i in run(project)] == ["done"]
     assert (tmp_path / "out" / "one" / "a.jpg").is_file()
     assert [i.status for i in run(project)] == ["skipped"]
-    changed = Recipe("a", size=64, steps=[fx.grain(seed=2)])
+    changed = Recipe(name="a", size=64, steps=[fx.grain(seed=2)])
     assert [i.status for i in run(make_project(tmp_path, photo, [changed]))] == ["done"]
 
 
 def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_report(tmp_path, photo):
-    look = Recipe("look", size=64, steps=[fx.grade(exposure=0.4), fx.slice_shift(seed=1)])
+    look = Recipe(name="look", size=64, steps=[fx.grade(exposure=0.4), fx.slice_shift(seed=1)])
     project = make_project(tmp_path, photo, [look], steps=True)
     (item,) = run(project)
     folder = tmp_path / "out" / "one" / "steps" / "look"
@@ -505,7 +505,7 @@ def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_rep
 
 
 def test_turning_steps_on_redoes_finished_work_so_the_pictures_exist(tmp_path, photo):
-    look = Recipe("look", size=64, steps=[fx.grain(seed=1)])
+    look = Recipe(name="look", size=64, steps=[fx.grain(seed=1)])
     assert [i.status for i in run(make_project(tmp_path, photo, [look]))] == ["done"]
     assert [i.status for i in run(make_project(tmp_path, photo, [look], steps=True))] == ["done"]
 

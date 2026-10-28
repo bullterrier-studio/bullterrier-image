@@ -166,7 +166,7 @@ def test_bands_come_on_top_of_the_tear_and_leave_the_rows_outside_them_as_the_te
 
 
 def test_the_glitch_preset_is_a_few_bands_not_a_tear(photo) -> None:
-    out = render(photo, Recipe("t", [fx.slice_shift(preset="glitch")], size=None))
+    out = render(photo, Recipe([fx.slice_shift(preset="glitch")], name="t", size=None))
     assert 0 < len(changed_rows(out, photo)) <= 0.5 * photo.shape[0]
 
 

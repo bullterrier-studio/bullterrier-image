@@ -128,7 +128,7 @@ def test_the_output_never_leaves_0_to_1_not_even_by_rounding(
 
 
 def _negative(picture: np.ndarray) -> np.ndarray:
-    return render(picture, Recipe("negative", [fx.levels(preset="invert")], size=None))
+    return render(picture, Recipe([fx.levels(preset="invert")], name="negative", size=None))
 
 
 def test_the_invert_preset_makes_every_channel_value_v_one_minus_v(photo: np.ndarray) -> None:

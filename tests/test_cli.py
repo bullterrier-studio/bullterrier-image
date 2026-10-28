@@ -267,6 +267,37 @@ def test_render_writes_one_file_per_recipe_in_a_folder_and_prints_each_to_stdout
     assert capsys.readouterr().out.splitlines() == [str(Path("out") / f"me__{n}.png") for n in "ab"]
 
 
+# A recipe's files are named after its name: every run of characters a file name may not hold becomes one `-`, and the
+# ends are trimmed so that the name starts with a letter or digit (expected values worked out by hand).
+@pytest.mark.parametrize(
+    ("name", "file"),
+    [
+        ("my look", "my-look"),
+        ("  --Holiday  (2024)!!", "Holiday-2024"),
+        ("v1.2 final", "v1.2-final"),
+        ("rock - roll", "rock-roll"),  # the `-` already there joins the two replaced spaces: one `-`
+        ("café au lait", "caf-au-lait"),
+        ("_draft_", "draft_"),
+        ("plain", "plain"),
+        ("a" * 63 + " b", "a" * 63),  # cut to 64 characters, then the dangling `-` trimmed
+        ("b" * 80, "b" * 64),
+        *(("CONSOLE", "CONSOLE"), ("com10", "com10"), ("my.con", "my.con")),  # only resembling a device name
+    ],
+)
+def test_render_names_each_file_after_its_recipes_name_made_safe(files, name, file):
+    (files / "r.toml").write_text(f'name = "{name}"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8")
+    assert cli("render me.png r.toml -o out") == 0
+    assert [p.name for p in (files / "out").iterdir()] == [f"me__{file}.png"]
+
+
+# Windows reserves these device names in any case, with or without an extension: a file so named cannot be made there.
+@pytest.mark.parametrize("name", ["日本", "---", "con", "LPT1 ", "Prn", "nul.tar.gz", "COM9"])
+def test_render_refuses_a_recipe_whose_name_leaves_no_file_name_saying_how_to_name_it(files, capsys, name):
+    (files / "r.toml").write_text(f'name = "{name}"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8")
+    assert cli("render me.png r.toml -o out") == 1
+    assert "name=" in capsys.readouterr().err
+
+
 def test_sheet_combines_recipes_into_one_image(files):
     assert cli("sheet me.png recipes -o s.png") == 0
     with Image.open(files / "s.png") as sheet:
@@ -281,7 +312,7 @@ def test_sweep_puts_the_recipe_at_each_value_of_a_parameter_side_by_side(files, 
     photo = imageio.load(files / "me.png")  # as the command reads it
     values = (0, 0.05, 0.1, 0.15, 0.2)
     expected = contact_sheet(
-        [(f"amount={v}", render(photo, Recipe("a", [Step("grain", {"amount": v})], size=64))) for v in values],
+        [(f"amount={v}", render(photo, Recipe([Step("grain", {"amount": v})], name="a", size=64))) for v in values],
         columns=2,
     )
     imageio.save(expected, files / "expected.png")
@@ -296,7 +327,7 @@ def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that
     photo = imageio.load(cut / "me.png")
     tiles = []
     for angle in (-90, 0, 90):
-        look = Recipe("masked", [Step("rgb_split", {"angle": angle, "amount": 6}, mask="subject")], size=128)
+        look = Recipe([Step("rgb_split", {"angle": angle, "amount": 6}, mask="subject")], name="masked", size=128)
         tiles.append((f"angle={angle}", render(photo, look, maps={"subject": imageio.load_map(cut / "matte.png")})))
     imageio.save(contact_sheet(tiles), cut / "expected.png")
     np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))

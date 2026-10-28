@@ -148,7 +148,8 @@ def test_the_pivot_is_the_brightness_the_compression_leaves_where_it_is(grey, co
 def test_the_shadows_highlights_preset_lifts_dark_areas_and_lowers_bright_ones() -> None:
     """Far from their edge, a dark half (0.05) comes out brighter and a bright half (0.9) darker."""
     out = render(
-        two_blocks(0.05, 0.9, (16, 128)), Recipe("look", size=128, steps=[fx.tone_map(preset="shadows_highlights")])
+        two_blocks(0.05, 0.9, (16, 128)),
+        Recipe(name="look", size=128, steps=[fx.tone_map(preset="shadows_highlights")]),
     )
     assert out[8, 5, 0] > 0.05 * 1.3
     assert out[8, 122, 0] < 0.9 * 0.95
