@@ -33,6 +33,16 @@ or of a parameter without an annotation; a literal passed by position (`np.pad(x
 a subscript string such as `np.einsum("ij,jk", a, b)`); and a boolean or None option (`replace=False`, `keepdims=True`),
 which cannot be told from plumbing. Array axes (`axis=`, `axes=`) and `dtype=` are plumbing, not options. The options
 of our own functions are not scanned (`blend(a, b, mode="mean")`): their bodies are.
+
+The Rust core's effects and ops (`crates/core/src/effects/*.rs`, `crates/core/src/ops/**/*.rs`) keep the same rule,
+read as text (comments and strings left out). A Rust effect gets every parameter from its `Params`, which has no
+defaults, so a numeric literal fails unless it is
+- a trivial value (as above), except as the whole value bound to a name (`let weight = 0.5;`, `const W: f32 = 0.5;`),
+- the integer 3, the colour channels, as an array length, a const generic or a range's end (`[f32; 3]`,
+  `as_chunks::<3>()`, `0..3`), or
+- marked `// constant: <reason of at least three words>`: a trailing marker covers its line, a marker on a line of its
+  own the lines of the next statement (up to the first line ending in `;`, `{` or `}`).
+Test modules (from the first `#[cfg(test)]` on) are not scanned: their numbers are test data.
 """
 
 import ast
@@ -48,6 +58,8 @@ import bullterrier_image
 
 PACKAGE = Path(bullterrier_image.__file__).parent
 SCANNED = sorted([*(PACKAGE / "effects").glob("*/effect.py"), *(PACKAGE / "ops").glob("*.py")])
+CORE = PACKAGE.parents[1] / "crates" / "core" / "src"  # the Rust core, in the checkout the package is imported from
+RUST_SCANNED = sorted([*(CORE / "effects").glob("*.rs"), *(CORE / "ops").rglob("*.rs")])
 TRIVIAL = {0, 1, 2, 0.5, 255}
 CHANNELS = 3
 MARKER = re.compile(r"#\s*constant:(.*)")
@@ -494,3 +506,143 @@ NOT_OPTIONS = {  # module body: nothing to report
 @pytest.mark.parametrize("body", NOT_OPTIONS.values(), ids=NOT_OPTIONS.keys())
 def test_the_option_check_passes_constants_axes_switches_parameters_and_calls_of_our_own(body):
     assert library_options(HEADER + body) == []
+
+
+# --- the Rust core ---------------------------------------------------------------------------------------------------
+
+# a number not inside a name and not a tuple field (`pixel.0`), with its type suffix (`2.0_f32`, `255u8`)
+RUST_NUMBER = re.compile(
+    r"(?<![\w])(?<!(?<!\.)\.)(0x[0-9a-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?)"
+    r"(?:_?(?:f32|f64|u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize))?(?![\w])"
+)
+RUST_MARKER = re.compile(r"//\s*constant:(.*)")
+
+
+def rust_hidden_tunables(source: str, code: str) -> list[tuple[int, float]]:
+    """(line, literal) of each numeric literal in the Rust module `source` that the rule above does not allow; `code`
+    is `source` with its comments and strings blanked out (the `rust_code` fixture), so a `#[cfg(test)]` named in a
+    comment is not taken for the test module."""
+    scanned = code.split("#[cfg(test)]", 1)[0].splitlines()
+    covered = _rust_marked_lines(source.splitlines()[: len(scanned)], scanned)
+    found = []
+    for number, line in enumerate(scanned, start=1):
+        for match in RUST_NUMBER.finditer(line):
+            text = match.group(1).replace("_", "")
+            value = int(text, 16) if text.startswith("0x") else float(text)
+            if number not in covered and not _allowed_in_rust(value, line, match):
+                found.append((number, int(value) if value.is_integer() and "." not in text else value))
+    return found
+
+
+def _rust_marked_lines(lines: list[str], code: list[str]) -> set[int]:
+    """The lines whose literals a `// constant:` marker with a reason covers (`code`: the lines, comments blanked)."""
+    covered: set[int] = set()
+    for number, line in enumerate(lines, start=1):
+        marker = RUST_MARKER.search(line)
+        if marker is None or len(marker.group(1).split()) < MIN_REASON_WORDS:
+            continue
+        if code[number - 1].strip():  # trailing: its own line
+            covered.add(number)
+            continue
+        following = number  # on a line of its own: the next statement
+        while following < len(code):
+            following += 1
+            covered.add(following)
+            if code[following - 1].rstrip().endswith((";", "{", "}")):
+                break
+    return covered
+
+
+def _allowed_in_rust(value: float, line: str, match: re.Match[str]) -> bool:
+    before, after = line[: match.start()].rstrip(), line[match.end() :].lstrip()
+    if value == CHANNELS and ((before.endswith(";") and after.startswith("]")) or before.endswith(("<", ".."))):
+        return True
+    bound = re.search(r"(?<![=!<>+\-*/%&|^])=\s*-?$", before) is not None and after.startswith(";")
+    return abs(value) in TRIVIAL and not bound
+
+
+@pytest.mark.parametrize("path", RUST_SCANNED, ids=[path.relative_to(CORE).as_posix() for path in RUST_SCANNED])
+def test_every_number_in_the_rust_core_is_a_parameter_or_a_cited_constant(path, rust_code):
+    source = path.read_text(encoding="utf-8")
+    assert rust_hidden_tunables(source, rust_code(source)) == []
+
+
+RUST_GOOD = """
+    //! A probe module that keeps the rule: "0.35 in a string" and 0.35 in a comment are not code.
+    const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722]; // constant: Rec. 709 weights of the channels
+
+    // constant: the sRGB transfer function, IEC 61966-2-1
+    const BREAK: f32 =
+        0.04045;
+
+    pub(crate) fn render(pixel: [f32; 3], params: &Params) -> [f32; 3] {
+        let (chunks, _) = values.as_chunks::<3>();
+        let half = params.temperature / 2.0;
+        let grey = pixel[0] * LUMA[0] + pixel.1 * 0.5_f32 - 1.0;
+        let flag = if grey > 0.5 { 1 } else { 0 };
+        let label = 'x';
+        for index in 0..3 {
+            out[index] = (pixel[index] * 255.0).clamp(0.0, 1.0);
+        }
+        out
+    }
+
+    #[cfg(test)]
+    mod tests {
+        const SAMPLE: f32 = 0.37;
+    }
+"""
+
+
+def test_the_rust_scan_passes_parameters_trivial_operands_channels_and_marked_constants(rust_code):
+    source = textwrap.dedent(RUST_GOOD)
+    assert rust_hidden_tunables(source, rust_code(source)) == []
+
+
+RUST_BAD = {
+    "a factor in an expression": ("let out = value * 0.35;", [0.35]),
+    "an unmarked constant": ("const EDGE: f32 = 3.5; // the edge width", [3.5]),
+    "an epsilon without the marker": ("let safe = total.max(1e-9);", [1e-9]),
+    "a three that is a factor, not a size": ("let out = value * 3.0;", [3.0]),
+    "a three as a count of something else": ("let taps = [0.0; 3 + 1];", [3]),
+    "a non-trivial bound": ("let out = value.clamp(0.0, 0.9);", [0.9]),
+    "a trivial value bound to a name": ("let weight = 0.5;", [0.5]),
+    "a trivial value as a constant": ("const WEIGHT: f32 = -1.0;", [1.0]),
+    "a typed literal": ("let gain = 1.2_f32 * value;", [1.2]),
+    "a marker without a reason": ("let out = value * 0.35; // constant:", [0.35]),
+    "a reason of two words": ("let out = value * 0.35; // constant: golden ratio", [0.35]),
+}
+
+
+@pytest.mark.parametrize(("line", "literals"), RUST_BAD.values(), ids=RUST_BAD.keys())
+def test_the_rust_scan_finds_each_hidden_tunable_with_its_line(line, literals, rust_code):
+    source = f"fn probe(value: f32, total: f32) -> f32 {{\n    {line}\n}}\n"
+    assert [(number, abs(value)) for number, value in rust_hidden_tunables(source, rust_code(source))] == [
+        (2, literal) for literal in literals
+    ]
+
+
+RUST_MARKED = {  # module source -> the literals still found
+    "a trailing marker covers its own line only": (
+        "const A: f32 = 0.3; // constant: the first standard value\nconst B: f32 = 0.35;\n",
+        [0.35],
+    ),
+    "a marker on its own line covers the next statement, over several lines": (
+        "// constant: Rec. 709 weights of the channels\nconst W: [f32; 3] = [\n    0.2126,\n    0.7152,\n"
+        "    0.0722,\n];\nconst OTHER: f32 = 0.9;\n",
+        [0.9],
+    ),
+    "a test module named in a comment does not end the scan": (
+        "// the tests follow, after #[cfg(test)]\nconst EDGE: f32 = 0.35;\n",
+        [0.35],
+    ),
+    "a marker before a function covers only its first line": (
+        "// constant: too far from its value\nfn probe() -> f32 {\n    0.35\n}\n",
+        [0.35],
+    ),
+}
+
+
+@pytest.mark.parametrize(("source", "found"), RUST_MARKED.values(), ids=RUST_MARKED.keys())
+def test_a_rust_constant_marker_with_a_reason_covers_its_statement(source, found, rust_code):
+    assert [value for _, value in rust_hidden_tunables(source, rust_code(source))] == found

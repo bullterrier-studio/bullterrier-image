@@ -9,6 +9,8 @@ import sees. Each layer may import only the layers below it:
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
     _native    the home of the Rust extension (`_native._core`), beside errors: imports nothing either
 
+The Rust core keeps the same rule for its effects: `crates/core/src/effects/<name>.rs` never refers to another effect.
+
 These are architecture tests: their subject is the package's structure (its import graph and its source files), so,
 unlike behaviour tests, they read source (the linter, and `ast` as an independent list of the declared effects).
 """
@@ -263,3 +265,39 @@ def test_the_rust_extension_imports_nothing_from_the_package(module, leaf):
     """The import linter checks the extension's home (`_native`) but cannot read the compiled module in it: importing
     the module shows that it loads nothing else of the package either."""
     assert (package_modules_loaded_by(module) == []) == leaf
+
+
+RUST_EFFECTS = ROOT / "crates" / "core" / "src" / "effects"
+# the names through which an effect file could reach the others: `super` (the module holding every effect) and the
+# `effects` module itself, however a path writes it (`crate::effects::x`, `crate::{effects::x}`, `crate::effects`)
+EFFECT_PATH = re.compile(r"\b(?:super|effects)\b")
+
+
+def references_to_other_effects(code: str) -> list[str]:
+    """Each name in the Rust effect `code` (comments and strings blanked out) through which it could reach another."""
+    return EFFECT_PATH.findall(code)
+
+
+@pytest.mark.parametrize("path", sorted(RUST_EFFECTS.glob("*.rs")), ids=lambda path: path.name)
+def test_no_rust_effect_refers_to_another(path, rust_code):
+    assert references_to_other_effects(rust_code(path.read_text(encoding="utf-8"))) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "found"),
+    [
+        pytest.param("use super::vignette;\n", ["super"], id="a sibling through super"),
+        pytest.param("let out = crate::effects::grade::render(p, &q);\n", ["effects"], id="a crate path"),
+        pytest.param("use crate :: effects :: grade;\n", ["effects"], id="spaced out"),
+        pytest.param("use crate::{effects::grade, ops};\n", ["effects"], id="inside a use group"),
+        pytest.param("use crate::{ops, effects};\n", ["effects"], id="the effects module in a use group"),
+        pytest.param("use crate::effects;\n", ["effects"], id="the effects module itself"),
+        pytest.param("use crate::ops::colorspace;\nuse crate::{Image, Picture};\n", [], id="ops and the core types"),
+        pytest.param("// unlike super::grade, this keeps to itself\nfn f() {}\n", [], id="a line comment is none"),
+        pytest.param("/* crate::effects::grade */\nfn f() {}\n", [], id="a block comment is none"),
+        pytest.param('const NAME: &str = "effects::grade";\n', [], id="a string is none"),
+        pytest.param("fn side_effects() {}\n", [], id="a word containing it is none"),
+    ],
+)
+def test_the_effect_reference_check_flags_any_path_through_the_effects_module(source, found, rust_code):
+    assert references_to_other_effects(rust_code(source)) == found
