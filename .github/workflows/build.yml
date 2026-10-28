@@ -133,12 +133,19 @@ jobs:
         with:
           enable-cache: false
           python-version: "3.12"
-      # No checkout: the environment has the package and its dependencies only. A wheel comes from the artifact alone
-      # (`--no-index`: no release from PyPI; `--only-binary`: no sdist built on the fly), the platform's wheel chosen
-      # by uv, then its dependencies from the index; the wheel's tag names the artifact's file it was. The sdist is
-      # installed from its file and built here (rustup installs the toolchain its rust-toolchain.toml pins);
-      # direct_url.json names that file. The recipe needs no subject, so no model is downloaded and no matte is given;
-      # grade runs in the Rust core.
+      # only the script that names the installed file, kept outside the environment under test
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: checkout
+          sparse-checkout: tools/check_installed.py
+          sparse-checkout-cone-mode: false
+      # The environment has the package and its dependencies only. A wheel comes from the artifact alone (`--no-index`:
+      # no release from PyPI; `--only-binary`: no sdist built on the fly), the platform's wheel chosen by uv, then its
+      # dependencies from the index. The sdist is installed from its file and built here (rustup installs the
+      # toolchain its rust-toolchain.toml pins). check_installed.py then names the artifact's file it came from, or
+      # fails. The recipe needs no subject, so no model is downloaded and no matte is given; grade runs in the Rust
+      # core, and onnxruntime (the portable subject finder) must import.
       - name: Install the ${{ matrix.from }} in a fresh environment and render a picture
         shell: bash
         env:
@@ -155,13 +162,12 @@ jobs:
             "$bin/python" -c "from importlib.metadata import requires; print('\n'.join(requires('bullterrier-image')))" \
               > requirements.txt
             uv pip install --python smoke --requirement requirements.txt
-            tag=$("$bin/python" -c "from importlib.metadata import distribution as d; print(next(line[5:] for line in d('bullterrier-image').read_text('WHEEL').splitlines() if line.startswith('Tag: ')))")
-            ls "$dist"/bullterrier_image-*-"$tag"*.whl # the installed wheel (its first tag) is this file of the artifact
           else
             uv pip install --python smoke "$dist"/bullterrier_image-*.tar.gz
-            "$bin/python" -c "from importlib.metadata import distribution as d; print(d('bullterrier-image').read_text('direct_url.json'))"
           fi
+          "$bin/python" "$GITHUB_WORKSPACE/checkout/tools/check_installed.py" "$dist" --from "$FROM"
           uv pip list --python smoke
+          "$bin/python" -c "import onnxruntime; print('onnxruntime', onnxruntime.__version__)"
           "$bin/bt-image" --version
           "$bin/bt-image" --help
           "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
