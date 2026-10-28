@@ -715,7 +715,41 @@ def test_a_recipe_with_a_number_set_equals_the_recipe_written_with_it_so_nothing
     assert rich().with_values({address: value}) == rich(**written)
 
 
-# --- the effect's own default opacity --------
+# --- copies with changes: `replace` takes what the constructor takes and checks it the same way ---------------------
+
+
+def test_a_step_copy_has_the_values_and_step_keys_given_and_keeps_the_rest():
+    step = fx.bloom(radius=8, threshold=0.4, mask="subject", opacity=0.7)
+    assert step.replace(radius=20, blend_mode="screen") == fx.bloom(
+        radius=20, threshold=0.4, mask="subject", opacity=0.7, blend_mode="screen"
+    )
+    assert step == fx.bloom(radius=8, threshold=0.4, mask="subject", opacity=0.7)  # the step itself is unchanged
+
+
+def test_a_recipe_copy_has_the_fields_given_and_keeps_the_rest():
+    recipe = Recipe([fx.grade(exposure=0.3)], name="warm", description="Warmer.", size=64)
+    assert recipe.replace(name="warmer", size=128) == Recipe(
+        [fx.grade(exposure=0.3)], name="warmer", description="Warmer.", size=128
+    )
+    assert recipe.name == "warm"  # the recipe itself is unchanged
+
+
+@pytest.mark.parametrize(
+    ("make", "error", "complaint"),
+    [
+        pytest.param(lambda: fx.bloom().replace(radius=-1), RecipeError, r"`radius`.*>= 0", id="a value out of range"),
+        pytest.param(lambda: fx.bloom().replace(radiuss=1), RecipeError, r"`radiuss`.*radius", id="a misspelt value"),
+        pytest.param(lambda: fx.bloom().replace(opacity=2), RecipeError, r"`opacity`", id="a bad step key"),
+        pytest.param(lambda: fx.bloom().replace(effect="grain"), RecipeError, r"`effect`.*fx\.grain", id="the effect"),
+        pytest.param(lambda: Recipe([fx.grade()]).replace(steps=[]), RecipeError, "at least one step", id="no steps"),
+        pytest.param(lambda: Recipe([fx.grade()]).replace(size=0), RecipeError, r"`size`", id="a size below 1"),
+        pytest.param(lambda: Recipe([fx.grade()]).replace(sise=64), RecipeError, r"`sise`", id="a misspelt field"),
+    ],
+)
+def test_a_copy_with_a_bad_change_is_refused_as_making_it_so_would_be(make, error, complaint):
+    with pytest.raises(error, match=complaint):
+        make()
+
 
 # --- the effect's own default opacity --------------------------------------------------------------------------------
 

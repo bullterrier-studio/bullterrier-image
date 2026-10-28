@@ -234,6 +234,21 @@ class Step(_Layer):
         drawn: list[Reference] = [] if self.partition is None else [("partition", self.partition, None)]
         return [*super().references(), *driving, *working, *drawn]
 
+    def replace(self, **changes: Any) -> "Step":
+        """A copy with `changes`: what `fx.<effect>(...)` takes, the effect's parameters (laid over this step's) and the
+        step keys (`mask`, `opacity`, `blend_mode`, `preset`, `partition`, `name`; replacing this step's). Checked as a
+        new step is: a misspelt or out-of-range value is a RecipeError. The effect stays: for another one, build its
+        step with `fx`. A picture or lookup table is given as a `Picture`, a `Lut`, a colour or an array; a path is
+        read only by `fx`."""
+        if "effect" in changes:
+            raise RecipeError(
+                f"`effect`: a copy of a step keeps its effect {self.effect!r} (got {changes['effect']!r}); build a "
+                f"step of another effect with fx.{changes['effect']}(...)"
+            )
+        keys = {key: changes.pop(key) for key in registry.STEP_KEYS if key in changes}  # the rest are the parameters
+        held = {"mask": self.mask, "opacity": self.opacity, "blend_mode": self.blend_mode, "partition": self.partition}
+        return Step(self.effect, params={**self.params, **changes}, **{**held, "name": self.name, **keys})
+
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `gradient(colors=['#000000']) on background` or `bloom() screen x0.8` (the
         blend mode, then the opacity), cut to `width` characters."""
@@ -533,6 +548,13 @@ class Recipe(ValidatedModel):
             **unknown,
         )
 
+    def replace(self, **changes: Any) -> "Recipe":
+        """A copy with `changes`: any of the fields `Recipe` takes (`steps`, `name`, `description`, `size`, `frame`,
+        `regions`), each replacing this recipe's. Checked as a new recipe is: RecipeError for a bad or unknown field.
+        To set numbers inside steps, regions or the frame by address, see `with_values`."""
+        held = {field: getattr(self, field) for field in type(self).model_fields}
+        return Recipe(**{**held, **changes})
+
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":
         if not self.steps:
@@ -648,7 +670,7 @@ class Recipe(ValidatedModel):
                 raise RecipeError(
                     f"{', '.join(repr(address) for address in blamed or where[target].values())}: {error}"
                 ) from None
-        return Recipe(steps, name=self.name, description=self.description, size=self.size, frame=frame, regions=regions)
+        return self.replace(steps=steps, frame=frame, regions=regions)
 
     def _heads(self) -> list[str]:
         """What each step's address starts with, in order: its name, else its effect (`each` for an `Each`) when it is
@@ -827,15 +849,7 @@ def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
             params[rest] = value
     for name, parts in ends.items():
         params[name] = Drive(**{**params[name].model_dump(), **parts})
-    return Step(
-        step.effect,
-        params=params,
-        mask=step.mask,
-        opacity=opacity,
-        blend_mode=step.blend_mode,
-        partition=step.partition,
-        name=step.name,
-    )
+    return step.replace(**params, opacity=opacity)
 
 
 def _set_numbers[M: EffectParams](model: M, put: Mapping[str, Any]) -> M:
