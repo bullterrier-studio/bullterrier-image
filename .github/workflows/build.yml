@@ -100,20 +100,9 @@ jobs:
         with:
           name: sdist
           path: dist
-      - name: Metadata and description as PyPI renders them (twine)
-        run: uv run --no-sync twine check --strict 'dist/*'
-      # each wheel against the package tree as an install from it has it: the library's code and the extension built
-      # for its platform (a wheel without one fails to unzip it); anything else in the wheel, or code left out, fails
-      - name: Each wheel holds the library's code and its extension, nothing else (check-wheel-contents)
-        run: |
-          set -euo pipefail
-          native=src/bullterrier_image/_native
-          for wheel in dist/*.whl; do
-            unzip -q -j "$wheel" 'bullterrier_image/_native/_core.*' -x 'bullterrier_image/_native/_core.pyi' -d "$native"
-            uv run --no-sync check-wheel-contents "$wheel"
-            find "$native" -name '_core.*' ! -name '_core.pyi' -delete
-          done
-          ls -l dist
+      # the checks `poe build-check` runs locally: twine, one build of the extension per wheel, check-wheel-contents
+      - name: Check every distribution (tools/check_dists.py)
+        run: uv run --no-sync python tools/check_dists.py dist && ls -l dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
