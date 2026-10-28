@@ -25,6 +25,9 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("tools/test_vulture_whitelist.py", "bullterrier_image._native"): (
         "the whitelist names the fields of exactly the effects the Rust core implements; only the core can say which"
     ),
+    ("_native/test__core.py", "bullterrier_image._native"): (
+        "the boundary between the package and the Rust core: which parameter values reach the core, and how"
+    ),
 }
 
 _PATCHERS = ("monkeypatch.setattr", "monkeypatch.delattr", "monkeypatch.setitem", "monkeypatch.delitem")

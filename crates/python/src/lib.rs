@@ -74,7 +74,10 @@ fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     } else if let Ok(flag) = value.cast::<PyBool>() {
         Ok(Value::Bool(flag.is_true()))
     } else if let Ok(whole) = value.cast::<PyInt>() {
-        Ok(Value::from(whole.extract::<i64>()?))
+        let number = whole
+            .extract::<i64>()
+            .map_err(|_| PyValueError::new_err(format!("a parameter is out of range for 64 bits: {whole}")))?;
+        Ok(Value::from(number))
     } else if let Ok(real) = value.cast::<PyFloat>() {
         serde_json::Number::from_f64(real.value())
             .map(Value::Number)
