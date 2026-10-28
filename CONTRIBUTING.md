@@ -6,21 +6,24 @@ way it is.
 
 ## Set up
 
-You need [uv](https://docs.astral.sh/uv/) and git.
+You need [uv](https://docs.astral.sh/uv/), git and [rustup](https://rustup.rs/) (the effects are written in Rust;
+`rust-toolchain.toml` makes rustup install the right compiler on the first build).
 
 ```bash
 git clone https://github.com/bullterrier-studio/bullterrier-image.git
 cd bullterrier-image
-uv sync                # the project and its development tools, in .venv
-uv run poe setup       # once per clone: the git hooks and the commit-message template
+uv sync                # the project (its Rust extension built) and its development tools, in .venv
+uv run poe setup       # once per clone: the git hooks, the commit-message template, cargo-shear and cargo-deny
 ```
+
+`uv sync` and `uv run` rebuild the extension when a Rust file changes.
 
 ## Before you push
 
 ```bash
-uv run poe check       # every gate: format, lint, dead code, dependencies, build, types, tests
+uv run poe check       # every gate, Python and Rust: format, lint, dead code, dependencies, build, types, tests
 uv run poe fix         # repairs what lint and format can repair by themselves
-uv run poe audit       # known vulnerabilities in the locked dependencies (pip-audit; needs the network)
+uv run poe audit       # known vulnerabilities in the locked dependencies (pip-audit, cargo-deny; needs the network)
 uv run pytest tests/ops -n 0  # one folder or file, in one process; `uv run poe test` runs the suite on every core
 ```
 

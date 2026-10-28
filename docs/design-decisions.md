@@ -11,7 +11,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   means the code is in the wrong layer, so the fix is always a move, never an exception. *Consequence:* the rules are
   import-linter contracts in `pyproject.toml`, run by the test suite (`uv run lint-imports`); `core` never imports
   `effects`: the registry loads the effect library through an entry point (see "Effects are found through entry
-  points").
+  points"). The Rust extension lives in a package of its own, `_native` (the compiled `_native._core`), at the bottom
+  beside `errors`: the linter cannot read a compiled module, but it sees the package, so an upward import from it, or
+  an import of the package root from anywhere, fails like any other.
 - **A microkernel with plugins.** A small, stable `core` (registry, parameter models, recipe engine) and many effects that
   register themselves and are found by discovery. *Reason:* adding an effect must not edit shared files, so many effects
   can be written in parallel without conflicts. *Consequence:* an effect is new files named for it (its package, tests,
@@ -420,6 +422,41 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the effects themselves aim far lower) and 12 picture-sized buffers of memory (`tracemalloc`), with a known-bad effect
   for each limit; an effect that needs more is redesigned, or the budget is raised in its own reviewed commit. The FFT is single-threaded, so CPU time stays predictable when photos are
   rendered in parallel.
+
+## The Rust core
+
+- **The numeric work moves to Rust; Python stays the interface.** Two crates in a Cargo workspace beside `src/`:
+  `crates/core` (pure Rust, no PyO3, `#![forbid(unsafe_code)]`: `ops/` and one file per effect in `effects/`) and
+  `crates/python` (PyO3 bindings that build `bullterrier_image._native._core`, built by maturin). Each effect is ported once and
+  its Python body deleted; there is no second implementation. *Reason:* measured on a proof of concept, a Rust core
+  renders several times faster per thread, needs no pickling between worker processes, starts in milliseconds, and
+  can serve a video API and live rendering later. *Consequence:* contributors need rustup (the toolchain file installs
+  the rest), and wheels are per platform (abi3: one per platform for every Python from 3.12).
+- **One generic boundary: `_core.apply(effect, rgb, params)`.** It borrows the picture (C-contiguous float32
+  `(h, w, 3)`) without copying, releases the GIL while the effect runs, and returns a new array. The bindings never
+  name an effect, so porting one never changes them. The core finds its effects without a list: its build script
+  makes one module per `effects/<name>.rs` and the name table. A wrong name, parameter set, dtype or shape is a
+  programming error (`ValueError`): a user's values are validated before they get there. The registry, the one place
+  that calls effects, hands every effect the contract's picture, float32 and C-contiguous (a float64 photo is
+  converted there once). A field or injected number arrives with the first ported effect that needs one.
+- **Pydantic stays the one declaration of parameters.** The Python effect keeps its model, docstring and `@effect`;
+  its body is `_core.apply("<name>", rgb, params.model_dump())`. The Rust `Params` has the same fields with no
+  defaults and refuses unknown ones, so a struct that drifts from the model fails the first contract-test call.
+  *Reason:* validation, units, documentation, scaling, drives and fields already live in the model and the runner;
+  the core gets values already checked and scaled and trusts them. Declaring parameters in Rust is a later decision.
+  vulture cannot see that the core reads a field by name, so `poe dead-code` writes a whitelist of the fields of the
+  effects `_core.effects()` names when it runs (porting edits no shared file), and rustc's dead-code lint checks the
+  Rust side.
+- **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
+  stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
+  last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without
+  breaking the effects not yet ported.
+- **The Rust gates match the Python ones**, each in `poe check` with a known-bad test (`tests/tools/test_rust_gates.py`):
+  rustfmt; clippy (pedantic plus no unwrap, expect, panic or printing; dead code, missing docs and unreachable `pub`
+  as errors); rustdoc; cargo-shear; cargo-deny (bans, licences, sources; advisories in `poe audit`); stubtest of
+  `_native/_core.pyi`; cargo test (proptest for `ops`). The hidden-tunable scan, one config home and effect independence cover
+  the Rust sources. Warnings are errors only in the gate, so a newer compiler never breaks a user's build. No
+  `.cargo/config.toml` and no `target-cpu=native`: a wheel must run on every CPU of its platform.
 
 ## Effects
 

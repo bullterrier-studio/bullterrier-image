@@ -1,9 +1,11 @@
 # Development
 
+Needs uv, git and rustup (`rust-toolchain.toml` pins the compiler; rustup installs it on the first build).
+
 ```bash
-uv sync
-uv run poe setup       # once per clone: installs the git hooks and the commit-message template
-uv run poe check       # before every push or merge: format, lint, dead code, dependencies, build, types, tests
+uv sync                # builds the Rust extension too; uv rebuilds it when a Rust file changes
+uv run poe setup       # once per clone: the git hooks, the commit-message template, the pinned cargo tools
+uv run poe check       # before every push or merge: every gate, Python and Rust
 uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
 uv run poe fix         # applies the automatic lint and format fixes
 uv run poe new-effect my_effect --category light   # a new effect's files, from the template
@@ -31,7 +33,8 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
 - Generated shared files (`src/bullterrier_image/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches
   adding effects never conflict. After merging, `uv run poe regenerate` brings them up to date in one commit. Existing
   pictures kept (`uv run poe gallery --force` renders all again; effect named with `--only` always rendered).
-- Every gate (ruff, vulture, deptry, build check, mypy, tests) is configured in `pyproject.toml`, listed in
+- Every gate (ruff, vulture, deptry, build check, mypy, tests; for Rust rustfmt, clippy, rustdoc, cargo-shear,
+  cargo-deny, stubtest, cargo test) is configured in `pyproject.toml` and `Cargo.toml`, listed in
   [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). Push to `main` (or a tag) runs the whole gate via pre-push hook unless it
   changes only documentation (pages and `docs/images/`); other branches checked by CI when the pull request opens.
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
@@ -65,6 +68,10 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   ops/           ops       shared numeric primitives named by concept: one module per concept (`blur`, `noise`, `warp`,
                            `edges`, `colorspace`...; internal; core may import ops; ops imports nothing above)
   errors.py      errors    BullterrierImageError and subclasses: bottom layer, importable from every other
+  _native/       errors    home of the Rust extension `_native._core` (crates/python; `_core.pyi` its stub), beside
+                           errors: imports nothing
+crates/core/     the Rust core: ops/ (numeric primitives by concept) and effects/<name>.rs (one per ported effect)
+crates/python/   the PyO3 bindings that build `bullterrier_image._native._core`; generic, names no effect
 examples/        demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/),
                  older experiments (experiments/), a Python example; see examples/README.md
 docs/            effect catalogue (effects/, generated: index + page per category), its pictures (gallery/), roadmap, design decisions

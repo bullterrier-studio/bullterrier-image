@@ -49,9 +49,16 @@ adapters   imageio (files), finding (finding the subject), loader (recipe files)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
-ops        pure numeric primitives                                    (may import errors)
+ops        pure numeric primitives                                    (may import errors, _native)
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
+_native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
+**Rust core:** `crates/core` (pure Rust: `ops/` by concept, one `effects/<name>.rs` per ported effect, found by
+`build.rs`) and `crates/python` (PyO3 bindings building `bullterrier_image._native._core`; generic, names no effect). A
+ported effect keeps its Python model, docstring and `@effect`; its body is `_core.apply("<name>", rgb,
+params.model_dump())` (`from bullterrier_image._native import _core`). Its Rust file has `Params`
+(`#[serde(deny_unknown_fields)]`, no defaults) and `fn render(picture: &Picture, params: &Params) -> Image`. Rust effects
+never refer to each other.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
@@ -80,6 +87,14 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
    `BackendUnavailableError`, `ImageReadError`, `LutError`, `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
    each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
    `ValueError`/`TypeError`.
+
+## Rust code
+
+Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
+no hidden tunables: a number is a `Params` field, trivial, or carries `// constant: <reason>`). Also: no `unwrap`,
+`expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe Rust. `pub` only for what the
+bindings use, else `pub(crate)`. A Python `ops` function and its Rust twin may coexist while unported effects use the
+Python one; delete it with its last Python user.
 
 ## Standards
 
@@ -193,9 +208,14 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
 
 ## Lint, types and gates
 
-`uv run poe check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check`; `ruff check` (plus
-`PLW1514` explicit encodings, `BLE` no blind `except`, `PTH` pathlib); `vulture` (dead code in `src`; exemptions in
-`[tool.vulture]`); `deptry`; `poe build-check` (twine, check-wheel-contents); `mypy`; the tests, in random order (import
+`uv run poe check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
+`ruff check` (plus `PLW1514` explicit encodings, `BLE` no blind `except`, `PTH` pathlib, `PYI` stubs) and `rust-lint`
+(clippy pedantic, `unwrap`/`expect`/`panic`/print banned, dead code, missing docs, unreachable `pub`; `[workspace.lints]`
+in `Cargo.toml`); `dead-code` (vulture on `src`; exemptions in `[tool.vulture]`, and a whitelist, written as it runs,
+of the fields the Rust core reads); `rust-doc`; `deptry`; `rust-tools` (cargo-shear and cargo-deny at the versions
+`Cargo.toml` pins; `poe setup` installs them), `rust-shear` (unused crates), `rust-deny` (bans, licences, sources;
+`deny.toml`); `poe build-check` (maturin sdist and wheel, twine, check-wheel-contents); `mypy` and `stubtest`
+(`_native/_core.pyi` against the extension); `rust-test`; the tests, in random order (import
 contracts, the effect contract at odd sizes and across every number's range, and the hidden-tunable scan of effect packages and
 `ops`: a number is a `param`, a trivial operand or index, or carries `# constant: <reason>`; a library option never gets a
 marker). Each gate has a test proving it fails on a known-bad input.
@@ -298,6 +318,8 @@ changes more than documentation.
   which rule failed. Merge, revert and fixup commits git writes pass unchanged.
 - **Never `--no-verify`, skip, silence or loosen a hook:** fix the cause. If a rule is wrong, change it in `pyproject.toml` in its
   own commit and say why.
-- All Python tooling is configured in `pyproject.toml` (ruff, mypy, pytest, import-linter, poe, commit-message). Do not add
-  `ruff.toml`, `mypy.ini`, `setup.cfg`, `pytest.ini`, `.coveragerc` or similar (a test fails). Other config files:
-  `.pre-commit-config.yaml` (hook wiring only), `.editorconfig`, `.gitmessage`.
+- All Python tooling is configured in `pyproject.toml` (ruff, mypy, pytest, import-linter, poe, commit-message, maturin),
+  all Rust tooling in `Cargo.toml` (lints, pinned cargo tools). Do not add `ruff.toml`, `mypy.ini`, `setup.cfg`,
+  `pytest.ini`, `.coveragerc`, `clippy.toml`, `.cargo/config.toml` or similar (a test fails). Other config files:
+  `.pre-commit-config.yaml` (hook wiring only), `.editorconfig`, `.gitmessage`, and, for Rust tools that cannot read
+  `Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `deny.toml` (root only).
