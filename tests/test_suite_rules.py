@@ -22,6 +22,9 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the contract test checks that every effect the Rust core implements is a registered effect; only the core "
         "can say which it implements"
     ),
+    ("tools/test_vulture_whitelist.py", "bullterrier_image._native"): (
+        "the whitelist names the fields of exactly the effects the Rust core implements; only the core can say which"
+    ),
 }
 
 _PATCHERS = ("monkeypatch.setattr", "monkeypatch.delattr", "monkeypatch.setitem", "monkeypatch.delitem")
