@@ -221,6 +221,14 @@ def no_model_download(monkeypatch):
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
 
 
+@pytest.fixture(autouse=True)
+def wide_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run every test in a 120-column terminal, whatever the terminal running the tests is: the CLI wraps its listings
+    to the terminal's width (`COLUMNS` comes first), so a narrow runner would change what a test reads. A test about
+    another width sets `COLUMNS` itself."""
+    monkeypatch.setenv("COLUMNS", "120")
+
+
 @pytest.fixture
 def echo_model(tmp_path) -> Callable[[int], Path]:
     """`echo_model(channel)` writes a tiny ONNX segmentation model and returns its path. It stands in for the real

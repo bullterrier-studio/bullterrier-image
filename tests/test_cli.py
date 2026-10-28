@@ -99,6 +99,18 @@ def test_effects_listing_is_short_and_ends_in_where_to_find_the_details(capsys):
     assert len(lines) <= 2 * len(registry.describe()) + 3 * len(looks.read()) + 10  # wrapped to at most two lines
 
 
+@pytest.mark.parametrize(
+    ("columns", "widest"),
+    [pytest.param("80", 80, id="80-columns"), pytest.param("40", 60, id="below-60-columns-wraps-at-60")],
+)
+def test_effects_listing_wraps_its_entries_to_a_narrow_terminal(capsys, monkeypatch, columns, widest):
+    monkeypatch.setenv("COLUMNS", columns)
+    assert cli("effects") == 0
+    entry_lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("  ")]
+    assert any(len(line) > widest - 10 for line in entry_lines)  # long entries do fill the width
+    assert max(map(len, entry_lines)) <= widest
+
+
 def test_effects_all_prints_every_effect_in_full_after_the_looks(capsys):
     assert cli("effects --all") == 0
     out = capsys.readouterr().out
