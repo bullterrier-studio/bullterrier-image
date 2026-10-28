@@ -168,5 +168,5 @@ def test_the_clarity_preset_is_local_contrast_against_a_wide_blur() -> None:
 
 def test_a_parameter_given_beside_the_clarity_preset_wins() -> None:
     picture = np.random.default_rng(6).random((40, 50, 3), dtype=np.float32)
-    off = Step(NAME, {"amount": 0.0}, preset="clarity").params
+    off = Step(NAME, params={"amount": 0.0}, preset="clarity").params
     np.testing.assert_array_equal(registry.apply(NAME, picture, **off), picture)

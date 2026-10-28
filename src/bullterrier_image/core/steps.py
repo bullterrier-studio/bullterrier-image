@@ -143,6 +143,7 @@ class Step(_Layer):
     def __init__(
         self,
         effect: str,
+        *,
         params: Mapping[str, Any] | None = None,
         mask: str | None = None,
         opacity: float | None = None,
@@ -290,6 +291,7 @@ class Each(_Layer):
     def __init__(
         self,
         each: str,
+        *,
         looks: Sequence[Step | str],
         mask: str | None = None,
         opacity: float | None = None,
@@ -800,7 +802,7 @@ def _set_each(each: Each, put: Mapping[str, Any]) -> Each:
     ]
     return Each(
         each.each,
-        looks,
+        looks=looks,
         mask=each.mask,
         opacity=own.get("opacity", each.opacity),
         blend_mode=each.blend_mode,
@@ -827,7 +829,7 @@ def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
         params[name] = Drive(**{**params[name].model_dump(), **parts})
     return Step(
         step.effect,
-        params,
+        params=params,
         mask=step.mask,
         opacity=opacity,
         blend_mode=step.blend_mode,

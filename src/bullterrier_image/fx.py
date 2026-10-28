@@ -65,28 +65,28 @@ def _builder(name: str, function: Callable) -> Callable[..., Step]:
     """The function behind `fx.<name>`: takes the effect's parameters (not the image), then the step keys, and returns
     a Step.
 
-    Values may be given by position, in the model's field order, or by keyword; the step keys (`mask`, `opacity`,
-    `blend_mode`, `preset`, `partition`, `name`) only by keyword. The Step checks them all, so a misspelt or
-    out-of-range value fails here exactly as it would in a recipe file. `preset=` names one of the effect's presets (see
-    `registry.presets`); the values given win over the preset's. A picture parameter takes a `Picture`, a colour, a path
-    (read now, relative to the current folder) or an array (float, height x width x 3 or 4). A lookup table
-    parameter takes a `Lut`, the path of a `.cube` file or an array (float, n x n x n x 3).
+    Every value is given by keyword; the step keys (`mask`, `opacity`, `blend_mode`, `preset`, `partition`, `name`)
+    follow the effect's parameters. The Step checks them all, so a misspelt or out-of-range value fails here exactly
+    as it would in a recipe file. `preset=` names one of the effect's presets (see `registry.presets`); the values
+    given win over the preset's. A picture parameter takes a `Picture`, a colour, a path (read now, relative to the
+    current folder) or an array (float, height x width x 3 or 4). A lookup table parameter takes a `Lut`, the path of
+    a `.cube` file or an array (float, n x n x n x 3).
     """
-    fields = tuple(registry.parameters(name).model_fields)
 
     def build(*args: Any, **values: Any) -> Step:
-        if len(args) > len(fields):
-            raise TypeError(f"fx.{name}() takes at most {len(fields)} positional values ({len(args)} given)")
-        positional = dict(zip(fields, args, strict=False))
-        for twice in positional.keys() & values.keys():
-            raise TypeError(f"fx.{name}() got `{twice}` both by position and by keyword")
+        if args:
+            first = next(iter(registry.parameters(name).model_fields), "value")
+            raise TypeError(
+                f"fx.{name}() takes its values by keyword, not by position (got {len(args)} positional): write "
+                f"fx.{name}({first}={args[0]!r})"
+            )
         if "effect" in values:  # the one step key fx does not take: the function's name already chose the effect
             raise RecipeError(
                 f"`effect`: fx.{name}() always builds the effect {name!r}, so it takes no `effect` "
                 f"(got {values['effect']!r}); call the fx function of the effect you want"
             )
         keys = {key: values.pop(key) for key in registry.STEP_KEYS if key in values}  # the rest are the parameters
-        return Step(name, with_files(name, {**positional, **values}, Path()), **keys)
+        return Step(name, params=with_files(name, values, Path()), **keys)
 
     build.__name__, build.__qualname__ = name, f"fx.{name}"
     build.__doc__ = registry.documentation(name)

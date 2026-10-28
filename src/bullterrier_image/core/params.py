@@ -575,8 +575,8 @@ class EffectParams(ValidatedModel):
 
     @classmethod
     def signature(cls) -> inspect.Signature:
-        """The fields as a call signature, in declaration order: each a positional-or-keyword parameter with its
-        default and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable
+        """The fields as a call signature, in declaration order: each a keyword-only parameter with its default and the
+        type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable
         field as `float | Drive`)."""
         hints = typing.get_type_hints(cls, include_extras=True)
         drivable = cls.drivable_fields()
@@ -584,7 +584,7 @@ class EffectParams(ValidatedModel):
             [
                 inspect.Parameter(
                     name,
-                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
                     default=info.default,
                     annotation=_public(hints[name]) | Drive if name in drivable else _public(hints[name]),
                 )

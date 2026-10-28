@@ -162,7 +162,7 @@ def test_the_fill_preset_is_a_flat_black_picture_that_ignores_the_input() -> Non
     black = render_recipe(photo, Recipe([Step("gradient", preset="fill")], name="t", size=None))
     np.testing.assert_array_equal(black, np.zeros((20, 30, 3), np.float32))
     green = render_recipe(
-        photo, Recipe([Step("gradient", {"colors": ["#00ff00"]}, preset="fill")], name="t", size=None)
+        photo, Recipe([Step("gradient", params={"colors": ["#00ff00"]}, preset="fill")], name="t", size=None)
     )
     np.testing.assert_array_equal(green, np.broadcast_to(np.array(GREEN, np.float32), (20, 30, 3)))
 

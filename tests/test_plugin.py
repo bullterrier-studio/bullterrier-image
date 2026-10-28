@@ -96,7 +96,7 @@ def test_an_installed_plugin_effect_is_listed_and_runs_from_toml_and_from_fx(tmp
 
         grey = np.full((6, 8, 3), 0.5, np.float32)
         from_toml = render(grey, load_recipe(sys.argv[1]))
-        from_fx = render(grey, Recipe([fx.zz_tint("#0000ff", amount=0.25)], name="tinted"))
+        from_fx = render(grey, Recipe([fx.zz_tint(colour="#0000ff", amount=0.25)], name="tinted"))
         json.dump({
             "listed": sorted(registry.categories()["colour"]),
             "builtin_too": "bloom" in registry.describe(),

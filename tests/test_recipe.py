@@ -35,7 +35,7 @@ def test_load_recipe_reads_steps_params_and_masks(tmp_path):
     r = load_recipe(
         write(tmp_path, 'name="x"\nsize=64\n[[step]]\neffect="gradient"\ncolors=["#fff"]\nmask="background"\n')
     )
-    assert r == Recipe((Step("gradient", {"colors": ["#fff"]}, "background"),), name="x", size=64)
+    assert r == Recipe((Step("gradient", params={"colors": ["#fff"]}, mask="background"),), name="x", size=64)
     assert "subject" in r.maps_needed
 
 
@@ -85,26 +85,32 @@ def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_
 def test_a_masked_step_changes_only_its_region(photo, subject, mask, color, filled, region):
     """`region` is the subject value of the pixels the mask selects."""
     out = render(
-        photo, Recipe((Step("gradient", {"colors": [color]}, mask),), name="m", size=None), maps={"subject": subject}
+        photo,
+        Recipe((Step("gradient", params={"colors": [color]}, mask=mask),), name="m", size=None),
+        maps={"subject": subject},
     )
     np.testing.assert_allclose(out[subject == 1 - region], photo[subject == 1 - region], atol=1e-6)
     assert np.allclose(out[subject == region], filled)
 
 
 def test_steps_run_in_order(photo):
-    r = Recipe((Step("gradient", {"colors": ["#ff0000"]}), Step("grade", {"exposure": -1.0})), name="o", size=None)
+    r = Recipe(
+        (Step("gradient", params={"colors": ["#ff0000"]}), Step("grade", params={"exposure": -1.0})),
+        name="o",
+        size=None,
+    )
     np.testing.assert_allclose(render(photo, r)[0, 0], [0.5, 0, 0], atol=1e-5)
 
 
 def test_opacity_blends_the_step_in_partway(photo):
-    half = Recipe((Step("gradient", {"colors": ["#000000"]}, None, 0.5),), name="h", size=None)
+    half = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=None, opacity=0.5),), name="h", size=None)
     np.testing.assert_allclose(render(photo, half), photo * 0.5, atol=1e-6)
-    off = Recipe((Step("gradient", {"colors": ["#000000"]}, None, 0.0),), name="o", size=None)
+    off = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=None, opacity=0.0),), name="o", size=None)
     np.testing.assert_allclose(render(photo, off), photo, atol=1e-6)
 
 
 def test_opacity_combines_with_a_mask(photo, subject):
-    r = Recipe((Step("gradient", {"colors": ["#000000"]}, "background", 0.5),), name="b", size=None)
+    r = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background", opacity=0.5),), name="b", size=None)
     out = render(photo, r, maps={"subject": subject})
     np.testing.assert_allclose(out[subject == 0], photo[subject == 0] * 0.5, atol=1e-6)
     np.testing.assert_allclose(out[subject == 1], photo[subject == 1], atol=1e-6)
@@ -129,7 +135,7 @@ ORANGE = np.array([1.0, 0.5, 0.0], np.float32)  # "#ff8000" to within 1/510
 
 
 def fill(color: str, **keys) -> Recipe:
-    return Recipe((Step("gradient", {"colors": [color]}, **keys),), name="b", size=None)
+    return Recipe((Step("gradient", params={"colors": [color]}, **keys),), name="b", size=None)
 
 
 @pytest.mark.parametrize(
@@ -216,7 +222,7 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
 def test_size_scales_photo_and_matte_together(photo, subject):
     out = render(
         photo,
-        Recipe((Step("gradient", {"colors": ["#000000"]}, "background"),), name="s", size=64),
+        Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="s", size=64),
         maps={"subject": subject},
     )
     assert out.shape == (48, 64, 3)
@@ -260,7 +266,7 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     monkeypatch.setenv("BT_IMAGE_SEGMENTER", "onnx")
     monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(echo_model(0)))
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
-    masked = Recipe((Step("gradient", {"colors": ["#000000"]}, "background"),), name="m", size=None)
+    masked = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="m", size=None)
     alpha = subject_matte(photo)
     expected = runner.render(photo, masked, maps={"subject": alpha})
     assert not np.array_equal(
@@ -272,16 +278,16 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
 
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):
-    masked = Recipe((Step("gradient", {"colors": ["#000000"]}, "background"),), name="m", size=None)
+    masked = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="m", size=None)
     found = facade.render(photo, masked, finders={"subject": Finder("stand-in", lambda rgb: 1.0 - subject)})
     np.testing.assert_array_equal(found, runner.render(photo, masked, maps={"subject": 1.0 - subject}))
     assert not np.array_equal(found, runner.render(photo, masked, maps={"subject": subject}))
 
 
-PLAIN = Recipe((Step("grade", {"exposure": 0.5}),), name="plain", size=None)
-MASKED = Recipe((Step("gradient", {"colors": ["#000000"]}, "background"),), name="masked", size=None)
+PLAIN = Recipe((Step("grade", params={"exposure": 0.5}),), name="plain", size=None)
+MASKED = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="masked", size=None)
 PIECE_BY_PIECE = Recipe(
-    (Step("gradient", {"colors": ["#000000"]}, "found"),),
+    (Step("gradient", params={"colors": ["#000000"]}, mask="found"),),
     name="pieces",
     size=None,
     regions={"cells": Grid(columns=2), "found": Subject(per="cells")},
@@ -312,7 +318,7 @@ def test_the_default_finder_is_built_only_when_a_recipe_asks_for_the_subject(
 
 
 DEEP = Recipe(
-    (Step("gradient", {"colors": ["#000000"]}, "near"),),
+    (Step("gradient", params={"colors": ["#000000"]}, mask="near"),),
     name="deep",
     size=None,
     regions={"near": Band(of="depth", low=0.5, high=1.0)},
@@ -357,7 +363,7 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
 )
 def test_a_look_is_rendered_at_the_size_asked_with_its_pixel_values_scaled_to_it(photo, picture_of):
     """The public renderers take `size`: a blur of 30 px designed for 480 px wide is 8 px at 128 (by hand)."""
-    designed = Recipe((Step("gaussian_blur", {"radius": 30.0}),), name="blur", size=64)
+    designed = Recipe((Step("gaussian_blur", params={"radius": 30.0}),), name="blur", size=64)
     by_hand = registry.apply("gaussian_blur", resize(photo, 128), radius=8.0)
     np.testing.assert_array_equal(picture_of(photo, designed, size=128), by_hand)
 

@@ -57,11 +57,11 @@ def gain(throwaway_effects):
 )
 def test_a_bad_value_is_refused_naming_the_effect_and_the_problem(gain, values, complaint):
     with pytest.raises(ValueError, match=f"gain_probe.*{complaint}"):
-        Step("gain_probe", values)
+        Step("gain_probe", params=values)
 
 
 def test_valid_values_make_a_step_that_keeps_them_as_written(gain):
-    step = Step("gain_probe", {"gain": 2})
+    step = Step("gain_probe", params={"gain": 2})
     assert step.params == {"gain": 2}
     assert step.describe() == "gain_probe(gain=2)"
 
@@ -83,7 +83,7 @@ def drive(**keys) -> Drive:
 
 
 def test_a_step_takes_a_drive_for_a_drivable_parameter_and_keeps_it_as_written(gain):
-    step = Step("gain_probe", {"gain": drive(), "offset": 0.1})
+    step = Step("gain_probe", params={"gain": drive(), "offset": 0.1})
     assert step.params == {"gain": drive(), "offset": 0.1}
     assert step.drives == {"gain": drive()}
     assert step.fixed == {"offset": 0.1}
@@ -91,12 +91,12 @@ def test_a_step_takes_a_drive_for_a_drivable_parameter_and_keeps_it_as_written(g
 
 
 def test_a_drive_written_as_a_table_is_the_drive_written_in_python(gain):
-    from_table = Step("gain_probe", {"gain": {"by": "near", "start": 0, "end": 2, "levels": 7}})
-    assert from_table == Step("gain_probe", {"gain": Drive(by="near", start=0, end=2, levels=7)})
+    from_table = Step("gain_probe", params={"gain": {"by": "near", "start": 0, "end": 2, "levels": 7}})
+    assert from_table == Step("gain_probe", params={"gain": Drive(by="near", start=0, end=2, levels=7)})
 
 
 def test_a_step_with_no_drive_has_none(gain):
-    step = Step("gain_probe", {"gain": 2})
+    step = Step("gain_probe", params={"gain": 2})
     assert (step.drives, step.fixed) == ({}, {"gain": 2})
 
 
@@ -122,7 +122,7 @@ DRIVEN_MISTAKES = {
 @pytest.mark.parametrize(("values", "complaint"), DRIVEN_MISTAKES.values(), ids=DRIVEN_MISTAKES.keys())
 def test_a_drive_that_cannot_be_is_refused_naming_the_effect_the_parameter_and_why(gain, values, complaint):
     with pytest.raises(RecipeError, match=complaint):
-        Step("gain_probe", values)
+        Step("gain_probe", params=values)
 
 
 def test_a_drivable_effect_with_none_to_offer_says_none_are_drivable(throwaway_effects):
@@ -137,7 +137,7 @@ def test_a_drivable_effect_with_none_to_offer_says_none_are_drivable(throwaway_e
         return rgb
 
     with pytest.raises(RecipeError, match=r"`amount` cannot be driven.*drivable parameters: none"):
-        Step("plain_probe", {"amount": drive(end=1)})
+        Step("plain_probe", params={"amount": drive(end=1)})
 
 
 def test_every_value_a_drive_goes_through_is_checked_not_only_its_ends(throwaway_effects):
@@ -158,11 +158,13 @@ def test_every_value_a_drive_goes_through_is_checked_not_only_its_ends(throwaway
         """Nothing."""
         return rgb
 
-    assert Step("gapped_probe", {"level": Drive(by="near", start=0.0, end=0.4, levels=5)}).drives  # all clear of it
+    assert Step(
+        "gapped_probe", params={"level": Drive(by="near", start=0.0, end=0.4, levels=5)}
+    ).drives  # all clear of it
     with pytest.raises(
         RecipeError, match=r"gapped_probe.*level 0\.5 is in the gap"
     ):  # both ends valid, a level between not
-        Step("gapped_probe", {"level": Drive(by="near", start=0.2, end=0.8, levels=5)})
+        Step("gapped_probe", params={"level": Drive(by="near", start=0.2, end=0.8, levels=5)})
 
 
 def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_the_end(throwaway_effects):
@@ -184,9 +186,9 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
         """Nothing."""
         return rgb
 
-    assert Step("paired_probe", {"low": Drive(by="near", start=0.0, end=0.8)}).drives
+    assert Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.8)}).drives
     with pytest.raises(RecipeError, match=r"paired_probe.*low 0\.9.*above high 0\.8"):
-        Step("paired_probe", {"low": Drive(by="near", start=0.0, end=0.9)})
+        Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.9)})
 
 
 @pytest.mark.parametrize("levels", range(2, 17))
@@ -194,7 +196,7 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
 def test_a_drive_from_one_end_of_the_range_to_the_other_is_valid_whatever_the_number_of_levels(
     gain, start, end, levels
 ):
-    assert Step("gain_probe", {"gain": Drive(by="near", start=start, end=end, levels=levels)}).drives
+    assert Step("gain_probe", params={"gain": Drive(by="near", start=start, end=end, levels=levels)}).drives
 
 
 def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_others_at_their_defaults(
@@ -222,19 +224,22 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
         "low": Drive(by="near", start=0.1, end=0.9, levels=3),
         "high": Drive(by="near", start=0.2, end=1.0, levels=3),
     }
-    assert Step("ordered_probe", both).drives.keys() == {"low", "high"}  # low 0.9 would be above the default high 0.8
+    assert Step("ordered_probe", params=both).drives.keys() == {
+        "low",
+        "high",
+    }  # low 0.9 would be above the default high 0.8
     crossing = {
         "low": Drive(by="near", start=0.1, end=0.9, levels=3),
         "high": Drive(by="near", start=0.5, end=0.6, levels=3),
     }
     with pytest.raises(RecipeError, match=r"ordered_probe.*low 0\.9.*above high 0\.6"):  # at the end the user wrote
-        Step("ordered_probe", crossing)
+        Step("ordered_probe", params=crossing)
 
 
 def test_a_look_of_an_each_takes_no_name_because_nothing_could_reach_it_by_it(gain):
     with pytest.raises(RecipeError, match=r"a look takes no `name`.*each\.looks\[0\]"):
-        Each("g", [Step("gain_probe", name="x"), "none"])
-    assert Each("g", [Step("gain_probe"), "none"], name="pieces").name == "pieces"
+        Each("g", looks=[Step("gain_probe", name="x"), "none"])
+    assert Each("g", looks=[Step("gain_probe"), "none"], name="pieces").name == "pieces"
 
 
 def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway_effects):
@@ -249,37 +254,45 @@ def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway
         """Nothing."""
         return rgb
 
-    ok = Step("two_probe", {"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=1, end=0)})
+    ok = Step(
+        "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=1, end=0)}
+    )
     assert ok.drives.keys() == {"first", "second"}
     with pytest.raises(RecipeError, match=r"two_probe.*one field.*'light' and 'near'"):
-        Step("two_probe", {"first": Drive(by="near", start=0, end=1), "second": Drive(by="light", start=0, end=1)})
+        Step(
+            "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="light", start=0, end=1)}
+        )
     with pytest.raises(RecipeError, match=r"two_probe.*one number of levels.*5 and 8"):
         Step(
             "two_probe",
-            {"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=0, end=1, levels=8)},
+            params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=0, end=1, levels=8)},
         )
 
 
 def test_a_step_names_the_field_that_drives_it_as_a_region_it_refers_to(gain):
-    step = Step("gain_probe", {"gain": drive()}, mask="subject")
+    step = Step("gain_probe", params={"gain": drive()}, mask="subject")
     assert step.references() == [("mask", "subject", "selection"), ("by", "near", "selection")]
-    assert Step("gain_probe", {"gain": 2}).references() == []
+    assert Step("gain_probe", params={"gain": 2}).references() == []
 
 
 def test_a_recipe_refuses_a_field_that_is_no_region_or_not_a_selection_naming_the_step_and_the_valid_ones(gain):
     with pytest.raises(
         RecipeError, match=r"step 1: `by` names 'near', which is no region; valid selections: subject, "
     ):
-        Recipe([Step("gain_probe", {"gain": drive()})], name="look", size=None)
+        Recipe([Step("gain_probe", params={"gain": drive()})], name="look", size=None)
     with pytest.raises(RecipeError, match=r"step 1: `by` names 'panes', a partition, but it needs a selection"):
-        Recipe([Step("gain_probe", {"gain": drive(by="panes")})], name="look", regions={"panes": Grid()}, size=None)
-    assert Recipe([Step("gain_probe", {"gain": drive(by="near")})], name="look", regions={"near": NEAR}, size=None)
+        Recipe(
+            [Step("gain_probe", params={"gain": drive(by="panes")})], name="look", regions={"panes": Grid()}, size=None
+        )
+    assert Recipe(
+        [Step("gain_probe", params={"gain": drive(by="near")})], name="look", regions={"near": NEAR}, size=None
+    )
 
 
 def test_a_look_of_an_each_names_its_field_too(gain):
-    look = Step("gain_probe", {"gain": drive(by="near")})
+    look = Step("gain_probe", params={"gain": drive(by="near")})
     with pytest.raises(RecipeError, match=r"step 1: `by` names 'near', which is no region"):
-        Recipe([Each("g", [look, "none"])], name="look", regions={"g": Grid()}, size=None)
+        Recipe([Each("g", looks=[look, "none"])], name="look", regions={"g": Grid()}, size=None)
 
 
 MAPS_OF_A_DRIVE = {
@@ -294,7 +307,7 @@ MAPS_OF_A_DRIVE = {
 @pytest.mark.parametrize(("by", "needed"), MAPS_OF_A_DRIVE.values(), ids=MAPS_OF_A_DRIVE.keys())
 def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed):
     recipe = Recipe(
-        [Step("gain_probe", {"gain": drive(by=by)})],
+        [Step("gain_probe", params={"gain": drive(by=by)})],
         name="look",
         regions={"near": NEAR, "star": Given()},
         size=None,
@@ -311,9 +324,9 @@ def pulse(gain):
     """A recipe with every kind of number: a named step, a driven one, an `Each` with a look, a band and a frame."""
     return Recipe(
         [
-            Step("gain_probe", {"gain": 2.0, "taps": 3}, name="pulse"),
-            Step("gain_probe", {"gain": Drive(by="near", start=0.5, end=2.5)}, opacity=0.5),
-            Each("g", [Step("gain_probe", {"offset": 0.1}), "none"], feather=0.002),
+            Step("gain_probe", params={"gain": 2.0, "taps": 3}, name="pulse"),
+            Step("gain_probe", params={"gain": Drive(by="near", start=0.5, end=2.5)}, opacity=0.5),
+            Each("g", looks=[Step("gain_probe", params={"offset": 0.1}), "none"], feather=0.002),
         ],
         name="pulse",
         regions={"g": Grid(columns=3), "near": Band(of="depth", low=0.4)},
@@ -387,11 +400,15 @@ def test_a_steps_opacity_is_a_number_of_the_step_at_its_own_or_its_effects_defau
 
 def test_an_effect_the_recipe_uses_once_is_addressed_by_its_name_and_one_it_uses_twice_by_its_number(gain):
     once = Recipe(
-        [Step("gain_probe", {"gain": 2.0}), Step("gradient", {"colors": ["#000000"]})], name="once", size=None
+        [Step("gain_probe", params={"gain": 2.0}), Step("gradient", params={"colors": ["#000000"]})],
+        name="once",
+        size=None,
     )
     assert "gain_probe.gain" in once.parameters()
     twice = Recipe(
-        [Step("gain_probe"), Step("gradient", {"colors": ["#000000"]}), Step("gain_probe")], name="twice", size=None
+        [Step("gain_probe"), Step("gradient", params={"colors": ["#000000"]}), Step("gain_probe")],
+        name="twice",
+        size=None,
     )
     assert "gain_probe#1.gain" in twice.parameters()
     assert "gain_probe#2.gain" in twice.parameters()
@@ -452,8 +469,12 @@ def test_setting_nothing_gives_an_equal_recipe(pulse):
 
 
 def test_a_recipe_with_a_number_set_renders_as_one_written_with_it(photo, gain, subject):
-    written = Recipe([Step("gain_probe", {"gain": Drive(by="light", start=0.5, end=3.0)})], name="pulse", size=None)
-    other = Recipe([Step("gain_probe", {"gain": Drive(by="light", start=0.5, end=2.0)})], name="pulse", size=None)
+    written = Recipe(
+        [Step("gain_probe", params={"gain": Drive(by="light", start=0.5, end=3.0)})], name="pulse", size=None
+    )
+    other = Recipe(
+        [Step("gain_probe", params={"gain": Drive(by="light", start=0.5, end=2.0)})], name="pulse", size=None
+    )
     np.testing.assert_array_equal(
         render(photo, other.with_values({"gain_probe.gain.end": 3.0})), render(photo, written)
     )
@@ -498,7 +519,7 @@ def test_an_address_or_value_that_is_wrong_is_refused_naming_the_address_and_wha
 
 def test_a_step_that_has_a_name_can_still_be_reached_by_its_effect_when_it_is_the_only_one_of_it(gain):
     named = Recipe(
-        [Step("gain_probe", name="pulse"), Step("gradient", {"colors": ["#000000"]})], name="look", size=None
+        [Step("gain_probe", name="pulse"), Step("gradient", params={"colors": ["#000000"]})], name="look", size=None
     )
     assert named.with_values({"gain_probe.gain": 1.5}).parameters()["pulse.gain"].value == 1.5
 
@@ -558,7 +579,9 @@ def test_numbers_from_numpy_are_taken_as_the_python_numbers_they_hold(pulse):
 
 def test_an_effect_the_recipe_uses_twice_cannot_be_named_without_its_number(gain):
     twice = Recipe(
-        [Step("gain_probe"), Step("gradient", {"colors": ["#000000"]}), Step("gain_probe")], name="twice", size=None
+        [Step("gain_probe"), Step("gradient", params={"colors": ["#000000"]}), Step("gain_probe")],
+        name="twice",
+        size=None,
     )
     with pytest.raises(
         RecipeError, match=r"'gain_probe\.gain'.*2 'gain_probe' steps.*gain_probe#1\.gain.*gain_probe#2\.gain"
@@ -609,13 +632,13 @@ def test_two_steps_of_a_recipe_cannot_share_a_name_or_take_the_name_of_an_effect
     with pytest.raises(RecipeError, match=r"'gain_probe'.*effect"):
         Recipe([Step("gain_probe", name="gain_probe")], name="look", size=None)
     with pytest.raises(RecipeError, match=r"'each'.*effect|reserved"):
-        Recipe([Each("g", ["none"], name="each")], name="look", regions={"g": Grid()}, size=None)
+        Recipe([Each("g", looks=["none"], name="each")], name="look", regions={"g": Grid()}, size=None)
     assert Recipe([Step("gain_probe", name="a"), Step("gain_probe", name="b")], name="look", size=None)
 
 
 def test_a_step_named_describes_itself_with_its_name_and_an_each_too(gain):
-    assert Step("gain_probe", {"gain": 2}, name="pulse").describe() == "pulse: gain_probe(gain=2)"
-    assert Each("g", ["none"], name="pieces").describe() == "pieces: each g [none]"
+    assert Step("gain_probe", params={"gain": 2}, name="pulse").describe() == "pulse: gain_probe(gain=2)"
+    assert Each("g", looks=["none"], name="pieces").describe() == "pieces: each g [none]"
     assert Step("gain_probe").name is None
 
 
@@ -639,17 +662,19 @@ def rich(**changed: float) -> Recipe:
         [
             Step(
                 "gain_probe",
-                {"gain": changed.get("gain", 2.0)},
+                params={"gain": changed.get("gain", 2.0)},
                 mask="near",
                 opacity=0.5,
                 blend_mode="screen",
                 name="a",
             ),
-            Step("seams", {"width": changed.get("width", 0.5), "color": "#ff0000"}, partition="s"),
+            Step("seams", params={"width": changed.get("width", 0.5), "color": "#ff0000"}, partition="s"),
             Each(
                 "s",
-                [
-                    Step("gain_probe", {"offset": changed.get("offset", 0.1)}, blend_mode="multiply", opacity=0.9),
+                looks=[
+                    Step(
+                        "gain_probe", params={"offset": changed.get("offset", 0.1)}, blend_mode="multiply", opacity=0.9
+                    ),
                     "none",
                 ],
                 mask="near",
@@ -800,19 +825,21 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
     [
         pytest.param(lambda: [Step("depth_probe")], (False, True), id="a step whose effect takes depth"),
         pytest.param(
-            lambda: [Each("g", [Step("grade"), Step("depth_probe")])], (False, True), id="a look whose effect takes it"
+            lambda: [Each("g", looks=[Step("grade"), Step("depth_probe")])],
+            (False, True),
+            id="a look whose effect takes it",
         ),
         pytest.param(
-            lambda: [Step("grade", mask="subject"), Each("g", [Step("disperse"), "none"])],
+            lambda: [Step("grade", mask="subject"), Each("g", looks=[Step("disperse"), "none"])],
             (True, False),
             id="steps and looks on the subject need no depth",
         ),
         pytest.param(lambda: [Step("depth_probe", mask="subject")], (True, True), id="a step that needs both"),
-        pytest.param(lambda: [Each("g", [Step("grade"), "none"])], (False, False), id="neither"),
+        pytest.param(lambda: [Each("g", looks=[Step("grade"), "none"])], (False, False), id="neither"),
         pytest.param(lambda: [Step("grade", mask="near")], (False, True), id="a mask made from depth"),
-        pytest.param(lambda: [Each("bands", ["none"])], (False, True), id="an each over depth bands"),
+        pytest.param(lambda: [Each("bands", looks=["none"])], (False, True), id="an each over depth bands"),
         pytest.param(lambda: [Step("grade", mask="front")], (False, True), id="a pick of depth bands"),
-        pytest.param(lambda: [Each("g", [Step("grade", mask="near")])], (False, True), id="a look's mask"),
+        pytest.param(lambda: [Each("g", looks=[Step("grade", mask="near")])], (False, True), id="a look's mask"),
         pytest.param(lambda: [Step("grade")], (False, False), id="depth regions no step uses"),
     ],
 )
@@ -838,7 +865,7 @@ def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_
         ),
         pytest.param([Step("grade")], {"star": Given()}, Framing(), set(), id="a given map no step uses"),
         pytest.param(
-            [Each("g", [Step("grade", mask="star"), "none"])],
+            [Each("g", looks=[Step("grade", mask="star"), "none"])],
             {"g": Grid(), "star": Given()},
             Framing(),
             {"star"},
@@ -887,19 +914,22 @@ EXPLICIT = {"shadow_clip": 0.2}  # a gradient_map parameter the sepia preset doe
 
 def test_a_steps_parameters_are_the_presets_with_the_given_ones_over_them():
     assert Step("gradient_map", preset="sepia").params == _shipped("gradient_map", "sepia")
-    assert Step("gradient_map", EXPLICIT, preset="sepia").params == {**_shipped("gradient_map", "sepia"), **EXPLICIT}
+    assert Step("gradient_map", params=EXPLICIT, preset="sepia").params == {
+        **_shipped("gradient_map", "sepia"),
+        **EXPLICIT,
+    }
 
 
 def test_a_given_parameter_wins_over_the_presets():
     sepia = _shipped("gradient_map", "sepia")
     chosen = ["#000000", "#ff0000"]
-    step = Step("gradient_map", {"stops": chosen}, preset="sepia")
+    step = Step("gradient_map", params={"stops": chosen}, preset="sepia")
     assert step.params["stops"] == chosen != sepia["stops"]
 
 
 def test_a_preset_step_renders_as_the_step_with_the_same_parameters_written_out(photo):
-    preset = Step("gradient_map", EXPLICIT, preset="sepia")
-    written = Step("gradient_map", {**_shipped("gradient_map", "sepia"), **EXPLICIT})
+    preset = Step("gradient_map", params=EXPLICIT, preset="sepia")
+    written = Step("gradient_map", params={**_shipped("gradient_map", "sepia"), **EXPLICIT})
     first = registry.apply("gradient_map", photo, **preset.params)
     np.testing.assert_array_equal(first, registry.apply("gradient_map", photo, **written.params))
     assert not np.array_equal(first, registry.apply("gradient_map", photo))  # and it is not the default look
@@ -926,10 +956,10 @@ def test_a_preset_for_an_unknown_effect_lists_the_effects():
 def test_steps_holding_pictures_compare_by_pixels_and_describe_without_them(layer_probe):
     rng = np.random.default_rng(5)
     pixels = rng.random((240, 320, 3), dtype=np.float32)
-    first = Step("layer_probe", {"image": Picture(pixels, "tex.png")})
-    assert first == Step("layer_probe", {"image": Picture(pixels.copy(), "other.png")})
-    assert first != Step("layer_probe", {"image": Picture(pixels[::-1].copy(), "tex.png")})
-    assert first != Step("layer_probe", {"image": "#808080"})
+    first = Step("layer_probe", params={"image": Picture(pixels, "tex.png")})
+    assert first == Step("layer_probe", params={"image": Picture(pixels.copy(), "other.png")})
+    assert first != Step("layer_probe", params={"image": Picture(pixels[::-1].copy(), "tex.png")})
+    assert first != Step("layer_probe", params={"image": "#808080"})
     assert first.describe().startswith("layer_probe(image=Picture('tex")
     assert len(first.describe()) <= 56
 
@@ -938,7 +968,7 @@ def test_an_effect_receives_the_picture_a_step_holds(layer_probe):
     picture = Picture(np.full((3, 3, 3), 0.25, np.float32))
     out = registry.apply("layer_probe", np.zeros((4, 4, 3), np.float32), image=picture)
     np.testing.assert_allclose(out, 0.25)
-    assert Step("layer_probe", {"image": picture}, mask="subject").params["image"] is picture
+    assert Step("layer_probe", params={"image": picture}, mask="subject").params["image"] is picture
 
 
 # --- regions: steps name them, the recipe declares them ---------------------------------------------------------------
@@ -954,7 +984,7 @@ def test_a_recipe_declaring_regions_accepts_steps_that_name_them_in_every_place_
     steps: list[Step | Each] = [
         Step("grade", mask="head"),
         Step("grade", mask="subject"),
-        Each("panes", [Step("grade", mask="head"), "none", Step("grade", opacity=0.5)], mask="background"),
+        Each("panes", looks=[Step("grade", mask="head"), "none", Step("grade", opacity=0.5)], mask="background"),
     ]
     assert Recipe(steps, name="r", regions=REGIONS).regions == REGIONS
     assert Recipe([Step("grade")], name="plain").regions == {}
@@ -972,23 +1002,23 @@ BAD_REFERENCES = {
         r"step 1: `mask` names 'panes', a partition, but it needs a selection; valid selections: .*head",
     ),
     "an each no region has": (
-        lambda: Recipe([Each("nope", ["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("nope", looks=["none"])], name="r", regions=REGIONS),
         r"step 1: `each` names 'nope', which is no region; valid partitions: panes, glass",
     ),
     "an each that is a selection": (
-        lambda: Recipe([Each("head", ["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("head", looks=["none"])], name="r", regions=REGIONS),
         r"step 1: `each` names 'head', a selection, but it needs a partition; valid partitions: panes, glass",
     ),
     "an each that is the subject": (
-        lambda: Recipe([Each("subject", ["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("subject", looks=["none"])], name="r", regions=REGIONS),
         r"step 1: `each` names 'subject', a selection",
     ),
     "a mask on an each": (
-        lambda: Recipe([Each("panes", ["none"], mask="glass")], name="r", regions=REGIONS),
+        lambda: Recipe([Each("panes", looks=["none"], mask="glass")], name="r", regions=REGIONS),
         r"step 1: `mask` names 'glass', a partition",
     ),
     "a look with a mask no region has": (
-        lambda: Recipe([Each("panes", [Step("grade", mask="nope")])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("panes", looks=[Step("grade", mask="nope")])], name="r", regions=REGIONS),
         r"step 1: `mask` names 'nope'",
     ),
     "a partition no region has": (
@@ -1022,18 +1052,18 @@ def test_a_recipe_refuses_a_bad_region_reference_when_it_is_made(partition_probe
 
 
 BAD_EACH = {
-    "no looks": (lambda: Each("panes", []), r"looks"),
-    "a look that is a word other than none": (lambda: Each("panes", ["nothing"]), r"looks"),
-    "a look that is a number": (lambda: Each("panes", [3]), r"looks"),  # type: ignore[list-item]
+    "no looks": (lambda: Each("panes", looks=[]), r"looks"),
+    "a look that is a word other than none": (lambda: Each("panes", looks=["nothing"]), r"looks"),
+    "a look that is a number": (lambda: Each("panes", looks=[3]), r"looks"),  # type: ignore[list-item]
     "an assignment that does not exist": (
-        lambda: Each("panes", ["none"], assign="shuffle"),
+        lambda: Each("panes", looks=["none"], assign="shuffle"),
         r"`assign`.*cycle.*random",
     ),
-    "a negative seed": (lambda: Each("panes", ["none"], seed=-1), r"`seed`.*0"),
-    "a feather below 0": (lambda: Each("panes", ["none"], feather=-0.005), r"`feather`.*0"),
-    "an infinite feather": (lambda: Each("panes", ["none"], feather=float("inf")), r"`feather`"),
-    "an unknown key": (lambda: Each("panes", ["none"], effect="grade"), r"`effect`"),
-    "a mask that is not a name": (lambda: Each("panes", ["none"], mask=3), r"`mask`"),  # type: ignore[arg-type]
+    "a negative seed": (lambda: Each("panes", looks=["none"], seed=-1), r"`seed`.*0"),
+    "a feather below 0": (lambda: Each("panes", looks=["none"], feather=-0.005), r"`feather`.*0"),
+    "an infinite feather": (lambda: Each("panes", looks=["none"], feather=float("inf")), r"`feather`"),
+    "an unknown key": (lambda: Each("panes", looks=["none"], effect="grade"), r"`effect`"),
+    "a mask that is not a name": (lambda: Each("panes", looks=["none"], mask=3), r"`mask`"),  # type: ignore[arg-type]
 }
 
 
@@ -1076,18 +1106,22 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
             id="a grid laid over the subject",
         ),
         pytest.param(
-            [Each("cut", ["none"])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
+            [Each("cut", looks=["none"])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
         ),
-        pytest.param([Each("cut", ["none"])], {"cut": Shards(fit="background")}, True, id="on the background"),
+        pytest.param([Each("cut", looks=["none"])], {"cut": Shards(fit="background")}, True, id="on the background"),
         pytest.param(
-            [Each("cut", ["none"])],
+            [Each("cut", looks=["none"])],
             {"cut": Shards(fit="aura"), "aura": Pick(of="g"), "g": Grid(fit="subject")},
             True,
             id="through two regions",
         ),
-        pytest.param([Each("g", [Step("disperse"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"),
-        pytest.param([Each("g", [Step("grade"), "none"])], {"g": Grid()}, False, id="looks that do not"),
-        pytest.param([Each("g", ["none"], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"),
+        pytest.param(
+            [Each("g", looks=[Step("disperse"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"
+        ),
+        pytest.param([Each("g", looks=[Step("grade"), "none"])], {"g": Grid()}, False, id="looks that do not"),
+        pytest.param(
+            [Each("g", looks=["none"], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"
+        ),
     ],
 )
 def test_a_recipe_needs_the_subject_only_when_a_region_it_uses_does(steps, regions, needs_subject):
@@ -1106,7 +1140,11 @@ FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
         pytest.param([Step("grade", mask="subject")], FOUND, True, False, id="the built-in subject"),
         pytest.param([Step("grade")], FOUND, False, False, id="found by pieces but no step uses it"),
         pytest.param(
-            [Each("cut", ["none"])], {**FOUND, "cut": Shards(fit="found")}, False, True, id="shards laid over that find"
+            [Each("cut", looks=["none"])],
+            {**FOUND, "cut": Shards(fit="found")},
+            False,
+            True,
+            id="shards laid over that find",
         ),
         pytest.param([Step("grade", mask="found"), Step("grade", mask="subject")], FOUND, True, True, id="both"),
     ],
@@ -1119,18 +1157,18 @@ def test_a_recipe_needs_a_finder_for_pieces_only_when_a_region_it_uses_finds_the
 
 
 def test_an_each_step_describes_itself_with_its_partition_and_looks():
-    step = Each("panes", [Step("grade", {"exposure": 0.5}), "none"], mask="subject", opacity=0.5)
+    step = Each("panes", looks=[Step("grade", params={"exposure": 0.5}), "none"], mask="subject", opacity=0.5)
     assert step.describe() == "each panes [grade(exposure=0.5), none] on subject x0.5"
-    assert len(Each("panes", [Step("ascii", {"chars": "xy" * 50})] * 3).describe(width=30)) == 30
+    assert len(Each("panes", looks=[Step("ascii", params={"chars": "xy" * 50})] * 3).describe(width=30)) == 30
 
 
 def test_an_each_step_shows_fully_unless_it_gives_an_opacity():
-    assert Each("panes", [Step("grade")]).opacity == 1.0
-    assert Each("panes", [Step("grade")], opacity=0.3).opacity == 0.3
+    assert Each("panes", looks=[Step("grade")]).opacity == 1.0
+    assert Each("panes", looks=[Step("grade")], opacity=0.3).opacity == 0.3
 
 
 def test_the_each_step_is_a_frozen_value_and_keeps_its_looks_as_a_tuple():
-    step = Each("panes", [Step("grade"), "none"])
+    step = Each("panes", looks=[Step("grade"), "none"])
     assert step.looks == (Step("grade"), "none")
     with pytest.raises(ValueError, match="frozen"):
         step.feather = 3.0  # type: ignore[misc]  # the point of the test

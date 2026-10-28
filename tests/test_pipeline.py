@@ -223,8 +223,10 @@ def test_changing_an_svg_file_a_recipe_reads_redoes_that_recipe_and_nothing_else
 @pytest.mark.parametrize(
     "layer",
     [
-        pytest.param(lambda image: fx.layer_probe(image), id="a step"),
-        pytest.param(lambda image: Each("panes", [fx.layer_probe(image), "none"]), id="a look of an each step"),
+        pytest.param(lambda image: fx.layer_probe(image=image), id="a step"),
+        pytest.param(
+            lambda image: Each("panes", looks=[fx.layer_probe(image=image), "none"]), id="a look of an each step"
+        ),
     ],
 )
 def test_a_recipe_built_in_code_is_redone_when_its_picture_changes_though_its_repr_does_not(folder, layer_probe, layer):

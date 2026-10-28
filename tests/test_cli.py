@@ -312,7 +312,10 @@ def test_sweep_puts_the_recipe_at_each_value_of_a_parameter_side_by_side(files, 
     photo = imageio.load(files / "me.png")  # as the command reads it
     values = (0, 0.05, 0.1, 0.15, 0.2)
     expected = contact_sheet(
-        [(f"amount={v}", render(photo, Recipe([Step("grain", {"amount": v})], name="a", size=64))) for v in values],
+        [
+            (f"amount={v}", render(photo, Recipe([Step("grain", params={"amount": v})], name="a", size=64)))
+            for v in values
+        ],
         columns=2,
     )
     imageio.save(expected, files / "expected.png")
@@ -327,7 +330,9 @@ def test_sweep_takes_a_negative_range_after_dashes_and_a_matte_for_a_recipe_that
     photo = imageio.load(cut / "me.png")
     tiles = []
     for angle in (-90, 0, 90):
-        look = Recipe([Step("rgb_split", {"angle": angle, "amount": 6}, mask="subject")], name="masked", size=128)
+        look = Recipe(
+            [Step("rgb_split", params={"angle": angle, "amount": 6}, mask="subject")], name="masked", size=128
+        )
         tiles.append((f"angle={angle}", render(photo, look, maps={"subject": imageio.load_map(cut / "matte.png")})))
     imageio.save(contact_sheet(tiles), cut / "expected.png")
     np.testing.assert_array_equal(imageio.load(cut / "s.png"), imageio.load(cut / "expected.png"))

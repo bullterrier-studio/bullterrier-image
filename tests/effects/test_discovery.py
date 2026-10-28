@@ -57,7 +57,7 @@ _REPORT = """
         "module": registry.get("zz_folder").__module__,
         "category": registry.category("zz_folder"),
         "fx": fx.zz_folder(amount=0.2).effect,
-        "recipe_step": Step("zz_folder", {"amount": 0.2}).effect,
+        "recipe_step": Step("zz_folder", params={"amount": 0.2}).effect,
         "cli_lists_it": "zz_folder" in listing.getvalue(),
     }, sys.stdout)
 """

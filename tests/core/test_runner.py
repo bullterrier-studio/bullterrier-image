@@ -26,8 +26,8 @@ from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
 from bullterrier_image.recipe import Band, Bands, Combine, Finder, Given, Grid, Pick, Shards, Subject
 
-MASKED = Recipe((Step("gradient", {"colors": ["#000000"]}, "background"),), name="masked", size=None)
-PLAIN = Recipe((Step("grade", {"exposure": 0.5}),), name="plain", size=None)
+MASKED = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="masked", size=None)
+PLAIN = Recipe((Step("grade", params={"exposure": 0.5}),), name="plain", size=None)
 
 
 class CountingFinder:
@@ -208,7 +208,7 @@ def deep(**keys) -> Recipe:
 
 
 FRONT = Recipe(  # paints red only the front quarter of the depth scale
-    [Step("gradient", {"colors": ["#ff0000"]}, mask="near")],
+    [Step("gradient", params={"colors": ["#ff0000"]}, mask="near")],
     name="front",
     size=None,
     regions={"near": Band(of="depth", low=0.75, feather=0)},
@@ -369,7 +369,10 @@ def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, s
 # --- a given map: any name a recipe declares, handed in or found like the subject and the depth -----------------------
 
 STAR_RED = Recipe(  # paints red where the `star` map is
-    [Step("gradient", {"colors": ["#ff0000"]}, mask="star")], name="star-red", size=None, regions={"star": Given()}
+    [Step("gradient", params={"colors": ["#ff0000"]}, mask="star")],
+    name="star-red",
+    size=None,
+    regions={"star": Given()},
 )
 # a hard-edged star-like mask, off-centre and asymmetric, so that a flip, a crop or a turn that missed it shows
 STAR = np.zeros((96, 128), np.float32)
@@ -474,7 +477,7 @@ def test_a_missing_subject_or_depth_is_caught_as_a_map_error(photo, recipe):
 
 LUMA = np.asarray([0.2126, 0.7152, 0.0722])  # Rec. 709, written here again so that the test does not use the code's
 DARK = Recipe(  # paints red where the picture is no brighter than half
-    [Step("gradient", {"colors": ["#ff0000"]}, mask="dark")],
+    [Step("gradient", params={"colors": ["#ff0000"]}, mask="dark")],
     name="dark",
     size=None,
     regions={"dark": Band(of="light", low=0, high=0.5, feather=0)},
@@ -512,7 +515,7 @@ def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(pho
     # a first step that blacks the whole picture out must not change where the second one finds the dark: the regions
     # are made once for the picture the recipe receives
     recipe = Recipe(
-        [Step("gradient", {"colors": ["#000000"]}), *DARK.steps],
+        [Step("gradient", params={"colors": ["#000000"]}), *DARK.steps],
         name="after",
         size=None,
         regions=DARK.regions,
@@ -524,7 +527,7 @@ def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(pho
 
 def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subject):
     lit_subject = Recipe(
-        [Step("gradient", {"colors": ["#ff0000"]}, mask="lit_subject")],
+        [Step("gradient", params={"colors": ["#ff0000"]}, mask="lit_subject")],
         name="lit-subject",
         size=None,
         regions={
@@ -583,11 +586,11 @@ def brighten(throwaway_effects):
 def driven(by: str = "f", levels: int = 5, **drives: tuple[float, float]) -> Recipe:
     """A recipe of one `brighten_probe` step whose parameters vary by the given map `f` (or a built-in field)."""
     values = {name: Drive(by=by, start=start, end=end, levels=levels) for name, (start, end) in drives.items()}
-    return Recipe([Step("brighten_probe", values)], name="driven", size=None, regions={"f": Given()})
+    return Recipe([Step("brighten_probe", params=values)], name="driven", size=None, regions={"f": Given()})
 
 
 def plain(**values: float) -> Recipe:
-    return Recipe([Step("brighten_probe", values)], name="plain", size=None)
+    return Recipe([Step("brighten_probe", params=values)], name="plain", size=None)
 
 
 def field_of(photo: np.ndarray, value: float) -> np.ndarray:
@@ -645,7 +648,7 @@ def test_two_drives_of_one_step_move_together_along_the_same_field(photo, bright
 
 def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten):
     recipe = Recipe(
-        [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5), "bias": 0.25})],
+        [Step("brighten_probe", params={"gain": Drive(by="f", start=0.5, end=2.5), "bias": 0.25})],
         name="mixed",
         size=None,
         regions={"f": Given()},
@@ -656,7 +659,7 @@ def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten)
 
 def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, subject):
     both = Recipe(
-        [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5)}, mask="subject", opacity=0.5)],
+        [Step("brighten_probe", params={"gain": Drive(by="f", start=0.5, end=2.5)}, mask="subject", opacity=0.5)],
         name="both",
         size=None,
         regions={"f": Given()},
@@ -669,7 +672,13 @@ def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, s
 
 def test_the_look_of_an_each_can_be_driven(photo, brighten):
     recipe = Recipe(
-        [Each("g", [Step("brighten_probe", {"gain": Drive(by="f", start=0.5, end=2.5)}), "none"], feather=0)],
+        [
+            Each(
+                "g",
+                looks=[Step("brighten_probe", params={"gain": Drive(by="f", start=0.5, end=2.5)}), "none"],
+                feather=0,
+            )
+        ],
         name="pieces",
         size=None,
         regions={"g": Grid(columns=2), "f": Given()},
@@ -684,7 +693,7 @@ def test_a_drive_by_the_depth_map_follows_the_depth(photo, brighten):
     dim = photo * 0.4  # at most 0.4, so a gain up to 2 never clips: the render is then linear in the gain
     depth = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
     recipe = Recipe(
-        [Step("brighten_probe", {"gain": Drive(by="depth", start=0.0, end=2.0)})], name="by-depth", size=None
+        [Step("brighten_probe", params={"gain": Drive(by="depth", start=0.0, end=2.0)})], name="by-depth", size=None
     )
     got = runner.render(dim, recipe, maps={"depth": depth})
     # a mix of renders that are linear in the gain is the render at the mixed gain: gain 2 x depth, pixel by pixel
@@ -694,7 +703,7 @@ def test_a_drive_by_the_depth_map_follows_the_depth(photo, brighten):
 def test_a_drive_by_a_band_of_the_depth_is_the_same_as_the_band_given_as_a_map(photo, brighten):
     depth = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
     banded = Recipe(
-        [Step("brighten_probe", {"gain": Drive(by="near", start=0.5, end=2.5)})],
+        [Step("brighten_probe", params={"gain": Drive(by="near", start=0.5, end=2.5)})],
         name="banded",
         size=None,
         regions={"near": Band(of="depth", low=0.6, high=1.0, feather=0.2)},
@@ -706,7 +715,9 @@ def test_a_drive_by_a_band_of_the_depth_is_the_same_as_the_band_given_as_a_map(p
 
 def test_a_drive_by_light_follows_the_brightness_of_the_picture_the_steps_work_on(photo, brighten):
     recipe = Recipe(
-        [Step("brighten_probe", {"gain": Drive(by="light", start=0.0, end=1.0, levels=2)})], name="by-light", size=None
+        [Step("brighten_probe", params={"gain": Drive(by="light", start=0.0, end=1.0, levels=2)})],
+        name="by-light",
+        size=None,
     )
     light = (photo @ LUMA)[..., None]
     np.testing.assert_allclose(runner.render(photo, recipe), np.clip(photo * light, 0, 1), atol=1e-5)
@@ -929,13 +940,13 @@ def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_outpu
     """A step's input is released once the next step has run, and neither the scaled photo nor a masked step's blend
     weights are kept for the rest of the chain: the peak is the busiest step's scratch, output and input (and the
     scaled subject), whatever the number of steps."""
-    steps = tuple(Step("scratch_probe", {"copies": SCRATCH_COPIES}, mask) for _ in range(6))
+    steps = tuple(Step("scratch_probe", params={"copies": SCRATCH_COPIES}, mask=mask) for _ in range(6))
     bound = (
         SCRATCH_COPIES + 1 + 1 + kept + 0.25
     )  # scratch, output, input, the selections, a quarter picture for small things
     assert peak_pictures(PHOTO, Recipe(steps, name="chain", size=320), subject) <= bound
     # known-bad: the same gauge sees a picture that something keeps alive
-    leaky = (*steps[:3], Step("hoarding_probe", {}, mask), *steps[3:])
+    leaky = (*steps[:3], Step("hoarding_probe", params={}, mask=mask), *steps[3:])
     assert peak_pictures(PHOTO, Recipe(leaky, name="leaky", size=320), subject) > bound
 
 
@@ -946,11 +957,11 @@ RGB = {RED: (1.0, 0.0, 0.0), GREEN: (0.0, 1.0, 0.0), BLUE: (0.0, 0.0, 1.0), WHIT
 
 
 def fill(color: str, **keys) -> Step:
-    return Step("gradient", {"colors": [color]}, **keys)
+    return Step("gradient", params={"colors": [color]}, **keys)
 
 
 def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo):
-    looks = Each("bands", [fill(RED), fill(GREEN), fill(BLUE)], feather=0)
+    looks = Each("bands", looks=[fill(RED), fill(GREEN), fill(BLUE)], feather=0)
     recipe = Recipe([looks], name="by-distance", size=None, regions={"bands": Bands(of="depth", count=3)})
     by_hand = np.empty((96, 128, 3), np.float32)
     by_hand[:32], by_hand[32:64], by_hand[64:] = RGB[RED], RGB[GREEN], RGB[BLUE]  # nearer than 2/3, than 1/3, the rest
@@ -975,7 +986,7 @@ def run(photo, steps, regions, **keys):
 @pytest.mark.parametrize("count", [1, 2, 4, 5])
 def test_each_piece_shows_its_look_and_the_looks_take_turns(photo, count):
     looks = [fill(RED), fill(GREEN), fill(BLUE)]
-    out = run(photo, [Each("cols", looks, feather=0)], columns(count))
+    out = run(photo, [Each("cols", looks=looks, feather=0)], columns(count))
     width = photo.shape[1]
     for x in range(width):
         column = int((x + 0.5) * count / width)  # the piece holding the pixel's centre, worked out by hand
@@ -993,7 +1004,7 @@ def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_fe
         fill(GREEN),
         fill(BLUE),
     ]  # a pure look is its own weight in its channel, so the channels add up to 1
-    out = run(photo, [Each("cols", pure, assign=assign, feather=feather)], columns(5))
+    out = run(photo, [Each("cols", looks=pure, assign=assign, feather=feather)], columns(5))
     assert out.shape == photo.shape
     assert out.min() >= 0
     assert out.max() <= 1
@@ -1001,14 +1012,14 @@ def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_fe
 
 
 def test_a_none_look_leaves_its_pieces_exactly_as_they_were(photo):
-    out = run(photo, [Each("cols", [fill(RED), "none"], feather=0)], columns(4))
+    out = run(photo, [Each("cols", looks=[fill(RED), "none"], feather=0)], columns(4))
     np.testing.assert_array_equal(out[:, 32:64], photo[:, 32:64])
     np.testing.assert_array_equal(out[:, 96:], photo[:, 96:])
     assert (out[:, 0:32] == RGB[RED]).all()
 
 
 def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
-    out = run(photo, [Each("cols", [fill(RED), "none"], feather=7.5)], columns(4))  # 2 px on the 128 px photo
+    out = run(photo, [Each("cols", looks=[fill(RED), "none"], feather=7.5)], columns(4))  # 2 px on the 128 px photo
     reach = 4 * 2 + 1  # a feather of 2 px, cut off at 4 sigmas
     np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
     assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
@@ -1022,13 +1033,13 @@ def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
 def test_looks_that_change_nothing_give_back_the_photo_exactly(photo, feather, assign):
     nothing: list[Step | str] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), "none"]
     np.testing.assert_array_equal(
-        run(photo, [Each("cols", nothing, assign=assign, feather=feather)], columns(7)), photo
+        run(photo, [Each("cols", looks=nothing, assign=assign, feather=feather)], columns(7)), photo
     )
 
 
 def test_a_look_with_its_own_opacity_and_blend_mode_is_laid_over_the_photo_like_a_step(photo):
     looks = [fill("#808080", blend_mode="multiply"), fill(WHITE, opacity=0.25)]
-    out = run(photo, [Each("cols", looks, feather=0)], columns(2))
+    out = run(photo, [Each("cols", looks=looks, feather=0)], columns(2))
     np.testing.assert_allclose(out[:, :64], photo[:, :64] * (128 / 255), atol=1e-6)
     np.testing.assert_allclose(out[:, 64:], photo[:, 64:] * 0.75 + 0.25, atol=1e-6)
 
@@ -1039,17 +1050,19 @@ def test_a_look_takes_its_effects_default_opacity_unless_it_gives_one(photo, thr
         """Paints white, shown at 0.4 unless a step says otherwise."""
         return np.ones_like(rgb)
 
-    out = run(photo, [Each("cols", [Step("faint_white"), Step("faint_white", opacity=1.0)], feather=0)], columns(2))
+    out = run(
+        photo, [Each("cols", looks=[Step("faint_white"), Step("faint_white", opacity=1.0)], feather=0)], columns(2)
+    )
     np.testing.assert_allclose(out[:, :64], photo[:, :64] * 0.6 + 0.4, atol=1e-6)
     assert (out[:, 64:] == 1).all()
 
 
 def test_the_each_steps_own_opacity_and_blend_mode_apply_to_the_blended_looks(photo):
     looks = [fill(RED), fill(GREEN)]
-    half = run(photo, [Each("cols", looks, feather=0, opacity=0.5)], columns(2))
+    half = run(photo, [Each("cols", looks=looks, feather=0, opacity=0.5)], columns(2))
     np.testing.assert_allclose(half[:, :64], photo[:, :64] * 0.5 + 0.5 * np.array(RGB[RED], np.float32), atol=1e-6)
     np.testing.assert_allclose(half[:, 64:], photo[:, 64:] * 0.5 + 0.5 * np.array(RGB[GREEN], np.float32), atol=1e-6)
-    multiplied = run(photo, [Each("cols", looks, feather=0, blend_mode="multiply")], columns(2))
+    multiplied = run(photo, [Each("cols", looks=looks, feather=0, blend_mode="multiply")], columns(2))
     np.testing.assert_allclose(multiplied[:, :64], photo[:, :64] * np.array(RGB[RED], np.float32), atol=1e-6)
 
 
@@ -1063,7 +1076,7 @@ HEAD: dict[str, Grid | Pick | Shards] = {
     "step",
     [
         pytest.param(fill(RED, mask="head"), id="a step"),
-        pytest.param(Each("panes", [fill(RED)], mask="head"), id="an each step"),
+        pytest.param(Each("panes", looks=[fill(RED)], mask="head"), id="an each step"),
     ],
 )
 def test_a_step_masked_by_a_region_changes_only_the_pixels_the_region_chooses(photo, step):
@@ -1099,15 +1112,15 @@ def stamp(throwaway_effects):
 
 
 def test_every_look_is_rendered_once_over_the_whole_picture_however_many_pieces_it_has(photo, stamp):
-    twice = Step("stamp", {"copies": 2})
-    out = run(photo, [Each("cols", [Step("stamp"), twice, "none"], feather=0), Step("stamp")], columns(30))
+    twice = Step("stamp", params={"copies": 2})
+    out = run(photo, [Each("cols", looks=[Step("stamp"), twice, "none"], feather=0), Step("stamp")], columns(30))
     # 30 pieces, 3 looks, one a "none": two renders (0.01 and 0.02) and the step after them is the third
     assert set(np.unique(out)) == {np.float32(0.03)}
 
 
 def test_a_look_no_piece_has_is_not_rendered(photo, stamp):
     out = run(
-        photo, [Each("cols", [Step("stamp"), Step("stamp"), Step("stamp")], feather=0), Step("stamp")], columns(2)
+        photo, [Each("cols", looks=[Step("stamp"), Step("stamp"), Step("stamp")], feather=0), Step("stamp")], columns(2)
     )
     assert set(np.unique(out)) == {np.float32(0.03)}  # two pieces use two looks; the third would have made it 0.04
 
@@ -1116,19 +1129,19 @@ def test_the_random_assignment_is_decided_by_the_seed_alone(photo):
     looks = [fill(RED), fill(GREEN), fill(BLUE)]
 
     def render_with(seed: int) -> np.ndarray:
-        return run(photo, [Each("cols", looks, assign="random", seed=seed, feather=0)], columns(40))
+        return run(photo, [Each("cols", looks=looks, assign="random", seed=seed, feather=0)], columns(40))
 
     np.testing.assert_array_equal(render_with(3), render_with(3))
     assert not np.array_equal(render_with(3), render_with(4))
     chosen = {tuple(pixel) for pixel in render_with(3).reshape(-1, 3)}
     assert chosen == set(RGB.values()) - {RGB[WHITE]}  # all three looks are used, and nothing else appears
-    cycle = run(photo, [Each("cols", looks, feather=0)], columns(40))
+    cycle = run(photo, [Each("cols", looks=looks, feather=0)], columns(40))
     assert not np.array_equal(render_with(3), cycle)
 
 
 def test_regions_are_made_for_the_working_picture_after_framing_and_scaling(photo):
     recipe = Recipe(
-        [Each("halves", [fill(RED), fill(GREEN)], feather=0)],
+        [Each("halves", looks=[fill(RED), fill(GREEN)], feather=0)],
         name="framed",
         size=64,
         frame=Framing(aspect=1.0),
@@ -1148,25 +1161,25 @@ def test_a_declared_region_nobody_uses_costs_nothing_and_does_not_look_for_the_s
     unused = {"glass": Shards(fit="subject"), "head": Pick(of="glass")}
     out = run(
         photo,
-        [fill(RED, mask="head")] if False else [Step("grade", {"exposure": 0.5})],
+        [fill(RED, mask="head")] if False else [Step("grade", params={"exposure": 0.5})],
         unused,
         finders={"subject": Finder("stand-in", finder)},
     )
     assert finder.seen == []
-    np.testing.assert_array_equal(out, run(photo, [Step("grade", {"exposure": 0.5})], {}))
+    np.testing.assert_array_equal(out, run(photo, [Step("grade", params={"exposure": 0.5})], {}))
 
 
 def test_a_region_in_use_asks_for_the_subject_once_however_many_steps_use_it(photo, subject):
     finder = CountingFinder(subject)
     regions = {"glass": Shards(count=5, fit="subject"), "head": Pick(of="glass", pieces=[0])}
-    steps = [fill(RED, mask="head"), Each("glass", [fill(GREEN), "none"]), fill(BLUE, mask="subject")]
+    steps = [fill(RED, mask="head"), Each("glass", looks=[fill(GREEN), "none"]), fill(BLUE, mask="subject")]
     run(photo, steps, regions, finders={"subject": Finder("stand-in", finder)})
     assert finder.seen == [(96, 128, 3)]  # the photo as given
 
 
 def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_working_picture(photo, subject):
     recipe = Recipe(
-        [Each("sides", [fill(RED), fill(GREEN)], feather=0)],
+        [Each("sides", looks=[fill(RED), fill(GREEN)], feather=0)],
         name="scaled",
         size=64,
         regions={"sides": Grid(columns=2, rows=1, fit="subject")},
@@ -1180,7 +1193,7 @@ def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_workin
 
 @pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
 def test_a_region_that_needs_the_subject_without_a_finder_is_refused_like_a_masked_step(run_it, photo):
-    recipe = Recipe([Each("glass", ["none"])], name="fitted", size=None, regions={"glass": Shards(fit="subject")})
+    recipe = Recipe([Each("glass", looks=["none"])], name="fitted", size=None, regions={"glass": Shards(fit="subject")})
     with pytest.raises(SubjectNotFoundError, match="needs the subject"):
         run_it(photo, recipe)
 
@@ -1212,7 +1225,7 @@ TRACED: dict[str, Grid | Pick | Shards] = {
 
 
 def traced(photo, **keys):
-    recipe = Recipe([Step("grade", {"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
+    recipe = Recipe([Step("grade", params={"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
     return runner.trace(photo, recipe, **keys)
 
 
@@ -1261,19 +1274,19 @@ def test_the_number_drawn_in_a_piece_is_its_own_a_one_has_less_ink_than_an_eight
 
 
 def test_trace_still_ends_in_what_render_returns_when_regions_are_drawn(photo):
-    recipe = Recipe([Step("grade", {"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
+    recipe = Recipe([Step("grade", params={"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
     np.testing.assert_array_equal(runner.trace(photo, recipe)[-1].image, runner.render(photo, recipe))
 
 
 def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
-    each = Each("panes", [fill(RED), "none"], mask="head")
+    each = Each("panes", looks=[fill(RED), "none"], mask="head")
     labels = [stage.label for stage in runner.trace(photo, Recipe([each], name="t", size=None, regions=TRACED))]
     assert labels[-1].startswith("1. each panes [gradient(colors=['#ff0000']), none]")
 
 
 def test_a_feather_is_in_design_px_so_the_blend_is_the_same_at_two_resolutions():
     grey = np.full((96, 128, 3), 0.5, np.float32)
-    recipe = [Each("cols", [fill(RED), "none"], feather=9.6)]
+    recipe = [Each("cols", looks=[fill(RED), "none"], feather=9.6)]
 
     def rendered(size: int) -> np.ndarray:
         return runner.render(grey, Recipe(recipe, name="scaled", size=size, regions=columns(2)))
@@ -1350,7 +1363,7 @@ def test_a_subject_found_piece_by_piece_is_refused_without_a_finder(run_it, phot
 def test_a_subject_found_piece_by_piece_that_no_step_uses_asks_nobody():
     finder = PieceFinder()
     photo = np.zeros((20, 30, 3), np.float32)
-    recipe = Recipe([Step("grade", {"exposure": 0.5})], name="unused", size=None, regions=GRID_FIRST.regions)
+    recipe = Recipe([Step("grade", params={"exposure": 0.5})], name="unused", size=None, regions=GRID_FIRST.regions)
     runner.render(photo, recipe, finders={"subject": Finder("stand-in", finder)})
     assert finder.crops == []
 
@@ -1365,7 +1378,7 @@ PICTURE_OF = {
 
 
 def blur(radius, size=64, **recipe) -> Recipe:
-    return Recipe([Step("gaussian_blur", {"radius": radius})], name="blur", size=size, **recipe)
+    return Recipe([Step("gaussian_blur", params={"radius": radius})], name="blur", size=size, **recipe)
 
 
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
@@ -1378,14 +1391,14 @@ def blur(radius, size=64, **recipe) -> Recipe:
         pytest.param(blur(60.0, 64), 32, "gaussian_blur", {"radius": 4.0}, id="half the size: half the radius"),
         pytest.param(blur(15.0, 64), 128, "gaussian_blur", {"radius": 4.0}, id="twice the size: twice the radius"),
         pytest.param(
-            Recipe([Step("pixel_grid", {"cell": 30})], name="grid", size=1024),
+            Recipe([Step("pixel_grid", params={"cell": 30})], name="grid", size=1024),
             128,
             "pixel_grid",
             {"cell": 8},
             id="a whole number",
         ),
         pytest.param(
-            Recipe([Step("pixel_grid", {"cell": 30})], name="grid", size=1024),
+            Recipe([Step("pixel_grid", params={"cell": 30})], name="grid", size=1024),
             16,
             "pixel_grid",
             {"cell": 3},
@@ -1407,7 +1420,7 @@ def test_a_pixel_value_is_written_for_480_and_scaled_by_the_working_size_over_48
     [
         pytest.param(
             Recipe(
-                [Step("gaussian_blur", {"radius": Drive(by="f", start=7.5, end=45.0)})],
+                [Step("gaussian_blur", params={"radius": Drive(by="f", start=7.5, end=45.0)})],
                 name="driven",
                 size=1024,
                 regions={"f": Given()},
@@ -1417,7 +1430,15 @@ def test_a_pixel_value_is_written_for_480_and_scaled_by_the_working_size_over_48
         ),
         pytest.param(
             Recipe(
-                [Each("g", [Step("gaussian_blur", {"radius": 45.0}), Step("gaussian_blur", {"radius": 45.0})])],
+                [
+                    Each(
+                        "g",
+                        looks=[
+                            Step("gaussian_blur", params={"radius": 45.0}),
+                            Step("gaussian_blur", params={"radius": 45.0}),
+                        ],
+                    )
+                ],
                 name="each",
                 size=1024,
                 regions={"g": Grid(columns=2)},
@@ -1461,7 +1482,10 @@ def disc(long_side: int) -> np.ndarray:
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
 @pytest.mark.parametrize(
     "step",
-    [Step("gaussian_blur", {"radius": 16.0}), Step("drop_shadow", {"offset": 34.0, "angle": 45.0, "blur": 12.0})],
+    [
+        Step("gaussian_blur", params={"radius": 16.0}),
+        Step("drop_shadow", params={"offset": 34.0, "angle": 45.0, "blur": 12.0}),
+    ],
     ids=["a blur radius", "a shadow's offset and blur"],
 )
 def test_a_recipe_without_a_size_gives_the_same_look_on_a_photo_of_any_size(picture_of, step):
@@ -1477,7 +1501,7 @@ def test_a_recipe_without_a_size_gives_the_same_look_on_a_photo_of_any_size(pict
 
 @pytest.mark.parametrize("picture_of", PICTURE_OF.values(), ids=PICTURE_OF.keys())
 def test_a_recipe_with_a_size_is_the_same_picture_as_the_recipe_at_480_rendered_at_that_size(picture_of):
-    step = Step("drop_shadow", {"offset": 34.0, "angle": 45.0, "blur": 12.0})
+    step = Step("drop_shadow", params={"offset": 34.0, "angle": 45.0, "blur": 12.0})
     sized = Recipe([step], name="sized", size=960)
     unsized = Recipe([step], name="plain", size=480)
     maps = {"subject": disc(1920)}
@@ -1504,14 +1528,14 @@ def test_a_size_that_is_not_a_whole_number_of_pixels_is_refused_naming_it(photo,
 @pytest.mark.parametrize(
     "step_at",
     [
-        pytest.param(lambda f: Step("gaussian_blur", {"radius": 12.0 * f}), id="a blur"),
-        pytest.param(lambda f: Step("bloom", {"radius": 48.0 * f}), id="a bloom"),
-        pytest.param(lambda f: Step("sharpen", {"radius": 60.0 * f}), id="a local contrast"),
+        pytest.param(lambda f: Step("gaussian_blur", params={"radius": 12.0 * f}), id="a blur"),
+        pytest.param(lambda f: Step("bloom", params={"radius": 48.0 * f}), id="a bloom"),
+        pytest.param(lambda f: Step("sharpen", params={"radius": 60.0 * f}), id="a local contrast"),
         pytest.param(
-            lambda f: Step("drop_shadow", {"offset": 44.0 * f, "angle": 56.0, "blur": 48.0 * f}),
+            lambda f: Step("drop_shadow", params={"offset": 44.0 * f, "angle": 56.0, "blur": 48.0 * f}),
             id="a shadow offset and blurred",
         ),
-        pytest.param(lambda f: Step("pixel_grid", {"cell": int(8 * f)}), id="a grid of whole pixels"),
+        pytest.param(lambda f: Step("pixel_grid", params={"cell": int(8 * f)}), id="a grid of whole pixels"),
     ],
 )
 def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(photo, subject, step_at):
@@ -1539,7 +1563,7 @@ def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(pho
     ],
 )
 def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_background_everything(photo, mask, expected):
-    recipe = Recipe((Step("gradient", {"colors": ["#000000"]}, mask),), name="masked", size=None)
+    recipe = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=mask),), name="masked", size=None)
     out = runner.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
     np.testing.assert_array_equal(out, expected(photo))
 
@@ -1547,10 +1571,11 @@ def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_backg
 @pytest.mark.parametrize(
     "marks",
     [
-        pytest.param(Step("particles", {"density": 3.0, "length": 12.0, "color": "#ffffff"}), id="streaks"),
-        pytest.param(Step("particles", {"density": 3.0, "size": 12.0}), id="dots"),
+        pytest.param(Step("particles", params={"density": 3.0, "length": 12.0, "color": "#ffffff"}), id="streaks"),
+        pytest.param(Step("particles", params={"density": 3.0, "size": 12.0}), id="dots"),
         pytest.param(
-            Step("dust_scratches", {"density": 3.0, "scratches": 0, "dark": "#000000", "light": "#ffffff"}), id="dust"
+            Step("dust_scratches", params={"density": 3.0, "scratches": 0, "dark": "#000000", "light": "#ffffff"}),
+            id="dust",
         ),
     ],
 )
@@ -1567,12 +1592,12 @@ def ratio_looks() -> dict[str, Recipe]:
     """Recipes of the probe: plain, driven by a field, and as the looks of an `Each`."""
     drive = Drive(by="f", start=0.0, end=1.0)
     return {
-        "a plain step": Recipe([Step("ratio_probe", {})], name="plain", size=64),
+        "a plain step": Recipe([Step("ratio_probe", params={})], name="plain", size=64),
         "a driven step": Recipe(
-            [Step("ratio_probe", {"level": drive})], name="driven", size=64, regions={"f": Given()}
+            [Step("ratio_probe", params={"level": drive})], name="driven", size=64, regions={"f": Given()}
         ),
         "the looks of an each": Recipe(
-            [Each("g", [Step("ratio_probe", {}), Step("ratio_probe", {})], feather=0)],
+            [Each("g", looks=[Step("ratio_probe", params={}), Step("ratio_probe", params={})], feather=0)],
             name="each",
             size=64,
             regions={"g": Grid(columns=2)},

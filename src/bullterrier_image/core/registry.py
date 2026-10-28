@@ -120,9 +120,7 @@ class ModelledEffect[P: EffectParams]:
         self.params_model, self.category, self.inputs, self.opacity = params_model, category, inputs, opacity
         named = params_model.field_name_fields()
         fields = [
-            p.replace(kind=inspect.Parameter.KEYWORD_ONLY, annotation=np.ndarray, default=inspect.Parameter.empty)
-            if p.name in named
-            else p.replace(kind=inspect.Parameter.KEYWORD_ONLY)
+            p.replace(annotation=np.ndarray, default=inspect.Parameter.empty) if p.name in named else p
             for p in params_model.signature().parameters.values()
         ]
         given = [p for p in inspect.signature(function).parameters.values() if p.name in inputs]

@@ -16,6 +16,7 @@ import bullterrier_image.core.runner
 import bullterrier_image.effects
 import bullterrier_image.plugin
 from bullterrier_image import (
+    Each,
     Grid,
     ImageReadError,
     Pick,
@@ -104,13 +105,13 @@ def test_effect_queries_live_only_in_the_registry(name):
     ("make", "expect"),
     [
         (lambda: Step("no_such_effect"), "unknown effect.*ascii"),
-        (lambda: Step("rgb_split", {"spilt": 3}), "spilt"),
+        (lambda: Step("rgb_split", params={"spilt": 3}), "spilt"),
         (lambda: Step("grain", mask=3), "mask"),  # type: ignore[arg-type]
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
         (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
         (lambda: Step("grain", opacity=True), "opacity"),
-        (lambda: Step("disperse", {"subject": 1}), "subject"),
-        (lambda: Step("grain", {"opacity": 0.5}), "`opacity` is a key of the step"),
+        (lambda: Step("disperse", params={"subject": 1}), "subject"),
+        (lambda: Step("grain", params={"opacity": 0.5}), "`opacity` is a key of the step"),
     ],
 )
 def test_a_step_built_in_code_fails_at_once_with_a_useful_message(make, expect):
@@ -176,12 +177,23 @@ def test_a_step_describes_itself_briefly_for_labels():
 # --- fx: the effects as step builders ------------------------------------------------------------------------------
 
 
-def test_fx_builds_steps_from_keyword_or_positional_arguments():
-    assert fx.rgb_split(amount=3, angle=2) == Step("rgb_split", {"amount": 3, "angle": 2})
-    assert fx.gradient(colors=["#fff"]) == Step(
-        "gradient", {"colors": ["#fff"]}
-    )  # positional: the first parameter after the image
-    assert fx.grain() == Step("grain", {})
+def test_fx_builds_steps_from_keyword_arguments():
+    assert fx.rgb_split(amount=3, angle=2) == Step("rgb_split", params={"amount": 3, "angle": 2})
+    assert fx.grain() == Step("grain")
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        pytest.param(lambda: fx.grade(0.5), id="an effect parameter"),
+        pytest.param(lambda: Step("grade", {"exposure": 0.5}), id="a step's parameters"),  # type: ignore[call-arg]  # the point of the test
+        pytest.param(lambda: Step("grade", None, "subject"), id="a step's mask"),  # type: ignore[call-arg]  # the point of the test
+        pytest.param(lambda: Each("panes", [fx.grade()]), id="an each step's looks"),  # type: ignore[call-arg]  # the point of the test
+    ],
+)
+def test_only_the_thing_itself_is_given_by_position_everything_else_by_keyword(make):
+    with pytest.raises(TypeError, match="positional"):
+        make()
 
 
 def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
@@ -262,17 +274,14 @@ def test_a_modelled_effects_builder_has_the_models_signature_then_the_step_keys(
     ]  # no image, subject
     assert [p.default for p in signature.parameters.values()] == [24.0, "paper", "#ffaa00", None, 1.0, "normal", None]
     assert "tint: str | list[float] | tuple[float, float, float]" in str(signature)
-    keyword_only = [p.name for p in signature.parameters.values() if p.kind is inspect.Parameter.KEYWORD_ONLY]
-    assert keyword_only == ["mask", "opacity", "blend_mode", "name"]
+    assert {p.kind for p in signature.parameters.values()} == {inspect.Parameter.KEYWORD_ONLY}
 
 
-def test_a_modelled_effects_builder_takes_positional_and_keyword_values(lantern):
-    assert fx.lantern_probe(30, style="silk") == Step("lantern_probe", {"radius": 30, "style": "silk"})
+def test_a_modelled_effects_builder_takes_keyword_values_and_refuses_them_by_position(lantern):
+    assert fx.lantern_probe(radius=30, style="silk") == Step("lantern_probe", params={"radius": 30, "style": "silk"})
     assert fx.lantern_probe() == Step("lantern_probe")
-    with pytest.raises(TypeError, match="at most 3"):
-        fx.lantern_probe(1, "silk", "#000", 4)
-    with pytest.raises(TypeError, match="radius"):
-        fx.lantern_probe(30, radius=31)
+    with pytest.raises(TypeError, match=r"fx\.lantern_probe.*keyword.*radius=30"):
+        fx.lantern_probe(30)
 
 
 @pytest.mark.parametrize(
@@ -292,8 +301,9 @@ def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lanter
 def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lantern):
     tree = ast.parse(fx.stub_text())
     (function,) = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "lantern_probe"]
-    assert [a.arg for a in function.args.args] == ["radius", "style", "tint"]
-    assert ast.unparse(function.args.args[1].annotation) == "Literal['paper', 'silk']"  # type: ignore[arg-type]
+    assert function.args.args == []  # every value by keyword
+    assert [a.arg for a in function.args.kwonlyargs][:3] == ["radius", "style", "tint"]
+    assert ast.unparse(function.args.kwonlyargs[1].annotation) == "Literal['paper', 'silk']"  # type: ignore[arg-type]
     doc = ast.get_docstring(function)
     assert doc is not None
     assert "Glow radius of the paper lantern, quite distinctive." in doc
@@ -308,10 +318,16 @@ MASK = ("str | None", None)
 BLEND_MODE = ("Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color']", "normal")
 
 
-def _keywords(function: ast.FunctionDef) -> dict[str, tuple[str, object]]:
-    """A stub function's keyword-only arguments: name -> (annotation, default); the stub writes both for each."""
+def _step_keys(function: ast.FunctionDef) -> dict[str, tuple[str, object]]:
+    """A stub function's keyword-only arguments after the effect's parameters: name -> (annotation, default); the stub
+    writes both for each."""
     pairs = zip(function.args.kwonlyargs, function.args.kw_defaults, strict=True)
-    return {a.arg: (ast.unparse(a.annotation), ast.literal_eval(d)) for a, d in pairs}  # type: ignore[arg-type]
+    fields = registry.parameters(function.name).model_fields
+    return {
+        a.arg: (ast.unparse(a.annotation), ast.literal_eval(d))  # type: ignore[arg-type]
+        for a, d in pairs
+        if a.arg not in fields
+    }
 
 
 def test_the_stub_shows_the_step_keys_and_a_preset_or_a_partition_exactly_where_an_effect_has_one():
@@ -321,7 +337,7 @@ def test_the_stub_shows_the_step_keys_and_a_preset_or_a_partition_exactly_where_
         step_keys = {"mask": MASK, "opacity": ("float", registry.opacity(name)), "blend_mode": BLEND_MODE}
         partition = {"partition": ("str | None", None)} if "partition" in registry.inputs(name) else {}
         called = {"name": ("str | None", None)}
-        assert _keywords(function) == {**step_keys, **partition, **presets, **called}, name
+        assert _step_keys(function) == {**step_keys, **partition, **presets, **called}, name
         if names:
             assert "preset" in inspect.signature(getattr(fx, name)).parameters
         else:
@@ -361,7 +377,7 @@ def test_the_editor_stub_names_a_picture_field_by_its_forms_and_every_name_it_us
     effect(category="compositing", params=SceneParams)(scene_probe)
     text = fx.stub_text()
     (function,) = [n for n in ast.parse(text).body if isinstance(n, ast.FunctionDef) and n.name == "scene_probe"]
-    annotation = ast.unparse(function.args.args[0].annotation)  # type: ignore[arg-type]
+    annotation = ast.unparse(function.args.kwonlyargs[0].annotation)  # type: ignore[arg-type]
     assert annotation.startswith("Picture | os.PathLike[str] | numpy.ndarray | str")
     exec(compile(text, "fx.pyi", "exec"), {"__package__": "bullterrier_image"})  # noqa: S102  (our own generated stub)
 
@@ -396,7 +412,7 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
         return rgb
 
     assert list(inspect.signature(fx.renamed_probe).parameters)[:1] == ["new"]
-    assert fx.renamed_probe(new=2.0) == Step("renamed_probe", {"new": 2.0})
+    assert fx.renamed_probe(new=2.0) == Step("renamed_probe", params={"new": 2.0})
 
 
 @pytest.mark.parametrize(
@@ -535,13 +551,13 @@ def test_fx_turns_a_path_or_an_array_into_a_picture_and_leaves_a_picture_or_a_co
     pixels = np.random.default_rng(2).random((5, 7, 4), dtype=np.float32)
     imageio.save(pixels, tmp_path / "tex.png")
     monkeypatch.chdir(tmp_path)  # a path is relative to the folder the program runs in
-    from_path, from_pathlib = fx.layer_probe("tex.png"), fx.layer_probe(image=Path("tex.png"))
-    from_array, picture = fx.layer_probe(pixels), Picture(pixels)
+    from_path, from_pathlib = fx.layer_probe(image="tex.png"), fx.layer_probe(image=Path("tex.png"))
+    from_array, picture = fx.layer_probe(image=pixels), Picture(pixels)
     assert from_path.params["image"].label == "tex.png"
-    assert from_array.params["image"] == picture == fx.layer_probe(picture).params["image"]
+    assert from_array.params["image"] == picture == fx.layer_probe(image=picture).params["image"]
     assert from_path.params["image"] == from_pathlib.params["image"]
     np.testing.assert_allclose(from_path.params["image"].pixels, pixels, atol=1 / 255)
-    assert fx.layer_probe("#102030").params["image"] == "#102030"  # a colour stays as written
+    assert fx.layer_probe(image="#102030").params["image"] == "#102030"  # a colour stays as written
 
 
 @pytest.mark.parametrize(
@@ -554,4 +570,4 @@ def test_fx_turns_a_path_or_an_array_into_a_picture_and_leaves_a_picture_or_a_co
 )
 def test_fx_refuses_a_picture_it_cannot_use_naming_the_problem(layer_probe, image, kind, complaint):
     with pytest.raises(kind, match=complaint):
-        fx.layer_probe(image)
+        fx.layer_probe(image=image)

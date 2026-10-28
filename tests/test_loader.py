@@ -90,7 +90,7 @@ GIVEN = "[region.star]\nkind = 'given'\n[[step]]\neffect = 'gradient'\ncolors = 
 def test_a_given_region_loads_in_format_3_as_the_recipe_written_in_python(tmp_path):
     loaded = load_recipe(_write(tmp_path, "format = 3\nname = 'g'\nsize = 64\n" + GIVEN))
     assert loaded == Recipe(
-        [Step("gradient", {"colors": ["#000000"]}, mask="star")], name="g", size=64, regions={"star": Given()}
+        [Step("gradient", params={"colors": ["#000000"]}, mask="star")], name="g", size=64, regions={"star": Given()}
     )
     assert loaded.maps_needed == frozenset({"star"})
 
@@ -183,7 +183,7 @@ def test_a_misspelt_top_level_key_lists_the_keys_a_recipe_has(tmp_path):
 def test_a_step_may_name_a_preset_and_its_own_keys_win_over_it(tmp_path):
     path = _write(tmp_path, "[[step]]\neffect = 'gradient_map'\npreset = 'sepia'\nshadow_clip = 0.2\nopacity = 0.5\n")
     (step,) = load_recipe(path).steps
-    assert step == Step("gradient_map", {"shadow_clip": 0.2}, opacity=0.5, preset="sepia")
+    assert step == Step("gradient_map", params={"shadow_clip": 0.2}, opacity=0.5, preset="sepia")
     assert "preset" not in step.params  # a step's key, not an effect's parameter
 
 
@@ -325,14 +325,14 @@ REGIONS_RECIPE = Recipe(
         "found": Subject(per="panes", context=0.3, threshold=0.8),
     },
     steps=[
-        Step("gradient", {"colors": ["#ff0000"]}, mask="head"),
-        Step("gradient", {"colors": ["#0000ff"]}, mask="found"),
+        Step("gradient", params={"colors": ["#ff0000"]}, mask="head"),
+        Step("gradient", params={"colors": ["#0000ff"]}, mask="found"),
         Each(
             "glass",
-            [
-                Step("grade", {"exposure": 0.5}, opacity=0.7),
+            looks=[
+                Step("grade", params={"exposure": 0.5}, opacity=0.7),
                 "none",
-                Step("gradient", {"colors": ["#00ff00"]}, blend_mode="multiply"),
+                Step("gradient", params={"colors": ["#00ff00"]}, blend_mode="multiply"),
             ],
             mask="subject",
             opacity=0.9,
@@ -391,8 +391,8 @@ def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
         size=None,
         regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
-            Each("bands", [Step("grade", {"exposure": 0.5}), "none"]),
-            Step("gradient", {"colors": ["#ff0000"]}, mask="near"),
+            Each("bands", looks=[Step("grade", params={"exposure": 0.5}), "none"]),
+            Step("gradient", params={"colors": ["#ff0000"]}, mask="near"),
         ],
     )
     assert load_recipe(_write(tmp_path, FIELDS_FILE)) == written
@@ -460,8 +460,8 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
             "ring": Pick(of="shapes", pieces=["ring", 0]),
         },
         steps=[
-            Step("gradient", {"colors": ["#ff0000"]}, mask="ring"),
-            Each("halves", ["none", Step("gradient", {"colors": ["#00ff00"]})], mask="blob"),
+            Step("gradient", params={"colors": ["#ff0000"]}, mask="ring"),
+            Each("halves", looks=["none", Step("gradient", params={"colors": ["#00ff00"]})], mask="blob"),
         ],
     )
     assert loaded == written
@@ -506,7 +506,7 @@ def test_a_parameter_written_as_a_table_with_by_is_a_drive_the_same_as_written_i
         steps=[
             Step(
                 "bloom",
-                {
+                params={
                     "radius": Drive(by="near", start=0, end=30),
                     "amount": Drive(by="near", start=0.1, end=0.8),
                     "threshold": 0.6,

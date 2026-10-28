@@ -362,7 +362,7 @@ def test_the_signature_lists_every_field_in_order_with_its_default_and_a_readabl
     signature = Probe.signature()
     assert list(signature.parameters) == ["radius", "count", "mode", "tint", "label"]
     assert [p.default for p in signature.parameters.values()] == [24.0, 3, "soft", "#ff8000", "probe"]
-    assert all(p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD for p in signature.parameters.values())
+    assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in signature.parameters.values())
     text = str(signature)
     assert "radius: float = 24.0" in text
     assert "mode: Literal['soft', 'hard']" in text

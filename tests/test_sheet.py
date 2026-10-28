@@ -11,10 +11,10 @@ from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
 SLIDE_PARAMS = {"bands": 3, "seed": 5}
 GRAIN_PARAMS = {"amount": 0.1, "size": 1.6, "seed": 2}
-SLIDE = Step("slice_shift", SLIDE_PARAMS)
-GRAIN = Step("grain", GRAIN_PARAMS)
+SLIDE = Step("slice_shift", params=SLIDE_PARAMS)
+GRAIN = Step("grain", params=GRAIN_PARAMS)
 LOOK = Recipe([SLIDE, GRAIN], name="look", size=48)
-TWICE = Recipe([GRAIN, SLIDE, Step("grain", {"amount": 0.3})], name="twice", size=48)
+TWICE = Recipe([GRAIN, SLIDE, Step("grain", params={"amount": 0.3})], name="twice", size=48)
 
 
 def labels(tiles) -> list[str]:
@@ -38,9 +38,9 @@ def test_a_sweep_renders_the_recipe_once_for_each_value_of_the_parameter(photo, 
     assert labels(tiles) == [f"{name}={value:g}" for value in values]
     for (_, tile), value in zip(tiles, values, strict=True):
         if effect == "slice_shift":
-            steps = [Step("slice_shift", SLIDE_PARAMS | {name: value}), GRAIN]
+            steps = [Step("slice_shift", params=SLIDE_PARAMS | {name: value}), GRAIN]
         else:
-            steps = [SLIDE, Step("grain", GRAIN_PARAMS | {name: value})]
+            steps = [SLIDE, Step("grain", params=GRAIN_PARAMS | {name: value})]
         np.testing.assert_array_equal(render(photo, tile), render(photo, Recipe(steps, name="by-hand", size=48)))
 
 
@@ -56,7 +56,7 @@ def test_a_sweep_through_negative_whole_numbers_rounds_each_to_the_nearest_whole
         """Returns the picture as it is."""
         return rgb
 
-    tiles = sweep(Recipe([Step("offset_probe", {})], name="probe", size=48), "offset_probe.offset", -4, 4, 4)
+    tiles = sweep(Recipe([Step("offset_probe", params={})], name="probe", size=48), "offset_probe.offset", -4, 4, 4)
     assert labels(tiles) == ["offset=-4", "offset=-1", "offset=1", "offset=4"]  # -4, -1.33, 1.33, 4
 
 
@@ -71,7 +71,7 @@ def test_a_sweep_keeps_the_recipes_framing():
 
 
 def test_a_sweep_keeps_what_the_swept_step_has_around_the_parameter():
-    masked = Step("grain", GRAIN_PARAMS, mask="subject", opacity=0.5, blend_mode="screen")
+    masked = Step("grain", params=GRAIN_PARAMS, mask="subject", opacity=0.5, blend_mode="screen")
     recipe = Recipe([SLIDE, masked], name="masked", size=48)
     for _, tile in sweep(recipe, "grain.amount", 0, 0.2, 3):
         assert (tile.steps[1].mask, tile.steps[1].opacity, tile.steps[1].blend_mode) == ("subject", 0.5, "screen")
@@ -105,7 +105,7 @@ MISTAKES = {
 
 @pytest.mark.parametrize(("arguments", "offender"), MISTAKES.values(), ids=MISTAKES.keys())
 def test_a_sweep_that_cannot_be_made_is_refused_naming_the_offender(arguments, offender):
-    recipe = Recipe([*TWICE.steps, Step("gradient", {"colors": ["#000000"]})], name="twice", size=48)
+    recipe = Recipe([*TWICE.steps, Step("gradient", params={"colors": ["#000000"]})], name="twice", size=48)
     with pytest.raises(RecipeError, match=offender):
         sweep(recipe, *arguments)
 
@@ -184,8 +184,8 @@ def test_write_stages_names_each_stage_and_saves_one_with_transparency_as_png_an
 
 
 def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps_of_the_recipe():
-    seams = Step("seams", {"width": 0.5}, partition="panes")
-    look = Recipe([Each("panes", ["none"]), seams], name="panes", size=48, regions={"panes": Grid(columns=2)})
+    seams = Step("seams", params={"width": 0.5}, partition="panes")
+    look = Recipe([Each("panes", looks=["none"]), seams], name="panes", size=48, regions={"panes": Grid(columns=2)})
     tiles = sweep(look, "seams.width", 0.1, 1, 3)
     assert [tile.steps[1].partition for _, tile in tiles] == ["panes"] * 3  # type: ignore[union-attr]
     assert all(tile.steps[0] == look.steps[0] and tile.regions == look.regions for _, tile in tiles)
@@ -197,8 +197,8 @@ def test_a_sweep_keeps_the_partition_a_step_draws_and_the_regions_and_each_steps
 def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive():
     look = Recipe(
         [
-            Step("grain", GRAIN_PARAMS, name="dust"),
-            Step("levels", {"output_black": Drive(by="near", start=0.0, end=0.2)}),
+            Step("grain", params=GRAIN_PARAMS, name="dust"),
+            Step("levels", params={"output_black": Drive(by="near", start=0.0, end=0.2)}),
         ],
         name="look",
         size=48,
@@ -221,7 +221,7 @@ def test_a_sweep_can_vary_the_frame_a_region_a_named_step_or_the_end_of_a_drive(
 
 def test_a_sweep_of_the_levels_of_a_drive_takes_whole_numbers():
     look = Recipe(
-        [Step("levels", {"output_black": Drive(by="near", start=0.0, end=0.2)})],
+        [Step("levels", params={"output_black": Drive(by="near", start=0.0, end=0.2)})],
         name="look",
         size=48,
         regions={"near": Band(of="depth")},
