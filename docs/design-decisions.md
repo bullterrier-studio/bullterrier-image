@@ -231,8 +231,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **`Step.apply` is `render` of the one-step recipe.** `fx.bloom(radius=12).apply(photo, maps=, finders=, size=)` equals
   `render(photo, Recipe([step]), ...)`, and `render`/`trace` take a step as that recipe. *Reason:* trying one effect
   should not need a recipe. *Consequence:* the default subject and depth finders live above the core (they know
-  `finding`), so `bullterrier_image.recipe` binds its `render` as what `apply` runs when it is imported, which every
-  public way to a step (`bullterrier_image.Step`, `fx`, `load_recipe`) does.
+  `finding`), so `Step.apply` imports `bullterrier_image.recipe` when it is called, a deliberate upward import that
+  import-linter cannot see; done at call time it also works in a fresh process (an unpickled step in a pool worker).
+  Later: the structural fix is runner-owned default finders, found through entry points, so the core needs no import.
 - **A recipe's name is free text; whoever writes files makes it safe.** `Recipe(steps, name=None, description=None)`; a
   file without `name` takes its file stem as it is. The command line and the pipeline name files `safe_name(name)` (runs
   of characters other than letters, digits, `.`, `_`, `-` become one `-`, no leading dot or dash, at most 64, never a

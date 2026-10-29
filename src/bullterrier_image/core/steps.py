@@ -26,8 +26,9 @@ module and do not know each other.
 
 import difflib
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from importlib import import_module
 from typing import Any, Literal
 
 import numpy as np
@@ -74,17 +75,6 @@ class Parameter:
     doc: str
     whole: bool = False
     cyclic: bool = False
-
-
-# What `Step.apply` renders with: `bullterrier_image.recipe.render`, which binds the default finders of the subject and
-# the depth and so lives above the core. It binds itself here when imported (`bind_render`); every public way to a
-# step (`bullterrier_image.Step`, `fx`, `load_recipe`) imports it.
-_RENDER: dict[str, Callable[..., np.ndarray]] = {}
-
-
-def bind_render(render: Callable[..., np.ndarray]) -> None:
-    """Make `render` (called as `render(photo, step, maps=, finders=, size=)`) what `Step.apply` runs."""
-    _RENDER["render"] = render
 
 
 # One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
@@ -233,7 +223,11 @@ class Step(_Layer):
         """This step alone on `photo`, without writing a recipe: exactly `bullterrier_image.render(photo,
         Recipe([step]), maps=maps, finders=finders, size=size)`, which documents every argument (`finders` holds a
         `Finder` by map name), including how the subject and the depth are found when the step needs them."""
-        return _RENDER["render"](photo, self, maps=maps, finders=finders, size=size)
+        # A deliberate upward import (import-linter cannot see a call-time import): the public `render` binds the
+        # default subject and depth finders, which live above the core. Importing it here, when called, works in a
+        # fresh process too (an unpickled step in a pool worker); the structural fix is runner-owned default finders.
+        render = import_module("bullterrier_image.recipe").render
+        return render(photo, self, maps=maps, finders=finders, size=size)
 
     def replace(self, **changes: Any) -> "Step":
         """A copy with `changes`: the effect's parameters (laid over this step's) and the step keys (`mask`, `opacity`,

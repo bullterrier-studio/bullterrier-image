@@ -17,7 +17,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .core import looks as shipped_looks
-from .core import runner, steps
+from .core import runner
 from .core.framing import Framing
 from .core.params import Drive
 from .core.regions import (
@@ -160,4 +160,3 @@ for _public in (render, trace, render_all):
         + "\n    "
     )
 del _public
-steps.bind_render(render)

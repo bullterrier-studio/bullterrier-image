@@ -45,9 +45,9 @@ from typing import Any, Literal, Protocol, cast
 
 from .core import registry
 from .core.params import signature as parameter_signature
+from .core.steps import Step
 from .errors import RecipeError
 from .loader import with_files
-from .recipe import Step  # the public home: importing it binds what `Step.apply` renders with
 
 
 class _Effect(Protocol):

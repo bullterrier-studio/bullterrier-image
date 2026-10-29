@@ -1,4 +1,7 @@
 import json
+import pickle
+import subprocess
+import sys
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -295,6 +298,42 @@ def test_one_step_applied_alone_is_the_recipe_of_that_step_rendered(photo, subje
     np.testing.assert_array_equal(step.apply(photo, **options), expected)
     np.testing.assert_array_equal(render(photo, step, **options), expected)
     np.testing.assert_array_equal(trace(photo, step, **options)[-1].image, expected)
+
+
+FRESH_STEPS = {
+    "a step unpickled in a worker": "import pickle; step = pickle.load(open(sys.argv[1], 'rb'))",
+    "a step read from a recipe file": (
+        "from bullterrier_image.loader import load_recipe; step = load_recipe(sys.argv[2]).steps[0]"
+    ),
+}
+
+
+@pytest.mark.parametrize("make_step", FRESH_STEPS.values(), ids=FRESH_STEPS.keys())
+def test_a_step_applies_in_a_fresh_process_that_imported_nothing_else(tmp_path, photo, make_step):
+    """A process pool's worker unpickles a step without ever importing the public names (`bullterrier_image.render`)."""
+    step = fx.bloom(radius=12, threshold=0.3)
+    (tmp_path / "step.pickle").write_bytes(pickle.dumps(step))
+    (tmp_path / "bloom.toml").write_text(
+        'name = "b"\n[[step]]\neffect = "bloom"\nradius = 12\nthreshold = 0.3\n', encoding="utf-8"
+    )
+    np.save(tmp_path / "photo.npy", photo)
+    code = f"import sys; import numpy as np; {make_step}; np.save(sys.argv[3], step.apply(np.load(sys.argv[4])))"
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            code,
+            tmp_path / "step.pickle",
+            tmp_path / "bloom.toml",
+            tmp_path / "out.npy",
+            tmp_path / "photo.npy",
+        ],
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    np.testing.assert_array_equal(np.load(tmp_path / "out.npy"), step.apply(photo))
 
 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):
