@@ -94,7 +94,8 @@ def render(
     size: int | None = None,
 ) -> np.ndarray:
     """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders. `size` is the
-    longest side of the result in px: the recipe's pixel values (written for 480) are scaled to it."""
+    longest side of the result in px: the recipe's pixel values (written for 480) are scaled to it. `rgb` is read in
+    place, not copied: do not modify it from another thread while it renders."""
     recipe = _one_recipe(recipe)
     return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 

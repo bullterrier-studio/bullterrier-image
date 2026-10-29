@@ -137,4 +137,6 @@ my_effects = "my_package.effects"
 
 **Plugins.** Plugin that fails to load stops first effect lookup with error naming it; `BT_IMAGE_PLUGINS=builtin` loads only
 own effects. Effect names unique across all installed packages. Import is quick: effects load on first ask, once, under a
-lock, so threads render at same time; register effects at import time only.
+lock, so threads render at same time; register effects at import time only. A thread must not modify a photo (or a map)
+while another thread renders it: rendering reads the array in place without a copy. Give each thread its own frame, or
+share one read-only (`array.flags.writeable = False`).

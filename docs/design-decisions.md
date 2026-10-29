@@ -502,6 +502,15 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   programming error (`ValueError`): a user's values are validated before they get there. The registry, the one place
   that calls effects, hands every effect the contract's picture, float32 and C-contiguous (a float64 photo is
   converted there once). A field or injected number arrives with the first ported effect that needs one.
+- **A picture is borrowed while it renders, so it must not be written meanwhile.** `_core.apply` reads the caller's
+  array in place with the GIL released; numpy's borrow flags only stop Rust borrows from clashing, so a Python thread
+  that writes into the same array during the call makes the core read memory that is changing (undefined behaviour).
+  The contract is "do not modify a picture while it is being rendered", stated on `apply`, here and in the user docs.
+  *Reason:* copying the input would add about 25 MB of memory traffic per 1080p frame, as much as a whole light effect
+  costs in a live frame budget, and NumPy itself borrows arrays the same way. *Check made (2026-10-29):* the library
+  starts no threads, and the two arrays it caches and shares (the dither tile, the glyph atlas) are already read-only.
+  The photo and maps a project run holds for a photo's recipes are used one recipe at a time; when batch rendering
+  moves to threads (`todo`: parallel batch processing), each worker must own its frame and share maps read-only.
 - **Pydantic stays the one declaration of parameters.** The Python effect keeps its model, docstring and `@effect`;
   its body is `_core.apply("<name>", rgb, params.model_dump())`. The Rust `Params` has the same fields with no
   defaults and refuses unknown ones, so a struct that drifts from the model fails the first contract-test call.

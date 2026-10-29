@@ -20,6 +20,12 @@ mod _core {
 ///
 /// `ValueError` if the effect, its parameters or the array are not what the core expects: a programming error, since
 /// the package validates a user's values before they get here.
+///
+/// The caller must not modify `rgb` while this runs. The effect reads the array's memory in place, with the GIL
+/// released, and numpy's borrow flags guard only against other Rust borrows: a Python thread that writes into `rgb`
+/// meanwhile makes the core read memory that is changing, which is undefined behaviour. The input is deliberately not
+/// copied (a 1080p float32 frame is about 25 MB, as much work as a whole light effect); `numpy` works the same way on
+/// arrays it is given. A thread that renders must own its frame, or share it read-only.
 #[pyfunction]
 fn apply<'py>(
     py: Python<'py>,
