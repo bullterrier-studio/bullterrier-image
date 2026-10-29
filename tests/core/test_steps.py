@@ -942,6 +942,27 @@ def test_the_recipe_objects_refuse_unknown_fields():
         Step.model_validate({"effect": "grade", "colour": "red"})
 
 
+@pytest.mark.parametrize(
+    ("make", "complaint"),
+    [
+        pytest.param(lambda: fx.bloom().model_copy(update={"params": {"radius": -1}}), r"`radius`", id="a step's copy"),
+        pytest.param(
+            lambda: Recipe([fx.grade()]).model_copy(update={"steps": ()}), "at least one step", id="a recipe's copy"
+        ),
+        pytest.param(lambda: Grid().model_copy(update={"columns": 0}), r"`columns`", id="a region's copy"),
+        pytest.param(
+            lambda: Step.model_validate({"effect": "bloom", "params": {"radius": -1}, "opacity": 1.0}),
+            r"`radius`",
+            id="a step from a dict",
+        ),
+        pytest.param(lambda: Recipe.model_validate({"steps": ()}), "at least one step", id="a recipe from a dict"),
+    ],
+)
+def test_no_copy_or_dict_skips_the_checks_of_the_constructor(make, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        make()
+
+
 # --- presets: an effect's named parameter sets, merged under the parameters a step is given ------------------------
 
 

@@ -390,9 +390,24 @@ class ValidatedModel(BaseModel):
         """The model for `values` (field name -> value); RecipeError naming `owner` (e.g. "effect 'bloom'"), each bad
         field, the constraint and the value, and listing the fields when an unknown one was given."""
         try:
-            return cls.model_validate(dict(values))
+            return super().model_validate(dict(values))
         except ValidationError as error:
             raise _invalid(error, owner, cls.model_fields) from None
+
+    @classmethod
+    def model_validate(cls, obj: Any, **options: Any) -> Self:
+        """pydantic's `model_validate`, its failure a RecipeError as `parse` reports it."""
+        try:
+            return super().model_validate(obj, **options)
+        except ValidationError as error:
+            raise _invalid(error, "", cls.model_fields) from None
+
+    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
+        """A copy with `update` laid over the values, checked as a new value is (pydantic's own copy checks nothing):
+        a bad value is a RecipeError. Without `update` the copy is equal (with `deep`, of copied fields)."""
+        if not update:
+            return super().model_copy(deep=deep)
+        return type(self).model_validate({**dict(self), **update})
 
     def _init_checked(self, owner: str, **values: Any) -> None:
         """For a subclass's own (positional) constructor: validate `values` into this instance; RecipeError like
