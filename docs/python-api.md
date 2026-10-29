@@ -47,6 +47,11 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   picture or lookup table is a `Picture`/`Lut`, a colour or an array, as for `fx`; a path is read only by `fx`.
 - **Names.** `Recipe(steps, name="my look!", description="...")`: free text, both optional. Files written for it (the
   command line, a project) are named by its name made safe (`my-look`); an unnamed recipe there is a `RecipeError`.
+- **Reading values.** `step.describe(width=56)` is the short label `trace` shows (an `Each` has one too, and
+  `drive.describe()`); `drive.values()` lists the values a `Drive` takes at its levels; `Framing().has_alpha` is true
+  when a recipe cuts the picture out, so its render has four channels. Every value class makes one from a dict with
+  `Model.parse(values)` (a `RecipeError` naming the field); the regions and `Framing` list their fields, with unit and
+  range, in `Model.documentation()` and `Model.fields_doc()`.
 - **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.
   `fx.<effect>.presets`: `{preset: {parameter: value}}`, used as `fx.<effect>(preset=...)`. A misspelt parameter or
   look name gets the nearest ones.

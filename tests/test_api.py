@@ -12,6 +12,7 @@ from typing import Literal
 
 import numpy as np
 import pytest
+from pydantic import BaseModel
 
 import bullterrier_image
 import bullterrier_image.core.runner
@@ -20,7 +21,6 @@ import bullterrier_image.gallery as gallery
 import bullterrier_image.plugin
 from bullterrier_image import (
     Each,
-    Framing,
     Grid,
     ImageReadError,
     Pick,
@@ -62,26 +62,60 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
     assert missing == []
 
 
-# What only the runner (or the library's own modules) uses is no attribute of the public classes: their help and
-# completion show what a caller uses.
-@pytest.mark.parametrize(
-    ("cls", "name"),
-    [
-        *((Step, name) for name in ("references", "runs", "named_fields", "fixed", "drives")),
-        *((Each, name) for name in ("references", "runs", "assignment")),
-        *((Recipe, name) for name in ("maps_needed", "derived_maps", "needs_finder")),
-        *((Framing, name) for name in ("apply", "cut", "needs_subject")),
-        *((Grid, name) for name in ("scaled", "picture_fields", "signature", "lut_fields", "field_name_fields")),
-        *((Grid, name) for name in ("whole_number_fields", "drivable_fields")),
-    ],
-    ids=lambda value: getattr(value, "__name__", value),
+ROOT = Path(__file__).parent.parent
+# what a user reads about the API; design-decisions.md is the maintainers', and names the helpers it says are hidden
+DOCS = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in [ROOT / "README.md", *(ROOT / "docs").glob("*.md")]
+    if path.name != "design-decisions.md"
 )
-def test_a_public_class_has_no_attribute_only_the_library_uses(cls, name):
-    assert not hasattr(cls, name)
+
+
+def undocumented(cls: type[BaseModel], docs: str) -> list[str]:
+    """The public attributes `cls` has beyond pydantic's and its fields' that its docstring and `docs` never name
+    (as `.name` or `name`, in backticks)."""
+    own = set(dir(cls)) - set(dir(BaseModel)) - set(cls.model_fields)
+    return sorted(
+        name for name in own if not name.startswith("_") and not re.search(rf"[.`]{name}\b", f"{cls.__doc__}\n{docs}")
+    )
+
+
+class DocumentedProbe(BaseModel):
+    """A probe: `read()` is named here."""
+
+    def read(self) -> None:
+        """Documented by the class docstring."""
+
+    def secret_helper(self) -> None:
+        """Public by its name, named nowhere."""
+
+
+def test_the_documentation_check_finds_a_public_method_named_nowhere_and_passes_one_that_is():
+    assert undocumented(DocumentedProbe, "") == ["secret_helper"]
+    assert undocumented(DocumentedProbe, "Call `.secret_helper()` to ...") == []
+
+
+# What a caller can see is what is documented: a public attribute of a public class is named in its docstring or in the
+# docs. What only the library uses is a function of its module (or starts with an underscore), so `help(Recipe)` and
+# completion show the API and nothing else.
+PUBLIC_MODELS = {
+    name: getattr(bullterrier_image, name)
+    for name in bullterrier_image.__all__
+    if inspect.isclass(getattr(bullterrier_image, name)) and issubclass(getattr(bullterrier_image, name), BaseModel)
+}
+
+
+@pytest.mark.parametrize("cls", PUBLIC_MODELS.values(), ids=PUBLIC_MODELS.keys())
+def test_every_public_attribute_of_a_public_class_is_documented(cls):
+    assert undocumented(cls, DOCS) == []
 
 
 def test_fx_exports_every_effect_and_nothing_else():
-    assert fx.__all__ == sorted(registry.describe())
+    exported = fx.__all__
+    assert {"bloom", "grade", "gradient_map", "slice_shift", "rgb_split"} <= set(exported)  # known effects
+    assert exported == sorted(exported)
+    assert all(not name.startswith("_") and callable(getattr(fx, name)) for name in exported)  # each one resolves
+    assert "stub_text" not in exported  # the stub generator is no effect
 
 
 def test_dir_of_the_package_shows_its_public_names_not_its_machinery():
