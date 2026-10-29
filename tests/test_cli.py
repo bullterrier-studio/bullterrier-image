@@ -298,6 +298,26 @@ def test_render_refuses_a_recipe_whose_name_leaves_no_file_name_saying_how_to_na
     assert "name=" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    ("command", "written"),
+    [
+        ("render me.png recipes/a.toml bad.toml -o out", "out"),
+        ("sheet me.png recipes/a.toml bad.toml -o s.png", "s.png"),
+    ],
+    ids=["render", "sheet"],
+)
+def test_a_recipe_name_that_gives_no_file_name_fails_before_anything_is_rendered_or_written(
+    files, capsys, command, written
+):
+    (files / "bad.toml").write_text('name = "日本"\nsize = 64\n[[step]]\neffect = "grain"\n', encoding="utf-8")
+    assert cli(command) == 1
+    error = capsys.readouterr().err
+    assert "bad.toml" in error  # which file, as for a recipe that fails to load
+    assert "name=" in error
+    assert not (files / written).exists()  # the good recipe was not rendered and saved before the bad one was found
+    assert cli(command.replace(" bad.toml", "")) == 0  # the known-good side: the same command without it works
+
+
 def test_sheet_combines_recipes_into_one_image(files):
     assert cli("sheet me.png recipes -o s.png") == 0
     with Image.open(files / "s.png") as sheet:

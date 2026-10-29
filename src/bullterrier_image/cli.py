@@ -323,7 +323,10 @@ def _maps(args: argparse.Namespace) -> "tuple[dict[str, np.ndarray], dict[str, F
 
 
 def _load_recipes(paths: list[str]) -> "list[Recipe]":
+    """The recipes of `paths` (files, folders of them, or a look's name), each checked to have a name its files can
+    be called by (RecipeError naming the file otherwise), so nothing slow starts for a recipe that cannot be saved."""
     from .core import looks
+    from .core.steps import file_name
     from .errors import RecipeError
     from .recipe import load_recipe
 
@@ -337,11 +340,17 @@ def _load_recipes(paths: list[str]) -> "list[Recipe]":
             files += sorted(path.glob("*.toml")) if path.is_dir() else [path]
     if not files:
         raise RecipeError(f"no recipe files found in {', '.join(paths)}")
-    return [load_recipe(f) for f in files]
+    recipes = [load_recipe(f) for f in files]
+    for file, recipe in zip(files, recipes, strict=True):  # as `run` does: files are named by it, so check it now
+        try:
+            file_name(recipe)
+        except RecipeError as error:
+            raise RecipeError(f"{file}: {error}") from None
+    return recipes
 
 
 def _render_all(args: argparse.Namespace) -> "tuple[list[Recipe], list[np.ndarray]]":
-    recipes = _load_recipes(args.recipes)  # validated before any slow work starts
+    recipes = _load_recipes(args.recipes)  # validated, names included, before any slow work starts
     _progress(args, f"rendering {len(recipes)} recipe(s)...")
     return recipes, _render_recipes(args, recipes)
 
