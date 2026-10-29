@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from pydantic import model_validator
 
-from bullterrier_image import fx
+from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, Picture, param
@@ -248,8 +248,8 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
 
 def test_a_look_of_an_each_takes_no_name_because_nothing_could_reach_it_by_it(gain):
     with pytest.raises(RecipeError, match=r"a look takes no `name`.*each\.looks\[0\]"):
-        Each("g", looks=[Step("gain_probe", name="x"), "none"])
-    assert Each("g", looks=[Step("gain_probe"), "none"], name="pieces").name == "pieces"
+        Each("g", looks=[Step("gain_probe", name="x"), None])
+    assert Each("g", looks=[Step("gain_probe"), None], name="pieces").name == "pieces"
 
 
 def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway_effects):
@@ -302,7 +302,7 @@ def test_a_recipe_refuses_a_field_that_is_no_region_or_not_a_selection_naming_th
 def test_a_look_of_an_each_names_its_field_too(gain):
     look = Step("gain_probe", params={"gain": drive(by="near")})
     with pytest.raises(RecipeError, match=r"step 1: `by` names 'near', which is no region"):
-        Recipe([Each("g", looks=[look, "none"])], name="look", regions={"g": Grid()}, size=None)
+        Recipe([Each("g", looks=[look, None])], name="look", regions={"g": Grid()}, size=None)
 
 
 MAPS_OF_A_DRIVE = {
@@ -336,7 +336,7 @@ def pulse(gain):
         [
             Step("gain_probe", params={"gain": 2.0, "taps": 3}, name="pulse"),
             Step("gain_probe", params={"gain": Drive(by="near", start=0.5, end=2.5)}, opacity=0.5),
-            Each("g", looks=[Step("gain_probe", params={"offset": 0.1}), "none"], feather=0.002),
+            Each("g", looks=[Step("gain_probe", params={"offset": 0.1}), None], feather=0.002),
         ],
         name="pulse",
         regions={"g": Grid(columns=3), "near": Band(of="depth", low=0.4)},
@@ -642,13 +642,13 @@ def test_two_steps_of_a_recipe_cannot_share_a_name_or_take_the_name_of_an_effect
     with pytest.raises(RecipeError, match=r"'gain_probe'.*effect"):
         Recipe([Step("gain_probe", name="gain_probe")], name="look", size=None)
     with pytest.raises(RecipeError, match=r"'each'.*effect|reserved"):
-        Recipe([Each("g", looks=["none"], name="each")], name="look", regions={"g": Grid()}, size=None)
+        Recipe([Each("g", looks=[None], name="each")], name="look", regions={"g": Grid()}, size=None)
     assert Recipe([Step("gain_probe", name="a"), Step("gain_probe", name="b")], name="look", size=None)
 
 
 def test_a_step_named_describes_itself_with_its_name_and_an_each_too(gain):
     assert Step("gain_probe", params={"gain": 2}, name="pulse").describe() == "pulse: gain_probe(gain=2)"
-    assert Each("g", looks=["none"], name="pieces").describe() == "pieces: each g [none]"
+    assert Each("g", looks=[None], name="pieces").describe() == "pieces: each g [none]"
     assert Step("gain_probe").name is None
 
 
@@ -685,7 +685,7 @@ def rich(**changed: float) -> Recipe:
                     Step(
                         "gain_probe", params={"offset": changed.get("offset", 0.1)}, blend_mode="multiply", opacity=0.9
                     ),
-                    "none",
+                    None,
                 ],
                 mask="near",
                 opacity=0.8,
@@ -796,7 +796,7 @@ def test_a_step_has_its_effects_default_opacity_unless_it_gives_one(faint, tmp_p
 
 def test_the_fx_signature_shows_the_effects_default_opacity(faint):
     assert inspect.signature(fx.faint_probe).parameters["opacity"].default == 0.4
-    (stub,) = [line for line in fx.stub_text().splitlines() if line.startswith("def faint_probe(")]
+    (stub,) = [line for line in gallery.stub_text().splitlines() if line.startswith("def faint_probe(")]
     assert ", opacity: float = 0.4, blend_mode: " in stub
 
 
@@ -874,14 +874,14 @@ def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame
             id="a look whose effect takes it",
         ),
         pytest.param(
-            lambda: [Step("grade", mask="subject"), Each("g", looks=[Step("disperse"), "none"])],
+            lambda: [Step("grade", mask="subject"), Each("g", looks=[Step("disperse"), None])],
             (True, False),
             id="steps and looks on the subject need no depth",
         ),
         pytest.param(lambda: [Step("depth_probe", mask="subject")], (True, True), id="a step that needs both"),
-        pytest.param(lambda: [Each("g", looks=[Step("grade"), "none"])], (False, False), id="neither"),
+        pytest.param(lambda: [Each("g", looks=[Step("grade"), None])], (False, False), id="neither"),
         pytest.param(lambda: [Step("grade", mask="near")], (False, True), id="a mask made from depth"),
-        pytest.param(lambda: [Each("bands", looks=["none"])], (False, True), id="an each over depth bands"),
+        pytest.param(lambda: [Each("bands", looks=[None])], (False, True), id="an each over depth bands"),
         pytest.param(lambda: [Step("grade", mask="front")], (False, True), id="a pick of depth bands"),
         pytest.param(lambda: [Each("g", looks=[Step("grade", mask="near")])], (False, True), id="a look's mask"),
         pytest.param(lambda: [Step("grade")], (False, False), id="depth regions no step uses"),
@@ -909,7 +909,7 @@ def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_
         ),
         pytest.param([Step("grade")], {"star": Given()}, Framing(), set(), id="a given map no step uses"),
         pytest.param(
-            [Each("g", looks=[Step("grade", mask="star"), "none"])],
+            [Each("g", looks=[Step("grade", mask="star"), None])],
             {"g": Grid(), "star": Given()},
             Framing(),
             {"star"},
@@ -1049,7 +1049,7 @@ def test_a_recipe_declaring_regions_accepts_steps_that_name_them_in_every_place_
     steps: list[Step | Each] = [
         Step("grade", mask="head"),
         Step("grade", mask="subject"),
-        Each("panes", looks=[Step("grade", mask="head"), "none", Step("grade", opacity=0.5)], mask="background"),
+        Each("panes", looks=[Step("grade", mask="head"), None, Step("grade", opacity=0.5)], mask="background"),
     ]
     assert Recipe(steps, name="r", regions=REGIONS).regions == REGIONS
     assert Recipe([Step("grade")], name="plain").regions == {}
@@ -1067,19 +1067,19 @@ BAD_REFERENCES = {
         r"step 1: `mask` names 'panes', a partition, but it needs a selection; valid selections: .*head",
     ),
     "an each no region has": (
-        lambda: Recipe([Each("nope", looks=["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("nope", looks=[None])], name="r", regions=REGIONS),
         r"step 1: `each` names 'nope', which is no region; valid partitions: panes, glass",
     ),
     "an each that is a selection": (
-        lambda: Recipe([Each("head", looks=["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("head", looks=[None])], name="r", regions=REGIONS),
         r"step 1: `each` names 'head', a selection, but it needs a partition; valid partitions: panes, glass",
     ),
     "an each that is the subject": (
-        lambda: Recipe([Each("subject", looks=["none"])], name="r", regions=REGIONS),
+        lambda: Recipe([Each("subject", looks=[None])], name="r", regions=REGIONS),
         r"step 1: `each` names 'subject', a selection",
     ),
     "a mask on an each": (
-        lambda: Recipe([Each("panes", looks=["none"], mask="glass")], name="r", regions=REGIONS),
+        lambda: Recipe([Each("panes", looks=[None], mask="glass")], name="r", regions=REGIONS),
         r"step 1: `mask` names 'glass', a partition",
     ),
     "a look with a mask no region has": (
@@ -1116,19 +1116,23 @@ def test_a_recipe_refuses_a_bad_region_reference_when_it_is_made(partition_probe
         make()
 
 
+def test_an_each_takes_none_for_a_piece_left_as_it_is():
+    assert Each("panes", looks=[fx.grade(), None]).looks == (fx.grade(), None)
+
+
 BAD_EACH = {
     "no looks": (lambda: Each("panes", looks=[]), r"looks"),
-    "a look that is a word other than none": (lambda: Each("panes", looks=["nothing"]), r"looks"),
+    "a look that is a word": (lambda: Each("panes", looks=["none"]), r"looks"),  # type: ignore[list-item]
     "a look that is a number": (lambda: Each("panes", looks=[3]), r"looks"),  # type: ignore[list-item]
     "an assignment that does not exist": (
-        lambda: Each("panes", looks=["none"], assign="shuffle"),
+        lambda: Each("panes", looks=[None], assign="shuffle"),
         r"`assign`.*cycle.*random",
     ),
-    "a negative seed": (lambda: Each("panes", looks=["none"], seed=-1), r"`seed`.*0"),
-    "a feather below 0": (lambda: Each("panes", looks=["none"], feather=-0.005), r"`feather`.*0"),
-    "an infinite feather": (lambda: Each("panes", looks=["none"], feather=float("inf")), r"`feather`"),
-    "an unknown key": (lambda: Each("panes", looks=["none"], effect="grade"), r"`effect`"),
-    "a mask that is not a name": (lambda: Each("panes", looks=["none"], mask=3), r"`mask`"),  # type: ignore[arg-type]
+    "a negative seed": (lambda: Each("panes", looks=[None], seed=-1), r"`seed`.*0"),
+    "a feather below 0": (lambda: Each("panes", looks=[None], feather=-0.005), r"`feather`.*0"),
+    "an infinite feather": (lambda: Each("panes", looks=[None], feather=float("inf")), r"`feather`"),
+    "an unknown key": (lambda: Each("panes", looks=[None], effect="grade"), r"`effect`"),
+    "a mask that is not a name": (lambda: Each("panes", looks=[None], mask=3), r"`mask`"),  # type: ignore[arg-type]
 }
 
 
@@ -1171,21 +1175,21 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
             id="a grid laid over the subject",
         ),
         pytest.param(
-            [Each("cut", looks=["none"])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
+            [Each("cut", looks=[None])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
         ),
-        pytest.param([Each("cut", looks=["none"])], {"cut": Shards(fit="background")}, True, id="on the background"),
+        pytest.param([Each("cut", looks=[None])], {"cut": Shards(fit="background")}, True, id="on the background"),
         pytest.param(
-            [Each("cut", looks=["none"])],
+            [Each("cut", looks=[None])],
             {"cut": Shards(fit="aura"), "aura": Pick(of="g"), "g": Grid(fit="subject")},
             True,
             id="through two regions",
         ),
         pytest.param(
-            [Each("g", looks=[Step("disperse"), "none"])], {"g": Grid()}, True, id="a look that takes the subject"
+            [Each("g", looks=[Step("disperse"), None])], {"g": Grid()}, True, id="a look that takes the subject"
         ),
-        pytest.param([Each("g", looks=[Step("grade"), "none"])], {"g": Grid()}, False, id="looks that do not"),
+        pytest.param([Each("g", looks=[Step("grade"), None])], {"g": Grid()}, False, id="looks that do not"),
         pytest.param(
-            [Each("g", looks=["none"], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"
+            [Each("g", looks=[None], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"
         ),
     ],
 )
@@ -1205,7 +1209,7 @@ FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
         pytest.param([Step("grade", mask="subject")], FOUND, True, False, id="the built-in subject"),
         pytest.param([Step("grade")], FOUND, False, False, id="found by pieces but no step uses it"),
         pytest.param(
-            [Each("cut", looks=["none"])],
+            [Each("cut", looks=[None])],
             {**FOUND, "cut": Shards(fit="found")},
             False,
             True,
@@ -1222,7 +1226,7 @@ def test_a_recipe_needs_a_finder_for_pieces_only_when_a_region_it_uses_finds_the
 
 
 def test_an_each_step_describes_itself_with_its_partition_and_looks():
-    step = Each("panes", looks=[Step("grade", params={"exposure": 0.5}), "none"], mask="subject", opacity=0.5)
+    step = Each("panes", looks=[Step("grade", params={"exposure": 0.5}), None], mask="subject", opacity=0.5)
     assert step.describe() == "each panes [grade(exposure=0.5), none] on subject x0.5"
     assert len(Each("panes", looks=[Step("ascii", params={"chars": "xy" * 50})] * 3).describe(width=30)) == 30
 
@@ -1233,7 +1237,7 @@ def test_an_each_step_shows_fully_unless_it_gives_an_opacity():
 
 
 def test_the_each_step_is_a_frozen_value_and_keeps_its_looks_as_a_tuple():
-    step = Each("panes", looks=[Step("grade"), "none"])
-    assert step.looks == (Step("grade"), "none")
+    step = Each("panes", looks=[Step("grade"), None])
+    assert step.looks == (Step("grade"), None)
     with pytest.raises(ValueError, match="frozen"):
         step.feather = 3.0  # type: ignore[misc]  # the point of the test

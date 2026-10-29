@@ -16,6 +16,7 @@ import pytest
 import bullterrier_image
 import bullterrier_image.core.runner
 import bullterrier_image.effects
+import bullterrier_image.gallery as gallery
 import bullterrier_image.plugin
 from bullterrier_image import (
     Each,
@@ -77,6 +78,16 @@ def test_every_public_module_lists_what_it_exports_and_has_it(module):
 )
 def test_a_public_class_has_no_attribute_only_the_library_uses(cls, name):
     assert not hasattr(cls, name)
+
+
+def test_fx_exports_every_effect_and_nothing_else():
+    assert fx.__all__ == sorted(registry.describe())
+
+
+def test_dir_of_the_package_shows_its_public_names_not_its_machinery():
+    shown = dir(bullterrier_image)
+    assert {"render", "Recipe", "fx", "__version__"} <= set(shown)
+    assert {"TYPE_CHECKING", "import_module"}.isdisjoint(shown)
 
 
 def test_a_recipe_is_framed_with_a_framing_from_the_public_names():
@@ -206,7 +217,7 @@ def test_fx_builds_steps_from_keyword_arguments():
 @pytest.mark.parametrize(
     "make",
     [
-        pytest.param(lambda: fx.grade(0.5), id="an effect parameter"),
+        pytest.param(lambda: fx.grade(0.5), id="an effect parameter"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Step("grade", {"exposure": 0.5}), id="a step's parameters"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Step("grade", None, "subject"), id="a step's mask"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Each("panes", [fx.grade()]), id="an each step's looks"),  # type: ignore[call-arg]  # the point of the test
@@ -263,8 +274,8 @@ def test_an_effects_presets_are_its_values_by_preset_name_and_none_for_an_effect
         name: {k: v for k, v in table.items() if k != "description"}
         for name, table in _toml("presets", "gradient_map").items()
     }
-    assert fx.gradient_map.presets == shipped  # type: ignore[attr-defined]  # fx.pyi is written at integration
-    assert fx.equalize.presets == {}  # type: ignore[attr-defined]  # fx.pyi is written at integration
+    assert fx.gradient_map.presets == shipped
+    assert fx.equalize.presets == {}
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
@@ -330,7 +341,7 @@ def test_a_modelled_effects_builder_takes_keyword_values_and_refuses_them_by_pos
     assert fx.lantern_probe(radius=30, style="silk") == Step("lantern_probe", params={"radius": 30, "style": "silk"})
     assert fx.lantern_probe() == Step("lantern_probe")
     with pytest.raises(TypeError, match=r"fx\.lantern_probe.*keyword.*radius=30"):
-        fx.lantern_probe(30)
+        fx.lantern_probe(30)  # type: ignore[call-arg]  # the point of the test
 
 
 @pytest.mark.parametrize(
@@ -348,7 +359,7 @@ def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lanter
 
 
 def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lantern):
-    tree = ast.parse(fx.stub_text())
+    tree = ast.parse(gallery.stub_text())
     (function,) = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "lantern_probe"]
     assert [ast.unparse(decorator) for decorator in function.decorator_list] == ["_effect"]  # typed with `presets`
     assert function.args.args == []  # every value by keyword
@@ -357,11 +368,11 @@ def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lante
     doc = ast.get_docstring(function)
     assert doc is not None
     assert "Glow radius of the paper lantern, quite distinctive." in doc
-    assert "pydantic" not in fx.stub_text()
+    assert "pydantic" not in gallery.stub_text()
 
 
 def _stub_functions() -> dict[str, ast.FunctionDef]:
-    tree = ast.parse(fx.stub_text())
+    tree = ast.parse(gallery.stub_text())
     return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name[0] != "_"}
 
 
@@ -406,7 +417,7 @@ def test_a_preset_is_chosen_with_the_keyword_preset_and_the_other_values_win_ove
 
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
     """fx.pyi itself is regenerated at integration (`poe regenerate`), so only its generator is checked here."""
-    tree = ast.parse(fx.stub_text())
+    tree = ast.parse(gallery.stub_text())
     functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name[0] != "_"}
     assert "lantern_probe" in functions
     assert sorted(functions) == sorted(registry.describe())  # one per effect, no more, no less
@@ -426,7 +437,7 @@ def test_the_editor_stub_names_a_picture_field_by_its_forms_and_every_name_it_us
         return rgb
 
     effect(category="compositing", params=SceneParams)(scene_probe)
-    text = fx.stub_text()
+    text = gallery.stub_text()
     (function,) = [n for n in ast.parse(text).body if isinstance(n, ast.FunctionDef) and n.name == "scene_probe"]
     annotation = ast.unparse(function.args.kwonlyargs[0].annotation)  # type: ignore[arg-type]
     assert annotation.startswith("Picture | os.PathLike[str] | numpy.ndarray | str")

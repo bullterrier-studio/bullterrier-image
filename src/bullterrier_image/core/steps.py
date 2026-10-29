@@ -267,15 +267,15 @@ class Each(_Layer):
     Each look is rendered once over the whole picture and shown through its pieces, so the cost is the number of looks,
     not of pieces. The pieces' weights add up to 1 at every pixel; then `mask`, `opacity` and `blend_mode` lay the
     blended picture over the step's input like any step's result. A look is a `Step`, with its own `opacity` and
-    `blend_mode` (and `mask`), or the word "none": the piece stays as it was.
+    `blend_mode` (and `mask`), or None: the piece stays as it was.
     """
 
     each: str = Field(
         description="The name of the partition whose pieces get a look each (grid, shards, cuts, svg or bands)."
     )
-    looks: tuple[Step | Literal["none"], ...] = Field(
+    looks: tuple[Step | None, ...] = Field(
         min_length=1,
-        description='The looks: each a step, or "none" for a piece left as it is. Piece k gets look k, then they '
+        description="The looks: each a step, or None for a piece left as it is. Piece k gets look k, then they "
         "start again (assign='cycle'), or each piece draws one at random (assign='random').",
     )
     assign: Literal["cycle", "random"] = Field(
@@ -307,7 +307,7 @@ class Each(_Layer):
         self,
         each: str,
         *,
-        looks: Sequence[Step | str],
+        looks: Sequence[Step | None],
         mask: str | None = None,
         opacity: float | None = None,
         blend_mode: str = "normal",
@@ -335,7 +335,7 @@ class Each(_Layer):
 
     @field_validator("looks")
     @classmethod
-    def _looks_take_no_name(cls, looks: tuple[Step | Literal["none"], ...]) -> tuple[Step | Literal["none"], ...]:
+    def _looks_take_no_name(cls, looks: tuple[Step | None, ...]) -> tuple[Step | None, ...]:
         """A look is reached by its place, `each.looks[0]`, so a name on it would address nothing."""
         for number, look in enumerate(looks):
             if isinstance(look, Step) and look.name is not None:
@@ -344,7 +344,7 @@ class Each(_Layer):
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `each panes [grade(exposure=0.5), none] on subject x0.5`, cut to `width`."""
-        looks = ", ".join(str(look) for look in self.looks)
+        looks = ", ".join("none" if look is None else str(look) for look in self.looks)
         return _described(f"each {self.each} [{looks}]", self, width)
 
     def __str__(self) -> str:
@@ -356,7 +356,7 @@ class Each(_Layer):
 
 
 def runs(step: Step | Each) -> tuple[Step, ...]:
-    """The effect steps `step` runs: a `Step` itself, an `Each` its looks but the "none" ones."""
+    """The effect steps `step` runs: a `Step` itself, an `Each` its looks but the None ones."""
     return (step,) if isinstance(step, Step) else tuple(look for look in step.looks if isinstance(look, Step))
 
 

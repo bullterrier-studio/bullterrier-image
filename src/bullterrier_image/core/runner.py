@@ -438,7 +438,7 @@ def _driven(
 def _each(before: np.ndarray, step: Each, regions: Regions, scale: float) -> np.ndarray:
     """`before` with each piece of the step's partition replaced by its look: every look that has pieces is rendered
     once over the whole picture and shown by the weights of its pieces, which add up to 1 with the weights of the
-    pieces left as they were ("none"). The pixels of a look's own pieces are changed by that look alone."""
+    pieces left as they were (None). The pixels of a look's own pieces are changed by that look alone."""
     partition = regions.partition(step.each)
     weights = look_weights(partition, assignment(step, partition.count), len(step.looks), feather=step.feather * scale)
     out = before.copy()

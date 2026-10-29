@@ -57,6 +57,15 @@ def test_a_recipe_keeps_the_description_its_file_gives_and_has_none_without_one(
     assert load_recipe(_write(tmp_path, STEP)).description is None
 
 
+def test_the_word_none_in_a_files_looks_is_a_piece_left_as_it_is(tmp_path):
+    text = (
+        'format = 2\n[region.panes]\nkind = "grid"\n[[step]]\neach = "panes"\nlooks = [{ effect = "grade" }, "none"]\n'
+    )
+    (each,) = load_recipe(_write(tmp_path, text)).steps
+    assert isinstance(each, Each)
+    assert each.looks == (Step("grade"), None)
+
+
 def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
     assert runs(load_recipe(_write(tmp_path, "name = 'a'\n" + STEP, "a.toml")).steps[0])[0].effect == "grade"
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
@@ -331,7 +340,7 @@ REGIONS_RECIPE = Recipe(
             "glass",
             looks=[
                 Step("grade", params={"exposure": 0.5}, opacity=0.7),
-                "none",
+                None,
                 Step("gradient", params={"colors": ["#00ff00"]}, blend_mode="multiply"),
             ],
             mask="subject",
@@ -391,7 +400,7 @@ def test_field_regions_load_as_the_recipe_written_in_python(tmp_path):
         size=None,
         regions={"near": Band(of="depth", low=0.6, high=0.9, feather=0.05), "bands": Bands(of="depth", count=4)},
         steps=[
-            Each("bands", looks=[Step("grade", params={"exposure": 0.5}), "none"]),
+            Each("bands", looks=[Step("grade", params={"exposure": 0.5}), None]),
             Step("gradient", params={"colors": ["#ff0000"]}, mask="near"),
         ],
     )
@@ -461,7 +470,7 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
         },
         steps=[
             Step("gradient", params={"colors": ["#ff0000"]}, mask="ring"),
-            Each("halves", looks=["none", Step("gradient", params={"colors": ["#00ff00"]})], mask="blob"),
+            Each("halves", looks=[None, Step("gradient", params={"colors": ["#00ff00"]})], mask="blob"),
         ],
     )
     assert loaded == written

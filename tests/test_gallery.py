@@ -19,7 +19,7 @@ import pytest
 from PIL import Image, JpegImagePlugin
 
 import bullterrier_image
-from bullterrier_image import ProjectError, UnknownEffectError, fx, gallery, imageio
+from bullterrier_image import ProjectError, UnknownEffectError, gallery, imageio
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import Color, EffectParams, param
 from bullterrier_image.core.registry import effect
@@ -485,7 +485,7 @@ def test_regenerate_writes_the_stub_and_the_pages_and_keeps_existing_pictures(do
     assert done.returncode == 0, done.stderr
     stub, pages = docs / "src" / "bullterrier_image" / "fx.pyi", _page_files(docs)
     assert done.stdout.split() == [str(stub), *map(str, pages.values())]  # into the scratch checkout, nowhere else
-    assert stub.read_text(encoding="utf-8") == fx.stub_text()
+    assert stub.read_text(encoding="utf-8") == gallery.stub_text()
     for filename, text in gallery.render_effects_pages().items():
         assert pages[filename].read_text(encoding="utf-8") == text
     pictures = [gallery.effect_files(name, checkout=docs).picture for name in registry.describe()]

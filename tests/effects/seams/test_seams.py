@@ -149,7 +149,7 @@ def test_a_mask_limits_the_seams_like_any_step():
 
 def test_as_the_look_of_an_each_step_only_the_pieces_with_that_look_show_the_line():
     step = Each(
-        "panes", looks=[Step(NAME, params={"width": 7.5, "color": "#ff0000"}, partition="panes"), "none"], feather=0
+        "panes", looks=[Step(NAME, params={"width": 7.5, "color": "#ff0000"}, partition="panes"), None], feather=0
     )
     photo, out = run([step])
     assert (out[:, 63] == RED).all()  # the left piece has the seams look, so its side of the border is drawn

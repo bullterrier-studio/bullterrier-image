@@ -675,7 +675,7 @@ def test_the_look_of_an_each_can_be_driven(photo, brighten):
         [
             Each(
                 "g",
-                looks=[Step("brighten_probe", params={"gain": Drive(by="f", start=0.5, end=2.5)}), "none"],
+                looks=[Step("brighten_probe", params={"gain": Drive(by="f", start=0.5, end=2.5)}), None],
                 feather=0,
             )
         ],
@@ -1012,14 +1012,14 @@ def test_the_looks_weights_add_up_to_one_at_every_pixel_whatever_the_size_and_fe
 
 
 def test_a_none_look_leaves_its_pieces_exactly_as_they_were(photo):
-    out = run(photo, [Each("cols", looks=[fill(RED), "none"], feather=0)], columns(4))
+    out = run(photo, [Each("cols", looks=[fill(RED), None], feather=0)], columns(4))
     np.testing.assert_array_equal(out[:, 32:64], photo[:, 32:64])
     np.testing.assert_array_equal(out[:, 96:], photo[:, 96:])
     assert (out[:, 0:32] == RGB[RED]).all()
 
 
 def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
-    out = run(photo, [Each("cols", looks=[fill(RED), "none"], feather=7.5)], columns(4))  # 2 px on the 128 px photo
+    out = run(photo, [Each("cols", looks=[fill(RED), None], feather=7.5)], columns(4))  # 2 px on the 128 px photo
     reach = 4 * 2 + 1  # a feather of 2 px, cut off at 4 sigmas
     np.testing.assert_array_equal(out[:, 32 + reach : 64 - reach], photo[:, 32 + reach : 64 - reach])
     assert (out[:, 0 : 32 - reach] == RGB[RED]).all()
@@ -1031,7 +1031,7 @@ def test_a_none_look_is_exact_away_from_the_feathered_borders(photo):
 @pytest.mark.parametrize("feather", [0, 11.25])  # design px: 3 px on the 128 px photo
 @pytest.mark.parametrize("assign", ["cycle", "random"])
 def test_looks_that_change_nothing_give_back_the_photo_exactly(photo, feather, assign):
-    nothing: list[Step | str] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), "none"]
+    nothing: list[Step | None] = [fill(RED, opacity=0.0), fill(GREEN, opacity=0.0), None]
     np.testing.assert_array_equal(
         run(photo, [Each("cols", looks=nothing, assign=assign, feather=feather)], columns(7)), photo
     )
@@ -1113,8 +1113,8 @@ def stamp(throwaway_effects):
 
 def test_every_look_is_rendered_once_over_the_whole_picture_however_many_pieces_it_has(photo, stamp):
     twice = Step("stamp", params={"copies": 2})
-    out = run(photo, [Each("cols", looks=[Step("stamp"), twice, "none"], feather=0), Step("stamp")], columns(30))
-    # 30 pieces, 3 looks, one a "none": two renders (0.01 and 0.02) and the step after them is the third
+    out = run(photo, [Each("cols", looks=[Step("stamp"), twice, None], feather=0), Step("stamp")], columns(30))
+    # 30 pieces, 3 looks, one None: two renders (0.01 and 0.02) and the step after them is the third
     assert set(np.unique(out)) == {np.float32(0.03)}
 
 
@@ -1172,7 +1172,7 @@ def test_a_declared_region_nobody_uses_costs_nothing_and_does_not_look_for_the_s
 def test_a_region_in_use_asks_for_the_subject_once_however_many_steps_use_it(photo, subject):
     finder = CountingFinder(subject)
     regions = {"glass": Shards(count=5, fit="subject"), "head": Pick(of="glass", pieces=[0])}
-    steps = [fill(RED, mask="head"), Each("glass", looks=[fill(GREEN), "none"]), fill(BLUE, mask="subject")]
+    steps = [fill(RED, mask="head"), Each("glass", looks=[fill(GREEN), None]), fill(BLUE, mask="subject")]
     run(photo, steps, regions, finders={"subject": Finder("stand-in", finder)})
     assert finder.seen == [(96, 128, 3)]  # the photo as given
 
@@ -1193,7 +1193,7 @@ def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_workin
 
 @pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
 def test_a_region_that_needs_the_subject_without_a_finder_is_refused_like_a_masked_step(run_it, photo):
-    recipe = Recipe([Each("glass", looks=["none"])], name="fitted", size=None, regions={"glass": Shards(fit="subject")})
+    recipe = Recipe([Each("glass", looks=[None])], name="fitted", size=None, regions={"glass": Shards(fit="subject")})
     with pytest.raises(SubjectNotFoundError, match="needs the subject"):
         run_it(photo, recipe)
 
@@ -1279,14 +1279,14 @@ def test_trace_still_ends_in_what_render_returns_when_regions_are_drawn(photo):
 
 
 def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
-    each = Each("panes", looks=[fill(RED), "none"], mask="head")
+    each = Each("panes", looks=[fill(RED), None], mask="head")
     labels = [stage.label for stage in runner.trace(photo, Recipe([each], name="t", size=None, regions=TRACED))]
     assert labels[-1].startswith("1. each panes [gradient(colors=['#ff0000']), none]")
 
 
 def test_a_feather_is_in_design_px_so_the_blend_is_the_same_at_two_resolutions():
     grey = np.full((96, 128, 3), 0.5, np.float32)
-    recipe = [Each("cols", looks=[fill(RED), "none"], feather=9.6)]
+    recipe = [Each("cols", looks=[fill(RED), None], feather=9.6)]
 
     def rendered(size: int) -> np.ndarray:
         return runner.render(grey, Recipe(recipe, name="scaled", size=size, regions=columns(2)))

@@ -1017,7 +1017,7 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
 def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
     maps = field_maps(photo, subject)
     recipe = Recipe(
-        [Each("halves", looks=[Step("field_probe", params={"field": "g"}), "none"], feather=0)],
+        [Each("halves", looks=[Step("field_probe", params={"field": "g"}), None], feather=0)],
         name="pieces",
         size=None,
         regions={"halves": Grid(columns=2), "g": Given()},

@@ -225,7 +225,7 @@ def test_changing_an_svg_file_a_recipe_reads_redoes_that_recipe_and_nothing_else
     [
         pytest.param(lambda image: fx.layer_probe(image=image), id="a step"),
         pytest.param(
-            lambda image: Each("panes", looks=[fx.layer_probe(image=image), "none"]), id="a look of an each step"
+            lambda image: Each("panes", looks=[fx.layer_probe(image=image), None]), id="a look of an each step"
         ),
     ],
 )

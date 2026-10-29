@@ -136,7 +136,6 @@ REFUSED = {  # name, category -> what the refusal must name
     "np": ("np", "light", ["'np'", "effect.py"]),  # the function would hide numpy from its own body
     "param": ("param", "light", ["'param'", "effect.py"]),
     "effect": ("effect", "light", ["'effect'", "effect.py"]),
-    "stub_text": ("stub_text", "light", ["'stub_text'", "fx"]),
     "registry": ("registry", "light", ["'registry'", "fx"]),  # a module fx imports for itself: it never builds it
     "cache": ("cache", "light", ["'cache'", "fx"]),
     "an unknown category, listing the categories": (

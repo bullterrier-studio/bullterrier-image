@@ -119,7 +119,8 @@ def __getattr__(name: str) -> object:
 
 
 def __dir__() -> list[str]:
-    return sorted({*globals(), *__all__})
+    """The public names and the module's own dunders, not the machinery that imports them."""
+    return sorted({*__all__, *(name for name in globals() if name.startswith("__"))})
 
 
 def _installed_version() -> str:

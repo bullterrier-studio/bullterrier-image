@@ -178,7 +178,7 @@ glass = Recipe(
     [
         Each(
             "glass",
-            looks=[fx.halftone(cell=8), "none", fx.gradient_map(preset="cyanotype")],
+            looks=[fx.halftone(cell=8), None, fx.gradient_map(preset="cyanotype")],
             assign="random",
             seed=4,
             mask="subject",

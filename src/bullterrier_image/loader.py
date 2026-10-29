@@ -366,10 +366,10 @@ def _step(entry: dict, where: str, folder: Path) -> Step | Each:
         raise RecipeError("`looks` needs `each`, the name of the partition whose pieces get them")
     if not isinstance(looks, list):
         raise RecipeError('an `each` step needs `looks`, a list of tables (one effect each) or "none"')
-    made = []
+    made: list[Step | None] = []
     for number, look in enumerate(looks, start=1):
-        if look == "none":
-            made.append(look)
+        if look == "none":  # a file's word for a piece left as it is, None in Python
+            made.append(None)
         elif isinstance(look, dict):
             try:
                 made.append(_effect_step(look, f"look {number}", folder))
