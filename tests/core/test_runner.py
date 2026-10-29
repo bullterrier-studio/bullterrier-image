@@ -240,6 +240,13 @@ def test_a_render_never_modifies_the_callers_photo_and_the_result_shares_no_memo
     assert not np.shares_memory(result, given)
 
 
+@pytest.mark.parametrize("run", PUBLIC_RUNS.values(), ids=PUBLIC_RUNS.keys())
+def test_a_misaligned_photo_renders_as_the_aligned_one_does(photo, misaligned, run):
+    expected = run(photo, PLAIN)
+    np.testing.assert_array_equal(run(misaligned(photo), PLAIN), expected)
+    assert not np.array_equal(expected, photo)  # the effect did something, so the comparison is not vacuous
+
+
 def test_a_photo_at_both_ends_of_the_range_is_a_picture():
     photo = _with(1.0)
     photo[0, 0, 0] = 0.0

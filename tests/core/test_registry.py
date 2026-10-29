@@ -182,6 +182,44 @@ def test_a_direct_call_gives_the_field_as_an_array_whatever_its_float_type(shade
     assert inspect.signature(shade).parameters["field"].default is inspect.Parameter.empty
 
 
+def test_a_direct_call_with_a_misaligned_picture_gives_the_result_for_the_aligned_one(photo, misaligned):
+    grade = registry.get("grade")  # an effect the Rust core renders, which reads the picture in place
+    expected = grade(photo, exposure=0.5)
+    np.testing.assert_array_equal(grade(misaligned(photo), exposure=0.5), expected)
+    assert not np.array_equal(expected, photo)
+
+
+def test_an_effect_is_given_its_picture_and_field_aligned_whatever_the_caller_passed(throwaway_effects, misaligned):
+    arrived: dict[str, np.ndarray] = {}
+
+    @effect(category="light", params=ShadeParams)
+    def shade_probe(rgb, params, *, field):
+        """Records the arrays it is given."""
+        arrived.update(rgb=rgb, field=field)
+        return rgb
+
+    picture = np.full((4, 5, 3), 0.25, np.float32)
+    shade_probe(misaligned(picture), field=misaligned(np.full((4, 5), 0.5, np.float32)))
+    for name, array in arrived.items():
+        assert array.flags.aligned, name
+        assert array.flags.c_contiguous, name
+    np.testing.assert_array_equal(arrived["field"], 0.5)
+
+
+def test_a_picture_that_is_already_in_the_layout_is_given_to_the_effect_without_a_copy(throwaway_effects):
+    arrived: list[np.ndarray] = []
+
+    @effect(category="light", params=ShadeParams)
+    def shade_probe(rgb, params, *, field):
+        """Records the picture it is given."""
+        arrived.append(rgb)
+        return rgb
+
+    picture = np.full((4, 5, 3), 0.25, np.float32)
+    shade_probe(picture, field=np.full((4, 5), 0.5, np.float32))
+    assert np.shares_memory(arrived[0], picture)
+
+
 @pytest.mark.parametrize(
     "field",
     [

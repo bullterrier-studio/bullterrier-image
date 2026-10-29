@@ -88,6 +88,12 @@ _LISTED = 5  # how many effects an unknown-name message names at most, for each 
 _SENTENCE_END = re.compile(r"(?<!e\.g)(?<!i\.e)[.!?](?=\s|$)")
 
 
+def _for_the_core(array: np.ndarray) -> np.ndarray:
+    """`array` as float32, C-contiguous and aligned, the layout an effect (and the Rust core) reads in place: the same
+    array when it is so already, else a copy."""
+    return np.require(array, dtype=np.float32, requirements=["C", "A"])
+
+
 class ModelledEffect[P: EffectParams]:
     """An effect registered with its parameter model: what `@effect(category=..., params=Model)` returns.
 
@@ -145,10 +151,11 @@ class ModelledEffect[P: EffectParams]:
             raise TypeError(f"{self.__name__}(): give a {self.params_model.__name__} or keyword values, not both")
         elif not isinstance(params, self.params_model):
             raise TypeError(f"{self.__name__}() takes a {self.params_model.__name__}, not a {type(params).__name__}")
-        # every effect gets the contract's picture, float32 and C-contiguous, which the Rust core reads in place: the
-        # values were checked where the photo entered (`ops.image.as_image`); only the layout is made here, for the
-        # output of a step before (a view, or float64) or a direct call
-        return self._function(np.ascontiguousarray(rgb, dtype=np.float32), params, **given)
+        # every effect gets the contract's picture, float32, C-contiguous and aligned, which the Rust core reads in
+        # place: the values were checked where the photo entered (`ops.image.as_image`); only the layout is made here,
+        # for the output of a step before (a view, or float64) or a direct call. `np.require` copies only when one of
+        # the three is wrong, where `np.ascontiguousarray` would hand a misaligned float32 array on as it is
+        return self._function(_for_the_core(rgb), params, **given)
 
     def _field_array(self, name: str, rgb: np.ndarray, array: object) -> np.ndarray:
         """The array given for the field parameter `name`, as the float32 the effect receives; MapNotFoundError unless
@@ -163,7 +170,7 @@ class ModelledEffect[P: EffectParams]:
             raise MapNotFoundError(f"{where}: its array is {array.shape} but the picture is {rgb.shape[:2]}")
         if (problem := map_problem(array)) is not None:
             raise MapNotFoundError(f"{where}: its array has {problem}")
-        return np.ascontiguousarray(array, dtype=np.float32)
+        return _for_the_core(array)
 
     def fields_named(self, values: Mapping[str, object]) -> dict[str, str]:
         """The field each field parameter names in `values` (parameter name -> value, already validated), else its

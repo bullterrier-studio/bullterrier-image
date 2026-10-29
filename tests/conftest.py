@@ -203,6 +203,22 @@ def photo() -> np.ndarray:
 
 
 @pytest.fixture
+def misaligned() -> Callable[[np.ndarray], np.ndarray]:
+    """`misaligned(array)` is a copy of a float32 array that is C-contiguous but starts one byte off its dtype's
+    alignment, as a view onto a received buffer can: numpy accepts it, a Rust slice would not."""
+
+    def shift(array: np.ndarray) -> np.ndarray:
+        buffer = bytearray(array.nbytes + 1)
+        view = np.frombuffer(buffer, array.dtype, array.size, offset=1).reshape(array.shape)
+        view[...] = array
+        assert view.flags.c_contiguous
+        assert not view.flags.aligned
+        return view
+
+    return shift
+
+
+@pytest.fixture
 def subject() -> np.ndarray:
     """A disc in the middle of the 96x128 picture: 1 inside, 0 outside, soft edge."""
     y, x = np.mgrid[0:96, 0:128].astype(np.float32)
