@@ -407,7 +407,7 @@ def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp
 # --- bring your own map: imageio.load_map ---------------------------------------------------------------------------
 
 
-def halves(low, high, dtype=np.uint8) -> np.ndarray:
+def halves(low, high, dtype: type[np.generic] = np.uint8) -> np.ndarray:
     """A 20x30 picture: `low` in the left half, `high` in the right half."""
     values = np.full((20, 30), low, dtype)
     values[:, 15:] = high
