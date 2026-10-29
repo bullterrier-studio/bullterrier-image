@@ -61,9 +61,19 @@ dependencies = [
 name = "bullterrier-image"
 version = "0.0.0"
 dependencies = [
+ "bullterrier-image-derive",
  "proptest",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "bullterrier-image-derive"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

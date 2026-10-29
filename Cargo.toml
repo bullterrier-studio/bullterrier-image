@@ -1,10 +1,10 @@
-# The Rust core of bullterrier-image: `crates/core` (pure Rust: ops and effects; the crate `bullterrier-image`) and
-# `crates/python` (the bindings that build `bullterrier_image._native._core`; maturin builds it, see [tool.maturin] in
-# pyproject.toml). Rust settings live here, except what a tool cannot read from this file: rust-toolchain.toml,
-# rustfmt.toml, deny.toml.
+# The Rust core of bullterrier-image: `crates/core` (pure Rust: ops and effects; the crate `bullterrier-image`),
+# `crates/derive` (the derive macros an effect declares its parameters with) and `crates/python` (the bindings that
+# build `bullterrier_image._native._core`; maturin builds it, see [tool.maturin] in pyproject.toml). Rust settings
+# live here, except what a tool cannot read from this file: rust-toolchain.toml, rustfmt.toml, deny.toml.
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/python"]
+members = ["crates/core", "crates/derive", "crates/python"]
 
 [workspace.package]
 version = "0.0.0"  # never published on its own: the Python package's version (pyproject.toml) is the release's
@@ -16,12 +16,16 @@ publish = false
 
 [workspace.dependencies]
 bullterrier-image = { path = "crates/core" }
+bullterrier-image-derive = { path = "crates/derive" }
 numpy = "0.30"
+proc-macro2 = "1"
 proptest = "1.12"
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)
 pyo3 = { version = "0.30", features = ["abi3-py312"] }
+quote = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+syn = "3"
 
 # Warnings, not errors, so a newer compiler's new lint never breaks a user's install; the gate (`poe check`) runs clippy
 # and rustdoc with `-D warnings`, so every one fails it.

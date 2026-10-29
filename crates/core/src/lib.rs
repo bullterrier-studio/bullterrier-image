@@ -10,6 +10,7 @@
 mod effects;
 mod error;
 mod ops;
+pub mod params;
 mod picture;
 
 pub use error::Error;
