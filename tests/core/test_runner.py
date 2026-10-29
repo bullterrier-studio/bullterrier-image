@@ -194,6 +194,12 @@ def _with(value: float, at: tuple[int, int, int] = (2, 3, 1)) -> np.ndarray:
         pytest.param(np.zeros((4, 6), np.float32), InvalidImageError, r"np\.dstack", id="greyscale names the fix"),
         pytest.param(np.zeros((4, 6, 4), np.float32), InvalidImageError, "alpha", id="RGBA names the fix"),
         pytest.param(np.zeros((4, 6, 2), np.float32), InvalidImageError, r"\(4, 6, 2\)", id="two channels: the shape"),
+        pytest.param(np.zeros((0, 6, 3), np.float32), InvalidImageError, "at least one pixel", id="no rows"),
+        pytest.param(np.zeros((4, 0, 3), np.float32), InvalidImageError, "at least one pixel", id="no columns"),
+        pytest.param(np.zeros((4, 6, 1), np.float32), InvalidImageError, r"one channel.*np\.repeat", id="one channel"),
+        pytest.param(np.zeros((1, 4, 6, 3), np.float32), InvalidImageError, r"batch.*picture\[0\]", id="a batch"),
+        pytest.param(np.zeros((4, 6, 3), np.uint32), InvalidImageError, "uint32", id="uint32 is refused, not divided"),
+        pytest.param(np.zeros((4, 6, 3), np.uint64), InvalidImageError, "uint64", id="uint64 is refused, not divided"),
         pytest.param(np.zeros((4, 6, 3), bool), InvalidImageError, "bool", id="bool is no colour level"),
         pytest.param(np.zeros((4, 6, 3), np.int16), InvalidImageError, "int16", id="a signed type is refused"),
         pytest.param(Image.new("RGB", (6, 4)), InvalidImageError, r"np\.asarray", id="a Pillow image names the fix"),
@@ -203,6 +209,35 @@ def _with(value: float, at: tuple[int, int, int] = (2, 3, 1)) -> np.ndarray:
 def test_a_photo_that_is_no_picture_is_refused_naming_what_was_found_and_the_fix(run, photo, error, complaint):
     with pytest.raises(error, match=complaint):
         run(photo, PLAIN)
+
+
+@pytest.mark.parametrize("shape", [(4, 6, 1), (1, 4, 6, 3)], ids=["one channel", "a batch"])
+def test_the_shape_hint_fits_the_shape_it_is_not_always_greyscale(shape):
+    with pytest.raises(InvalidImageError) as raised:
+        bullterrier_image.render(np.zeros(shape, np.float32), PLAIN)
+    assert "dstack" not in str(raised.value)
+
+
+KEPT_AS_IS = {
+    "a float32 photo": lambda photo: photo,
+    "an 8-bit photo": lambda photo: (photo * 255).astype(np.uint8),
+    "a float64 photo": lambda photo: photo.astype(np.float64),
+}
+UNCHANGED = {
+    "an effect": PLAIN,
+    "a step that mixes nothing in": Recipe([Step("grade", params={"exposure": 0.5}, opacity=0.0)], size=None),
+}
+
+
+@pytest.mark.parametrize("run", PUBLIC_RUNS.values(), ids=PUBLIC_RUNS.keys())
+@pytest.mark.parametrize("recipe", UNCHANGED.values(), ids=UNCHANGED.keys())
+@pytest.mark.parametrize("make", KEPT_AS_IS.values(), ids=KEPT_AS_IS.keys())
+def test_a_render_never_modifies_the_callers_photo_and_the_result_shares_no_memory_with_it(photo, make, recipe, run):
+    given = make(photo)
+    before = given.copy()
+    result = run(given, recipe)
+    np.testing.assert_array_equal(given, before)
+    assert not np.shares_memory(result, given)
 
 
 def test_a_photo_at_both_ends_of_the_range_is_a_picture():

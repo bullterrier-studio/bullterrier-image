@@ -36,7 +36,7 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
 
 - **Photos in.** `render`, `trace`, `render_all`, `step.apply` and `imageio.save` take a numpy array (h, w, 3): uint8 or
   uint16 levels (divided by 255 or 65535, as Pillow and numpy give them) or floats 0..1. Greyscale, an alpha channel
-  (`save` takes (h, w, 4)), `bool`, signed integers, values outside 0..1 (not clipped) and a Pillow image itself are an
+  (`save` takes (h, w, 4)), `bool`, signed or wider unsigned integers, values outside 0..1 (not clipped) and a Pillow image itself are an
   `InvalidImageError` naming the fix (`np.dstack([grey] * 3)`, `np.asarray(image)`); NaN is a `NonFiniteImageError`.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too. The recipe is a `Recipe` or a `Step`, `render_all` takes a list

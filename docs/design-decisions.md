@@ -211,7 +211,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **A photo is checked once, where it enters.** `render`, `trace`, `render_all`, `Step.apply` and `imageio.save` (and
   `to_pil`) take a numpy array through `ops.image.as_image`: unsigned integer levels are divided by their type's largest
   value (uint8 by 255, uint16 by 65535), floats must be finite (`NonFiniteImageError`) and within 0..1; any other shape
-  (greyscale, RGBA where only RGB is taken), `bool`, signed integers, a Pillow image or a list is an `InvalidImageError`
+  (greyscale, RGBA where only RGB is taken), `bool`, signed integers, `uint32`/`uint64` (levels of no known white), a Pillow image or a list is an `InvalidImageError`
   naming what was found and the fix. Nothing is clipped. *Reason:* a uint8 photo rendered silent garbage and saved all
   white; the contract was the caller's to know. Signed integers are refused, not divided: an `int64` array of 0..255
   levels (numpy's default) over 2^63 would render black without a word. *Consequence:* inside the library nothing
