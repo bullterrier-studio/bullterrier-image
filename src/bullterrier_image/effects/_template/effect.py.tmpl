@@ -1,37 +1,26 @@
-"""The `$name` effect: <replace with what it does, in one line>."""
+"""The `$name` effect: <replace with what it does, in one line>.
+
+Its parameters are declared by the `Params` struct of its Rust kernel.
+"""
 
 import numpy as np
 
 from bullterrier_image._native import _core
-from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.params import EffectParams
 from bullterrier_image.core.registry import effect
 
 
-class ${Name}Params(EffectParams):
-    """The settings of `$name`: every value that shapes its result."""
-
-    # Replace this example field. Every field has a default and a doc: what it does, its unit and range in words,
-    # what raising it does. A number also has a unit and an inclusive min and max that hold the default. Names are
-    # the field's own terms (radius, amount, threshold, angle, seed...), never strength, intensity or factor.
-    # bool, Literal[...], str and Color fields take no unit, min or max. Options of every library call are fields
-    # too; constants are allowed only for standards (Rec. 709, sRGB...) and pure guards (an epsilon), each with a
-    # `# constant: <citation or reason>` comment ending its statement or on the line above it (a test fails on any
-    # other number, and on any number given to a library call as an option). The kernel's `Params`
-    # (crates/core/src/effects/$name.rs) has the same fields, by name.
-    amount: float = param(
-        1.0,
-        unit="fraction",
-        min=0,
-        max=1,
-        doc="How far the picture is mixed toward its negative: 0 = unchanged, 1 = fully inverted.",
-    )
+# The model is built from the Rust declaration: its fields, docs, defaults and ranges are written there, once, and the
+# class body stays empty. An effect that works from a map (a `FieldName` parameter) keeps a Python model for now, with
+# `param(...)` fields as `effects/relight/` has.
+class ${Name}Params(EffectParams, core="$name"):  # noqa: D101  (documented by its Rust declaration)
+    pass
 
 
 # Replace the docstring with what the effect does, for its users (`help(fx.<name>)`, the catalogue): its first
 # sentence is the summary. An effect is a pure function: a float32 RGB picture (h, w, 3) in 0..1 in, a new picture of
 # the same shape and range out, the same for the same values, the input never modified. The work is done by its Rust
-# kernel, which `uv sync` rebuilds after a change; the core takes no map yet, so an effect that works from one (a
-# `FieldName` parameter) keeps a Python body for now. The kernel:
+# kernel, which `uv sync` rebuilds after a change. The kernel:
 # crates/core/src/effects/$name.rs
 @effect(category="$category", params=${Name}Params)
 def $name(

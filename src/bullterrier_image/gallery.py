@@ -196,9 +196,9 @@ def stub_text() -> str:
 def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
     """Write the files of a new effect called `name`, in `category` (one of `registry.CATEGORIES`), into `checkout`,
     each made from the template in `src/bullterrier_image/effects/_template/` and placed where `effect_files` says: its
-    package (`__init__.py`, and `effect.py` with a parameter model with one documented example field and a body that
-    calls the core), its Rust kernel (`Params` with the same field, and `render`), its tests (`test_<name>.py`) and its
-    example recipe. Returns the files written, sorted.
+    package (`__init__.py`, and `effect.py` with a parameter model built from the kernel's declaration and a body that
+    calls the core), its Rust kernel (`Params`, which declares one documented example field, and `render`), its tests
+    (`test_<name>.py`) and its example recipe. Returns the files written, sorted.
 
     The effect is registered whenever bullterrier_image is imported; once the extension is rebuilt with its kernel
     (`uv sync`, which a Rust file's change triggers), it passes the contract tests and its own as written. Replacing the

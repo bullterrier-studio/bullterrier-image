@@ -219,8 +219,7 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
 `uv run poe check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
 `ruff check` (plus `PLW1514` explicit encodings, `BLE` no blind `except`, `PTH` pathlib, `PYI` stubs) and `rust-lint`
 (clippy pedantic, `unwrap`/`expect`/`panic`/print banned, dead code, missing docs, unreachable `pub`; `[workspace.lints]`
-in `Cargo.toml`); `dead-code` (vulture on `src`; exemptions in `[tool.vulture]`, and a whitelist, written as it runs,
-of the fields the Rust core reads); `rust-doc`; `deptry`; `rust-tools` (cargo-shear and cargo-deny at the versions
+in `Cargo.toml`); `dead-code` (vulture on `src`; exemptions in `[tool.vulture]`); `rust-doc`; `deptry`; `rust-tools` (cargo-shear and cargo-deny at the versions
 `Cargo.toml` pins; `poe setup` installs them), `rust-shear` (unused crates), `rust-deny` (bans, licences, sources;
 `deny.toml`); `poe build-check` (maturin sdist and wheel, twine, check-wheel-contents); `mypy` and `stubtest`
 (`_native/_core.pyi` against the extension); `rust-test`; the tests, in random order (import

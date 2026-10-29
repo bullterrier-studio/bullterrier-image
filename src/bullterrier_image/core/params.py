@@ -63,6 +63,7 @@ from pydantic import (
 from pydantic.fields import FieldInfo
 from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
 
+from bullterrier_image._native import _core
 from bullterrier_image.errors import LutError, RecipeError
 
 from .types import Color as ColorForms
@@ -546,13 +547,16 @@ class EffectParams(ValidatedModel):
         """The JSON schema of the parameters (pydantic's), without a default for a field that cannot show one."""
         return super().model_json_schema(by_alias, ref_template, schema_generator, mode, **kwargs)
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
+    def __init_subclass__(cls, core: str | None = None, **kwargs: Any) -> None:
         """Check every field's declaration and turn it into a strict pydantic field.
 
         This runs before pydantic reads the fields, which is why the field (and, for a list, the type of its items) can
-        depend on the annotation here.
+        depend on the annotation here. `core="grade"` declares the model from the Rust `Params` struct of the effect
+        called so (see `_declare_from_core`) instead of from fields written in the class body.
         """
         super().__init_subclass__(**kwargs)
+        if core is not None:
+            _declare_from_core(cls, core)
         annotations = cls.__annotations__  # this class's own, in definition order
         for name, annotation in inspect.get_annotations(cls, eval_str=True).items():
             if name.startswith("_"):  # private attributes are not parameters
@@ -617,6 +621,40 @@ class EffectParams(ValidatedModel):
 
 
 _MISSING = object()
+_PLAIN_KINDS: dict[str, Any] = {
+    "float": float,
+    "int": int,
+    "bool": bool,
+    "color": Color,
+}  # a Rust kind -> its annotation
+
+
+def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
+    """Give `cls` the docstring and the fields (annotations and `param` specs) that the Rust core's `Params` struct of
+    `effect` declares, before pydantic reads them; the checks of `_field` then run on them like on any model. Every
+    default and bound is the literal the declaration wrote, so a whole number stays an `int` and a decimal a `float`.
+    ValueError if the core implements no such effect."""
+    declared = _core.params(effect)
+    cls.__doc__ = declared["doc"]
+    fields = declared["fields"]
+    cls.__annotations__ = {
+        entry["name"]: Literal[tuple(entry["choices"])] if entry["kind"] == "choice" else _PLAIN_KINDS[entry["kind"]]
+        for entry in fields
+    }
+    for entry in fields:
+        spec = param(
+            entry["default"],
+            doc=entry["doc"],
+            unit=entry["unit"],
+            min=entry["min"],
+            max=entry["max"],
+            advanced=entry["advanced"],
+            drivable=entry["drivable"],
+            cyclic=entry["cyclic"],
+        )
+        setattr(cls, entry["name"], spec)
+
+
 _TURN = 360  # constant: a full turn, in degrees
 
 

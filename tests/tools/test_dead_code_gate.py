@@ -1,19 +1,16 @@
 """The dead-code gate can fail: `poe dead-code` (vulture, with the project's configuration) rejects an unused function
-and an unused class, passes the package as it is, and does not report the fields of a parameter model that only the
-Rust core reads (by name, from `model_dump()`): it is given a whitelist of exactly those, written when it runs.
+and an unused class, and passes the package as it is.
 
 An architecture test of the tooling: its subject is the `dead-code` task and `[tool.vulture]` in pyproject.toml, so it
 runs that task, the way `uv run poe check` does, in a copy of the project into which the dead code is written.
 """
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.xdist_group("dead-code-gate")
 
 DEAD_CODE = '''"""A module with code nothing calls."""
@@ -31,9 +28,7 @@ class NeverUsedThing:
 
 @pytest.fixture
 def checkout(project_copy) -> Path:
-    copy = project_copy("pyproject.toml")
-    shutil.copytree(ROOT / "tools", copy / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-    return copy
+    return project_copy("pyproject.toml")
 
 
 def dead_code(checkout: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
@@ -54,12 +49,3 @@ def test_an_unused_function_and_an_unused_class_fail_the_gate_by_name(checkout, 
     assert "leftover.py" in result.stdout
     assert "'never_called_helper'" in result.stdout
     assert "'NeverUsedThing'" in result.stdout
-
-
-def test_without_the_whitelist_the_fields_only_rust_reads_would_be_reported(checkout):
-    # vulture alone, as before the whitelist: grade's `temperature` is read nowhere in Python
-    result = subprocess.run(
-        [sys.executable, "-m", "vulture"], cwd=checkout, capture_output=True, encoding="utf-8", check=False
-    )
-    assert result.returncode != 0
-    assert "'temperature'" in result.stdout

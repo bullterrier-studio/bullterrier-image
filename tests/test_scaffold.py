@@ -78,25 +78,6 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     assert [step["effect"] for step in recipe["step"]] == ["lamp_probe"]
 
 
-def test_a_new_effect_is_registered_as_soon_as_the_package_is_imported_documented_for_its_users(checkout):
-    gallery.new_effect("lamp_probe", "light", checkout=checkout)
-    code = (
-        "import json, sys\n"
-        "from bullterrier_image.core import registry\n"
-        "json.dump([registry.category('lamp_probe'), registry.documentation('lamp_probe')], sys.stdout)\n"
-    )
-    environment = {**os.environ, "PYTHONPATH": str(checkout / "src")}
-    done = subprocess.run(
-        [sys.executable, "-c", code], env=environment, capture_output=True, encoding="utf-8", check=False
-    )
-    assert done.returncode == 0, done.stderr
-    category, documentation = json.loads(done.stdout)
-    assert category == "light"
-    # what `help(fx.lamp_probe)` and the catalogue show, should its author forget to edit it: no note to the author
-    for note in ("Replace", "crates/", "uv sync", "Rust"):
-        assert note not in documentation, documentation
-
-
 @pytest.mark.parametrize(
     "existing",
     [
@@ -134,7 +115,6 @@ REFUSED = {  # name, category -> what the refusal must name
     "empty": ("", "light", ["''"]),
     # a name the generated effect.py or fx already uses, saying which
     "np": ("np", "light", ["'np'", "effect.py"]),  # the function would hide numpy from its own body
-    "param": ("param", "light", ["'param'", "effect.py"]),
     "effect": ("effect", "light", ["'effect'", "effect.py"]),
     "registry": ("registry", "light", ["'registry'", "fx"]),  # a module fx imports for itself: it never builds it
     "cache": ("cache", "light", ["'cache'", "fx"]),
@@ -234,9 +214,6 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     created = _scaffold_into(copy)
     python = [path for path in created if path.endswith(".py")]
-    # and an effect named like a crate the core's generated effect table uses: it must not hide that crate
-    shadowing = run_dev_script(copy, "new-effect", "serde_json", "--category", "utilities")
-    assert shadowing.returncode == 0, shadowing.stderr
     environment = {
         **os.environ,
         "PYTHONPATH": str(copy / "src"),  # the copy's bullterrier_image, not the installed one
@@ -274,13 +251,36 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
     } <= passed, done.stdout[-4000:]
 
 
+def test_an_effect_named_like_a_crate_the_cores_effect_table_uses_does_not_hide_that_crate(tmp_path, tracked_files):
+    copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
+    shadowing = run_dev_script(copy, "new-effect", "serde_json", "--category", "utilities")
+    assert shadowing.returncode == 0, shadowing.stderr
+    environment = {**os.environ, "CARGO_NET_OFFLINE": "true", "CARGO_TERM_COLOR": "never"}
+    clippy = [
+        "cargo",
+        "clippy",
+        "--package",
+        "bullterrier-image",
+        "--all-targets",
+        "--locked",
+        "--quiet",
+        "--",
+        "-D",
+        "warnings",
+    ]
+    done = subprocess.run(clippy, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
+    assert done.returncode == 0, f"clippy failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
+
+
 @pytest.mark.rebuild
 def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_extension_is_rebuilt(
     tmp_path, tracked_files
 ):
     """What its author does, end to end: in a copy of the tree, scaffold PROBE, `uv sync` (a project environment of the
-    copy's own, with the extension rebuilt around the new kernel, from the caches only), then the probe's own tests
-    and the contract tests over it. A Python model and a Rust `Params` that disagree fail here."""
+    copy's own, with the extension rebuilt around the new kernel, from the caches only), then the effect is registered
+    and documented for its users, and the probe's own tests and the contract tests pass over it. Until the extension
+    is rebuilt, the effect's model has no declaration to be built from, so the scaffold is only checked unbuilt by
+    the scans and lints above."""
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     _scaffold_into(copy)
     outside = ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "PYTHONPATH")  # this environment's: the copy makes its own
@@ -288,14 +288,26 @@ def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_exte
         "UV_OFFLINE": "1",  # every release uv.lock pins is in uv's cache already
         "CARGO_NET_OFFLINE": "true",  # and every crate in cargo's (CI runs `cargo fetch` first)
     }
+    registered = (
+        "import json, sys\n"
+        "from bullterrier_image.core import registry\n"
+        f"json.dump([registry.category({PROBE!r}), registry.documentation({PROBE!r})], sys.stdout)\n"
+    )
     commands = [
         ["uv", "sync", "--locked", "--quiet", "--python", sys.executable],
+        ["uv", "run", "--no-sync", "python", "-c", registered],
         ["uv", "run", "--no-sync", "pytest", "-q", "-rA", "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly",
          f"--basetemp={tmp_path / 'tmp'}", f"tests/effects/{PROBE}", "tests/effects/test_contract.py", "-k", PROBE],
     ]  # fmt: skip
+    outputs = []
     for command in commands:
         done = subprocess.run(command, cwd=copy, env=environment, capture_output=True, encoding="utf-8", check=False)
         assert done.returncode == 0, f"{' '.join(command[:3])} failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
+        outputs.append(done.stdout)
+    category, documentation = json.loads(outputs[1])  # registered, and documented as its users see it
+    assert category == "utilities"
+    for note in ("Replace", "crates/", "uv sync", "Rust"):  # no note to the author, should they forget to edit it
+        assert note not in documentation, documentation
     passed = [line for line in done.stdout.splitlines() if line.startswith("PASSED ")]
     assert any(f"tests/effects/{PROBE}/test_{PROBE}.py::" in line for line in passed), done.stdout[-4000:]
     assert any(line.startswith("PASSED tests/effects/test_contract.py::") for line in passed), done.stdout[-4000:]

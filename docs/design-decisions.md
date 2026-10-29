@@ -512,14 +512,22 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   starts no threads, and the two arrays it caches and shares (the dither tile, the glyph atlas) are already read-only.
   The photo and maps a project run holds for a photo's recipes are used one recipe at a time; when batch rendering
   moves to threads (`todo`: parallel batch processing), each worker must own its frame and share maps read-only.
-- **Pydantic stays the one declaration of parameters.** The Python effect keeps its model, docstring and `@effect`;
-  its body is `_core.apply("<name>", rgb, params.model_dump())`. The Rust `Params` has the same fields with no
-  defaults and refuses unknown ones, so a struct that drifts from the model fails the first contract-test call.
-  *Reason:* validation, units, documentation, scaling, drives and fields already live in the model and the runner;
-  the core gets values already checked and scaled and trusts them. Declaring parameters in Rust is a later decision.
-  vulture cannot see that the core reads a field by name, so `poe dead-code` writes a whitelist of the fields of the
-  effects `_core.effects()` names when it runs (porting edits no shared file), and rustc's dead-code lint checks the
-  Rust side.
+- **A ported effect's parameters are declared once, in Rust.** Its `Params` struct is the declaration: each field has a
+  type, a `///` doc comment and `#[param(default, unit, min, max, drivable, advanced, cyclic)]`, and a choice is a
+  fieldless enum (`crates/derive`: `#[derive(Params)]`, `#[derive(Choice)]`). The derives write `Default` and a table;
+  the declaration rules (a doc, a unit and range holding the default, `cyclic` only for a turn of degrees, `drivable`
+  only on `f32`) are compile errors naming the field. The Python class is `class GradeParams(EffectParams,
+  core="grade")` with an empty body: `EffectParams` fills the annotations and `param(...)` specs from
+  `_core.params("grade")` before pydantic reads them, so strict validation, `fx`, `help()`, the schema, scaling and
+  drives are the same code as for a hand-written model. A default or bound keeps the literal as written (a whole number
+  stays an `int`, a decimal a `float`), so the schema, docs and `fx.pyi` do not change when an effect moves. An effect
+  that works from a map keeps a Python model until the core takes maps (`FieldName`, `Picture`, `Lut`, lists and
+  optional colours arrive with the first port that needs one). *Reason:* the Rust struct and the Python model
+  repeated every field name and could drift; with one declaration they cannot, and a Rust user gets documented,
+  ranged, defaulted `Params`. Because Python does not read the fields of a ported effect, vulture needs no whitelist.
+  *Validation stays Python's for now:* the model checks every value (inclusive ranges, finiteness, the cyclic wrap) and
+  Rust trusts it; a Rust `checked()` has no consumer until the core loads files and recipes, and then Python validation
+  switches to it in the same move, instead of the rules living in two languages in between.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without

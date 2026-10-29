@@ -1,13 +1,16 @@
 """The parameter-model pattern every effect follows: `EffectParams`, `param`, `Color`, and the wording of errors."""
 
 import inspect
+import pickle
 import re
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import pytest
 from pydantic import ValidationError
 
+from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is the declaration compared with
+from bullterrier_image.core import registry
 from bullterrier_image.core.params import (
     Color,
     Drive,
@@ -838,3 +841,101 @@ def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
     first = Sized()
     assert scaled(first, 2) is not first
     assert first.radius == 24.0
+
+
+# --- parameters declared in Rust ---------------------------------------------------------------------------------
+# `class XParams(EffectParams, core="x")` is the model of the effect x whose Rust `Params` struct declares the fields:
+# the oracle is the table the core reports, which is what the declaration says.
+
+RUST_EFFECTS = _core.effects()
+KIND_SCHEMA = {"float": "number", "int": "integer", "bool": "boolean"}  # the JSON-schema type of each plain kind
+OF_ANOTHER_KIND: dict[
+    str, list[Any]
+] = {  # a value of the wrong kind for each kind of field: strict models refuse every one
+    "float": [True, "1.5"],
+    "int": [2.5, True, "2"],
+    "bool": [1, "true"],
+    "choice": [1, "no such choice"],
+    "color": ["red", [2, 0, 0]],
+}
+
+
+class Copy(EffectParams, core="grade"):
+    pass
+
+
+@pytest.mark.parametrize("effect", RUST_EFFECTS)
+def test_a_model_declared_in_rust_has_its_structs_fields_docs_defaults_and_ranges(effect):
+    table = _core.params(effect)
+    model = registry.parameters(effect)
+    assert model.__doc__ == table["doc"]
+    docs = model.fields_doc()
+    assert [doc.name for doc in docs] == [field["name"] for field in table["fields"]]
+    for doc, field in zip(docs, table["fields"], strict=True):
+        assert (doc.doc, doc.unit, doc.minimum, doc.maximum, doc.advanced, doc.cyclic) == (
+            field["doc"],
+            field["unit"],
+            field["min"],
+            field["max"],
+            field["advanced"],
+            field["cyclic"],
+        )
+        # a literal keeps its kind: `min = 0` is the int 0 and `default = 0.0` the float 0.0 (the schema shows it)
+        assert [type(value) for value in (doc.default, doc.minimum, doc.maximum)] == [
+            type(value) for value in (field["default"], field["min"], field["max"])
+        ]
+        assert doc.default == field["default"]
+    assert drivable_fields(model) == {field["name"] for field in table["fields"] if field["drivable"]}
+
+
+@pytest.mark.parametrize("effect", RUST_EFFECTS)
+def test_each_kind_of_rust_field_is_the_matching_json_schema_type_and_choices_keep_their_order(effect):
+    properties = registry.parameters(effect).model_json_schema()["properties"]
+    for field in _core.params(effect)["fields"]:
+        schema = properties[field["name"]]
+        if field["kind"] == "choice":
+            assert schema["enum"] == field["choices"]
+        elif field["kind"] == "color":
+            assert "anyOf" in schema
+        else:
+            assert schema["type"] == KIND_SCHEMA[field["kind"]]
+
+
+@pytest.mark.parametrize("effect", RUST_EFFECTS)
+def test_every_rust_field_refuses_values_of_another_kind_naming_the_field(effect):
+    model = registry.parameters(effect)
+    for field in _core.params(effect)["fields"]:
+        for value in OF_ANOTHER_KIND[field["kind"]]:
+            with pytest.raises(RecipeError, match=field["name"]):
+                model.parse({field["name"]: value}, f"effect {effect!r}")
+
+
+@pytest.mark.parametrize("effect", RUST_EFFECTS)
+def test_every_rust_fields_range_holds_inclusive_bounds_and_refuses_beyond_them(effect):
+    model = registry.parameters(effect)
+    for field in _core.params(effect)["fields"]:
+        if field["min"] is None or field["cyclic"]:  # a cyclic field wraps into its turn instead
+            continue
+        low, high = field["min"], field["max"]
+        assert model.parse({field["name"]: low}).model_dump()[field["name"]] == low
+        assert model.parse({field["name"]: high}).model_dump()[field["name"]] == high
+        for beyond in (low - 1, high + 1):
+            with pytest.raises(RecipeError, match=field["name"]):
+                model.parse({field["name"]: beyond})
+
+
+def test_a_rust_declared_model_is_an_ordinary_class_that_pickles_and_validates():
+    original = Copy.parse({"exposure": 2.5})
+    assert pickle.loads(pickle.dumps(original)) == original  # noqa: S301  our own value
+    assert Copy().model_dump()["exposure"] == 0.0
+    with pytest.raises(RecipeError, match=r"effect 'grade': `exposure` must be <= 10, got 12"):
+        Copy.parse({"exposure": 12}, "effect 'grade'")
+    with pytest.raises(RecipeError, match="`nope` is not a parameter"):
+        Copy.parse({"nope": 1})
+
+
+def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made():
+    with pytest.raises(ValueError, match="no_such_effect"):
+
+        class Nowhere(EffectParams, core="no_such_effect"):
+            pass
