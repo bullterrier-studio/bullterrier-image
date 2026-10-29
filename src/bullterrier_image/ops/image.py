@@ -49,8 +49,10 @@ def as_image(picture: object, *, alpha: bool = False) -> np.ndarray:
         )
     low, high = float(image.min()), float(image.max())
     if low < 0 or high > 1:
+        # the values in full (`repr`): a level a hair out of range must not print as the bound it misses
+        beyond = [f"{high!r} is {high - 1!r} above 1"] * (high > 1) + [f"{low!r} is {-low!r} below 0"] * (low < 0)
         raise InvalidImageError(
-            f"a picture's float levels are 0..1, got min {low:g}, max {high:g}: scale it into 0..1 (8-bit levels "
-            "as uint8 are divided by 255 for you)"
+            f"a picture's float levels are 0..1, got min {low!r}, max {high!r}: {'; '.join(beyond)}; scale it into "
+            "0..1 (8-bit levels as uint8 are divided by 255 for you)"
         )
     return image
