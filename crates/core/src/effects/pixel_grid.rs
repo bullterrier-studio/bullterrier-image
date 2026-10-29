@@ -42,17 +42,22 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
     let cell = f64::from(params.cell);
     let amount = f64::from(params.amount);
+    let gap = f64::from(params.gap);
     let stripe = cell / CHANNELS;
-    let margin = f64::from(params.gap) * stripe / 2.0; // half the gap is free on each side of a stripe
-    let rows = lit(picture.height(), cell, margin, cell - margin);
+    let margin = gap * stripe / 2.0; // half the gap is free on each side of a stripe
+    // The lengths that stay lit, worked out so that none can be negative: a gap of at most 1 leaves a row more than
+    // two thirds of the cell and a stripe `1 - gap` of itself, which is exactly nothing at the documented maximum.
+    let lit_rows = cell - 2.0 * margin;
+    let lit_stripe = stripe * (1.0 - gap);
+    let rows = lit(picture.height(), cell, margin, lit_rows);
     let columns: Vec<[f64; 3]> = {
-        let channel = |index: f64| lit(picture.width(), cell, index * stripe + margin, (index + 1.0) * stripe - margin);
+        let channel = |index: f64| lit(picture.width(), cell, index * stripe + margin, lit_stripe);
         let [red, green, blue] = [0.0, 1.0, 2.0].map(channel);
         red.iter().zip(&green).zip(&blue).map(|((&r, &g), &b)| [r, g, b]).collect()
     };
     let mean_gain = if params.keep_brightness {
         // each channel is lit over its stripe's share of a cell less the gap's border, in both directions
-        let lit_share = (cell - 2.0 * margin) / cell * (stripe - 2.0 * margin) / cell;
+        let lit_share = lit_rows / cell * lit_stripe / cell;
         // a gap of 1 at amount 1 lights nothing: black stays black, so there is no gain to divide by
         Some(1.0 - amount * (1.0 - lit_share)).filter(|&mean| mean > 0.0)
     } else {
@@ -68,13 +73,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
     })
 }
 
-/// The share of each of `count` pixels (pixel i spans i to i + 1) covered by the intervals from `start` to `stop`
-/// repeated every `period`, as the difference of the length lit below each pixel edge.
+/// The share of each of `count` pixels (pixel i spans i to i + 1) covered by the intervals of `length` from `start`
+/// repeated every `period`, as the difference of the length lit below each pixel edge. `length` is not negative and
+/// at most `period` (the caller works it out as a length, never as the difference of two positions).
 #[expect(clippy::cast_precision_loss, reason = "a pixel index is far below the 2^53 an f64 holds exactly")]
-fn lit(count: usize, period: f64, start: f64, stop: f64) -> Vec<f64> {
+fn lit(count: usize, period: f64, start: f64, length: f64) -> Vec<f64> {
     let lit_below = |edge: usize| {
         let edge = edge as f64;
-        (edge / period).floor() * (stop - start) + (edge.rem_euclid(period) - start).clamp(0.0, stop - start)
+        (edge / period).floor() * length + (edge.rem_euclid(period) - start).clamp(0.0, length)
     };
     (0..count).map(|index| lit_below(index + 1) - lit_below(index)).collect()
 }

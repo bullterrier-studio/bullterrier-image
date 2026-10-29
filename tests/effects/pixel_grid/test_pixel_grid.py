@@ -125,3 +125,12 @@ def test_rendered_at_a_small_size_the_cell_shrinks_to_its_floor_as_a_whole_numbe
     for channel in range(3):
         expected[:, channel::3, channel] = photo[:, channel::3, channel]
     np.testing.assert_allclose(out, expected, atol=1e-6)
+
+
+@pytest.mark.parametrize("keep_brightness", [False, True], ids=["dimmed", "brightness kept"])
+@pytest.mark.parametrize("cell", range(3, 33))
+def test_a_gap_of_1_lights_nothing_whatever_the_cell_so_the_picture_is_black(cell: int, keep_brightness: bool) -> None:
+    """`gap` 1 is the documented maximum: the dark lines are as wide as the stripes, so no stripe has any area. A third
+    of a cell is not a whole number of pixels for most cells, which is where a width computed by subtraction rounds."""
+    out = registry.apply(NAME, white(48), cell=cell, gap=1, amount=1, keep_brightness=keep_brightness)
+    np.testing.assert_array_equal(out, np.zeros_like(out))
