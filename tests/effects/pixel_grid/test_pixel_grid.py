@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from bullterrier_image import fx, render
 from bullterrier_image.core import registry
 
 NAME = "pixel_grid"
@@ -112,3 +113,15 @@ def test_keep_brightness_clips_a_lifted_stripe_at_white() -> None:
     """Cell 3, no gap, amount 0.5 lifts a lit stripe by 1.5: white stays 1 there and is 0.75 on the other stripes."""
     out = registry.apply(NAME, white(6), cell=3, gap=0, amount=0.5, keep_brightness=True)
     np.testing.assert_allclose(out[0, :3], [[1, 0.75, 0.75], [0.75, 1, 0.75], [0.75, 0.75, 1]], atol=1e-6)
+
+
+def test_rendered_at_a_small_size_the_cell_shrinks_to_its_floor_as_a_whole_number() -> None:
+    """At size 64 the default 4 px cell scales to 4 * 64 / 480 = 0.53 px, below the minimum of 3, so it is 3: stripes
+    one pixel wide, in the order red, green, blue along every row (with no gap and amount 1)."""
+    rng = np.random.default_rng(0)
+    photo = rng.random((48, 64, 3), dtype=np.float32)
+    out = render(photo, fx.pixel_grid(gap=0, amount=1), size=64)
+    expected = np.zeros_like(photo)
+    for channel in range(3):
+        expected[:, channel::3, channel] = photo[:, channel::3, channel]
+    np.testing.assert_allclose(out, expected, atol=1e-6)
