@@ -2,13 +2,26 @@ import json
 import pickle
 import subprocess
 import sys
+from collections.abc import Callable
 from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from bullterrier_image import Finder, Recipe, Step, SubjectNotFoundError, fx, imageio, load_recipe, render, trace
+from bullterrier_image import (
+    Each,
+    Finder,
+    Recipe,
+    Step,
+    SubjectNotFoundError,
+    fx,
+    imageio,
+    load_recipe,
+    render,
+    render_all,
+    trace,
+)
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import looks, registry, runner
 from bullterrier_image.core.params import EffectParams, FieldName, param
@@ -298,6 +311,35 @@ def test_one_step_applied_alone_is_the_recipe_of_that_step_rendered(photo, subje
     np.testing.assert_array_equal(step.apply(photo, **options), expected)
     np.testing.assert_array_equal(render(photo, step, **options), expected)
     np.testing.assert_array_equal(trace(photo, step, **options)[-1].image, expected)
+
+
+STEP, ONE = fx.grade(), Recipe([fx.grade()])
+WRONG_RECIPES: dict[str, tuple[Callable[..., object], Callable[[np.ndarray], tuple], str]] = {
+    "a list of steps": (render, lambda photo: (photo, [STEP]), r"Recipe\(\["),
+    "a look's name": (render, lambda photo: (photo, "glitch"), r"load_recipe"),
+    "an each step": (render, lambda photo: (photo, Each("panes", looks=[None])), r"Recipe\(\["),
+    "the photo and the recipe swapped": (render, lambda photo: (ONE, photo), r"photo comes first"),
+    "a trace of a list": (trace, lambda photo: (photo, [STEP]), r"Recipe\(\["),
+    "render_all of a list of steps": (render_all, lambda photo: (photo, [STEP]), r"sequence of Recipe.*Step"),
+    "render_all of one recipe": (render_all, lambda photo: (photo, ONE), r"sequence of Recipe"),
+}
+
+
+@pytest.mark.parametrize(("run", "arguments", "fix"), WRONG_RECIPES.values(), ids=WRONG_RECIPES.keys())
+def test_render_refuses_what_is_no_recipe_naming_the_fix(photo, run, arguments, fix):
+    with pytest.raises(RecipeError, match=fix):
+        run(*arguments(photo))
+
+
+def test_render_takes_a_recipe_a_step_and_render_all_a_sequence_of_recipes(photo):
+    step = fx.grade(exposure=0.3)
+    recipe = Recipe([step])
+    expected = render(photo, recipe)
+    np.testing.assert_array_equal(render(photo, step), expected)
+    assert trace(photo, recipe)[-1].image.shape == expected.shape
+    for recipes in ([recipe], (recipe,)):
+        (rendered,) = render_all(photo, recipes)
+        np.testing.assert_array_equal(rendered, expected)
 
 
 FRESH_STEPS = {

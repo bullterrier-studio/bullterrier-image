@@ -12,7 +12,7 @@ finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is 
 neither never depends on the model settings. Any other map (a `Given` region's) is handed in by name in `maps`.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 
@@ -41,6 +41,7 @@ from .core.regions import (
 )
 from .core.runner import Finder, Stage
 from .core.steps import Each, Parameter, Recipe, Step, maps_needed, needs_finder
+from .errors import RecipeError
 from .finding import subject
 from .finding.depth import depth_finder
 from .loader import load_recipe
@@ -94,7 +95,7 @@ def render(
 ) -> np.ndarray:
     """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders. `size` is the
     longest side of the result in px: the recipe's pixel values (written for 480) are scaled to it."""
-    recipe = Recipe([recipe]) if isinstance(recipe, Step) else recipe
+    recipe = _one_recipe(recipe)
     return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
@@ -108,13 +109,13 @@ def trace(
 ) -> list[Stage]:
     """Every stage of a render: `bullterrier_image.core.runner.trace` with the default finders; `size` as for
     `render`."""
-    recipe = Recipe([recipe]) if isinstance(recipe, Step) else recipe
+    recipe = _one_recipe(recipe)
     return runner.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
 def render_all(
     rgb: np.ndarray,
-    recipes: list[Recipe],
+    recipes: Sequence[Recipe],
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
@@ -122,7 +123,38 @@ def render_all(
 ) -> list[np.ndarray]:
     """Several recipes on one photo: `bullterrier_image.core.runner.render_all` with the default finders. `size` as for
     `render`."""
+    recipes = _recipes(recipes)
     return runner.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size)
+
+
+def _one_recipe(recipe: object) -> Recipe:
+    """`recipe` as the `Recipe` to run: itself, or a `Step` as the recipe of that one step. RecipeError, naming the fix,
+    for anything else: the one check of what `render` and `trace` are given as the recipe."""
+    if isinstance(recipe, Recipe):
+        return recipe
+    if isinstance(recipe, Step):
+        return Recipe([recipe])
+    fix = {
+        np.ndarray: "the photo comes first, then the recipe: render(photo, recipe)",
+        str: 'a look is loaded first: load_recipe("glitch"), or a file with load_recipe(path)',
+    }.get(type(recipe), "wrap steps in a recipe: Recipe([step, ...])")
+    raise RecipeError(f"the recipe is a Recipe or a Step, got {type(recipe).__name__}: {fix}")
+
+
+def _recipes(recipes: object) -> list[Recipe]:
+    """`recipes` as the list of `Recipe` to run; RecipeError, naming the fix, unless it is a list or tuple of them:
+    the one check of what `render_all` is given."""
+    if not isinstance(recipes, list | tuple) or not all(isinstance(recipe, Recipe) for recipe in recipes):
+        found = type(recipes).__name__ + (
+            f" of {', '.join(sorted({type(item).__name__ for item in recipes}))}"
+            if isinstance(recipes, list | tuple)
+            else ""
+        )
+        raise RecipeError(
+            f"the recipes are a sequence of Recipe (a list or tuple), got {found}: one recipe is "
+            "render(photo, recipe); steps are wrapped in Recipe([step, ...])"
+        )
+    return list(recipes)
 
 
 def _finders(
