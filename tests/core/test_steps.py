@@ -1,8 +1,10 @@
 """A step's values are validated by its effect's parameter model, at once; the recipe objects (Step, Recipe) are
 validated, frozen models wherever they are made."""
 
+import copy
 import inspect
 import json
+import pickle
 import tomllib
 from importlib.resources import files
 from typing import Literal
@@ -30,7 +32,22 @@ from bullterrier_image.core.steps import (
 )
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Bands, Each, Edge, Given, Grid, Pick, Shards, Subject, render
+from bullterrier_image.recipe import (
+    Band,
+    Bands,
+    Cuts,
+    Each,
+    Edge,
+    Given,
+    Grid,
+    LinearGradient,
+    Pick,
+    RadialGradient,
+    Shards,
+    Subject,
+    render,
+)
+from bullterrier_image.recipe import Path as PathRegion
 
 
 class GainParams(EffectParams):
@@ -1005,6 +1022,114 @@ def test_the_recipe_objects_refuse_unknown_fields():
 def test_no_copy_or_dict_skips_the_checks_of_the_constructor(make, complaint):
     with pytest.raises(RecipeError, match=complaint):
         make()
+
+
+def test_a_recipe_takes_steps_written_as_dicts_a_step_by_effect_an_each_step_by_each():
+    written = [
+        {"effect": "grade", "params": {"exposure": 0.3}, "opacity": 0.5},
+        {"each": "panes", "looks": [{"effect": "grade"}, None], "seed": 3},
+    ]
+    expected: list[Step | Each] = [fx.grade(exposure=0.3, opacity=0.5), Each("panes", looks=[fx.grade(), None], seed=3)]
+    regions = {"panes": Grid(columns=2)}
+    assert Recipe(written, regions=regions) == Recipe(expected, regions=regions)  # type: ignore[arg-type]
+    assert Recipe.model_validate({"steps": written, "regions": regions}) == Recipe(expected, regions=regions)
+
+
+@pytest.mark.parametrize(
+    ("written", "complaint"),
+    [
+        pytest.param({}, r"`effect`.*`each`", id="neither a step nor an each step"),
+        pytest.param({"colour": "red"}, r"`effect`.*`each`", id="no effect"),
+        pytest.param({"effect": "grade", "colour": "red"}, r"`colour`", id="an unknown key of a step"),
+        pytest.param({"effect": "grade", "params": {"exposure": 99}}, r"`exposure`", id="a value out of range"),
+        pytest.param({"each": "panes"}, r"`each`.*`looks`", id="an each step without looks"),
+        pytest.param({"looks": [None]}, r"`each`.*`looks`", id="an each step without a partition"),
+    ],
+)
+def test_a_step_written_as_a_bad_dict_is_a_recipe_error_naming_what_is_wrong(written, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        Recipe([written], regions={"panes": Grid()})
+    with pytest.raises(RecipeError, match=complaint):
+        Recipe.model_validate({"steps": [written], "regions": {"panes": Grid()}})
+
+
+def test_a_recipe_dumped_to_a_dict_is_validated_back_into_an_equal_recipe():
+    recipe = Recipe(
+        [
+            fx.grade(exposure=0.3, name="warm"),
+            fx.bloom(radius=Drive(by="light", start=1, end=10), opacity=0.5, mask="subject"),
+            fx.gradient_map(preset="sepia"),
+        ],
+        name="look",
+        description="A look.",
+        size=64,
+        frame=Framing(aspect=1.0, transparent="circle"),
+    )
+    assert Recipe.model_validate(recipe.model_dump()) == recipe
+
+
+REGION_KINDS = {
+    "grid": Grid(columns=2, rows=3),
+    "shards": Shards(count=5, seed=2),
+    "cuts": Cuts(),
+    "path": PathRegion(d="M0 0 L1 1 L0 1 Z"),
+    "subject": Subject(threshold=0.3),
+    "band": Band(of="depth", low=0.2),
+    "bands": Bands(of="depth", count=3),
+    "linear_gradient": LinearGradient(angle=30),
+    "radial_gradient": RadialGradient(radius=0.7),
+}
+
+
+@pytest.mark.parametrize("kind", REGION_KINDS.values(), ids=REGION_KINDS.keys())
+def test_a_recipe_with_a_region_dumped_to_a_dict_comes_back_equal_and_of_its_kind(kind):
+    recipe = Recipe([fx.grade()], regions={"here": kind})
+    back = Recipe.model_validate(recipe.model_dump())
+    assert back == recipe
+    assert type(back.regions["here"]) is type(kind)
+
+
+def test_an_each_step_and_a_pick_dumped_to_a_dict_come_back_equal():
+    recipe = Recipe(
+        [Each("panes", looks=[fx.grade(), None], seed=2), fx.grade(mask="first")],
+        regions={"panes": Grid(columns=2), "first": Pick(of="panes", pieces=[0])},
+    )
+    assert Recipe.model_validate(recipe.model_dump()) == recipe
+
+
+def test_a_region_with_no_fields_cannot_be_read_back_from_a_dict_as_it_fits_every_kind():
+    """Until the canonical form names each region's kind (R3), `Given()` dumps to `{}`: no kind in particular."""
+    recipe = Recipe([fx.grade()], regions={"mine": Given()})
+    with pytest.raises(RecipeError, match=r"region 'mine'.*empty.*Given\(\)"):
+        Recipe.model_validate(recipe.model_dump())
+    assert recipe.regions["mine"] == Given()  # the region itself is accepted, as ever
+
+
+COPIED = {
+    "a step": fx.bloom(radius=Drive(by="light", start=1, end=10), opacity=0.5, name="halo"),
+    "a step holding a picture": fx.blend(image=np.linspace(0, 1, 4 * 5 * 3, dtype=np.float32).reshape(4, 5, 3)),
+    "an each step": Each("panes", looks=[fx.grade(), None], seed=2),
+    "a recipe": Recipe(
+        [fx.grade(exposure=0.3), Each("panes", looks=[fx.grade(), None])],
+        name="look",
+        description="A look.",
+        size=64,
+        frame=Framing(aspect=1.0),
+        regions={"panes": Grid(columns=2)},
+    ),
+}
+COPIERS = {
+    "pickle": lambda value: pickle.loads(pickle.dumps(value)),  # noqa: S301  (our own objects, dumped a moment before)
+    "copy.copy": copy.copy,
+    "copy.deepcopy": copy.deepcopy,
+}
+
+
+@pytest.mark.parametrize("copier", COPIERS.values(), ids=COPIERS.keys())
+@pytest.mark.parametrize("value", COPIED.values(), ids=COPIED.keys())
+def test_steps_and_recipes_survive_pickling_and_copying_equal_as_a_process_pool_needs(value, copier):
+    """Recipes go to worker processes by pickle."""
+    assert copier(value) == value
 
 
 BAD_STEP = {"effect": "bloom", "params": {"radius": -1}}

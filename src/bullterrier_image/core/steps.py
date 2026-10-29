@@ -432,6 +432,18 @@ def _names_used(recipe: "Recipe") -> list[str]:
     return [name for step in recipe.steps for _, name, _ in references(step)]
 
 
+def _step_from_dict(written: Mapping[str, Any]) -> Step | Each:
+    """The `Each` (it has `each` or `looks`) or the `Step` (it has `effect`) that the dict `written` describes, made by
+    their own constructors; ValueError otherwise."""
+    if "each" in written or "looks" in written:
+        if not {"each", "looks"} <= written.keys():
+            raise ValueError("an each step written as a dict needs both `each` and `looks`")
+        return Each(**written)
+    if "effect" not in written:
+        raise ValueError(f"a step written as a dict needs `effect` (a step) or `each` and `looks`, got {list(written)}")
+    return Step(**written)
+
+
 def _as_drive(effect: str, name: str, value: Any) -> Any:
     """`value`, or the `Drive` it writes when it is a table with a `by` (what a recipe file gives); RecipeError naming
     the effect and the parameter when the table is not a drive."""
@@ -620,6 +632,30 @@ class Recipe(ValidatedModel):
         To set numbers inside steps, regions or the frame by address, see `with_values`."""
         held = {field: getattr(self, field) for field in type(self).model_fields}
         return Recipe(**{**held, **changes})
+
+    @field_validator("steps", mode="before")
+    @classmethod
+    def _steps_from_dicts(cls, steps: object) -> object:
+        """A step written as a dict (what `model_dump` gives, or a file read into data) is a `Step`, or an `Each` when
+        it has `each` or `looks`; ValueError, naming the keys, when it is neither."""
+        if not isinstance(steps, list | tuple):
+            return steps  # pydantic says what is wrong
+        return tuple(_step_from_dict(step) if isinstance(step, Mapping) else step for step in steps)
+
+    @field_validator("regions", mode="before")
+    @classmethod
+    def _regions_from_dicts(cls, regions: object) -> object:
+        """A region written as a dict is read as the kind whose fields it has, which only a dict with fields can name:
+        `Given()` dumps to `{}`, which fits every kind (R3's canonical form names the kind), so an empty one is refused
+        rather than read as another kind."""
+        if isinstance(regions, Mapping):
+            for name, region in regions.items():
+                if isinstance(region, Mapping) and not region:
+                    raise ValueError(
+                        f"region {name!r} is an empty dict, which fits every kind of region: pass the region itself "
+                        "(`Given()`)"
+                    )
+        return regions
 
     @model_validator(mode="after")
     def _complete(self) -> "Recipe":
