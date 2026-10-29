@@ -597,6 +597,11 @@ class Recipe(ValidatedModel):
         """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name).
         `frame` is the recipe's `Framing`; without one the photo is only scaled. `regions` are the declared regions,
         by name; every region a step names must be among them or built in, and of the kind its key takes."""
+        if isinstance(steps, str | Mapping | Step | Each):  # iterating one of these would give its fields or letters
+            raise RecipeError(
+                f"`steps`: a recipe's steps are a list, Recipe([step, ...]), got {type(steps).__name__}: "
+                "wrap one step in a list"
+            )
         given = {} if frame is None else {"frame": frame}
         self._init_checked(
             "",

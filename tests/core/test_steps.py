@@ -855,6 +855,21 @@ def test_a_recipe_needs_no_name_or_description_and_keeps_the_ones_it_is_given():
 
 
 @pytest.mark.parametrize(
+    ("steps", "complaint"),
+    [
+        pytest.param(fx.grade(), r"`steps`.*Recipe\(\[", id="one step, not a list"),
+        pytest.param(Each("panes", looks=[None]), r"`steps`.*Recipe\(\[", id="one each step, not a list"),
+        pytest.param("warm", r"`steps`.*Recipe\(\[", id="a name where the steps go"),
+        pytest.param({"effect": "grade"}, r"`steps`.*Recipe\(\[", id="one step as a dict, not a list"),
+    ],
+)
+def test_a_recipe_given_one_step_or_text_instead_of_a_list_names_the_fix(steps, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        Recipe(steps)
+    assert Recipe([fx.grade()]).steps == (fx.grade(),)  # the known-good side
+
+
+@pytest.mark.parametrize(
     "make",
     [
         pytest.param(lambda: Recipe("warm", [Step("grade")]), id="the name first"),  # type: ignore[call-arg, arg-type]  # the point of the test
