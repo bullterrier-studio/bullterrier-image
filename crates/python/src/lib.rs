@@ -3,6 +3,7 @@
 
 use bullterrier_image::Picture;
 use numpy::{PyArray1, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
+use pyo3::IntoPyObjectExt as _;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
@@ -12,7 +13,7 @@ use serde_json::Value;
 #[pymodule]
 mod _core {
     #[pymodule_export]
-    use super::{apply, effects};
+    use super::{apply, effects, params};
 }
 
 /// Run the effect called `effect` on `rgb` (float32, C-contiguous, (height, width, 3)) with `params` (exactly the
@@ -54,6 +55,19 @@ fn apply<'py>(
 #[pyfunction]
 fn effects() -> Vec<&'static str> {
     bullterrier_image::effects()
+}
+
+/// The parameters of the effect called `effect`, as its Rust struct declares them: a dict `{"doc": str, "fields":
+/// [...]}`, each field a dict with `name`, `kind` (`"float"`, `"int"`, `"bool"`, `"choice"` or `"color"`), `doc`,
+/// `default`, `unit`, `min`, `max`, `cyclic`, `choices`, `drivable` and `advanced`. A default or bound is the literal
+/// the declaration wrote, a whole number an `int` and a decimal a `float`; a colour's default is its `'#rrggbb'` text and
+/// a choice's its name.
+///
+/// `ValueError` if the core implements no effect of that name.
+#[pyfunction]
+fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
+    let table = bullterrier_image::params(effect).map_err(value_error)?;
+    from_json(py, &serde_json::to_value(table).map_err(value_error)?)
 }
 
 /// A `ValueError` carrying `error`'s message.
@@ -111,5 +125,36 @@ fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
             "a parameter of type {} has no JSON form",
             value.get_type()
         )))
+    }
+}
+
+/// `value` as the Python object of its kind: the inverse of `to_json`.
+fn from_json<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny>> {
+    match value {
+        Value::Null => Ok(py.None().into_bound(py)),
+        Value::Bool(flag) => flag.into_bound_py_any(py),
+        // an integer literal stays an `int`, a decimal one a `float`
+        Value::Number(number) => match number.as_i64() {
+            Some(whole) => whole.into_bound_py_any(py),
+            None => number
+                .as_f64()
+                .ok_or_else(|| PyValueError::new_err(format!("a number has no Python form: {number}")))?
+                .into_bound_py_any(py),
+        },
+        Value::String(text) => text.into_bound_py_any(py),
+        Value::Array(items) => {
+            let items = items
+                .iter()
+                .map(|item| from_json(py, item))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(PyList::new(py, items)?.into_any())
+        }
+        Value::Object(entries) => {
+            let dict = PyDict::new(py);
+            for (key, item) in entries {
+                dict.set_item(key, from_json(py, item)?)?;
+            }
+            Ok(dict.into_any())
+        }
     }
 }

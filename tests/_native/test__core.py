@@ -43,3 +43,44 @@ def test_a_whole_number_is_read_as_the_float_it_equals():
 def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
     with pytest.raises(ValueError, match=kind):
         grade_with_contrast(value)
+
+
+# --- params: what an effect's Rust struct declares -----------------------------------------------------------------
+
+
+def test_the_parameters_of_an_effect_come_in_declaration_order_with_the_struct_doc():
+    table = _core.params("grade")
+    assert [field["name"] for field in table["fields"]] == [
+        "temperature",
+        "tint",
+        "exposure",
+        "contrast",
+        "pivot",
+        "saturation",
+        "vibrance",
+    ]
+    assert table["doc"].startswith("Colour balance")
+
+
+def test_a_field_is_described_with_its_unit_range_and_flags_and_its_literals_keep_their_kind():
+    temperature = _core.params("grade")["fields"][0]
+    assert {key: temperature[key] for key in ("kind", "unit", "min", "max", "default", "cyclic", "drivable")} == {
+        "kind": "float",
+        "unit": "stops",
+        "min": -2,
+        "max": 2,
+        "default": 0.0,
+        "cyclic": False,
+        "drivable": True,
+    }
+    # `==` cannot tell -2 from -2.0, and the schema text shows the difference
+    assert type(temperature["min"]) is int
+    assert type(temperature["default"]) is float
+    assert temperature["choices"] == []
+    assert temperature["advanced"] is False
+    assert temperature["doc"].startswith("Warm-cool shift in stops")
+
+
+def test_the_parameters_of_an_effect_the_core_does_not_implement_are_refused_by_name():
+    with pytest.raises(ValueError, match="no_such_effect"):
+        _core.params("no_such_effect")

@@ -5,7 +5,8 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["apply", "effects"]
+__all__ = ["apply", "effects", "params"]
 
 def apply(effect: str, rgb: np.ndarray, params: dict[str, Any]) -> np.ndarray: ...
 def effects() -> list[str]: ...
+def params(effect: str) -> dict[str, Any]: ...

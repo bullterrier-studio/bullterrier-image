@@ -1,13 +1,14 @@
 //! The numeric core of bullterrier-image: the effects implemented in Rust and the primitives they share.
 //!
-//! An effect is a pure function from one picture to a new one: [`apply`] runs one by name. Its parameters arrive
-//! already validated and scaled by the Python package, which declares them (one Pydantic model per effect); the core
-//! trusts them and does not check their ranges again. Each effect is one file in `src/effects/`, found by the build
-//! script, with a `Params` struct (the model's fields, every one required) and a `render` function.
+//! An effect is a pure function from one picture to a new one: [`apply`] runs one by name. Its parameters are declared
+//! once, by its `Params` struct (see [`mod@params`]): [`params()`] describes them, and the Python package builds the effect's
+//! model from that description. They arrive validated and scaled by the Python package; the core trusts them and does
+//! not check their ranges again. Each effect is one file in `src/effects/`, found by the build script, with a `Params`
+//! struct and a `render` function.
 
 #![forbid(unsafe_code)]
 
-mod effects;
+pub mod effects;
 mod error;
 mod ops;
 pub mod params;
@@ -16,6 +17,14 @@ mod picture;
 pub use error::Error;
 pub use picture::{Image, Picture};
 
+/// Find the effect called `effect` in the table.
+fn find(effect: &str) -> Result<&'static (&'static str, effects::Run, effects::Describe), Error> {
+    effects::EFFECTS
+        .iter()
+        .find(|(name, ..)| *name == effect)
+        .ok_or_else(|| Error::UnknownEffect(effect.to_owned()))
+}
+
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
 /// image of the picture's size.
 ///
@@ -23,22 +32,28 @@ pub use picture::{Image, Picture};
 /// [`Error::UnknownEffect`] if the core implements no effect of that name, and [`Error::Params`] if `params` misses
 /// one of its parameters, has one it does not know, or one of the wrong type.
 pub fn apply(effect: &str, picture: &Picture<'_>, params: serde_json::Value) -> Result<Image, Error> {
-    let (_, run) = effects::EFFECTS
-        .iter()
-        .find(|(name, _)| *name == effect)
-        .ok_or_else(|| Error::UnknownEffect(effect.to_owned()))?;
+    let (_, run, _) = find(effect)?;
     run(picture, params)
+}
+
+/// The parameters of the effect called `effect`, described: what its `Params` struct declares.
+///
+/// # Errors
+/// [`Error::UnknownEffect`] if the core implements no effect of that name.
+pub fn params(effect: &str) -> Result<params::Table, Error> {
+    let (_, _, describe) = find(effect)?;
+    Ok(describe())
 }
 
 /// The names of the effects the core implements, sorted.
 #[must_use]
 pub fn effects() -> Vec<&'static str> {
-    effects::EFFECTS.iter().map(|(name, _)| *name).collect()
+    effects::EFFECTS.iter().map(|(name, ..)| *name).collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Picture, apply};
+    use super::{Error, Picture, apply, effects::grade, params};
     use serde_json::json;
 
     fn grade_params() -> serde_json::Value {
@@ -57,6 +72,22 @@ mod tests {
         assert_eq!((image.height(), image.width()), (2, 3));
         let out = image.into_values();
         assert_eq!(out.len(), values.len());
+        assert!(
+            out.iter()
+                .zip(values)
+                .all(|(after, before)| (after - before).abs() < 1e-6),
+            "{out:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_declared_defaults_of_grade_leave_a_picture_as_it_is() -> Result<(), Error> {
+        // a different value in every channel, so a default that moves any step shows
+        let values = [
+            0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,
+        ];
+        let out = grade::render(&Picture::new(2, 3, &values)?, &grade::Params::default()).into_values();
         assert!(
             out.iter()
                 .zip(values)
@@ -96,6 +127,24 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn the_parameters_of_an_effect_are_described_by_its_name_and_those_of_an_unknown_one_refused() {
+        let names = params("grade").map(|table| table.fields.iter().map(|field| field.name).collect::<Vec<_>>());
+        assert_eq!(
+            names.ok(),
+            Some(vec![
+                "temperature",
+                "tint",
+                "exposure",
+                "contrast",
+                "pivot",
+                "saturation",
+                "vibrance"
+            ])
+        );
+        assert!(matches!(params("no_such_effect"), Err(Error::UnknownEffect(name)) if name == "no_such_effect"));
     }
 
     #[test]

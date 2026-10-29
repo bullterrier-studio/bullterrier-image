@@ -1,18 +1,30 @@
 //! The Rust kernel of `$name`: <replace with what it does, in one line>.
 //! What it does is documented once, on the Python effect, whose body runs this through the core (`_core.apply`):
-//! `src/bullterrier_image/effects/$name/effect.py`.
+//! `src/bullterrier_image/effects/$name/effect.py`. Its parameters are declared here.
 
 use serde::Deserialize;
 
+use crate::params::Params;
 use crate::{Image, Picture};
 
-/// The parameters of the effect, validated by its Python model, `${Name}Params`.
-/// The same fields, every one required, so a struct that drifts from the model fails its first call. Replace the
-/// example field with the effect's own.
-#[derive(Deserialize)]
+// The parameters are declared once, here: each field's `///` doc comment and `#[param(..)]` make its description,
+// default and range, and the Python model is built from them (`${Name}Params` in effect.py). Replace the example
+// field. Every field has a doc (what it does, its unit and range in words, what raising it does) and a default. A
+// number (`f32`, or `i32` for a whole number) also has a `unit` (px, fraction, degrees, stops, count, ratio, cycles,
+// density) and an inclusive `min` and `max` that hold the default; `drivable` (only an `f32`), `advanced` and `cyclic`
+// (degrees, min to max one turn) are flags. `bool`, `Color` (`default = "#rrggbb"`) and a `#[derive(Choice)]` enum
+// (`default = Variant`; the doc names every variant) take no unit or range. Names are the field's own terms (radius,
+// amount, threshold, angle, seed...), never strength, intensity or factor. A mistake fails the build, naming the field.
+// Options of every library call are fields too; a constant is allowed only for a standard (Rec. 709, sRGB...) or a pure
+// guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number).
+
+/// The settings of `$name`: every value that shapes its result. Replace this with what they are as a whole.
+#[derive(Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Params {
-    amount: f32,
+pub struct Params {
+    /// How far the picture is mixed toward its negative: 0 = unchanged, 1 = fully inverted.
+    #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
+    pub amount: f32,
 }
 
 /// The picture mixed toward its negative by `amount`. Replace with the effect: pixel by pixel as here, or over the

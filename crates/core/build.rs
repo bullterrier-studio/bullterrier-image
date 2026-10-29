@@ -33,18 +33,19 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
     Ok(files)
 }
 
-/// The Rust source of the table: a module per effect file, and `EFFECTS`, each name with the function that runs it
-/// (it reads the effect's `Params` from the parameters and calls its `render`).
+/// The Rust source of the table: a public module per effect file, and `EFFECTS`, each name with the function that runs
+/// it (it reads the effect's `Params` from the parameters and calls its `render`) and the one that describes its
+/// `Params`.
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {
-        writeln!(code, "#[path = {:?}]\nmod {name};", path.display().to_string())?;
+        writeln!(code, "#[path = {:?}]\npub mod {name};", path.display().to_string())?;
     }
     writeln!(
         code,
-        "/// Every effect the core implements, sorted by name, with the function that runs it."
+        "/// Every effect the core implements, sorted by name, with the function that runs it and the one that describes its\n/// parameters."
     )?;
-    writeln!(code, "pub(crate) static EFFECTS: &[(&str, Run)] = &[")?;
+    writeln!(code, "pub(crate) static EFFECTS: &[(&str, Run, Describe)] = &[")?;
     for (name, _) in files {
         writeln!(code, "    ({name:?}, |picture, params| {{")?;
         // `::serde_json`, the crate: an effect module named `serde_json` would otherwise stand in its place
@@ -54,7 +55,7 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
             "            .map_err(|source| Error::Params {{ effect: {name:?}, source }})?;"
         )?;
         writeln!(code, "        Ok({name}::render(picture, &params))")?;
-        writeln!(code, "    }}),")?;
+        writeln!(code, "    }}, <{name}::Params as crate::params::Declared>::table),")?;
     }
     writeln!(code, "];")?;
     Ok(code)
