@@ -134,3 +134,17 @@ def test_a_gap_of_1_lights_nothing_whatever_the_cell_so_the_picture_is_black(cel
     of a cell is not a whole number of pixels for most cells, which is where a width computed by subtraction rounds."""
     out = registry.apply(NAME, white(48), cell=cell, gap=1, amount=1, keep_brightness=keep_brightness)
     np.testing.assert_array_equal(out, np.zeros_like(out))
+
+
+def test_with_no_settings_a_cell_of_4_px_lights_each_stripe_as_the_documented_gap_and_amount_leave_it() -> None:
+    """Hand-worked defaults on a white picture: cell 4, gap 0.15, amount 0.4. A stripe is 4 / 3 px wide and the gap
+    leaves 0.15 * (4 / 3) / 2 = 0.1 px free on each side of it, so red covers 0.1 to 1.2333 px of the cell, green 1.4333
+    to 2.5667 and blue 2.7667 to 3.9; a pixel's lit share is the length of that it spans. A row of cells likewise
+    covers 0.1 to 3.9 of its 4 px. The result is the picture mixed with the grid by amount: 1 - 0.4 * (1 - lit)."""
+    out = registry.apply(NAME, white(8))
+    lit_columns = np.array(  # red, green, blue shares of the 4 pixels of a cell, left to right
+        [[0.9, 0, 0], [0.2333333, 0.5666667, 0], [0, 0.5666667, 0.2333333], [0, 0, 0.9]]
+    )
+    for row, lit_row in [(0, 0.9), (1, 1.0), (2, 1.0), (3, 0.9), (4, 0.9)]:  # row 4 starts the next cell
+        expected = 1 - 0.4 * (1 - lit_row * lit_columns)
+        np.testing.assert_allclose(out[row], np.tile(expected, (2, 1)), atol=1e-6, err_msg=f"row {row}")

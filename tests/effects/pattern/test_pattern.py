@@ -103,13 +103,55 @@ def test_thickness_and_radius_only_matter_to_the_kinds_that_use_them() -> None:
     np.testing.assert_array_equal(render(kind="grid", radius=0.7), render(kind="grid"))
 
 
-def test_with_no_settings_it_draws_white_grid_lines_6_px_wide_every_32_px_on_a_near_black_ground() -> None:
-    """The defaults, worked out by hand: a grid of a 32 px cell with lines 0.2 * 32 = 6.4 px wide, feather 1. The
-    corner pixel's centre is 0.5 px from the cell borders, inside the line (coverage 1); the middle of the cell is
-    16 px from every border, far outside it (coverage 0): the ground, #101018."""
-    out = registry.apply(NAME, np.zeros((40, 40, 3), np.float32))
-    np.testing.assert_allclose(out[0, 0], (1.0, 1.0, 1.0), atol=1e-6)
-    np.testing.assert_allclose(out[16, 16], (16 / 255, 16 / 255, 24 / 255), atol=1e-6)
+DEFAULTS = {  # settings, row, column -> the coverage of the foreground there, worked out by hand from the documentation
+    "grid: a line 0.2 * 32 = 6.4 px wide, so 3.2 px each side of a border, fully covers the pixel centred 2.5 px in": (
+        {},
+        16,
+        2,
+        1.0,
+    ),
+    "grid: the pixel centred 3.5 px in is 0.3 px beyond the line, feathered over 1 px: 0.5 - 0.3": ({}, 16, 3, 0.2),
+    "grid: a pixel 1.3 px beyond the line is clear of it": ({}, 16, 4, 0.0),
+    "grid: the middle of the cell is far from every line": ({}, 16, 16, 0.0),
+    "stripes run down the picture at angle 0: the same in every row": ({"kind": "stripes"}, 5, 18, 1.0),
+    "stripes: centred on the middle of the cell, 3.2 px each side, so the pixel at 2.5 px is covered": (
+        {"kind": "stripes"},
+        0,
+        18,
+        1.0,
+    ),
+    "stripes: the pixel at 3.5 px from the middle is 0.3 px beyond the stripe: 0.5 - 0.3": (
+        {"kind": "stripes"},
+        9,
+        19,
+        0.2,
+    ),
+    "stripes: the border of a cell is 16 px from the stripe": ({"kind": "stripes"}, 0, 0, 0.0),
+    "dots: the dot is 0.3 * 32 = 9.6 px in radius, so the pixel at (9.5, 0.5) from its centre is feathered": (
+        {"kind": "dots"},
+        16,
+        25,
+        0.5 + (9.6 - (9.5**2 + 0.5**2) ** 0.5),
+    ),
+    "dots: the pixel at (10.5, 0.5) from the centre is clear of the dot": ({"kind": "dots"}, 16, 26, 0.0),
+    "checks: the top-left square is the foreground, 16.5 px from the nearest border at its middle": (
+        {"kind": "checks"},
+        15,
+        15,
+        1.0,
+    ),
+}
+
+
+@pytest.mark.parametrize(("settings", "row", "column", "coverage"), DEFAULTS.values(), ids=DEFAULTS.keys())
+def test_with_no_settings_it_draws_white_on_near_black_with_a_cell_of_32_px_and_a_feather_of_1_px(
+    settings: dict, row: int, column: int, coverage: float
+) -> None:
+    """The defaults: a grid of 32 px cells, white on #101018, lines 0.2 of a cell wide, dots 0.3 of a cell in radius, a
+    1 px feather, at angle 0. The colour at a pixel is the ground plus the white less the ground times the coverage."""
+    out = registry.apply(NAME, np.zeros((40, 40, 3), np.float32), **settings)
+    ground = np.array([16, 16, 24]) / 255
+    np.testing.assert_allclose(out[row, column], ground + (1 - ground) * coverage, atol=1e-6)
 
 
 def test_the_kinds_are_these_four_by_name_listed_in_this_order() -> None:

@@ -939,3 +939,15 @@ def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when
 
         class Nowhere(EffectParams, core="no_such_effect"):
             pass
+
+
+@pytest.mark.parametrize("effect", RUST_EFFECTS)
+def test_a_rust_default_is_written_in_the_kind_of_its_field_a_decimal_for_a_float_and_a_whole_number_for_an_int(effect):
+    """A default written `0` for a decimal field would show as `0` in the schema, the docs and `fx.pyi`, where the
+    model it replaced showed `0.0`: the literal is kept as written, so the writing is the contract."""
+    for field in registry.parameters(effect).fields_doc():
+        kind = next(entry["kind"] for entry in _core.params(effect)["fields"] if entry["name"] == field.name)
+        if kind in ("float", "int"):
+            assert type(field.default) is {"float": float, "int": int}[kind], (
+                f"{effect}.{field.name}: {field.default!r}"
+            )
