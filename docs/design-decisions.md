@@ -221,10 +221,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Reason:* a value read by its place silently changes meaning when a field is added or reordered; Rust's struct
   literals have only names. *Consequence:* the editor stub and `help` show keyword-only signatures.
 - **Copies are checked; nothing builds an unchecked value.** `Step.replace(**changes)` takes what `fx` takes (parameters
-  laid over the step's, step keys replacing its), `Recipe.replace(**changes)` the recipe's fields, both through the
+  laid over the step's, step keys replacing its), except `effect` and `preset`: a step keeps the merged values, not
+  which came from its preset, so a new preset would silently keep the old one's values (a later batch that keeps the preset's name
+  lifts this). `Recipe.replace(**changes)` takes the recipe's fields, both through the
   constructor; pydantic's `model_copy(update=...)` and `model_validate` are routed through the same validation and fail
   with a `RecipeError`. *Reason:* `model_copy` built a step with a negative radius. *Consequence:* `replace` reads no
-  file (a picture is given as a `Picture`, a colour or an array; `fx` reads paths): the data model does no I/O. Until R3
+  file (arrays become a `Picture` or `Lut` as for `fx`; only `fx` reads paths): the data model does no I/O. Until R3
   wraps pydantic instead of inheriting it, `model_construct` stays pydantic's unchecked constructor.
 - **`Step.apply` is `render` of the one-step recipe.** `fx.bloom(radius=12).apply(photo, maps=, finders=, size=)` equals
   `render(photo, Recipe([step]), ...)`, and `render`/`trace` take a step as that recipe. *Reason:* trying one effect

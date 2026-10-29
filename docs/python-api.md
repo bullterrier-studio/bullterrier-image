@@ -40,9 +40,10 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   `InvalidImageError` naming the fix (`np.dstack([grey] * 3)`, `np.asarray(image)`); NaN is a `NonFiniteImageError`.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too.
-- **Copies.** `step.replace(radius=20, opacity=0.5)` takes what `fx` takes; `recipe.replace(name="warmer", size=64)` the
-  recipe's fields. Checked as when made; the original is untouched. A copy reads no file: give a picture as a
-  `Picture`, a colour or an array.
+- **Copies.** `step.replace(radius=20, opacity=0.5)` takes the parameters and step keys `fx` takes, except `effect`
+  and `preset` (a step does not know which values its preset gave: build it again with `fx.<effect>(preset=...)`);
+  `recipe.replace(name="warmer", size=64)` the recipe's fields. Checked as when made; the original is untouched. A
+  picture or lookup table is a `Picture`/`Lut`, a colour or an array, as for `fx`; a path is read only by `fx`.
 - **Names.** `Recipe(steps, name="my look!", description="...")`: free text, both optional. Files written for it (the
   command line, a project) are named by its name made safe (`my-look`); an unnamed recipe there is a `RecipeError`.
 - **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.

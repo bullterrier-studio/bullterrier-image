@@ -653,6 +653,20 @@ def lut_fields(model: type[EffectParams]) -> frozenset[str]:
     return frozenset(name for name in model.model_fields if hints[name] is Lut)
 
 
+def arrays_as_values(model: type[EffectParams], values: Mapping[str, Any]) -> dict[str, Any]:
+    """`values` (parameters of `model`) with each array given for a picture parameter (3-d) or a lookup table parameter
+    turned into the `Picture` or `Lut` it holds; everything else passes unchanged (a path stays a path: reading files
+    is the loader's, `fx`'s job). The one place an array becomes a value, for `fx` and `Step.replace` alike."""
+    made = dict(values)
+    for key in picture_fields(model) & values.keys():
+        if isinstance(values[key], np.ndarray) and values[key].ndim == 3:  # anything else is `Picture`'s to refuse
+            made[key] = Picture(values[key])
+    for key in lut_fields(model) & values.keys():
+        if isinstance(values[key], np.ndarray):
+            made[key] = Lut(values[key])
+    return made
+
+
 def drivable_fields(model: type[EffectParams]) -> frozenset[str]:
     """The fields of `model` a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
     return frozenset(name for name, info in model.model_fields.items() if _extra(info).get("drivable"))

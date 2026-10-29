@@ -44,6 +44,7 @@ from .params import (
     Drive,
     EffectParams,
     ValidatedModel,
+    arrays_as_values,
     bounds,
     cyclic_of,
     drivable_fields,
@@ -235,19 +236,27 @@ class Step(_Layer):
         return _RENDER["render"](photo, self, maps=maps, finders=finders, size=size)
 
     def replace(self, **changes: Any) -> "Step":
-        """A copy with `changes`: what `fx.<effect>(...)` takes, the effect's parameters (laid over this step's) and the
-        step keys (`mask`, `opacity`, `blend_mode`, `preset`, `partition`, `name`; replacing this step's). Checked as a
-        new step is: a misspelt or out-of-range value is a RecipeError. The effect stays: for another one, build its
-        step with `fx`. A picture or lookup table is given as a `Picture`, a `Lut`, a colour or an array; a path is
-        read only by `fx`."""
+        """A copy with `changes`: the effect's parameters (laid over this step's) and the step keys (`mask`, `opacity`,
+        `blend_mode`, `partition`, `name`; each replacing this step's), as `fx.<effect>(...)` takes them, checked as a
+        new step is: a misspelt or out-of-range value is a RecipeError. A picture or lookup table parameter takes a
+        `Picture`, a `Lut`, a colour or an array, as `fx` does; a path is read only by `fx`, which makes a step for
+        it. Neither `effect` nor `preset` can be replaced: another effect is another step (`fx.<effect>(...)`), and a
+        step does not know which of its values its preset gave, so `fx.<effect>(preset=...)` builds the step with
+        another preset."""
         if "effect" in changes:
             raise RecipeError(
                 f"`effect`: a copy of a step keeps its effect {self.effect!r} (got {changes['effect']!r}); build a "
                 f"step of another effect with fx.{changes['effect']}(...)"
             )
+        if "preset" in changes:
+            raise RecipeError(
+                f"`preset`: a copy of a step cannot take another preset, as it does not know which of its values the "
+                f"old one gave; build the step again with fx.{self.effect}(preset={changes['preset']!r}, ...)"
+            )
         keys = {key: changes.pop(key) for key in registry.STEP_KEYS if key in changes}  # the rest are the parameters
         held = {"mask": self.mask, "opacity": self.opacity, "blend_mode": self.blend_mode, "partition": self.partition}
-        return Step(self.effect, params={**self.params, **changes}, **{**held, "name": self.name, **keys})
+        params = {**self.params, **arrays_as_values(registry.parameters(self.effect), changes)}
+        return Step(self.effect, params=params, **{**held, "name": self.name, **keys})
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `gradient(colors=['#000000']) on background` or `bloom() screen x0.8` (the

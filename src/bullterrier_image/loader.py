@@ -113,14 +113,12 @@ from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
 
-import numpy as np
-
 from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutError, RecipeError
 
 from . import imageio
 from .core import looks, registry
 from .core.framing import Framing
-from .core.params import Lut, Picture, lut_fields, picture_fields
+from .core.params import Picture, arrays_as_values, lut_fields, picture_fields
 from .core.regions import (
     Band,
     Bands,
@@ -211,8 +209,6 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
                 resolved[key] = Picture(imageio.load_picture(folder / value), str(value))
             except ImageReadError as error:
                 raise ImageReadError(f"effect {effect!r}: `{key}`: {error}") from None
-        elif isinstance(value, np.ndarray) and value.ndim == 3:
-            resolved[key] = Picture(value)
     for key in lut_fields(model) & values.keys():
         value = values[key]
         if isinstance(value, PathLike | str):
@@ -220,9 +216,7 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
                 resolved[key] = imageio.load_lut(folder / value)
             except LutError as error:
                 raise LutError(f"effect {effect!r}: `{key}`: {error}") from None
-        elif isinstance(value, np.ndarray):
-            resolved[key] = Lut(value)
-    return resolved
+    return arrays_as_values(model, resolved)
 
 
 def _read(path: Path) -> dict:

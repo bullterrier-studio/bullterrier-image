@@ -13,7 +13,7 @@ from pydantic import model_validator
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import Drive, EffectParams, Picture, param
+from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import (
@@ -736,6 +736,16 @@ def test_a_step_copy_has_the_values_and_step_keys_given_and_keeps_the_rest():
     assert step == fx.bloom(radius=8, threshold=0.4, mask="subject", opacity=0.7)  # the step itself is unchanged
 
 
+def test_a_step_copy_takes_the_picture_and_table_arrays_fx_takes():
+    texture = np.linspace(0, 1, 4 * 5 * 4, dtype=np.float32).reshape(4, 5, 4)
+    other = texture[::-1].copy()
+    assert fx.blend(image=texture).replace(image=other) == fx.blend(image=other)
+    assert fx.blend(image=texture).replace(image=Picture(other)) == fx.blend(image=other)
+    cube = np.random.default_rng(0).random((2, 2, 2, 3), dtype=np.float32)
+    assert fx.lut().replace(file=cube) == fx.lut(file=cube)
+    assert fx.lut(file=cube).replace(file=Lut(cube[::-1].copy())) == fx.lut(file=cube[::-1].copy())
+
+
 def test_a_recipe_copy_has_the_fields_given_and_keeps_the_rest():
     recipe = Recipe([fx.grade(exposure=0.3)], name="warm", description="Warmer.", size=64)
     assert recipe.replace(name="warmer", size=128) == Recipe(
@@ -751,6 +761,24 @@ def test_a_recipe_copy_has_the_fields_given_and_keeps_the_rest():
         pytest.param(lambda: fx.bloom().replace(radiuss=1), RecipeError, r"`radiuss`.*radius", id="a misspelt value"),
         pytest.param(lambda: fx.bloom().replace(opacity=2), RecipeError, r"`opacity`", id="a bad step key"),
         pytest.param(lambda: fx.bloom().replace(effect="grain"), RecipeError, r"`effect`.*fx\.grain", id="the effect"),
+        pytest.param(
+            lambda: fx.gradient_map(preset="sepia").replace(preset="xray"),
+            RecipeError,
+            r"`preset`.*fx\.gradient_map\(preset=",
+            id="a preset: a step does not know which values came from the old one",
+        ),
+        pytest.param(
+            lambda: fx.bloom().replace(image="tex.png"),
+            RecipeError,
+            r"bloom.*`image` is not",
+            id="a parameter it lacks",
+        ),
+        pytest.param(
+            lambda: fx.blend().replace(image="tex.png"),
+            RecipeError,
+            r"`image`.*recipe file or fx",
+            id="a path: only fx reads",
+        ),
         pytest.param(lambda: Recipe([fx.grade()]).replace(steps=[]), RecipeError, "at least one step", id="no steps"),
         pytest.param(lambda: Recipe([fx.grade()]).replace(size=0), RecipeError, r"`size`", id="a size below 1"),
         pytest.param(lambda: Recipe([fx.grade()]).replace(sise=64), RecipeError, r"`sise`", id="a misspelt field"),
