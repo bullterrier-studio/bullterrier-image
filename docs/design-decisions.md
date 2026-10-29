@@ -516,7 +516,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   type, a `///` doc comment and `#[param(default, unit, min, max, drivable, advanced, cyclic)]`, and a choice is a
   fieldless enum (`crates/derive`: `#[derive(Params)]`, `#[derive(Choice)]`). The derives write `Default` and a table;
   the declaration rules (a doc, a unit and range holding the default, `cyclic` only for a turn of degrees, `drivable`
-  only on `f32`) are compile errors naming the field. The Python class is `class GradeParams(EffectParams,
+  only on `f32`) are compile errors naming the field (an unknown unit is rustc's own error, and a choice's doc naming
+  every variant is checked when Python builds the model). The Python class is `class GradeParams(EffectParams,
   core="grade")` with an empty body: `EffectParams` fills the annotations and `param(...)` specs from
   `_core.params("grade")` before pydantic reads them, so strict validation, `fx`, `help()`, the schema, scaling and
   drives are the same code as for a hand-written model. A default or bound keeps the literal as written (a whole number

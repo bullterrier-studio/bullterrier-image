@@ -115,20 +115,32 @@ enum Written {
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it knows the two numeric primitives, to check their declaration; every other
-/// type reports its kind itself (`Parameter`).
+/// How the derive reads a field's type: it recognises the two numbers, `bool` and `Color` by their written names (a type
+/// alias is not recognised) and takes any other type for a choice enum; the table's kind comes from the type itself
+/// (`Parameter`).
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
     Float,
     Int,
-    Other,
+    Switch,
+    Colour,
+    Choice,
 }
 
 fn shape(ty: &Type) -> Shape {
-    match ty {
-        Type::Path(path) if path.path.is_ident("f32") => Shape::Float,
-        Type::Path(path) if path.path.is_ident("i32") => Shape::Int,
-        _ => Shape::Other,
+    let Type::Path(path) = ty else { return Shape::Choice };
+    match path
+        .path
+        .segments
+        .last()
+        .map(|segment| segment.ident.to_string())
+        .as_deref()
+    {
+        Some("f32") => Shape::Float,
+        Some("i32") => Shape::Int,
+        Some("bool") => Shape::Switch,
+        Some("Color") => Shape::Colour,
+        _ => Shape::Choice,
     }
 }
 
@@ -167,8 +179,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     })?;
     let ty = &field.ty;
     let parts = match shape(ty) {
-        Shape::Other => other_parts(&settings, &written, ty, &broken)?,
-        numeric => number_parts(&settings, &written, numeric, &broken)?,
+        Shape::Float | Shape::Int => number_parts(&settings, &written, shape(ty), &broken)?,
+        other => other_parts(&settings, &written, other, ty, &broken)?,
     };
     let Parts {
         value,
@@ -200,8 +212,14 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     })
 }
 
-/// A switch, a colour or a choice: no unit, no bounds, not cyclic, not drivable.
-fn other_parts(settings: &Settings, written: &Written, ty: &Type, broken: Broken<'_>) -> syn::Result<Parts> {
+/// A switch, a colour or a choice: no unit, no bounds, not cyclic, not drivable, and a default of its own kind.
+fn other_parts(
+    settings: &Settings,
+    written: &Written,
+    shape: Shape,
+    ty: &Type,
+    broken: Broken<'_>,
+) -> syn::Result<Parts> {
     if settings.unit.is_some() || settings.min.is_some() || settings.max.is_some() {
         return Err(broken("only a number takes a unit, min and max"));
     }
@@ -211,20 +229,22 @@ fn other_parts(settings: &Settings, written: &Written, ty: &Type, broken: Broken
     if settings.drivable {
         return Err(broken("only a decimal number (f32) can be drivable"));
     }
-    let (value, default) = match written {
-        Written::Switch(on) => (quote!(#on), quote!(crate::params::Scalar::Bool(#on))),
-        Written::Text(hex) => {
+    let (value, default) = match (shape, written) {
+        (Shape::Switch, Written::Switch(on)) => (quote!(#on), quote!(crate::params::Scalar::Bool(#on))),
+        (Shape::Colour, Written::Text(hex)) => {
             let channels = colour(hex).ok_or_else(|| broken("a colour default is '#rrggbb'"))?;
             (
                 quote!(crate::params::Color([#(#channels),*])),
                 quote!(crate::params::Scalar::Text(#hex)),
             )
         }
-        Written::Name(variant) => {
+        (Shape::Choice, Written::Name(variant)) => {
             let choice = snake_case(&variant.to_string());
             (quote!(<#ty>::#variant), quote!(crate::params::Scalar::Text(#choice)))
         }
-        Written::Number(_) => return Err(broken("a number default needs a number field (f32 or i32)")),
+        (Shape::Switch, _) => return Err(broken("the default of a switch is true or false")),
+        (Shape::Colour, _) => return Err(broken("the default of a colour is '#rrggbb', in quotes")),
+        _ => return Err(broken("the default of a choice is the name of one of its variants")),
     };
     let none = quote!(::core::option::Option::None);
     Ok(Parts {
@@ -387,7 +407,7 @@ fn number(expr: &Expr) -> Option<Number> {
 fn colour(hex: &str) -> Option<[Literal; 3]> {
     let digits = hex
         .strip_prefix('#')
-        .filter(|digits| digits.len() == 6 && digits.is_ascii())?;
+        .filter(|digits| digits.len() == 6 && digits.chars().all(|digit| digit.is_ascii_hexdigit()))?;
     let channel = |at: usize| u8::from_str_radix(&digits[at..at + 2], 16).ok();
     let levels = [channel(0)?, channel(2)?, channel(4)?];
     Some(levels.map(|level| Literal::f32_suffixed(f32::from(level) / 255.0))) // constant: 8-bit levels
@@ -595,7 +615,7 @@ mod tests {
     }
 
     #[test]
-    fn a_switch_colour_or_choice_that_takes_a_number_setting_is_refused_naming_the_field() {
+    fn a_switch_colour_or_choice_with_a_setting_or_default_of_another_kind_is_refused_naming_the_field() {
         assert_refused(&[
             (
                 "a unit on a switch",
@@ -630,7 +650,47 @@ mod tests {
             (
                 "a number for a switch",
                 documented! { #[param(default = 1.0)] keep: bool, },
-                &["keep", "number"],
+                &["keep", "true or false"],
+            ),
+            (
+                "a colour for a switch",
+                documented! { #[param(default = "#ffffff")] keep: bool, },
+                &["keep", "true or false"],
+            ),
+            (
+                "a switch for a colour",
+                documented! { #[param(default = true)] tint: Color, },
+                &["tint", "#rrggbb"],
+            ),
+            (
+                "a number for a colour",
+                documented! { #[param(default = 1.0)] tint: Color, },
+                &["tint", "#rrggbb"],
+            ),
+            (
+                "a number for a choice",
+                documented! { #[param(default = 1)] kind: Kind, },
+                &["kind", "variants"],
+            ),
+            (
+                "a switch for a choice",
+                documented! { #[param(default = true)] kind: Kind, },
+                &["kind", "variants"],
+            ),
+            (
+                "a colour for a choice",
+                documented! { #[param(default = "#ffffff")] kind: Kind, },
+                &["kind", "variants"],
+            ),
+            (
+                "a variant for a number",
+                documented! { #[param(default = Grid, unit = px, min = 0, max = 32)] cell: f32, },
+                &["cell", "number"],
+            ),
+            (
+                "a colour whose digits are not all hex",
+                documented! { #[param(default = "#+f+f+f")] tint: Color, },
+                &["tint", "#rrggbb"],
             ),
         ]);
     }

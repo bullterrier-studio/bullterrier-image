@@ -38,6 +38,17 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         .iter()
         .map(|variant| snake_case(&variant.to_string()))
         .collect();
+    for (index, variant) in variants.iter().enumerate() {
+        if let Some(first) = names[..index].iter().position(|earlier| *earlier == names[index]) {
+            let (first, name_of_both) = (variants[first], &names[index]);
+            return Err(Error::new_spanned(
+                variant,
+                format!(
+                    "variants `{first}` and `{variant}` of `{name}` are both called `{name_of_both}`: a choice has one name each"
+                ),
+            ));
+        }
+    }
     Ok(quote! {
         impl crate::params::Parameter for #name {
             const KIND: crate::params::Kind = crate::params::Kind::Choice;
@@ -103,19 +114,23 @@ mod tests {
 
     #[test]
     fn what_is_not_a_fieldless_enum_is_refused_naming_it() {
-        let cases: [(DeriveInput, &str); 4] = [
-            (parse_quote! { struct Kind { a: u8 } }, "enum"),
-            (parse_quote! { enum Kind {} }, "at least one"),
-            (parse_quote! { enum Kind { Stripes(u8) } }, "Stripes"),
-            (parse_quote! { enum Kind { Stripes { width: u8 } } }, "Stripes"),
+        let cases: [(DeriveInput, &[&str]); 5] = [
+            (parse_quote! { struct Kind { a: u8 } }, &["enum"]),
+            (parse_quote! { enum Kind {} }, &["at least one"]),
+            (parse_quote! { enum Kind { Stripes(u8) } }, &["Stripes"]),
+            (parse_quote! { enum Kind { Stripes { width: u8 } } }, &["Stripes"]),
+            (
+                parse_quote! { enum Kind { FourthWay, Fourth_way } },
+                &["FourthWay", "Fourth_way", "fourth_way"],
+            ),
         ];
         for (input, named) in cases {
             let error = expanded(&input).err();
             assert!(
                 error
                     .as_deref()
-                    .is_some_and(|text| text.contains(named) && text.contains("Kind")),
-                "{named}: {error:?}"
+                    .is_some_and(|text| text.contains("Kind") && named.iter().all(|name| text.contains(name))),
+                "{named:?}: {error:?}"
             );
         }
     }

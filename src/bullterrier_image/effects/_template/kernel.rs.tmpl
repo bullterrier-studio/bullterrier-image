@@ -14,7 +14,8 @@ use crate::{Image, Picture};
 // density) and an inclusive `min` and `max` that hold the default; `drivable` (only an `f32`), `advanced` and `cyclic`
 // (degrees, min to max one turn) are flags. `bool`, `Color` (`default = "#rrggbb"`) and a `#[derive(Choice)]` enum
 // (`default = Variant`; the doc names every variant) take no unit or range. Names are the field's own terms (radius,
-// amount, threshold, angle, seed...), never strength, intensity or factor. A mistake fails the build, naming the field.
+// amount, threshold, angle, seed...), never strength, intensity or factor. A broken declaration fails the build, naming the field
+// (an unknown unit shows as rustc's own error, and the doc must name every variant: Python checks that on import).
 // Options of every library call are fields too; a constant is allowed only for a standard (Rec. 709, sRGB...) or a pure
 // guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number). The doc
 // comment of the struct says what the parameters are as a whole: it is the model's docstring. Keep the fields

@@ -5,9 +5,13 @@
 //!   comment and a `#[param(default = .., unit = .., min = .., max = .., drivable, advanced, cyclic)]` attribute. The
 //!   struct's own doc comment documents the effect's parameters as a whole. The derive writes `Default` and the table
 //!   the Python package builds the effect's model from, and refuses a broken declaration at compile time, naming the
-//!   field.
+//!   field, for each rule it checks: a doc, a default of the field's kind, a unit and range holding the default,
+//!   `cyclic` and `drivable` where they apply, a setting given once, a field that is not `pub`. It recognises `f32`,
+//!   `i32`, `bool` and `Color` by those written names (a type alias is not recognised and is taken for a choice enum).
+//!   Left to others: an unknown `unit` is rustc's error pointing at it, and that a choice's doc names every variant is
+//!   checked when Python builds the model.
 //! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order.
-//!   It reads them from text, so the names are written once, in the enum.
+//!   It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
 //!
 //! The code they write refers to the core's `crate::params` paths: every effect lives in the core.
 
