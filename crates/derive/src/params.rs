@@ -304,19 +304,29 @@ fn number_value(number: Number, whole: bool) -> Option<TokenStream> {
 
 /// The attribute `#[param(..)]` of `field`, read.
 fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
-    let attribute = field
+    let mut attributes = field
         .attrs
         .iter()
-        .find(|attribute| attribute.path().is_ident("param"))
-        .ok_or_else(|| {
-            Error::new_spanned(
-                field,
-                format!("parameter `{name}`: declare it with #[param(default = .., ..)]"),
-            )
-        })?;
+        .filter(|attribute| attribute.path().is_ident("param"));
+    let Some(attribute) = attributes.next() else {
+        return Err(Error::new_spanned(
+            field,
+            format!("parameter `{name}`: declare it with #[param(default = .., ..)]"),
+        ));
+    };
+    if attributes.next().is_some() {
+        return Err(Error::new_spanned(
+            field,
+            format!("parameter `{name}`: declare it in one #[param(..)] attribute, not several"),
+        ));
+    }
     let mut settings = Settings::default();
+    let mut given = Vec::new();
     attribute.parse_nested_meta(|meta| {
         let key = meta.path.get_ident().map(ToString::to_string).unwrap_or_default();
+        if given.contains(&key) {
+            return Err(meta.error(format!("parameter `{name}`: `{key}` is given twice")));
+        }
         match key.as_str() {
             "default" => settings.default = Some(meta.value()?.parse()?),
             "unit" => settings.unit = Some(meta.value()?.parse()?),
@@ -331,6 +341,7 @@ fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
                 )));
             }
         }
+        given.push(key);
         Ok(())
     })?;
     Ok(settings)
@@ -513,6 +524,21 @@ mod tests {
                 "no max",
                 documented! { #[param(default = 4.0, unit = px, min = 0)] cell: f32, },
                 &["cell", "max"],
+            ),
+            (
+                "a value given twice",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, min = 1)] cell: f32, },
+                &["cell", "`min`", "twice"],
+            ),
+            (
+                "a flag given twice",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, drivable, drivable)] cell: f32, },
+                &["cell", "`drivable`", "twice"],
+            ),
+            (
+                "a second param attribute",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] #[param(drivable)] cell: f32, },
+                &["cell", "one #[param"],
             ),
             (
                 "a setting nobody knows",
