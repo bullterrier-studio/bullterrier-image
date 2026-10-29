@@ -242,11 +242,9 @@ def _not_an_effect(name: str) -> str:
     presets and looks."""
     homes = {effect: sorted(presets(effect)) for effect in _EFFECTS}  # effect -> its preset names
     looks = look_files.read()
-    meanings = [
-        f'a preset (effect = "{effect}", preset = "{name}")' for effect, names in homes.items() if name in names
-    ]
+    meanings = [f'a preset (fx.{effect}(preset="{name}"))' for effect, names in homes.items() if name in names]
     if name in looks:
-        meanings.append(f'a look (`bt-image render PHOTO {name}`, load_recipe("{name}")): {looks[name].description}')
+        meanings.append(f'a look (load_recipe("{name}"), `bt-image render PHOTO {name}`): {looks[name].description}')
     owners = sorted(
         (effect for effect, fn in _EFFECTS.items() if name in fn.params_model.model_fields),
         key=lambda effect: (len(_EFFECTS[effect].params_model.model_fields), effect),  # the narrowest effect first

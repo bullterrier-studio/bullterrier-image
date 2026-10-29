@@ -34,6 +34,7 @@ Promises:
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """
 
+import difflib
 import hashlib
 import inspect
 import math
@@ -846,6 +847,12 @@ def _number(value: float) -> str:
     return str(int(value)) if float(value).is_integer() and abs(value) < 1e15 else repr(value)
 
 
+def _nearest(given: object, valid: list[str]) -> str:
+    """ " (did you mean `x`?)" for the name `x` in `valid` nearest the misspelt `given`; "" when none is near."""
+    near = difflib.get_close_matches(str(given), valid, n=1)
+    return f" (did you mean `{near[0]}`?)" if near else ""
+
+
 def _problem(detail: Any, valid: list[str]) -> str:
     location = detail["loc"]
     if not location:  # a rule about the whole model, not one field
@@ -854,7 +861,8 @@ def _problem(detail: Any, valid: list[str]) -> str:
     kind, ctx, given = detail["type"], detail.get("ctx", {}), detail.get("input")
     got = f", got {given!r}"
     wording = {
-        "extra_forbidden": f"{name} is not a parameter; the parameters are: {', '.join(valid)}",
+        "extra_forbidden": f"{name} is not a parameter{_nearest(location[-1], valid)}; the parameters are: "
+        f"{', '.join(valid)}",
         "missing": f"{name} is required",
         "greater_than_equal": f"{name} must be >= {_number(ctx.get('ge', 0))}{got}",
         "less_than_equal": f"{name} must be <= {_number(ctx.get('le', 0))}{got}",

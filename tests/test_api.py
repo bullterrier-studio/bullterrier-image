@@ -5,6 +5,8 @@ import pydoc
 import re
 import subprocess
 import sys
+import tomllib
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
@@ -225,7 +227,8 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
 @pytest.mark.parametrize(
     ("name", "says"),
     [
-        pytest.param("glitch", r"'glitch' is a preset.*effect = \"slice_shift\", preset = \"glitch\"", id="a-preset"),
+        pytest.param("glitch", r"'glitch' is a preset.*fx\.slice_shift\(preset=\"glitch\"\)", id="a-preset"),
+        pytest.param("glitch", r"a look.*load_recipe\(\"glitch\"\)", id="a-look"),
         pytest.param("temperature", r"'temperature' is a parameter of grade", id="a-parameter"),
         pytest.param(
             "depth_of_field", r"'depth_of_field' is named in the summary of focus_blur", id="a-word-of-a-summary"
@@ -235,6 +238,33 @@ def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
 def test_fx_says_where_a_name_that_is_no_effect_lives(name, says):
     with pytest.raises(AttributeError, match=says):
         getattr(fx, name)
+
+
+def test_a_misspelt_parameter_suggests_the_nearest():
+    with pytest.raises(RecipeError, match=r"`radiuss`.*did you mean `radius`"):
+        fx.bloom(radiuss=3)
+
+
+def _toml(folder: str, name: str) -> dict:
+    """A shipped data file, read with tomllib, not through the library."""
+    path = files("bullterrier_image") / folder / f"{name}.toml"
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def test_looks_lists_every_shipped_look_by_name_with_its_description():
+    shipped = sorted(path.name.removesuffix(".toml") for path in (files("bullterrier_image") / "looks").iterdir())
+    listed = bullterrier_image.looks()
+    assert sorted(listed) == shipped
+    assert listed["glitch"] == _toml("looks", "glitch")["description"]
+
+
+def test_an_effects_presets_are_its_values_by_preset_name_and_none_for_an_effect_without():
+    shipped = {
+        name: {k: v for k, v in table.items() if k != "description"}
+        for name, table in _toml("presets", "gradient_map").items()
+    }
+    assert fx.gradient_map.presets == shipped  # type: ignore[attr-defined]  # fx.pyi is written at integration
+    assert fx.equalize.presets == {}  # type: ignore[attr-defined]  # fx.pyi is written at integration
 
 
 def test_fx_functions_document_themselves_and_can_be_found_in_a_repl():
@@ -320,6 +350,7 @@ def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lanter
 def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lantern):
     tree = ast.parse(fx.stub_text())
     (function,) = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "lantern_probe"]
+    assert [ast.unparse(decorator) for decorator in function.decorator_list] == ["_effect"]  # typed with `presets`
     assert function.args.args == []  # every value by keyword
     assert [a.arg for a in function.args.kwonlyargs][:3] == ["radius", "style", "tint"]
     assert ast.unparse(function.args.kwonlyargs[1].annotation) == "Literal['paper', 'silk']"  # type: ignore[arg-type]
@@ -330,7 +361,8 @@ def test_the_editor_stub_shows_a_modelled_effects_fields_and_documentation(lante
 
 
 def _stub_functions() -> dict[str, ast.FunctionDef]:
-    return {node.name: node for node in ast.parse(fx.stub_text()).body if isinstance(node, ast.FunctionDef)}
+    tree = ast.parse(fx.stub_text())
+    return {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name[0] != "_"}
 
 
 MASK = ("str | None", None)
@@ -375,7 +407,7 @@ def test_a_preset_is_chosen_with_the_keyword_preset_and_the_other_values_win_ove
 def test_the_editor_stub_is_valid_python_with_one_function_per_effect(lantern):
     """fx.pyi itself is regenerated at integration (`poe regenerate`), so only its generator is checked here."""
     tree = ast.parse(fx.stub_text())
-    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name[0] != "_"}
     assert "lantern_probe" in functions
     assert sorted(functions) == sorted(registry.describe())  # one per effect, no more, no less
 

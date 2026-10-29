@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from .core import looks as shipped_looks
 from .core import runner, steps
 from .core.framing import Framing
 from .core.params import Drive
@@ -70,10 +71,17 @@ __all__ = [
     "Subject",
     "Svg",
     "load_recipe",
+    "looks",
     "render",
     "render_all",
     "trace",
 ]
+
+
+def looks() -> dict[str, str]:
+    """The looks that ship with bullterrier-image, by name, each with what it looks like in a sentence; load one with
+    `load_recipe(name)`."""
+    return {name: look.description for name, look in shipped_looks.read().items()}
 
 
 def render(

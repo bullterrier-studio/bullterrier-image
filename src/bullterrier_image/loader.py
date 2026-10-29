@@ -107,6 +107,7 @@ Dependency direction: imports `core` (steps, framing, regions, registry, params,
 not know `runner`.
 """
 
+import difflib
 import tomllib
 from collections.abc import Mapping
 from os import PathLike
@@ -257,7 +258,13 @@ def load_recipe(path: str | Path) -> Recipe:
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
     shipped = looks.read()
-    path = shipped[path].file if isinstance(path, str) and path in shipped else Path(path)
+    if isinstance(path, str) and path in shipped:
+        path = shipped[path].file
+    elif isinstance(path, str) and not Path(path).exists():
+        near = ", ".join(f'load_recipe("{look}")' for look in difflib.get_close_matches(path, list(shipped), n=3))
+        hint = f"did you mean {near}? " if near else ""
+        raise RecipeError(f"no look or file {path!r}: {hint}the looks: {', '.join(shipped)}")
+    path = Path(path)
     raw = _read(path)
     table = raw.get("frame", {})
     if not isinstance(table, dict):

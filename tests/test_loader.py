@@ -822,7 +822,7 @@ def test_a_mistake_in_an_each_step_names_the_file_the_step_and_the_problem(tmp_p
 @pytest.mark.parametrize(
     ("effect", "says"),
     [
-        pytest.param("glitch", 'effect = "slice_shift", preset = "glitch"', id="known-good-a-preset-name"),
+        pytest.param("glitch", 'fx.slice_shift(preset="glitch")', id="known-good-a-preset-name"),
         pytest.param("vibrance", "'vibrance' is a parameter of grade", id="known-good-a-parameter-name"),
         pytest.param("depth_of_field", "named in the summary of focus_blur", id="known-good-a-word-of-a-summary"),
         pytest.param("crt", 'load_recipe("crt")', id="known-good-a-look-name"),
@@ -858,10 +858,17 @@ def test_a_path_is_always_a_file_never_a_look(tmp_path, monkeypatch):
         load_recipe(Path("crt"))
 
 
-def test_a_name_that_is_no_look_is_a_missing_file(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("name", "says"),
+    [
+        pytest.param("glich", r"no look or file 'glich'.*did you mean load_recipe\(\"glitch\"\)", id="near a look"),
+        pytest.param("zzz", r"no look or file 'zzz'.*the looks: .*crt", id="near nothing: the looks listed"),
+    ],
+)
+def test_a_name_that_is_no_look_and_no_file_suggests_the_nearest_looks(tmp_path, monkeypatch, name, says):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError):
-        load_recipe("cr")
+    with pytest.raises(RecipeError, match=says):
+        load_recipe(name)
 
 
 @pytest.mark.parametrize(

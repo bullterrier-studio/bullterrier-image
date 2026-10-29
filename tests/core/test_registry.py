@@ -470,8 +470,8 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
 @pytest.mark.parametrize(
     ("name", "says"),
     [
-        pytest.param("glitch", ['"slice_shift"', 'preset = "glitch"'], id="a-preset-names-its-effect-and-itself"),
-        pytest.param("sepia", ['"gradient_map"', 'preset = "sepia"'], id="a-preset-of-another-effect"),
+        pytest.param("glitch", ['fx.slice_shift(preset="glitch")'], id="a-preset-names-its-effect-and-itself"),
+        pytest.param("sepia", ['fx.gradient_map(preset="sepia")'], id="a-preset-of-another-effect"),
         pytest.param("crt", ["look", 'load_recipe("crt")'], id="a-look-says-how-to-load-it"),
         pytest.param("vibrance", ["is a parameter of grade"], id="a-parameter-names-its-effect"),
         pytest.param("temperature", ["is a parameter of grade"], id="a-parameter-of-one-effect"),
@@ -500,7 +500,10 @@ def test_an_unknown_effect_name_says_where_the_name_lives(name, says):
     [
         pytest.param(
             "glitch",
-            ['a preset (effect = "slice_shift", preset = "glitch")', "a look (`bt-image render PHOTO glitch`"],
+            [
+                'a preset (fx.slice_shift(preset="glitch"))',
+                'a look (load_recipe("glitch"), `bt-image render PHOTO glitch`)',
+            ],
             ["parameter"],
             id="a-preset-and-a-look-are-both-named",
         ),
@@ -510,7 +513,7 @@ def test_an_unknown_effect_name_says_where_the_name_lives(name, says):
             ["a preset", "a look"],
             id="a-parameter-and-a-summary-mention-are-both-named",
         ),
-        pytest.param("sepia", ['preset = "sepia"'], ["a look", "a parameter", "the summary of"], id="only-a-preset"),
+        pytest.param("sepia", ['preset="sepia"'], ["a look", "a parameter", "the summary of"], id="only-a-preset"),
     ],
 )
 def test_a_name_that_is_several_things_lists_all_of_them_and_nothing_else(name, says, absent):
