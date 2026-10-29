@@ -2,6 +2,7 @@
 validated, frozen models wherever they are made."""
 
 import inspect
+import json
 import tomllib
 from importlib.resources import files
 from typing import Literal
@@ -1004,6 +1005,34 @@ def test_the_recipe_objects_refuse_unknown_fields():
 def test_no_copy_or_dict_skips_the_checks_of_the_constructor(make, complaint):
     with pytest.raises(RecipeError, match=complaint):
         make()
+
+
+BAD_STEP = {"effect": "bloom", "params": {"radius": -1}}
+CHECKED_ENTRANCES = {
+    "model_validate": lambda: Step.model_validate(BAD_STEP),
+    "model_validate_json": lambda: Step.model_validate_json(json.dumps(BAD_STEP)),
+    "model_validate_strings": lambda: Step.model_validate_strings({"effect": "bloom", "opacity": "7"}),
+    "model_copy": lambda: fx.bloom().model_copy(update={"params": BAD_STEP["params"]}),
+}
+
+
+@pytest.mark.parametrize("enter", CHECKED_ENTRANCES.values(), ids=CHECKED_ENTRANCES.keys())
+def test_every_pydantic_entrance_refuses_a_bad_step_as_a_recipe_error(enter):
+    with pytest.raises(RecipeError):
+        enter()
+
+
+def test_a_step_from_json_is_the_step_and_a_bad_one_names_the_value():
+    step = fx.bloom(radius=12, opacity=0.5, name="halo")
+    assert Step.model_validate_json(step.model_dump_json()) == step
+    with pytest.raises(RecipeError, match=r"`radius`.*>= 0.*-1"):
+        Step.model_validate_json(json.dumps({**BAD_STEP, "opacity": 1.0}))
+
+
+@pytest.mark.parametrize("cls", [Step, Recipe, Each, Grid, Framing, Drive])
+def test_nothing_builds_an_unchecked_value_with_model_construct(cls):
+    with pytest.raises(RecipeError, match="model_construct"):
+        cls.model_construct()
 
 
 # --- presets: an effect's named parameter sets, merged under the parameters a step is given ------------------------

@@ -226,8 +226,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   lifts this). `Recipe.replace(**changes)` takes the recipe's fields, both through the
   constructor; pydantic's `model_copy(update=...)` and `model_validate` are routed through the same validation and fail
   with a `RecipeError`. *Reason:* `model_copy` built a step with a negative radius. *Consequence:* `replace` reads no
-  file (arrays become a `Picture` or `Lut` as for `fx`; only `fx` reads paths): the data model does no I/O. Until R3
-  wraps pydantic instead of inheriting it, `model_construct` stays pydantic's unchecked constructor.
+  file (arrays become a `Picture` or `Lut` as for `fx`; only `fx` reads paths): the data model does no I/O. `model_validate_json` and
+  `model_validate_strings` fail with a `RecipeError` too, and `model_construct` raises. Until R3 wraps pydantic
+  instead of inheriting it, these are guards on pydantic's own entrances.
 - **`Step.apply` is `render` of the one-step recipe.** `fx.bloom(radius=12).apply(photo, maps=, finders=, size=)` equals
   `render(photo, Recipe([step]), ...)`, and `render`/`trace` take a step as that recipe. *Reason:* trying one effect
   should not need a recipe. *Consequence:* the default subject and depth finders live above the core (they know

@@ -316,6 +316,7 @@ ignore_names = [
     "StartElementHandler",
     "EndElementHandler",
     "model_config",  # pydantic reads each model's settings from this class attribute
+    "model_construct",  # `ValidatedModel.model_construct` overrides pydantic's to raise: a guard, called by no one
     "ignored_warning_kinds",  # pydantic reads it from a JSON schema generator class
     "__signature__",  # `inspect.signature` reads it (the documented way to give a callable a signature)
     "__call__",  # Python calls it when a registered effect object is called

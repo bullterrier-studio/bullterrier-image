@@ -403,6 +403,31 @@ class ValidatedModel(BaseModel):
         except ValidationError as error:
             raise _invalid(error, "", cls.model_fields) from None
 
+    @classmethod
+    def model_validate_json(cls, json_data: str | bytes | bytearray, **options: Any) -> Self:
+        """pydantic's `model_validate_json`, its failure a RecipeError as `parse` reports it."""
+        try:
+            return super().model_validate_json(json_data, **options)
+        except ValidationError as error:
+            raise _invalid(error, "", cls.model_fields) from None
+
+    @classmethod
+    def model_validate_strings(cls, obj: Any, **options: Any) -> Self:
+        """pydantic's `model_validate_strings`, its failure a RecipeError as `parse` reports it."""
+        try:
+            return super().model_validate_strings(obj, **options)
+        except ValidationError as error:
+            raise _invalid(error, "", cls.model_fields) from None
+
+    @classmethod
+    def model_construct(cls, _fields_set: set[str] | None = None, **values: Any) -> Self:  # type: ignore[override]  # mypy reads pydantic's underscore name as private
+        """Refused: pydantic's `model_construct` builds a value without checking it, which nothing may. Make one with
+        its constructor or `model_validate`."""
+        raise RecipeError(
+            f"{cls.__name__}.model_construct() builds a value without checking it: use {cls.__name__}(...) or "
+            f"{cls.__name__}.model_validate(...)"
+        )
+
     def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
         """A copy with `update` laid over the values, checked as a new value is (pydantic's own copy checks nothing):
         a bad value is a RecipeError. Without `update` the copy is equal (with `deep`, of copied fields)."""
