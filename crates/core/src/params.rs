@@ -13,16 +13,17 @@
 //! pub struct Params {
 //!     /// The size of one repeat in px. Larger = a coarser pattern.
 //!     #[param(default = 32.0, unit = px, min = 2, max = 512)]
-//!     pub cell: f32,
+//!     pub(crate) cell: f32,
 //!     /// The pattern: 'stripes' or 'grid'.
 //!     #[param(default = Grid)]
-//!     pub kind: Kind,
+//!     pub(crate) kind: Kind,
 //! }
 //! ```
 //!
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
-//! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number. Values are validated by the
-//! Python package, not here.
+//! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number, and the fields are `pub(crate)`,
+//! so that rustc reports one `render` never reads (they become `pub` with the core's typed entry point). Values are
+//! validated by the Python package, not here.
 
 use serde::{Deserialize, Serialize};
 

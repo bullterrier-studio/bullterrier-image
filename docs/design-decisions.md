@@ -525,6 +525,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   optional colours arrive with the first port that needs one). *Reason:* the Rust struct and the Python model
   repeated every field name and could drift; with one declaration they cannot, and a Rust user gets documented,
   ranged, defaulted `Params`. Because Python does not read the fields of a ported effect, vulture needs no whitelist.
+  The fields are `pub(crate)` and the derive refuses `pub`: a `pub` field of a `pub` struct is never reported when
+  `render` does not read it, a `pub(crate)` one is (rustc's dead-code lint, which replaces the whitelist's old check).
+  They become `pub` with the core's typed entry point (R2/R3), which then needs a test that every parameter is read.
   *Validation stays Python's for now:* the model checks every value (inclusive ranges, finiteness, the cyclic wrap) and
   Rust trusts it; a Rust `checked()` has no consumer until the core loads files and recipes, and then Python validation
   switches to it in the same move, instead of the rules living in two languages in between.

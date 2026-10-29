@@ -27,34 +27,34 @@ pub struct Params {
     /// top-left one in the foreground colour), 'dots' (a disc of `radius` in every cell) or 'grid' (lines `thickness`
     /// wide along the cell borders).
     #[param(default = Grid)]
-    pub kind: Kind,
+    pub(crate) kind: Kind,
     /// The size of one repeat in px: the distance from one stripe to the next, the side of a check, a dot or a grid
     /// square. Tuned for a picture about 480 px high; larger = a coarser pattern.
     #[param(default = 32.0, unit = px, min = 2, max = 512)]
-    pub cell: f32,
+    pub(crate) cell: f32,
     /// The direction the pattern varies along, in degrees clockwise from pointing right, about the picture's top-left
     /// corner: at 0 it changes from left to right, so the stripes are vertical and the checks, dots and grid lines are
     /// aligned with the picture's edges; at 90 it changes downward and the stripes are horizontal.
     #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
-    pub angle: f32,
+    pub(crate) angle: f32,
     /// The colour of the stripes, the dark checks, the dots and the grid lines.
     #[param(default = "#ffffff")]
-    pub foreground: Color,
+    pub(crate) foreground: Color,
     /// The colour between them.
     #[param(default = "#101018")]
-    pub background: Color,
+    pub(crate) background: Color,
     /// Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of `cell`; 1 fills everything
     /// with the foreground colour. Ignored by 'checks' and 'dots'.
     #[param(default = 0.2, unit = fraction, min = 0, max = 1)]
-    pub thickness: f32,
+    pub(crate) thickness: f32,
     /// Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the neighbours, above 0.71 the
     /// dots overlap into a filled picture. Ignored by 'stripes', 'checks' and 'grid'.
     #[param(default = 0.3, unit = fraction, min = 0, max = 0.75)]
-    pub radius: f32,
+    pub(crate) radius: f32,
     /// The width of the soft edge in px, centred on the shape's border and blended linearly: 0 = hard (jagged) edges, 1
     /// = anti-aliased, larger = blurred shapes.
     #[param(default = 1.0, unit = px, min = 0, max = 32)]
-    pub feather: f32,
+    pub(crate) feather: f32,
 }
 
 /// The pattern, in the picture's size: the picture is used only for its height and width.

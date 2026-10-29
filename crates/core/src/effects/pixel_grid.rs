@@ -17,23 +17,23 @@ pub struct Params {
     /// Width and height in px of one grid cell, which holds one red, one green and one blue stripe, each a third of the
     /// cell wide. Larger = a coarser grid; the smallest, 3, gives stripes one pixel wide.
     #[param(default = 4, unit = px, min = 3, max = 32)]
-    pub cell: i32,
+    pub(crate) cell: i32,
     /// Width of the dark lines between sub-pixels, as a fraction of a stripe's width (cell / 3): the same lines run
     /// between the stripes and between rows of cells, half of each inside its own sub-pixel. 0 = stripes touch, 1 =
     /// nothing is lit and the grid is black. Raising it darkens the picture and shows the grid.
     #[param(default = 0.15, unit = fraction, min = 0, max = 1)]
-    pub gap: f32,
+    pub(crate) gap: f32,
     /// How far the picture is shown through the grid: 0 = the picture unchanged, 1 = the picture as the grid lights it
     /// (each channel only inside its own sub-pixels, a third of the picture's brightness or less), in between a mix of
     /// the two.
     #[param(default = 0.4, unit = fraction, min = 0, max = 1)]
-    pub amount: f32,
+    pub(crate) amount: f32,
     /// Whether the grid is brightened by the share it darkens the picture on average, so the average brightness is kept
     /// and raising `amount` or `gap` shows the grid without dimming the picture (a lit stripe is lifted above the
     /// picture's own value and clips at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and
     /// the picture is black). False = the grid only ever darkens, as an LCD does.
     #[param(default = false)]
-    pub keep_brightness: bool,
+    pub(crate) keep_brightness: bool,
 }
 
 /// The picture on the grid. The share of each pixel a stripe lights is worked out in `f64`, as the shares of whole

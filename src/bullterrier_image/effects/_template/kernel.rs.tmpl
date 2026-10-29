@@ -17,7 +17,8 @@ use crate::{Image, Picture};
 // amount, threshold, angle, seed...), never strength, intensity or factor. A mistake fails the build, naming the field.
 // Options of every library call are fields too; a constant is allowed only for a standard (Rec. 709, sRGB...) or a pure
 // guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number). The doc
-// comment of the struct says what the parameters are as a whole: it is the model's docstring.
+// comment of the struct says what the parameters are as a whole: it is the model's docstring. Keep the fields
+// `pub(crate)` (the build refuses `pub`): rustc then reports a parameter `render` never reads.
 
 /// The settings of `$name`: every value that shapes its result.
 #[derive(Deserialize, Params)]
@@ -25,7 +26,7 @@ use crate::{Image, Picture};
 pub struct Params {
     /// How far the picture is mixed toward its negative: 0 = unchanged, 1 = fully inverted.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
-    pub amount: f32,
+    pub(crate) amount: f32,
 }
 
 /// The picture mixed toward its negative by `amount`. Replace with the effect: pixel by pixel as here, or over the
