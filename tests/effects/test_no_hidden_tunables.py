@@ -40,6 +40,8 @@ defaults, so a numeric literal fails unless it is
 - a trivial value (as above), except as the whole value bound to a name (`let weight = 0.5;`, `const W: f32 = 0.5;`),
 - the integer 3, the colour channels, as an array length, a const generic or a range's end (`[f32; 3]`,
   `as_chunks::<3>()`, `0..3`), or
+- inside a `#[param(...)]` attribute, which declares the parameter (default, unit, range), however many lines rustfmt
+  wraps it over, or
 - marked `// constant: <reason of at least three words>`: a trailing marker covers its line, a marker on a line of its
   own the lines of the next statement (up to the first line ending in `;`, `{` or `}`).
 Test modules (from the first `#[cfg(test)]` on) are not scanned: their numbers are test data.
@@ -516,22 +518,46 @@ RUST_NUMBER = re.compile(
     r"(?:_?(?:f32|f64|u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize))?(?![\w])"
 )
 RUST_MARKER = re.compile(r"//\s*constant:(.*)")
+RUST_PARAM = re.compile(r"#\[\s*param\s*\(")  # the attribute that declares a parameter
 
 
 def rust_hidden_tunables(source: str, code: str) -> list[tuple[int, float]]:
     """(line, literal) of each numeric literal in the Rust module `source` that the rule above does not allow; `code`
     is `source` with its comments and strings blanked out (the `rust_code` fixture), so a `#[cfg(test)]` named in a
     comment is not taken for the test module."""
-    scanned = code.split("#[cfg(test)]", 1)[0].splitlines()
+    scanned_text = code.split("#[cfg(test)]", 1)[0]
+    scanned = scanned_text.splitlines()
     covered = _rust_marked_lines(source.splitlines()[: len(scanned)], scanned)
+    declared = _rust_declared(scanned_text)
     found = []
+    line_start = 0
     for number, line in enumerate(scanned, start=1):
         for match in RUST_NUMBER.finditer(line):
             text = match.group(1).replace("_", "")
             value = int(text, 16) if text.startswith("0x") else float(text)
-            if number not in covered and not _allowed_in_rust(value, line, match):
+            if (
+                number not in covered
+                and line_start + match.start() not in declared
+                and not _allowed_in_rust(value, line, match)
+            ):
                 found.append((number, int(value) if value.is_integer() and "." not in text else value))
+        line_start += len(line) + 1
     return found
+
+
+def _rust_declared(code: str) -> set[int]:
+    """The offsets in `code` inside a `#[param(...)]` attribute, which declares a parameter: its numbers are the
+    default and the range, documented beside the field. The attribute ends at its own closing bracket, so one that
+    rustfmt wrapped over several lines is covered whole and nothing after it is."""
+    inside: set[int] = set()
+    for start in RUST_PARAM.finditer(code):
+        depth = 0
+        for offset in range(start.start() + 1, len(code)):
+            depth += {"[": 1, "]": -1}.get(code[offset], 0)
+            inside.add(offset)
+            if depth == 0:
+                break
+    return inside
 
 
 def _rust_marked_lines(lines: list[str], code: list[str]) -> set[int]:
@@ -579,6 +605,21 @@ RUST_GOOD = """
     // constant: the sRGB transfer function, IEC 61966-2-1
     const BREAK: f32 =
         0.04045;
+
+    pub struct Params {
+        /// A size.
+        #[param(default = 32.0, unit = px, min = 2, max = 512)]
+        pub cell: f32,
+        /// A direction, in an attribute that rustfmt wrapped over several lines.
+        #[param(
+            default = -90.0,
+            unit = degrees,
+            min = -180,
+            max = 180,
+            cyclic,
+        )]
+        pub lean: f32,
+    }
 
     pub(crate) fn render(pixel: [f32; 3], params: &Params) -> [f32; 3] {
         let (chunks, _) = values.as_chunks::<3>();
@@ -645,6 +686,16 @@ RUST_MARKED = {  # module source -> the literals still found
         "// constant: too far from its value\nfn probe() -> f32 {\n    0.35\n}\n",
         [0.35],
     ),
+    "a number in a param attribute is the declaration, over any number of lines": (
+        "#[param(default = 3.5, unit = px, min = 0, max = 40)]\npub a: f32,\n"
+        "#[param(\n    default = 0.35,\n    unit = px,\n    min = 0,\n    max = 40,\n)]\npub b: f32,\n",
+        [],
+    ),
+    "a number after the attribute is closed is not": (
+        "#[param(\n    default = 3.5,\n)]\npub a: f32 = 0.35;\nconst B: f32 = 0.36;\n",
+        [0.35, 0.36],
+    ),
+    "a number in another attribute is not": ("#[serde(default = 3.5)]\npub a: f32,\n", [3.5]),
 }
 
 
