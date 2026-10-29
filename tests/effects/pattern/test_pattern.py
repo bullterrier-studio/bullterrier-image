@@ -101,3 +101,19 @@ def test_thickness_and_radius_only_matter_to_the_kinds_that_use_them() -> None:
     np.testing.assert_array_equal(render(kind="checks", thickness=0.1, radius=0.1), render(kind="checks"))
     np.testing.assert_array_equal(render(kind="dots", thickness=0.1), render(kind="dots"))
     np.testing.assert_array_equal(render(kind="grid", radius=0.7), render(kind="grid"))
+
+
+def test_with_no_settings_it_draws_white_grid_lines_6_px_wide_every_32_px_on_a_near_black_ground() -> None:
+    """The defaults, worked out by hand: a grid of a 32 px cell with lines 0.2 * 32 = 6.4 px wide, feather 1. The
+    corner pixel's centre is 0.5 px from the cell borders, inside the line (coverage 1); the middle of the cell is
+    16 px from every border, far outside it (coverage 0): the ground, #101018."""
+    out = registry.apply(NAME, np.zeros((40, 40, 3), np.float32))
+    np.testing.assert_allclose(out[0, 0], (1.0, 1.0, 1.0), atol=1e-6)
+    np.testing.assert_allclose(out[16, 16], (16 / 255, 16 / 255, 24 / 255), atol=1e-6)
+
+
+def test_the_kinds_are_these_four_by_name_listed_in_this_order() -> None:
+    """A recipe writes the kind by name, and the order is the one help and error messages list them in."""
+    schema = registry.parameters(NAME).model_json_schema()["properties"]["kind"]
+    assert schema["enum"] == ["stripes", "checks", "dots", "grid"]
+    assert schema["default"] == "grid"

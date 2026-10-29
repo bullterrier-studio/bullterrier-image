@@ -45,10 +45,23 @@ impl<'a> Picture<'a> {
     /// effect that works pixel by pixel.
     #[must_use]
     pub fn map(&self, change: impl Fn([f32; 3]) -> [f32; 3]) -> Image {
+        self.map_at(|_, _, pixel| change(pixel))
+    }
+
+    /// Like [`Picture::map`], for an effect that also depends on where a pixel is: `change` is given the pixel's row
+    /// (from the top), its column (from the left) and the pixel. An effect that ignores the picture's content uses
+    /// only the position.
+    #[must_use]
+    pub fn map_at(&self, change: impl Fn(usize, usize, [f32; 3]) -> [f32; 3]) -> Image {
         Image {
             height: self.height,
             width: self.width,
-            pixels: self.pixels.iter().map(|&pixel| change(pixel)).collect(),
+            pixels: self
+                .pixels
+                .iter()
+                .enumerate()
+                .map(|(index, &pixel)| change(index / self.width, index % self.width, pixel))
+                .collect(),
         }
     }
 }
@@ -78,5 +91,29 @@ impl Image {
     #[must_use]
     pub fn into_values(self) -> Vec<f32> {
         self.pixels.into_flattened()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Picture;
+    use crate::Error;
+
+    #[test]
+    fn map_at_hands_each_pixel_with_its_row_and_column_in_reading_order() -> Result<(), Error> {
+        // 2 rows of 3 pixels, each pixel's channels all its own number 0 to 5
+        let values: Vec<f32> = (0_u8..6).flat_map(|pixel| [f32::from(pixel); 3]).collect();
+        let picture = Picture::new(2, 3, &values)?;
+        // the new pixel records where it was found (row, column) and the value it held
+        let image = picture.map_at(|row, column, pixel| {
+            let place = |index: usize| u8::try_from(index).map_or(f32::NAN, f32::from);
+            [place(row), place(column), pixel[0]]
+        });
+        assert_eq!((image.height(), image.width()), (2, 3));
+        assert_eq!(
+            image.into_values(),
+            [0., 0., 0., 0., 1., 1., 0., 2., 2., 1., 0., 3., 1., 1., 4., 1., 2., 5.]
+        );
+        Ok(())
     }
 }
