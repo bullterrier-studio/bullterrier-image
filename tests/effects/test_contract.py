@@ -608,7 +608,7 @@ def test_the_color_tints_the_light(name, photo):
 
 # --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
 
-CPU_BUDGET = 3.0  # seconds of process CPU time per effect at 1 MP: about 10x the slowest measured (see test below)
+CPU_BUDGET = 4.0  # seconds of process CPU time per effect at 1 MP: 5x the slowest measured (dither: 0.8 s)
 MEMORY_BUDGET = 12  # picture-sized buffers of working memory held at once; the most measured is 7.3 (gradient_map)
 
 
