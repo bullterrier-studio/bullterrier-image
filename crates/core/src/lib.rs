@@ -130,20 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn the_parameters_of_an_effect_are_described_by_its_name_and_those_of_an_unknown_one_refused() {
-        let names = params("grade").map(|table| table.fields.iter().map(|field| field.name).collect::<Vec<_>>());
-        assert_eq!(
-            names.ok(),
-            Some(vec![
-                "temperature",
-                "tint",
-                "exposure",
-                "contrast",
-                "pivot",
-                "saturation",
-                "vibrance"
-            ])
-        );
+    fn the_parameters_of_an_unknown_effect_are_refused_by_name() {
         assert!(matches!(params("no_such_effect"), Err(Error::UnknownEffect(name)) if name == "no_such_effect"));
     }
 

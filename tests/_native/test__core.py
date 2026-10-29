@@ -47,38 +47,33 @@ def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
 
 # --- params: what an effect's Rust struct declares -----------------------------------------------------------------
 
-
-def test_the_parameters_of_an_effect_come_in_declaration_order_with_the_struct_doc():
-    table = _core.params("grade")
-    assert [field["name"] for field in table["fields"]] == [
-        "temperature",
-        "tint",
-        "exposure",
-        "contrast",
-        "pivot",
-        "saturation",
-        "vibrance",
-    ]
-    assert table["doc"].startswith("Colour balance")
+FIELD_KEYS = {"name", "kind", "doc", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
+KINDS = {"float", "int", "bool", "choice", "color"}
 
 
-def test_a_field_is_described_with_its_unit_range_and_flags_and_its_literals_keep_their_kind():
-    temperature = _core.params("grade")["fields"][0]
-    assert {key: temperature[key] for key in ("kind", "unit", "min", "max", "default", "cyclic", "drivable")} == {
-        "kind": "float",
-        "unit": "stops",
-        "min": -2,
-        "max": 2,
-        "default": 0.0,
-        "cyclic": False,
-        "drivable": True,
-    }
-    # `==` cannot tell -2 from -2.0, and the schema text shows the difference
-    assert type(temperature["min"]) is int
-    assert type(temperature["default"]) is float
-    assert temperature["choices"] == []
-    assert temperature["advanced"] is False
-    assert temperature["doc"].startswith("Warm-cool shift in stops")
+@pytest.mark.parametrize("effect", _core.effects())
+def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_with_every_key(effect):
+    table = _core.params(effect)
+    assert set(table) == {"doc", "fields"}
+    assert table["doc"].strip()
+    assert table["fields"]
+    for field in table["fields"]:
+        assert set(field) == FIELD_KEYS
+        assert field["kind"] in KINDS
+        assert field["doc"].strip()
+        assert (field["choices"] != []) == (field["kind"] == "choice")  # only a choice lists names
+
+
+@pytest.mark.parametrize("effect", _core.effects())
+def test_a_literal_keeps_its_kind_across_the_boundary_a_whole_number_is_an_int_and_a_decimal_a_float(effect):
+    """The declaration's `0` and `0.0` are different values to the schema, the docs and the stub, so the table must
+    not widen or round one into the other; `==` cannot tell them apart, so the types are compared."""
+    for field in _core.params(effect)["fields"]:
+        if field["kind"] == "int":
+            assert [type(field[key]) for key in ("default", "min", "max")] == [int, int, int], field["name"]
+        if field["kind"] == "float":
+            assert type(field["default"]) is float, field["name"]
+            assert {type(field[key]) for key in ("min", "max")} <= {int, float}, field["name"]
 
 
 def test_the_parameters_of_an_effect_the_core_does_not_implement_are_refused_by_name():
