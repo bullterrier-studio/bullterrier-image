@@ -57,7 +57,8 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   look name gets the nearest ones.
 - **A piece left as it is** in an `Each` is `None`: `Each("panes", looks=[fx.halftone(), None])`.
 
-Every effect declares parameters once, as frozen Pydantic model: description, unit, range, default. Validation, `fx`
+Every effect declares parameters once (as frozen Pydantic model, or, for effect the Rust core runs, in its Rust
+struct): description, unit, range, default. Validation, `fx`
 signatures, `help(fx.<effect>)`, `bt-image effects`, [docs/effects/](effects/README.md) all come from it, so
 `fx.grade(exposure=12)` fails at once naming effect, field, limit, value.
 

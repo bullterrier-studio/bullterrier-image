@@ -56,11 +56,12 @@ errors     BullterrierImageError and its subclasses                            (
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
 **Rust core:** `crates/core` (crate `bullterrier-image`, pure Rust: `ops/` by concept, one `effects/<name>.rs` per
-ported effect, found by `build.rs`) and `crates/python` (PyO3 bindings building `bullterrier_image._native._core`; generic, names no effect). A
-ported effect keeps its Python model, docstring and `@effect`; its body is `_core.apply("<name>", rgb,
-params.model_dump())` (`from bullterrier_image._native import _core`). Its Rust file has `Params`
-(`#[serde(deny_unknown_fields)]`, no defaults) and `fn render(picture: &Picture, params: &Params) -> Image`. Rust effects
-never refer to each other.
+ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives) and `crates/python` (PyO3
+bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect keeps its docstring and
+`@effect`; its body is `_core.apply("<name>", rgb, params.model_dump())` (`from bullterrier_image._native import
+_core`). Its Rust file declares the parameters (`Params`, see "Parameters") and has `fn render(picture: &Picture,
+params: &Params) -> Image`; its Python model is `class XParams(EffectParams, core="x")`, built from that declaration.
+Rust effects never refer to each other.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
@@ -75,8 +76,9 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
    `edges`, `colorspace`...), never `utils`/`common`/`helpers`. Extract when a second effect needs it. An `ops` module arrives
    with its first consumer (`vulture` fails on unused code). `ops` is internal.
 2. **Presets and looks are data**: a preset is a named parameter set of one effect, `src/bullterrier_image/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `src/bullterrier_image/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
-3. **Params are declared once** as a Pydantic model; it drives validation, defaults, generated docs (`help(fx.<effect>)`,
-   `bt-image effects`, `docs/effects/`, `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
+3. **Params are declared once**: in Rust for an effect the core runs, else as a Pydantic model; either way the Pydantic
+   model drives validation, defaults, generated docs (`help(fx.<effect>)`, `bt-image effects`, `docs/effects/`,
+   `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates files named for it and modifies none (`tests/test_scaffold.py` proves it). Editing
    the registry, `__init__`, README, `fx.pyi` or `docs/effects/` for a new effect means something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including library options, is a named, documented parameter in the
@@ -93,9 +95,10 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 ## Rust code
 
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
-no hidden tunables: a number is a `Params` field, trivial, or carries `// constant: <reason>`). Also: no `unwrap`,
+no hidden tunables: a number is a `Params` field, in a `#[param(..)]` attribute, trivial, or carries `// constant:
+<reason>`). Also: no `unwrap`,
 `expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe Rust. `pub` only for what the
-bindings use, else `pub(crate)`. A Python `ops` function and its Rust twin may coexist while unported effects use the
+bindings use and each effect's `Params` and choices (documented, with `Default`), else `pub(crate)` (`render` too). A Python `ops` function and its Rust twin may coexist while unported effects use the
 Python one; delete it with its last Python user.
 
 ## Standards
@@ -143,9 +146,16 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 
 ## Parameters
 
-A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict),
-each field `param(default, doc=...)`. Every field has a default and a description (what it does, unit and range in words, what
-raising it does).
+A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict).
+An effect the core runs **declares its fields in Rust**, on its `Params` struct (`#[derive(Deserialize, Params)]`, from
+`crate::params`): each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = ..,
+drivable, advanced, cyclic)]`; a choice is a fieldless `#[derive(Choice)]` enum (`default = Variant`). The struct's own
+doc is the model's docstring. The compiler refuses a broken declaration, naming the field. The Python class is
+`class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
+declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python validates, Rust
+trusts. Rust kinds: `f32`, `i32`, `bool`, `Color`, a choice; an effect with any other (`FieldName`, `Picture`, `Lut`,
+lists, optional colours) keeps a Python model, each field `param(default, doc=...)`, until its port extends the macro.
+Every field has a default and a description (what it does, unit and range in words, what raising it does).
 - **Numeric** (`int`, `float`): also a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`, `ratio`, `cycles`, `density`) and inclusive
   `min`/`max` that hold the default.
 - **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
@@ -177,11 +187,12 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
 defines the shape; `grade` (`effects/grade/`, `crates/core/src/effects/grade.rs`) is the worked example. An effect that
 works from a map keeps a Python body until the core takes maps (`effects/relight/`).
-1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with one
-   example field, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`Params`, `render`),
-   `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. After `uv sync` (it rebuilds the extension
-   with the kernel) it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
-2. **Fill in:** replace the example field with the effect's own, in the model and in `Params`, and the kernel with the
+1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with an
+   empty `core="<name>"` model, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`Params`
+   with one example field, `render`), `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. The model
+   is built from the kernel, so the effect imports only once the extension is rebuilt with it (`uv run` and `uv sync`
+   do); then it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
+2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), and the kernel with the
    effect (the Python docstring documents it; its first sentence is the summary); in the test file, the behaviour's
    properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
@@ -209,8 +220,8 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
    module. For tests: look for existing coverage first; add a row to the existing table; a rule for every effect lives once in
    `tests/effects/test_contract.py`; setup two files need is a fixture in the nearest `conftest.py`.
 8. **KISS outranks these rules.** If applying one makes the code longer, more indirect or harder to read than the problem, don't:
-   note the finding and move on. Two similar declarations beat an abstraction with generated fields; a three-line repeat beats a
-   helper that hides the case.
+   note the finding and move on. Two similar Python declarations beat an abstraction with generated fields (a field's
+   declaration is written once, in Rust, only for an effect the core runs); a three-line repeat beats a helper that hides the case.
 9. Where a skill (`systematic-debugging`'s defence-in-depth, "add validation at every layer") disagrees with this section, this
    section wins.
 

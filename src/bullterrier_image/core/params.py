@@ -30,6 +30,10 @@ Promises:
 - A `Lut` field (a 3D colour lookup table, from a `.cube` file) holds a `Lut`, a read-only table with a content digest;
   it must have a default such as `Lut.identity()`. Recipe files and `fx` turn a path or an array into a `Lut` before
   validation (see `loader`).
+- `class XParams(EffectParams, core="x")`, with an empty body, is the model of an effect the Rust core runs: its fields,
+  descriptions, defaults and ranges are the ones its Rust `Params` struct declares (`_core.params("x")`), literals as
+  written (a whole number stays an `int`), and every promise above holds for it. `ValueError` if the core has no such
+  effect. Python validates; the core trusts.
 - `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
   defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
 """

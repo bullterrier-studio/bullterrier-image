@@ -91,7 +91,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 ## Parameters
 
 - **Every effect declares its parameters once, as a frozen Pydantic model** (`EffectParams`, `extra="forbid"`, strict
-  fields). *Reason:* one declaration drives validation, defaults, `help(fx.<effect>)`, `bt-image effects`,
+  fields; for an effect the Rust core runs, the model is built from its Rust declaration, see "Rust core"). *Reason:* one declaration drives validation, defaults, `help(fx.<effect>)`, `bt-image effects`,
   `docs/effects/`, `fx.pyi`, the `fx` signatures and the JSON schema, so they cannot disagree. *Consequence:*
   `@effect(category=..., params=...)` requires the model; a misspelt or out-of-range value fails at construction or
   load, naming the effect, the field, the constraint and the value, never deep inside a render.
