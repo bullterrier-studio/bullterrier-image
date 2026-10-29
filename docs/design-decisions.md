@@ -190,10 +190,66 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   saturation is not, because `grade` takes its grey from the blurred picture where `tilt_shift` took it from the sharp one
   (up to 0.23 at the old example's settings).
 
+## The code API
+
+- **The code API is the product; a recipe file is one serialisation of a `Recipe`.** As in numpy, polars or PyTorch, a
+  look is built, changed and run in code (`Recipe`, `fx`, `render`, `Step.apply`, `replace`, `with_values`); TOML is how
+  one is saved and shared (JSON and YAML later), read into the same validated `Recipe`, never a model of its own.
+  *Reason:* an API review scored the Python side about 6/10 because it was shaped around the file: the photo contract
+  was the caller's to know, the recipe's name was a file-name rule, its description existed only in TOML. Files stay
+  because the command line runs them, looks ship and are shared as data, a service takes looks as data, and video hands
+  looks over as data. *Consequence:* every capability exists in code first; the README and the docs lead with code and
+  introduce TOML as the saved form; the Rust core (R3) ports this API, not the file format.
+- **The serialised form is one canonical dict (design; built in R3).** `Recipe.to_dict()` / `Recipe.from_dict()` give
+  and take `{"format", "name", "description", "size", "frame": {field: value}, "regions": {name: {"kind": ..., field:
+  value}}, "steps": [...]}`: a step tagged by `effect` (`{"effect": "bloom", "preset": "glow", "params": {...}, "mask",
+  "opacity", "blend_mode", "name", "partition"}`), an `Each` by `each` (`looks` holding step dicts and `null`), a region
+  by `kind`, a picture or lookup table by `{"path": ..., "sha256": ...}`, the preset's name and the description kept.
+  TOML, JSON and YAML are codecs over that dict (`save_recipe`), the pipeline fingerprints the dict, not `repr`.
+  *Reason:* one shape for every format, and the one Rust's serde form takes. *Consequence:* a step must keep its preset's
+  name beside the merged values (today it keeps only the values).
+- **A photo is checked once, where it enters.** `render`, `trace`, `render_all`, `Step.apply` and `imageio.save` (and
+  `to_pil`) take a numpy array through `ops.image.as_image`: unsigned integer levels are divided by their type's largest
+  value (uint8 by 255, uint16 by 65535), floats must be finite (`NonFiniteImageError`) and within 0..1; any other shape
+  (greyscale, RGBA where only RGB is taken), `bool`, signed integers, a Pillow image or a list is an `InvalidImageError`
+  naming what was found and the fix. Nothing is clipped. *Reason:* a uint8 photo rendered silent garbage and saved all
+  white; the contract was the caller's to know. Signed integers are refused, not divided: an `int64` array of 0..255
+  levels (numpy's default) over 2^63 would render black without a word. *Consequence:* inside the library nothing
+  re-checks the photo; the registry only makes its layout (float32, C-contiguous) for an effect.
+- **One argument by position, the thing itself.** Effect parameters are keyword-only (`fx.bloom(radius=12)`), and
+  `Recipe(steps)`, `Step(effect)`, `Each(each)`, `Drive`, `Grid` and `Framing` take everything else by keyword.
+  *Reason:* a value read by its place silently changes meaning when a field is added or reordered; Rust's struct
+  literals have only names. *Consequence:* the editor stub and `help` show keyword-only signatures.
+- **Copies are checked; nothing builds an unchecked value.** `Step.replace(**changes)` takes what `fx` takes (parameters
+  laid over the step's, step keys replacing its), `Recipe.replace(**changes)` the recipe's fields, both through the
+  constructor; pydantic's `model_copy(update=...)` and `model_validate` are routed through the same validation and fail
+  with a `RecipeError`. *Reason:* `model_copy` built a step with a negative radius. *Consequence:* `replace` reads no
+  file (a picture is given as a `Picture`, a colour or an array; `fx` reads paths): the data model does no I/O. Until R3
+  wraps pydantic instead of inheriting it, `model_construct` stays pydantic's unchecked constructor.
+- **`Step.apply` is `render` of the one-step recipe.** `fx.bloom(radius=12).apply(photo, maps=, finders=, size=)` equals
+  `render(photo, Recipe([step]), ...)`, and `render`/`trace` take a step as that recipe. *Reason:* trying one effect
+  should not need a recipe. *Consequence:* the default subject and depth finders live above the core (they know
+  `finding`), so `bullterrier_image.recipe` binds its `render` as what `apply` runs when it is imported, which every
+  public way to a step (`bullterrier_image.Step`, `fx`, `load_recipe`) does.
+- **A recipe's name is free text; whoever writes files makes it safe.** `Recipe(steps, name=None, description=None)`; a
+  file without `name` takes its file stem as it is. The command line and the pipeline name files `safe_name(name)` (runs
+  of characters other than letters, digits, `.`, `_`, `-` become one `-`, no leading dot or dash, at most 64, never a
+  Windows device name); a recipe without a name, or whose name leaves none, is a `RecipeError` there; two recipes whose
+  names give one file name are a `ProjectError`. *Reason:* a name is what a person calls the look; the file-system rule
+  (CWE-22) belongs where files are written.
+- **What only the library uses is not on a public class.** The runner's questions (`references`, `runs`, `drives`,
+  `maps_needed`, `needs_finder`, `frame_photo`, `cut_out`...) and the parameter models' (`scaled`, `signature`, the field
+  lists) are functions of their core modules, not methods. *Reason:* `help(Recipe)` and completion show what a caller
+  uses; a leading underscore would have made the runner reach into private names.
+- **Find things from code.** `bullterrier_image.looks()` lists the looks with their descriptions, `fx.<effect>.presets`
+  an effect's presets with their values; hints are written as code (`fx.slice_shift(preset="glitch")`,
+  `load_recipe("glitch")`), and a misspelt parameter or look gets the nearest names.
+
 ## Recipes
 
-- **Recipes are data.** A look is an ordered list of steps in TOML (or built in Python with `fx`), validated when it is
-  made. *Reason:* data can be diffed, cached by fingerprint, edited by non-programmers and generated by tools.
+- **Recipes are data.** A look is a `Recipe`, an ordered list of steps built in Python (`fx`) or read from its saved
+  form, a TOML file, validated when it is made. *Reason:* data can be diffed, cached by fingerprint, edited by
+  non-programmers and generated by tools.
   *Consequence:* a recipe file may carry `format = <n>`, and a release that
   changes the format adds a number and keeps reading the old ones.
 - **Presets are per-effect parameter sets, shipped as data in `src/bullterrier_image/presets/<effect>.toml`.** A look that is
@@ -216,7 +272,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   not looks; a look is not a preset (one effect) and not an effect (one picture in, one out, with parameters).
 - **A name that is no effect says where it lives, every place.** `registry.get` is the one place an effect name is looked
   up, so recipes, `fx`, the command line and the gallery give the same answer. The message lists everything the name is:
-  each preset (`effect = "slice_shift", preset = "glitch"`), a look (how to render it, and its own `description`), a
+  each preset (`fx.slice_shift(preset="glitch")`), a look (`load_recipe("glitch")`, and its own `description`), a
   parameter (`'vibrance' is a parameter of grade`), and each effect whose summary mentions it with underscores read as
   spaces, quoting the whole summary sentence (`'depth_of_field'` in `focus_blur`'s). Only a name that is none of these
   gets the close matches among effects, presets and looks. *Reason:* a cut effect lives on as a preset, a look, a
@@ -497,8 +553,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `subject` and `background` are built in); `each` + `looks` gives each piece of a partition its own look; `partition`
   is the partition an edge-aware effect draws. A hard-edged selection is also a two-piece partition. *Reason:* `mask`
   already means "where".
-- **A look is a single inline step, or `"none"` (the piece is left as it is).** Named multi-step looks wait for a real
-  need. Each distinct look is rendered once over the whole picture and blended through its pieces' weights, which sum
+- **A look is a single inline step, or None (the piece is left as it is; a file writes `"none"`).** Named multi-step
+  looks wait for a real need. Each distinct look is rendered once over the whole picture and blended through its pieces' weights, which sum
   to 1 and are then multiplied by `mask`: the cost is the number of looks, not pieces.
 - **Positions are shares of the frame, lengths are design px.** The frame is the picture, or the box of the selection
   named by `fit`. A length (a torn `Edge`'s `amount` and `scale`, an `Each`'s `feather`) is `px` written for a picture

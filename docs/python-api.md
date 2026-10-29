@@ -1,6 +1,7 @@
 # Python API
 
-Same recipes as the TOML files, written with `fx`. Basics are in the [README](../README.md); this page is the rest.
+The code API is the product; a TOML recipe file is a `Recipe` saved. Basics are in the [README](../README.md); this
+page is the rest.
 
 Every effect = function with real signature and docstring: editors complete names and
 parameters.
@@ -29,6 +30,25 @@ Step keys are keywords on every `fx` function: `fx.bloom(radius=12.2, opacity=0.
 `radius = 12.2`, `opacity = 0.8`, `blend_mode = "screen"`. `fx.rgb_split(amnt=8)` raises at once, lists valid parameters, same as
 TOML typo. Code-built recipes go straight to pipeline: `run(Project(photos=(...), recipes=(neon_glitch,), output=...))`.
 Runnable: [`examples/python_api.py`](../examples/python_api.py).
+
+One argument by position, the thing itself: `Recipe(steps)`, `Step(effect)`, `Each(each)`; effect parameters and
+everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
+
+- **Photos in.** `render`, `trace`, `render_all`, `step.apply` and `imageio.save` take a numpy array (h, w, 3): uint8 or
+  uint16 levels (divided by 255 or 65535, as Pillow and numpy give them) or floats 0..1. Greyscale, an alpha channel
+  (`save` takes (h, w, 4)), `bool`, signed integers, values outside 0..1 (not clipped) and a Pillow image itself are an
+  `InvalidImageError` naming the fix (`np.dstack([grey] * 3)`, `np.asarray(image)`); NaN is a `NonFiniteImageError`.
+- **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
+  (`maps`, `finders`, `size`); `render(photo, step)` too.
+- **Copies.** `step.replace(radius=20, opacity=0.5)` takes what `fx` takes; `recipe.replace(name="warmer", size=64)` the
+  recipe's fields. Checked as when made; the original is untouched. A copy reads no file: give a picture as a
+  `Picture`, a colour or an array.
+- **Names.** `Recipe(steps, name="my look!", description="...")`: free text, both optional. Files written for it (the
+  command line, a project) are named by its name made safe (`my-look`); an unnamed recipe there is a `RecipeError`.
+- **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.
+  `fx.<effect>.presets`: `{preset: {parameter: value}}`, used as `fx.<effect>(preset=...)`. A misspelt parameter or
+  look name gets the nearest ones.
+- **A piece left as it is** in an `Each` is `None`: `Each("panes", looks=[fx.halftone(), None])`.
 
 Every effect declares parameters once, as frozen Pydantic model: description, unit, range, default. Validation, `fx`
 signatures, `help(fx.<effect>)`, `bt-image effects`, [docs/effects/](effects/README.md) all come from it, so

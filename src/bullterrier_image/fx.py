@@ -12,14 +12,21 @@
     ], name="neon-glitch", size=1024)
     image = render(photo, look)
 
-Every effect listed by `bt-image effects` is here under its own name, with its own parameters and documentation
-(`help(fx.bloom)`). After them it takes the step keys of a recipe file, by keyword and with the same meaning: `mask` (a
+    fx.bloom(radius=12).apply(photo)                                   # one effect, no recipe
+    fx.slice_shift.presets["glitch"]                                     # an effect's presets: {parameter: value}
+
+Every effect listed by `bt-image effects` (and in `fx.__all__`) is here under its own name, with its own parameters and
+documentation (`help(fx.bloom)`). After them it takes the step keys of a recipe file, with the same meaning: `mask` (a
 selection: "subject", "background", "depth", "light" or a region), `opacity` (0..1), `blend_mode` (normal, multiply,
 screen, overlay, soft_light, difference, color), `name` (a word that addresses the step's numbers, see
 `Recipe.parameters`), for an effect with presets `preset`, and for an effect that draws along the borders of a partition
 (`seams`) `partition`. A number the effect's documentation marks "(drivable)" also takes a `Drive`
 (`radius=Drive(by="far", start=0, end=12)`): it then varies across the picture by a field. A misspelt parameter or key
-fails when the step is made, not when the photo is rendered.
+fails when the step is made, not when the photo is rendered, with the nearest valid name.
+
+Everything is given by keyword. Across the API, a call takes at most one argument by position, the thing itself
+(`Recipe(steps)`, `Step(effect)`, `Each(each)`); the rest are keywords, so a new or reordered field never changes what
+a call means. A step is changed by copying it, `step.replace(radius=20, opacity=0.5)`, checked as `fx` checks it.
 
 `mask` may name a region the recipe declares (`Recipe(..., regions={"glass": Shards(...)})`); `fx` itself declares none,
 so by itself it knows only the built-in `subject` and `background`, and the recipe that holds the step checks the name,

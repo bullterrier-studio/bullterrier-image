@@ -1,7 +1,9 @@
 # CLAUDE.md: bullterrier-image
 
-Python library and CLI that styles photos with composable effects. A look is a **recipe** (TOML or Python): an ordered list of
-steps. See `README.md` (usage), `docs/design-decisions.md` (why), `docs/effects-roadmap.md` (planned).
+Python library and CLI that styles photos with composable effects. **The code API is the product** (as numpy's or polars'
+is): a look is a `Recipe`, an ordered list of steps, built and run in Python; a TOML recipe file is one serialisation of
+it, never a model of its own. Every capability exists in code first. See `README.md` (usage), `docs/design-decisions.md`
+(why), `docs/effects-roadmap.md` (planned).
 
 **Write docs tersely.** This file, the README, `docs/`, docstrings, reports and briefs: state the rule or fact, drop preamble,
 repetition and justification a reader does not need to act. Reasons go in `docs/design-decisions.md`, once.
@@ -102,6 +104,9 @@ Python one; delete it with its last Python user.
 - Public API, each with `__all__`: `bullterrier_image`, `.recipe`, `.fx`, `.imageio`, `.plugin`. Everything else, including
   `core` and `ops`, is internal.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.
+- A public call takes at most one argument by position, the thing itself (`Recipe(steps)`, `Step(effect)`); effect
+  parameters and everything else by keyword. What only the library uses is a function of its module, not an attribute
+  of a public class.
 - The CLI catches `BullterrierImageError` and never prints a traceback for a user's mistake.
 - The library never prints and never configures logging.
 - Output files carry no EXIF or GPS data from the input.

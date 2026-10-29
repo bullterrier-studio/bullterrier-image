@@ -23,15 +23,17 @@
 **A look you can write down, change with one number, and run on a thousand photos.**
 
 Styling by hand does not repeat. Styling in image code means arrays, loops and magic numbers nobody can read next month.
-bullterrier-image makes a look *data*: a short recipe, TOML or Python, listing effects and their values. 84 effects ready.
+bullterrier-image makes a look a value you write in Python: a `Recipe`, a list of effects with their values, checked the
+moment you write it. Save it as a small TOML file to share it or run it from the command line. 84 effects ready.
 It finds the subject first: bloom can hit the dog, glitch the background, blur can grow with depth. Edit a number, rerun: only
 that recipe redone. Same seed, same pixels. Look wrong? See the picture after every step.
 
-- **Recipes are data.** Look = list of effects, TOML or Python. Same recipe, any photo.
+- **Recipes are data.** A look is a list of effects, built in Python and saved as TOML. Same recipe, any photo.
 - **Batch ready.** Many photos x many recipes, cached. One bad photo never stops the run. HTML report.
 - **Subject- and depth-aware.** Aim an effect at subject, background, near or far.
-- **Looks and presets built in.** `bt-image render photo.jpg crt`: nine multi-step looks (glitch, crt, hologram, stained glass...);
-  a preset is one effect's named values (`slice_shift` preset `glitch`). `bt-image effects` lists both.
+- **Looks and presets built in.** Nine multi-step looks (glitch, crt, hologram, stained glass...): `looks()` lists them,
+  `load_recipe("crt")` loads one, `bt-image render photo.jpg crt` renders it. A preset is one effect's named values:
+  `fx.slice_shift(preset="glitch")`, listed by `fx.slice_shift.presets` and `bt-image effects`.
 - **Fails early.** Typo fails at load, not halfway through batch.
 
 ## Install
@@ -48,8 +50,25 @@ Ready-built for most Linux, macOS and Windows machines; which platforms, and wha
 
 ## Quick start
 
-Repo ships demo project: one photo, 16 recipes. A checkout builds the Rust core, so it needs
-[rustup](https://rustup.rs/) besides uv.
+In Python: load a photo, try one effect, then a whole look.
+
+```python
+from bullterrier_image import Recipe, fx, imageio, load_recipe, looks, render
+
+photo = imageio.load("dog.jpg")  # or any numpy array: uint8 as Pillow gives it, or floats 0..1
+
+glow = fx.bloom(radius=12, amount=0.8)  # one effect, checked now: a typo fails here
+imageio.save(glow.apply(photo), "dog-glow.jpg")
+
+print(looks())  # the built-in looks: {"crt": "...", "glitch": "...", ...}
+imageio.save(render(photo, load_recipe("glitch")), "dog-glitch.jpg")
+
+look = Recipe([fx.grade(exposure=0.3), glow.replace(radius=20)], name="warm-glow")
+imageio.save(render(photo, look), "dog-warm-glow.jpg")
+```
+
+From the command line: the repo ships a demo project, one photo and 16 recipes. A checkout builds the Rust core, so it
+needs [rustup](https://rustup.rs/) besides uv.
 
 ```bash
 git clone https://github.com/bullterrier-studio/bullterrier-image.git
@@ -71,7 +90,30 @@ uv run bt-image run my-project/bt-image.toml
 
 ## A recipe
 
-Ordered list of effects. Each `[[step]]` names an effect; other keys are its parameters.
+An ordered list of effects, each with its values.
+
+```python
+from bullterrier_image import Recipe, fx, imageio, render
+
+photo = imageio.load("dog.jpg")
+
+neon_glitch = Recipe(
+    [
+        fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
+        fx.gradient(colors=["#000000"], mask="background"),  # only where the photo's background is
+        fx.slice_shift(preset="glitch", bands=8, seed=4),
+        fx.rgb_split(angle=0, amount=5.6, edge="wrap"),
+        fx.bloom(radius=12.2, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
+    ],
+    name="neon-glitch",
+    size=1024,
+)
+
+imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
+```
+
+Saved, a recipe is a small TOML file: the form the command line and a project run, and `load_recipe(path)` reads back.
+Each `[[step]]` names an effect; the other keys are its parameters (a shorter `examples/recipes/ember-glitch.toml`):
 
 ```toml
 name = "ember-glitch"
@@ -103,28 +145,6 @@ edge = "wrap"
 effect = "bloom"
 blend_mode = "screen"             # lighten what is below, as light does
 opacity = 0.6                     # mix this step in at 60%
-```
-
-Same in Python:
-
-```python
-from bullterrier_image import Recipe, fx, imageio, render
-
-photo = imageio.load("dog.jpg")
-
-neon_glitch = Recipe(
-    [
-        fx.gradient_map(stops=("#12002b", "#ff2bd6", "#00f0ff")),
-        fx.gradient(colors=["#000000"], mask="background"),  # only where the photo's background is
-        fx.slice_shift(preset="glitch", bands=8, seed=4),
-        fx.rgb_split(angle=0, amount=5.6, edge="wrap"),
-        fx.bloom(radius=12.2, amount=0.65, opacity=0.8, blend_mode="screen"),  # screened over it at 80%
-    ],
-    name="neon-glitch",
-    size=1024,
-)
-
-imageio.save(render(photo, neon_glitch), "dog-neon-glitch.jpg")
 ```
 
 Look wrong? See picture after every step:
