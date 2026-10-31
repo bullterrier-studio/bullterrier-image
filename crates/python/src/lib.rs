@@ -1,13 +1,15 @@
 //! `bullterrier_image._native._core`: runs the effects of the Rust core on numpy pictures. Generic: it names no effect, so
 //! porting one never changes it.
 
+mod run;
+
 use std::sync::Arc;
 
 use bullterrier_image::{
     BlendMode, Category, Effect, Error, ErrorKind, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe,
     STEP_KEYS,
 };
-use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
+use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyReadonlyArray3, PyUntypedArrayMethods};
 use pyo3::IntoPyObjectExt as _;
 use pyo3::create_exception;
 use pyo3::exceptions::PyValueError;
@@ -31,6 +33,9 @@ mod _core {
 
     #[pymodule_export]
     use super::{CoreError, apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
+
+    #[pymodule_export]
+    use super::run::{render, trace};
 }
 
 create_exception!(
@@ -75,15 +80,8 @@ fn apply<'py>(
     partition: Option<&Bound<'py, PyAny>>,
     fields: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
-    let array = rgb.cast::<PyArray3<f32>>().map_err(|_| picture_error(rgb))?;
-    let &[height, width, 3] = array.shape() else {
-        return Err(picture_error(rgb));
-    };
-    if !array.is_c_contiguous() {
-        return Err(picture_error(rgb));
-    }
-    let readonly = array.try_readonly().map_err(value_error)?;
-    let picture = Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(core_error)?;
+    let readonly = photo_array(rgb)?;
+    let picture = picture_of(&readonly)?;
     let params = to_json(params.as_any())?;
     if !(size_ratio.is_finite() && size_ratio > 0.0) {
         return Err(PyValueError::new_err(format!(
@@ -481,6 +479,23 @@ fn layers_of(fields: &Bound<'_, PyDict>) -> PyResult<Vec<(String, Layer)>> {
             Ok((parameter, layer))
         })
         .collect()
+}
+
+/// The array `rgb` for reading: a C-contiguous float32 `(height, width, 3)` array, borrowed in place.
+fn photo_array<'py>(rgb: &Bound<'py, PyAny>) -> PyResult<PyReadonlyArray3<'py, f32>> {
+    let array = rgb.cast::<PyArray3<f32>>().map_err(|_| picture_error(rgb))?;
+    if !matches!(array.shape(), &[_, _, 3]) || !array.is_c_contiguous() {
+        return Err(picture_error(rgb));
+    }
+    array.try_readonly().map_err(value_error)
+}
+
+/// The picture `readonly` holds, read in place.
+fn picture_of<'a>(readonly: &'a PyReadonlyArray3<'_, f32>) -> PyResult<Picture<'a>> {
+    let &[height, width, _] = readonly.shape() else {
+        return Err(value_error("a picture is (height, width, 3)"));
+    };
+    Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(core_error)
 }
 
 /// The `CoreError` of the invalid-image kind for an `rgb` that is not a C-contiguous float32 (height, width, 3) array.

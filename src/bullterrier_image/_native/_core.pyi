@@ -1,8 +1,8 @@
 # The stub of the Rust extension `bullterrier_image._native._core` (crates/python). The functions' documentation is the
 # extension's own (`help(_core.apply)`); `uv run poe stubtest` (in `poe check`) checks this stub against it.
 
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -15,12 +15,17 @@ __all__ = [
     "params",
     "read_recipe",
     "register",
+    "render",
+    "trace",
     "unregister",
     "vocabulary",
 ]
 
 class CoreError(ValueError):
     kind: str
+
+class _Finder(Protocol):
+    def find(self, rgb: np.ndarray) -> np.ndarray | None: ...
 
 def apply(
     effect: str,
@@ -47,3 +52,21 @@ def register(
     fields: dict[str, str] | None = None,
 ) -> None: ...
 def unregister(name: str) -> None: ...
+def render(
+    rgb: np.ndarray,
+    recipe: dict[str, Any],
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, _Finder] | None = None,
+    presets: Mapping[str, str] | None = None,
+    size_ratio: float = 1.0,
+) -> np.ndarray: ...
+def trace(
+    rgb: np.ndarray,
+    recipe: dict[str, Any],
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, _Finder] | None = None,
+    presets: Mapping[str, str] | None = None,
+    size_ratio: float = 1.0,
+) -> list[tuple[str, int | None, np.ndarray]]: ...

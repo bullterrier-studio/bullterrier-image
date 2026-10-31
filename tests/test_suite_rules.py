@@ -37,6 +37,11 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the facade translates the errors the extension raises: a CoreError of each kind the core reports is needed, "
         "and the kinds the core lists are compared with the ones the facade knows"
     ),
+    ("_native/test_runner_parity.py", "bullterrier_image._native"): (
+        "the extension's runner (`_core.render`, `_core.trace`) is compared with the definitions and with Python's "
+        "engine, the second oracle; `_core.apply` is the oracle for a scaled effect, and only the core can say which "
+        "effects it runs"
+    ),
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"
     ),

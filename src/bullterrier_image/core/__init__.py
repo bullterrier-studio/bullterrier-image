@@ -6,6 +6,7 @@
     vocabulary  parameter names effects must not use, and what to use instead
     steps       `Step` and `Recipe`: the data model of a look and its validation
     runner      running a recipe on a photo; its maps are given to it (by name, as arrays or as `Finder`s)
+    bridge      the same, run by the Rust core: a recipe as the dict the core reads (transitional, see its docstring)
 
 `core` imports only `ops` from the rest of bullterrier_image (import-linter enforces it), so it stays small and stable
 while effects, adapters and the app change around it. Its names are imported from their modules

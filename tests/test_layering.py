@@ -4,7 +4,8 @@ import sees. Each layer may import only the layers below it:
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, finding, loader (recipe files)
     effects    one folder per effect; never import each other
-    core       runner > steps > framing | registry | regions > presets | outlines > params | vocabulary > native > types
+    core       runner | bridge > steps > framing | registry | regions > presets | outlines > params | vocabulary
+               > native > types
     ops        may import errors
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
     _native    the home of the Rust extension (`_native._core`), beside errors: imports nothing either
@@ -35,7 +36,8 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
 CORE_ORDER = (
-    "Core: runner > steps > framing|registry|regions > presets|looks|outlines > params|vocabulary > native > types"
+    "Core: runner|bridge > steps > framing|registry|regions > presets|looks|outlines > params|vocabulary"
+    " > native > types"
 )
 CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
 
