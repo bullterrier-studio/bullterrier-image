@@ -18,6 +18,7 @@ publish = false
 bullterrier-image = { path = "crates/core" }
 bullterrier-image-derive = { path = "crates/derive" }
 numpy = "0.30"
+peak_alloc = "0.3"
 proc-macro2 = "1"
 proptest = "1.12"
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)
