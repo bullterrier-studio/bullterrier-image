@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "parameter-1",
+  "title": "Parameter description, version 1",
+  "description": "One parameter of an effect or a drawing. Arithmetic rules (min <= max, default within range, a cyclic range of exactly one turn) are checked by each package's declaration, not here.",
+  "type": "object",
+  "required": ["name", "kind", "meaning", "default", "unit", "min", "max", "cyclic"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+    "kind": { "enum": ["float", "int", "bool", "choice", "color"] },
+    "meaning": { "type": "string" },
+    "default": { "type": ["number", "boolean", "string"] },
+    "unit": { "enum": [null, "px", "fraction", "degrees", "stops", "count", "ratio", "cycles", "density"] },
+    "min": { "type": ["number", "null"] },
+    "max": { "type": ["number", "null"] },
+    "cyclic": { "type": "boolean" },
+    "choices": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "drivable": { "type": "boolean" },
+    "advanced": { "type": "boolean" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "float" } } },
+      "then": {
+        "properties": { "default": { "type": "number" }, "unit": { "not": { "const": null } }, "min": { "type": "number" }, "max": { "type": "number" } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "int" } } },
+      "then": {
+        "properties": { "default": { "type": "integer" }, "unit": { "not": { "const": null } }, "min": { "type": "integer" }, "max": { "type": "integer" } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "bool" } } },
+      "then": { "properties": { "default": { "type": "boolean" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "color" } } },
+      "then": { "properties": { "default": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "choice" } } },
+      "then": {
+        "required": ["choices"],
+        "properties": { "default": { "type": "string" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null }, "choices": { "minItems": 1 } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "enum": ["float", "int", "bool", "color"] } } },
+      "then": { "properties": { "choices": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "cyclic": { "const": true } } },
+      "then": { "properties": { "kind": { "const": "float" }, "unit": { "enum": ["degrees", "cycles"] } } }
+    }
+  ]
+}

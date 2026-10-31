@@ -1,0 +1,42 @@
+[
+  {
+    "label": "bounded float in design pixels",
+    "parameter": { "name": "cell", "kind": "float", "meaning": "The size of one repeat. Larger is a coarser pattern.", "default": 32.0, "unit": "px", "min": 2, "max": 512, "cyclic": false }
+  },
+  {
+    "label": "cyclic angle in degrees",
+    "parameter": { "name": "angle", "kind": "float", "meaning": "The direction the pattern varies along.", "default": 0.0, "unit": "degrees", "min": 0, "max": 360, "cyclic": true }
+  },
+  {
+    "label": "cyclic angle centred on zero",
+    "parameter": { "name": "turn", "kind": "float", "meaning": "How far the drawing is turned.", "default": 0, "unit": "degrees", "min": -180, "max": 180, "cyclic": true }
+  },
+  {
+    "label": "cyclic phase in cycles",
+    "parameter": { "name": "phase", "kind": "float", "meaning": "Where in its cycle the motion starts.", "default": 0, "unit": "cycles", "min": 0, "max": 1, "cyclic": true }
+  },
+  {
+    "label": "bounded angle",
+    "parameter": { "name": "elevation", "kind": "float", "meaning": "How high the light stands.", "default": 45, "unit": "degrees", "min": 0, "max": 90, "cyclic": false }
+  },
+  {
+    "label": "whole number",
+    "parameter": { "name": "rings", "kind": "int", "meaning": "How many rings.", "default": 3, "unit": "count", "min": 1, "max": 12, "cyclic": false }
+  },
+  {
+    "label": "switch, with the optional keys written",
+    "parameter": { "name": "invert", "kind": "bool", "meaning": "Swap light and dark.", "default": false, "unit": null, "min": null, "max": null, "cyclic": false, "choices": [], "drivable": false, "advanced": true }
+  },
+  {
+    "label": "colour",
+    "parameter": { "name": "tint", "kind": "color", "meaning": "The colour laid over the shadows.", "default": "#336699", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "choice",
+    "parameter": { "name": "kind", "kind": "choice", "meaning": "The pattern.", "default": "grid", "unit": null, "min": null, "max": null, "cyclic": false, "choices": ["stripes", "grid"] }
+  },
+  {
+    "label": "a drivable ratio",
+    "parameter": { "name": "gain", "kind": "float", "meaning": "1 leaves the picture as it is.", "default": 1.0, "unit": "ratio", "min": 0, "max": 4, "cyclic": false, "drivable": true }
+  }
+]
