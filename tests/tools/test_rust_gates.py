@@ -155,6 +155,16 @@ OFFENCES = {
         ),
         ["never read", "unused", "grade.rs"],
     ),
+    "a declared parameter no test shows to change the result": (
+        "rust-test",
+        "crates/core/src/effects/grade.rs",
+        replaced(
+            "\n}\n\n/// The graded picture.",
+            "\n    /// A parameter nobody reads.\n    #[param(default = 0.0, unit = ratio, min = 0, max = 1)]\n"
+            "    #[serde(default)]\n    pub(crate) unused: f32,\n}\n\n/// The graded picture.",
+        ),
+        ["parameters_are_read", "grade.unused is never read"],
+    ),
     "unsafe code in the core": (
         "rust-lint",
         CORE,
