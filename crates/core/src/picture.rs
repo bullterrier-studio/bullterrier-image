@@ -41,6 +41,12 @@ impl<'a> Picture<'a> {
         self.width
     }
 
+    /// The channel values, three per pixel, pixel after pixel, row after row: what [`Picture::new`] was given.
+    #[must_use]
+    pub fn values(&self) -> &'a [f32] {
+        self.pixels.as_flattened()
+    }
+
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an
     /// effect that works pixel by pixel.
     #[must_use]
@@ -75,6 +81,28 @@ pub struct Image {
 }
 
 impl Image {
+    /// The image of `height` x `width` pixels whose channels are `values`, pixel after pixel, row after row: for an
+    /// effect that makes its pixels elsewhere.
+    ///
+    /// # Errors
+    /// [`Error::Size`] unless there are exactly `height * width * 3` values.
+    pub fn new(height: usize, width: usize, values: &[f32]) -> Result<Self, Error> {
+        let (pixels, rest) = values.as_chunks::<3>();
+        if rest.is_empty() && height.checked_mul(width) == Some(pixels.len()) {
+            Ok(Self {
+                height,
+                width,
+                pixels: pixels.to_vec(),
+            })
+        } else {
+            Err(Error::Size {
+                height,
+                width,
+                values: values.len(),
+            })
+        }
+    }
+
     /// The number of rows.
     #[must_use]
     pub fn height(&self) -> usize {
@@ -96,7 +124,7 @@ impl Image {
 
 #[cfg(test)]
 mod tests {
-    use super::Picture;
+    use super::{Image, Picture};
     use crate::Error;
 
     #[test]
@@ -115,5 +143,28 @@ mod tests {
             [0., 0., 0., 0., 1., 1., 0., 2., 2., 1., 0., 3., 1., 1., 4., 1., 2., 5.]
         );
         Ok(())
+    }
+
+    #[test]
+    fn the_values_of_a_picture_and_of_an_image_made_from_them_are_the_ones_given() -> Result<(), Error> {
+        let values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let picture = Picture::new(1, 2, &values)?;
+        assert_eq!(picture.values(), values);
+        let image = Image::new(1, 2, picture.values())?;
+        assert_eq!((image.height(), image.width()), (1, 2));
+        assert_eq!(image.into_values(), values);
+        Ok(())
+    }
+
+    #[test]
+    fn an_image_of_values_that_do_not_make_its_size_is_refused() {
+        assert!(matches!(
+            Image::new(1, 2, &[0.0; 5]),
+            Err(Error::Size { values: 5, .. })
+        ));
+        assert!(matches!(
+            Image::new(2, 2, &[0.0; 6]),
+            Err(Error::Size { values: 6, .. })
+        ));
     }
 }
