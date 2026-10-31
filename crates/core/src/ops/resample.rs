@@ -7,6 +7,7 @@
 
 use std::f64::consts::PI;
 
+use super::length::{float, whole};
 use crate::Error;
 
 /// The most pixels a resized picture may have, so that a `size` no picture can have is refused before anything is
@@ -90,11 +91,6 @@ fn taps(filter: Filter, from: usize, to: usize) -> Vec<Tap> {
         .collect()
 }
 
-#[expect(clippy::cast_precision_loss, reason = "a length is far below 2^53")]
-const fn float(length: usize) -> f64 {
-    length as f64
-}
-
 /// A change of a picture's or a map's size, planned once from the size it starts at, so that a picture and the maps of
 /// it (which have its size) are all resized to the same grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -113,15 +109,8 @@ impl Resize {
     /// [`Error::Recipe`] if the new size has more pixels than a picture may have (178,956,970: twice Pillow's limit).
     pub(crate) fn to_longest_side(height: usize, width: usize, longest: u32) -> Result<Option<Self>, Error> {
         let scale = f64::from(longest) / float(height.max(width));
-        let scaled = |side: usize| {
-            #[expect(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "a rounded positive length; one too long for a count is refused below"
-            )]
-            let length = (float(side) * scale).round_ties_even() as usize;
-            length.max(1)
-        };
+        // a side too long for a count saturates and is refused below
+        let scaled = |side: usize| whole(float(side) * scale).max(1);
         let to = (scaled(height), scaled(width));
         if to == (height, width) {
             return Ok(None);

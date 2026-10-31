@@ -35,7 +35,7 @@ mod _core {
     use super::{CoreError, apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
 
     #[pymodule_export]
-    use super::run::{render, trace};
+    use super::run::{check_recipe, render, trace};
 }
 
 create_exception!(

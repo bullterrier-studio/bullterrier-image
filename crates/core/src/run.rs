@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
+mod frame;
 mod maps;
 mod size;
 mod trace;
@@ -24,6 +25,7 @@ pub use trace::Stage;
 use serde_json::{Map, Value};
 
 use crate::effect::{self, Effect};
+use crate::frame::{Anchor, Transparent};
 use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
@@ -95,12 +97,14 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a recipe with a `frame` other than the
-    /// default are refused until the core runs them.
+    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a `frame` with an `angle` or a
+    /// `transparent` cut are refused until the core runs them.
     ///
-    /// The steps work on the photo at the size `options` ask for, else the recipe's `size`, else its own: the photo and
-    /// every map are resampled to it with the aspect kept (see [`Options::with_size`]), and a finder is still given the
-    /// photo as it was handed in. The recipe's pixel values are scaled by that picture's longest side over 480.
+    /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
+    /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the
+    /// recipe's `size`, else the framed picture's own: the photo and every map are resampled to it with the aspect kept
+    /// (see [`Options::with_size`]). A finder is still given the photo as it was handed in. The recipe's pixel values are
+    /// scaled by the working picture's longest side over 480.
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] for a step or recipe the core does not
@@ -133,12 +137,28 @@ impl<'a> Photo<'a> {
         options: Options,
     ) -> Result<Run<'a>, Error> {
         recipe.check_in(registry, presets)?;
-        if !recipe.frame.is_empty() {
-            return Err(Error::Recipe("`frame` is not run by the core yet".to_owned()));
+        // the parts of a frame the core does not run yet: a turn by an angle and a cut-out
+        for (field, set) in [
+            ("angle", recipe.frame.angle != 0.0),
+            ("transparent", recipe.frame.transparent != Transparent::None),
+        ] {
+            if set {
+                return Err(Error::Recipe(format!("`frame.{field}` is not run by the core yet")));
+            }
         }
-        let working = Working::new(self.picture, options.size().or(recipe.size))?;
+        let subject_for_frame = || maps::stored(self, recipe, "subject", "`frame`, `anchor`");
+        let working = Working::new(
+            self.picture,
+            &recipe.frame,
+            options.size().or(recipe.size),
+            subject_for_frame,
+        )?;
         let ratio = working.ratio();
         let maps = Maps::new(self, recipe, &working)?;
+        if recipe.frame.anchor == Anchor::Subject {
+            // the framed subject is a map of the render like any a step uses: a trace shows it
+            maps.get("subject", "`frame`, `anchor`")?;
+        }
         let steps = recipe
             .steps
             .iter()
@@ -349,7 +369,6 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::frame::Flip;
     use crate::params::Declared;
     use crate::params::probe::Probe;
     use crate::testing::{Finds, Measured, Paint, Recorder, Shrinks, registry};
@@ -443,7 +462,7 @@ mod tests {
         let registry = registry()?;
         let mut recipe_with_frame = Recipe::new([Step::new("probe")]);
         recipe_with_frame.frame = Frame {
-            flip: Flip::X,
+            angle: 30.0,
             ..Frame::default()
         };
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
@@ -453,7 +472,7 @@ mod tests {
             .unwrap_or_default();
         for (recipe, said) in [
             (recipe_with_each, "step 1: an `each` step"),
-            (recipe_with_frame, "`frame`"),
+            (recipe_with_frame, "`frame.angle`"),
         ] {
             let result = rendered(&registry, &recipe, &Presets::new());
             assert!(

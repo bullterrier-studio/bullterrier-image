@@ -1,9 +1,11 @@
-//! The size a render works at: [`Options`], and the working picture with the ratio of its pixels to design pixels.
+//! The picture a render works on: [`Options`] (the size), and the working picture, framed and sized, with the ratio of its
+//! pixels to design pixels.
 
 use std::sync::Arc;
 
+use super::frame::Geometry;
 use crate::ops::resample::Resize;
-use crate::{Error, Image, Layer, Picture};
+use crate::{Error, Frame, Image, Layer, Picture};
 
 /// The longest side in px that a recipe's pixel values are written for.
 const DESIGN_SIZE: f64 = 480.0; // constant: the design size of the format, Python's `DESIGN_SIZE`
@@ -35,43 +37,60 @@ impl Options {
     }
 }
 
-/// The picture a render works on: the photo as given, or, when the render is asked for another size, a resized copy that
-/// the render owns. Maps follow the picture to its size.
-pub(super) enum Working<'a> {
-    /// The photo as given.
-    Photo(Picture<'a>),
-    /// The photo resampled by `resize`.
-    Resized { image: Image, resize: Resize },
+/// The picture a render works on: the photo as given, or, when the recipe frames it or the render is asked for another
+/// size, a copy that the render owns, framed and then resized. Maps follow the picture the same way.
+pub(super) struct Working<'a> {
+    given: Picture<'a>,
+    /// The framed, resized copy; none when neither changes the photo.
+    made: Option<Image>,
+    framing: Option<Geometry>,
+    resize: Option<Resize>,
 }
 
 impl<'a> Working<'a> {
-    /// The working picture for `photo` at the longest side `size` (none: the photo as given).
+    /// The working picture for `photo`: framed by `frame`, then at the longest side `size` (none: as framed). `subject`
+    /// finds the subject map of the photo as given, asked only for a crop around it.
     ///
     /// # Errors
     /// [`Error::Recipe`] for a size of 0, or one that makes a picture of more than 178,956,970 pixels (twice Pillow's
-    /// decompression-bomb limit).
-    pub(super) fn new(photo: Picture<'a>, size: Option<u32>) -> Result<Self, Error> {
-        let Some(size) = size else {
-            return Ok(Self::Photo(photo));
-        };
-        if size == 0 {
+    /// decompression-bomb limit), [`Error::MapNotFound`] for a subject a crop needs and the photo cannot give.
+    pub(super) fn new(
+        photo: Picture<'a>,
+        frame: &Frame,
+        size: Option<u32>,
+        subject: impl FnOnce() -> Result<Arc<Layer>, Error>,
+    ) -> Result<Self, Error> {
+        if size == Some(0) {
             return Err(Error::Recipe("`size` must be >= 1, got 0".to_owned()));
         }
-        match Resize::to_longest_side(photo.height(), photo.width(), size)? {
-            None => Ok(Self::Photo(photo)),
-            Some(resize) => {
-                let image = Image::new(resize.height(), resize.width(), &resize.apply(photo.values(), 3))?;
-                Ok(Self::Resized { image, resize })
-            }
-        }
+        let framing = Geometry::plan(frame, photo.height(), photo.width(), subject)?;
+        let framed = framing.as_ref().map(|framing| framing.photo(photo.values()));
+        let (height, width) = framing.as_ref().map_or((photo.height(), photo.width()), |framing| {
+            (framing.height(), framing.width())
+        });
+        let resize = size
+            .map(|size| Resize::to_longest_side(height, width, size))
+            .transpose()?
+            .flatten();
+        let values = framed.as_deref().unwrap_or_else(|| photo.values());
+        let made = match &resize {
+            Some(resize) => Some(Image::new(resize.height(), resize.width(), &resize.apply(values, 3))?),
+            None => framed
+                .as_deref()
+                .map(|values| Image::new(height, width, values))
+                .transpose()?,
+        };
+        Ok(Self {
+            given: photo,
+            made,
+            framing,
+            resize,
+        })
     }
 
     /// The picture the steps work on.
     pub(super) fn picture(&self) -> Picture<'_> {
-        match self {
-            Self::Photo(photo) => *photo,
-            Self::Resized { image, .. } => image.as_picture(),
-        }
+        self.made.as_ref().map_or(self.given, Image::as_picture)
     }
 
     /// Working pixels per design pixel: the picture's longest side over [`DESIGN_SIZE`].
@@ -83,19 +102,21 @@ impl<'a> Working<'a> {
     }
 
     /// `map`, a map of the photo as given, as a map of the working picture: the map itself if the picture is the photo,
-    /// else resampled to the same grid.
+    /// else framed and resampled to the same grid.
     ///
     /// # Errors
-    /// [`Error::Inputs`] only if the resampling broke the rule of a map, which a clipped result cannot.
+    /// [`Error::Inputs`] only if the framing or resampling broke the rule of a map, which neither can.
     pub(super) fn follow(&self, map: Arc<Layer>) -> Result<Arc<Layer>, Error> {
-        match self {
-            Self::Photo(_) => Ok(map),
-            Self::Resized { resize, .. } => Ok(Arc::new(Layer::new(
-                resize.height(),
-                resize.width(),
-                resize.apply(map.values(), 1),
-            )?)),
-        }
+        let framed = self.framing.as_ref().map(|framing| framing.map(&map)).transpose()?;
+        let Some(resize) = &self.resize else {
+            return Ok(framed.map_or(map, Arc::new));
+        };
+        let current = framed.as_ref().unwrap_or(&map);
+        Ok(Arc::new(Layer::new(
+            resize.height(),
+            resize.width(),
+            resize.apply(current.values(), 1),
+        )?))
     }
 }
 

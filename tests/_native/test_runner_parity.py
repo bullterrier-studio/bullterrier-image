@@ -14,6 +14,7 @@ import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with Python's
 from bullterrier_image.core import bridge, native, registry, runner
+from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.presets import SHIPPED
 from bullterrier_image.core.regions import Given, Grid
@@ -368,6 +369,114 @@ def test_a_trace_shows_every_stage_at_the_working_size(photo, subject):
     assert [array.shape for _, _, array in stages] == [(48, 64, 3), (48, 64), (48, 64, 3)]
 
 
+# --- the frame: flip, crop and border ---------------------------------------------------------------------------------
+
+# Every frame here is exact (nothing is resampled): the core's picture and the maps it shows equal the Python engine's
+# (`core.framing`) to the last bit.
+FRAMES = {
+    "flip x": {"flip": "x"},
+    "flip y": {"flip": "y"},
+    "flip both": {"flip": "both"},
+    "a square, centred": {"aspect": 1},
+    "a square against each side": {"aspect": 1, "anchor": "right"},
+    "a wide crop at the bottom": {"aspect": 2.5, "anchor": "bottom"},
+    "a tall crop at the top": {"aspect": 0.4, "anchor": "top"},
+    "a very wide aspect": {"aspect": 10},
+    "borders": {"pad_top": 0.1, "pad_right": 0.375, "pad_bottom": 0.125, "pad_left": 0.625, "fill": "#336699"},
+    "a crop and then a border": {"aspect": 1, "pad_left": 0.3},
+    "a flip and then a crop": {"flip": "x", "aspect": 0.8, "anchor": "left"},
+    "the subject's box": {"anchor": "subject"},
+    "the subject at an aspect with a margin": {"anchor": "subject", "aspect": 1.5, "margin": 0.1},
+    "the flipped subject, then a border": {"flip": "both", "anchor": "subject", "aspect": 1, "pad_top": 0.25},
+    "a subject too big for the aspect": {"anchor": "subject", "aspect": 5, "margin": 1},
+}
+
+
+def frame_recipe(frame: dict) -> dict:
+    return {"steps": [{"effect": "grade", "opacity": 0.0, "mask": "subject"}], "frame": frame}
+
+
+def python_framed(photo: np.ndarray, frame: dict, subject: np.ndarray) -> list:
+    recipe = Recipe([Step("grade", opacity=0.0, mask="subject")], frame=Framing(**frame))
+    return runner.trace(photo, recipe, maps={"subject": subject})
+
+
+@pytest.mark.parametrize("frame", FRAMES.values(), ids=FRAMES.keys())
+def test_the_core_frames_the_photo_and_its_map_exactly_as_the_python_engine_does(frame, photo, subject):
+    stages = _core.trace(photo, frame_recipe(frame), maps={"subject": subject})
+    python = python_framed(photo, frame, subject)
+    core_picture, core_subject = stages[0][2], stages[1][2]
+    assert core_picture.shape == python[0].image.shape
+    np.testing.assert_array_equal(core_picture, python[0].image)
+    np.testing.assert_array_equal(core_subject, python[1].image[..., 0])
+    np.testing.assert_array_equal(_core.render(photo, frame_recipe(frame), maps={"subject": subject}), python[-1].image)
+
+
+def test_a_flip_is_a_reversed_view_of_the_rows_or_columns(photo):
+    for flip, expected in [("x", photo[:, ::-1]), ("y", photo[::-1]), ("both", photo[::-1, ::-1])]:
+        np.testing.assert_array_equal(_core.render(photo, STILL | {"frame": {"flip": flip}}), expected, err_msg=flip)
+
+
+@pytest.mark.parametrize(
+    ("frame", "rows", "columns"),
+    [
+        pytest.param({"aspect": 1}, slice(0, 96), slice(16, 112), id="a square of the 128 x 96 photo, centred"),
+        pytest.param({"aspect": 1, "anchor": "left"}, slice(0, 96), slice(0, 96), id="a square at the left"),
+        pytest.param({"aspect": 1, "anchor": "right"}, slice(0, 96), slice(32, 128), id="a square at the right"),
+        pytest.param({"aspect": 4}, slice(32, 64), slice(0, 128), id="four to one: 32 rows of the 96, centred"),
+        pytest.param({"aspect": 4, "anchor": "bottom"}, slice(64, 96), slice(0, 128), id="four to one at the bottom"),
+        pytest.param({"aspect": 4, "anchor": "top"}, slice(0, 32), slice(0, 128), id="four to one at the top"),
+    ],
+)
+def test_a_crop_is_the_part_of_the_photo_the_aspect_and_anchor_say(photo, frame, rows, columns):
+    np.testing.assert_array_equal(_core.render(photo, STILL | {"frame": frame}), photo[rows, columns])
+
+
+def test_a_crop_around_the_subject_is_the_box_of_its_pixels_at_one_half_or_more(photo, subject):
+    inside = np.argwhere(subject >= 0.5)  # by numpy, not by the code under test
+    (top, left), (bottom, right) = inside.min(axis=0), inside.max(axis=0) + 1
+    made = _core.render(photo, frame_recipe({"anchor": "subject"}), maps={"subject": subject})
+    np.testing.assert_array_equal(made, photo[top:bottom, left:right])
+
+
+def test_a_border_adds_its_share_of_the_shorter_side_in_the_fill_and_the_map_has_zero_there(photo, subject):
+    # the shorter side is 96: 0.1 -> 9.6 -> 10 rows above, 0.375 -> 36 right, 0.125 -> 12 below, 0.625 -> 60 left
+    frame = {"pad_top": 0.1, "pad_right": 0.375, "pad_bottom": 0.125, "pad_left": 0.625, "fill": "#ff8000"}
+    stages = _core.trace(photo, frame_recipe(frame), maps={"subject": subject})
+    made, shown = stages[0][2], stages[1][2]
+    assert made.shape == (96 + 10 + 12, 128 + 36 + 60, 3)
+    np.testing.assert_array_equal(made[10:106, 60:188], photo)
+    np.testing.assert_array_equal(shown[10:106, 60:188], subject)
+    border = np.ones(made.shape[:2], bool)
+    border[10:106, 60:188] = False
+    np.testing.assert_allclose(made[border], np.broadcast_to([1.0, 128 / 255, 0.0], (border.sum(), 3)), atol=1e-7)
+    assert not shown[border].any()
+
+
+def test_a_tie_in_a_crops_place_goes_to_the_even_pixel_as_pythons_round_does():
+    photo = np.random.default_rng(3).random((4, 9, 3), dtype=np.float32)
+    # 5 columns of room, the middle is 2.5: Python's round puts the crop at column 2 (round half away would say 3)
+    made = _core.render(photo, STILL | {"frame": {"aspect": 1}})
+    np.testing.assert_array_equal(made, photo[:, 2:6])
+    np.testing.assert_array_equal(
+        made, runner.render(photo, Recipe([Step("grade", opacity=0.0)], frame=Framing(aspect=1)))
+    )
+
+
+def test_a_crop_around_a_subject_that_is_not_there_is_the_subject_not_found(photo):
+    with pytest.raises(SubjectNotFoundError, match="subject"):
+        native.render(
+            photo, frame_recipe({"anchor": "subject"}), maps={"subject": np.zeros(photo.shape[:2], np.float32)}
+        )
+    with pytest.raises(SubjectNotFoundError, match="subject"):
+        native.render(photo, {**STILL, "frame": {"anchor": "subject"}})
+
+
+def test_the_size_is_made_of_the_framed_picture(photo):
+    made = _core.render(photo, STILL | {"frame": {"aspect": 1}}, size=48)
+    assert made.shape == (48, 48, 3)
+
+
 @pytest.mark.parametrize("size", [0, 4_294_967_295])
 def test_a_size_of_0_or_too_large_to_hold_is_refused_naming_it(photo, size):
     with pytest.raises(RecipeError, match="size"):
@@ -652,7 +761,15 @@ RECIPE_FAULTS = {
     "no steps": ({"steps": []}, "step"),
     "a mask no region declares": ({"steps": [{"effect": "grade", "mask": "sky"}]}, "sky"),
     "a key no recipe has": ({"steps": [{"effect": "grade"}], "colour": "red"}, "colour"),
-    "a framing, which the core does not run yet": ({"steps": [{"effect": "grade"}], "frame": {"flip": "x"}}, "frame"),
+    "a frame value out of range": ({"steps": [{"effect": "grade"}], "frame": {"aspect": 20}}, "frame.aspect"),
+    "a frame turn, which the core does not run yet": (
+        {"steps": [{"effect": "grade"}], "frame": {"angle": 30}},
+        "frame.angle",
+    ),
+    "a frame cut-out, which the core does not run yet": (
+        {"steps": [{"effect": "grade"}], "frame": {"transparent": "circle"}},
+        "frame.transparent",
+    ),
 }
 
 

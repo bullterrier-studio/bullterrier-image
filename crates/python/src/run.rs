@@ -17,7 +17,7 @@ use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
 /// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe with a
-/// non-default `frame` or an `each` step is refused: the core does not run them yet.
+/// `frame` with an `angle` or a `transparent` cut, or an `each` step, is refused: the core does not run them yet.
 ///
 /// `maps` hands the photo's maps in by name: `subject` (white = subject), `depth` (1 = nearest) and one for each region
 /// of kind `given` the recipe declares, each a float array `(height, width)` of finite values within 0..1. `finders`
@@ -57,6 +57,20 @@ pub(crate) fn render<'py>(
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
     image_array(py, image)
+}
+
+/// Check `recipe` (a dict, as for `render`) against the rules of a recipe without running it: the effects exist, every
+/// value is within its range, the frame is valid, a mask names a region. `presets` as for `render`.
+///
+/// Returns nothing; a `CoreError` (a `ValueError`) naming the step or `frame.<field>`, the value and the rule for the
+/// first rule the recipe breaks.
+#[pyfunction]
+#[pyo3(signature = (recipe, *, presets=None))]
+pub(crate) fn check_recipe(recipe: &Bound<'_, PyDict>, presets: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
+    recipe_of(recipe)?
+        .checked(&presets_of(presets)?)
+        .map(|_| ())
+        .map_err(core_error)
 }
 
 /// Every stage of rendering `recipe` on `rgb`, with the arguments and the failures of `render`: a list of `(kind,

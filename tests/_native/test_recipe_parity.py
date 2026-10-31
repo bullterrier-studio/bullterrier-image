@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 from typing import get_args
 
-import numpy as np
 import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's engine
@@ -358,8 +357,6 @@ FRAME_ROWS = [
     pytest.param({"zoom": 2}, False, id="a field the frame lacks"),
 ]
 
-PHOTO = np.zeros((1, 1, 3), np.float32)
-
 
 def python_accepts_frame(frame: dict) -> bool:
     try:
@@ -370,12 +367,11 @@ def python_accepts_frame(frame: dict) -> bool:
 
 
 def core_accepts_frame(frame: dict) -> bool:
-    """Whether the core takes `frame` through its checks. It has no entry that only checks a recipe, and cannot run a
-    non-empty frame yet (R4b commit 3), so the entry is a render: a frame it accepts is refused last, as not run yet."""
+    """Whether the core's check of a recipe takes `frame` (it does not run it)."""
     try:
-        _core.render(PHOTO, {"steps": [{"effect": "grade"}], "frame": frame})
-    except ValueError as error:
-        return "not run by the core yet" in str(error)
+        _core.check_recipe({"steps": [{"effect": "grade"}], "frame": frame})
+    except ValueError:  # CoreError, which is one
+        return False
     return True
 
 

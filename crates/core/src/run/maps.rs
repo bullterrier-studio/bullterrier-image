@@ -132,7 +132,8 @@ impl<'r, 'a> Maps<'r, 'a> {
     }
 
     /// The map called `name`, which the step at `place` (as `step 2, mask`) works from: handed in, else found, else made
-    /// from the picture (`background` is `1 - subject`, `light` the Rec. 709 brightness of the picture as given).
+    /// from the picture (`background` is `1 - subject`, `light` the Rec. 709 brightness of the working picture: framed
+    /// and sized, before any step).
     ///
     /// # Errors
     /// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit
@@ -149,7 +150,7 @@ impl<'r, 'a> Maps<'r, 'a> {
                 Arc::new(Layer::new(subject.height(), subject.width(), inverse)?)
             }
             "light" => Arc::new(light(&self.working.picture())?),
-            _ => self.working.follow(self.stored(name, place)?)?,
+            _ => self.working.follow(stored(self.photo, self.recipe, name, place)?)?,
         };
         self.resolved.borrow_mut().insert(name.to_owned(), Arc::clone(&layer));
         Ok(layer)
@@ -159,43 +160,47 @@ impl<'r, 'a> Maps<'r, 'a> {
     pub(super) fn resolved(&self, name: &str) -> Option<Arc<Layer>> {
         self.resolved.borrow().get(name).cloned()
     }
+}
 
-    /// The map `name` handed to the photo or found by its finder.
-    fn stored(&self, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
-        if !FOUND.contains(&name) && !is_given(self.recipe.regions.get(name)) {
-            return Err(Error::Recipe(format!(
-                "{place}: the region '{name}' is not run by the core yet; only the regions of kind `given` are"
-            )));
-        }
-        if let Some(layer) = self.photo.maps.get(name) {
-            return Ok(Arc::clone(layer));
-        }
-        match self.photo.finders.get(name) {
-            Some(found) => found.answer(name, &self.photo.picture),
-            None => Err(self.missing(name, place)),
-        }
+/// The map `name` of `recipe` that `photo` was handed or finds, as the photo's picture has it (neither framed nor sized).
+/// `place` (as `step 2, mask`) says where the recipe uses it.
+///
+/// # Errors
+/// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit,
+/// [`Error::Recipe`] for a region the core does not run yet.
+pub(super) fn stored(photo: &Photo<'_>, recipe: &Recipe, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
+    if !FOUND.contains(&name) && !is_given(recipe.regions.get(name)) {
+        return Err(Error::Recipe(format!(
+            "{place}: the region '{name}' is not run by the core yet; only the regions of kind `given` are"
+        )));
     }
+    if let Some(layer) = photo.maps.get(name) {
+        return Ok(Arc::clone(layer));
+    }
+    match photo.finders.get(name) {
+        Some(found) => found.answer(name, &photo.picture),
+        None => Err(missing(recipe, name, place)),
+    }
+}
 
-    /// The error for the map `name`, needed at `place` and neither handed in nor to be found.
-    fn missing(&self, name: &str, place: &str) -> Error {
-        let who = self
-            .recipe
-            .name
-            .as_ref()
-            .map_or_else(|| "the recipe".to_owned(), |name| format!("recipe '{name}'"));
-        let meaning = match name {
-            "subject" => "the subject's alpha, white = subject",
-            "depth" => "how near, 1 = nearest",
-            _ => "a region of kind `given`",
-        };
-        Error::map_not_found(
-            name,
-            format!(
-                "{who} needs the map '{name}' ({meaning}) at {place}: hand it to the photo with \
-                 `Photo::with_map(\"{name}\", ..)` or give the photo a finder with `Photo::with_finder(\"{name}\", ..)`"
-            ),
-        )
-    }
+/// The error for the map `name` of `recipe`, needed at `place` and neither handed in nor to be found.
+fn missing(recipe: &Recipe, name: &str, place: &str) -> Error {
+    let who = recipe
+        .name
+        .as_ref()
+        .map_or_else(|| "the recipe".to_owned(), |name| format!("recipe '{name}'"));
+    let meaning = match name {
+        "subject" => "the subject's alpha, white = subject",
+        "depth" => "how near, 1 = nearest",
+        _ => "a region of kind `given`",
+    };
+    Error::map_not_found(
+        name,
+        format!(
+            "{who} needs the map '{name}' ({meaning}) at {place}: hand it to the photo with \
+             `Photo::with_map(\"{name}\", ..)` or give the photo a finder with `Photo::with_finder(\"{name}\", ..)`"
+        ),
+    )
 }
 
 /// Whether `region`, as a recipe declares it, is a map handed in or found (kind `given`).
