@@ -107,10 +107,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   naming the effect shows all) and a collapsed block in the catalogue. Every field stays settable, validated, in
   declaration order in the signature and in the JSON schema (`"advanced"`). No tiers, no classification by name.
 - **An angle that wraps says so: `cyclic=True`.** A degrees field whose value and the value a turn further mean the same
-  picture (a direction, a rotation, a hue) is declared with `min` to `max` exactly 360 and takes any real number; a value
-  outside is stored as the same direction inside (270 on -180..180 is -90; the bounds themselves are kept). Other angles
-  (an elevation, a lean, a twist whose strength falls off with distance, a shift scaled by a weight) stay bounded and
-  refuse what is out of range. *Reason:* ranges were 0..360, +-180 and +-360 by habit, and a caller that sets an
+  picture (a direction, a rotation, a hue) is flagged; what the flag means (a range of exactly 360, any real wrapped into
+  it) is the [parameter format](parameter-format/parameters.md)'s rule, and image keeps the bounds themselves (360 stays
+  360). Other angles (an elevation, a lean, a twist whose strength falls off with distance, a shift scaled by a weight)
+  stay bounded and refuse what is out of range. *Reason:* ranges were 0..360, +-180 and +-360 by habit, and a caller that sets an
   angle by a rule could not tell from the description whether 370 wraps or is refused; one flag in the description lets it wrap by
   the flag, with no per-effect knowledge. *Consequence:* the documentation says `(cyclic)` and the schema `"cyclic"`;
   a contract test holds each flagged field to the property that makes it cyclic (the picture at `min` is the picture at
@@ -374,7 +374,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
   `BT_IMAGE_DEPTH_MODEL`.
 
-- **Pixel values are design pixels.** A `px` value is a length on a picture whose long side is 480, always:
+- **Pixel values are design pixels.** The [parameter format](parameter-format/parameters.md) makes a `px` value a design
+  pixel; image's design picture has a long side of 480, always:
   `recipe.size` is only how big the output is (the working size: `render(..., size=)`, else the recipe's size, else the
   framed photo's longest side). A render multiplies the values by the working size over 480, in the one place a step's
   values reach its effect (`params.scaled`, from the parameter description: no per-effect code). A whole number is
@@ -656,7 +657,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   colour, a choice, a list, a text, a picture, `size`, the names of regions, and the fields of a table inside a region (a
   torn `edge`, a cut's `lines`); a look takes no name, so it is reached by its place.
 - **A field varies a parameter: `Drive(by, start, end, levels)`, rendered at levels and mixed.** A number an effect marks
-  drivable (`param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
+  drivable (the format's `drivable`, `param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
   `end` where it is 1. Effects do not change: the runner renders the effect at `levels` evenly spaced values and each pixel
   mixes the two renders either side of its field value (`ops/levels`, the rule `graded_blur` already used), a level no pixel
   needs is not rendered, and the step's `mask`, `opacity` and `blend_mode` apply after as for any step. *Reason:* a mask only

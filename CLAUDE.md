@@ -172,15 +172,22 @@ user's values until R4 moves it; `Table::check` in Rust is the same rules, compa
 (`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `bool`, `Color`, a choice; an
 effect with any other (`FieldName`, `Picture`, `Lut`, lists, optional colours) keeps a Python model, each field `param(default, doc=...)`, until its port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
-- **Numeric** (`int`, `float`): also a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`, `ratio`, `cycles`, `density`) and inclusive
-  `min`/`max` that hold the default.
+
+**The format.** What a parameter is, as JSON (keys, kinds, the closed list of units, ranges, `cyclic`, `drivable`,
+`advanced`), is the ecosystem's parameter format, version 1: [docs/parameter-format/parameters.md](docs/parameter-format/parameters.md),
+with its [schema](docs/parameter-format/schemas/parameter-1.schema.json) and
+[fixtures](docs/parameter-format/fixtures/parameters). The copy is not edited: a change is a new version in the
+ecosystem's format first, then a new copy here. `tests/_native/test_parameter_format.py` validates every field of every
+Rust-declared effect. A port that needs `FieldName`, `Picture`, lists or optional colours needs format v2 first. What
+follows is what image adds.
+- **Numeric** (`int`, `float`): a `unit` from the format's list and inclusive `min`/`max` that hold the default.
 - **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
   size). Numerous marks take `density`: marks per 1000 design px², the one meaning everywhere (`params.scaled`
   divides it by the size ratio squared).
-- **Other** fields take no unit/min/max: `bool`, `Literal[...]` (the doc mentions every choice), `str`, `Color` (`'#rrggbb'`,
-  `'#rgb'`, or three numbers 0..1), lists of those.
-- **Basic and advanced:** `advanced=True` marks a field that tunes the technique rather than chooses the look; listed apart,
-  still settable and validated. Aim at six or fewer basic fields.
+- **Other** fields: `bool`, `Literal[...]` (the doc mentions every choice), `str`, `Color` (`'#rrggbb'`, `'#rgb'`, or
+  three numbers 0..1), lists of those.
+- **Basic and advanced:** `advanced=True` lists a field apart, still settable and validated. Aim at six or fewer basic
+  fields.
 - **Drivable:** `drivable=True` on a float lets a `Drive` vary it per pixel. Declare it only where the output changes
   smoothly with the value (a radius, an amount, an exposure), never for a whole number, choice, seed or colour; every
   drivable field is tested by `tests/effects/test_contract.py`.
@@ -188,8 +195,8 @@ Every field has a default and a description (what it does, unit and range in wor
   `subject`, a region), as `mask` and `Drive.by` do; not drivable, not a number. The effect takes the array as a keyword-only
   argument of that name, no default: `def relight(rgb, params, *, field)`; the runner builds only the fields steps name.
 - **Cyclic:** `cyclic=True` on a degrees field whose value and the value 360 further give the same picture (a direction,
-  a rotation, a hue): `min` to `max` is one turn and any real wraps into it. Not for elevations, leans, twists or amounts;
-  the contract test checks the picture at `min` equals the picture at `max`.
+  a rotation, a hue). Not for elevations, leans, twists or amounts; the contract test checks the picture at `min` equals
+  the picture at `max`.
 - **State, not time:** a parameter that changes with a process is a state (`progress`, a share in `fraction`, a position in
   `cycles`), never a duration.
 

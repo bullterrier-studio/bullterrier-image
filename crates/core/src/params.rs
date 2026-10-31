@@ -4,7 +4,9 @@
 //! attribute (default, unit, range; see [`Params`]), and a choice is a fieldless enum (see [`Choice`]). The derives
 //! write `Default` and a [`Table`] describing every field, which the Python package builds the effect's parameter model
 //! from (`bullterrier_image.core.params`), so the documented ranges, defaults and descriptions are written nowhere
-//! else.
+//! else. A [`Field`] is a parameter in the ecosystem's parameter format, version 1 (`docs/parameter-format/parameters.md`
+//! in the repository: keys, kinds, units, ranges), and `tests/_native/test_parameter_format.py` validates every declared
+//! field against its schema.
 //!
 //! ```text
 //! /// The parameters of `pattern`.
