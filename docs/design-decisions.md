@@ -574,7 +574,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
   until R4.
 - **The runner is Rust (R4a): steps, maps, drives, blend, scaling.** `Photo::render`/`trace` run a checked recipe's
-  steps; the core refuses what it does not run yet (`frame`, `size`, `each`, a region other than `given`, a step that takes a
+  steps; the core refuses what it does not run yet (a non-default `frame`, `each`, a region other than `given`, a step that takes a
   partition) with an error saying so. Python's runner serves users until R4e; `core/bridge.py` and the parity tests
   (`tests/_native/test_runner_parity.py`) hold the core to it meanwhile. Decisions:
   - *Inputs.* `Effect::apply(picture, params, &Inputs)`, and `render(&Picture, &Params, &Inputs)` for every ported effect

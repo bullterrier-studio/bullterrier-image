@@ -12,10 +12,13 @@ use std::fmt;
 use std::sync::Arc;
 
 mod maps;
+mod size;
 mod trace;
 
 pub use maps::Finder;
 use maps::{Found, Maps};
+pub use size::Options;
+use size::Working;
 pub use trace::Stage;
 
 use serde_json::{Map, Value};
@@ -25,31 +28,6 @@ use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
 use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets, Recipe};
-
-/// What a render is asked for besides the recipe.
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[non_exhaustive]
-pub struct Options {
-    size_ratio: f64,
-}
-
-impl Default for Options {
-    /// A ratio of 1: the picture is the size the recipe's pixel values are written for.
-    fn default() -> Self {
-        Self { size_ratio: 1.0 }
-    }
-}
-
-impl Options {
-    /// These options with `ratio` working pixels per design pixel: the working size over 480, the longest side a
-    /// recipe's pixel values (`px`) are written for. A render multiplies them by it, so the look is the same at any
-    /// size. A finite number above 0, else the render is refused.
-    #[must_use]
-    pub const fn with_size_ratio(mut self, ratio: f64) -> Self {
-        self.size_ratio = ratio;
-        self
-    }
-}
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
 /// or found by a [`Finder`]. It borrows the picture: rendering never copies or changes it.
@@ -117,8 +95,12 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the photo as it is given). An `each` step and a recipe with a `frame` or a `size` are
-    /// refused until the core runs them.
+    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a recipe with a `frame` other than the
+    /// default are refused until the core runs them.
+    ///
+    /// The steps work on the photo at the size `options` ask for, else the recipe's `size`, else its own: the photo and
+    /// every map are resampled to it with the aspect kept (see [`Options::with_size`]), and a finder is still given the
+    /// photo as it was handed in. The recipe's pixel values are scaled by that picture's longest side over 480.
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] for a step or recipe the core does not
@@ -150,33 +132,28 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Run<'a>, Error> {
-        let ratio = options.size_ratio;
-        if !(ratio.is_finite() && ratio > 0.0) {
-            return Err(Error::Inputs(format!(
-                "`size_ratio` must be a finite number above 0, got {ratio}"
-            )));
-        }
         recipe.check_in(registry, presets)?;
         if !recipe.frame.is_empty() {
             return Err(Error::Recipe("`frame` is not run by the core yet".to_owned()));
         }
-        if recipe.size.is_some() {
-            return Err(Error::Recipe("`size` is not run by the core yet".to_owned()));
-        }
-        let maps = Maps::new(self, recipe)?;
+        let working = Working::new(self.picture, options.size().or(recipe.size))?;
+        let ratio = working.ratio();
+        let maps = Maps::new(self, recipe, &working)?;
         let steps = recipe
             .steps
             .iter()
             .enumerate()
             .map(|(index, entry)| prepare(registry, presets, ratio, &maps, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
+        let (subject, depth) = (maps.resolved("subject"), maps.resolved("depth"));
+        drop(maps);
         Ok(Run {
-            picture: self.picture,
+            working,
             ratio,
             steps: steps.into_iter(),
             current: None,
-            subject: maps.resolved("subject"),
-            depth: maps.resolved("depth"),
+            subject,
+            depth,
         })
     }
 }
@@ -185,7 +162,8 @@ impl<'a> Photo<'a> {
 /// takes the image before it and drops it once its own is made, so no earlier image is kept; whoever wants them (a
 /// trace) copies what [`advance`](Self::advance) shows.
 struct Run<'a> {
-    picture: Picture<'a>,
+    /// The picture the steps work on: the photo, or the copy of it at the size asked for.
+    working: Working<'a>,
     ratio: f64,
     steps: std::vec::IntoIter<Prepared>,
     current: Option<Image>,
@@ -201,7 +179,10 @@ impl Run<'_> {
         let Some(step) = self.steps.next() else {
             return Ok(None);
         };
-        let before = self.current.as_ref().map_or(self.picture, Image::as_picture);
+        let before = self
+            .current
+            .as_ref()
+            .map_or_else(|| self.working.picture(), Image::as_picture);
         let mut offered = Inputs::default().with_size_ratio(self.ratio);
         for (parameter, layer) in &step.fields {
             offered = offered.with_field(parameter.as_str(), layer);
@@ -409,7 +390,14 @@ mod tests {
         presets.add_in(&registry, "recorder", &table)?;
         let mut step = Step::new("recorder").param("cells", 9);
         step.preset = Some("wide".to_owned());
-        rendered(&registry, &Recipe::new([step]), &presets)?;
+        // a picture of the design size, so that px values are not scaled
+        let values = vec![0.5_f32; 480 * 3];
+        Photo::new(Picture::new(1, 480, &values)?).render_in(
+            &registry,
+            &Recipe::new([step]),
+            &presets,
+            Options::default(),
+        )?;
         // `cell` from the preset (a decimal, though written whole), `cells` from the step over the preset's 7, the rest
         // the probe's declared defaults, a colour as three numbers
         let expected = json!({
@@ -458,8 +446,6 @@ mod tests {
             flip: Flip::X,
             ..Frame::default()
         };
-        let mut recipe_with_size = Recipe::new([Step::new("probe")]);
-        recipe_with_size.size = Some(480);
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
         recipe_with_each.regions = json!({"panes": {"kind": "grid"}})
             .as_object()
@@ -468,7 +454,6 @@ mod tests {
         for (recipe, said) in [
             (recipe_with_each, "step 1: an `each` step"),
             (recipe_with_frame, "`frame`"),
-            (recipe_with_size, "`size`"),
         ] {
             let result = rendered(&registry, &recipe, &Presets::new());
             assert!(
@@ -747,17 +732,11 @@ mod tests {
         let registry = registry()?;
         let recorder = Arc::new(Recorder::new("measure", &[], &[]).with_table(Measured::table()));
         registry.register(recorder.clone())?;
-        // `length` is px with a minimum of 2: from 3 (map 0) to 8 (map 1) at half size: 1.5 is held at 2, 4 stays 4
+        // `length` is px with a minimum of 2: from 3 (map 0) to 8 (map 1) at half size, a picture of 240 px: 1.5 is held
+        // at 2, 4 stays 4
         let step = Step::new("measure").param("length", Drive::new("subject", 3.0, 8.0).levels(2));
-        let (values, subject) = banded(&[0.0, 1.0])?;
-        Photo::new(Picture::new(1, 2, &values)?)
-            .with_map("subject", subject)?
-            .render_in(
-                &registry,
-                &Recipe::new([step]),
-                &Presets::new(),
-                Options::default().with_size_ratio(0.5),
-            )?;
+        let field: Vec<f32> = (0..240).map(|index| f32::from(u8::from(index > 0))).collect();
+        driven_by(&registry, step, &field)?;
         let lengths: Vec<Value> = recorder
             .received()
             .iter()

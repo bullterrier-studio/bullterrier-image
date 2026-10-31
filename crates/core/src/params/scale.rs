@@ -81,15 +81,22 @@ mod tests {
         Ok((registry, measure, loose))
     }
 
-    /// The parameters `step` reaches its effect with when rendered at `ratio` working pixels per design pixel on a
-    /// one-pixel picture, as `received` of the effect's recorder reads them.
+    /// Renders `step` at `ratio` working pixels per design pixel, so that `received` of the effect's recorder reads the
+    /// parameters it reached the effect with. The ratio is that of the picture, its longest side over 480: a picture
+    /// one row high and `480 x ratio` pixels wide.
     fn render_at(registry: &Registry, step: Step, ratio: f64) -> Result<(), Error> {
-        let values = [0.5_f32; 3];
-        Photo::new(Picture::new(1, 1, &values)?).render_in(
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "the ratios of the tests are small"
+        )]
+        let width = (480.0 * ratio) as usize;
+        let values = vec![0.5_f32; width * 3];
+        Photo::new(Picture::new(1, width, &values)?).render_in(
             registry,
             &Recipe::new([step]),
             &Presets::new(),
-            Options::default().with_size_ratio(ratio),
+            Options::default(),
         )?;
         Ok(())
     }
@@ -227,20 +234,6 @@ mod tests {
         let received = loose.received();
         assert_eq!(received[0].params, json!({"cell": 10}));
         assert!((received[0].size_ratio - 2.5).abs() < f64::EPSILON);
-        Ok(())
-    }
-
-    #[test]
-    fn a_ratio_that_is_not_a_positive_number_is_refused() -> Result<(), Error> {
-        let (registry, measure, _) = measuring()?;
-        for ratio in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            let result = render_at(&registry, Step::new("measure"), ratio);
-            assert!(
-                matches!(&result, Err(error) if error.to_string().contains("size_ratio")),
-                "{ratio}: {result:?}"
-            );
-        }
-        assert_eq!(measure.received().len(), 0);
         Ok(())
     }
 

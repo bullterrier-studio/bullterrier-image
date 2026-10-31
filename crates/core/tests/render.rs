@@ -33,7 +33,8 @@ fn a_recipe_renders_as_its_effects_run_in_order_with_their_defaults_filled_in() 
         json!({"temperature": 0.0, "tint": 0.0, "exposure": exposure, "contrast": 1.0, "pivot": 0.5,
                "saturation": saturation, "vibrance": 0.0})
     };
-    let grid = json!({"cell": 4, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
+    // the picture is 12 / 480 of the design size: the 4 px cell of the step shrinks to 0.1 px and is held at its minimum, 3
+    let grid = json!({"cell": 3, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
     let offered = Inputs::default();
     let first = apply("grade", &picture, grade(0.5, 1.0), &offered)?.into_values();
     let second = apply("pixel_grid", &Picture::new(8, 12, &first)?, grid, &offered)?.into_values();
@@ -62,18 +63,33 @@ fn wide_values() -> Vec<f32> {
     (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect()
 }
 
-/// `recipe` rendered at `ratio` working pixels per design pixel on the 20 x 30 picture.
-fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
-    let values = wide_values();
-    let photo = Photo::new(Picture::new(20, 30, &values)?);
-    let options = Options::default().with_size_ratio(ratio);
-    Ok(photo.render(recipe, &Presets::new(), options)?.into_values())
+/// A 20 px high picture of the width that makes `ratio` working pixels per design pixel (the longest side over 480).
+fn scaled_values(ratio: f64) -> (usize, Vec<f32>) {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "the ratios of the tests are small"
+    )]
+    let width = (480.0 * ratio) as usize;
+    (
+        width,
+        (0..20 * width * 3)
+            .map(|index| f32::from(u8::try_from(index % 251).unwrap_or(0)) / 251.0)
+            .collect(),
+    )
 }
 
-/// The effect `name` run on the same picture with `params` written out, as `rendered_at` does.
-fn applied(name: &str, params: serde_json::Value) -> Result<Vec<f32>, Box<dyn Error>> {
-    let values = wide_values();
-    Ok(apply(name, &Picture::new(20, 30, &values)?, params, &Inputs::default())?.into_values())
+/// `recipe` rendered at `ratio` working pixels per design pixel on a picture whose longest side makes it.
+fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
+    let (width, values) = scaled_values(ratio);
+    let photo = Photo::new(Picture::new(20, width, &values)?);
+    Ok(photo.render(recipe, &Presets::new(), Options::default())?.into_values())
+}
+
+/// The effect `name` run with `params` written out on the picture `rendered_at` makes for `ratio`.
+fn applied(name: &str, params: serde_json::Value, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
+    let (width, values) = scaled_values(ratio);
+    Ok(apply(name, &Picture::new(20, width, &values)?, params, &Inputs::default())?.into_values())
 }
 
 #[test]
@@ -85,8 +101,8 @@ fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> O
     };
     let recipe = Recipe::new([Step::new("pattern")]);
     // `cell` (default 32) and `feather` (default 1) are px; `thickness` and `radius` are fractions of the cell
-    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", pattern(64.0, 2.0))?);
-    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", pattern(32.0, 1.0))?);
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", pattern(64.0, 2.0), 2.0)?);
+    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", pattern(32.0, 1.0), 1.0)?);
     assert_ne!(rendered_at(&recipe, 2.0)?, rendered_at(&recipe, 1.0)?);
     Ok(())
 }
@@ -95,11 +111,11 @@ fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> O
 fn a_whole_number_of_pixels_scales_rounded_and_never_below_its_minimum() -> Outcome {
     let grid = |cell: i32| json!({"cell": cell, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
     let recipe = Recipe::new([Step::new("pixel_grid")]); // `cell` is 4 px, at least 3
-    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pixel_grid", grid(8))?);
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pixel_grid", grid(8), 2.0)?);
     // 4 x 0.5 = 2, below the minimum of 3
-    assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", grid(3))?);
+    assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", grid(3), 0.5)?);
     // 4 x 1.6 = 6.4 -> 6
-    assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", grid(6))?);
+    assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", grid(6), 1.6)?);
     Ok(())
 }
 
@@ -179,11 +195,14 @@ fn a_step_masked_by_the_background_changes_the_picture_only_where_a_finder_found
     let rendered = photo
         .render(&recipe, &Presets::new(), Options::default())?
         .into_values();
-    let graded = applied(
+    let graded = apply(
         "grade",
+        &Picture::new(20, 30, &values)?,
         json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
                "vibrance": 0.0}),
-    )?;
+        &Inputs::default(),
+    )?
+    .into_values();
     for (index, pixel) in rendered.chunks(3).enumerate() {
         let expected = if index % 30 < 12 { &values } else { &graded };
         assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");

@@ -14,7 +14,7 @@ import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with Python's
 from bullterrier_image.core import bridge, native, registry, runner
-from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, design_scale, param
+from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.presets import SHIPPED
 from bullterrier_image.core.regions import Given, Grid
 from bullterrier_image.core.registry import effect, unregister
@@ -26,6 +26,7 @@ from bullterrier_image.errors import (
     SubjectNotFoundError,
     UnknownEffectError,
 )
+from bullterrier_image.ops.resample import resize
 
 Row = tuple[np.ndarray, Recipe, dict[str, np.ndarray], np.ndarray]  # photo, recipe, maps, the picture it must make
 
@@ -270,20 +271,118 @@ def test_pixel_values_are_written_for_480_and_scaled_to_the_photo(photo, effect,
     np.testing.assert_allclose(core_render(photo, recipe), runner.render(photo, recipe), atol=1e-5)
 
 
-def test_the_ratio_is_the_callers_to_set():
+def photo_of(height: int, width: int) -> np.ndarray:
+    return np.random.default_rng(3).random((height, width, 3), dtype=np.float32)
+
+
+# (the picture's height and width, the cell the recipe's `cell = 4` px becomes): the ratio is the picture's longest
+# side over 480, so a picture 960 wide is ratio 2 (cell 8), one 1440 wide ratio 3 (12) and one 480 wide ratio 1 (4)
+RATIOS = [((4, 480), 4), ((1, 960), 8), ((6, 1440), 12), ((960, 5), 8)]
+
+
+@pytest.mark.parametrize(("shape", "cell"), RATIOS, ids=[str(shape) for shape, _ in RATIOS])
+def test_the_ratio_of_design_pixels_is_the_pictures_longest_side_over_480(shape, cell):
     recipe = {"steps": [{"effect": "pixel_grid", "params": {"cell": 4}, "opacity": 1.0}]}
-    photo = np.random.default_rng(3).random((40, 60, 3), dtype=np.float32)
-    for ratio, cell in [(1.0, 4), (2.0, 8), (3.0, 12)]:
-        np.testing.assert_allclose(
-            native.render(photo, recipe, size_ratio=ratio), applied("pixel_grid", photo, cell=cell), atol=1e-6
-        )
-    assert design_scale((96, 128)) == 128 / 480  # what the facade passes for the photos of these tests
+    photo = photo_of(*shape)
+    np.testing.assert_allclose(native.render(photo, recipe), applied("pixel_grid", photo, cell=cell), atol=1e-6)
 
 
-@pytest.mark.parametrize("ratio", [0, -1.0, float("nan"), float("inf")])
-def test_a_ratio_that_is_no_positive_number_is_refused(ratio):
-    with pytest.raises(ValueError, match="size_ratio"):
-        _core.render(PIXEL, {"steps": [{"effect": "grade"}]}, size_ratio=ratio)
+def test_the_ratio_is_that_of_the_picture_the_steps_work_on_not_of_the_photo():
+    # 40 x 60 asked for a longest side of 960: ratio 2, cell 8 on the 640 x 960 picture it works on
+    recipe = {"steps": [{"effect": "pixel_grid", "params": {"cell": 4}, "opacity": 1.0}]}
+    photo = photo_of(40, 60)
+    resized = _core.render(photo, {"steps": [{"effect": "grade", "opacity": 0.0}]}, size=960)
+    np.testing.assert_allclose(
+        native.render(photo, recipe, size=960), applied("pixel_grid", resized, cell=8), atol=1e-6
+    )
+
+
+# --- size: the photo and its maps resampled -------------------------------------------------------------------------
+
+STILL = {"steps": [{"effect": "grade", "opacity": 0.0}]}  # a step that leaves the picture as it is
+MASKED = {"steps": [{"effect": "grade", "opacity": 0.0, "mask": "subject"}]}  # and one that has the core hold a map
+
+# The pictures the core's resampling is held to Pillow's on (`ops.resample.resize`, which the Python engine used):
+# a shrink, a growth, odd sizes and a single row or column, with noise, hard edges and smooth shades.
+# (5, 8) and (7, 8) meet halves of a pixel (2.5 at size 4, 10.5 at size 12), where Python's `round` goes to the even one
+SHAPES = [(96, 128), (97, 131), (1, 300), (300, 1), (33, 500), (500, 33), (7, 9), (2, 2), (1, 1), (5, 8), (7, 8)]
+SIZES = [1, 2, 3, 4, 12, 17, 64, 128, 129, 200, 333, 480, 640, 1000]
+TOLERANCE = (
+    2e-7  # measured: the largest |core - Pillow| over 11 shapes x 3 kinds x 16 sizes was 1.19e-7 (one float32 ulp)
+)
+
+
+def picture_like(kind: str, shape: tuple[int, int]) -> np.ndarray:
+    rng = np.random.default_rng(5)
+    if kind == "noise":
+        return rng.random((*shape, 3), dtype=np.float32)
+    if kind == "hard edges":  # every value 0 or 1: a sharp kernel overshoots and the result is clipped
+        return (rng.random((*shape, 3)) > 0.5).astype(np.float32)
+    y, x = np.mgrid[0 : shape[0], 0 : shape[1]]
+    return np.stack([x / shape[1], y / shape[0], (x * y) % 7 / 7], axis=-1).astype(np.float32)
+
+
+@pytest.mark.parametrize("kind", ["noise", "hard edges", "smooth"])
+@pytest.mark.parametrize("shape", SHAPES, ids=[str(shape) for shape in SHAPES])
+def test_the_core_resamples_the_photo_and_its_maps_as_pillow_does(shape, kind):
+    photo = picture_like(kind, shape)
+    layer = np.ascontiguousarray(photo[..., 0])
+    for size in SIZES:
+        expected, expected_map = resize(photo, size), resize(layer, size)
+        made = _core.render(photo, STILL, size=size)
+        assert made.shape == expected.shape, f"size {size}"  # the longest side, and the other as Python rounds it
+        np.testing.assert_allclose(made, expected, atol=TOLERANCE, rtol=0, err_msg=f"size {size}")
+        stages = _core.trace(photo, MASKED, maps={"subject": layer}, size=size)
+        shown = next(array for kind_, _, array in stages if kind_ == "subject")
+        np.testing.assert_allclose(shown, expected_map, atol=TOLERANCE, rtol=0, err_msg=f"map, size {size}")
+
+
+def test_a_photo_of_the_size_asked_for_is_rendered_exactly_as_it_was(photo):
+    np.testing.assert_array_equal(_core.render(photo, STILL, size=128), photo)
+
+
+def test_the_core_and_the_python_engine_make_the_same_picture_of_a_recipe_at_a_size(photo, subject):
+    recipe = Recipe(
+        [
+            Step("pixel_grid", params={"cell": 30}, opacity=1),
+            Step("grade", params={"exposure": 1}, mask="subject", blend_mode="screen"),
+        ]
+    )
+    for size in (64, 200, 480):
+        made = core_render(photo, recipe, maps={"subject": subject}, size=size)
+        python = runner.render(photo, recipe, maps={"subject": subject}, size=size)
+        assert made.shape[:2] == python.shape[:2] == (round(96 * size / 128), size)
+        np.testing.assert_allclose(made, python, atol=1e-5, err_msg=f"size {size}")
+
+
+def test_the_size_is_the_calls_else_the_recipes_else_the_photos(photo):
+    recipe = {**STILL, "size": 64}
+    assert _core.render(photo, recipe).shape == (48, 64, 3)
+    assert _core.render(photo, recipe, size=32).shape == (24, 32, 3)
+    assert _core.render(photo, STILL).shape == photo.shape
+    np.testing.assert_array_equal(_core.render(photo, recipe, size=128), photo)
+
+
+def test_a_trace_shows_every_stage_at_the_working_size(photo, subject):
+    stages = _core.trace(photo, MASKED, maps={"subject": subject}, size=64)
+    assert [array.shape for _, _, array in stages] == [(48, 64, 3), (48, 64), (48, 64, 3)]
+
+
+@pytest.mark.parametrize("size", [0, 4_294_967_295])
+def test_a_size_of_0_or_too_large_to_hold_is_refused_naming_it(photo, size):
+    with pytest.raises(RecipeError, match="size"):
+        native.render(photo, STILL, size=size)
+
+
+def test_a_recipe_of_size_0_is_refused_naming_it(photo):
+    with pytest.raises(RecipeError, match="size"):
+        native.render(photo, {**STILL, "size": 0})
+
+
+@pytest.mark.parametrize("size", [-1, 2**32])
+def test_a_size_beyond_the_range_of_a_picture_is_an_overflow_for_the_caller_to_prevent(photo, size):
+    with pytest.raises(OverflowError):
+        _core.render(photo, STILL, size=size)
 
 
 # --- presets ---------------------------------------------------------------------------------------------------------
@@ -625,10 +724,10 @@ def test_a_python_effect_is_scaled_by_its_wrapper_and_told_the_ratio_only_if_it_
         np.testing.assert_allclose(core_render(photo, reach_recipe(name)), runner.render(photo, reach_recipe(name)))
 
 
-def test_the_ratio_a_python_effect_sees_is_the_callers_to_set(reach_probes):
+def test_the_ratio_a_python_effect_sees_is_that_of_the_picture(reach_probes):
     recipe = {"steps": [{"effect": "reach_probe", "params": {"reach": 45}, "opacity": 1.0}]}
-    photo = np.zeros((4, 6, 3), np.float32)
-    made = native.render(photo, recipe, size_ratio=2.0)
+    photo = np.zeros((4, 960, 3), np.float32)  # twice the design size
+    made = native.render(photo, recipe)
     np.testing.assert_allclose(made[0, 0], [0.9, 1.0, 0.5], atol=1e-7)  # 45 x 2 = 90 px, ratio 2 / 2
 
 

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::Value;
 
-use super::Photo;
+use super::{Photo, Working};
 use crate::ops::color::luminance;
 use crate::{Error, Layer, Picture, Recipe};
 
@@ -92,6 +92,8 @@ const FOUND: [&str; 2] = ["subject", "depth"];
 pub(super) struct Maps<'r, 'a> {
     photo: &'r Photo<'a>,
     recipe: &'r Recipe,
+    /// The picture the render works on, whose size every map is given at.
+    working: &'r Working<'a>,
     resolved: RefCell<BTreeMap<String, Arc<Layer>>>,
 }
 
@@ -101,7 +103,7 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// # Errors
     /// [`Error::Recipe`] if the photo was given a map or a finder under a name that is no map of the recipe: `subject`,
     /// `depth`, or a region of kind `given`. Names the maps there are.
-    pub(super) fn new(photo: &'r Photo<'a>, recipe: &'r Recipe) -> Result<Self, Error> {
+    pub(super) fn new(photo: &'r Photo<'a>, recipe: &'r Recipe, working: &'r Working<'a>) -> Result<Self, Error> {
         let known: BTreeSet<&str> = FOUND
             .into_iter()
             .chain(
@@ -124,6 +126,7 @@ impl<'r, 'a> Maps<'r, 'a> {
         Ok(Self {
             photo,
             recipe,
+            working,
             resolved: RefCell::new(BTreeMap::new()),
         })
     }
@@ -145,8 +148,8 @@ impl<'r, 'a> Maps<'r, 'a> {
                 let inverse = subject.values().iter().map(|value| 1.0 - value).collect();
                 Arc::new(Layer::new(subject.height(), subject.width(), inverse)?)
             }
-            "light" => Arc::new(light(&self.photo.picture)?),
-            _ => self.stored(name, place)?,
+            "light" => Arc::new(light(&self.working.picture())?),
+            _ => self.working.follow(self.stored(name, place)?)?,
         };
         self.resolved.borrow_mut().insert(name.to_owned(), Arc::clone(&layer));
         Ok(layer)

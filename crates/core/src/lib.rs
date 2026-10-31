@@ -14,7 +14,9 @@
 //! mode, opacity and mask. A mask is a map of the photo, by name: `subject` and `depth` (handed to the photo with
 //! [`Photo::with_map`], or found by a [`Finder`] the photo is given with [`Photo::with_finder`], once however many
 //! recipes are rendered), `background` (1 - the subject), `light` (the picture's brightness) or a region the recipe
-//! declares as given. A parameter an effect declares drivable may be a [`Drive`], which varies it across the picture by
+//! declares as given. The steps work on the photo at the size [`Options::with_size`] or the recipe's `size` asks for (the
+//! photo and its maps resampled, the aspect kept), and a recipe's pixel values are scaled by that picture's longest side
+//! over 480. A parameter an effect declares drivable may be a [`Drive`], which varies it across the picture by
 //! such a map. [`Photo::trace`] runs the same code and returns every [`Stage`]: the photo, the maps used, and the picture
 //! after each step. [`apply`] runs one effect on parameters that are already complete.
 

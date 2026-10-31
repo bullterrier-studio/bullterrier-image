@@ -59,7 +59,7 @@ def render(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
     presets: Mapping[str, str] | None = None,
-    size_ratio: float = 1.0,
+    size: int | None = None,
 ) -> np.ndarray: ...
 def trace(
     rgb: np.ndarray,
@@ -68,5 +68,5 @@ def trace(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
     presets: Mapping[str, str] | None = None,
-    size_ratio: float = 1.0,
+    size: int | None = None,
 ) -> list[tuple[str, int | None, np.ndarray]]: ...

@@ -2,7 +2,7 @@
 
 Transitional (R4a to R4e): the Python runner (`runner`) still renders for users; this is the path R4e switches them to,
 and what the parity tests (`tests/_native/test_runner_parity.py`) hold the core's runner to. The core does not run a
-framing, a `size` or an `each` step yet: a recipe with one is a `RecipeError` from the core.
+framing or an `each` step yet: a recipe with one is a `RecipeError` from the core.
 """
 
 import re
@@ -15,7 +15,7 @@ from bullterrier_image.ops.image import as_image
 
 from . import native, registry
 from .framing import Framing
-from .params import Drive, Lut, Picture, design_scale
+from .params import Drive, Lut, Picture
 from .regions import Kind
 from .steps import Each, Recipe, Step
 
@@ -29,15 +29,14 @@ def render(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Any] | None = None,
+    size: int | None = None,
 ) -> np.ndarray:
     """`recipe` run on the photo `rgb` by the core; the arguments and the result are those of `runner.render` (a
-    `finders` value needs only a `find` method), but for `size`. The recipe's pixel values are scaled to the photo
-    (`design_scale`)."""
+    `finders` value needs only a `find` method). The core resamples the photo and its maps to `size`, else the recipe's,
+    and scales the recipe's pixel values to the picture it works on."""
     rgb = as_image(rgb)
     with registry.holding() as hold:
-        return native.render(
-            rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2])
-        )
+        return native.render(rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size=size)
 
 
 def trace(
@@ -46,15 +45,14 @@ def trace(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Any] | None = None,
+    size: int | None = None,
 ) -> list[Stage]:
     """Every stage of `render`, as the core reports them: `("input", None, photo)`, `("subject", None, map)` and
     `("depth", None, map)` for the maps the recipe uses (float32 (h, w)), then `("step", n, picture)` after step `n`
-    (from 1). The last is exactly what `render` returns. Labels are for the caller to make."""
+    (from 1), all at the working size. The last is exactly what `render` returns. Labels are for the caller to make."""
     rgb = as_image(rgb)
     with registry.holding() as hold:
-        return native.trace(
-            rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2])
-        )
+        return native.trace(rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size=size)
 
 
 def recipe_dict(recipe: Recipe, hold: Hold) -> dict[str, Any]:

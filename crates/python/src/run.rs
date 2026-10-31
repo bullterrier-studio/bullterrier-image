@@ -17,7 +17,7 @@ use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
 /// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe with a
-/// `frame`, a `size` or an `each` step is refused: the core does not run them yet.
+/// non-default `frame` or an `each` step is refused: the core does not run them yet.
 ///
 /// `maps` hands the photo's maps in by name: `subject` (white = subject), `depth` (1 = nearest) and one for each region
 /// of kind `given` the recipe declares, each a float array `(height, width)` of finite values within 0..1. `finders`
@@ -29,13 +29,16 @@ use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 /// `presets` holds the presets the steps name, by effect: the TOML text of the effect's presets file, one `[name]` table
 /// for each preset with its `description` and the effect's parameters (`{"grade": "[warm]\ndescription = ...\n"}`).
 ///
-/// `size_ratio` is the working pixels per design pixel (the photo's longest side over 480, for a recipe written at the
-/// design size): every `px` value is multiplied by it, so the look is the same at any size.
+/// `size` is the longest side in px of the picture the steps work on and the render returns (a whole number from 1 up; a
+/// negative one is an `OverflowError`): the photo and its maps are resampled to it, the aspect kept. Without it the
+/// recipe's own `size` applies, and without either the photo keeps its size. Every `px` value of the recipe is written
+/// for a longest side of 480 and multiplied by the working picture's longest side over 480, so the look is the same at
+/// any size.
 ///
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size_ratio=1.0))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
 pub(crate) fn render<'py>(
     py: Python<'py>,
     rgb: &Bound<'py, PyAny>,
@@ -43,13 +46,13 @@ pub(crate) fn render<'py>(
     maps: Option<&Bound<'py, PyDict>>,
     finders: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size_ratio: f64,
+    size: Option<u32>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = Options::default().with_size_ratio(size_ratio);
+    let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
     let image = py
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -62,7 +65,7 @@ pub(crate) fn render<'py>(
 /// picture after step `n`, counting from 1. The last stage is exactly what `render` returns. Naming the stages is left
 /// to the caller.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size_ratio=1.0))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
 pub(crate) fn trace<'py>(
     py: Python<'py>,
     rgb: &Bound<'py, PyAny>,
@@ -70,13 +73,13 @@ pub(crate) fn trace<'py>(
     maps: Option<&Bound<'py, PyDict>>,
     finders: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size_ratio: f64,
+    size: Option<u32>,
 ) -> PyResult<Bound<'py, PyList>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = Options::default().with_size_ratio(size_ratio);
+    let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
     let stages = py
         .detach(|| photo.trace(&recipe, &presets, options))
         .map_err(core_error)?;

@@ -53,7 +53,7 @@ impl Photo<'_> {
         options: Options,
     ) -> Result<Vec<Stage>, Error> {
         let mut run = self.start(registry, recipe, presets, options)?;
-        let picture = self.picture;
+        let picture = run.working.picture();
         let mut stages = vec![Stage::Input(Image::new(
             picture.height(),
             picture.width(),
