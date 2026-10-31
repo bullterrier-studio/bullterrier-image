@@ -530,11 +530,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   repeated every field name and could drift; with one declaration they cannot. The derive's output refers to
   `crate::params::...`, so it compiles only inside the core crate; if the core is ever published, the derive crate
   is published with it. Because Python does not read the fields
-  of a ported effect, vulture needs no whitelist. `Params`, its fields and the choice enums are `pub(crate)`, and
-  `effects` is a private module: nothing outside the crate can use them yet, and a `pub(crate)` field `render` does not
-  read is reported by rustc's dead-code lint (a `pub` one is not), which replaces the whitelist's old check. The public
-  typed entry point, with `pub` `Params` for a Rust user, comes with R3b, which then needs a test that every parameter
-  is read.
+  of a ported effect, vulture needs no whitelist. *Typed params (R3b):* `Params`, its fields and the choice enums are
+  `pub`, in a public `effects` module, so a Rust user writes `grade::Params { exposure: 1.0, ..Default::default() }` and
+  `Step::of` turns it into a step that carries every parameter and no preset. `META` and `render` stay `pub(crate)`.
+  `Step::of` takes the parameters through `Declared::values`, which the derive writes (a decimal as the shortest number
+  that reads back: `0.2`, not the `f32` widened to `0.20000000298`), and the effect's name through `EffectParams`, which
+  `build.rs` implements from the file's name. *The unread-field guard moved:* rustc's dead-code lint no longer reports a
+  parameter `render` never reads (the field is `pub`, and `values` reads every field), so `tests/parameters_are_read.rs`
+  does: each effect is applied with each parameter changed and one that changes nothing fails; a parameter that matters
+  only while another is set (`grade.pivot`, `pattern.radius`) has a row in its `conditional` table, checked both ways. A
+  public `Params` has no `#[non_exhaustive]`, so `..Default::default()` works outside; adding a field to one is a
+  breaking change, accepted until the crate is published (R5). There is no typed apply: running a step is R4's runner.
   *Validation of a user's values is in Rust since R3* (`Table::check`, next to the recipe): running an effect still
   trusts its parameters, and Python's models keep validating what Python runs until R4 switches them to the Rust
   checks, so the rules live in two languages only while the parity tests (`tests/_native/test_recipe_parity.py`)
@@ -563,8 +569,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   and still be published, so the data under `src/bullterrier_image/{presets,looks}` stays package data; Rust users
   pass text (`Presets::add_toml`), and shipping them in the crate is R5's (publish). *Moved:* rendering a step
   (mask, opacity, blend, drives evaluated, each, framing, scaling) and the region kinds are R4's, hence the one-off
-  `fx.bloom(radius=12).apply(photo)` too; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) is
-  R3b, which needs a design for the test that every parameter is read. *Known losses:* a Rust map keeps keys sorted,
+  `fx.bloom(radius=12).apply(photo)` too; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) came
+  with R3b. *Known losses:* a Rust map keeps keys sorted,
   not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
   until R4.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects

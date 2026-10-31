@@ -60,12 +60,12 @@ ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` 
 bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect keeps its docstring and
 `@effect`; its body is `_core.apply("<name>", rgb, params.model_dump())` (`from bullterrier_image._native import
 _core`). Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
-opacity and inputs (`pub(crate) const META: Meta`) and has `fn render(picture: &Picture, params: &Params) -> Image`; its
+opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params) -> Image`; its
 Python model is `class XParams(EffectParams, core="x")`, built from that declaration. `@effect(params=XParams)` takes
 category and opacity from the core and refuses them if given. The core's registry (`Effect` trait, `register`) also
 takes foreign effects, such as a Python function (`_core.register`). Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
-(`Recipe::from_toml`, `from_json`; the same types are the JSON form). `Recipe::checked(&Presets)` applies the rules of a
+(`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.read_recipe`). The Python `Step`, `Recipe`
 and loader still validate and run recipes until R4 makes them a facade over these types.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
@@ -103,9 +103,12 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
 no hidden tunables: a number is a `Params` field, inside a `#[param(..)]` attribute, trivial, or carries `// constant:
 <reason>`). Also: no `unwrap`, `expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe
-Rust. `pub` only for what the bindings use, the recipe model and the support types the derives write (`crate::params`); else `pub(crate)`:
-an effect's module, `Params`, choice enums and `render`. A `pub(crate)` field is reported when unread, a `pub` one is not,
-so `Params` becomes `pub` with the core's typed entry point (R3b), which then needs a test that every parameter is read.
+Rust. `pub` only for what the bindings use, the recipe model, the support types the derives write (`crate::params`) and an
+effect's typed parameters (`effects::<name>::Params`, its fields and choice enums, documented); else `pub(crate)`: an
+effect's `META` and `render`. Fields are `pub`, so rustc no longer reports one that `render` never reads:
+`crates/core/tests/parameters_are_read.rs` does. A new effect needs nothing there, unless a parameter matters only while
+another is set (as `grade.pivot` needs `contrast` other than 1): add a row to that test's `conditional` table. Adding a field to a
+`Params` breaks code that builds it without `..Default::default()`, accepted until the crate is published.
 A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user. Effect inputs in Rust arrive with the
 runner (R4). A user's values are checked by Rust code (`Table::check`, `Recipe::checked`, `Presets`), which Python
@@ -160,7 +163,7 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 ## Parameters
 
 A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict).
-An effect the core runs **declares its fields in Rust**, on its `Params` struct (`#[derive(Deserialize, Params)]`, from
+An effect the core runs **declares its fields in Rust**, on its public `Params` struct (`#[derive(Debug, Clone, PartialEq, Deserialize, Params)]`, from
 `crate::params`): each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = ..,
 drivable, advanced, cyclic)]`; a choice is a fieldless `#[derive(Choice)]` enum (`default = Variant`). The struct's own
 doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line
@@ -212,12 +215,13 @@ defines the shape; `grade` (`effects/grade/`, `crates/core/src/effects/grade.rs`
 works from a map keeps a Python body until the core takes maps (`effects/relight/`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with an
    empty `core="<name>"` model, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
-   category, `Params` with one example field, `render`), `tests/effects/<name>/test_<name>.py` and
+   category, a public `Params` with one example field, `render`), `tests/effects/<name>/test_<name>.py` and
    `examples/effects/<name>.toml`. The model is built from the kernel, so the effect imports only once the extension is rebuilt with it (`uv run` and `uv sync`
    do); then it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
 2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), `META` (opacity below 1
    if its steps should be mixed in partway), and the kernel with the effect (the Python docstring documents it; its first
-   sentence is the summary); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
+   sentence is the summary; a parameter that matters only while another is set gets a row in
+   `parameters_are_read.rs`); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.
