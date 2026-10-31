@@ -8,7 +8,7 @@
 
 #![forbid(unsafe_code)]
 
-pub mod effects;
+mod effects;
 mod error;
 mod ops;
 pub mod params;

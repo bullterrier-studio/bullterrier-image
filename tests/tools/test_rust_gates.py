@@ -141,9 +141,9 @@ OFFENCES = {
     ),
     "pub where no user of the crate reaches it": (
         "rust-lint",
-        "crates/core/src/ops.rs",
+        "crates/core/src/effects.rs",
         appended("\n/// Probe.\npub fn reachable_only_inside() {}\n"),
-        ["unreachable-pub", "crates/core/src/ops.rs"],
+        ["unreachable-pub", "crates/core/src/effects.rs"],
     ),
     "a declared parameter no code reads": (
         "rust-lint",
@@ -151,7 +151,7 @@ OFFENCES = {
         replaced(
             "\n}\n\n/// The graded picture.",
             "\n    /// A parameter nobody reads.\n    #[param(default = 0.0, unit = ratio, min = 0, max = 1)]\n"
-            "    pub(crate) unused: f32,\n}\n\n/// The graded picture.",
+            "    pub unused: f32,\n}\n\n/// The graded picture.",
         ),
         ["never read", "unused", "grade.rs"],
     ),

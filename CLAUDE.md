@@ -97,10 +97,10 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
 no hidden tunables: a number is a `Params` field, inside a `#[param(..)]` attribute, trivial, or carries `// constant:
 <reason>`). Also: no `unwrap`, `expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe
-Rust. `pub` only for what the bindings use, an effect's `Params` struct and choice enums (documented) and the support
-types the derives write (`crate::params`); else `pub(crate)`, `render` too. The fields of `Params` are `pub(crate)` (the
-derive refuses `pub`), so rustc reports a parameter `render` never reads; they become `pub` with the core's typed entry
-point (R2/R3), which then needs a test that every parameter is read. A Python `ops` function and its Rust twin may coexist
+Rust. `pub` only for what the bindings use and the support types the derives write (`crate::params`); else `pub(crate)`:
+an effect's module, `Params`, choice enums and `render`. A `pub(crate)` field is reported when unread, a `pub` one is not,
+so `Params` becomes `pub` with the core's typed entry point (R2/R3), which then needs a test that every parameter is read.
+A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user.
 
 ## Standards

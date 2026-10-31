@@ -8,7 +8,7 @@ use crate::{Image, Picture};
 
 /// The shapes `pattern` can draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
-pub enum Kind {
+pub(crate) enum Kind {
     /// Parallel bands.
     Stripes,
     /// A chessboard.
@@ -22,7 +22,7 @@ pub enum Kind {
 /// A regular pattern of `cell` px, drawn in a foreground colour on a background colour.
 #[derive(Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub struct Params {
+pub(crate) struct Params {
     /// The pattern: 'stripes' (parallel bands, `thickness` wide), 'checks' (a chessboard of `cell` px squares, the
     /// top-left one in the foreground colour), 'dots' (a disc of `radius` in every cell) or 'grid' (lines `thickness`
     /// wide along the cell borders).

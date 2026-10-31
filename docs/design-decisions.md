@@ -524,11 +524,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   stays an `int`, a decimal a `float`), so the schema, docs and `fx.pyi` do not change when an effect moves. An effect
   that works from a map keeps a Python model until the core takes maps (`FieldName`, `Picture`, `Lut`, lists and
   optional colours arrive with the first port that needs one). *Reason:* the Rust struct and the Python model
-  repeated every field name and could drift; with one declaration they cannot, and a Rust user gets documented,
-  ranged, defaulted `Params`. Because Python does not read the fields of a ported effect, vulture needs no whitelist.
-  The fields are `pub(crate)` and the derive refuses `pub`: a `pub` field of a `pub` struct is never reported when
-  `render` does not read it, a `pub(crate)` one is (rustc's dead-code lint, which replaces the whitelist's old check).
-  They become `pub` with the core's typed entry point (R2/R3), which then needs a test that every parameter is read.
+  repeated every field name and could drift; with one declaration they cannot. Because Python does not read the fields
+  of a ported effect, vulture needs no whitelist. `Params`, its fields and the choice enums are `pub(crate)`, and
+  `effects` is a private module: nothing outside the crate can use them yet, and a `pub(crate)` field `render` does not
+  read is reported by rustc's dead-code lint (a `pub` one is not), which replaces the whitelist's old check. The public
+  typed entry point, with `pub` `Params` for a Rust user, comes with R2/R3, which then needs a test that every parameter
+  is read.
   *Validation stays Python's for now:* the model checks every value (inclusive ranges, finiteness, the cyclic wrap) and
   Rust trusts it; a Rust `checked()` has no consumer until the core loads files and recipes, and then Python validation
   switches to it in the same move, instead of the rules living in two languages in between.

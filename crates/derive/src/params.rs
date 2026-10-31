@@ -2,9 +2,7 @@
 
 use proc_macro2::{Literal, TokenStream};
 use quote::quote;
-use syn::{
-    Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, Ident, Lit, Meta, Type, UnOp, Visibility,
-};
+use syn::{Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, Ident, Lit, Meta, Type, UnOp};
 
 use crate::snake_case;
 
@@ -165,13 +163,6 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     let doc = doc_of(&field.attrs).ok_or_else(|| {
         broken("needs a doc comment: what it does, its unit and range in words, what raising it does")
     })?;
-    if matches!(field.vis, Visibility::Public(_)) {
-        // a `pub` field is never reported when `render` does not read it; fields become `pub` with the typed entry
-        // point of the core, which will need a test that every parameter is read
-        return Err(broken(
-            "declare it `pub(crate)`: only fields no code outside the crate can reach are reported when unread",
-        ));
-    }
     let settings = settings(field, name)?;
     let default = settings.default.as_ref().ok_or_else(|| broken("needs a default"))?;
     let written = written(default).ok_or_else(|| {
@@ -484,7 +475,6 @@ mod tests {
         let good = [
             documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, drivable, advanced)] cell: f32, },
             documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: i32, },
-            documented! { #[param(default = 4, unit = count, min = 3, max = 32)] pub(crate) crate_wide: i32, },
             // the bounds are inclusive: a default may sit on either
             documented! { #[param(default = 0.0, unit = px, min = 0, max = 32)] low: f32, },
             documented! { #[param(default = 32.0, unit = px, min = 0, max = 32)] high: f32, },
@@ -520,11 +510,6 @@ mod tests {
                 &["cell", "doc"],
             ),
             ("no param attribute", documented! { cell: f32, }, &["cell", "param"]),
-            (
-                "a public field, which the dead-code lint would not report if render never read it",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] pub cell: f32, },
-                &["cell", "pub(crate)"],
-            ),
             (
                 "no default",
                 documented! { #[param(unit = px, min = 0, max = 32)] cell: f32, },

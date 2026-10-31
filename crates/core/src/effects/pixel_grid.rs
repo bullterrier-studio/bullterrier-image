@@ -13,7 +13,7 @@ const CHANNELS: f64 = 3.0; // constant: one stripe for each of red, green and bl
 /// brightened to keep the picture's average brightness.
 #[derive(Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub struct Params {
+pub(crate) struct Params {
     /// Width and height in px of one grid cell, which holds one red, one green and one blue stripe, each a third of the
     /// cell wide. Larger = a coarser grid; the smallest, 3, gives stripes one pixel wide.
     #[param(default = 4, unit = px, min = 3, max = 32)]

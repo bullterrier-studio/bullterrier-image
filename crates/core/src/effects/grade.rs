@@ -12,7 +12,7 @@ use crate::{Image, Picture};
 /// Colour balance (temperature, tint), then exposure, contrast, saturation and vibrance.
 #[derive(Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub struct Params {
+pub(crate) struct Params {
     /// Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red
     /// up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0
     /// leaves the colour balance alone. Use a negative value to correct a picture shot under warm light.

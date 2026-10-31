@@ -18,13 +18,13 @@ use crate::{Image, Picture};
 // (an unknown unit shows as rustc's own error, and the doc must name every variant: Python checks that on import).
 // Options of every library call are fields too; a constant is allowed only for a standard (Rec. 709, sRGB...) or a pure
 // guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number). The doc
-// comment of the struct says what the parameters are as a whole: it is the model's docstring. Keep the fields
-// `pub(crate)` (the build refuses `pub`): rustc then reports a parameter `render` never reads.
+// comment of the struct says what the parameters are as a whole: it is the model's docstring. Keep the struct and
+// its fields `pub(crate)`: rustc then reports a parameter `render` never reads.
 
 /// The settings of `$name`: every value that shapes its result.
 #[derive(Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub struct Params {
+pub(crate) struct Params {
     /// How far the picture is mixed toward its negative: 0 = unchanged, 1 = fully inverted.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
     pub(crate) amount: f32,

@@ -33,13 +33,17 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
     Ok(files)
 }
 
-/// The Rust source of the table: a public module per effect file, and `EFFECTS`, each name with the function that runs
+/// The Rust source of the table: a `pub(crate)` module per effect file, and `EFFECTS`, each name with the function that runs
 /// it (it reads the effect's `Params` from the parameters and calls its `render`) and the one that describes its
 /// `Params`.
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {
-        writeln!(code, "#[path = {:?}]\npub mod {name};", path.display().to_string())?;
+        writeln!(
+            code,
+            "#[path = {:?}]\npub(crate) mod {name};",
+            path.display().to_string()
+        )?;
     }
     writeln!(
         code,
