@@ -25,7 +25,7 @@ mod registry;
 mod testing;
 
 pub use effect::{Category, Effect, FieldParam, Input};
-pub use error::{Constraint, Error};
+pub use error::{Constraint, Error, ErrorKind, MapKind};
 pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};

@@ -4,10 +4,12 @@
 use std::sync::Arc;
 
 use bullterrier_image::{
-    BlendMode, Category, Effect, Error, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe, STEP_KEYS,
+    BlendMode, Category, Effect, Error, ErrorKind, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe,
+    STEP_KEYS,
 };
 use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::IntoPyObjectExt as _;
+use pyo3::create_exception;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
@@ -16,19 +18,44 @@ use serde_json::{Map, Value, json};
 /// The effects of bullterrier-image's Rust core, run on numpy pictures.
 #[pymodule]
 mod _core {
+    use pyo3::prelude::*;
+
+    /// Put the exception where `import` finds it again, so pickling it (to send it between processes) works.
+    #[pymodule_init]
+    fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
+        module
+            .py()
+            .get_type::<super::CoreError>()
+            .setattr("__module__", "bullterrier_image._native._core")
+    }
+
     #[pymodule_export]
-    use super::{apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
+    use super::{CoreError, apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
 }
+
+create_exception!(
+    _core,
+    CoreError,
+    PyValueError,
+    "An error of the Rust core: a `ValueError` whose `kind` attribute names which of the package's exceptions it is \
+     (`ErrorKind::name` in the core: `recipe`, `unknown_effect`, `subject_not_found`, `depth_not_found`, \
+     `map_not_found`, `invalid_image`, `non_finite_image`, or `other`: a programming error). The package turns the \
+     kind into its `BullterrierImageError` subclass. When a Python function registered with `register` raised, its \
+     own exception comes back instead, unchanged."
+);
 
 /// Run the effect called `effect` on `rgb` (float32, C-contiguous, (height, width, 3)) with `params` (exactly the
 /// effect's parameters, validated and scaled); a new array of `rgb`'s shape. The effect runs without the GIL.
+///
+/// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
+/// when a Python function registered with `register` raised, that very exception.
 ///
 /// The keyword arguments are what is on offer to the effect, which receives the part it declares and nothing else:
 /// `size_ratio` (working pixels per design pixel, a finite number above 0), `partition` (an int32 `(height, width)`
 /// array of piece numbers from 0; the pieces are as many as the largest number plus one) and `fields` (a dict from a
 /// field parameter's name to a float32 `(height, width)` array of finite values within 0..1).
 ///
-/// `ValueError` if the effect, its parameters, the array or an input are not what the core expects, or the effect
+/// `CoreError` if the effect, its parameters, the array or an input are not what the core expects, or the effect
 /// declares an input that is not on offer: a programming error, since the package validates a user's values before
 /// they get here.
 ///
@@ -56,7 +83,7 @@ fn apply<'py>(
         return Err(picture_error(rgb));
     }
     let readonly = array.try_readonly().map_err(value_error)?;
-    let picture = Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(value_error)?;
+    let picture = Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(core_error)?;
     let params = to_json(params.as_any())?;
     if !(size_ratio.is_finite() && size_ratio > 0.0) {
         return Err(PyValueError::new_err(format!(
@@ -74,7 +101,7 @@ fn apply<'py>(
     }
     let image = py
         .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))
-        .map_err(value_error)?;
+        .map_err(core_error)?;
     let shape = [image.height(), image.width(), 3];
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
 }
@@ -91,11 +118,11 @@ fn effects() -> Vec<String> {
 /// the declaration wrote, a whole number an `int` and a decimal a `float`; a colour's default is its `'#rrggbb'` text and
 /// a choice's its name.
 ///
-/// `ValueError` if the core implements no effect of that name.
+/// `CoreError` if the core implements no effect of that name.
 #[pyfunction]
 fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
     let table = bullterrier_image::effect(effect)
-        .map_err(value_error)?
+        .map_err(core_error)?
         .params()
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
@@ -105,10 +132,10 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
 /// "inputs": [str], "fields": {str: str}}`, where `fields` maps each parameter that names a field to the field a step
 /// that does not set it uses.
 ///
-/// `ValueError` if there is no effect of that name.
+/// `CoreError` if there is no effect of that name.
 #[pyfunction]
 fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
-    let effect = bullterrier_image::effect(effect).map_err(value_error)?;
+    let effect = bullterrier_image::effect(effect).map_err(core_error)?;
     let inputs: Vec<_> = effect.inputs().iter().map(|input| input.name()).collect();
     let fields: Map<String, Value> = effect
         .fields()
@@ -128,15 +155,23 @@ fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
 }
 
 /// The names recipes and effects are described with, in the order the catalogue lists them: a dict `{"categories":
-/// [str], "inputs": [str], "blend_modes": [str], "step_keys": [str]}`.
+/// [str], "inputs": [str], "blend_modes": [str], "step_keys": [str], "error_kinds": [str]}`; the last are the `kind`s
+/// of `CoreError`.
 #[pyfunction]
 fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     let categories: Vec<_> = Category::ALL.iter().map(|category| category.name()).collect();
     let inputs: Vec<_> = Input::ALL.iter().map(|input| input.name()).collect();
     let blend_modes: Vec<_> = BlendMode::ALL.iter().map(|mode| mode.name()).collect();
+    let error_kinds: Vec<_> = ErrorKind::ALL.iter().map(|kind| kind.name()).collect();
     from_json(
         py,
-        &json!({"categories": categories, "inputs": inputs, "blend_modes": blend_modes, "step_keys": STEP_KEYS}),
+        &json!({
+            "categories": categories,
+            "inputs": inputs,
+            "blend_modes": blend_modes,
+            "step_keys": STEP_KEYS,
+            "error_kinds": error_kinds,
+        }),
     )
 }
 
@@ -145,20 +180,20 @@ fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 /// whole number as an `int` and a colour as a list of three floats 0..1 (given as `'#rrggbb'`, `'#rgb'` or three
 /// numbers). A number outside its inclusive range is refused, except an angle declared cyclic, which any real wraps into.
 ///
-/// `ValueError` with the sentence naming the effect, the parameter, the rule and the value, for the first rule `params`
+/// `CoreError` with the sentence naming the effect, the parameter, the rule and the value, for the first rule `params`
 /// break; also if the core implements no such effect or the effect describes its own parameters (a Python function
 /// registered with `register`).
 #[pyfunction]
 fn check<'py>(py: Python<'py>, effect: &str, params: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny>> {
     let table = bullterrier_image::effect(effect)
-        .map_err(value_error)?
+        .map_err(core_error)?
         .params()
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     let given = params
         .iter()
         .map(|(key, value)| Ok((key.extract::<String>()?, to_json(&value)?)))
         .collect::<PyResult<Map<_, _>>>()?;
-    let checked = table.check(effect, &given).map_err(value_error)?;
+    let checked = table.check(effect, &given).map_err(core_error)?;
     from_json(py, &Value::Object(checked))
 }
 
@@ -169,7 +204,7 @@ fn check<'py>(py: Python<'py>, effect: &str, params: &Bound<'py, PyDict>) -> PyR
 /// is `None`). Only the shape and the rules of the file's format version are read: whether the effects exist or
 /// the values are in range is for the recipe's check, and an opacity left out stays unset.
 ///
-/// `ValueError` for text that is not that format or breaks one of those rules, naming the step and the key.
+/// `CoreError` for text that is not that format or breaks one of those rules, naming the step and the key.
 #[pyfunction]
 fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound<'py, PyAny>> {
     let recipe = match syntax {
@@ -181,7 +216,7 @@ fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound
             )));
         }
     }
-    .map_err(value_error)?;
+    .map_err(core_error)?;
     from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)
 }
 
@@ -260,7 +295,7 @@ fn register(
         fields,
         function: function.clone().unbind(),
     };
-    bullterrier_image::register(Arc::new(effect)).map_err(value_error)
+    bullterrier_image::register(Arc::new(effect)).map_err(core_error)
 }
 
 /// Remove the effect `register` added as `name`. `ValueError` if there is none: the core's own effects stay.
@@ -285,24 +320,19 @@ struct PythonEffect {
 
 impl PythonEffect {
     /// Call the function with `picture`, `params` and the inputs it declares; its result as an image of the picture's
-    /// size, or what is wrong.
+    /// size, or what is wrong: the function's own exception, kept whole, or text saying what it returned.
     fn call(
         &self,
         py: Python<'_>,
         picture: &Picture<'_>,
         params: &Value,
         inputs: &Inputs<'_>,
-    ) -> Result<Image, String> {
+    ) -> Result<Image, Failure> {
         let shape = [picture.height(), picture.width(), 3];
-        let rgb = PyArray1::from_slice(py, picture.values())
-            .reshape(shape)
-            .map_err(|error| error.to_string())?;
-        let params = from_json(py, params).map_err(|error| error.to_string())?;
-        let given = self.keywords(py, picture, inputs).map_err(|error| error.to_string())?;
-        let result = self
-            .function
-            .call(py, (rgb, params), Some(&given))
-            .map_err(|error| error.to_string())?;
+        let rgb = PyArray1::from_slice(py, picture.values()).reshape(shape)?;
+        let params = from_json(py, params)?;
+        let given = self.keywords(py, picture, inputs)?;
+        let result = self.function.call(py, (rgb, params), Some(&given))?;
         let result = result.bind(py);
         let wrong = || {
             format!(
@@ -312,14 +342,12 @@ impl PythonEffect {
         };
         let array = result.cast::<PyArray3<f32>>().map_err(|_| wrong())?;
         if array.shape() != shape {
-            return Err(wrong());
+            return Err(wrong().into());
         }
         let values: Vec<f32> = array.readonly().as_array().iter().copied().collect();
-        Image::new(shape[0], shape[1], &values).map_err(|error| error.to_string())
+        Ok(Image::new(shape[0], shape[1], &values)?)
     }
-}
 
-impl PythonEffect {
     /// The keyword arguments the function declares, from `inputs`.
     fn keywords<'py>(
         &self,
@@ -374,11 +402,31 @@ impl Effect for PythonEffect {
 
     fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         // `_core.apply` runs the core without the interpreter lock; the function needs it back
-        Python::attach(|py| self.call(py, picture, &params, inputs)).map_err(|message| Error::Foreign {
-            effect: self.name.clone(),
-            message,
-        })
+        Python::attach(|py| self.call(py, picture, &params, inputs))
+            .map_err(|failure| Error::foreign(self.name.clone(), failure))
     }
+}
+
+/// What a Python effect can fail with: the exception its function raised (kept whole, so it can be raised again as it
+/// was) or text saying what it returned.
+type Failure = Box<dyn std::error::Error + Send + Sync>;
+
+/// The exception for `error`: a `CoreError` of the error's kind, except that the exception a registered Python function
+/// raised is given back as it was, so the caller catches the class the function chose.
+fn core_error(error: Error) -> PyErr {
+    let error = match error {
+        Error::Foreign { effect, source } => match source.downcast::<PyErr>() {
+            Ok(raised) => return *raised,
+            Err(source) => Error::Foreign { effect, source },
+        },
+        other => other,
+    };
+    let kind = error.kind().name();
+    let problem = CoreError::new_err(error.to_string());
+    Python::attach(|py| match problem.value(py).setattr("kind", kind) {
+        Ok(()) => problem,
+        Err(unset) => unset,
+    })
 }
 
 /// A `ValueError` carrying `error`'s message.
@@ -408,7 +456,7 @@ fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
         .copied()
         .max()
         .map_or(0, |largest| usize::try_from(largest).map_or(0, |largest| largest + 1));
-    Labels::new(height, width, labels, pieces).map_err(value_error)
+    Labels::new(height, width, labels, pieces).map_err(core_error)
 }
 
 /// The map of every `(parameter, array)` in `fields`: float32 `(height, width)` arrays.
@@ -429,18 +477,18 @@ fn layers_of(fields: &Bound<'_, PyDict>) -> PyResult<Vec<(String, Layer)>> {
             };
             let values: Vec<f32> = typed.readonly().as_array().iter().copied().collect();
             let layer = Layer::new(height, width, values)
-                .map_err(|error| PyValueError::new_err(format!("the field {parameter:?}: {error}")))?;
+                .map_err(|error| core_error(Error::Inputs(format!("the field {parameter:?}: {error}"))))?;
             Ok((parameter, layer))
         })
         .collect()
 }
 
-/// The `ValueError` for an `rgb` that is not a C-contiguous float32 (height, width, 3) array.
+/// The `CoreError` of the invalid-image kind for an `rgb` that is not a C-contiguous float32 (height, width, 3) array.
 fn picture_error(rgb: &Bound<'_, PyAny>) -> PyErr {
-    PyValueError::new_err(format!(
+    core_error(Error::InvalidImage(format!(
         "rgb must be a C-contiguous float32 array of shape (h, w, 3), got {}",
         found(rgb)
-    ))
+    )))
 }
 
 /// What `value` is, for a message about an array that was expected: its shape and dtype if it is an array, else its type.

@@ -6,7 +6,21 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["apply", "check", "effect", "effects", "params", "read_recipe", "register", "unregister", "vocabulary"]
+__all__ = [
+    "CoreError",
+    "apply",
+    "check",
+    "effect",
+    "effects",
+    "params",
+    "read_recipe",
+    "register",
+    "unregister",
+    "vocabulary",
+]
+
+class CoreError(ValueError):
+    kind: str
 
 def apply(
     effect: str,

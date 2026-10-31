@@ -67,9 +67,9 @@ from pydantic import (
 from pydantic.fields import FieldInfo
 from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
 
-from bullterrier_image._native import _core
 from bullterrier_image.errors import LutError, RecipeError
 
+from . import native
 from .types import Color as ColorForms
 
 UNITS = (
@@ -672,11 +672,11 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
             f"parameter model {cls.__name__!r} is declared with core={effect!r} and also has fields of its own "
             f"({', '.join(own)}): the Rust declaration is the only one"
         )
-    if effect not in _core.effects():
+    if effect not in native.effects():
         raise ValueError(
             f"the Rust core has no effect called {effect!r}: if its kernel is new, rebuild the extension (`uv sync`)"
         )
-    declared = _core.params(effect)
+    declared = native.params(effect)
     cls.__doc__ = declared["doc"]
     fields = declared["fields"]
     cls.__annotations__ = {entry["name"]: _annotation(effect, entry) for entry in fields}

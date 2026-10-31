@@ -8,10 +8,23 @@ use crate::params::Scalar;
 
 /// Why the core refused to check or run something.
 ///
-/// [`Error::Invalid`] and [`Error::Recipe`] are a user's mistakes (a value out of range, a recipe that breaks a rule);
-/// the Python package raises them as `RecipeError` and [`Error::UnknownEffect`] as `UnknownEffectError`. The others
-/// are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that runs outside the core
-/// raised: running an effect trusts the parameters it is given (see [`crate::params::Table::check`] for checking them).
+/// [`Error::kind`] says which of the package's exceptions an error is: the one place that decides, so every binding
+/// (the Python package raises these as the `BullterrierImageError` subclasses) agrees.
+///
+/// | Error | [`ErrorKind`] | Python exception |
+/// |---|---|---|
+/// | [`Error::Invalid`], [`Error::Recipe`] | `Recipe` | `RecipeError` |
+/// | [`Error::UnknownEffect`] | `UnknownEffect` | `UnknownEffectError` |
+/// | [`Error::MapNotFound`] of the subject | `SubjectNotFound` | `SubjectNotFoundError` |
+/// | [`Error::MapNotFound`] of the depth | `DepthNotFound` | `DepthNotFoundError` |
+/// | [`Error::MapNotFound`] of any other map | `MapNotFound` | `MapNotFoundError` |
+/// | [`Error::InvalidImage`], [`Error::Size`] | `InvalidImage` | `InvalidImageError` |
+/// | [`Error::NonFinite`] | `NonFiniteImage` | `NonFiniteImageError` |
+/// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
+///
+/// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
+/// runs outside the core raised: running an effect trusts the parameters it is given (see
+/// [`crate::params::Table::check`] for checking them).
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -23,9 +36,24 @@ pub enum Error {
     Foreign {
         /// The effect that failed.
         effect: String,
-        /// What went wrong, in the words of whoever runs it.
+        /// What went wrong, as whoever runs the effect reports it: the error itself, so a binding can hand back the
+        /// very exception its own language raised (see [`Error::foreign`]).
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+    /// A map of the photo (the subject, the depth, a region's) is needed but not given, not found, or not usable: of
+    /// another size than the photo, or holding values outside 0..=1.
+    MapNotFound {
+        /// The map's name: `subject`, `depth`, or the name of a region.
+        map: String,
+        /// Which map it is, as far as the package's exceptions tell them apart.
+        kind: MapKind,
+        /// What is wrong with it, naming the map and the fix.
         message: String,
     },
+    /// A picture handed in is not one: not (h, w, 3), a type that is no colour level, or values outside 0..=1.
+    InvalidImage(String),
+    /// A picture handed in holds NaN or an infinity, which is no colour; the text names the first such pixel.
+    NonFinite(String),
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
         /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
@@ -64,6 +92,70 @@ pub enum Error {
     },
 }
 
+/// Which of the photo's maps an [`Error::MapNotFound`] is about, as far as the package's exceptions tell them apart.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MapKind {
+    /// The subject: the alpha of what stands out.
+    Subject,
+    /// The depth, 1 = nearest.
+    Depth,
+    /// Any other map: a region a recipe declares.
+    Other,
+}
+
+/// Which of the package's exceptions an [`Error`] is (see [`Error::kind`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// A recipe, a step or an effect's parameters are invalid.
+    Recipe,
+    /// No effect is registered under the name.
+    UnknownEffect,
+    /// The subject was needed but could not be found or used.
+    SubjectNotFound,
+    /// The depth was needed but could not be found or used.
+    DepthNotFound,
+    /// Another map was needed but could not be found or used.
+    MapNotFound,
+    /// A picture handed in is not one.
+    InvalidImage,
+    /// A picture handed in holds NaN or an infinity.
+    NonFiniteImage,
+    /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
+    /// error (a `ValueError` in Python).
+    Other,
+}
+
+impl ErrorKind {
+    /// Every kind, in the order of [`Error`]'s table.
+    pub const ALL: &'static [Self] = &[
+        Self::Recipe,
+        Self::UnknownEffect,
+        Self::SubjectNotFound,
+        Self::DepthNotFound,
+        Self::MapNotFound,
+        Self::InvalidImage,
+        Self::NonFiniteImage,
+        Self::Other,
+    ];
+
+    /// The kind's name in `snake_case`: `"subject_not_found"`.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Recipe => "recipe",
+            Self::UnknownEffect => "unknown_effect",
+            Self::SubjectNotFound => "subject_not_found",
+            Self::DepthNotFound => "depth_not_found",
+            Self::MapNotFound => "map_not_found",
+            Self::InvalidImage => "invalid_image",
+            Self::NonFiniteImage => "non_finite_image",
+            Self::Other => "other",
+        }
+    }
+}
+
 /// The rule a parameter value breaks.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -87,6 +179,50 @@ pub enum Constraint {
 }
 
 impl Error {
+    /// A failure of the effect `effect` that runs outside the core, caused by `source`: an error a binding keeps whole
+    /// (the Python bindings wrap the `PyErr` the effect raised, and give that very exception back), or plain text.
+    #[must_use]
+    pub fn foreign(effect: impl Into<String>, source: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+        Self::Foreign {
+            effect: effect.into(),
+            source: source.into(),
+        }
+    }
+
+    /// A problem with the map called `map`: [`MapKind::Subject`] for `subject`, [`MapKind::Depth`] for `depth`, else
+    /// [`MapKind::Other`].
+    #[must_use]
+    pub fn map_not_found(map: impl Into<String>, message: impl Into<String>) -> Self {
+        let map = map.into();
+        let kind = match map.as_str() {
+            "subject" => MapKind::Subject,
+            "depth" => MapKind::Depth,
+            _ => MapKind::Other,
+        };
+        Self::MapNotFound {
+            map,
+            kind,
+            message: message.into(),
+        }
+    }
+
+    /// Which of the package's exceptions this error is: the one mapping every binding follows (the table is above).
+    #[must_use]
+    pub const fn kind(&self) -> ErrorKind {
+        match self {
+            Self::Invalid { .. } | Self::Recipe(_) => ErrorKind::Recipe,
+            Self::UnknownEffect(_) => ErrorKind::UnknownEffect,
+            Self::MapNotFound { kind, .. } => match kind {
+                MapKind::Subject => ErrorKind::SubjectNotFound,
+                MapKind::Depth => ErrorKind::DepthNotFound,
+                MapKind::Other => ErrorKind::MapNotFound,
+            },
+            Self::InvalidImage(_) | Self::Size { .. } => ErrorKind::InvalidImage,
+            Self::NonFinite(_) => ErrorKind::NonFiniteImage,
+            Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
+        }
+    }
+
     /// This error placed in a recipe at `place` if it is a parameter refusal.
     pub(crate) fn at(self, place: &str) -> Self {
         match self {
@@ -147,8 +283,12 @@ impl fmt::Display for Error {
                     _ => write!(formatter, "effect '{effect}': `{field}` {constraint}, got {value}"),
                 }
             }
-            Self::Recipe(message) | Self::Inputs(message) => formatter.write_str(message),
-            Self::Foreign { effect, message } => write!(formatter, "the effect {effect:?} failed: {message}"),
+            Self::Recipe(message)
+            | Self::Inputs(message)
+            | Self::InvalidImage(message)
+            | Self::NonFinite(message)
+            | Self::MapNotFound { message, .. } => formatter.write_str(message),
+            Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
             Self::Size { height, width, values } => {
                 write!(
@@ -164,13 +304,151 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Params { source, .. } => Some(source),
+            Self::Foreign { source, .. } => Some(&**source),
             Self::UnknownEffect(_)
             | Self::Duplicate(_)
             | Self::Invalid { .. }
             | Self::Recipe(_)
             | Self::Inputs(_)
-            | Self::Foreign { .. }
+            | Self::MapNotFound { .. }
+            | Self::InvalidImage(_)
+            | Self::NonFinite(_)
             | Self::Size { .. } => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error as _;
+
+    use serde_json::json;
+
+    use super::*;
+
+    /// One error of every variant (the map ones of each kind), with the kind each must be.
+    fn rows() -> Vec<(Error, ErrorKind)> {
+        let bad_json = Error::Params {
+            effect: "grade",
+            source: <serde_json::Error as serde::de::Error>::custom("a number is needed"),
+        };
+        vec![
+            (
+                Error::Invalid {
+                    place: None,
+                    effect: "grade".to_owned(),
+                    field: "exposure".to_owned(),
+                    constraint: Constraint::Number,
+                    value: Box::new(json!("a")),
+                },
+                ErrorKind::Recipe,
+            ),
+            (Error::Recipe("step 1: no effect".to_owned()), ErrorKind::Recipe),
+            (Error::UnknownEffect("nope".to_owned()), ErrorKind::UnknownEffect),
+            (
+                Error::map_not_found("subject", "no subject"),
+                ErrorKind::SubjectNotFound,
+            ),
+            (Error::map_not_found("depth", "no depth"), ErrorKind::DepthNotFound),
+            (Error::map_not_found("sky", "no sky"), ErrorKind::MapNotFound),
+            (Error::InvalidImage("not (h, w, 3)".to_owned()), ErrorKind::InvalidImage),
+            (
+                Error::Size {
+                    height: 1,
+                    width: 2,
+                    values: 5,
+                },
+                ErrorKind::InvalidImage,
+            ),
+            (Error::NonFinite("pixel (0, 0)".to_owned()), ErrorKind::NonFiniteImage),
+            (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
+            (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
+            (Error::foreign("fx", "broke"), ErrorKind::Other),
+            (bad_json, ErrorKind::Other),
+        ]
+    }
+
+    #[test]
+    fn every_error_is_the_kind_the_package_raises_it_as() {
+        for (error, kind) in rows() {
+            assert_eq!(error.kind(), kind, "{error}");
+        }
+    }
+
+    #[test]
+    fn the_rows_cover_every_kind_and_all_lists_each_once_with_a_name_of_its_own() {
+        let produced: Vec<ErrorKind> = rows().iter().map(|(error, _)| error.kind()).collect();
+        for kind in ErrorKind::ALL {
+            assert!(produced.contains(kind), "no row makes {kind:?}");
+        }
+        let mut names: Vec<&str> = ErrorKind::ALL.iter().map(|kind| kind.name()).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), ErrorKind::ALL.len(), "{names:?}");
+        assert!(
+            names
+                .iter()
+                .all(|name| name.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+        );
+    }
+
+    #[test]
+    fn a_map_error_names_the_subject_and_the_depth_and_every_other_map_is_the_rest() {
+        for (map, kind) in [
+            ("subject", MapKind::Subject),
+            ("depth", MapKind::Depth),
+            ("light", MapKind::Other),
+            ("Subject", MapKind::Other),
+            ("", MapKind::Other),
+        ] {
+            assert!(
+                matches!(Error::map_not_found(map, "m"), Error::MapNotFound { kind: found, map: named, .. } if found == kind && named == map),
+                "{map:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_map_or_image_error_says_its_message_as_it_is() {
+        for (error, text) in [
+            (
+                Error::map_not_found("depth", "the depth map is 2 x 2 but the photo is 3 x 3"),
+                "the depth map is 2 x 2 but the photo is 3 x 3",
+            ),
+            (
+                Error::InvalidImage("the picture is 2 x 2 x 4".to_owned()),
+                "the picture is 2 x 2 x 4",
+            ),
+            (
+                Error::NonFinite("row 1, column 2 is NaN".to_owned()),
+                "row 1, column 2 is NaN",
+            ),
+        ] {
+            assert_eq!(error.to_string(), text);
+        }
+    }
+
+    #[test]
+    fn a_foreign_failure_keeps_the_source_it_was_made_from() {
+        #[derive(Debug)]
+        struct Mine;
+        impl std::fmt::Display for Mine {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("mine broke")
+            }
+        }
+        impl std::error::Error for Mine {}
+
+        let error = Error::foreign("fx", Mine);
+        assert_eq!(error.to_string(), "the effect \"fx\" failed: mine broke");
+        assert!(error.source().is_some_and(<dyn std::error::Error>::is::<Mine>));
+        assert!(matches!(&error, Error::Foreign { effect, .. } if effect == "fx"));
+        // the source comes back whole, as the bindings need it
+        let kept = if let Error::Foreign { source, .. } = error {
+            source.downcast::<Mine>().is_ok()
+        } else {
+            false
+        };
+        assert!(kept);
     }
 }

@@ -33,6 +33,10 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the parameters an effect declares are judged against the parameter format's schema, for every effect the core "
         "implements; only the core can say which, and what its structs declare"
     ),
+    ("core/test_native.py", "bullterrier_image._native"): (
+        "the facade translates the errors the extension raises: a CoreError of each kind the core reports is needed, "
+        "and the kinds the core lists are compared with the ones the facade knows"
+    ),
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"
     ),

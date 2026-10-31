@@ -7,6 +7,7 @@ values are validated by the parameter model first).
 """
 
 import math
+import pickle
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -16,6 +17,7 @@ import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the boundary the effects call
 from bullterrier_image.core.registry import CATEGORIES, INPUTS
+from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 
 PIXEL = np.array([[[0.2, 0.5, 0.7]]], np.float32)  # contrast moves each channel differently
 GRADE = {"temperature": 0.0, "tint": 0.0, "exposure": 0.0, "pivot": 0.5, "saturation": 1.0, "vibrance": 0.0}
@@ -201,14 +203,9 @@ def test_a_foreign_effect_describes_its_own_parameters():
         _core.params("probe_own")
 
 
-def fails(rgb, params):
-    raise KeyError("amount")
-
-
 @pytest.mark.parametrize(
     ("function", "said"),
     [
-        pytest.param(fails, ["KeyError", "amount"], id="an exception is reported with its class and message"),
         pytest.param(lambda rgb, params: [[[0.5]]], ["ndarray"], id="a list is not an array"),
         pytest.param(lambda rgb, params: rgb.astype(np.float64), ["float32"], id="float64 is not float32"),
         pytest.param(lambda rgb, params: rgb[:, :, :2].copy(), ["[1, 1, 3]", "[1, 1, 2]"], id="a wrong shape"),
@@ -371,6 +368,91 @@ def test_a_declaration_that_is_no_inputs_or_fields_is_refused_and_registers_noth
     with pytest.raises((ValueError, TypeError), match=said):
         _core.register("probe_declared", "utilities", 1.0, fill(0.5), **declared)
     assert "probe_declared" not in _core.effects()
+
+
+# --- errors: the kind the core reports, and the exception a function raised ------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raised",
+    [
+        pytest.param(KeyError("amount"), id="a builtin"),
+        pytest.param(RecipeError("the amount is out of range"), id="a bullterrier-image exception"),
+        pytest.param(SubjectNotFoundError("no subject in this piece"), id="a subclass with its own base"),
+    ],
+)
+def test_the_exception_a_foreign_effect_raised_comes_back_unchanged(raised):
+    def raises(rgb, params):
+        raise raised
+
+    with registered("probe_raises", raises), pytest.raises(type(raised)) as caught:
+        _core.apply("probe_raises", PIXEL, {})
+    assert caught.value is raised
+
+
+def test_the_exception_of_a_foreign_effect_that_a_foreign_effect_ran_comes_back_unchanged_through_both():
+    raised = RecipeError("deep inside")
+
+    def raises(rgb, params):
+        raise raised
+
+    def through(rgb, params):
+        return _core.apply("probe_inner", rgb, {})
+
+    with registered("probe_inner", raises), registered("probe_outer", through), pytest.raises(RecipeError) as caught:
+        _core.apply("probe_outer", PIXEL, {})
+    assert caught.value is raised
+
+
+@pytest.mark.parametrize(
+    ("call", "kind"),
+    [
+        pytest.param(lambda: _core.check("grade", {"exposure": 11}), "recipe", id="a value out of range"),
+        pytest.param(lambda: _core.read_recipe('{"steps": [{"opacity": 1}]}', "json"), "recipe", id="a broken recipe"),
+        pytest.param(lambda: _core.params("no_such_effect"), "unknown_effect", id="params of no effect"),
+        pytest.param(lambda: _core.effect("no_such_effect"), "unknown_effect", id="metadata of no effect"),
+        pytest.param(lambda: _core.apply("no_such_effect", PIXEL, {}), "unknown_effect", id="running no effect"),
+        pytest.param(lambda: _core.check("no_such_effect", {}), "unknown_effect", id="checking no effect"),
+        pytest.param(
+            lambda: _core.apply("grade", np.zeros((2, 2), np.float32), {}), "invalid_image", id="a picture of no shape"
+        ),
+        pytest.param(lambda: _core.apply("grade", PIXEL, {}), "other", id="parameters that are not the effect's"),
+        pytest.param(lambda: _core.register("grade", "utilities", 1.0, fill(0.5)), "other", id="a name that is taken"),
+    ],
+)
+def test_an_error_of_the_core_is_a_value_error_that_names_its_kind(call, kind):
+    with pytest.raises(_core.CoreError) as caught:
+        call()
+    assert caught.value.kind == kind
+    assert isinstance(caught.value, ValueError)
+    assert str(caught.value)
+
+
+def test_an_error_of_the_core_survives_pickling_with_its_kind():
+    """Renders may run in other processes, which send their exceptions back pickled."""
+    with pytest.raises(_core.CoreError) as caught:
+        _core.effect("no_such_effect")
+    again = pickle.loads(pickle.dumps(caught.value))  # noqa: S301  a value made just above, not outside data
+    assert (type(again), again.kind, str(again)) == (_core.CoreError, "unknown_effect", str(caught.value))
+
+
+def test_a_foreign_effect_that_returns_no_picture_is_an_error_of_the_other_kind_naming_it():
+    with registered("probe_bad", lambda rgb, params: None), pytest.raises(_core.CoreError, match="probe_bad") as caught:
+        _core.apply("probe_bad", PIXEL, {})
+    assert caught.value.kind == "other"
+
+
+def test_the_core_names_the_kinds_of_its_errors_in_the_order_of_the_table():
+    assert _core.vocabulary()["error_kinds"] == [
+        "recipe",
+        "unknown_effect",
+        "subject_not_found",
+        "depth_not_found",
+        "map_not_found",
+        "invalid_image",
+        "non_finite_image",
+        "other",
+    ]
 
 
 # --- checking parameters and reading recipes ---------------------------------------------------------------------

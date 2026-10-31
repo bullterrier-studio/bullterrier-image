@@ -39,10 +39,7 @@ impl Effect for Seams {
     }
 
     fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
-        Err(Error::Foreign {
-            effect: "seams".to_owned(),
-            message: "the tests never run it".to_owned(),
-        })
+        Err(Error::foreign("seams", "the tests never run it"))
     }
 }
 
@@ -82,10 +79,9 @@ impl Effect for Paint {
     }
 
     fn apply(&self, picture: &Picture<'_>, params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
-        let level = params["level"].as_f64().ok_or_else(|| Error::Foreign {
-            effect: self.name.to_owned(),
-            message: "no level".to_owned(),
-        })?;
+        let level = params["level"]
+            .as_f64()
+            .ok_or_else(|| Error::foreign(self.name, "no level"))?;
         #[expect(clippy::cast_possible_truncation, reason = "a test level is a small number")]
         Ok(picture.map(|_| [level as f32; 3]))
     }

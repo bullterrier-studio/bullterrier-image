@@ -42,11 +42,11 @@ from typing import Any
 
 import numpy as np
 
-from bullterrier_image._native import _core
 from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
 from bullterrier_image.ops.maps import map_problem
 
 from . import looks as look_files
+from . import native
 from . import presets as preset_files
 from .params import EffectParams, core_effect, field_name_fields, signature
 from .presets import Preset
@@ -427,7 +427,7 @@ def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> Model
             )
         if name != core:
             raise ValueError(f"effect {name!r} is run by the Rust core effect {core!r}: name the function {core!r}")
-        declared = _core.effect(core)
+        declared = native.effect(core)
         category, opacity = declared["category"], declared["opacity"]
     elif category is None:
         raise ValueError(
