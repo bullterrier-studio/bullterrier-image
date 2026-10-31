@@ -593,8 +593,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *A finder is asked at most once per photo.* Its answer is kept behind a lock held across `find`, so threads sharing the
     photo cannot both ask; an error is not kept (the next render asks again). `Finder` is `find` only: the identity only the
     pipeline's fingerprint reads is the pipeline's. *Rejected:* releasing the lock before `find` (two asks).
-  - *`Photo` borrows the picture* (zero copy from numpy), and `light` is made from the picture as given, as Python's regions
-    do, not from a step's output. `background` is 1 - `subject`.
+  - *`Photo` borrows the picture* (zero copy from numpy), and `light` is made from the working picture (framed and sized, before
+    any step; the pictures as given are only what a finder is asked about), not from a step's output. `background` is 1 - `subject`.
   - *`render` and `trace` are one engine* (`Run::advance` replaces the newest image), so the last stage of a trace is
     `render`'s result byte for byte and `render` keeps only the newest image, by construction. `Stage` is a flat
     `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`, and from R4b `CutOut`); labels are the facade's, since they come

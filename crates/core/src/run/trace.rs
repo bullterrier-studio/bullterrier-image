@@ -10,7 +10,8 @@ use crate::{Error, Image, Layer, Options, Presets, Recipe};
 pub enum Stage {
     /// The photo, as the recipe receives it.
     Input(Image),
-    /// The subject, if the recipe uses it (a mask, a field, a drive, or `background`): white where it is.
+    /// The subject as the steps work on it (framed and sized), if the recipe uses it (a mask, a field, a drive or
+    /// `background`) or its `frame` needs it (`anchor` `Subject`, `transparent` `Background`): white where it is.
     Subject(Layer),
     /// The depth, if the recipe uses it: 1 where it is nearest.
     Depth(Layer),

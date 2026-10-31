@@ -97,7 +97,7 @@ Nothing imports `effects`: the registry loads every entry point of the group `bu
 checkout, `uv sync` installs ours; without it no effect is found.
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
 (`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made
-from the picture as given) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.
+from the working picture: framed and sized, before any step) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.
 `bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
 ## The rules
