@@ -35,7 +35,8 @@ impl Recipe {
     ///
     /// # Errors
     /// [`Error::UnknownEffect`] for an effect that is not registered, [`Error::Invalid`] for a parameter that breaks
-    /// the rule of its declaration, [`Error::Recipe`] for any other rule, naming the step (`step 2`).
+    /// the rule of its declaration (its `place` is the step, `step 2`, or the look of an each step, `step 2, look 1`),
+    /// [`Error::Recipe`] for any other rule, naming the step the same way.
     pub fn checked(self, presets: &Presets) -> Result<Self, Error> {
         self.check_in(crate::registry::registry(), presets)?;
         Ok(self)
@@ -218,7 +219,7 @@ impl Rules<'_> {
                 for (name, drive) in &drives {
                     values.insert(name.clone(), Value::from(end(drive)));
                 }
-                table.check(&step.effect, &values)?;
+                table.check(&step.effect, &values).map_err(|error| error.at(place))?;
             }
         }
         match (effect.inputs().contains(&Input::Partition), &step.partition) {
@@ -788,7 +789,7 @@ mod tests {
     fn a_parameter_out_of_range_is_the_tables_own_error() -> Result<(), Error> {
         let refused = refusal(&Recipe::new([probe().param("cell", 1)]), &Presets::new())?;
         assert!(
-            matches!(&refused, Some(Error::Invalid { effect, field, value, .. }) if effect == "probe" && field == "cell" && *value == json!(1)),
+            matches!(&refused, Some(Error::Invalid { effect, field, value, .. }) if effect == "probe" && field == "cell" && **value == json!(1)),
             "{refused:?}"
         );
         Ok(())
@@ -828,6 +829,44 @@ mod tests {
         assert!(
             refused.as_deref().is_some_and(|text| text.contains("no presets")),
             "{refused:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_parameter_refused_in_a_later_step_names_the_step_and_keeps_its_typed_information() {
+        let grade = |step: Step| Recipe::new([Step::new("grade"), step]);
+        let refused = grade(Step::new("grade").param("subject", 1)).checked(&Presets::new());
+        assert!(
+            matches!(&refused, Err(Error::Invalid { place: Some(place), effect, field, .. })
+                if place == "step 2" && effect == "grade" && field == "subject"),
+            "{refused:?}"
+        );
+        let text = refused.err().map(|error| error.to_string());
+        assert!(
+            text.as_deref()
+                .is_some_and(|text| text.starts_with("step 2: effect 'grade': `subject` is not")),
+            "{text:?}"
+        );
+    }
+
+    #[test]
+    fn a_parameter_refused_in_a_look_names_the_step_and_the_look() -> Result<(), Error> {
+        let with_regions = with_regions(Recipe::new([
+            probe().into(),
+            Entry::from(Each::new("panes", [None, Some(probe().param("cell", 1))])),
+        ]));
+        let refused = refusal(&with_regions, &Presets::new())?;
+        assert!(
+            matches!(&refused, Some(Error::Invalid { place: Some(place), field, .. })
+                if place == "step 2, look 2" && field == "cell"),
+            "{refused:?}"
+        );
+        // the first step is named too, and a table checked on its own has no place
+        let first = refusal(&Recipe::new([probe().param("cell", 1)]), &Presets::new())?;
+        assert!(
+            matches!(&first, Some(Error::Invalid { place: Some(place), .. }) if place == "step 1"),
+            "{first:?}"
         );
         Ok(())
     }

@@ -20,10 +20,11 @@ impl Table {
     /// [`Error::Invalid`] naming `effect`, the parameter, the rule and the value.
     pub fn check(&self, effect: &str, given: &Map<String, Value>) -> Result<Map<String, Value>, Error> {
         let invalid = |field: &str, constraint, value: &Value| Error::Invalid {
+            place: None,
             effect: effect.to_owned(),
             field: field.to_owned(),
             constraint,
-            value: value.clone(),
+            value: Box::new(value.clone()),
         };
         if let Some((name, value)) = given
             .iter()
@@ -461,8 +462,8 @@ mod tests {
             assert!(
                 matches!(
                     &result,
-                    Err(Error::Invalid { effect, field: blamed, constraint: broken, value: shown })
-                        if effect == "probe" && blamed == field && *broken == constraint && *shown == value
+                    Err(Error::Invalid { place: None, effect, field: blamed, constraint: broken, value: shown })
+                        if effect == "probe" && blamed == field && *broken == constraint && **shown == value
                 ),
                 "{rule}: {result:?}"
             );

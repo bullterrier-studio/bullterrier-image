@@ -28,16 +28,20 @@ pub enum Error {
     },
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
+        /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
+        /// their own (`Table::check`), not as part of a recipe (`Recipe::checked` names the place).
+        place: Option<String>,
         /// The effect whose parameters these were.
         effect: String,
         /// The parameter.
         field: String,
         /// The rule it breaks.
         constraint: Constraint,
-        /// The value that was given.
-        value: Value,
+        /// The value that was given (boxed to keep `Error` small).
+        value: Box<Value>,
     },
-    /// A recipe breaks a rule; the text says which, naming the step and the key.
+    /// A recipe breaks a rule; the text says which, naming the step (`step 2`, as [`Error::Invalid`] does in its
+    /// `place`) and the key.
     Recipe(String),
     /// The parameters are not the effect's: one is missing, unknown, or of the wrong type.
     Params {
@@ -79,6 +83,28 @@ pub enum Constraint {
     Colour,
 }
 
+impl Error {
+    /// This error placed in a recipe at `place` if it is a parameter refusal.
+    pub(crate) fn at(self, place: &str) -> Self {
+        match self {
+            Self::Invalid {
+                effect,
+                field,
+                constraint,
+                value,
+                ..
+            } => Self::Invalid {
+                place: Some(place.to_owned()),
+                effect,
+                field,
+                constraint,
+                value,
+            },
+            other => other,
+        }
+    }
+}
+
 impl fmt::Display for Constraint {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -104,14 +130,20 @@ impl fmt::Display for Error {
             Self::UnknownEffect(name) => write!(formatter, "the Rust core has no effect called {name:?}"),
             Self::Duplicate(name) => write!(formatter, "an effect called {name:?} is registered already"),
             Self::Invalid {
+                place,
                 effect,
                 field,
                 constraint,
                 value,
-            } => match constraint {
-                Constraint::Unknown(_) => write!(formatter, "effect '{effect}': `{field}` {constraint}"),
-                _ => write!(formatter, "effect '{effect}': `{field}` {constraint}, got {value}"),
-            },
+            } => {
+                if let Some(place) = place {
+                    write!(formatter, "{place}: ")?;
+                }
+                match constraint {
+                    Constraint::Unknown(_) => write!(formatter, "effect '{effect}': `{field}` {constraint}"),
+                    _ => write!(formatter, "effect '{effect}': `{field}` {constraint}, got {value}"),
+                }
+            }
             Self::Recipe(message) => formatter.write_str(message),
             Self::Foreign { effect, message } => write!(formatter, "the effect {effect:?} failed: {message}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
