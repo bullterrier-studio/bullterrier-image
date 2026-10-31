@@ -2,8 +2,9 @@
 
 use std::fmt;
 
-/// Why an effect could not run. Each is a programming error of the caller, never a user's mistake: the Python package
-/// validates whatever a user gives before it reaches the core.
+/// Why an effect could not run. Except [`Error::Foreign`], which is whatever an effect that runs outside the core
+/// raised, each is a programming error of the caller, never a user's mistake: the Python package validates whatever a
+/// user gives before it reaches the core.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {

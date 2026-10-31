@@ -114,7 +114,8 @@ fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 #[pyfunction]
 fn register(name: &str, category: &str, opacity: f64, function: &Bound<'_, PyAny>) -> PyResult<()> {
     let category = Category::ALL
-        .into_iter()
+        .iter()
+        .copied()
         .find(|known| known.name() == category)
         .ok_or_else(|| PyValueError::new_err(format!("{category:?} is not a category of effects")))?;
     if !(0.0..=1.0).contains(&opacity) {

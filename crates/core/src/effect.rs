@@ -41,7 +41,7 @@ pub enum Category {
 
 impl Category {
     /// Every category, in catalogue order.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: &'static [Self] = &[
         Self::Colour,
         Self::Light,
         Self::Texture,
@@ -88,7 +88,7 @@ pub enum Input {
 
 impl Input {
     /// Every input, in the order recipes list them.
-    pub const ALL: [Self; 2] = [Self::Partition, Self::SizeRatio];
+    pub const ALL: &'static [Self] = &[Self::Partition, Self::SizeRatio];
 
     /// The input's name in `snake_case`: `"size_ratio"`.
     #[must_use]
@@ -183,5 +183,52 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
             source,
         })?;
         Ok((self.render)(picture, &params))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The variant after `category` in catalogue order. The match has no wildcard: a new variant stops this compiling
+    /// until it is placed here, and then `ALL` must list it too for the walk below to match.
+    const fn next_category(category: Category) -> Option<Category> {
+        match category {
+            Category::Colour => Some(Category::Light),
+            Category::Light => Some(Category::Texture),
+            Category::Texture => Some(Category::Stylised),
+            Category::Stylised => Some(Category::Text),
+            Category::Text => Some(Category::Distortion),
+            Category::Distortion => Some(Category::Glitch),
+            Category::Glitch => Some(Category::Atmosphere),
+            Category::Atmosphere => Some(Category::Subject),
+            Category::Subject => Some(Category::Compositing),
+            Category::Compositing => Some(Category::Backgrounds),
+            Category::Backgrounds => Some(Category::Utilities),
+            Category::Utilities => None,
+        }
+    }
+
+    /// As [`next_category`], for inputs.
+    const fn next_input(input: Input) -> Option<Input> {
+        match input {
+            Input::Partition => Some(Input::SizeRatio),
+            Input::SizeRatio => None,
+        }
+    }
+
+    #[test]
+    fn all_categories_lists_every_variant_once_in_catalogue_order() {
+        let all: &'static [Category] = Category::ALL;
+        let walk: Vec<Category> =
+            std::iter::successors(Some(Category::Colour), |&variant| next_category(variant)).collect();
+        assert_eq!(all, walk.as_slice());
+    }
+
+    #[test]
+    fn all_inputs_lists_every_variant_once_in_recipe_order() {
+        let all: &'static [Input] = Input::ALL;
+        let walk: Vec<Input> = std::iter::successors(Some(Input::Partition), |&variant| next_input(variant)).collect();
+        assert_eq!(all, walk.as_slice());
     }
 }
