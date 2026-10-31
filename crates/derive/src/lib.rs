@@ -29,7 +29,7 @@ pub fn derive_params(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Derive `Parameter` and `Deserialize` for a fieldless enum whose variants are the choices of a parameter.
+/// Derive `Choice` (the names) and `Deserialize` for a fieldless enum whose variants are the choices of a parameter.
 #[proc_macro_derive(Choice)]
 pub fn derive_choice(input: TokenStream) -> TokenStream {
     choice::expand(&parse_macro_input!(input as DeriveInput))

@@ -113,9 +113,8 @@ enum Written {
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it recognises the two numbers, `bool` and `Color` by their written names (a type
-/// alias is not recognised) and takes any other type for a choice enum; the table's kind comes from the type itself
-/// (`Parameter`).
+/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool` and `Color` by their written names (a type
+/// alias is not recognised) and takes any other type for a choice enum, whose names come from its `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
     Float,
@@ -142,8 +141,11 @@ fn shape(ty: &Type) -> Shape {
     }
 }
 
-/// What a checked field contributes: the expression of its default value, and the table's default, unit and bounds.
+/// What a checked field contributes: the expression of its default value, and the table's kind, choices, default, unit
+/// and bounds.
 struct Parts {
+    kind: TokenStream,
+    choices: TokenStream,
     value: TokenStream,
     default: TokenStream,
     unit: TokenStream,
@@ -174,6 +176,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         other => other_parts(&settings, &written, other, ty, &broken)?,
     };
     let Parts {
+        kind,
+        choices,
         value,
         default,
         unit,
@@ -184,14 +188,14 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     let row = quote! {
         crate::params::Field {
             name: #label,
-            kind: <#ty as crate::params::Parameter>::KIND,
+            kind: #kind,
             doc: #doc,
             default: #default,
             unit: #unit,
             min: #min,
             max: #max,
             cyclic: #cyclic,
-            choices: <#ty as crate::params::Parameter>::CHOICES,
+            choices: #choices,
             drivable: #drivable,
             advanced: #advanced,
         }
@@ -238,7 +242,14 @@ fn other_parts(
         _ => return Err(broken("the default of a choice is the name of one of its variants")),
     };
     let none = quote!(::core::option::Option::None);
+    let (kind, choices) = match shape {
+        Shape::Switch => (quote!(Bool), quote!(&[])),
+        Shape::Colour => (quote!(Color), quote!(&[])),
+        _ => (quote!(Choice), quote!(<#ty as crate::params::Choice>::CHOICES)),
+    };
     Ok(Parts {
+        kind: quote!(crate::params::Kind::#kind),
+        choices,
         value,
         default,
         unit: none.clone(),
@@ -289,7 +300,10 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
     let value = number_value(number, whole).ok_or_else(|| broken("the default does not fit i32"))?;
     let unit = Ident::new(&capitalised(&unit.to_string()), unit.span());
     let (low, high) = (low.scalar(), high.scalar());
+    let kind = if whole { quote!(Int) } else { quote!(Float) };
     Ok(Parts {
+        kind: quote!(crate::params::Kind::#kind),
+        choices: quote!(&[]),
         value,
         default: number.scalar(),
         unit: quote!(::core::option::Option::Some(crate::params::Unit::#unit)),

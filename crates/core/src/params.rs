@@ -29,28 +29,12 @@ use serde::{Deserialize, Serialize};
 
 pub use bullterrier_image_derive::{Choice, Params};
 
-/// What a type must say to be a parameter's: its kind, and for a choice its names.
-pub trait Parameter {
-    /// The kind of value the type holds.
-    const KIND: Kind;
-    /// The names a choice picks from, in declaration order; none for any other kind.
-    const CHOICES: &'static [&'static str] = &[];
-}
-
-impl Parameter for f32 {
-    const KIND: Kind = Kind::Float;
-}
-
-impl Parameter for i32 {
-    const KIND: Kind = Kind::Int;
-}
-
-impl Parameter for bool {
-    const KIND: Kind = Kind::Bool;
-}
-
-impl Parameter for Color {
-    const KIND: Kind = Kind::Color;
+/// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
+/// four other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool` and `Color` by their
+/// written names.
+pub trait Choice {
+    /// The names, in `snake_case`.
+    const CHOICES: &'static [&'static str];
 }
 
 /// The parameters of an effect, declared with `#[derive(Params)]`: the table of what they are.
@@ -95,7 +79,7 @@ pub struct Field {
     pub advanced: bool,
 }
 
-/// The kind of value a parameter holds.
+/// The kind of value a parameter holds. Python's `_PLAIN_KINDS` (`core/params.py`) maps each to its annotation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
@@ -111,7 +95,7 @@ pub enum Kind {
     Color,
 }
 
-/// The unit a number is in.
+/// The unit a number is in. Python's `UNITS` (`core/params.py`) lists the same names; a model checks its unit against them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Unit {

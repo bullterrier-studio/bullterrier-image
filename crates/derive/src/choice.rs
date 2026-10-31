@@ -50,8 +50,7 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         }
     }
     Ok(quote! {
-        impl crate::params::Parameter for #name {
-            const KIND: crate::params::Kind = crate::params::Kind::Choice;
+        impl crate::params::Choice for #name {
             const CHOICES: &'static [&'static str] = &[#(#names),*];
         }
 
@@ -71,7 +70,7 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
                             #(#names => ::core::result::Result::Ok(#name::#variants),)*
                             _ => ::core::result::Result::Err(E::unknown_variant(
                                 text,
-                                <#name as crate::params::Parameter>::CHOICES,
+                                <#name as crate::params::Choice>::CHOICES,
                             )),
                         }
                     }

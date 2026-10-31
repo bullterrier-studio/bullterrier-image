@@ -72,7 +72,16 @@ from bullterrier_image.errors import LutError, RecipeError
 
 from .types import Color as ColorForms
 
-UNITS = ("px", "fraction", "degrees", "stops", "count", "ratio", "cycles", "density")
+UNITS = (
+    "px",
+    "fraction",
+    "degrees",
+    "stops",
+    "count",
+    "ratio",
+    "cycles",
+    "density",
+)  # also `Unit` in crates/core/src/params.rs
 DESIGN_SIZE = 480  # px: the long side every px value is written for (the effects' defaults are tuned for it)
 
 
@@ -630,7 +639,21 @@ _PLAIN_KINDS: dict[str, Any] = {
     "int": int,
     "bool": bool,
     "color": Color,
-}  # a Rust kind -> its annotation
+}  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
+
+
+def _annotation(effect: str, entry: dict[str, Any]) -> Any:
+    """The annotation of the field `entry` of the Rust declaration of `effect`; ValueError if its kind is one the core
+    has and this module has not (a kind added to `Kind` without a line in `_PLAIN_KINDS`)."""
+    kind = entry["kind"]
+    if kind == "choice":
+        return Literal[tuple(entry["choices"])]
+    if kind not in _PLAIN_KINDS:
+        raise ValueError(
+            f"the Rust core declares {effect}.{entry['name']} of the kind {kind!r}, which EffectParams cannot build a "
+            f"field from (it knows {', '.join([*_PLAIN_KINDS, 'choice'])})"
+        )
+    return _PLAIN_KINDS[kind]
 
 
 def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
@@ -641,10 +664,7 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
     declared = _core.params(effect)
     cls.__doc__ = declared["doc"]
     fields = declared["fields"]
-    cls.__annotations__ = {
-        entry["name"]: Literal[tuple(entry["choices"])] if entry["kind"] == "choice" else _PLAIN_KINDS[entry["kind"]]
-        for entry in fields
-    }
+    cls.__annotations__ = {entry["name"]: _annotation(effect, entry) for entry in fields}
     for entry in fields:
         spec = param(
             entry["default"],
