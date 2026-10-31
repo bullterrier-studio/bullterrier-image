@@ -6,14 +6,16 @@
 //!   struct's own doc comment documents the effect's parameters as a whole. The derive writes `Default` and the table
 //!   the Python package builds the effect's model from, and refuses a broken declaration at compile time, naming the
 //!   field, for each rule it checks: a doc, a default of the field's kind, a unit and range holding the default,
-//!   `cyclic` and `drivable` where they apply, a setting given once. It recognises `f32`,
-//!   `i32`, `bool` and `Color` by those written names (a type alias is not recognised and is taken for a choice enum).
-//!   Left to others: an unknown `unit` is rustc's error pointing at it, and that a choice's doc names every variant is
-//!   checked when Python builds the model.
+//!   `cyclic` and `drivable` where they apply, a setting given once. It recognises `f32`, `i32`, `bool` and `Color`
+//!   by those written names and takes any other type for a choice enum: `f64`, `u32`, `Option<f32>` or an alias of
+//!   `f32` (`type Real = f32`) is not recognised, and a number declaration on one is refused with an error naming the
+//!   type. Left to others: an unknown `unit` is rustc's own error ("no variant `Banana` found for enum `params::Unit`"),
+//!   which is adequate, and that a choice's doc names every variant is checked when Python builds the model.
 //! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order.
 //!   It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
 //!
-//! The code they write refers to the core's `crate::params` paths: every effect lives in the core.
+//! The code they write refers to the core's `crate::params` paths, so it compiles only inside the core crate (every
+//! effect lives there); were the core published, this crate would be published with it.
 
 mod choice;
 mod params;

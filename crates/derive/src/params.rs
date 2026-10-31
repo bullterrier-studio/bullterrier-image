@@ -1,7 +1,7 @@
 //! `#[derive(Params)]`: an effect's parameters, declared by field type, doc comment and `#[param(..)]`.
 
 use proc_macro2::{Literal, TokenStream};
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, Ident, Lit, Meta, Type, UnOp};
 
 use crate::snake_case;
@@ -215,14 +215,27 @@ fn other_parts(
     ty: &Type,
     broken: Broken<'_>,
 ) -> syn::Result<Parts> {
+    // A type the derive does not know is taken for a choice enum; when the declaration is not one's, the likelier
+    // mistake is a number type (`f64`, `u32`, `Option<f32>`, an alias of `f32`), so the message names the type.
+    let wrong = |problem: &str| {
+        if shape == Shape::Choice {
+            let ty = ty.to_token_stream().to_string().replace(' ', "");
+            broken(&format!(
+                "`{ty}` is not f32, i32, bool or Color, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                 (a number is f32 or i32)"
+            ))
+        } else {
+            broken(problem)
+        }
+    };
     if settings.unit.is_some() || settings.min.is_some() || settings.max.is_some() {
-        return Err(broken("only a number takes a unit, min and max"));
+        return Err(wrong("only a number takes a unit, min and max"));
     }
     if settings.cyclic {
-        return Err(broken("only a number in degrees can be cyclic"));
+        return Err(wrong("only a number in degrees can be cyclic"));
     }
     if settings.drivable {
-        return Err(broken("only a decimal number (f32) can be drivable"));
+        return Err(wrong("only a decimal number (f32) can be drivable"));
     }
     let (value, default) = match (shape, written) {
         (Shape::Switch, Written::Switch(on)) => (quote!(#on), quote!(crate::params::Scalar::Bool(#on))),
@@ -239,7 +252,7 @@ fn other_parts(
         }
         (Shape::Switch, _) => return Err(broken("the default of a switch is true or false")),
         (Shape::Colour, _) => return Err(broken("the default of a colour is '#rrggbb', in quotes")),
-        _ => return Err(broken("the default of a choice is the name of one of its variants")),
+        _ => return Err(wrong("the default of a choice is the name of one of its variants")),
     };
     let none = quote!(::core::option::Option::None);
     let (kind, choices) = match shape {
@@ -690,6 +703,42 @@ mod tests {
                 "a colour whose digits are not all hex",
                 documented! { #[param(default = "#+f+f+f")] tint: Color, },
                 &["tint", "#rrggbb"],
+            ),
+        ]);
+    }
+
+    #[test]
+    fn a_type_the_derive_does_not_know_is_refused_naming_the_field_and_the_type() {
+        assert_refused(&[
+            (
+                "f64 is not a decimal the derive knows",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: f64, },
+                &["cell", "`f64`"],
+            ),
+            (
+                "u32 is not a whole number the derive knows",
+                documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: u32, },
+                &["cells", "`u32`"],
+            ),
+            (
+                "an optional number is not a number",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Option<f32>, },
+                &["cell", "`Option<f32>`"],
+            ),
+            (
+                "an alias of f32 is not recognised by its name",
+                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Real, },
+                &["cell", "`Real`", "(a number is f32 or i32)"],
+            ),
+            (
+                "an unknown type with a number for its default",
+                documented! { #[param(default = 4.0)] cell: f64, },
+                &["cell", "`f64`", "variants"],
+            ),
+            (
+                "an unknown type that is drivable",
+                documented! { #[param(default = Grid, drivable)] kind: Kind, },
+                &["kind", "`Kind`", "f32"],
             ),
         ]);
     }
