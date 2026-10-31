@@ -15,7 +15,8 @@
 //! [`Photo::with_map`], or found by a [`Finder`] the photo is given with [`Photo::with_finder`], once however many
 //! recipes are rendered), `background` (1 - the subject), `light` (the picture's brightness) or a region the recipe
 //! declares as given. A parameter an effect declares drivable may be a [`Drive`], which varies it across the picture by
-//! such a map. [`apply`] runs one effect on parameters that are already complete.
+//! such a map. [`Photo::trace`] runs the same code and returns every [`Stage`]: the photo, the maps used, and the picture
+//! after each step. [`apply`] runs one effect on parameters that are already complete.
 
 #![forbid(unsafe_code)]
 
@@ -40,7 +41,7 @@ pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
 pub use recipe::{Assign, BlendMode, Drive, Each, Entry, Recipe, STEP_KEYS, Step};
 pub use registry::{effect, effects, register, unregister};
-pub use run::{Finder, Options, Photo};
+pub use run::{Finder, Options, Photo, Stage};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
 /// image of the picture's size. `inputs` is what is on offer: the effect receives the part it declares.

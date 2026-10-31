@@ -6,7 +6,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use bullterrier_image::{
-    BlendMode, Drive, Finder, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply,
+    BlendMode, Drive, Finder, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step, apply,
 };
 use serde_json::json;
 
@@ -188,5 +188,25 @@ fn a_step_masked_by_the_background_changes_the_picture_only_where_a_finder_found
         let expected = if index % 30 < 12 { &values } else { &graded };
         assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
     }
+    Ok(())
+}
+
+#[test]
+fn a_trace_shows_the_photo_the_subject_and_the_picture_after_each_step_ending_in_the_render() -> Outcome {
+    let values = wide_values();
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_finder("subject", Arc::new(LeftSide));
+    let recipe = Recipe::new([
+        Step::new("grade").param("exposure", 1.0).mask("subject"),
+        Step::new("pixel_grid").param("cell", 4),
+    ]);
+    let stages = photo.trace(&recipe, &Presets::new(), Options::default())?;
+    let rendered = photo.render(&recipe, &Presets::new(), Options::default())?;
+    assert_eq!(stages.len(), 4);
+    assert!(matches!(&stages[0], Stage::Input(input) if input.clone().into_values() == values));
+    assert!(
+        matches!(&stages[1], Stage::Subject(matte) if matte.values()[..30].iter().enumerate().all(|(column, alpha)| (*alpha > 0.5) == (column < 12)))
+    );
+    assert!(matches!(&stages[2], Stage::Step { number: 1, .. }));
+    assert!(matches!(&stages[3], Stage::Step { number: 2, image } if *image == rendered));
     Ok(())
 }

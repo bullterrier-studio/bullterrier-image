@@ -136,8 +136,7 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// (the error of the map's kind, see [`Error::kind`]), whatever a finder fails with, [`Error::Recipe`] for a region
     /// the core does not run yet, [`Error::InvalidImage`] for the `light` of a picture that is no picture.
     pub(super) fn get(&self, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
-        let resolved = self.resolved.borrow().get(name).cloned();
-        if let Some(layer) = resolved {
+        if let Some(layer) = self.resolved(name) {
             return Ok(layer);
         }
         let layer = match name {
@@ -151,6 +150,11 @@ impl<'r, 'a> Maps<'r, 'a> {
         };
         self.resolved.borrow_mut().insert(name.to_owned(), Arc::clone(&layer));
         Ok(layer)
+    }
+
+    /// The map `name` if this render has used it.
+    pub(super) fn resolved(&self, name: &str) -> Option<Arc<Layer>> {
+        self.resolved.borrow().get(name).cloned()
     }
 
     /// The map `name` handed to the photo or found by its finder.

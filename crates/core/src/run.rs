@@ -12,9 +12,11 @@ use std::fmt;
 use std::sync::Arc;
 
 mod maps;
+mod trace;
 
 pub use maps::Finder;
 use maps::{Found, Maps};
+pub use trace::Stage;
 
 use serde_json::{Map, Value};
 
@@ -135,6 +137,19 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Image, Error> {
+        let mut run = self.start(registry, recipe, presets, options)?;
+        while run.advance()?.is_some() {}
+        run.finish()
+    }
+
+    /// `recipe` checked and every step of it prepared, with all the maps they use found: ready to run.
+    fn start(
+        &self,
+        registry: &Registry,
+        recipe: &Recipe,
+        presets: &Presets,
+        options: Options,
+    ) -> Result<Run<'a>, Error> {
         let ratio = options.size_ratio;
         if !(ratio.is_finite() && ratio > 0.0) {
             return Err(Error::Inputs(format!(
@@ -155,17 +170,51 @@ impl<'a> Photo<'a> {
             .enumerate()
             .map(|(index, entry)| prepare(registry, presets, ratio, &maps, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut current: Option<Image> = None;
-        for step in &steps {
-            let before = current.as_ref().map_or(self.picture, Image::as_picture);
-            let mut offered = Inputs::default().with_size_ratio(ratio);
-            for (parameter, layer) in &step.fields {
-                offered = offered.with_field(parameter.as_str(), layer);
-            }
-            let after = step.run(&before, &offered)?;
-            current = Some(step.lay(&before, after));
+        Ok(Run {
+            picture: self.picture,
+            ratio,
+            steps: steps.into_iter(),
+            current: None,
+            subject: maps.resolved("subject"),
+            depth: maps.resolved("depth"),
+        })
+    }
+}
+
+/// A recipe being run, the one engine of `render` and `trace`: the steps still to run and the newest image. Each step
+/// takes the image before it and drops it once its own is made, so no earlier image is kept; whoever wants them (a
+/// trace) copies what [`advance`](Self::advance) shows.
+struct Run<'a> {
+    picture: Picture<'a>,
+    ratio: f64,
+    steps: std::vec::IntoIter<Prepared>,
+    current: Option<Image>,
+    /// The subject, if some step uses it (a mask, a field, a drive, `background`).
+    subject: Option<Arc<Layer>>,
+    /// The depth, if some step uses it.
+    depth: Option<Arc<Layer>>,
+}
+
+impl Run<'_> {
+    /// Runs the next step, and shows the image it made; none once all have run.
+    fn advance(&mut self) -> Result<Option<&Image>, Error> {
+        let Some(step) = self.steps.next() else {
+            return Ok(None);
+        };
+        let before = self.current.as_ref().map_or(self.picture, Image::as_picture);
+        let mut offered = Inputs::default().with_size_ratio(self.ratio);
+        for (parameter, layer) in &step.fields {
+            offered = offered.with_field(parameter.as_str(), layer);
         }
-        current.ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))
+        let after = step.run(&before, &offered)?;
+        self.current = Some(step.lay(&before, after));
+        Ok(self.current.as_ref())
+    }
+
+    /// The image after the last step.
+    fn finish(self) -> Result<Image, Error> {
+        self.current
+            .ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))
     }
 }
 
