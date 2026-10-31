@@ -3,7 +3,7 @@
 
 use std::error::Error;
 
-use bullterrier_image::{Inputs, Options, Photo, Picture, Presets, Recipe, Step, apply};
+use bullterrier_image::{BlendMode, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply};
 use serde_json::json;
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -53,9 +53,14 @@ fn rendering_twice_gives_the_same_picture_and_leaves_the_photo_as_it_was() -> Ou
     Ok(())
 }
 
-/// `recipe` rendered at `ratio` working pixels per design pixel on a 20 x 30 picture.
+/// A 20 x 30 picture with a different value in every channel.
+fn wide_values() -> Vec<f32> {
+    (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect()
+}
+
+/// `recipe` rendered at `ratio` working pixels per design pixel on the 20 x 30 picture.
 fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
-    let values: Vec<f32> = (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect();
+    let values = wide_values();
     let photo = Photo::new(Picture::new(20, 30, &values)?);
     let options = Options::default().with_size_ratio(ratio);
     Ok(photo.render(recipe, &Presets::new(), options)?.into_values())
@@ -63,7 +68,7 @@ fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> 
 
 /// The effect `name` run on the same picture with `params` written out, as `rendered_at` does.
 fn applied(name: &str, params: serde_json::Value) -> Result<Vec<f32>, Box<dyn Error>> {
-    let values: Vec<f32> = (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect();
+    let values = wide_values();
     Ok(apply(name, &Picture::new(20, 30, &values)?, params, &Inputs::default())?.into_values())
 }
 
@@ -91,5 +96,35 @@ fn a_whole_number_of_pixels_scales_rounded_and_never_below_its_minimum() -> Outc
     assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", grid(3))?);
     // 4 x 1.6 = 6.4 -> 6
     assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", grid(6))?);
+    Ok(())
+}
+
+#[test]
+fn a_masked_step_changes_the_picture_only_where_the_mask_is_above_0() -> Outcome {
+    let values = wide_values();
+    // the left 12 of 30 columns are outside the mask, the rest inside it
+    let weights: Vec<f32> = (0..20 * 30)
+        .map(|index| f32::from(u8::from(index % 30 >= 12)))
+        .collect();
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("subject", Layer::new(20, 30, weights)?);
+    let recipe = Recipe::new([Step::new("grade")
+        .param("exposure", 1.0)
+        .mask("subject")
+        .blend_mode(BlendMode::Normal)]);
+    let rendered = photo
+        .render(&recipe, &Presets::new(), Options::default())?
+        .into_values();
+    let graded = apply(
+        "grade",
+        &Picture::new(20, 30, &values)?,
+        json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
+               "vibrance": 0.0}),
+        &Inputs::default(),
+    )?
+    .into_values();
+    for (index, pixel) in rendered.chunks(3).enumerate() {
+        let expected = if index % 30 >= 12 { &graded } else { &values };
+        assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
+    }
     Ok(())
 }

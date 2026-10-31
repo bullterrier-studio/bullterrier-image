@@ -1,6 +1,6 @@
 //! What the unit tests of the core share: a registry that holds a `probe` effect (one parameter of every kind, see
 //! `params::probe`) and a `seams` effect that takes a partition and describes no parameters of its own, beside the
-//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`] and [`Shrinks`].
+//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`], [`Shrinks`] and [`Replaces`].
 //!
 //! Integration tests (`crates/core/tests/`) cannot reach this module: they use the core's own effects, or a double
 //! written against the public [`Effect`] trait.
@@ -228,6 +228,29 @@ impl Effect for Shrinks {
 
     fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Image::new(1, 1, &[0.0; 3])
+    }
+}
+
+/// A foreign effect that ignores the picture and returns `values` (pixel after pixel, row after row) instead: the
+/// source a blend mode is laid over the photo with.
+pub(crate) struct Replaces {
+    pub(crate) name: &'static str,
+    pub(crate) height: usize,
+    pub(crate) width: usize,
+    pub(crate) values: Vec<f32>,
+}
+
+impl Effect for Replaces {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn category(&self) -> Category {
+        Category::Utilities
+    }
+
+    fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+        Image::new(self.height, self.width, &self.values)
     }
 }
 

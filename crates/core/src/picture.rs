@@ -47,6 +47,11 @@ impl<'a> Picture<'a> {
         self.pixels.as_flattened()
     }
 
+    /// The pixels, row after row.
+    pub(crate) const fn pixels(&self) -> &'a [[f32; 3]] {
+        self.pixels
+    }
+
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an
     /// effect that works pixel by pixel.
     #[must_use]
@@ -101,6 +106,11 @@ impl Image {
                 values: values.len(),
             })
         }
+    }
+
+    /// The image of `height` x `width` `pixels`, row after row; the caller made exactly that many.
+    pub(crate) const fn from_pixels(height: usize, width: usize, pixels: Vec<[f32; 3]>) -> Self {
+        Self { height, width, pixels }
     }
 
     /// The number of rows.

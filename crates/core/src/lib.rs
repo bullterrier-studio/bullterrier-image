@@ -9,8 +9,9 @@
 //! from an effect's typed `Params` (`effects::grade::Params`). There is no typed apply yet: [`apply`] takes JSON. Running an effect trusts its
 //! parameters (and, for now, expects them scaled by the Python package): check them first.
 //!
-//! A look runs on a picture with [`Photo::render`]: it checks the recipe, completes each step's parameters (preset,
-//! defaults) and runs the steps in order. [`apply`] runs one effect on parameters that are already complete.
+//! A look runs on a picture with [`Photo::render`]: it checks the recipe, completes and scales each step's parameters
+//! (preset, defaults, design pixels) and runs the steps in order, laying each result over its input by the step's blend
+//! mode, opacity and mask (a map handed to the photo with [`Photo::with_map`]). [`apply`] runs one effect on parameters that are already complete.
 
 #![forbid(unsafe_code)]
 

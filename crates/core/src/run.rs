@@ -6,13 +6,15 @@
 //! let image = Photo::new(picture).render(&look, &Presets::new(), Options::default())?;
 //! ```
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde_json::Value;
 
 use crate::effect::{self, Effect};
+use crate::ops::blend;
 use crate::registry::Registry;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Picture, Presets, Recipe};
+use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets, Recipe};
 
 /// What a render is asked for besides the recipe.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -39,17 +41,31 @@ impl Options {
     }
 }
 
-/// A picture a recipe is rendered on. It borrows the picture: rendering never copies or changes it.
-#[derive(Clone, Copy, Debug)]
+/// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region). It
+/// borrows the picture: rendering never copies or changes it.
+#[derive(Clone, Debug)]
 pub struct Photo<'a> {
     picture: Picture<'a>,
+    maps: BTreeMap<String, Layer>,
 }
 
 impl<'a> Photo<'a> {
-    /// The photo whose picture is `picture`.
+    /// The photo whose picture is `picture`, with no maps.
     #[must_use]
     pub const fn new(picture: Picture<'a>) -> Self {
-        Self { picture }
+        Self {
+            picture,
+            maps: BTreeMap::new(),
+        }
+    }
+
+    /// This photo with `map` for the name `name` (`subject`, `depth`, or a region the recipe declares as given): a
+    /// step's `mask`, a drive's `by` and an effect's field parameters find it there. A map of the same name given
+    /// before is replaced. It must be of the picture's size, which a render checks when it uses the map.
+    #[must_use]
+    pub fn with_map(mut self, name: impl Into<String>, map: Layer) -> Self {
+        self.maps.insert(name.into(), map);
+        self
     }
 
     /// The picture `recipe` makes of this photo: its steps run in order, each on the previous one's output, and only
@@ -57,12 +73,15 @@ impl<'a> Photo<'a> {
     ///
     /// The recipe is checked first by the rules of [`Recipe::checked`], so nothing runs for a recipe that breaks one;
     /// each step's effect then receives its complete parameters: the step's values over its preset's, the declared
-    /// defaults for the rest. A step with an `opacity`, `mask` or `blend_mode`, an `each` step, and a recipe with a
-    /// `frame` or a `size` are refused until the core runs them.
+    /// defaults for the rest, scaled to `options`. The step's result is laid over its input as an image editor lays a
+    /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
+    /// as far as the mask says. An `each` step and a recipe with a `frame` or a `size` are refused until the core
+    /// runs them.
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] for a step or recipe the core does not
-    /// run yet, and [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size.
+    /// run yet, [`Error::MapNotFound`] for a mask or field the photo has no map of (or of another size), and
+    /// [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size.
     pub fn render(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Image, Error> {
         self.render_in(crate::registry::registry(), recipe, presets, options)
     }
@@ -92,56 +111,114 @@ impl<'a> Photo<'a> {
             .steps
             .iter()
             .enumerate()
-            .map(|(index, entry)| prepare(registry, presets, ratio, entry, &format!("step {}", index + 1)))
+            .map(|(index, entry)| self.prepare(registry, presets, ratio, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
-        let offered = Inputs::default().with_size_ratio(ratio);
         let mut current: Option<Image> = None;
         for step in &steps {
             let before = current.as_ref().map_or(self.picture, Image::as_picture);
+            let mut offered = Inputs::default().with_size_ratio(ratio);
+            for (parameter, layer) in &step.fields {
+                offered = offered.with_field(parameter.as_str(), layer);
+            }
             let after = effect::run(&*step.effect, &before, step.params.clone(), &offered)?;
-            current = Some(after);
+            current = Some(step.lay(&before, after));
         }
         current.ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))
     }
+
+    /// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete and scaled, the maps it names
+    /// found, or why the core does not run it yet.
+    fn prepare(
+        &self,
+        registry: &Registry,
+        presets: &Presets,
+        ratio: f64,
+        entry: &Entry,
+        place: &str,
+    ) -> Result<Prepared<'_>, Error> {
+        let Entry::Step(step) = entry else {
+            return Err(Error::Recipe(format!(
+                "{place}: an `each` step is not run by the core yet"
+            )));
+        };
+        let effect = registry.effect(&step.effect)?;
+        let given = presets.under(step, place)?;
+        let mut fields = Vec::new();
+        for field in effect.fields() {
+            let name = match given.get(&field.parameter) {
+                None => &field.default,
+                Some(Value::String(name)) => name,
+                Some(other) => {
+                    return Err(Error::Recipe(format!(
+                        "{place}: `{}` names a field, got {other}",
+                        field.parameter
+                    )));
+                }
+            };
+            fields.push((field.parameter.clone(), self.map(name)?));
+        }
+        let params = match effect.params() {
+            Some(table) => table.scaled(
+                table.check(&step.effect, &given).map_err(|error| error.at(place))?,
+                ratio,
+            ),
+            None => given,
+        };
+        Ok(Prepared {
+            opacity: step.opacity.unwrap_or_else(|| effect.opacity()),
+            blend_mode: step.blend_mode,
+            mask: step.mask.as_deref().map(|name| self.map(name)).transpose()?,
+            fields,
+            effect,
+            params: Value::Object(params),
+        })
+    }
+
+    /// The map handed in as `name`, if it is of the picture's size.
+    fn map(&self, name: &str) -> Result<&Layer, Error> {
+        let layer = self.maps.get(name).ok_or_else(|| {
+            Error::map_not_found(
+                name,
+                format!("no map '{name}' was given to the photo (Photo::with_map)"),
+            )
+        })?;
+        let (height, width) = (self.picture.height(), self.picture.width());
+        if (layer.height(), layer.width()) != (height, width) {
+            return Err(Error::map_not_found(
+                name,
+                format!(
+                    "the map '{name}' is {} x {} pixels, but the picture is {height} x {width}",
+                    layer.height(),
+                    layer.width()
+                ),
+            ));
+        }
+        Ok(layer)
+    }
 }
 
-/// A step ready to run: its effect and the complete parameters it receives.
-struct Prepared {
+/// A step ready to run: its effect, the complete parameters it receives, the maps it works from and how its result is
+/// laid over its input.
+struct Prepared<'p> {
     effect: Arc<dyn Effect>,
     params: Value,
+    /// The field parameters of the effect, each with its map.
+    fields: Vec<(String, &'p Layer)>,
+    opacity: f64,
+    blend_mode: BlendMode,
+    mask: Option<&'p Layer>,
 }
 
-/// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete, or why the core does not run it yet.
-fn prepare(registry: &Registry, presets: &Presets, ratio: f64, entry: &Entry, place: &str) -> Result<Prepared, Error> {
-    let Entry::Step(step) = entry else {
-        return Err(Error::Recipe(format!(
-            "{place}: an `each` step is not run by the core yet"
-        )));
-    };
-    let effect = registry.effect(&step.effect)?;
-    let opacity = step.opacity.unwrap_or_else(|| effect.opacity());
-    let unsupported = |what: String| Error::Recipe(format!("{place}: {what} is not run by the core yet"));
-    if opacity < 1.0 {
-        return Err(unsupported(format!("`opacity` {opacity}")));
+impl Prepared<'_> {
+    /// `after`, the effect's result for `before`, laid over `before` as the step says. A plain step (blend mode
+    /// normal, opacity 1, no mask) is its result as it is, uncopied.
+    fn lay(&self, before: &Picture<'_>, after: Image) -> Image {
+        if self.opacity >= 1.0 && self.mask.is_none() && self.blend_mode == BlendMode::Normal {
+            after
+        } else {
+            blend::lay(before, &after.as_picture(), self.blend_mode, self.opacity, self.mask)
+        }
     }
-    if step.mask.is_some() {
-        return Err(unsupported("`mask`".to_owned()));
-    }
-    if step.blend_mode != BlendMode::Normal {
-        return Err(unsupported("`blend_mode`".to_owned()));
-    }
-    let given = presets.under(step, place)?;
-    let params = match effect.params() {
-        Some(table) => table.scaled(
-            table.check(&step.effect, &given).map_err(|error| error.at(place))?,
-            ratio,
-        ),
-        None => given,
-    };
-    Ok(Prepared {
-        effect,
-        params: Value::Object(params),
-    })
 }
 
 #[cfg(test)]
@@ -151,11 +228,10 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::Each;
-    use crate::Step;
     use crate::params::Declared;
     use crate::params::probe::Probe;
     use crate::testing::{Paint, Recorder, Shrinks, registry};
+    use crate::{Each, ErrorKind, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
     fn values() -> Vec<f32> {
@@ -166,6 +242,14 @@ mod tests {
     fn rendered(registry: &Registry, recipe: &Recipe, presets: &Presets) -> Result<Image, Error> {
         let values = values();
         Photo::new(Picture::new(4, 6, &values)?).render_in(registry, recipe, presets, Options::default())
+    }
+
+    /// `actual` is `expected` to within what an f32 sum loses.
+    fn assert_close(actual: &[f32], expected: &[f32]) {
+        assert_eq!(actual.len(), expected.len());
+        for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
+            assert!((a - e).abs() < 1e-6, "value {index}: {a} is not {e}");
+        }
     }
 
     /// The test registry with a recorder of the probe's parameters, called `recorder`.
@@ -213,23 +297,24 @@ mod tests {
         let registry = registry()?;
         registry.register(Arc::new(Paint { name: "paint" }))?;
         let paint = || Step::new("paint").param("level", 0.5);
-        // `paint` declares 0.25; this is not run until opacity is
-        let result = rendered(&registry, &Recipe::new([paint()]), &Presets::new());
-        assert!(
-            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("`opacity` 0.25")),
-            "{result:?}"
-        );
+        // `paint` declares an opacity of 0.25: a quarter of the way from the photo (value v) to 0.5 is v + 0.25 (0.5 - v)
+        let default = rendered(&registry, &Recipe::new([paint()]), &Presets::new())?;
+        let expected: Vec<f32> = values().iter().map(|v| v + 0.25 * (0.5 - v)).collect();
+        assert_close(&default.into_values(), &expected);
+        let own = rendered(&registry, &Recipe::new([paint().opacity(0.5)]), &Presets::new())?;
+        let expected: Vec<f32> = values().iter().map(|v| v + 0.5 * (0.5 - v)).collect();
+        assert_close(&own.into_values(), &expected);
         let full = rendered(&registry, &Recipe::new([paint().opacity(1.0)]), &Presets::new())?;
         assert_eq!(full.into_values(), vec![0.5; 72]);
         Ok(())
     }
 
     #[test]
-    fn a_step_that_is_not_run_yet_is_refused_naming_what_and_where() -> Result<(), Error> {
+    fn what_the_core_does_not_run_yet_is_refused_naming_it() -> Result<(), Error> {
         let registry = registry()?;
-        let mut recipe_with_frame = Recipe::new([Step::new("probe").opacity(1.0)]);
+        let mut recipe_with_frame = Recipe::new([Step::new("probe")]);
         recipe_with_frame.frame = json!({"flip": "horizontal"}).as_object().cloned().unwrap_or_default();
-        let mut recipe_with_size = Recipe::new([Step::new("probe").opacity(1.0)]);
+        let mut recipe_with_size = Recipe::new([Step::new("probe")]);
         recipe_with_size.size = Some(480);
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
         recipe_with_each.regions = json!({"panes": {"kind": "grid"}})
@@ -237,18 +322,6 @@ mod tests {
             .cloned()
             .unwrap_or_default();
         for (recipe, said) in [
-            (Recipe::new([Step::new("probe").opacity(0.5)]), "step 1: `opacity` 0.5"),
-            (
-                Recipe::new([Step::new("probe").opacity(1.0).mask("subject")]),
-                "step 1: `mask`",
-            ),
-            (
-                Recipe::new([
-                    Step::new("probe").opacity(1.0),
-                    Step::new("probe").opacity(1.0).blend_mode(BlendMode::Screen),
-                ]),
-                "step 2: `blend_mode`",
-            ),
             (recipe_with_each, "step 1: an `each` step"),
             (recipe_with_frame, "`frame`"),
             (recipe_with_size, "`size`"),
@@ -288,6 +361,79 @@ mod tests {
             );
         }
         assert_eq!(recorder.received().len(), 0);
+        Ok(())
+    }
+
+    /// A map of the 4 x 6 picture whose every value is `level`.
+    fn flat(level: f32) -> Result<Layer, Error> {
+        Layer::new(4, 6, vec![level; 24])
+    }
+
+    #[test]
+    fn a_mask_the_photo_has_no_map_of_refuses_the_render_as_that_maps_error_and_nothing_runs() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &[]));
+        registry.register(recorder.clone())?;
+        let recipe = |mask: &str| {
+            let mut recipe = Recipe::new([Step::new("recorder"), Step::new("recorder").mask(mask)]);
+            recipe.regions = json!({"cutout": {"kind": "path"}})
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+            recipe
+        };
+        // (mask, the kind of error the package raises it as); the maps handed in are `depth`, of the wrong size, and
+        // `other`
+        let small = Layer::new(2, 2, vec![0.5; 4])?;
+        let values = values();
+        let photo = Photo::new(Picture::new(4, 6, &values)?)
+            .with_map("depth", small)
+            .with_map("other", flat(0.5)?);
+        for (mask, kind, said) in [
+            ("subject", ErrorKind::SubjectNotFound, "'subject'"),
+            ("cutout", ErrorKind::MapNotFound, "'cutout'"),
+            ("light", ErrorKind::MapNotFound, "'light'"),
+            ("depth", ErrorKind::DepthNotFound, "2 x 2"),
+        ] {
+            let result = photo.render_in(&registry, &recipe(mask), &Presets::new(), Options::default());
+            assert!(
+                matches!(&result, Err(error) if error.kind() == kind && error.to_string().contains(said)),
+                "{mask}: {result:?}"
+            );
+        }
+        assert_eq!(recorder.received().len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_field_parameter_receives_the_map_its_step_names_or_the_effects_default() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &["near", "far"]));
+        registry.register(recorder.clone())?;
+        let values = values();
+        let photo = Photo::new(Picture::new(4, 6, &values)?)
+            .with_map("subject", flat(0.25)?)
+            .with_map("NEAR", flat(0.75)?)
+            .with_map("FAR", flat(0.5)?);
+        let render = |step: Step| photo.render_in(&registry, &Recipe::new([step]), &Presets::new(), Options::default());
+        render(Step::new("recorder").param("near", "subject"))?;
+        render(Step::new("recorder"))?; // the recorder's default field is the parameter upcased
+        let received = recorder.received();
+        // each parameter under its own name, the named map or the default one
+        assert_eq!(received[0].fields["near"], vec![0.25; 24]);
+        assert_eq!(received[0].fields["far"], vec![0.5; 24]);
+        assert_eq!(received[1].fields["near"], vec![0.75; 24]);
+        assert_eq!(received[1].fields["far"], vec![0.5; 24]);
+        let missing = render(Step::new("recorder").param("far", "depth"));
+        assert!(
+            matches!(&missing, Err(error) if error.kind() == ErrorKind::DepthNotFound),
+            "{missing:?}"
+        );
+        let mistyped = render(Step::new("recorder").param("near", 3));
+        assert!(
+            matches!(&mistyped, Err(error @ Error::Recipe(_)) if error.to_string().contains("`near` names a field")),
+            "{mistyped:?}"
+        );
         Ok(())
     }
 
