@@ -1,6 +1,6 @@
 //! The rules of a look.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value};
 
@@ -82,7 +82,7 @@ impl Recipe {
     /// The names of the steps are unique and none is the name of an effect a step uses (it would be taken for that
     /// effect in an address).
     fn check_names(&self) -> Result<(), Error> {
-        let used: Vec<&str> = self
+        let used: BTreeSet<&str> = self
             .steps
             .iter()
             .filter_map(|entry| match entry {
@@ -102,7 +102,7 @@ impl Recipe {
                     "`name` '{name}' is the name of steps {earlier} and {number}"
                 )));
             }
-            if used.contains(&name.as_str()) {
+            if used.contains(name.as_str()) {
                 return Err(Error::Recipe(format!(
                     "step {number}: `name` '{name}' is also an effect this recipe uses; choose another"
                 )));
