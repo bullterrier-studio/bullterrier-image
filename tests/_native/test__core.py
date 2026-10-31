@@ -88,7 +88,8 @@ def test_the_parameters_of_an_effect_the_core_does_not_implement_are_refused_by_
 
 
 def test_the_core_names_the_categories_and_inputs_in_the_order_the_package_lists_them():
-    assert _core.vocabulary() == {"categories": list(CATEGORIES), "inputs": list(INPUTS)}
+    vocabulary = _core.vocabulary()
+    assert (vocabulary["categories"], vocabulary["inputs"]) == (list(CATEGORIES), list(INPUTS))
 
 
 @pytest.mark.parametrize(
@@ -222,3 +223,40 @@ def test_a_foreign_effect_may_run_a_core_effect_itself():
 
     with registered("probe_nested", through_grade):
         np.testing.assert_allclose(_core.apply("probe_nested", PIXEL, {}), grade_with_contrast(2.0))
+
+
+# --- checking parameters and reading recipes ---------------------------------------------------------------------
+
+
+def test_checking_gives_the_complete_parameters_with_a_whole_number_kept_whole_and_a_decimal_kept_decimal():
+    checked = _core.check("pixel_grid", {"cell": 5, "gap": 1})
+    assert checked == {"cell": 5, "gap": 1.0, "amount": 0.4, "keep_brightness": False}
+    assert [type(checked[key]) for key in ("cell", "gap")] == [int, float]
+
+
+def test_a_value_the_declaration_refuses_is_a_value_error_in_the_sentence_the_core_says_it_in():
+    with pytest.raises(ValueError, match=r"^effect 'grade': `exposure` must be <= 10, got 11$"):
+        _core.check("grade", {"exposure": 11})
+
+
+def test_checking_the_parameters_of_an_effect_the_core_does_not_describe_is_refused_by_name():
+    with pytest.raises(ValueError, match="no_such_effect"):
+        _core.check("no_such_effect", {})
+    with registered("probe_double", fill(0.5)), pytest.raises(ValueError, match=r"probe_double.*its own parameters"):
+        _core.check("probe_double", {})
+
+
+def test_a_recipe_is_read_from_json_or_toml_and_any_other_format_is_refused():
+    assert _core.read_recipe('{"steps": [{"effect": "grade", "opacity": 0.5}]}', "json") == {
+        "steps": [{"effect": "grade", "opacity": 0.5}]
+    }
+    assert _core.read_recipe("[[step]]\neffect = 'grade'\nexposure = 1\n", "toml") == {
+        "steps": [{"effect": "grade", "params": {"exposure": 1}}]
+    }
+    with pytest.raises(ValueError, match=r"toml.*json"):
+        _core.read_recipe("steps: []", "yaml")
+
+
+def test_a_recipe_that_is_not_one_is_a_value_error_naming_the_key():
+    with pytest.raises(ValueError, match="opacity"):
+        _core.read_recipe('{"steps": [{"effect": "grade", "opacity": "half"}]}', "json")

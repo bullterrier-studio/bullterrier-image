@@ -3,19 +3,19 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{Category, Effect, Error, Image, Input, Picture};
+use bullterrier_image::{BlendMode, Category, Effect, Error, Image, Input, Picture, Recipe, STEP_KEYS};
 use numpy::{PyArray1, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::IntoPyObjectExt as _;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 /// The effects of bullterrier-image's Rust core, run on numpy pictures.
 #[pymodule]
 mod _core {
     #[pymodule_export]
-    use super::{apply, effect, effects, params, register, unregister, vocabulary};
+    use super::{apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
 }
 
 /// Run the effect called `effect` on `rgb` (float32, C-contiguous, (height, width, 3)) with `params` (exactly the
@@ -94,13 +94,62 @@ fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
     )
 }
 
-/// The names effects are described with, in the order the catalogue lists them: a dict `{"categories": [str],
-/// "inputs": [str]}`.
+/// The names recipes and effects are described with, in the order the catalogue lists them: a dict `{"categories":
+/// [str], "inputs": [str], "blend_modes": [str], "step_keys": [str]}`.
 #[pyfunction]
 fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     let categories: Vec<_> = Category::ALL.iter().map(|category| category.name()).collect();
     let inputs: Vec<_> = Input::ALL.iter().map(|input| input.name()).collect();
-    from_json(py, &json!({"categories": categories, "inputs": inputs}))
+    let blend_modes: Vec<_> = BlendMode::ALL.iter().map(|mode| mode.name()).collect();
+    from_json(
+        py,
+        &json!({"categories": categories, "inputs": inputs, "blend_modes": blend_modes, "step_keys": STEP_KEYS}),
+    )
+}
+
+/// The complete parameters the effect called `effect` takes for the values `params`, as its Rust struct declares them:
+/// a dict with every parameter, defaults filled in, a decimal as a `float` (also when given as a whole number), a
+/// whole number as an `int` and a colour as a list of three floats 0..1 (given as `'#rrggbb'`, `'#rgb'` or three
+/// numbers). A number outside its inclusive range is refused, except an angle declared cyclic, which any real wraps into.
+///
+/// `ValueError` with the sentence naming the effect, the parameter, the rule and the value, for the first rule `params`
+/// break; also if the core implements no such effect or the effect describes its own parameters (a Python function
+/// registered with `register`).
+#[pyfunction]
+fn check<'py>(py: Python<'py>, effect: &str, params: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny>> {
+    let table = bullterrier_image::effect(effect)
+        .map_err(value_error)?
+        .params()
+        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
+    let given = params
+        .iter()
+        .map(|(key, value)| Ok((key.extract::<String>()?, to_json(&value)?)))
+        .collect::<PyResult<Map<_, _>>>()?;
+    let checked = table.check(effect, &given).map_err(value_error)?;
+    from_json(py, &Value::Object(checked))
+}
+
+/// The recipe that the text `text` writes, in `syntax` (`"toml"`, a recipe file, or `"json"`), as a dict: `{"steps":
+/// [...], "name", "description", "size", "frame", "regions"}` with a key left out when the text left it unset; a
+/// step is `{"effect", "params", "preset", "partition", "mask", "opacity", "blend_mode", "name"}` and an each step
+/// `{"each", "looks", "assign", "seed", "feather", "mask", "opacity", "blend_mode", "name"}` likewise (a skipped look
+/// is `None`). Only the shape and the rules of the file's format version are read: whether the effects exist or
+/// the values are in range is for the recipe's check, and an opacity left out stays unset.
+///
+/// `ValueError` for text that is not that format or breaks one of those rules, naming the step and the key.
+#[pyfunction]
+fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound<'py, PyAny>> {
+    let recipe = match syntax {
+        "toml" => Recipe::from_toml(text),
+        "json" => Recipe::from_json(text),
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "a recipe is written in 'toml' or 'json', not {other:?}"
+            )));
+        }
+    }
+    .map_err(value_error)?;
+    from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)
 }
 
 /// Add the Python function `function(rgb, params) -> rgb` to the core's effects as `name`, in `category` (a name from
