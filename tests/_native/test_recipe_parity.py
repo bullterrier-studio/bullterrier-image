@@ -260,6 +260,11 @@ BAD_FILES = {
     "a look without an effect": FORMAT_2_EACH + "looks = ['none', { exposure = 1 }]\n",
     "an assignment that does not exist": FORMAT_2_EACH + "looks = ['none']\nassign = 'shuffle'\n",
     "a step without an effect": "[[step]]\nmask = 'subject'\n",
+    "a step opacity of nan": STEP + "opacity = nan\n",
+    "a step opacity of infinity": STEP + "opacity = inf\n",
+    "a parameter of infinity": STEP + "exposure = -inf\n",
+    "a parameter that is a date": STEP + "exposure = 1979-05-27\n",
+    "a parameter that is a date and time": STEP + "exposure = 1979-05-27T07:32:00Z\n",
 }
 
 GOOD_FILES = {

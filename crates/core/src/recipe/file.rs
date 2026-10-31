@@ -78,11 +78,12 @@ impl Recipe {
     ///
     /// # Errors
     /// [`Error::Recipe`] for text that is not TOML (the message keeps its line and column), a key that is not a
-    /// recipe key, a format this release does not read, a feature used in a format that lacks it, or a table of the
-    /// wrong shape, naming the step and the key.
+    /// recipe key, a format this release does not read, a feature used in a format that lacks it, a table of the
+    /// wrong shape, or a value a recipe has no use for (`nan`, `inf`, a date or time), naming the step and the key.
     pub fn from_toml(text: &str) -> Result<Self, Error> {
-        let file: Map<String, Value> =
+        let parsed: toml::Table =
             toml::from_str(text).map_err(|error| Error::Recipe(error.to_string().trim_end().to_owned()))?;
+        let file = model_of(parsed)?;
         let format = format_of(&file)?;
         if let Some(key) = file.keys().find(|key| KEYS.iter().all(|(known, _)| known != key)) {
             let keys: Vec<&str> = KEYS.iter().map(|(_, written)| *written).collect();
@@ -152,6 +153,50 @@ impl Recipe {
             regions,
         })
     }
+}
+
+/// The file's table as the model's values. TOML has what a recipe has no use for and `serde_json::Value` cannot hold:
+/// a number that is not finite would turn into `null` and a date into a table of its own, both unseen, so they are
+/// refused here, naming the key.
+fn model_of(table: toml::Table) -> Result<Map<String, Value>, Error> {
+    let mut path = String::new();
+    table
+        .into_iter()
+        .map(|(key, value)| Ok((key.clone(), value_of(value, &mut path, &key)?)))
+        .collect()
+}
+
+/// The model's value for `value`, which sits at `path` + `key` in the file.
+fn value_of(value: toml::Value, path: &mut String, key: &str) -> Result<Value, Error> {
+    let at = path.len();
+    if !path.is_empty() && !key.starts_with('[') {
+        path.push('.');
+    }
+    path.push_str(key);
+    let converted = match value {
+        toml::Value::String(text) => Ok(Value::String(text)),
+        toml::Value::Integer(number) => Ok(Value::from(number)),
+        toml::Value::Float(number) => serde_json::Number::from_f64(number)
+            .map(Value::Number)
+            .ok_or_else(|| Error::Recipe(format!("`{path}` must be a finite number, got {number}"))),
+        toml::Value::Boolean(switch) => Ok(Value::Bool(switch)),
+        toml::Value::Datetime(date) => Err(Error::Recipe(format!(
+            "`{path}` is a date or time ({date}), which a recipe has no use for: write text in quotes"
+        ))),
+        toml::Value::Array(items) => items
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| value_of(item, path, &format!("[{index}]")))
+            .collect::<Result<_, _>>()
+            .map(Value::Array),
+        toml::Value::Table(table) => table
+            .into_iter()
+            .map(|(key, item)| Ok((key.clone(), value_of(item, path, &key)?)))
+            .collect::<Result<_, _>>()
+            .map(Value::Object),
+    };
+    path.truncate(at);
+    converted
 }
 
 /// The format version a file declares: the first when it declares none.
@@ -533,6 +578,78 @@ looks = [
                 "{rule}: wanted {word:?}, got {refused:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_number_that_is_not_finite_and_a_date_are_refused_naming_the_key() {
+        let step = "[[step]]\neffect = \"a\"\n";
+        let region = "format = 2\n[region.p]\nkind = \"grid\"\n";
+        let rows = [
+            (
+                "nan",
+                format!("{step}{step}opacity = nan\n"),
+                "step[1].opacity",
+                "finite",
+            ),
+            ("inf", format!("{step}opacity = inf\n"), "step[0].opacity", "finite"),
+            ("-inf", format!("{step}radius = -inf\n"), "step[0].radius", "finite"),
+            ("+inf", format!("{step}radius = +inf\n"), "step[0].radius", "finite"),
+            ("-nan", format!("{step}radius = -nan\n"), "step[0].radius", "finite"),
+            (
+                "in a drive",
+                format!("{step}cell = {{ by = \"depth\", start = nan, end = 1 }}\n"),
+                "step[0].cell.start",
+                "finite",
+            ),
+            (
+                "in a list",
+                format!("{step}tint = [0.0, inf, 1.0]\n"),
+                "step[0].tint[1]",
+                "finite",
+            ),
+            (
+                "in a look",
+                format!("{region}[[step]]\neach = \"p\"\nlooks = [{{ effect = \"a\", radius = inf }}]\n"),
+                "step[0].looks[0].radius",
+                "finite",
+            ),
+            (
+                "in the framing",
+                format!("[frame]\naspect = nan\n{step}"),
+                "frame.aspect",
+                "finite",
+            ),
+            (
+                "a date and time",
+                format!("{step}when = 1979-05-27T07:32:00Z\n"),
+                "step[0].when",
+                "date",
+            ),
+            ("a date", format!("{step}when = 1979-05-27\n"), "step[0].when", "date"),
+            ("a time", format!("{step}when = 07:32:00\n"), "step[0].when", "date"),
+            (
+                "a date in a list",
+                format!("{step}days = [1, 1979-05-27]\n"),
+                "step[0].days[1]",
+                "date",
+            ),
+        ];
+        for (what, text, key, word) in rows {
+            let refused = read(&text).err().map(|error| error.to_string());
+            assert!(
+                refused
+                    .as_deref()
+                    .is_some_and(|message| message.contains(key) && message.contains(word)),
+                "{what}: wanted {key:?} and {word:?}, got {refused:?}"
+            );
+        }
+        // the finite numbers either side of the limits are read as they are written
+        let read = written(&format!(
+            "{step}a = 1.7976931348623157e308\nb = -0.0\nc = 5e-324\nd = [1, 2.5]\n"
+        ));
+        let expected = json!({"steps": [{"effect": "a", "params": {
+            "a": 1.797_693_134_862_315_7e308, "b": -0.0, "c": 5e-324, "d": [1, 2.5]}}]});
+        assert_eq!(read.ok(), Some(expected));
     }
 
     #[test]
