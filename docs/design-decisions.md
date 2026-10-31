@@ -201,10 +201,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   looks over as data. *Consequence:* every capability exists in code first; the README and the docs lead with code and
   introduce TOML as the saved form; the Rust core ports this API, not the file format.
 - **The serialised form is one canonical dict (design; the Rust types are this form since R3, Python's follows in R4).** `Recipe.to_dict()` / `Recipe.from_dict()` give
-  and take `{"format", "name", "description", "size", "frame": {field: value}, "regions": {name: {"kind": ..., field:
+  and take `{"name", "description", "size", "frame": {field: value}, "regions": {name: {"kind": ..., field:
   value}}, "steps": [...]}`: a step tagged by `effect` (`{"effect": "bloom", "preset": "glow", "params": {...}, "mask",
   "opacity", "blend_mode", "name", "partition"}`), an `Each` by `each` (`looks` holding step dicts and `null`), a region
   by `kind`, a picture or lookup table by `{"path": ..., "sha256": ...}`, the preset's name and the description kept.
+  The Rust types differ in two ways: they have no `format` (a TOML file's version only gates what it may use, and is
+  not part of the recipe), and `frame` and `regions` are opaque tables there until R4 gives them types.
   TOML, JSON and YAML are codecs over that dict (`save_recipe`), the pipeline fingerprints the dict, not `repr`.
   *Reason:* one shape for every format, and the one Rust's serde form takes. *Consequence:* a step must keep its preset's
   name beside the merged values (today it keeps only the values).

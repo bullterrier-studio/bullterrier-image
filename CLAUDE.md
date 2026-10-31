@@ -108,8 +108,8 @@ an effect's module, `Params`, choice enums and `render`. A `pub(crate)` field is
 so `Params` becomes `pub` with the core's typed entry point (R3b), which then needs a test that every parameter is read.
 A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user. Effect inputs in Rust arrive with the
-runner (R4). A user's values are checked in Rust (`Table::check`, `Recipe::checked`, `Presets`); running an effect
-trusts its parameters.
+runner (R4). A user's values are checked by Rust code (`Table::check`, `Recipe::checked`, `Presets`), which Python
+calls only from R4 (until then it checks them itself); running an effect trusts its parameters.
 
 ## Standards
 
@@ -164,9 +164,10 @@ doc is the model's docstring, a field's doc its help text in Python: plain text,
 becomes a double space. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
 error; that a choice's doc names every variant is checked when Python builds the model). The Python class is
 `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
-declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python validates, Rust
-trusts. Rust kinds: `f32`, `i32`, `bool`, `Color`, a choice; an effect with any other (`FieldName`, `Picture`, `Lut`,
-lists, optional colours) keeps a Python model, each field `param(default, doc=...)`, until its port extends the macro.
+declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python validates a
+user's values until R4 moves it; `Table::check` in Rust is the same rules, compared with Python's by parity tests
+(`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `bool`, `Color`, a choice; an
+effect with any other (`FieldName`, `Picture`, `Lut`, lists, optional colours) keeps a Python model, each field `param(default, doc=...)`, until its port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 - **Numeric** (`int`, `float`): also a `unit` (`px`, `fraction`, `degrees`, `stops`, `count`, `ratio`, `cycles`, `density`) and inclusive
   `min`/`max` that hold the default.

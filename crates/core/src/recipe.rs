@@ -32,7 +32,8 @@ pub const STEP_KEYS: &[&str] = &[
     "name",
 ];
 
-/// How a step's result combines with the picture below it, as the W3C blend modes do.
+/// How a step's result combines with the picture below it: the library's seven blend modes, each defined as in W3C
+/// Compositing and Blending Level 1 (which lists more).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -566,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn the_blend_modes_are_the_seven_of_the_w3c_list_in_recipe_order() {
+    fn the_blend_modes_are_the_librarys_seven_in_recipe_order() {
         let names: Vec<&str> = BlendMode::ALL.iter().map(|mode| mode.name()).collect();
         assert_eq!(
             names,
