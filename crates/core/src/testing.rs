@@ -9,11 +9,12 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::effect::{Category, Effect, FieldParam, Input, Meta, Native};
-use crate::params::Table;
 use crate::params::probe::Probe;
+use crate::params::{Params, Table};
 use crate::registry::Registry;
 use crate::{Error, Image, Inputs, Picture};
 
@@ -228,4 +229,37 @@ impl Effect for Shrinks {
     fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Image::new(1, 1, &[0.0; 3])
     }
+}
+
+/// The parameters of an effect that measures: one number of every unit, the whole-number ones as `i32`.
+#[derive(Debug, Deserialize, Params)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Measured {
+    /// A length in px.
+    #[param(default = 10.0, unit = px, min = 2, max = 100)]
+    pub(crate) length: f32,
+    /// A whole number of px.
+    #[param(default = 10, unit = px, min = 3, max = 100)]
+    pub(crate) cell: i32,
+    /// Marks per 1000 design px squared.
+    #[param(default = 8.0, unit = density, min = 2, max = 1000)]
+    pub(crate) marks: f32,
+    /// A count of marks.
+    #[param(default = 5, unit = count, min = 0, max = 100)]
+    pub(crate) copies: i32,
+    /// A share of something.
+    #[param(default = 0.5, unit = fraction, min = 0, max = 1)]
+    pub(crate) share: f32,
+    /// A direction.
+    #[param(default = 90.0, unit = degrees, min = 0, max = 360)]
+    pub(crate) turn: f32,
+    /// A ratio.
+    #[param(default = 2.0, unit = ratio, min = 0, max = 5)]
+    pub(crate) gain: f32,
+    /// Photographic stops.
+    #[param(default = 1.0, unit = stops, min = -2, max = 2)]
+    pub(crate) stops: f32,
+    /// Turns of a cycle.
+    #[param(default = 1.5, unit = cycles, min = 0, max = 10)]
+    pub(crate) laps: f32,
 }

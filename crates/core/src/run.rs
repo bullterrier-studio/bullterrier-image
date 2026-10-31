@@ -15,9 +15,29 @@ use crate::registry::Registry;
 use crate::{BlendMode, Entry, Error, Image, Inputs, Picture, Presets, Recipe};
 
 /// What a render is asked for besides the recipe.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
-pub struct Options {}
+pub struct Options {
+    size_ratio: f64,
+}
+
+impl Default for Options {
+    /// A ratio of 1: the picture is the size the recipe's pixel values are written for.
+    fn default() -> Self {
+        Self { size_ratio: 1.0 }
+    }
+}
+
+impl Options {
+    /// These options with `ratio` working pixels per design pixel: the working size over 480, the longest side a
+    /// recipe's pixel values (`px`) are written for. A render multiplies them by it, so the look is the same at any
+    /// size. A finite number above 0, else the render is refused.
+    #[must_use]
+    pub const fn with_size_ratio(mut self, ratio: f64) -> Self {
+        self.size_ratio = ratio;
+        self
+    }
+}
 
 /// A picture a recipe is rendered on. It borrows the picture: rendering never copies or changes it.
 #[derive(Clone, Copy, Debug)]
@@ -53,8 +73,14 @@ impl<'a> Photo<'a> {
         registry: &Registry,
         recipe: &Recipe,
         presets: &Presets,
-        _options: Options,
+        options: Options,
     ) -> Result<Image, Error> {
+        let ratio = options.size_ratio;
+        if !(ratio.is_finite() && ratio > 0.0) {
+            return Err(Error::Inputs(format!(
+                "`size_ratio` must be a finite number above 0, got {ratio}"
+            )));
+        }
         recipe.check_in(registry, presets)?;
         if !recipe.frame.is_empty() {
             return Err(Error::Recipe("`frame` is not run by the core yet".to_owned()));
@@ -66,9 +92,9 @@ impl<'a> Photo<'a> {
             .steps
             .iter()
             .enumerate()
-            .map(|(index, entry)| prepare(registry, presets, entry, &format!("step {}", index + 1)))
+            .map(|(index, entry)| prepare(registry, presets, ratio, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
-        let offered = Inputs::default();
+        let offered = Inputs::default().with_size_ratio(ratio);
         let mut current: Option<Image> = None;
         for step in &steps {
             let before = current.as_ref().map_or(self.picture, Image::as_picture);
@@ -86,7 +112,7 @@ struct Prepared {
 }
 
 /// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete, or why the core does not run it yet.
-fn prepare(registry: &Registry, presets: &Presets, entry: &Entry, place: &str) -> Result<Prepared, Error> {
+fn prepare(registry: &Registry, presets: &Presets, ratio: f64, entry: &Entry, place: &str) -> Result<Prepared, Error> {
     let Entry::Step(step) = entry else {
         return Err(Error::Recipe(format!(
             "{place}: an `each` step is not run by the core yet"
@@ -106,7 +132,10 @@ fn prepare(registry: &Registry, presets: &Presets, entry: &Entry, place: &str) -
     }
     let given = presets.under(step, place)?;
     let params = match effect.params() {
-        Some(table) => table.check(&step.effect, &given).map_err(|error| error.at(place))?,
+        Some(table) => table.scaled(
+            table.check(&step.effect, &given).map_err(|error| error.at(place))?,
+            ratio,
+        ),
         None => given,
     };
     Ok(Prepared {

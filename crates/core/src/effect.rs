@@ -145,7 +145,10 @@ pub trait Effect: Send + Sync {
         &[]
     }
 
-    /// Its parameters, described; none when the effect's owner describes and validates them itself.
+    /// Its parameters, described; none when the effect's owner describes and validates them itself. A render checks,
+    /// completes and scales the values of a described effect (`px` and `density` fields, to the picture's size); an
+    /// effect with none receives them as the step wrote them, in design pixels, and scales them itself by the
+    /// [`Input::SizeRatio`] it declares.
     fn params(&self) -> Option<Table> {
         None
     }

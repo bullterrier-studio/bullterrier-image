@@ -49,7 +49,7 @@ impl Table {
 impl Scalar {
     /// The number a bound or default holds, if it is one.
     #[expect(clippy::cast_precision_loss, reason = "declared bounds are small whole numbers")]
-    const fn number(self) -> Option<f64> {
+    pub(super) const fn number(self) -> Option<f64> {
         match self {
             Self::Int(whole) => Some(whole as f64),
             Self::Float(real) => Some(real),

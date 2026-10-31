@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 mod check;
+mod scale;
 
 pub use bullterrier_image_derive::{Choice, Params};
 

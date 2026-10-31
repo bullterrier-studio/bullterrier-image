@@ -52,3 +52,44 @@ fn rendering_twice_gives_the_same_picture_and_leaves_the_photo_as_it_was() -> Ou
     assert_eq!(values, picture_values());
     Ok(())
 }
+
+/// `recipe` rendered at `ratio` working pixels per design pixel on a 20 x 30 picture.
+fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
+    let values: Vec<f32> = (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect();
+    let photo = Photo::new(Picture::new(20, 30, &values)?);
+    let options = Options::default().with_size_ratio(ratio);
+    Ok(photo.render(recipe, &Presets::new(), options)?.into_values())
+}
+
+/// The effect `name` run on the same picture with `params` written out, as `rendered_at` does.
+fn applied(name: &str, params: serde_json::Value) -> Result<Vec<f32>, Box<dyn Error>> {
+    let values: Vec<f32> = (0_u16..20 * 30 * 3).map(|index| f32::from(index) / 1800.0).collect();
+    Ok(apply(name, &Picture::new(20, 30, &values)?, params, &Inputs::default())?.into_values())
+}
+
+#[test]
+fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> Outcome {
+    let pattern = |cell: f64, feather: f64| {
+        json!({"kind": "grid", "cell": cell, "angle": 0.0, "foreground": [1.0, 1.0, 1.0],
+               "background": [16.0 / 255.0, 16.0 / 255.0, 24.0 / 255.0], "thickness": 0.2, "radius": 0.3,
+               "feather": feather})
+    };
+    let recipe = Recipe::new([Step::new("pattern")]);
+    // `cell` (default 32) and `feather` (default 1) are px; `thickness` and `radius` are fractions of the cell
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", pattern(64.0, 2.0))?);
+    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", pattern(32.0, 1.0))?);
+    assert_ne!(rendered_at(&recipe, 2.0)?, rendered_at(&recipe, 1.0)?);
+    Ok(())
+}
+
+#[test]
+fn a_whole_number_of_pixels_scales_rounded_and_never_below_its_minimum() -> Outcome {
+    let grid = |cell: i32| json!({"cell": cell, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
+    let recipe = Recipe::new([Step::new("pixel_grid")]); // `cell` is 4 px, at least 3
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pixel_grid", grid(8))?);
+    // 4 x 0.5 = 2, below the minimum of 3
+    assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", grid(3))?);
+    // 4 x 1.6 = 6.4 -> 6
+    assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", grid(6))?);
+    Ok(())
+}
