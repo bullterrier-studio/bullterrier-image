@@ -40,8 +40,13 @@ impl Registry {
 
     /// Remove the registered effect called `name`; false if there is none (the core's own cannot be removed).
     pub(crate) fn unregister(&self, name: &str) -> bool {
-        let mut registered = self.registered.write().unwrap_or_else(PoisonError::into_inner);
-        registered.remove(name).is_some()
+        let removed = self
+            .registered
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(name);
+        // The lock is released: dropping a foreign effect may run code (a Python `__del__`) that uses the registry.
+        removed.is_some()
     }
 
     /// The effect called `name`; [`Error::UnknownEffect`] if there is none.
@@ -219,6 +224,55 @@ mod tests {
         registry.register(paint("painter"))?;
         assert!(!registry.unregister("grade"));
         assert!(registry.effect("grade").is_ok());
+        Ok(())
+    }
+
+    /// An effect that asks its registry for the names when it is dropped, as a Python callable's `__del__` may.
+    struct AsksOnDrop {
+        registry: Arc<Registry>,
+        asked: std::sync::mpsc::Sender<usize>,
+    }
+
+    impl Effect for AsksOnDrop {
+        fn name(&self) -> &'static str {
+            "asks_on_drop"
+        }
+        fn category(&self) -> Category {
+            Category::Utilities
+        }
+        fn opacity(&self) -> f64 {
+            1.0
+        }
+        fn inputs(&self) -> &[Input] {
+            &[]
+        }
+        fn apply(&self, picture: &Picture<'_>, _params: Value) -> Result<Image, Error> {
+            Ok(picture.map(|pixel| pixel))
+        }
+    }
+
+    impl Drop for AsksOnDrop {
+        fn drop(&mut self) {
+            let _ = self.asked.send(self.registry.names().len());
+        }
+    }
+
+    #[test]
+    fn an_unregistered_effect_that_uses_the_registry_as_it_is_dropped_does_not_deadlock() -> Result<(), Error> {
+        let (asked, answer) = std::sync::mpsc::channel();
+        let registry = Arc::new(Registry::new());
+        registry.register(Arc::new(AsksOnDrop {
+            registry: Arc::clone(&registry),
+            asked,
+        }))?;
+        // On its own thread, so a deadlock fails the test instead of hanging it.
+        let unregistering = Arc::clone(&registry);
+        std::thread::spawn(move || unregistering.unregister("asks_on_drop"));
+        let names = answer.recv_timeout(std::time::Duration::from_secs(5));
+        assert!(
+            names.is_ok(),
+            "dropping the unregistered effect deadlocked on the registry"
+        );
         Ok(())
     }
 }
