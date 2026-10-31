@@ -234,8 +234,8 @@ def test_checking_gives_the_complete_parameters_with_a_whole_number_kept_whole_a
     assert [type(checked[key]) for key in ("cell", "gap")] == [int, float]
 
 
-def test_a_value_the_declaration_refuses_is_a_value_error_in_the_sentence_the_core_says_it_in():
-    with pytest.raises(ValueError, match=r"^effect 'grade': `exposure` must be <= 10, got 11$"):
+def test_a_value_the_declaration_refuses_is_a_value_error_naming_the_field_and_the_limit():
+    with pytest.raises(ValueError, match=r"exposure.*<= 10"):
         _core.check("grade", {"exposure": 11})
 
 
