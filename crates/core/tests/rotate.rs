@@ -443,3 +443,59 @@ fn the_border_is_laid_round_the_turned_picture() -> Result<(), Error> {
     );
     Ok(())
 }
+
+#[test]
+fn a_nearest_turn_picks_the_pixel_pillows_fixed_point_does_where_a_position_is_close_to_a_border() -> Result<(), Error>
+{
+    // The expected pixel numbers (row * width + column of the scene) were taken from Pillow 13.0's
+    // `Image.fromarray(np.arange(n * n, dtype=np.float32).reshape(n, n)).transform((side, side), Image.Transform.AFFINE,
+    // matrix, Image.Resampling.NEAREST)`, with the matrix the Python engine builds for a crop (`ops.frame.rotate`). Rounding
+    // the matrix to 16.16 fixed point down instead of to the nearest changes 8 of the 25 pixels of the first picture and
+    // 7 of the 49 of the second, so these are the positions that tell the two apart.
+    let number =
+        |row: usize, column: usize, width: usize| f32::from(u8::try_from(row * width + column).unwrap_or(0)) / 100.0;
+    for (size, angle, expected) in [
+        (
+            8,
+            45.0,
+            vec![
+                vec![33_u8, 25, 18, 11, 12],
+                vec![33, 34, 27, 20, 12],
+                vec![42, 35, 36, 28, 21],
+                vec![51, 44, 36, 37, 30],
+                vec![52, 52, 45, 38, 38],
+            ],
+        ),
+        (
+            10,
+            -45.0,
+            vec![
+                vec![5, 15, 26, 27, 37, 48, 59],
+                vec![14, 25, 25, 36, 47, 57, 58],
+                vec![23, 24, 35, 45, 56, 57, 67],
+                vec![22, 33, 44, 55, 55, 66, 77],
+                vec![32, 42, 53, 54, 65, 75, 76],
+                vec![41, 52, 52, 63, 74, 75, 85],
+                vec![50, 51, 62, 72, 73, 84, 95],
+            ],
+        ),
+    ] {
+        let scene = picture_of(size, size, |row, column| [number(row, column, size); 3]);
+        let frame = Frame {
+            angle,
+            fit: Fit::Crop,
+            resample: Resample::Nearest,
+            ..Frame::default()
+        };
+        let made = turn(size, size, &scene, frame, None)?;
+        let side = expected.len();
+        assert_eq!((made.height, made.width), (side, side), "{size} at {angle}");
+        let numbers: Vec<f32> = expected
+            .iter()
+            .flatten()
+            .flat_map(|&index| [f32::from(index) / 100.0; 3])
+            .collect();
+        assert_eq!(made.values, numbers, "{size} at {angle}");
+    }
+    Ok(())
+}

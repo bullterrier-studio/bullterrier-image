@@ -5,8 +5,9 @@ use std::error::Error;
 
 use std::sync::Arc;
 
+use bullterrier_image::frame::Anchor;
 use bullterrier_image::{
-    BlendMode, Drive, Finder, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step, apply,
+    BlendMode, Drive, Finder, Frame, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step, apply,
 };
 use serde_json::json;
 
@@ -227,5 +228,44 @@ fn a_trace_shows_the_photo_the_subject_and_the_picture_after_each_step_ending_in
     );
     assert!(matches!(&stages[2], Stage::Step { number: 1, .. }));
     assert!(matches!(&stages[3], Stage::Step { number: 2, image } if *image == rendered));
+    Ok(())
+}
+
+#[test]
+fn a_handed_in_map_follows_the_photo_through_a_crop_a_border_and_a_size() -> Outcome {
+    // A 6 x 8 photo that is white at row 2, column 5 and black elsewhere, and a map that is 1 at that pixel and 0
+    // elsewhere. Cropped to a square against the right side (columns 2 to 7), given a border of 3 px on the left (half
+    // of 6) and resized to a longest side of 24 (9 px across become 24, 6 rows become 16), they go through the same
+    // operations, so the map the steps are given is the photo's red channel exactly, and its peak is where the white
+    // pixel went: row (2 + 0.5) * 16 / 6 = 6.7, column (3 + 3 + 0.5) * 24 / 9 = 17.3.
+    let (height, width) = (6, 8);
+    let hot: Vec<f32> = (0..height * width)
+        .map(|index| f32::from(u8::from(index == 2 * width + 5)))
+        .collect();
+    let values: Vec<f32> = hot.iter().flat_map(|&value| [value; 3]).collect();
+    let photo =
+        Photo::new(Picture::new(height, width, &values)?).with_map("subject", Layer::new(height, width, hot)?)?;
+    let mut recipe = Recipe::new([Step::new("grade").opacity(0.0).mask("subject")]);
+    recipe.frame = Frame {
+        aspect: Some(1.0),
+        anchor: Anchor::Right,
+        pad_left: 0.5,
+        ..Frame::default()
+    };
+    let stages = photo.trace(&recipe, &Presets::new(), Options::default().with_size(24))?;
+    let (Some(Stage::Input(picture)), Some(Stage::Subject(map))) = (stages.first(), stages.get(1)) else {
+        return Err(format!("the stages start otherwise: {stages:?}").into());
+    };
+    assert_eq!((picture.height(), picture.width()), (16, 24));
+    assert_eq!((map.height(), map.width()), (16, 24));
+    let red: Vec<f32> = picture.clone().into_values().chunks(3).map(|pixel| pixel[0]).collect();
+    assert_eq!(map.values(), red);
+    let peak = map
+        .values()
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.total_cmp(b.1))
+        .map_or(0, |(index, _)| index);
+    assert_eq!((peak / 24, peak % 24), (6, 17));
     Ok(())
 }
