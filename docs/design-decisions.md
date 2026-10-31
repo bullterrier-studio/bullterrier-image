@@ -199,8 +199,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   was the caller's to know, the recipe's name was a file-name rule, its description existed only in TOML. Files stay
   because the command line runs them, looks ship and are shared as data, a service takes looks as data, and video hands
   looks over as data. *Consequence:* every capability exists in code first; the README and the docs lead with code and
-  introduce TOML as the saved form; the Rust core (R3) ports this API, not the file format.
-- **The serialised form is one canonical dict (design; built in R3).** `Recipe.to_dict()` / `Recipe.from_dict()` give
+  introduce TOML as the saved form; the Rust core ports this API, not the file format.
+- **The serialised form is one canonical dict (design; the Rust types are this form since R3, Python's follows in R4).** `Recipe.to_dict()` / `Recipe.from_dict()` give
   and take `{"format", "name", "description", "size", "frame": {field: value}, "regions": {name: {"kind": ..., field:
   value}}, "steps": [...]}`: a step tagged by `effect` (`{"effect": "bloom", "preset": "glow", "params": {...}, "mask",
   "opacity", "blend_mode", "name", "partition"}`), an `Each` by `each` (`looks` holding step dicts and `null`), a region
@@ -228,8 +228,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   with a `RecipeError`. *Reason:* `model_copy` built a step with a negative radius. *Consequence:* `replace` reads no
   file (arrays become a `Picture` or `Lut` as for `fx`; only `fx` reads paths): the data model does no I/O. `Recipe.model_validate(recipe.model_dump())` is the recipe again: a step is read as a
   `Step`, or an `Each` when it has `each` or `looks`, a region as the kind whose fields it has; `Given()`, which has
-  none, dumps to `{}` and is refused when read back until R3's form names each kind. `model_validate_json` and
-  `model_validate_strings` fail with a `RecipeError` too, and `model_construct` raises. Until R3 wraps pydantic
+  none, dumps to `{}` and is refused when read back until R4's form names each kind. `model_validate_json` and
+  `model_validate_strings` fail with a `RecipeError` too, and `model_construct` raises. Until R4 wraps pydantic
   instead of inheriting it, these are guards on pydantic's own entrances.
 - **`Step.apply` is `render` of the one-step recipe.** `fx.bloom(radius=12).apply(photo, maps=, finders=, size=)` equals
   `render(photo, Recipe([step]), ...)`, and `render`/`trace` take a step as that recipe. *Reason:* trying one effect
@@ -530,11 +530,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   of a ported effect, vulture needs no whitelist. `Params`, its fields and the choice enums are `pub(crate)`, and
   `effects` is a private module: nothing outside the crate can use them yet, and a `pub(crate)` field `render` does not
   read is reported by rustc's dead-code lint (a `pub` one is not), which replaces the whitelist's old check. The public
-  typed entry point, with `pub` `Params` for a Rust user, comes with R2/R3, which then needs a test that every parameter
+  typed entry point, with `pub` `Params` for a Rust user, comes with R3b, which then needs a test that every parameter
   is read.
-  *Validation stays Python's for now:* the model checks every value (inclusive ranges, finiteness, the cyclic wrap) and
-  Rust trusts it; a Rust `checked()` has no consumer until the core loads files and recipes, and then Python validation
-  switches to it in the same move, instead of the rules living in two languages in between.
+  *Validation of a user's values is in Rust since R3* (`Table::check`, next to the recipe): running an effect still
+  trusts its parameters, and Python's models keep validating what Python runs until R4 switches them to the Rust
+  checks, so the rules live in two languages only while the parity tests (`tests/_native/test_recipe_parity.py`)
+  hold them equal.
 - **An effect is a Rust value that knows its place in the catalogue (R2).** `Effect` is a trait (name, category, default
   opacity, declared inputs, parameters described, `apply`); the core's registry holds the core's own effects and any
   registered at run time under a lock, and refuses a name that is taken, native or not. A ported effect's file declares
@@ -545,9 +546,24 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `INPUTS` equal to it. A Python function can be registered as an `Effect` (`_core.register`, which takes the
   interpreter lock back, since `_core.apply` releases it): the trait fits it, but the Python registry does not mirror
   its effects into the core's until the Rust runner (R4) needs to call one. *Reason:* one home for each fact. *Not
-  yet:* `Inputs` and a `render` that takes them wait for R4's runner, the first consumer. *Presets in Rust are
-  deferred to R3,* with `checked()`: presets are named `Params` read by file loading, which does not exist in Rust
-  yet, and a preset of an unported effect needs its Pydantic model anyway; preset files stay in the Python package.
+  yet:* `Inputs` and a `render` that takes them wait for R4's runner, the first consumer. *Presets in Rust came with R3.*
+- **A recipe is a Rust value with one check (R3).** `Recipe`, `Step` and `Each` (crate `recipe`) are plain public
+  values, built in code (`Step::new("bloom").param("radius", 12).opacity(0.4)`) or read from TOML or JSON; serde's
+  nested form `{effect, params, preset, partition, mask, opacity, blend_mode, name}` is the JSON form, and
+  unknown keys are refused by name. A step keeps its parameters as written (a preset's lie under them only in the
+  check), an opacity left out stays unset until the runner resolves it, and regions and the framing are opaque
+  tables the runner (R4) reads. `Recipe::checked(&Presets)` is the one place the rules of a look live (known effects,
+  parameters through `Table::check`, drives, partitions, names, opacity, regions that resolve) and `checked_look` adds
+  the description a look needs; every consumer calls it first. `from_toml` does what the Python loader does: a step's
+  other keys become its parameters, `"none"` a skipped look, and a feature a later format version added is refused in
+  an earlier one. *Why presets and looks are not embedded yet:* a crate cannot `include_str!` files outside itself
+  and still be published, so the data under `src/bullterrier_image/{presets,looks}` stays package data; Rust users
+  pass text (`Presets::add_toml`), and shipping them in the crate is R5's (publish). *Moved:* rendering a step
+  (mask, opacity, blend, drives evaluated, each, framing, scaling) and the region kinds are R4's, hence the one-off
+  `fx.bloom(radius=12).apply(photo)` too; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) is
+  R3b, which needs a design for the test that every parameter is read. *Known losses:* a Rust map keeps keys sorted,
+  not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
+  until R4.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without

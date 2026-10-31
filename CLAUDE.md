@@ -64,6 +64,10 @@ opacity and inputs (`pub(crate) const META: Meta`) and has `fn render(picture: &
 Python model is `class XParams(EffectParams, core="x")`, built from that declaration. `@effect(params=XParams)` takes
 category and opacity from the core and refuses them if given. The core's registry (`Effect` trait, `register`) also
 takes foreign effects, such as a Python function (`_core.register`). Rust effects never refer to each other.
+The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
+(`Recipe::from_toml`, `from_json`; the same types are the JSON form). `Recipe::checked(&Presets)` applies the rules of a
+look, `Table::check` those of an effect's parameters (`_core.check`, `_core.read_recipe`). The Python `Step`, `Recipe`
+and loader still validate and run recipes until R4 makes them a facade over these types.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
@@ -99,12 +103,13 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
 no hidden tunables: a number is a `Params` field, inside a `#[param(..)]` attribute, trivial, or carries `// constant:
 <reason>`). Also: no `unwrap`, `expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe
-Rust. `pub` only for what the bindings use and the support types the derives write (`crate::params`); else `pub(crate)`:
+Rust. `pub` only for what the bindings use, the recipe model and the support types the derives write (`crate::params`); else `pub(crate)`:
 an effect's module, `Params`, choice enums and `render`. A `pub(crate)` field is reported when unread, a `pub` one is not,
-so `Params` becomes `pub` with the core's typed entry point (R2/R3), which then needs a test that every parameter is read.
+so `Params` becomes `pub` with the core's typed entry point (R3b), which then needs a test that every parameter is read.
 A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user. Effect inputs in Rust arrive with the
-runner (R4), presets and validation in Rust with recipe loading (R3).
+runner (R4). A user's values are checked in Rust (`Table::check`, `Recipe::checked`, `Presets`); running an effect
+trusts its parameters.
 
 ## Standards
 
