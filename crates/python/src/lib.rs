@@ -104,10 +104,17 @@ fn apply<'py>(
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
 }
 
-/// The names of the effects the core implements, sorted.
+/// The names of the effects the core can run, sorted: its own and the Python functions registered with `register`. With
+/// `declared`, only the effects whose parameters the core declares (`params` describes them): the ones it implements
+/// itself.
 #[pyfunction]
-fn effects() -> Vec<String> {
-    bullterrier_image::effects()
+#[pyo3(signature = (*, declared=false))]
+fn effects(declared: bool) -> Vec<String> {
+    let mut names = bullterrier_image::effects();
+    if declared {
+        names.retain(|name| bullterrier_image::effect(name).is_ok_and(|found| found.params().is_some()));
+    }
+    names
 }
 
 /// The parameters of the effect called `effect`, as its Rust struct declares them: a dict `{"doc": str, "fields":

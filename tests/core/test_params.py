@@ -848,7 +848,7 @@ def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
 # `class XParams(EffectParams, core="x")` is the model of the effect x whose Rust `Params` struct declares the fields:
 # the oracle is the table the core reports, which is what the declaration says.
 
-RUST_EFFECTS = _core.effects()
+RUST_EFFECTS = _core.effects(declared=True)
 KIND_SCHEMA = {"float": "number", "int": "integer", "bool": "boolean"}  # the JSON-schema type of each plain kind
 OF_ANOTHER_KIND: dict[
     str, list[Any]
@@ -937,11 +937,13 @@ def test_a_rust_declared_model_is_an_ordinary_class_that_pickles_and_validates()
         Copy.parse({"nope": 1})
 
 
-def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made():
+@pytest.mark.parametrize("name", ["ghost", "gradient"])  # no such effect; a Python effect the core runs by callback
+def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made(name):
     """The usual cause is an extension built before the effect's kernel was written, so the error says to rebuild."""
-    with pytest.raises(ValueError, match=r"'ghost'.*uv sync"):
+    registry.get("gradient")  # the registry has loaded its effects, so the core knows `gradient` by callback as well
+    with pytest.raises(ValueError, match=rf"'{name}'.*uv sync"):
 
-        class Nowhere(EffectParams, core="ghost"):
+        class Nowhere(EffectParams, core=name):
             pass
 
 

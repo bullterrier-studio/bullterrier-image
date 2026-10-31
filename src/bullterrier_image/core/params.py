@@ -672,7 +672,7 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
             f"parameter model {cls.__name__!r} is declared with core={effect!r} and also has fields of its own "
             f"({', '.join(own)}): the Rust declaration is the only one"
         )
-    if effect not in native.effects():
+    if effect not in native.effects(declared=True):
         raise ValueError(
             f"the Rust core has no effect called {effect!r}: if its kernel is new, rebuild the extension (`uv sync`)"
         )

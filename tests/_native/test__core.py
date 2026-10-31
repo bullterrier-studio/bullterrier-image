@@ -57,7 +57,7 @@ FIELD_KEYS = {"name", "kind", "meaning", "default", "unit", "min", "max", "cycli
 KINDS = {"float", "int", "bool", "choice", "color"}
 
 
-@pytest.mark.parametrize("effect", _core.effects())
+@pytest.mark.parametrize("effect", _core.effects(declared=True))
 def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_with_every_key(effect):
     table = _core.params(effect)
     assert set(table) == {"doc", "fields"}
@@ -70,7 +70,7 @@ def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_wit
         assert (field["choices"] != []) == (field["kind"] == "choice")  # only a choice lists names
 
 
-@pytest.mark.parametrize("effect", _core.effects())
+@pytest.mark.parametrize("effect", _core.effects(declared=True))
 def test_a_literal_keeps_its_kind_across_the_boundary_a_whole_number_is_an_int_and_a_decimal_a_float(effect):
     """The declaration's `0` and `0.0` are different values to the schema, the docs and the stub, so the table must
     not widen or round one into the other; `==` cannot tell them apart, so the types are compared."""
@@ -149,6 +149,16 @@ def test_a_python_function_registered_as_an_effect_is_listed_described_and_run_b
         out = _core.apply("probe_double", PIXEL, {"amount": 3, "label": "x"})
     np.testing.assert_allclose(out, PIXEL * 2)
     assert seen == {"shape": (1, 1, 3), "dtype": np.float32, "params": {"amount": 3, "label": "x"}}
+
+
+def test_the_effects_the_core_declares_are_the_ones_it_runs_itself_not_the_ones_registered_with_it():
+    with registered("probe_double", fill(0.5)):
+        assert "probe_double" in _core.effects()
+        assert "probe_double" not in _core.effects(declared=True)  # it describes its own parameters
+        assert {"grade", "pattern", "pixel_grid"} <= set(_core.effects(declared=True)) <= set(_core.effects())
+    assert _core.effects(declared=True) == sorted(_core.effects(declared=True))
+    for effect in _core.effects(declared=True):
+        _core.params(effect)  # the parameters of each are declared, so none refuses
 
 
 def test_an_unregistered_effect_is_gone_and_a_core_effect_cannot_be_unregistered():

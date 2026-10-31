@@ -82,7 +82,7 @@ def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, 
 
 
 def test_every_effect_of_the_rust_core_is_a_registered_effect():
-    assert set(_core.effects()) <= set(ALL)
+    assert set(_core.effects(declared=True)) <= set(ALL)
 
 
 @pytest.mark.parametrize("name", ALL)

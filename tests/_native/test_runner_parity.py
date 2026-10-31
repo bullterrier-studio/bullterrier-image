@@ -13,16 +13,18 @@ import numpy as np
 import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with Python's
-from bullterrier_image.core import bridge, native, runner
-from bullterrier_image.core.params import Drive, design_scale
+from bullterrier_image.core import bridge, native, registry, runner
+from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, design_scale, param
 from bullterrier_image.core.presets import SHIPPED
-from bullterrier_image.core.regions import Given
+from bullterrier_image.core.regions import Given, Grid
+from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.errors import (
     DepthNotFoundError,
     MapNotFoundError,
     RecipeError,
     SubjectNotFoundError,
+    UnknownEffectError,
 )
 
 Row = tuple[np.ndarray, Recipe, dict[str, np.ndarray], np.ndarray]  # photo, recipe, maps, the picture it must make
@@ -304,8 +306,6 @@ def test_the_steps_own_value_wins_over_its_preset(photo):
 
 
 def test_a_shipped_preset_renders_as_the_python_engine_renders_its_step(photo):
-    from bullterrier_image.core import registry
-
     name = next(iter(registry.presets("grade")))
     shipped = (SHIPPED / "grade.toml").read_text(encoding="utf-8")
     made = native.render(photo, {"steps": [{"effect": "grade", "preset": name}]}, presets={"grade": shipped})
@@ -579,3 +579,217 @@ def test_a_picture_that_is_not_a_contiguous_float32_array_of_rgb_is_refused(rgb)
 
     with pytest.raises(InvalidImageError, match="float32"):
         native.render(rgb, {"steps": [{"effect": "grade"}]})
+
+
+# --- effects written in Python: the registry mirrors them into the core, which runs them like its own --------------
+
+
+class ReachParams(EffectParams):
+    """What the reach probes encode."""
+
+    reach: float = param(30.0, unit="px", min=0, max=500, doc="Written into the picture, as the core hands it over.")
+
+
+@pytest.fixture
+def reach_probes(throwaway_effects):
+    """`reach_probe`, which declares `size_ratio`, and `plain_probe`, which does not. Both write their `reach` (in the
+    working px they are handed: 0.01 per px) into the picture, `reach_probe` also its `size_ratio` (0.5 per unit)."""
+
+    def reach_probe(rgb: np.ndarray, params: ReachParams, *, size_ratio: float = 1.0) -> np.ndarray:
+        """Writes its reach and the size ratio it was given into the picture."""
+        out = np.full(rgb.shape, 0.5, np.float32)
+        out[..., 0], out[..., 1] = params.reach / 100, size_ratio / 2
+        return out
+
+    def plain_probe(rgb: np.ndarray, params: ReachParams) -> np.ndarray:
+        """Writes its reach into the picture."""
+        return np.full(rgb.shape, params.reach / 100, np.float32)
+
+    effect(category="utilities", params=ReachParams)(reach_probe)
+    effect(category="light", params=ReachParams, opacity=0.5)(plain_probe)
+
+
+def reach_recipe(effect_name: str, reach: float = 45) -> Recipe:
+    return Recipe([Step(effect_name, params={"reach": reach}, opacity=1)])
+
+
+def test_a_python_effect_is_scaled_by_its_wrapper_and_told_the_ratio_only_if_it_declares_it(photo, reach_probes):
+    ratio = 128 / 480
+    made = core_render(photo, reach_recipe("reach_probe"))
+    np.testing.assert_allclose(made[..., 0], 0.12, atol=1e-7)  # 45 x 128 / 480 = 12 px working, by hand
+    np.testing.assert_allclose(made[..., 1], ratio / 2, atol=1e-7)  # the ratio the effect declared
+    np.testing.assert_allclose(made[..., 2], 0.5, atol=1e-7)
+    plain = core_render(photo, reach_recipe("plain_probe"))  # a function with no size_ratio would fail if given one
+    np.testing.assert_allclose(plain, 0.12, atol=1e-7)
+    for name in ("reach_probe", "plain_probe"):
+        np.testing.assert_allclose(core_render(photo, reach_recipe(name)), runner.render(photo, reach_recipe(name)))
+
+
+def test_the_ratio_a_python_effect_sees_is_the_callers_to_set(reach_probes):
+    recipe = {"steps": [{"effect": "reach_probe", "params": {"reach": 45}, "opacity": 1.0}]}
+    photo = np.zeros((4, 6, 3), np.float32)
+    made = native.render(photo, recipe, size_ratio=2.0)
+    np.testing.assert_allclose(made[0, 0], [0.9, 1.0, 0.5], atol=1e-7)  # 45 x 2 = 90 px, ratio 2 / 2
+
+
+def test_a_python_effect_has_the_default_opacity_it_was_registered_with(photo, reach_probes):
+    recipe = Recipe([Step("plain_probe", params={"reach": 45})])  # opacity 0.5 by registration
+    made = core_render(photo, recipe)
+    np.testing.assert_allclose(made, photo + 0.5 * (0.12 - photo), atol=1e-6)
+
+
+def test_a_python_effect_given_a_misspelt_parameter_in_a_recipe_file_is_a_recipe_error(photo, reach_probes):
+    recipe = {"steps": [{"effect": "reach_probe", "params": {"reach": 501}}]}
+    with pytest.raises(RecipeError, match="reach"):
+        native.render(photo, recipe)
+
+
+FAULTS = {
+    "a recipe error": RecipeError("the effect's own complaint"),
+    "a subject that is not there": SubjectNotFoundError("nobody is in this picture"),
+    "a plain error": ZeroDivisionError("the effect divided by nothing"),
+}
+
+
+@pytest.mark.parametrize("raised", FAULTS.values(), ids=FAULTS.keys())
+def test_an_exception_a_python_effect_raises_comes_back_as_it_was(photo, throwaway_effects, raised):
+    def failing(rgb: np.ndarray, params: ReachParams) -> np.ndarray:
+        """Raises."""
+        raise raised
+
+    effect(category="utilities", params=ReachParams)(failing)
+    with pytest.raises(type(raised)) as caught:
+        core_render(photo, reach_recipe("failing"))
+    assert caught.value is raised
+
+
+class DepthParams(ReachParams):
+    """The reach, and a field to paint."""
+
+    field: str = param("depth", doc="The field painted.")
+
+
+FIELDS = {
+    "the depth, by default": ({}, lambda photo, subject, depth: depth),
+    "the light, by name": (
+        {"field": "light"},
+        lambda photo, subject, depth: photo @ np.array([0.2126, 0.7152, 0.0722]),
+    ),
+    "the subject, by name": ({"field": "subject"}, lambda photo, subject, depth: subject),
+    "the background, by name": ({"field": "background"}, lambda photo, subject, depth: 1 - subject),
+}
+
+
+@pytest.mark.parametrize(("params", "painted"), FIELDS.values(), ids=FIELDS.keys())
+def test_a_python_effect_with_a_field_receives_the_map_its_step_names_or_its_default(
+    photo, subject, depth_probe, params, painted
+):
+    depth = ramp(photo)
+    recipe = Recipe([Step("depth_probe", params=params, opacity=1)])
+    maps = {"subject": subject, "depth": depth}
+    made = core_render(photo, recipe, maps=maps)
+    np.testing.assert_allclose(made, np.repeat(painted(photo, subject, depth)[..., None], 3, axis=2), atol=1e-6)
+    np.testing.assert_allclose(made, runner.render(photo, recipe, maps=maps), atol=1e-6)
+
+
+def test_a_python_effect_that_works_from_the_depth_asks_for_the_depth(photo, depth_probe):
+    with pytest.raises(DepthNotFoundError):
+        core_render(photo, Recipe([Step("depth_probe")]))
+
+
+def test_a_python_effect_that_takes_a_partition_is_known_to_the_core_with_it(partition_probe, depth_probe):
+    assert "partition" in _core.effect("partition_probe")["inputs"]
+    assert "partition" not in _core.effect("depth_probe")["inputs"]
+    assert _core.effect("depth_probe")["fields"] == {"field": "depth"}
+
+
+def test_an_effect_that_takes_a_partition_is_refused_until_the_core_runs_the_regions_that_make_one(
+    photo, partition_probe
+):
+    recipe = Recipe([Step("partition_probe", partition="panes")], regions={"panes": Grid()})
+    with pytest.raises(ValueError, match="partition"):  # the core has no partition to give it yet
+        core_render(photo, recipe)
+
+
+# --- a Picture or a Lut cannot be written in a recipe: the call holds it -------------------------------------------
+
+
+def test_a_picture_in_a_step_reaches_its_effect(photo, layer_probe):
+    recipe = Recipe([Step("layer_probe", params={"image": Picture.of_color("#336699")}, opacity=1)])
+    made = core_render(photo, recipe)
+    np.testing.assert_allclose(made, np.broadcast_to([0.2, 0.4, 0.6], photo.shape), atol=1e-6)  # 0x33, 0x66, 0x99 / 255
+
+
+def test_two_pictures_in_two_steps_reach_their_own_steps(photo, layer_probe):
+    first = Step("layer_probe", params={"image": Picture.of_color("#336699")}, opacity=1)
+    second = Step("layer_probe", params={"image": Picture.of_color("#ff0000")}, opacity=0.5)
+    made = core_render(photo, Recipe([first, second]))
+    # (0.2, 0.4, 0.6) with (1, 0, 0) laid over it at one half
+    np.testing.assert_allclose(made, np.broadcast_to([0.6, 0.2, 0.3], photo.shape), atol=1e-6)
+    np.testing.assert_allclose(made, runner.render(photo, Recipe([first, second])), atol=1e-6)
+
+
+def test_a_lut_in_a_step_reaches_its_effect(photo):
+    inverting = Lut(1.0 - Lut.identity(2).table, label="inverting")
+    made = core_render(photo, Recipe([Step("lut", params={"file": inverting}, opacity=1)]))
+    np.testing.assert_allclose(made, 1.0 - photo, atol=1e-5)  # a table of 1 - colour, interpolated trilinearly
+    identity = core_render(photo, Recipe([Step("lut", params={"file": Lut.identity(2)}, opacity=1)]))
+    np.testing.assert_allclose(identity, photo, atol=1e-5)
+
+
+# --- real effects written in Python --------------------------------------------------------------------------------
+
+
+def test_the_gradient_runs_from_its_first_colour_to_its_last_across_the_picture(photo):
+    recipe = Recipe(
+        [Step("gradient", params={"kind": "linear", "colors": ["#000000", "#ffffff"], "angle": 0}, opacity=1)]
+    )
+    made = core_render(photo, recipe)
+    np.testing.assert_allclose(made[:, :1], 0.0, atol=0.02)  # the left edge is the first colour, the right the last
+    np.testing.assert_allclose(made[:, -1:], 1.0, atol=0.02)
+    assert (np.diff(made[0, :, 0]) >= -1e-6).all()  # and it never goes back
+    np.testing.assert_allclose(made, made[:1].repeat(photo.shape[0], axis=0), atol=1e-6)  # the same on every row
+    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-5)
+
+
+def test_relighting_a_flat_field_changes_nothing_and_a_slope_does(photo):
+    flat = {"depth": np.full(photo.shape[:2], 0.5, np.float32)}
+    recipe = Recipe([Step("relight", opacity=1)])
+    np.testing.assert_allclose(core_render(photo, recipe, maps=flat), photo, atol=1e-6)
+    slope = {"depth": ramp(photo)}
+    lit = core_render(photo, recipe, maps=slope)
+    assert np.abs(lit - photo).max() > 0.05
+    np.testing.assert_allclose(lit, runner.render(photo, recipe, maps=slope), atol=1e-5)
+
+
+# --- the two registries are one list -------------------------------------------------------------------------------
+
+
+def test_the_core_knows_exactly_the_effects_the_registry_knows():
+    assert set(_core.effects()) == set(registry.all_effects())
+
+
+def test_an_effect_registered_or_removed_in_python_is_registered_or_removed_in_the_core(reach_probes):
+    assert _core.effect("reach_probe")["category"] == "utilities"
+    plain = _core.effect("plain_probe")
+    assert (plain["category"], plain["opacity"]) == ("light", 0.5)
+    unregister("plain_probe")
+    assert "plain_probe" not in _core.effects()
+    assert "reach_probe" in _core.effects()
+    with pytest.raises(UnknownEffectError, match="plain_probe"):  # and the registry has forgotten it too
+        registry.get("plain_probe")
+
+
+def test_registering_an_effect_again_with_another_category_and_opacity_replaces_it_in_the_core(reach_probes):
+    effect(category="light", params=ReachParams, opacity=0.25)(registry.get("reach_probe"))
+    changed = _core.effect("reach_probe")
+    assert (changed["category"], changed["opacity"]) == ("light", 0.25)
+
+
+def test_emptying_the_registry_empties_the_core_of_python_effects_but_not_of_its_own(registry_emptied):
+    own = {name for name in _core.effects() if name in {"grade", "pattern", "pixel_grid"}}
+    assert own == {"grade", "pattern", "pixel_grid"}
+    everything = set(registry.all_effects())
+    with registry_emptied():  # unregisters every effect, and registers them again afterwards
+        assert set(_core.effects()) == own  # a core effect cannot be removed from the core, only from the registry
+    assert set(_core.effects()) == everything == set(registry.all_effects())

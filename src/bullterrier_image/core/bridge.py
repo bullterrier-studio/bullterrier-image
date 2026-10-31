@@ -6,20 +6,21 @@ framing, a `size` or an `each` step yet: a recipe with one is a `RecipeError` fr
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import numpy as np
 
 from bullterrier_image.ops.image import as_image
 
-from . import native
+from . import native, registry
 from .framing import Framing
-from .params import Drive, design_scale
+from .params import Drive, Lut, Picture, design_scale
 from .regions import Kind
 from .steps import Each, Recipe, Step
 
 Stage = tuple[str, int | None, np.ndarray]  # (kind, step number, picture or map); see `trace`
+Hold = Callable[[object], dict[str, int]]  # `registry.holding`'s: keeps an object, returns the reference to it
 
 
 def render(
@@ -33,7 +34,10 @@ def render(
     `finders` value needs only a `find` method), but for `size`. The recipe's pixel values are scaled to the photo
     (`design_scale`)."""
     rgb = as_image(rgb)
-    return native.render(rgb, recipe_dict(recipe), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2]))
+    with registry.holding() as hold:
+        return native.render(
+            rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2])
+        )
 
 
 def trace(
@@ -47,13 +51,17 @@ def trace(
     `("depth", None, map)` for the maps the recipe uses (float32 (h, w)), then `("step", n, picture)` after step `n`
     (from 1). The last is exactly what `render` returns. Labels are for the caller to make."""
     rgb = as_image(rgb)
-    return native.trace(rgb, recipe_dict(recipe), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2]))
+    with registry.holding() as hold:
+        return native.trace(
+            rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size_ratio=design_scale(rgb.shape[:2])
+        )
 
 
-def recipe_dict(recipe: Recipe) -> dict[str, Any]:
+def recipe_dict(recipe: Recipe, hold: Hold) -> dict[str, Any]:
     """`recipe` as the dict the core reads (the form of `_core.read_recipe`): a key is there when it is set. A step's
-    preset is already in its parameters."""
-    document: dict[str, Any] = {"steps": [_entry(step) for step in recipe.steps]}
+    preset is already in its parameters. A parameter that cannot be written as data, a `Picture` or a `Lut`, is
+    `hold`'s (`registry.holding`): the dict has the reference `hold` returns."""
+    document: dict[str, Any] = {"steps": [_entry(step, hold) for step in recipe.steps]}
     for key in ("name", "description", "size"):
         if (value := getattr(recipe, key)) is not None:
             document[key] = value
@@ -64,13 +72,13 @@ def recipe_dict(recipe: Recipe) -> dict[str, Any]:
     return document
 
 
-def _entry(step: Step | Each | None) -> dict[str, Any] | None:
+def _entry(step: Step | Each | None, hold: Hold) -> dict[str, Any] | None:
     if step is None:  # a piece of an `each` step left as it was
         return None
     if isinstance(step, Each):
         entry: dict[str, Any] = {
             "each": step.each,
-            "looks": [_entry(look) for look in step.looks],
+            "looks": [_entry(look, hold) for look in step.looks],
             "assign": step.assign,
             "seed": step.seed,
             "feather": step.feather,
@@ -78,7 +86,7 @@ def _entry(step: Step | Each | None) -> dict[str, Any] | None:
     else:
         entry = {"effect": step.effect}
         if step.params:
-            entry["params"] = {name: _value(value) for name, value in step.params.items()}
+            entry["params"] = {name: _value(value, hold) for name, value in step.params.items()}
         if step.partition is not None:
             entry["partition"] = step.partition
     entry |= {"opacity": step.opacity, "blend_mode": step.blend_mode}
@@ -95,14 +103,17 @@ def _region(region: Kind) -> dict[str, Any]:
     return {"kind": kind, **region.model_dump()}
 
 
-def _value(value: object) -> object:
-    """A parameter value as the plain data it is written as: a drive as its table, an array as a list."""
+def _value(value: object, hold: Hold) -> object:
+    """A parameter value as the plain data it is written as: a drive as its table, an array as a list, a `Picture` or
+    a `Lut` as the reference `hold` gives."""
+    if isinstance(value, Picture | Lut):
+        return hold(value)
     if isinstance(value, Drive):
         return value.model_dump()
     if isinstance(value, Mapping):
-        return {key: _value(item) for key, item in value.items()}
+        return {key: _value(item, hold) for key, item in value.items()}
     if isinstance(value, list | tuple):
-        return [_value(item) for item in value]
+        return [_value(item, hold) for item in value]
     if isinstance(value, np.ndarray):
         return value.tolist()
     if isinstance(value, np.generic):

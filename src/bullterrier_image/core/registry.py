@@ -35,7 +35,9 @@ import inspect
 import os
 import re
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from importlib import metadata
 from typing import Any
@@ -48,7 +50,7 @@ from bullterrier_image.ops.maps import map_problem
 from . import looks as look_files
 from . import native
 from . import presets as preset_files
-from .params import EffectParams, core_effect, field_name_fields, signature
+from .params import EffectParams, core_effect, field_name_fields, scaled, signature
 from .presets import Preset
 
 # The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
@@ -231,8 +233,10 @@ def effect[P: EffectParams](
 def unregister(name: str) -> None:
     """Remove the effect called `name` (UnknownEffectError if there is none). For tests that register throwaway
     effects."""
-    get(name)
+    removed = get(name)
     del _EFFECTS[name]
+    if core_effect(removed.params_model) is None:
+        native.unregister(name)
 
 
 def get(name: str) -> ModelledEffect:
@@ -459,8 +463,64 @@ def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> Model
             f"two effects are called {name!r}: one in {existing.__module__}, another in {registered.__module__}; "
             "rename one"
         )
+    if core is None:
+        _mirror(registered)
     _EFFECTS[name] = registered
     return registered
+
+
+def _mirror(effect: "ModelledEffect") -> None:
+    """Make `effect` known to the Rust core, so that a recipe the core runs can use it; replaces the core's copy of an
+    earlier registration of the name. The core calls `run` with the parameters as a step wrote them (a Python effect
+    describes none to the core) and `size_ratio`, always declared: the wrapper validates and scales them as the Python
+    runner does, and passes the ratio on only to an effect that declares it. An effect the core runs itself is not
+    mirrored (`_register`): the core has it."""
+    name = effect.__name__
+
+    def run(rgb: np.ndarray, params: dict[str, Any], *, size_ratio: float, **inputs: Any) -> np.ndarray:
+        values = effect.validate(_resolved(params))
+        if "size_ratio" in effect.inputs:
+            inputs["size_ratio"] = size_ratio
+        return effect(rgb, scaled(values, size_ratio), **inputs)
+
+    if name in native.effects():
+        native.unregister(name)
+    declared = [name for name in INPUTS if name == "size_ratio" or name in effect.inputs]
+    native.register(name, effect.category, effect.opacity, run, inputs=declared, fields=effect.fields_named({}))
+
+
+# The only form a Picture or a Lut can take in the dict a recipe is run from: a reference to an object the call holds.
+_REFERENCE = "$object"
+_HELD: ContextVar[Sequence[object]] = ContextVar("held", default=())
+
+
+@contextmanager
+def holding() -> Iterator[Callable[[object], dict[str, int]]]:
+    """For a call that runs a recipe in the core: `hold(obj)` keeps `obj`, a parameter that cannot be written as data (a
+    Picture, a Lut), until the block ends, and returns the reference to put in the recipe's dict in its place. A Python
+    effect the core runs receives the objects back where the references were."""
+    held: list[object] = []
+
+    def hold(obj: object) -> dict[str, int]:
+        held.append(obj)
+        return {_REFERENCE: len(held) - 1}
+
+    token = _HELD.set(held)
+    try:
+        yield hold
+    finally:
+        _HELD.reset(token)
+
+
+def _resolved(value: Any) -> Any:
+    """`value`, a parameter as the core hands it over, with the objects the call holds back in place of references."""
+    if isinstance(value, dict):
+        if value.keys() == {_REFERENCE}:
+            return _HELD.get()[value[_REFERENCE]]
+        return {key: _resolved(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_resolved(item) for item in value]
+    return value
 
 
 def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:

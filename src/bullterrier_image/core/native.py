@@ -54,5 +54,7 @@ def entry[**P, R](function: Callable[P, R]) -> Callable[P, R]:
 effects = entry(_core.effects)
 params = entry(_core.params)
 effect = entry(_core.effect)
+register = entry(_core.register)
+unregister = entry(_core.unregister)
 render = entry(_core.render)
 trace = entry(_core.trace)
