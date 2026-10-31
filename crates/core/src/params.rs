@@ -10,15 +10,15 @@
 //!
 //! ```text
 //! /// The parameters of `pattern`.
-//! #[derive(Deserialize, Params)]
+//! #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 //! #[serde(deny_unknown_fields)]
-//! pub(crate) struct Params {
+//! pub struct Params {
 //!     /// The size of one repeat in px. Larger = a coarser pattern.
 //!     #[param(default = 32.0, unit = px, min = 2, max = 512)]
-//!     pub(crate) cell: f32,
+//!     pub cell: f32,
 //!     /// The pattern: 'stripes' or 'grid'.
 //!     #[param(default = Grid)]
-//!     pub(crate) kind: Kind,
+//!     pub kind: Kind,
 //! }
 //! ```
 //!

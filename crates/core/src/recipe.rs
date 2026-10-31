@@ -17,6 +17,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::Error;
+use crate::params::EffectParams;
 
 mod check;
 mod file;
@@ -142,6 +143,22 @@ impl Step {
             opacity: None,
             blend_mode: BlendMode::Normal,
             name: None,
+        }
+    }
+
+    /// A step of the effect the typed `params` belong to, with every parameter written and no preset:
+    /// `Step::of(grade::Params { exposure: 1.0, ..Default::default() })` sets all seven of `grade`'s, the six others to
+    /// their defaults. A decimal is the number a person would write (`0.2`, not the `f32` widened to
+    /// `0.20000000298`). Like any step, it is checked by [`Recipe::checked`].
+    #[must_use]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "a `Params { .. }` literal is passed as written, not borrowed"
+    )]
+    pub fn of<P: EffectParams>(params: P) -> Self {
+        Self {
+            params: params.values(),
+            ..Self::new(P::EFFECT)
         }
     }
 

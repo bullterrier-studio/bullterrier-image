@@ -18,35 +18,35 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// Colour balance (temperature, tint), then exposure, contrast, saturation and vibrance.
-#[derive(Deserialize, Params)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Params {
+pub struct Params {
     /// Warm-cool shift in stops (-2..2): the difference in stops between the red and the blue gain, shared evenly (red
     /// up and blue down by half of it each). Positive warms the picture (more orange), negative cools it (more blue), 0
     /// leaves the colour balance alone. Use a negative value to correct a picture shot under warm light.
     #[param(default = 0.0, unit = stops, min = -2, max = 2, drivable)]
-    pub(crate) temperature: f32,
+    pub temperature: f32,
     /// Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power of minus tint. Positive
     /// adds magenta (less green), negative adds green, 0 leaves the balance alone.
     #[param(default = 0.0, unit = stops, min = -1, max = 1, drivable)]
-    pub(crate) tint: f32,
+    pub tint: f32,
     /// Brightness in photographic stops: +1 doubles every value, -1 halves it.
     #[param(default = 0.0, unit = stops, min = -10, max = 10, drivable)]
-    pub(crate) exposure: f32,
+    pub exposure: f32,
     /// How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 = flat at the pivot.
     #[param(default = 1.0, unit = ratio, min = 0, max = 5, drivable)]
-    pub(crate) contrast: f32,
+    pub contrast: f32,
     /// The brightness (0..1) that contrast leaves where it is; values above it brighten, below it darken.
     #[param(default = 0.5, unit = fraction, min = 0, max = 1)]
-    pub(crate) pivot: f32,
+    pub pivot: f32,
     /// Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more vivid.
     #[param(default = 1.0, unit = ratio, min = 0, max = 5, drivable)]
-    pub(crate) saturation: f32,
+    pub saturation: f32,
     /// How far muted colours are pushed toward full saturation (0..1), after `saturation`: 0 changes nothing, 1 raises
     /// a colour's saturation s to s + s * (1 - s), so a colour at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99.
     /// Greys and fully saturated colours stay as they are; colours are never made duller.
     #[param(default = 0.0, unit = fraction, min = 0, max = 1, drivable)]
-    pub(crate) vibrance: f32,
+    pub vibrance: f32,
 }
 
 /// The graded picture.

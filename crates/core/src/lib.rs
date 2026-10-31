@@ -5,13 +5,14 @@
 //! core's own, its parameters described). The core's own effects are files in `src/effects/`, found by the build
 //! script; one that lives elsewhere implements [`Effect`] and joins them with [`register`]. A core effect's parameters
 //! are declared once, by its `Params` struct (see [`mod@params`]); [`params::Table::check`] checks a user's values
-//! against that declaration and the Python package builds the effect's model from it. Running an effect trusts its
+//! against that declaration and the Python package builds the effect's model from it; [`Step::of`] builds a recipe step
+//! from an effect's typed `Params` (`effects::grade::Params`). There is no typed apply yet: [`apply`] takes JSON. Running an effect trusts its
 //! parameters (and, for now, expects them scaled by the Python package): check them first.
 
 #![forbid(unsafe_code)]
 
 mod effect;
-mod effects;
+pub mod effects;
 mod error;
 mod ops;
 pub mod params;

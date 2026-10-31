@@ -40,7 +40,7 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     for (name, path) in files {
         writeln!(
             code,
-            "#[path = {:?}]\npub(crate) mod {name};\nimpl crate::params::EffectParams for {name}::Params {{\n    const EFFECT: &'static str = {name:?};\n}}",
+            "#[path = {:?}]\npub mod {name};\nimpl crate::params::EffectParams for {name}::Params {{\n    const EFFECT: &'static str = {name:?};\n}}",
             path.display().to_string()
         )?;
     }

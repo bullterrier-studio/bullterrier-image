@@ -28,17 +28,18 @@ pub(crate) const META: Meta = Meta {
 // Options of every library call are fields too; a constant is allowed only for a standard (Rec. 709, sRGB...) or a pure
 // guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number). The doc
 // comment of the struct says what the parameters are as a whole: it is the model's docstring, and a field's doc is its
-// help text in Python: plain text, no rustdoc links, and a blank `///` line becomes a double space. Keep the struct and
-// its fields `pub(crate)`. A parameter `render` never reads fails `crates/core/tests/parameters_are_read.rs`; one that
-// matters only while another is set needs a row in that test's `conditional`.
+// help text in Python: plain text, no rustdoc links, and a blank `///` line becomes a double space. Keep the struct,
+// its fields and a choice enum `pub`: users build a step from them (`Step::of`). A parameter `render` never reads fails
+// `crates/core/tests/parameters_are_read.rs`; one that matters only while another is set needs a row in that test's
+// `conditional`.
 
 /// The settings of `$name`: every value that shapes its result.
-#[derive(Deserialize, Params)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Params {
+pub struct Params {
     /// How far the picture is mixed toward its negative: 0 = unchanged, 1 = fully inverted.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
-    pub(crate) amount: f32,
+    pub amount: f32,
 }
 
 /// The picture mixed toward its negative by `amount`. Replace with the effect: pixel by pixel as here, or over the

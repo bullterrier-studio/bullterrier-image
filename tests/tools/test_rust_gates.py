@@ -141,9 +141,9 @@ OFFENCES = {
     ),
     "pub where no user of the crate reaches it": (
         "rust-lint",
-        "crates/core/src/effects.rs",
+        "crates/core/src/ops.rs",
         appended("\n/// Probe.\npub fn reachable_only_inside() {}\n"),
-        ["unreachable-pub", "crates/core/src/effects.rs"],
+        ["unreachable-pub", "crates/core/src/ops.rs"],
     ),
     "a declared parameter no test shows to change the result": (
         "rust-test",
