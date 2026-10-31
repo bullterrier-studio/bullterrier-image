@@ -260,3 +260,18 @@ def test_a_recipe_is_read_from_json_or_toml_and_any_other_format_is_refused():
 def test_a_recipe_that_is_not_one_is_a_value_error_naming_the_key():
     with pytest.raises(ValueError, match="opacity"):
         _core.read_recipe('{"steps": [{"effect": "grade", "opacity": "half"}]}', "json")
+
+
+@pytest.mark.parametrize(
+    ("text", "named"),
+    [
+        pytest.param('{"steps": [{"effect": "grade", "effect": "pattern"}]}', "effect", id="a key written twice"),
+        pytest.param(
+            '{"steps": [{"effect": "grade", "params": {"a": 1, "a": 2}}]}', "a", id="a parameter written twice"
+        ),
+        pytest.param('{"steps": [], "regions": {"depth": null}}', "depth", id="a region that is null"),
+    ],
+)
+def test_a_recipe_in_json_with_a_repeated_key_or_a_region_that_is_no_table_is_a_value_error(text, named):
+    with pytest.raises(ValueError, match=named):
+        _core.read_recipe(text, "json")

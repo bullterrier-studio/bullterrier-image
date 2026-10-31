@@ -9,7 +9,10 @@
 //! Reading and building check nothing but the shape: an unknown key is refused by name, a wrong type too. The rules of
 //! a look (known effects, parameters within their ranges, names that resolve) are `Recipe::checked`.
 
-use serde::de::Error as _;
+use std::collections::BTreeSet;
+use std::fmt;
+
+use serde::de::{Error as _, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
@@ -284,7 +287,7 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub frame: Map<String, Value>,
     /// The regions the steps can name besides the built-in ones, by name: tables whose kind the runner reads.
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    #[serde(default, skip_serializing_if = "Map::is_empty", deserialize_with = "tables")]
     pub regions: Map<String, Value>,
 }
 
@@ -306,11 +309,83 @@ impl Recipe {
     /// see `Recipe::checked` for the rules.
     ///
     /// # Errors
-    /// [`Error::Recipe`] if the text is not JSON or not the shape of a recipe: an unknown or mistyped key is named.
+    /// [`Error::Recipe`] if the text is not JSON or not the shape of a recipe: an unknown, mistyped or twice-written
+    /// key is named.
     pub fn from_json(text: &str) -> Result<Self, Error> {
+        serde_json::from_str::<Unique>(text).map_err(|error| Error::Recipe(format!("not a recipe: {error}")))?;
         let mut deserializer = serde_json::Deserializer::from_str(text);
         serde_path_to_error::deserialize(&mut deserializer)
             .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error))))
+    }
+}
+
+/// Regions as the JSON writes them: each a table, as a file's `[region.NAME]` is.
+fn tables<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Map<String, Value>, D::Error> {
+    let regions = Map::deserialize(deserializer)?;
+    match regions.iter().find(|(_, region)| !region.is_object()) {
+        Some((name, other)) => Err(D::Error::custom(format!(
+            "region '{name}' must be a table, got {other}"
+        ))),
+        None => Ok(regions),
+    }
+}
+
+/// A JSON text in which no object writes a key twice (`serde_json::Value` would keep the last silently).
+struct Unique;
+
+impl<'de> Deserialize<'de> for Unique {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(UniqueVisitor).map(|()| Self)
+    }
+}
+
+struct UniqueVisitor;
+
+impl<'de> Visitor<'de> for UniqueVisitor {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("JSON")
+    }
+
+    fn visit_bool<E>(self, _: bool) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_i64<E>(self, _: i64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_u64<E>(self, _: u64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_f64<E>(self, _: f64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_str<E>(self, _: &str) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_unit<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut items: A) -> Result<(), A::Error> {
+        while items.next_element::<Unique>()?.is_some() {}
+        Ok(())
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut entries: A) -> Result<(), A::Error> {
+        let mut seen = BTreeSet::new();
+        while let Some(key) = entries.next_key::<String>()? {
+            if !seen.insert(key.clone()) {
+                return Err(A::Error::custom(format!("`{key}` is written twice in one table")));
+            }
+            entries.next_value::<Unique>()?;
+        }
+        Ok(())
     }
 }
 
@@ -545,6 +620,66 @@ mod tests {
         // the largest seed is allowed
         let seed = read(&json!({"steps": [{"each": "p", "looks": [], "seed": 4_294_967_295_u32}]}));
         assert!(seed.is_ok(), "{seed:?}");
+    }
+
+    #[test]
+    fn a_key_written_twice_is_refused_wherever_it_is() {
+        for (what, text, key) in [
+            ("in a recipe", r#"{"steps": [], "size": 1, "size": 2}"#, "size"),
+            ("in a step", r#"{"steps": [{"effect": "a", "effect": "b"}]}"#, "effect"),
+            (
+                "in a step's parameters",
+                r#"{"steps": [{"effect": "a", "params": {"x": 1, "x": 2}}]}"#,
+                "x",
+            ),
+            (
+                "in a drive",
+                r#"{"steps": [{"effect": "a", "params": {"x": {"by": "depth", "by": "light"}}}]}"#,
+                "by",
+            ),
+            (
+                "in a look",
+                r#"{"steps": [{"each": "p", "looks": [{"effect": "a", "mask": "x", "mask": "y"}]}]}"#,
+                "mask",
+            ),
+            (
+                "in a region",
+                r#"{"steps": [], "regions": {"p": {"kind": "grid", "kind": "path"}}}"#,
+                "kind",
+            ),
+            (
+                "in a list of parameters",
+                r#"{"steps": [{"effect": "a", "params": {"x": [{"y": 1, "y": 1}]}}]}"#,
+                "y",
+            ),
+        ] {
+            let result = Recipe::from_json(text);
+            assert!(
+                matches!(&result, Err(Error::Recipe(message)) if message.contains(&format!("`{key}`"))),
+                "{what}: {result:?}"
+            );
+        }
+        // the same key in different tables is fine
+        let steps = r#"{"steps": [{"effect": "a", "params": {"x": 1}}, {"effect": "b", "params": {"x": 2}}]}"#;
+        assert!(Recipe::from_json(steps).is_ok());
+    }
+
+    #[test]
+    fn a_region_that_is_not_a_table_is_refused_naming_it() {
+        for (what, regions) in [
+            ("null", json!({"depth": null})),
+            ("text", json!({"depth": "band"})),
+            ("a list", json!({"depth": []})),
+            ("one of two", json!({"fine": {"kind": "grid"}, "depth": 3})),
+        ] {
+            let result = read(&json!({"steps": [], "regions": regions}));
+            assert!(
+                matches!(&result, Err(Error::Recipe(message)) if message.contains("depth") && message.contains("table")),
+                "{what}: {result:?}"
+            );
+        }
+        let tables = read(&json!({"steps": [], "regions": {"depth": {"kind": "band"}, "empty": {}}}));
+        assert!(tables.is_ok(), "{tables:?}");
     }
 
     /// The place of `mode` in `ALL`. The match has no wildcard: a new mode stops this compiling until it is placed here.
