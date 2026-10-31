@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value};
 
-use super::{Each, Entry, Recipe, STEP_KEYS, Step};
+use super::{Drive, Each, Entry, Recipe, STEP_KEYS, Step, drive};
 use crate::effect::Input;
 use crate::registry::Registry;
 use crate::{Error, Presets};
@@ -120,58 +120,6 @@ struct Rules<'a> {
     regions: &'a Map<String, Value>,
 }
 
-/// A parameter that varies across the picture, as a recipe writes it: its value is `start` where the field `by` is 0
-/// and `end` where it is 1.
-struct Drive {
-    by: String,
-    start: f64,
-    end: f64,
-    levels: i64,
-}
-
-impl Drive {
-    /// The drive a table writes, or what is wrong with it.
-    fn read(table: &Map<String, Value>) -> Result<Self, String> {
-        if let Some(key) = table
-            .keys()
-            .find(|key| !["by", "start", "end", "levels"].contains(&key.as_str()))
-        {
-            return Err(format!(
-                "`{key}` is not a key of a drive; a drive has by, start, end and levels"
-            ));
-        }
-        let number = |key: &str| match table.get(key) {
-            None => Err(format!("`{key}` is required")),
-            Some(value) => value
-                .as_f64()
-                .ok_or_else(|| format!("`{key}` must be a number, got {value}")),
-        };
-        let by = match table.get("by") {
-            Some(Value::String(by)) if !by.is_empty() => by.clone(),
-            other => {
-                return Err(format!(
-                    "`by` names the field that drives it, got {}",
-                    other.unwrap_or(&Value::Null)
-                ));
-            }
-        };
-        // constant: the default `levels` of the Python `Drive`
-        let levels = table.get("levels").map_or(Some(5), Value::as_i64);
-        match levels {
-            Some(levels @ 2..=16) => Ok(Self {
-                by,
-                start: number("start")?,
-                end: number("end")?,
-                levels,
-            }),
-            _ => Err(format!(
-                "`levels` must be a whole number from 2 to 16, got {}",
-                table.get("levels").unwrap_or(&Value::Null)
-            )),
-        }
-    }
-}
-
 impl Rules<'_> {
     fn step(&self, step: &Step, place: &str) -> Result<(), Error> {
         let effect = self.registry.effect(&step.effect)?;
@@ -192,7 +140,7 @@ impl Rules<'_> {
                 )));
             }
         }
-        let drives = drives(&step.effect, &params, place)?;
+        let drives = drive::in_params(&step.effect, &params, place)?;
         if let Some(table) = effect.params() {
             for (name, _) in &drives {
                 if table.fields.iter().any(|field| field.name == name && !field.drivable) {
@@ -318,33 +266,6 @@ impl Rules<'_> {
             valid.join(", ")
         )))
     }
-}
-
-/// The parameters in `params` that are drives (a table with `by`), with their names, once their shape and the sharing
-/// of one `by` and one `levels` are checked.
-fn drives(effect: &str, params: &Map<String, Value>, place: &str) -> Result<Vec<(String, Drive)>, Error> {
-    let mut drives = Vec::new();
-    for (name, value) in params {
-        let Some(table) = value.as_object().filter(|table| table.contains_key("by")) else {
-            continue;
-        };
-        let drive = Drive::read(table)
-            .map_err(|problem| Error::Recipe(format!("{place}: effect '{effect}': `{name}`: {problem}")))?;
-        drives.push((name.clone(), drive));
-    }
-    if let [(_, first), rest @ ..] = drives.as_slice() {
-        if rest.iter().any(|(_, other)| other.by != first.by) {
-            return Err(Error::Recipe(format!(
-                "{place}: effect '{effect}': the drives of one step must vary by one field"
-            )));
-        }
-        if rest.iter().any(|(_, other)| other.levels != first.levels) {
-            return Err(Error::Recipe(format!(
-                "{place}: effect '{effect}': the drives of one step must vary by one number of levels"
-            )));
-        }
-    }
-    Ok(drives)
 }
 
 #[cfg(test)]

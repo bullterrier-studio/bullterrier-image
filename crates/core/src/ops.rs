@@ -3,3 +3,4 @@
 pub(crate) mod blend;
 pub(crate) mod color;
 pub(crate) mod colorspace;
+pub(crate) mod levels;

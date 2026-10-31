@@ -3,7 +3,9 @@
 
 use std::error::Error;
 
-use bullterrier_image::{BlendMode, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply};
+use bullterrier_image::{
+    BlendMode, Drive, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply,
+};
 use serde_json::json;
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -124,6 +126,31 @@ fn a_masked_step_changes_the_picture_only_where_the_mask_is_above_0() -> Outcome
     .into_values();
     for (index, pixel) in rendered.chunks(3).enumerate() {
         let expected = if index % 30 >= 12 { &graded } else { &values };
+        assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_parameter_driven_by_a_map_takes_its_start_where_the_map_is_0_and_its_end_where_it_is_1() -> Outcome {
+    let values = wide_values();
+    // the left 12 of 30 columns are 0 in the depth map, the rest 1
+    let depth: Vec<f32> = (0..20 * 30)
+        .map(|index| f32::from(u8::from(index % 30 >= 12)))
+        .collect();
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("depth", Layer::new(20, 30, depth)?);
+    let recipe = Recipe::new([Step::new("grade").param("exposure", Drive::new("depth", -1.0, 1.0).levels(2))]);
+    let rendered = photo
+        .render(&recipe, &Presets::new(), Options::default())?
+        .into_values();
+    let graded = |exposure: f64| {
+        let params = json!({"temperature": 0.0, "tint": 0.0, "exposure": exposure, "contrast": 1.0, "pivot": 0.5,
+                            "saturation": 1.0, "vibrance": 0.0});
+        apply("grade", &Picture::new(20, 30, &values)?, params, &Inputs::default()).map(Image::into_values)
+    };
+    let (darker, brighter) = (graded(-1.0)?, graded(1.0)?);
+    for (index, pixel) in rendered.chunks(3).enumerate() {
+        let expected = if index % 30 >= 12 { &brighter } else { &darker };
         assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
     }
     Ok(())

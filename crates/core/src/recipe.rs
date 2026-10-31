@@ -20,7 +20,10 @@ use crate::Error;
 use crate::params::EffectParams;
 
 mod check;
+pub(crate) mod drive;
 mod file;
+
+pub use drive::Drive;
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an
 /// effect may be named like one.

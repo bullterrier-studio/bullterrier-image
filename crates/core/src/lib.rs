@@ -11,7 +11,8 @@
 //!
 //! A look runs on a picture with [`Photo::render`]: it checks the recipe, completes and scales each step's parameters
 //! (preset, defaults, design pixels) and runs the steps in order, laying each result over its input by the step's blend
-//! mode, opacity and mask (a map handed to the photo with [`Photo::with_map`]). [`apply`] runs one effect on parameters that are already complete.
+//! mode, opacity and mask (a map handed to the photo with [`Photo::with_map`]). A parameter an effect declares drivable
+//! may be a [`Drive`], which varies it across the picture by such a map. [`apply`] runs one effect on parameters that are already complete.
 
 #![forbid(unsafe_code)]
 
@@ -34,7 +35,7 @@ pub use error::{Constraint, Error, ErrorKind, MapKind};
 pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
-pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, STEP_KEYS, Step};
+pub use recipe::{Assign, BlendMode, Drive, Each, Entry, Recipe, STEP_KEYS, Step};
 pub use registry::{effect, effects, register, unregister};
 pub use run::{Options, Photo};
 

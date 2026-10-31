@@ -9,10 +9,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::effect::{self, Effect};
-use crate::ops::blend;
+use crate::ops::{blend, levels};
+use crate::recipe::drive;
 use crate::registry::Registry;
 use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets, Recipe};
 
@@ -120,7 +121,7 @@ impl<'a> Photo<'a> {
             for (parameter, layer) in &step.fields {
                 offered = offered.with_field(parameter.as_str(), layer);
             }
-            let after = effect::run(&*step.effect, &before, step.params.clone(), &offered)?;
+            let after = step.run(&before, &offered)?;
             current = Some(step.lay(&before, after));
         }
         current.ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))
@@ -157,12 +158,25 @@ impl<'a> Photo<'a> {
             };
             fields.push((field.parameter.clone(), self.map(name)?));
         }
-        let params = match effect.params() {
-            Some(table) => table.scaled(
-                table.check(&step.effect, &given).map_err(|error| error.at(place))?,
-                ratio,
-            ),
-            None => given,
+        let drives = drive::in_params(&step.effect, &given, place)?;
+        let runs = if let Some((_, first)) = drives.first() {
+            // one run for each level of the drives, each with its values checked and scaled like a plain step's
+            let levels = (0..first.levels)
+                .map(|level| {
+                    let mut values = given.clone();
+                    for (name, drive) in &drives {
+                        values.insert(name.clone(), Value::from(drive.value(level)));
+                    }
+                    complete(&*effect, &step.effect, values, ratio, place)
+                })
+                .collect::<Result<_, _>>()?;
+            Runs::Driven {
+                by: self.map(&first.by)?,
+                top: first.levels - 1,
+                levels,
+            }
+        } else {
+            Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
         };
         Ok(Prepared {
             opacity: step.opacity.unwrap_or_else(|| effect.opacity()),
@@ -170,7 +184,7 @@ impl<'a> Photo<'a> {
             mask: step.mask.as_deref().map(|name| self.map(name)).transpose()?,
             fields,
             effect,
-            params: Value::Object(params),
+            runs,
         })
     }
 
@@ -197,11 +211,19 @@ impl<'a> Photo<'a> {
     }
 }
 
+/// The complete parameters a step's effect is run with.
+enum Runs<'p> {
+    /// A plain step: one run.
+    One(Value),
+    /// A step with driven parameters: one run for each level, `levels[n]` for level `n` (0 to `top`), mixed by the map.
+    Driven { by: &'p Layer, top: u8, levels: Vec<Value> },
+}
+
 /// A step ready to run: its effect, the complete parameters it receives, the maps it works from and how its result is
 /// laid over its input.
 struct Prepared<'p> {
     effect: Arc<dyn Effect>,
-    params: Value,
+    runs: Runs<'p>,
     /// The field parameters of the effect, each with its map.
     fields: Vec<(String, &'p Layer)>,
     opacity: f64,
@@ -209,7 +231,47 @@ struct Prepared<'p> {
     mask: Option<&'p Layer>,
 }
 
+/// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes them, checked
+/// and scaled to `ratio`, else as given.
+fn complete(
+    effect: &dyn Effect,
+    name: &str,
+    given: Map<String, Value>,
+    ratio: f64,
+    place: &str,
+) -> Result<Value, Error> {
+    Ok(Value::Object(match effect.params() {
+        Some(table) => table.scaled(table.check(name, &given).map_err(|error| error.at(place))?, ratio),
+        None => given,
+    }))
+}
+
 impl Prepared<'_> {
+    /// The effect run on `before`. A driven step runs it once for each level that some pixel is on or next to, and each
+    /// pixel mixes the runs of the two levels either side of its map value, linearly; a level none is near is not run.
+    fn run(&self, before: &Picture<'_>, offered: &Inputs<'_>) -> Result<Image, Error> {
+        let (by, top, levels) = match &self.runs {
+            Runs::One(params) => return effect::run(&*self.effect, before, params.clone(), offered),
+            Runs::Driven { by, top, levels } => (by, *top, levels),
+        };
+        let positions: Vec<f32> = by.values().iter().map(|value| value * f32::from(top)).collect();
+        let mut mixed = vec![[0.0_f32; 3]; positions.len()];
+        for (level, params) in (0..=top).zip(levels) {
+            let weights: Vec<f32> = positions
+                .iter()
+                .map(|&position| levels::weight(position, level))
+                .collect();
+            if weights.iter().all(|&weight| weight <= 0.0) {
+                continue;
+            }
+            let run = effect::run(&*self.effect, before, params.clone(), offered)?;
+            for ((out, pixel), weight) in mixed.iter_mut().zip(run.as_picture().pixels()).zip(&weights) {
+                *out = std::array::from_fn(|channel| out[channel] + weight * pixel[channel]);
+            }
+        }
+        Ok(Image::from_pixels(before.height(), before.width(), mixed))
+    }
+
     /// `after`, the effect's result for `before`, laid over `before` as the step says. A plain step (blend mode
     /// normal, opacity 1, no mask) is its result as it is, uncopied.
     fn lay(&self, before: &Picture<'_>, after: Image) -> Image {
@@ -230,8 +292,8 @@ mod tests {
     use super::*;
     use crate::params::Declared;
     use crate::params::probe::Probe;
-    use crate::testing::{Paint, Recorder, Shrinks, registry};
-    use crate::{Each, ErrorKind, Step};
+    use crate::testing::{Measured, Paint, Recorder, Shrinks, registry};
+    use crate::{Drive, Each, ErrorKind, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
     fn values() -> Vec<f32> {
@@ -434,6 +496,222 @@ mod tests {
             matches!(&mistyped, Err(error @ Error::Recipe(_)) if error.to_string().contains("`near` names a field")),
             "{mistyped:?}"
         );
+        Ok(())
+    }
+
+    /// The 1 x `width` photo of `width` grey pixels, with `field` as its map `subject` (one value per pixel).
+    fn banded(field: &[f32]) -> Result<(Vec<f32>, Layer), Error> {
+        Ok((vec![0.5; field.len() * 3], Layer::new(1, field.len(), field.to_vec())?))
+    }
+
+    /// `step` rendered on a grey photo as wide as `field` that has `field` as its map `subject`.
+    fn driven_by(registry: &Registry, step: Step, field: &[f32]) -> Result<Image, Error> {
+        let (values, subject) = banded(field)?;
+        Photo::new(Picture::new(1, field.len(), &values)?)
+            .with_map("subject", subject)
+            .render_in(registry, &Recipe::new([step]), &Presets::new(), Options::default())
+    }
+
+    #[test]
+    fn a_driven_parameter_mixes_the_runs_either_side_of_the_maps_value() -> Result<(), Error> {
+        let registry = registry()?;
+        registry.register(Arc::new(Paint { name: "paint" }))?;
+        // paints the grey `level`, here 0.2 where the map is 0 and 0.8 where it is 1: a pixel at v mixes (1 - v) of the
+        // first run with v of the second
+        let step = Step::new("paint")
+            .param("level", Drive::new("subject", 0.2, 0.8).levels(2))
+            .opacity(1.0);
+        let field = [0.0, 1.0, 0.25, 0.5, 0.75, 0.1];
+        let painted = driven_by(&registry, step, &field)?.into_values();
+        let expected: Vec<f32> = [0.2, 0.8, 0.35, 0.5, 0.65, 0.26]
+            .iter()
+            .flat_map(|level| [*level; 3])
+            .collect();
+        assert_close(&painted, &expected);
+        Ok(())
+    }
+
+    #[test]
+    fn a_driven_effect_with_the_map_on_a_level_is_the_plain_effect_at_that_levels_value() -> Result<(), Error> {
+        // grade's exposure from 0 to 2 in 5 levels (0, 0.5, 1, 1.5, 2); a map of 0.5 is on level 2 (exposure 1), 0.25 on
+        // level 1 (0.5), 0.375 halfway between levels 1 and 2
+        let grade = |exposure: f64| Step::new("grade").param("exposure", exposure);
+        let driven = Step::new("grade").param("exposure", Drive::new("subject", 0.0, 2.0));
+        let registry = registry()?;
+        let rendered_with = |step: Step, field: f32| -> Result<Vec<f32>, Error> {
+            Ok(driven_by(&registry, step, &[field; 6])?.into_values())
+        };
+        let plain = |exposure: f64| rendered_with(grade(exposure), 0.0);
+        assert_eq!(rendered_with(driven.clone(), 0.5)?, plain(1.0)?);
+        assert_eq!(rendered_with(driven.clone(), 0.25)?, plain(0.5)?);
+        let (below, above) = (plain(0.5)?, plain(1.0)?);
+        let halfway: Vec<f32> = below
+            .iter()
+            .zip(&above)
+            .map(|(low, high)| 0.5 * low + 0.5 * high)
+            .collect();
+        assert_close(&rendered_with(driven, 0.375)?, &halfway);
+        Ok(())
+    }
+
+    #[test]
+    fn only_the_levels_a_pixel_is_on_or_next_to_are_run_and_the_last_is_exactly_the_end() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &[]));
+        registry.register(recorder.clone())?;
+        // x from 10 to 50 in 5 levels: 10, 20, 30, 40, 50
+        let step = Step::new("recorder").param("x", Drive::new("subject", 10.0, 50.0));
+        // (the map's values, the x of the runs in order)
+        let rows: [(&[f32], &[f64]); 5] = [
+            (&[0.0, 0.0], &[10.0]),
+            (&[0.5, 0.5], &[30.0]),
+            (&[0.3, 0.3], &[20.0, 30.0]),
+            (&[0.0, 1.0], &[10.0, 50.0]),
+            (&[0.9], &[40.0, 50.0]),
+        ];
+        for (field, expected) in rows {
+            driven_by(&registry, step.clone(), field)?;
+            let runs: Vec<f64> = recorder
+                .received()
+                .iter()
+                .filter_map(|received| received.params["x"].as_f64())
+                .collect();
+            assert_eq!(runs, expected, "{field:?}");
+            recorder.clear();
+        }
+        // 0.3 + 0.6 x 3 / 3 is 0.9000000000000001: the run of the last level gets `end` itself
+        let end = Step::new("recorder").param("x", Drive::new("subject", 0.3, 0.9).levels(4));
+        driven_by(&registry, end, &[1.0])?;
+        let received = recorder.received();
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].params["x"].as_f64().map(f64::to_bits),
+            Some(0.9_f64.to_bits())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_weights_of_a_pixel_add_up_to_one_so_a_constant_stays_that_constant() -> Result<(), Error> {
+        let registry = registry()?;
+        registry.register(Arc::new(Paint { name: "paint" }))?;
+        // every level paints 1: the result is the sum of the weights, for every map value from 0 to 1
+        let field: Vec<f32> = (0..1001_u16).map(|index| f32::from(index) / 1000.0).collect();
+        for levels in [2, 3, 5, 16] {
+            let step = Step::new("paint")
+                .param("level", Drive::new("subject", 1.0, 1.0).levels(levels))
+                .opacity(1.0);
+            let painted = driven_by(&registry, step, &field)?.into_values();
+            assert!(
+                painted.iter().all(|value| (1.0 - 1e-6..=1.0).contains(value)),
+                "{levels} levels"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_linear_effect_driven_by_a_map_is_its_parameter_at_the_maps_value_whatever_the_levels() -> Result<(), Error> {
+        let registry = registry()?;
+        registry.register(Arc::new(Paint { name: "paint" }))?;
+        // paint's grey is its `level`, so a driven pixel is 0.2 + 0.6 v at map value v, however many levels mix it
+        let field: Vec<f32> = (0..=100_u8).map(|index| f32::from(index) / 100.0).collect();
+        let expected: Vec<f32> = field.iter().flat_map(|v| [0.2 + 0.6 * v; 3]).collect();
+        for levels in [2, 3, 5, 16] {
+            let step = Step::new("paint")
+                .param("level", Drive::new("subject", 0.2, 0.8).levels(levels))
+                .opacity(1.0);
+            let painted = driven_by(&registry, step, &field)?.into_values();
+            assert_close(&painted, &expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn every_driven_parameter_of_a_step_moves_with_its_level_and_the_others_stay_as_they_are() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &[]));
+        registry.register(recorder.clone())?;
+        let step = Step::new("recorder")
+            .param("x", Drive::new("subject", 10.0, 50.0).levels(2))
+            .param("y", Drive::new("subject", 1.0, 5.0).levels(2))
+            .param("z", 7);
+        driven_by(&registry, step, &[0.0, 1.0])?;
+        let runs: Vec<Value> = recorder
+            .received()
+            .iter()
+            .map(|received| received.params.clone())
+            .collect();
+        assert_eq!(
+            runs,
+            [
+                json!({"x": 10.0, "y": 1.0, "z": 7}),
+                json!({"x": 50.0, "y": 5.0, "z": 7})
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn each_level_is_scaled_to_the_picture_on_its_own() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("measure", &[], &[]).with_table(Measured::table()));
+        registry.register(recorder.clone())?;
+        // `length` is px with a minimum of 2: from 3 (map 0) to 8 (map 1) at half size: 1.5 is held at 2, 4 stays 4
+        let step = Step::new("measure").param("length", Drive::new("subject", 3.0, 8.0).levels(2));
+        let (values, subject) = banded(&[0.0, 1.0])?;
+        Photo::new(Picture::new(1, 2, &values)?)
+            .with_map("subject", subject)
+            .render_in(
+                &registry,
+                &Recipe::new([step]),
+                &Presets::new(),
+                Options::default().with_size_ratio(0.5),
+            )?;
+        let lengths: Vec<Value> = recorder
+            .received()
+            .iter()
+            .map(|received| received.params["length"].clone())
+            .collect();
+        assert_eq!(lengths, [json!(2.0), json!(4.0)]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_drive_the_photo_has_no_map_for_or_that_breaks_a_rule_refuses_the_render_and_nothing_runs() -> Result<(), Error>
+    {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &[]));
+        registry.register(recorder.clone())?;
+        let drive = |by: &str| Drive::new(by, 0.0, 1.0);
+        let values = values();
+        let photo = Photo::new(Picture::new(4, 6, &values)?);
+        for (step, said) in [
+            (Step::new("recorder").param("x", drive("depth")), "'depth'"),
+            (
+                Step::new("recorder")
+                    .param("x", drive("depth"))
+                    .param("y", drive("light")),
+                "one field",
+            ),
+            (
+                Step::new("recorder")
+                    .param("x", drive("depth"))
+                    .param("y", drive("depth").levels(3)),
+                "one number of levels",
+            ),
+            (
+                Step::new("recorder").param("x", drive("depth").levels(17)),
+                "from 2 to 16",
+            ),
+        ] {
+            let result = photo.render_in(&registry, &Recipe::new([step]), &Presets::new(), Options::default());
+            assert!(
+                matches!(&result, Err(error) if error.to_string().contains(said)),
+                "{said}: {result:?}"
+            );
+        }
+        assert_eq!(recorder.received().len(), 0);
         Ok(())
     }
 

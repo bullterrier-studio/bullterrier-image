@@ -137,6 +137,11 @@ impl Recorder {
     pub(crate) fn received(&self) -> Vec<Received> {
         self.log.lock().unwrap_or_else(PoisonError::into_inner).clone()
     }
+
+    /// Forget what was received so far.
+    pub(crate) fn clear(&self) {
+        self.log.lock().unwrap_or_else(PoisonError::into_inner).clear();
+    }
 }
 
 impl Effect for Recorder {
@@ -259,7 +264,7 @@ impl Effect for Replaces {
 #[serde(deny_unknown_fields)]
 pub(crate) struct Measured {
     /// A length in px.
-    #[param(default = 10.0, unit = px, min = 2, max = 100)]
+    #[param(default = 10.0, unit = px, min = 2, max = 100, drivable)]
     pub(crate) length: f32,
     /// A whole number of px.
     #[param(default = 10, unit = px, min = 3, max = 100)]
