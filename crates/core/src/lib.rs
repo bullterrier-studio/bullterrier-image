@@ -16,11 +16,13 @@ mod error;
 mod ops;
 pub mod params;
 mod picture;
+mod recipe;
 mod registry;
 
 pub use effect::{Category, Effect, Input};
 pub use error::{Constraint, Error};
 pub use picture::{Image, Picture};
+pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, Step};
 pub use registry::{effect, effects, register, unregister};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
