@@ -370,7 +370,7 @@ mod tests {
     use super::*;
     use crate::params::Declared;
     use crate::params::probe::Probe;
-    use crate::testing::{Measured, Paint, Recorder, Shrinks, registry};
+    use crate::testing::{Finds, Measured, Paint, Recorder, Shrinks, registry};
     use crate::{Drive, Each, ErrorKind, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
@@ -545,6 +545,43 @@ mod tests {
             matches!(&mistyped, Err(error @ Error::Recipe(_)) if error.to_string().contains("`near` names a field")),
             "{mistyped:?}"
         );
+        Ok(())
+    }
+
+    /// The map `subject` that an effect with the field parameter `near` receives when `photo` is rendered with a step
+    /// that sets `near` to `subject`.
+    fn subject_received(registry: &Registry, recorder: &Recorder, photo: &Photo<'_>) -> Result<Vec<f32>, Error> {
+        let step = Step::new("recorder").param("near", "subject");
+        photo.render_in(registry, &Recipe::new([step]), &Presets::new(), Options::default())?;
+        let received = recorder.received();
+        Ok(received[received.len() - 1].fields["near"].clone())
+    }
+
+    #[test]
+    fn a_map_given_again_under_the_same_name_replaces_the_first() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &["near"]));
+        registry.register(recorder.clone())?;
+        let values = values();
+        let photo = Photo::new(Picture::new(4, 6, &values)?)
+            .with_map("subject", flat(0.25)?)?
+            .with_map("subject", flat(0.75)?)?;
+        assert_eq!(subject_received(&registry, &recorder, &photo)?, vec![0.75; 24]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_finder_given_again_under_the_same_name_replaces_the_first() -> Result<(), Error> {
+        let registry = registry()?;
+        let recorder = Arc::new(Recorder::new("recorder", &[], &["near"]));
+        registry.register(recorder.clone())?;
+        let values = values();
+        let (first, second) = (Arc::new(Finds::flat(0.25)), Arc::new(Finds::flat(0.75)));
+        let photo = Photo::new(Picture::new(4, 6, &values)?)
+            .with_finder("subject", first.clone())
+            .with_finder("subject", second.clone());
+        assert_eq!(subject_received(&registry, &recorder, &photo)?, vec![0.75; 24]);
+        assert_eq!((first.calls(), second.calls()), (0, 1));
         Ok(())
     }
 
