@@ -97,7 +97,7 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a `frame` with an `angle` or a
+    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a `frame` with a
     /// `transparent` cut are refused until the core runs them.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
@@ -137,14 +137,11 @@ impl<'a> Photo<'a> {
         options: Options,
     ) -> Result<Run<'a>, Error> {
         recipe.check_in(registry, presets)?;
-        // the parts of a frame the core does not run yet: a turn by an angle and a cut-out
-        for (field, set) in [
-            ("angle", recipe.frame.angle != 0.0),
-            ("transparent", recipe.frame.transparent != Transparent::None),
-        ] {
-            if set {
-                return Err(Error::Recipe(format!("`frame.{field}` is not run by the core yet")));
-            }
+        // the part of a frame the core does not run yet: the cut-out
+        if recipe.frame.transparent != Transparent::None {
+            return Err(Error::Recipe(
+                "`frame.transparent` is not run by the core yet".to_owned(),
+            ));
         }
         let subject_for_frame = || maps::stored(self, recipe, "subject", "`frame`, `anchor`");
         let working = Working::new(
@@ -462,7 +459,7 @@ mod tests {
         let registry = registry()?;
         let mut recipe_with_frame = Recipe::new([Step::new("probe")]);
         recipe_with_frame.frame = Frame {
-            angle: 30.0,
+            transparent: Transparent::Circle,
             ..Frame::default()
         };
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
@@ -472,7 +469,7 @@ mod tests {
             .unwrap_or_default();
         for (recipe, said) in [
             (recipe_with_each, "step 1: an `each` step"),
-            (recipe_with_frame, "`frame.angle`"),
+            (recipe_with_frame, "`frame.transparent`"),
         ] {
             let result = rendered(&registry, &recipe, &Presets::new());
             assert!(

@@ -1,9 +1,9 @@
 //! What a recipe's [`Frame`] does to the pixels before the steps run: the photo and each of its maps go through the same
-//! flip, crop and border, so a map stays on the pixels of the photo it describes.
+//! flip, turn, crop and border, so a map stays on the pixels of the photo it describes.
 //!
 //! The geometry is planned once from the photo's size and, for a crop around the subject, the subject map: the boxes
-//! and border widths are numbers, then applied to the photo (its three channels, borders in the frame's `fill`) and to
-//! each map as it is first used (one channel, borders 0: where the picture is not, there is no subject, the farthest
+//! and border widths are numbers, then applied to the photo (its three channels, borders and corners in the frame's
+//! `fill`) and to each map as it is first used (one channel, borders and corners 0: where the picture is not, there is no subject, the farthest
 //! depth, no region). Applying plane by plane gives what stacking the maps behind the photo would, as every step is
 //! per channel.
 
@@ -12,13 +12,15 @@ use std::sync::Arc;
 
 use crate::frame::{Anchor, Flip};
 use crate::ops::frame::{self, Edges, Rect, Shape, Side};
+use crate::ops::rotate::Turn;
 use crate::{Error, Frame, Layer};
 
-/// The flip, crop and border of a [`Frame`] for a photo of one size, ready to apply.
+/// The flip, turn, crop and border of a [`Frame`] for a photo of one size, ready to apply.
 #[derive(Debug)]
 pub(super) struct Geometry {
     across: bool,
     down: bool,
+    turn: Option<Turn>,
     crop: Option<Rect>,
     edges: Edges,
     fill: [f32; 3],
@@ -40,54 +42,55 @@ impl Geometry {
         width: usize,
         subject: impl FnOnce() -> Result<Arc<Layer>, Error>,
     ) -> Result<Option<Self>, Error> {
-        let (across, down) = (
-            matches!(frame.flip, Flip::X | Flip::Both),
-            matches!(frame.flip, Flip::Y | Flip::Both),
-        );
-        let crop = match (frame.anchor, frame.aspect) {
+        let turn = (frame.angle != 0.0).then(|| Turn::new(height, width, frame.angle, frame.fit, frame.resample));
+        let mut geometry = Self {
+            across: matches!(frame.flip, Flip::X | Flip::Both),
+            down: matches!(frame.flip, Flip::Y | Flip::Both),
+            turn,
+            crop: None,
+            edges: Edges::default(),
+            fill: frame.fill.0,
+            from: (height, width),
+            to: turn.map_or((height, width), |turn| (turn.height(), turn.width())),
+        };
+        let (turned_height, turned_width) = geometry.to;
+        geometry.crop = match (frame.anchor, frame.aspect) {
             (Anchor::Subject, aspect) => {
-                // the box is found in the picture as flipped, as the crop is cut from it
+                // the box is found in the picture as flipped and turned, as the crop is cut from it
                 let subject = subject()?;
-                let shape = Shape {
-                    height,
-                    width,
-                    channels: 1,
-                };
-                let flipped = frame::flip(subject.values(), shape, across, down);
-                let around = frame::subject_box(&flipped, height, width, frame.margin).ok_or_else(|| {
-                    Error::map_not_found(
-                        "subject",
-                        "the subject map has no pixel at one half or more: there is no subject to frame",
-                    )
-                })?;
-                Some(frame::crop_around(height, width, around, aspect))
+                let turned = geometry.turned(subject.values(), 1, &[0.0]);
+                let around =
+                    frame::subject_box(&turned, turned_height, turned_width, frame.margin).ok_or_else(|| {
+                        Error::map_not_found(
+                            "subject",
+                            "the subject map has no pixel at one half or more: there is no subject to frame",
+                        )
+                    })?;
+                Some(frame::crop_around(turned_height, turned_width, around, aspect))
             }
-            (anchor, Some(aspect)) => Some(frame::crop_box(height, width, aspect, side(anchor))),
+            (anchor, Some(aspect)) => Some(frame::crop_box(turned_height, turned_width, aspect, side(anchor))),
             (_, None) => None,
         };
-        let (cropped_height, cropped_width) = crop.map_or((height, width), |rect| (rect.height, rect.width));
-        let edges = Edges::of_shares(
+        let (cropped_height, cropped_width) = geometry
+            .crop
+            .map_or((turned_height, turned_width), |rect| (rect.height, rect.width));
+        geometry.edges = Edges::of_shares(
             frame.pad_top,
             frame.pad_right,
             frame.pad_bottom,
             frame.pad_left,
             cropped_height.min(cropped_width),
         );
-        if !(across || down || crop.is_some() || !edges.is_zero()) {
-            return Ok(None);
-        }
-        Ok(Some(Self {
-            across,
-            down,
-            crop,
-            edges,
-            fill: frame.fill.0,
-            from: (height, width),
-            to: (
-                cropped_height + edges.top + edges.bottom,
-                cropped_width + edges.left + edges.right,
-            ),
-        }))
+        geometry.to = (
+            cropped_height + geometry.edges.top + geometry.edges.bottom,
+            cropped_width + geometry.edges.left + geometry.edges.right,
+        );
+        let changes_nothing = !(geometry.across
+            || geometry.down
+            || geometry.turn.is_some()
+            || geometry.crop.is_some()
+            || !geometry.edges.is_zero());
+        Ok((!changes_nothing).then_some(geometry))
     }
 
     /// The number of rows of what comes out.
@@ -100,12 +103,13 @@ impl Geometry {
         self.to.1
     }
 
-    /// The photo's channel values (three per pixel, of the size planned for) framed: borders in the frame's `fill`.
+    /// The photo's channel values (three per pixel, of the size planned for) framed: borders and the corners of a turn
+    /// in the frame's `fill`.
     pub(super) fn photo(&self, values: &[f32]) -> Vec<f32> {
         self.apply(values, 3, &self.fill)
     }
 
-    /// `map`, a map of the size planned for, framed: borders 0.
+    /// `map`, a map of the size planned for, framed: borders and corners 0.
     ///
     /// # Errors
     /// [`Error::Inputs`] only if the framing broke the rule of a map, which moving its values cannot.
@@ -113,8 +117,9 @@ impl Geometry {
         Layer::new(self.to.0, self.to.1, self.apply(map.values(), 1, &[0.0]))
     }
 
-    fn apply(&self, values: &[f32], channels: usize, fill: &[f32]) -> Vec<f32> {
-        let mut shape = Shape {
+    /// `values` flipped and turned, the first two steps of the frame, which a crop around the subject is found in.
+    fn turned<'v>(&self, values: &'v [f32], channels: usize, fill: &[f32]) -> Cow<'v, [f32]> {
+        let shape = Shape {
             height: self.from.0,
             width: self.from.1,
             channels,
@@ -123,6 +128,20 @@ impl Geometry {
         if self.across || self.down {
             made = Cow::Owned(frame::flip(&made, shape, self.across, self.down));
         }
+        if let Some(turn) = &self.turn {
+            made = Cow::Owned(turn.apply(&made, channels, fill));
+        }
+        made
+    }
+
+    fn apply(&self, values: &[f32], channels: usize, fill: &[f32]) -> Vec<f32> {
+        let mut made = self.turned(values, channels, fill);
+        let (height, width) = self.turn.map_or(self.from, |turn| (turn.height(), turn.width()));
+        let mut shape = Shape {
+            height,
+            width,
+            channels,
+        };
         if let Some(rect) = self.crop {
             made = Cow::Owned(frame::window(&made, shape, rect));
             (shape.height, shape.width) = (rect.height, rect.width);
@@ -709,21 +728,13 @@ mod tests {
     }
 
     #[test]
-    fn what_the_core_does_not_run_yet_of_a_frame_is_refused_naming_the_field() {
-        for (frame, said) in [
-            (with(|frame| frame.angle = 30.0), "`frame.angle`"),
-            (
-                with(|frame| frame.transparent = Transparent::Circle),
-                "`frame.transparent`",
-            ),
-        ] {
-            let result = framed(4, 6, frame);
-            assert!(
-                matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains(said)),
-                "{said}: {:?}",
-                result.map(|made| made.values.len())
-            );
-        }
+    fn the_cut_out_of_a_frame_is_refused_until_the_core_runs_it_naming_the_field() {
+        let result = framed(4, 6, with(|frame| frame.transparent = Transparent::Circle));
+        assert!(
+            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("`frame.transparent`")),
+            "{:?}",
+            result.map(|made| made.values.len())
+        );
     }
 
     proptest! {

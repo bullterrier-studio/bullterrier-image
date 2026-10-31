@@ -7,3 +7,4 @@ pub(crate) mod frame;
 pub(crate) mod length;
 pub(crate) mod levels;
 pub(crate) mod resample;
+pub(crate) mod rotate;

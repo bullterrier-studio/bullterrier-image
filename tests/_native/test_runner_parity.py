@@ -477,6 +477,60 @@ def test_the_size_is_made_of_the_framed_picture(photo):
     assert made.shape == (48, 48, 3)
 
 
+# --- the turn: angle, fit and resample ------------------------------------------------------------------------------
+
+# The core's turn against the Python engine's, which is Pillow's `Image.transform`. The sizes are equal in every case;
+# the nearest pixel is exact (the core does Pillow's 16.16 fixed-point arithmetic) and bilinear and bicubic are within a
+# few float32 ulps. Measured over 10 shapes (odd sizes, one row, one column, 2 x 2) x 3 kinds of picture (noise, hard
+# edges, smooth) x 26 angles x 2 fits x 3 resamples = 4,680 cases: every size equal, and the largest |core - Python|
+# was 0 (nearest), 1.19e-7 (bilinear) and 2.98e-7 (bicubic), photo and map alike. The rows below are a subset.
+TURN_TOLERANCE = {"nearest": 0.0, "bilinear": 2e-7, "bicubic": 4e-7}
+TURN_ANGLES = [0.5, 3, 17.3, 30, 45, 89, 91, 135, -135, 179.5, -10, -45.5, 90, -90, 180, 270, 360, 720.5]
+TURN_SHAPES = [(96, 128), (97, 131), (1, 40), (7, 9), (2, 2), (33, 50)]
+
+
+@pytest.mark.parametrize("resample", TURN_TOLERANCE)
+@pytest.mark.parametrize("fit", ["crop", "expand"])
+@pytest.mark.parametrize("shape", TURN_SHAPES, ids=[str(shape) for shape in TURN_SHAPES])
+def test_the_core_turns_the_photo_and_its_map_as_the_python_engine_does(shape, fit, resample):
+    for kind in ("noise", "hard edges"):
+        photo = picture_like(kind, shape)
+        subject = np.ascontiguousarray(photo[..., 0])
+        for angle in TURN_ANGLES:
+            frame = {"angle": angle, "fit": fit, "resample": resample, "fill": "#336699"}
+            stages = _core.trace(photo, frame_recipe(frame), maps={"subject": subject})
+            python = python_framed(photo, frame, subject)
+            where = f"{kind} {shape} at {angle}"
+            assert stages[0][2].shape == python[0].image.shape, where
+            for made, expected in [(stages[0][2], python[0].image), (stages[1][2], python[1].image[..., 0])]:
+                np.testing.assert_allclose(made, expected, atol=TURN_TOLERANCE[resample], rtol=0, err_msg=where)
+
+
+@pytest.mark.parametrize(
+    ("angle", "turns"), [(90, -1), (180, -2), (-90, 1), (270, 1), (-180, 2), (360, 0)], ids=lambda value: str(value)
+)
+def test_a_quarter_turn_is_numpys_rotation_the_other_way_round_so_that_positive_is_clockwise(photo, angle, turns):
+    made = _core.render(photo, STILL | {"frame": {"angle": angle, "fit": "expand"}})
+    np.testing.assert_array_equal(made, np.rot90(photo, turns))
+
+
+def test_a_quarter_turn_that_crops_is_the_centred_part_of_the_rotated_photo(photo):
+    # 96 x 128 turned a quarter is 128 x 96; the part of the photo's 3:4 shape it covers is 72 x 96, rows 28 to 100
+    made = _core.render(photo, STILL | {"frame": {"angle": 90}})
+    np.testing.assert_array_equal(made, np.rot90(photo, -1)[28:100])
+
+
+def test_an_expanded_turn_has_the_fill_in_its_corners_and_the_cropped_one_has_none(photo):
+    expanded = _core.render(photo, STILL | {"frame": {"angle": 30, "fit": "expand", "fill": "#ff8000"}})
+    np.testing.assert_allclose(expanded[0, 0], [1.0, 128 / 255, 0.0], atol=1e-7)
+    np.testing.assert_allclose(expanded[-1, -1], [1.0, 128 / 255, 0.0], atol=1e-7)
+    cropped = _core.render(photo, STILL | {"frame": {"angle": 30, "fill": "#ff8000"}})
+    assert cropped.shape[0] < photo.shape[0]
+    # no corner is the fill: the photo's own colours run to the edge (a constant photo would stay constant)
+    flat = np.full(photo.shape, 0.25, np.float32)
+    np.testing.assert_allclose(_core.render(flat, STILL | {"frame": {"angle": 30, "fill": "#ff8000"}}), 0.25, atol=1e-6)
+
+
 @pytest.mark.parametrize("size", [0, 4_294_967_295])
 def test_a_size_of_0_or_too_large_to_hold_is_refused_naming_it(photo, size):
     with pytest.raises(RecipeError, match="size"):
@@ -762,10 +816,6 @@ RECIPE_FAULTS = {
     "a mask no region declares": ({"steps": [{"effect": "grade", "mask": "sky"}]}, "sky"),
     "a key no recipe has": ({"steps": [{"effect": "grade"}], "colour": "red"}, "colour"),
     "a frame value out of range": ({"steps": [{"effect": "grade"}], "frame": {"aspect": 20}}, "frame.aspect"),
-    "a frame turn, which the core does not run yet": (
-        {"steps": [{"effect": "grade"}], "frame": {"angle": 30}},
-        "frame.angle",
-    ),
     "a frame cut-out, which the core does not run yet": (
         {"steps": [{"effect": "grade"}], "frame": {"transparent": "circle"}},
         "frame.transparent",

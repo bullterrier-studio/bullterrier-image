@@ -17,7 +17,7 @@ use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
 /// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe with a
-/// `frame` with an `angle` or a `transparent` cut, or an `each` step, is refused: the core does not run them yet.
+/// `frame` with a `transparent` cut, or an `each` step, is refused: the core does not run them yet.
 ///
 /// `maps` hands the photo's maps in by name: `subject` (white = subject), `depth` (1 = nearest) and one for each region
 /// of kind `given` the recipe declares, each a float array `(height, width)` of finite values within 0..1. `finders`
