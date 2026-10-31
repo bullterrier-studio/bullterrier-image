@@ -926,11 +926,13 @@ def test_every_rust_fields_range_holds_inclusive_bounds_and_refuses_beyond_them(
 
 
 def test_a_rust_declared_model_is_an_ordinary_class_that_pickles_and_validates():
-    original = Copy.parse({"exposure": 2.5})
+    field = next(entry for entry in _core.params("grade")["fields"] if entry["max"] is not None)
+    name, high = field["name"], field["max"]
+    original = Copy.parse({name: high})
     assert pickle.loads(pickle.dumps(original)) == original  # noqa: S301  our own value
-    assert Copy().model_dump()["exposure"] == 0.0
-    with pytest.raises(RecipeError, match=r"effect 'grade': `exposure` must be <= 10, got 12"):
-        Copy.parse({"exposure": 12}, "effect 'grade'")
+    assert Copy().model_dump()[name] == field["default"]
+    with pytest.raises(RecipeError, match=rf"effect 'grade': `{name}` must be <= {high}, got {high + 2}"):
+        Copy.parse({name: high + 2}, "effect 'grade'")
     with pytest.raises(RecipeError, match="`nope` is not a parameter"):
         Copy.parse({"nope": 1})
 

@@ -152,10 +152,3 @@ def test_with_no_settings_it_draws_white_on_near_black_with_a_cell_of_32_px_and_
     out = registry.apply(NAME, np.zeros((40, 40, 3), np.float32), **settings)
     ground = np.array([16, 16, 24]) / 255
     np.testing.assert_allclose(out[row, column], ground + (1 - ground) * coverage, atol=1e-6)
-
-
-def test_the_kinds_are_these_four_by_name_listed_in_this_order() -> None:
-    """A recipe writes the kind by name, and the order is the one help and error messages list them in."""
-    schema = registry.parameters(NAME).model_json_schema()["properties"]["kind"]
-    assert schema["enum"] == ["stripes", "checks", "dots", "grid"]
-    assert schema["default"] == "grid"

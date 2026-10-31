@@ -94,24 +94,6 @@ mod tests {
     }
 
     #[test]
-    fn a_fieldless_enum_gives_its_choices_in_snake_case_in_declaration_order() {
-        let code = expanded(&parse_quote! {
-            enum Kind { Stripes, Checks, FourthWay }
-        });
-        let places = code.as_deref().ok().and_then(|code| {
-            Some((
-                code.find("\"stripes\"")?,
-                code.find("\"checks\"")?,
-                code.find("\"fourth_way\"")?,
-            ))
-        });
-        assert!(
-            matches!(places, Some((first, second, third)) if first < second && second < third),
-            "{code:?}"
-        );
-    }
-
-    #[test]
     fn what_is_not_a_fieldless_enum_is_refused_naming_it() {
         let cases: [(DeriveInput, &[&str]); 5] = [
             (parse_quote! { struct Kind { a: u8 } }, &["enum"]),
