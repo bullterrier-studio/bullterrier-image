@@ -3,8 +3,16 @@
 
 use serde::Deserialize;
 
+use crate::effect::{Category, Meta};
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Picture};
+
+/// Where `pattern` sits in the catalogue.
+pub(crate) const META: Meta = Meta {
+    category: Category::Backgrounds,
+    opacity: 1.0,
+    inputs: &[],
+};
 
 /// The shapes `pattern` can draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

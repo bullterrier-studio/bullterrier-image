@@ -9,6 +9,15 @@ use std::fmt;
 pub enum Error {
     /// The core implements no effect of this name.
     UnknownEffect(String),
+    /// An effect of this name is registered already, whether the core's own or another's.
+    Duplicate(String),
+    /// An effect that runs outside the core failed, or returned something that is not a picture of the right form.
+    Foreign {
+        /// The effect that failed.
+        effect: String,
+        /// What went wrong, in the words of whoever runs it.
+        message: String,
+    },
     /// The parameters are not the effect's: one is missing, unknown, or of the wrong type.
     Params {
         /// The effect whose parameters these were meant to be.
@@ -31,6 +40,8 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownEffect(name) => write!(formatter, "the Rust core has no effect called {name:?}"),
+            Self::Duplicate(name) => write!(formatter, "an effect called {name:?} is registered already"),
+            Self::Foreign { effect, message } => write!(formatter, "the effect {effect:?} failed: {message}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
             Self::Size { height, width, values } => {
                 write!(
@@ -46,7 +57,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Params { source, .. } => Some(source),
-            Self::UnknownEffect(_) | Self::Size { .. } => None,
+            Self::UnknownEffect(_) | Self::Duplicate(_) | Self::Foreign { .. } | Self::Size { .. } => None,
         }
     }
 }

@@ -4,10 +4,18 @@
 
 use serde::Deserialize;
 
+use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::{linear_to_srgb, srgb_to_linear};
 use crate::params::Params;
 use crate::{Image, Picture};
+
+/// Where `grade` sits in the catalogue.
+pub(crate) const META: Meta = Meta {
+    category: Category::Colour,
+    opacity: 1.0,
+    inputs: &[],
+};
 
 /// Colour balance (temperature, tint), then exposure, contrast, saturation and vibrance.
 #[derive(Deserialize, Params)]

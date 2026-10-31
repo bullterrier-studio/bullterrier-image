@@ -4,8 +4,17 @@
 
 use serde::Deserialize;
 
+use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Picture};
+
+// What the effect declares besides its parameters: its section of the catalogue, the opacity of a step of it that sets
+// none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet).
+pub(crate) const META: Meta = Meta {
+    category: Category::$Category,
+    opacity: 1.0,
+    inputs: &[],
+};
 
 // The parameters are declared once, here: each field's `///` doc comment and `#[param(..)]` make its description,
 // default and range, and the Python model is built from them (`${Name}Params` in effect.py). Replace the example

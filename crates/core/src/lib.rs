@@ -1,59 +1,42 @@
 //! The numeric core of bullterrier-image: the effects implemented in Rust and the primitives they share.
 //!
-//! An effect is a pure function from one picture to a new one: [`apply`] runs one by name. Its parameters are declared
-//! once, by its `Params` struct (see [`mod@params`]): [`params()`] describes them, and the Python package builds the effect's
-//! model from that description. They arrive validated and scaled by the Python package; the core trusts them and does
-//! not check their ranges again. Each effect is one file in `src/effects/`, found by the build script, with a `Params`
-//! struct and a `render` function.
+//! An effect is a pure function from one picture to a new one, known by a name and found in the registry: [`apply`] runs
+//! one by name, [`effect`] gives it with what it declares (its [`Category`], default opacity, [`Input`]s and, for the
+//! core's own, its parameters described). The core's own effects are files in `src/effects/`, found by the build
+//! script; one that lives elsewhere implements [`Effect`] and joins them with [`register`]. A core effect's parameters
+//! are declared once, by its `Params` struct (see [`mod@params`]), and the Python package builds the effect's model
+//! from that description. They arrive validated and scaled by the Python package; the core trusts them and does not
+//! check their ranges again.
 
 #![forbid(unsafe_code)]
 
+mod effect;
 mod effects;
 mod error;
 mod ops;
 pub mod params;
 mod picture;
+mod registry;
 
+pub use effect::{Category, Effect, Input};
 pub use error::Error;
 pub use picture::{Image, Picture};
-
-/// Find the effect called `effect` in the table.
-fn find(effect: &str) -> Result<&'static (&'static str, effects::Run, effects::Describe), Error> {
-    effects::EFFECTS
-        .iter()
-        .find(|(name, ..)| *name == effect)
-        .ok_or_else(|| Error::UnknownEffect(effect.to_owned()))
-}
+pub use registry::{effect, effects, register, unregister};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
 /// image of the picture's size.
 ///
 /// # Errors
-/// [`Error::UnknownEffect`] if the core implements no effect of that name, and [`Error::Params`] if `params` misses
-/// one of its parameters, has one it does not know, or one of the wrong type.
+/// [`Error::UnknownEffect`] if there is no effect of that name, [`Error::Params`] if `params` misses one of a core
+/// effect's parameters, has one it does not know, or one of the wrong type, and [`Error::Foreign`] if an effect run
+/// elsewhere fails.
 pub fn apply(effect: &str, picture: &Picture<'_>, params: serde_json::Value) -> Result<Image, Error> {
-    let (_, run, _) = find(effect)?;
-    run(picture, params)
-}
-
-/// The parameters of the effect called `effect`, described: what its `Params` struct declares.
-///
-/// # Errors
-/// [`Error::UnknownEffect`] if the core implements no effect of that name.
-pub fn params(effect: &str) -> Result<params::Table, Error> {
-    let (_, _, describe) = find(effect)?;
-    Ok(describe())
-}
-
-/// The names of the effects the core implements, sorted.
-#[must_use]
-pub fn effects() -> Vec<&'static str> {
-    effects::EFFECTS.iter().map(|(name, ..)| *name).collect()
+    registry::effect(effect)?.apply(picture, params)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Picture, apply, effects::grade, params};
+    use super::{Error, Picture, apply, effects::grade};
     use serde_json::json;
 
     fn grade_params() -> serde_json::Value {
@@ -127,11 +110,6 @@ mod tests {
             );
         }
         Ok(())
-    }
-
-    #[test]
-    fn the_parameters_of_an_unknown_effect_are_refused_by_name() {
-        assert!(matches!(params("no_such_effect"), Err(Error::UnknownEffect(name)) if name == "no_such_effect"));
     }
 
     #[test]

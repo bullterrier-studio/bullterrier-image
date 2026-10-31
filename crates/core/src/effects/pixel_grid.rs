@@ -3,8 +3,16 @@
 
 use serde::Deserialize;
 
+use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Picture};
+
+/// Where `pixel_grid` sits in the catalogue.
+pub(crate) const META: Meta = Meta {
+    category: Category::Texture,
+    opacity: 1.0,
+    inputs: &[],
+};
 
 const CHANNELS: f64 = 3.0; // constant: one stripe for each of red, green and blue
 

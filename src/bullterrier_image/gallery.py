@@ -253,8 +253,14 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
 
 
 def _words(name: str, category: str) -> dict[str, str]:
-    """What the template's placeholders stand for: $name, $Name (the name in CamelCase, for the model), $category."""
-    return {"name": name, "Name": "".join(part.capitalize() for part in name.split("_")), "category": category}
+    """What the template's placeholders stand for: $name, $Name (the name in CamelCase, for the model), $category and
+    $Category (its name as the Rust core's `Category` variant)."""
+    return {
+        "name": name,
+        "Name": "".join(part.capitalize() for part in name.split("_")),
+        "category": category,
+        "Category": category.capitalize(),
+    }
 
 
 def _names_in_the_template_effect(template: Path) -> set[str]:

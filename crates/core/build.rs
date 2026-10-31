@@ -1,5 +1,5 @@
-//! Writes the effect table the core compiles in: one module per file in `src/effects/`, and the list of every effect
-//! by name. Adding an effect adds its file and edits nothing else.
+//! Writes the effect list the core compiles in: one module per file in `src/effects/`, and the function that makes every
+//! effect. Adding an effect adds its file and edits nothing else.
 
 use std::fmt::{self, Write as _};
 use std::path::{Path, PathBuf};
@@ -33,9 +33,8 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
     Ok(files)
 }
 
-/// The Rust source of the table: a `pub(crate)` module per effect file, and `EFFECTS`, each name with the function that runs
-/// it (it reads the effect's `Params` from the parameters and calls its `render`) and the one that describes its
-/// `Params`.
+/// The Rust source of the list: a `pub(crate)` module per effect file, and `builtin()`, which makes each effect from its
+/// `META`, its `Params` (read from the parameters) and its `render`.
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {
@@ -45,22 +44,18 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
             path.display().to_string()
         )?;
     }
+    writeln!(code, "/// Every effect the core implements.")?;
+    // full paths: an effect module named like `crate` or a std item must not stand in its place
     writeln!(
         code,
-        "/// Every effect the core implements, sorted by name, with the function that runs it and the one that describes its\n/// parameters."
+        "pub(crate) fn builtin() -> Vec<::std::sync::Arc<dyn crate::effect::Effect>> {{\n    vec!["
     )?;
-    writeln!(code, "pub(crate) static EFFECTS: &[(&str, Run, Describe)] = &[")?;
     for (name, _) in files {
-        writeln!(code, "    ({name:?}, |picture, params| {{")?;
-        // `::serde_json`, the crate: an effect module named `serde_json` would otherwise stand in its place
-        writeln!(code, "        let params = ::serde_json::from_value(params)")?;
         writeln!(
             code,
-            "            .map_err(|source| Error::Params {{ effect: {name:?}, source }})?;"
+            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::render)),"
         )?;
-        writeln!(code, "        Ok({name}::render(picture, &params))")?;
-        writeln!(code, "    }}, <{name}::Params as crate::params::Declared>::table),")?;
     }
-    writeln!(code, "];")?;
+    writeln!(code, "    ]\n}}")?;
     Ok(code)
 }

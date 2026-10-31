@@ -53,7 +53,7 @@ fn apply<'py>(
 
 /// The names of the effects the core implements, sorted.
 #[pyfunction]
-fn effects() -> Vec<&'static str> {
+fn effects() -> Vec<String> {
     bullterrier_image::effects()
 }
 
@@ -66,7 +66,10 @@ fn effects() -> Vec<&'static str> {
 /// `ValueError` if the core implements no effect of that name.
 #[pyfunction]
 fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
-    let table = bullterrier_image::params(effect).map_err(value_error)?;
+    let table = bullterrier_image::effect(effect)
+        .map_err(value_error)?
+        .params()
+        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
 }
 
