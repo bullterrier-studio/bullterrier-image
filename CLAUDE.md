@@ -152,7 +152,8 @@ A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.co
 An effect the core runs **declares its fields in Rust**, on its `Params` struct (`#[derive(Deserialize, Params)]`, from
 `crate::params`): each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = ..,
 drivable, advanced, cyclic)]`; a choice is a fieldless `#[derive(Choice)]` enum (`default = Variant`). The struct's own
-doc is the model's docstring. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
+doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line
+becomes a double space. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
 error; that a choice's doc names every variant is checked when Python builds the model). The Python class is
 `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
 declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python validates, Rust
