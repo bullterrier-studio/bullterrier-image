@@ -3,6 +3,7 @@
 pub(crate) mod blend;
 pub(crate) mod color;
 pub(crate) mod colorspace;
+pub(crate) mod cutout;
 pub(crate) mod frame;
 pub(crate) mod length;
 pub(crate) mod levels;

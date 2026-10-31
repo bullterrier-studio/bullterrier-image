@@ -11,11 +11,13 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
+mod cut;
 mod frame;
 mod maps;
 mod size;
 mod trace;
 
+use cut::Cut;
 pub use maps::Finder;
 use maps::{Found, Maps};
 pub use size::Options;
@@ -25,7 +27,7 @@ pub use trace::Stage;
 use serde_json::{Map, Value};
 
 use crate::effect::{self, Effect};
-use crate::frame::{Anchor, Transparent};
+use crate::frame::Anchor;
 use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
@@ -97,14 +99,17 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step and a `frame` with a
-    /// `transparent` cut are refused until the core runs them.
+    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step is refused until the core runs it.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
     /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the
     /// recipe's `size`, else the framed picture's own: the photo and every map are resampled to it with the aspect kept
     /// (see [`Options::with_size`]). A finder is still given the photo as it was handed in. The recipe's pixel values are
     /// scaled by the working picture's longest side over 480.
+    ///
+    /// After the last step a `frame.transparent` cut gives the picture its alpha channel (see [`Image`]): the inscribed
+    /// circle, corners rounded by `corner_radius` of the shorter side, or the subject map of the working picture,
+    /// which this render then needs. The colour is as the steps made it.
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] for a step or recipe the core does not
@@ -137,12 +142,6 @@ impl<'a> Photo<'a> {
         options: Options,
     ) -> Result<Run<'a>, Error> {
         recipe.check_in(registry, presets)?;
-        // the part of a frame the core does not run yet: the cut-out
-        if recipe.frame.transparent != Transparent::None {
-            return Err(Error::Recipe(
-                "`frame.transparent` is not run by the core yet".to_owned(),
-            ));
-        }
         let subject_for_frame = || maps::stored(self, recipe, "subject", "`frame`, `anchor`");
         let working = Working::new(
             self.picture,
@@ -156,6 +155,8 @@ impl<'a> Photo<'a> {
             // the framed subject is a map of the render like any a step uses: a trace shows it
             maps.get("subject", "`frame`, `anchor`")?;
         }
+        // a cut-out by the subject needs it, and a trace shows it like any other map
+        let cut = Cut::plan(&recipe.frame, &working, &maps)?;
         let steps = recipe
             .steps
             .iter()
@@ -169,6 +170,7 @@ impl<'a> Photo<'a> {
             ratio,
             steps: steps.into_iter(),
             current: None,
+            cut,
             subject,
             depth,
         })
@@ -184,6 +186,8 @@ struct Run<'a> {
     ratio: f64,
     steps: std::vec::IntoIter<Prepared>,
     current: Option<Image>,
+    /// How the image after the last step is cut out, if the recipe's frame says so.
+    cut: Option<Cut>,
     /// The subject, if some step uses it (a mask, a field, a drive, `background`).
     subject: Option<Arc<Layer>>,
     /// The depth, if some step uses it.
@@ -209,10 +213,15 @@ impl Run<'_> {
         Ok(self.current.as_ref())
     }
 
-    /// The image after the last step.
+    /// The image after the last step, cut out if the recipe's frame says so.
     fn finish(self) -> Result<Image, Error> {
-        self.current
-            .ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))
+        let image = self
+            .current
+            .ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))?;
+        Ok(match &self.cut {
+            Some(cut) => cut.apply(image),
+            None => image,
+        })
     }
 }
 
@@ -369,7 +378,7 @@ mod tests {
     use crate::params::Declared;
     use crate::params::probe::Probe;
     use crate::testing::{Finds, Measured, Paint, Recorder, Shrinks, registry};
-    use crate::{Drive, Each, ErrorKind, Frame, Step};
+    use crate::{Drive, Each, ErrorKind, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
     fn values() -> Vec<f32> {
@@ -455,28 +464,18 @@ mod tests {
     }
 
     #[test]
-    fn what_the_core_does_not_run_yet_is_refused_naming_it() -> Result<(), Error> {
+    fn an_each_step_is_refused_naming_it_because_the_core_does_not_run_it_yet() -> Result<(), Error> {
         let registry = registry()?;
-        let mut recipe_with_frame = Recipe::new([Step::new("probe")]);
-        recipe_with_frame.frame = Frame {
-            transparent: Transparent::Circle,
-            ..Frame::default()
-        };
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
         recipe_with_each.regions = json!({"panes": {"kind": "grid"}})
             .as_object()
             .cloned()
             .unwrap_or_default();
-        for (recipe, said) in [
-            (recipe_with_each, "step 1: an `each` step"),
-            (recipe_with_frame, "`frame.transparent`"),
-        ] {
-            let result = rendered(&registry, &recipe, &Presets::new());
-            assert!(
-                matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains(said)),
-                "{said}: {result:?}"
-            );
-        }
+        let result = rendered(&registry, &recipe_with_each, &Presets::new());
+        assert!(
+            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("step 1: an `each` step")),
+            "{result:?}"
+        );
         Ok(())
     }
 

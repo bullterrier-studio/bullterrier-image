@@ -21,11 +21,14 @@ pub enum Stage {
         /// The picture after it.
         image: Image,
     },
+    /// The picture after the last step, cut out as the recipe's `frame.transparent` says: four channels, the last the
+    /// alpha. What [`render`](Photo::render) returns; there is no such stage for a recipe that cuts nothing out.
+    CutOut(Image),
 }
 
 impl Photo<'_> {
-    /// Every stage of rendering `recipe`: the photo, the subject and depth if the recipe uses them, and the picture after
-    /// each step, in that order. It runs exactly the code [`render`](Self::render) does, so the last stage is what
+    /// Every stage of rendering `recipe`: the photo, the subject and depth if the recipe uses them, the picture after
+    /// each step and, if the recipe's frame cuts the picture out, the cut-out picture, in that order. It runs exactly the code [`render`](Self::render) does, so the last stage is what
     /// `render` returns, byte for byte, and it fails where `render` would. Where `render` keeps only the newest
     /// picture, a trace keeps one picture per step, as many as the recipe has steps.
     ///
@@ -68,6 +71,9 @@ impl Photo<'_> {
                 number,
                 image: image.clone(),
             });
+        }
+        if run.cut.is_some() {
+            stages.push(Stage::CutOut(run.finish()?));
         }
         Ok(stages)
     }
@@ -113,6 +119,7 @@ mod tests {
                 Stage::Subject(_) => "subject".to_owned(),
                 Stage::Depth(_) => "depth".to_owned(),
                 Stage::Step { number, .. } => format!("step {number}"),
+                Stage::CutOut(_) => "cut out".to_owned(),
             })
             .collect()
     }

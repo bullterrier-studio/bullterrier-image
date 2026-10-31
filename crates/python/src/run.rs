@@ -10,14 +10,15 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 
 use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 
-/// Run `recipe` on `rgb` (float32, C-contiguous, `(height, width, 3)`) and return the picture it makes: a new array of
-/// the same shape. The core's runner does the work, without the GIL; it borrows `rgb` as `apply` does, so the same
+/// Run `recipe` on `rgb` (float32, C-contiguous, `(height, width, 3)`) and return the picture it makes: a new float32
+/// array `(height, width, 3)`, or `(height, width, 4)` (straight alpha last) when the recipe's frame has a `transparent`
+/// cut. The core's runner does the work, without the GIL; it borrows `rgb` as `apply` does, so the same
 /// warning holds: do not modify `rgb` while this runs.
 ///
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
 /// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe with a
-/// `frame` with a `transparent` cut, or an `each` step, is refused: the core does not run them yet.
+/// `each` step is refused: the core does not run it yet.
 ///
 /// `maps` hands the photo's maps in by name: `subject` (white = subject), `depth` (1 = nearest) and one for each region
 /// of kind `given` the recipe declares, each a float array `(height, width)` of finite values within 0..1. `finders`
@@ -75,8 +76,9 @@ pub(crate) fn check_recipe(recipe: &Bound<'_, PyDict>, presets: Option<&Bound<'_
 
 /// Every stage of rendering `recipe` on `rgb`, with the arguments and the failures of `render`: a list of `(kind,
 /// number, array)`, in this order. `("input", None, rgb)` is the photo, `("subject", None, map)` and `("depth", None,
-/// map)` are the maps the recipe uses (float32 `(height, width)`, if it uses them) and `("step", n, picture)` is the
-/// picture after step `n`, counting from 1. The last stage is exactly what `render` returns. Naming the stages is left
+/// map)` are the maps the recipe uses (float32 `(height, width)`, if it uses them), `("step", n, picture)` is the
+/// picture after step `n`, counting from 1, and `("cut_out", None, picture)`, only when the recipe's frame cuts the
+/// picture out, is that picture with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left
 /// to the caller.
 #[pyfunction]
 #[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
@@ -209,9 +211,9 @@ impl Finder for PyFinder {
     }
 }
 
-/// `image` as a numpy array `(height, width, 3)`.
+/// `image` as a numpy array `(height, width, channels)`: 3, or 4 with alpha.
 fn image_array(py: Python<'_>, image: Image) -> PyResult<Bound<'_, PyArray3<f32>>> {
-    let shape = [image.height(), image.width(), 3];
+    let shape = [image.height(), image.width(), image.channels()];
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
 }
 
@@ -223,6 +225,7 @@ fn stage_of(py: Python<'_>, stage: Stage) -> PyResult<Bound<'_, PyTuple>> {
         Stage::Subject(layer) => ("subject", None, map(layer)?.into_any()),
         Stage::Depth(layer) => ("depth", None, map(layer)?.into_any()),
         Stage::Step { number, image } => ("step", Some(number), image_array(py, image)?.into_any()),
+        Stage::CutOut(image) => ("cut_out", None, image_array(py, image)?.into_any()),
         other => {
             return Err(value_error(format!(
                 "this binding does not know the stage {other:?} of a newer core"

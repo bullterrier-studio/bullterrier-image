@@ -64,25 +64,29 @@ impl<'a> Picture<'a> {
     /// only the position.
     #[must_use]
     pub fn map_at(&self, change: impl Fn(usize, usize, [f32; 3]) -> [f32; 3]) -> Image {
-        Image {
-            height: self.height,
-            width: self.width,
-            pixels: self
-                .pixels
+        Image::from_pixels(
+            self.height,
+            self.width,
+            self.pixels
                 .iter()
                 .enumerate()
                 .map(|(index, &pixel)| change(index / self.width, index % self.width, pixel))
                 .collect(),
-        }
+        )
     }
 }
 
 /// An image an effect made, of the size of the picture it read: pixel after pixel, row after row, three channels each.
+///
+/// A render can end in an image with a fourth channel, alpha (0 transparent, 1 opaque; straight, the colour not
+/// multiplied by it): the recipe's `frame.transparent` cut-out, made after the last step. An effect never sees one:
+/// what it reads is a [`Picture`], whose colour channels are all of it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Image {
     height: usize,
     width: usize,
     pixels: Vec<[f32; 3]>,
+    alpha: Option<Vec<f32>>,
 }
 
 impl Image {
@@ -98,6 +102,7 @@ impl Image {
                 height,
                 width,
                 pixels: pixels.to_vec(),
+                alpha: None,
             })
         } else {
             Err(Error::Size {
@@ -110,7 +115,20 @@ impl Image {
 
     /// The image of `height` x `width` `pixels`, row after row; the caller made exactly that many.
     pub(crate) const fn from_pixels(height: usize, width: usize, pixels: Vec<[f32; 3]>) -> Self {
-        Self { height, width, pixels }
+        Self {
+            height,
+            width,
+            pixels,
+            alpha: None,
+        }
+    }
+
+    /// This image with `alpha`, one value from 0 to 1 for each pixel, row after row; the caller made exactly that many.
+    pub(crate) fn with_alpha(self, alpha: Vec<f32>) -> Self {
+        Self {
+            alpha: Some(alpha),
+            ..self
+        }
     }
 
     /// The number of rows.
@@ -125,10 +143,24 @@ impl Image {
         self.width
     }
 
-    /// The channel values, three per pixel, pixel after pixel, row after row.
+    /// The number of channels of each pixel: 3 (red, green, blue), or 4 with alpha last.
+    #[must_use]
+    pub const fn channels(&self) -> usize {
+        if self.alpha.is_some() { 4 } else { 3 }
+    }
+
+    /// The channel values, [`channels`](Self::channels) per pixel, pixel after pixel, row after row.
     #[must_use]
     pub fn into_values(self) -> Vec<f32> {
-        self.pixels.into_flattened()
+        match self.alpha {
+            None => self.pixels.into_flattened(),
+            Some(alpha) => self
+                .pixels
+                .into_iter()
+                .zip(alpha)
+                .flat_map(|([red, green, blue], alpha)| [red, green, blue, alpha])
+                .collect(),
+        }
     }
 
     /// This image read as a picture, without copying it: the input of the next effect.
@@ -183,6 +215,19 @@ mod tests {
         let picture = image.as_picture();
         assert_eq!((picture.height(), picture.width()), (2, 1));
         assert_eq!(picture.values(), values);
+        Ok(())
+    }
+
+    #[test]
+    fn an_image_with_alpha_has_four_channels_per_pixel_and_is_read_by_an_effect_as_its_colour_alone()
+    -> Result<(), Error> {
+        let colour = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let plain = Image::new(1, 2, &colour)?;
+        assert_eq!(plain.channels(), 3);
+        let cut = plain.with_alpha(vec![0.7, 0.9]);
+        assert_eq!(cut.channels(), 4);
+        assert_eq!(cut.as_picture().values(), colour);
+        assert_eq!(cut.into_values(), [0.1, 0.2, 0.3, 0.7, 0.4, 0.5, 0.6, 0.9]);
         Ok(())
     }
 

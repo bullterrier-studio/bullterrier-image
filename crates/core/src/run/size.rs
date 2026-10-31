@@ -367,7 +367,9 @@ mod tests {
         assert_eq!(stages.len(), 4);
         for stage in &stages {
             let shape = match stage {
-                Stage::Input(image) | Stage::Step { image, .. } => (image.height(), image.width()),
+                Stage::Input(image) | Stage::Step { image, .. } | Stage::CutOut(image) => {
+                    (image.height(), image.width())
+                }
                 Stage::Subject(layer) | Stage::Depth(layer) => (layer.height(), layer.width()),
             };
             assert_eq!(shape, (8, 12));

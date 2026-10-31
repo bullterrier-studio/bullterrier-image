@@ -171,7 +171,7 @@ mod tests {
     use proptest::prelude::*;
 
     use crate::effect::Input;
-    use crate::frame::{Anchor, Flip, Transparent};
+    use crate::frame::{Anchor, Flip};
     use crate::params::Color;
     use crate::testing::{Finds, Recorder, registry};
     use crate::{Error, ErrorKind, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step};
@@ -725,16 +725,6 @@ mod tests {
         });
         assert_picture(&framed(4, 6, frame)?, &(4, 6, picture_of(4, 6, px)), "unchanged");
         Ok(())
-    }
-
-    #[test]
-    fn the_cut_out_of_a_frame_is_refused_until_the_core_runs_it_naming_the_field() {
-        let result = framed(4, 6, with(|frame| frame.transparent = Transparent::Circle));
-        assert!(
-            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("`frame.transparent`")),
-            "{:?}",
-            result.map(|made| made.values.len())
-        );
     }
 
     proptest! {

@@ -477,6 +477,86 @@ def test_the_size_is_made_of_the_framed_picture(photo):
     assert made.shape == (48, 48, 3)
 
 
+# --- the cut-out: frame.transparent --------------------------------------------------------------------------------
+
+# The alpha is a float32 signed distance with a one-pixel soft edge: the core's against the Python engine's within what
+# `hypot` loses; the colour is untouched, so it is exactly the uncut render.
+
+# measured max |core - Python| of the alpha: 5.96e-8, one float32 ulp near 1 (352 cases: 11 shapes x 8 cuts x 4 sizes)
+CUT_TOLERANCE = 2e-7
+
+CUTS = {
+    "a circle": {"transparent": "circle"},
+    "rounded corners": {"transparent": "rounded", "corner_radius": 0.25},
+    "rounded by the default radius": {"transparent": "rounded"},
+    "rounded to the circle": {"transparent": "rounded", "corner_radius": 0.5},
+    "no radius": {"transparent": "rounded", "corner_radius": 0.0},
+    "the subject": {"transparent": "background"},
+    "a circle of a crop": {"transparent": "circle", "aspect": 2.5, "anchor": "bottom"},
+    "rounded corners of a crop around the subject": {
+        "transparent": "rounded",
+        "corner_radius": 0.3,
+        "anchor": "subject",
+        "aspect": 0.8,
+    },
+    "the subject of a flipped crop with a border": {
+        "transparent": "background",
+        "flip": "x",
+        "aspect": 1,
+        "pad_left": 0.2,
+    },
+}
+
+
+@pytest.mark.parametrize("size", [None, 33, 200], ids=["as is", "shrunk", "grown"])
+@pytest.mark.parametrize("frame", CUTS.values(), ids=CUTS.keys())
+def test_the_core_cuts_the_picture_out_as_the_python_engine_does(frame, size, photo, subject):
+    recipe = Recipe([Step("grade", params={"exposure": 1}, mask="subject")], frame=Framing(**frame))
+    maps = {"subject": subject}
+    made = bridge.render(photo, recipe, maps=maps, size=size)
+    python = runner.render(photo, recipe, maps=maps, size=size)
+    assert made.shape == python.shape
+    assert made.shape[2] == 4
+    assert made.dtype == np.float32
+    np.testing.assert_allclose(made[..., :3], python[..., :3], atol=1e-5)  # the steps' own tolerance
+    np.testing.assert_allclose(made[..., 3], python[..., 3], atol=CUT_TOLERANCE)
+
+
+@pytest.mark.parametrize("frame", CUTS.values(), ids=CUTS.keys())
+def test_a_cut_leaves_the_colour_as_the_uncut_render_made_it_and_gives_alpha_within_0_and_1(frame, photo, subject):
+    recipe = Recipe([Step("grade", params={"exposure": 1})], frame=Framing(**frame))
+    uncut = Recipe(recipe.steps, frame=Framing(**{**frame, "transparent": "none"}))
+    maps = {"subject": subject}
+    made = bridge.render(photo, recipe, maps=maps)
+    plain = bridge.render(photo, uncut, maps=maps)
+    assert plain.shape[2] == 3
+    np.testing.assert_array_equal(made[..., :3], plain)
+    assert made[..., 3].min() >= 0.0
+    assert made[..., 3].max() <= 1.0
+
+
+def test_a_circle_is_symmetric_whole_in_the_middle_and_clear_in_the_corners(photo):
+    made = bridge.render(photo[:96, :96], Recipe([Step("grade")], frame=Framing(transparent="circle")))
+    alpha = made[..., 3]
+    np.testing.assert_array_equal(alpha, alpha[::-1])
+    np.testing.assert_array_equal(alpha, alpha[:, ::-1])
+    assert alpha[48, 48] == 1.0
+    assert alpha[0, 0] == alpha[0, -1] == alpha[-1, 0] == alpha[-1, -1] == 0.0
+
+
+def test_the_subject_is_the_alpha_of_a_background_cut_exactly(photo, subject):
+    made = bridge.render(
+        photo, Recipe([Step("grade")], frame=Framing(transparent="background")), maps={"subject": subject}
+    )
+    np.testing.assert_array_equal(made[..., 3], subject)
+
+
+def test_a_background_cut_needs_the_subject_and_a_circle_does_not(photo):
+    with pytest.raises(SubjectNotFoundError, match="subject"):
+        bridge.render(photo, Recipe([Step("grade")], frame=Framing(transparent="background")))
+    assert bridge.render(photo, Recipe([Step("grade")], frame=Framing(transparent="circle"))).shape == (96, 128, 4)
+
+
 # --- the turn: angle, fit and resample ------------------------------------------------------------------------------
 
 # The core's turn against the Python engine's, which is Pillow's `Image.transform`. The sizes are equal in every case;
@@ -755,7 +835,7 @@ def kind_of(label: str) -> str:
     if label.startswith("depth"):
         return "depth"
     assert label[0].isdigit(), label
-    return "step"
+    return "cut_out" if "transparent" in label else "step"
 
 
 def test_a_trace_shows_the_photo_the_maps_used_and_the_picture_after_each_step(photo, subject):
@@ -794,6 +874,22 @@ def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject
     np.testing.assert_array_equal(stages[-1][2], core_render(photo, recipe, maps={"subject": subject}))
 
 
+def test_a_trace_ends_with_the_cut_out_picture_when_the_frame_cuts_one_out(photo, subject):
+    recipe = Recipe([Step("grade", params={"exposure": 1})], frame=Framing(transparent="background"))
+    stages = bridge.trace(photo, recipe, maps={"subject": subject})
+    python = runner.trace(photo, recipe, maps={"subject": subject})
+    assert (
+        [kind for kind, _, _ in stages]
+        == [kind_of(stage.label) for stage in python]
+        == ["input", "subject", "step", "cut_out"]
+    )
+    assert [number for _, number, _ in stages] == [None, None, 1, None]
+    assert stages[2][2].shape == photo.shape
+    assert stages[3][2].shape == (*photo.shape[:2], 4)
+    np.testing.assert_array_equal(stages[3][2], bridge.render(photo, recipe, maps={"subject": subject}))
+    np.testing.assert_array_equal(stages[3][2][..., :3], stages[2][2])
+
+
 def test_a_trace_fails_where_a_render_does(photo):
     with pytest.raises(SubjectNotFoundError):
         bridge.trace(photo, grade_one_stop(mask="subject"))
@@ -816,10 +912,6 @@ RECIPE_FAULTS = {
     "a mask no region declares": ({"steps": [{"effect": "grade", "mask": "sky"}]}, "sky"),
     "a key no recipe has": ({"steps": [{"effect": "grade"}], "colour": "red"}, "colour"),
     "a frame value out of range": ({"steps": [{"effect": "grade"}], "frame": {"aspect": 20}}, "frame.aspect"),
-    "a frame cut-out, which the core does not run yet": (
-        {"steps": [{"effect": "grade"}], "frame": {"transparent": "circle"}},
-        "frame.transparent",
-    ),
 }
 
 

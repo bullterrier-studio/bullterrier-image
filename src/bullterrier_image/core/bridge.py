@@ -1,8 +1,8 @@
 """A recipe run by the Rust core: the Python `Recipe` as the dict the core reads, and `render` and `trace` over it.
 
 Transitional (R4a to R4e): the Python runner (`runner`) still renders for users; this is the path R4e switches them to,
-and what the parity tests (`tests/_native/test_runner_parity.py`) hold the core's runner to. The core does not run a
-framing or an `each` step yet: a recipe with one is a `RecipeError` from the core.
+and what the parity tests (`tests/_native/test_runner_parity.py`) hold the core's runner to. The core does not run an
+`each` step yet: a recipe with one is a `RecipeError` from the core.
 """
 
 import re
@@ -33,7 +33,8 @@ def render(
 ) -> np.ndarray:
     """`recipe` run on the photo `rgb` by the core; the arguments and the result are those of `runner.render` (a
     `finders` value needs only a `find` method). The core resamples the photo and its maps to `size`, else the recipe's,
-    and scales the recipe's pixel values to the picture it works on."""
+    and scales the recipe's pixel values to the picture it works on. A recipe whose frame is `transparent` gives
+    (h, w, 4): RGB and straight alpha."""
     rgb = as_image(rgb)
     with registry.holding() as hold:
         return native.render(rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size=size)
@@ -49,7 +50,8 @@ def trace(
 ) -> list[Stage]:
     """Every stage of `render`, as the core reports them: `("input", None, photo)`, `("subject", None, map)` and
     `("depth", None, map)` for the maps the recipe uses (float32 (h, w)), then `("step", n, picture)` after step `n`
-    (from 1), all at the working size. The last is exactly what `render` returns. Labels are for the caller to make."""
+    (from 1), all at the working size, and `("cut_out", None, picture)` (h, w, 4) when the frame cuts the picture out.
+    The last is exactly what `render` returns. Labels are for the caller to make."""
     rgb = as_image(rgb)
     with registry.holding() as hold:
         return native.trace(rgb, recipe_dict(recipe, hold), maps=maps, finders=finders, size=size)
