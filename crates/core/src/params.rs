@@ -23,9 +23,10 @@
 //! ```
 //!
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
-//! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number. The struct and its fields are
-//! `pub(crate)`, so that rustc reports a field `render` never reads (they become `pub` with the core's typed entry
-//! point, which then needs a test that every parameter is read).
+//! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number. The derive also writes
+//! [`Declared::values`], which reads every field, so rustc cannot report a field that `render` never reads;
+//! `tests/parameters_are_read.rs` does: it fails for a parameter that changes no result. A parameter that matters
+//! only while another is set (`grade.pivot` needs `contrast` other than 1) gets a row in that test's `conditional`.
 //!
 //! A user's values are checked against the table, not against the struct: [`Table::check`] gives the complete parameters
 //! an effect takes or the first rule broken. Running an effect trusts what it is given.
@@ -33,6 +34,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 mod check;
 
@@ -44,12 +46,32 @@ pub use bullterrier_image_derive::{Choice, Params};
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
+
+    /// The name of this variant: one of [`Choice::CHOICES`].
+    fn name(&self) -> &'static str;
 }
 
-/// The parameters of an effect, declared with `#[derive(Params)]`: the table of what they are.
+/// The parameters of an effect, declared with `#[derive(Params)]`: the table of what they are, and their values.
 pub trait Declared: Default {
     /// The effect's parameters, described.
     fn table() -> Table;
+
+    /// Every parameter with its value, as a recipe writes it: a decimal as the number a person would write (`0.2`, not
+    /// the `f32` widened to `0.20000000298`), a colour as three such numbers, a choice as its name.
+    fn values(&self) -> Map<String, Value>;
+}
+
+/// The parameters of the effect called [`EffectParams::EFFECT`]: the build script writes the impl for the `Params` of
+/// each file in `src/effects/`, so a step can be built from the typed parameters (see `Step::of`).
+pub trait EffectParams: Declared {
+    /// The name of the effect, as its file is called.
+    const EFFECT: &'static str;
+}
+
+/// `value` as the number a person would write: the shortest decimal that reads back as the same `f32`. A non-finite
+/// value is JSON `null`, which `Recipe::checked` refuses.
+pub(crate) fn decimal(value: f32) -> Value {
+    Value::from(value.to_string().parse::<f64>().unwrap_or_else(|_| f64::from(value)))
 }
 
 /// An effect's parameters, described: the Python package builds the effect's model from it.
@@ -201,8 +223,9 @@ pub(crate) mod probe {
 #[cfg(test)]
 mod tests {
     use super::probe::{Probe, Shape};
-    use super::{Color, Declared};
-    use serde_json::json;
+    use super::{Choice as _, Color, Declared, EffectParams};
+    use crate::effects::{grade, pattern, pixel_grid};
+    use serde_json::{Value, json};
 
     #[test]
     fn a_default_is_what_the_field_declares() {
@@ -213,6 +236,46 @@ mod tests {
         assert_eq!(probe.shape, Shape::FourthWay);
         assert!(probe.keep);
         assert_eq!(probe.tint, Color([1.0, 128.0 / 255.0, 0.0]));
+    }
+
+    #[test]
+    fn values_are_the_numbers_a_person_would_write() {
+        // 0.2 must not widen to 0.20000000298; a whole decimal stays a decimal; a colour is three numbers; a choice its name
+        let probe = Probe {
+            cell: 0.2,
+            cells: -7,
+            angle: 90.0,
+            shape: Shape::FourthWay,
+            keep: false,
+            tint: Color([0.1, 0.3, 1.0]),
+        };
+        let expected = json!({
+            "cell": 0.2, "cells": -7, "angle": 90.0, "shape": "fourth_way", "keep": false,
+            "tint": [0.1, 0.3, 1.0],
+        });
+        assert_eq!(Value::Object(probe.values()), expected);
+    }
+
+    #[test]
+    fn the_values_of_the_defaults_are_the_declared_defaults() {
+        let expected = json!({
+            "cell": 32.0, "cells": 4, "angle": 0.5, "shape": "fourth_way", "keep": true,
+            "tint": [1.0, 0.501_960_8, 0.0],
+        });
+        assert_eq!(Value::Object(Probe::default().values()), expected);
+    }
+
+    #[test]
+    fn a_choice_names_its_variant() {
+        let names = [Shape::Stripes, Shape::Checks, Shape::FourthWay].map(|shape| shape.name());
+        assert_eq!(names, ["stripes", "checks", "fourth_way"]);
+    }
+
+    #[test]
+    fn each_effect_file_ties_its_params_to_the_effect_called_as_the_file() {
+        assert_eq!(<grade::Params as EffectParams>::EFFECT, "grade");
+        assert_eq!(<pattern::Params as EffectParams>::EFFECT, "pattern");
+        assert_eq!(<pixel_grid::Params as EffectParams>::EFFECT, "pixel_grid");
     }
 
     #[test]

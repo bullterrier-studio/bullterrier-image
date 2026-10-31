@@ -9,7 +9,7 @@ use crate::snake_case;
 /// The turn a cyclic field spans, in degrees.
 const TURN: f64 = 360.0;
 
-/// The code `#[derive(Params)]` writes for `input`: `Default` and `Declared` (the table). A compile error naming the
+/// The code `#[derive(Params)]` writes for `input`: `Default` and `Declared` (the table and the values). A compile error naming the
 /// field if its declaration is broken, or the struct if it is not a struct of named fields with a doc comment.
 pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let name = &input.ident;
@@ -35,6 +35,8 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let names = declared.iter().map(|declared| &declared.name);
     let values = declared.iter().map(|declared| &declared.value);
     let rows = declared.iter().map(|declared| &declared.row);
+    let labels = declared.iter().map(|declared| declared.name.to_string());
+    let writes = declared.iter().map(|declared| &declared.write);
     Ok(quote! {
         impl ::core::default::Default for #name {
             fn default() -> Self {
@@ -46,15 +48,23 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
             fn table() -> crate::params::Table {
                 crate::params::Table { doc: #doc, fields: ::std::vec![#(#rows),*] }
             }
+
+            fn values(&self) -> ::serde_json::Map<::std::string::String, ::serde_json::Value> {
+                let mut values = ::serde_json::Map::new();
+                #(values.insert(::std::string::String::from(#labels), #writes);)*
+                values
+            }
         }
     })
 }
 
-/// One field, declared: its name, the expression of its default value, and its row of the table.
+/// One field, declared: its name, the expression of its default value, its row of the table and the expression of its
+/// value as JSON.
 struct Declared {
     name: Ident,
     value: TokenStream,
     row: TokenStream,
+    write: TokenStream,
 }
 
 /// What a field's `#[param(..)]` attribute says.
@@ -200,10 +210,19 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             advanced: #advanced,
         }
     };
+    let write = match shape(ty) {
+        Shape::Float => quote!(crate::params::decimal(self.#name)),
+        Shape::Colour => quote!(::serde_json::Value::Array(
+            self.#name.0.iter().copied().map(crate::params::decimal).collect()
+        )),
+        Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
+        Shape::Int | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
+    };
     Ok(Declared {
         name: name.clone(),
         value,
         row,
+        write,
     })
 }
 

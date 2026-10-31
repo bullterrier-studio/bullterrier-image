@@ -145,16 +145,6 @@ OFFENCES = {
         appended("\n/// Probe.\npub fn reachable_only_inside() {}\n"),
         ["unreachable-pub", "crates/core/src/effects.rs"],
     ),
-    "a declared parameter no code reads": (
-        "rust-lint",
-        "crates/core/src/effects/grade.rs",
-        replaced(
-            "\n}\n\n/// The graded picture.",
-            "\n    /// A parameter nobody reads.\n    #[param(default = 0.0, unit = ratio, min = 0, max = 1)]\n"
-            "    pub unused: f32,\n}\n\n/// The graded picture.",
-        ),
-        ["never read", "unused", "grade.rs"],
-    ),
     "a declared parameter no test shows to change the result": (
         "rust-test",
         "crates/core/src/effects/grade.rs",

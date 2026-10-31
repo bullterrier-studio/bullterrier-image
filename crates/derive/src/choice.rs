@@ -6,7 +6,7 @@ use syn::{Data, DeriveInput, Error, Fields};
 
 use crate::snake_case;
 
-/// The code `#[derive(Choice)]` writes for `input`: its names as the parameter's choices, and a `Deserialize` that
+/// The code `#[derive(Choice)]` writes for `input`: its names as the parameter's choices, the name of each variant, and a `Deserialize` that
 /// reads one of them; an error naming the type or variant if `input` is not a fieldless enum.
 pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     let name = &input.ident;
@@ -52,6 +52,12 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     Ok(quote! {
         impl crate::params::Choice for #name {
             const CHOICES: &'static [&'static str] = &[#(#names),*];
+
+            fn name(&self) -> &'static str {
+                match self {
+                    #(Self::#variants => #names,)*
+                }
+            }
         }
 
         impl<'de> ::serde::Deserialize<'de> for #name {

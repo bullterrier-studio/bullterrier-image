@@ -29,7 +29,8 @@ pub(crate) const META: Meta = Meta {
 // guard (an epsilon), with a `// constant: <citation or reason>` comment (a test fails on any other number). The doc
 // comment of the struct says what the parameters are as a whole: it is the model's docstring, and a field's doc is its
 // help text in Python: plain text, no rustdoc links, and a blank `///` line becomes a double space. Keep the struct and
-// its fields `pub(crate)`: rustc then reports a parameter `render` never reads.
+// its fields `pub(crate)`. A parameter `render` never reads fails `crates/core/tests/parameters_are_read.rs`; one that
+// matters only while another is set needs a row in that test's `conditional`.
 
 /// The settings of `$name`: every value that shapes its result.
 #[derive(Deserialize, Params)]

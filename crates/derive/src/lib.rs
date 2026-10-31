@@ -3,16 +3,16 @@
 //!
 //! - `#[derive(Params)]` on an effect's `Params` struct: each field is declared once, by its type, its `///` doc
 //!   comment and a `#[param(default = .., unit = .., min = .., max = .., drivable, advanced, cyclic)]` attribute. The
-//!   struct's own doc comment documents the effect's parameters as a whole. The derive writes `Default` and the table
-//!   the Python package builds the effect's model from, and refuses a broken declaration at compile time, naming the
+//!   struct's own doc comment documents the effect's parameters as a whole. The derive writes `Default`, the values
+//!   as a recipe writes them and the table the Python package builds the effect's model from, and refuses a broken declaration at compile time, naming the
 //!   field, for each rule it checks: a doc, a default of the field's kind, a unit and range holding the default,
 //!   `cyclic` and `drivable` where they apply, a setting given once. It recognises `f32`, `i32`, `bool` and `Color`
 //!   by those written names and takes any other type for a choice enum: `f64`, `u32`, `Option<f32>` or an alias of
 //!   `f32` (`type Real = f32`) is not recognised, and a number declaration on one is refused with an error naming the
 //!   type. Left to others: an unknown `unit` is rustc's own error ("no variant `Banana` found for enum `params::Unit`"),
 //!   which is adequate, and that a choice's doc names every variant is checked when Python builds the model.
-//! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order.
-//!   It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
+//! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order,
+//!   and the name of each variant. It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
 //!
 //! The code they write refers to the core's `crate::params` paths, so it compiles only inside the core crate (every
 //! effect lives there); were the core published, this crate would be published with it.
@@ -23,7 +23,7 @@ mod params;
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};
 
-/// Derive `Default` and `Declared` (the parameters' table) for an effect's `Params` struct; see the crate documentation.
+/// Derive `Default` and `Declared` (the parameters' table and values) for an effect's `Params` struct; see the crate documentation.
 #[proc_macro_derive(Params, attributes(param))]
 pub fn derive_params(input: TokenStream) -> TokenStream {
     params::expand(&parse_macro_input!(input as DeriveInput))

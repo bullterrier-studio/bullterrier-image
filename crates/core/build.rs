@@ -33,14 +33,14 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
     Ok(files)
 }
 
-/// The Rust source of the list: a `pub(crate)` module per effect file, and `builtin()`, which makes each effect from its
-/// `META`, its `Params` (read from the parameters) and its `render`.
+/// The Rust source of the list: a module per effect file, the `EffectParams` impl that names the effect of its `Params`,
+/// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters) and its `render`.
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {
         writeln!(
             code,
-            "#[path = {:?}]\npub(crate) mod {name};",
+            "#[path = {:?}]\npub(crate) mod {name};\nimpl crate::params::EffectParams for {name}::Params {{\n    const EFFECT: &'static str = {name:?};\n}}",
             path.display().to_string()
         )?;
     }
