@@ -238,7 +238,10 @@ def test_the_stub_as_it_is_matches_the_extension(project_copy, copy_env):
     [
         pytest.param("effect: str", "name: str", "bullterrier_image._native._core.apply", id="a parameter renamed"),
         pytest.param(
-            "def effects() -> list[str]: ...\n", "", "bullterrier_image._native._core.effects", id="a function left out"
+            "def effects() -> list[str]: ...\n",
+            "def effects() -> list[str]: ...\ndef ghost() -> None: ...\n",
+            "bullterrier_image._native._core.ghost",
+            id="a function the extension lacks",
         ),
     ],
 )

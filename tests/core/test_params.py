@@ -935,9 +935,10 @@ def test_a_rust_declared_model_is_an_ordinary_class_that_pickles_and_validates()
 
 
 def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made():
-    with pytest.raises(ValueError, match="no_such_effect"):
+    """The usual cause is an extension built before the effect's kernel was written, so the error says to rebuild."""
+    with pytest.raises(ValueError, match=r"'ghost'.*uv sync"):
 
-        class Nowhere(EffectParams, core="no_such_effect"):
+        class Nowhere(EffectParams, core="ghost"):
             pass
 
 

@@ -660,7 +660,12 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
     """Give `cls` the docstring and the fields (annotations and `param` specs) that the Rust core's `Params` struct of
     `effect` declares, before pydantic reads them; the checks of `_field` then run on them like on any model. Every
     default and bound is the literal the declaration wrote, so a whole number stays an `int` and a decimal a `float`.
-    ValueError if the core implements no such effect."""
+    ValueError if the core implements no such effect, which is most often an extension built before the effect's kernel
+    was written: it says to rebuild."""
+    if effect not in _core.effects():
+        raise ValueError(
+            f"the Rust core has no effect called {effect!r}: if its kernel is new, rebuild the extension (`uv sync`)"
+        )
     declared = _core.params(effect)
     cls.__doc__ = declared["doc"]
     fields = declared["fields"]
