@@ -328,4 +328,7 @@ pub(crate) struct Measured {
     /// Turns of a cycle.
     #[param(default = 1.5, unit = cycles, min = 0, max = 10)]
     pub(crate) laps: f32,
+    /// A signed offset in px, which may be negative.
+    #[param(default = -10.0, unit = px, min = -50, max = 50)]
+    pub(crate) shift: f32,
 }

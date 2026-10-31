@@ -379,7 +379,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `recipe.size` is only how big the output is (the working size: `render(..., size=)`, else the recipe's size, else the
   framed photo's longest side). A render multiplies the values by the working size over 480, in the one place a step's
   values reach its effect (`params.scaled`, from the parameter description: no per-effect code). A whole number is
-  rounded; a value shrinks no further than its field's `min` and grows without a ceiling, because a range is in design
+  rounded; a value shrinks no further than its field's `min` and grows without limit, because a range is in design
   pixels. *Reason:* the README promised a look that matches at any resolution, but with `size=None` a draft at half size
   meant scaling every radius by hand, and with a size the output was always rescaled to it; defaults and presets are
   tuned for 480, so a `size` that also set what the numbers meant made one preset look different in every recipe it sat

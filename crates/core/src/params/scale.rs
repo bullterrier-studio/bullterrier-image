@@ -10,10 +10,10 @@ impl Table {
     ///
     /// Every pixel value (a field with the unit `px`) is multiplied by `ratio`; every `density` (marks per 1000 design
     /// px squared) is divided by `ratio` squared, as an area grows with the square of a length. A whole number stays
-    /// whole: it is rounded, halves to the even number (as Python's `round` does). A pixel value never falls below the
-    /// field's `min`, which keeps a small picture valid (a cell of at least 3 pixels); growing has no ceiling, since a
-    /// range is in design pixels and the result is not checked against it. Every other unit is unchanged, and a ratio
-    /// of 1 changes nothing.
+    /// whole: it is rounded, halves to the even number (as Python's `round` does). When shrinking (a ratio below 1) a
+    /// pixel value stops at the field's `min`, which keeps a small picture valid (a cell of at least 3 pixels);
+    /// growing has no limit at either end, since a range is in design pixels and the result is not checked against
+    /// it. Every other unit is unchanged, and a ratio of 1 changes nothing.
     pub(crate) fn scaled(&self, params: Map<String, Value>, ratio: f64) -> Map<String, Value> {
         params
             .into_iter()
@@ -43,7 +43,7 @@ impl Field {
             _ => scaled,
         };
         let scaled = match (self.unit, self.min.and_then(Scalar::number)) {
-            (Some(Unit::Px), Some(min)) => scaled.max(min),
+            (Some(Unit::Px), Some(min)) if ratio < 1.0 => scaled.max(min),
             _ => scaled,
         };
         match self.kind {
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn shrinking_stops_at_the_minimum_and_growing_has_no_ceiling() -> Result<(), Error> {
+    fn shrinking_stops_at_the_minimum_and_growing_has_no_limit() -> Result<(), Error> {
         // length: min 2, max 100; cell: min 3, max 100. 3 x 0.5 = 1.5 -> 2; 10 x 0.1 = 1 -> 2; 5 x 0.5 = 2.5 -> 2.5 (kept)
         // cell 5 x 0.5 = 2.5 -> rounds to 2 -> 3; 4 x 0.1 = 0.4 -> 0 -> 3
         // 100 x 3 = 300 and 100 x 1.5 = 150, past the declared maximum of 100
@@ -176,6 +176,17 @@ mod tests {
             (0.1, "cell", json!(4), json!(3)),
             (3.0, "length", json!(100.0), json!(300.0)),
             (1.5, "cell", json!(100), json!(150)),
+            // shift: min -50. Growing never stops at the minimum: -40 x 2 = -80, past -50; 20 x 2 = 40
+            (2.0, "shift", json!(-40.0), json!(-80.0)),
+            (2.0, "shift", json!(20.0), json!(40.0)),
+            // shrinking moves a negative value towards 0, away from the minimum: -40 x 0.5 = -20, -10 x 0.1 = -1
+            (0.5, "shift", json!(-40.0), json!(-20.0)),
+            (0.1, "shift", json!(-10.0), json!(-1.0)),
+            // a ratio of 1 changes nothing, whatever the minimum: length 2 stays 2, shift -50 stays -50
+            (1.0, "length", json!(2.0), json!(2.0)),
+            (1.0, "shift", json!(-50.0), json!(-50.0)),
+            // growing a positive value from the minimum: length 2 x 3 = 6
+            (3.0, "length", json!(2.0), json!(6.0)),
         ];
         for (ratio, field, written, expected) in rows {
             let received = measured(field, &written, ratio)?;
@@ -194,17 +205,17 @@ mod tests {
         let at_two = received[1].params.as_object().cloned().unwrap_or_default();
         let expected = json!({
             "length": 10.0, "cell": 10, "marks": 8.0, "copies": 5, "share": 0.5, "turn": 90.0, "gain": 2.0,
-            "stops": 1.0, "laps": 1.5,
+            "stops": 1.0, "laps": 1.5, "shift": -10.0,
         });
         assert_eq!(Value::Object(at_one), expected);
-        // and a ratio of 2 really moves the three that scale, so the two renders differ in exactly those
+        // and a ratio of 2 really moves the four that scale, so the two renders differ in exactly those
         let mut moved: Vec<&str> = at_two
             .iter()
             .filter(|(name, value)| expected[name.as_str()] != **value)
             .map(|(name, _)| name.as_str())
             .collect();
         moved.sort_unstable();
-        assert_eq!(moved, ["cell", "length", "marks"]);
+        assert_eq!(moved, ["cell", "length", "marks", "shift"]);
         Ok(())
     }
 
@@ -239,7 +250,7 @@ mod tests {
         let (registry, measure, _) = measuring()?;
         render_at(&registry, Step::new("measure").param("copies", 3), 2.0)?;
         let received: Map<String, Value> = measure.received()[0].params.as_object().cloned().unwrap_or_default();
-        assert_eq!(received.len(), 9);
+        assert_eq!(received.len(), 10);
         assert_eq!(received["copies"], json!(3));
         Ok(())
     }
