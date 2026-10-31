@@ -114,6 +114,9 @@ calls only from R4 (until then it checks them itself); running an effect trusts 
 ## Standards
 
 - `src/` holds only code and the data it runs on (presets, looks). Tests, examples and gallery pictures live outside it.
+- **File size:** a source file stays within 1000 lines, a test file within 1500 (`tools/check_file_size.py`, run by the tests;
+  `[tool.file-size]`). Split by concept before you reach it. A file already over is listed in `[tool.file-size.exempt]` at its
+  size: it may shrink, never grow; never add an entry.
 - Public API, each with `__all__`: `bullterrier_image`, `.recipe`, `.fx`, `.imageio`, `.plugin`. Everything else, including
   `core` and `ops`, is internal.
 - No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.

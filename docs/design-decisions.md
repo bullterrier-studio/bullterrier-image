@@ -771,3 +771,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **The gates are the review.** `uv run poe check` runs format, lint, dead code, dependencies, build, types and tests;
   each gate has a known-bad test proving it can fail. *Reason:* reviews stay light and consistent. *Consequence:* a
   defect a review finds twice becomes a gate.
+- **Files have a size budget.** Source files up to 1000 lines, test files up to 1500, checked by `tools/check_file_size.py`.
+  A file already over when the gate began is recorded at its size and may only shrink; an entry for a file that is gone or
+  within budget fails the gate, so the list empties as files are split or deleted. *Reason:* agents read in chunks, and a
+  huge file costs them tokens and makes edits land in the wrong place; no linter measures file length. *Consequence:* a
+  growing file is split by concept, never exempted.

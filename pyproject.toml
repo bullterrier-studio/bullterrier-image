@@ -175,6 +175,22 @@ header-max-length = 72
 body-max-line-length = 100
 scope-pattern = "^[a-z0-9][a-z0-9/_-]*$"
 
+# Read by tools/check_file_size.py (run by tests/tools/test_file_size_gate.py, so by `poe test`): a file over its budget
+# fails, so nothing grows without bound and agents, who read in chunks, can navigate. Measured: Python under src/, tools/
+# and tests/, Rust under crates/ (a path with a `tests` folder is a test file, any other is source). Not measured:
+# generated (fx.pyi), data, templates, docs, examples, lock files. Budgets are lines. `exempt` is a ratchet for files
+# already over budget when the gate began: path = its line count then. Such a file may shrink, never grow past its entry,
+# and an entry whose file is gone or within budget fails the gate: remove it. Never add a file here; split it by concept.
+[tool.file-size]
+source = 1000
+tests = 1500
+
+[tool.file-size.exempt]
+"src/bullterrier_image/core/params.py" = 1003
+"src/bullterrier_image/core/regions.py" = 1272
+"tests/core/test_regions.py" = 1901
+"tests/core/test_runner.py" = 1689
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # test files are named after the module they test, so equal names in different folders must never collide
