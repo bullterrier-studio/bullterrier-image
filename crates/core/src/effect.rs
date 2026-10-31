@@ -163,15 +163,28 @@ pub trait Effect: Send + Sync {
 /// Run `effect` on `picture` with `params`, handing it the part of `offered` that it declares.
 ///
 /// # Errors
-/// [`Error::Inputs`] if the effect declares an input that `offered` lacks or that is not of the picture's size, else
-/// what [`Effect::apply`] returns.
+/// [`Error::Inputs`] if the effect declares an input that `offered` lacks or that is not of the picture's size,
+/// [`Error::Foreign`] if the image it makes is not of the picture's size, else what [`Effect::apply`] returns.
 pub(crate) fn run(
     effect: &dyn Effect,
     picture: &Picture<'_>,
     params: serde_json::Value,
     offered: &Inputs<'_>,
 ) -> Result<Image, Error> {
-    effect.apply(picture, params, &offered.declared_by(effect, picture)?)
+    let image = effect.apply(picture, params, &offered.declared_by(effect, picture)?)?;
+    if (image.height(), image.width()) != (picture.height(), picture.width()) {
+        return Err(Error::foreign(
+            effect.name(),
+            format!(
+                "changed the picture's shape from {} x {} to {} x {}",
+                picture.height(),
+                picture.width(),
+                image.height(),
+                image.width()
+            ),
+        ));
+    }
+    Ok(image)
 }
 
 /// What a file in `src/effects/` declares about its effect besides its parameters: `pub(crate) const META: Meta`.

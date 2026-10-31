@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
-use crate::Error;
 use crate::registry::Registry;
+use crate::{Error, Step};
 
 /// One preset: what it looks like in a sentence, and the parameters it sets.
 #[derive(Clone, Debug, PartialEq)]
@@ -96,6 +96,29 @@ impl Presets {
     #[must_use]
     pub fn get(&self, effect: &str, preset: &str) -> Option<&Preset> {
         self.by_effect.get(effect)?.get(preset)
+    }
+
+    /// The parameters of `step` with its preset's under them: the ones given win. `place` (`step 2`) leads the message
+    /// when the step names a preset its effect lacks.
+    pub(crate) fn under(&self, step: &Step, place: &str) -> Result<Map<String, Value>, Error> {
+        let Some(name) = &step.preset else {
+            return Ok(step.params.clone());
+        };
+        let Some(preset) = self.get(&step.effect, name) else {
+            let names = self.names(&step.effect);
+            let has = if names.is_empty() {
+                "it has no presets".to_owned()
+            } else {
+                format!("its presets: {}", names.join(", "))
+            };
+            return Err(Error::Recipe(format!(
+                "{place}: effect '{}' has no preset '{name}'; {has}",
+                step.effect
+            )));
+        };
+        let mut params = preset.params.clone();
+        params.extend(step.params.clone());
+        Ok(params)
     }
 
     /// The names of the presets of `effect`, sorted.

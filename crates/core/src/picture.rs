@@ -120,6 +120,16 @@ impl Image {
     pub fn into_values(self) -> Vec<f32> {
         self.pixels.into_flattened()
     }
+
+    /// This image read as a picture, without copying it: the input of the next effect.
+    #[must_use]
+    pub fn as_picture(&self) -> Picture<'_> {
+        Picture {
+            height: self.height,
+            width: self.width,
+            pixels: &self.pixels,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -153,6 +163,16 @@ mod tests {
         let image = Image::new(1, 2, picture.values())?;
         assert_eq!((image.height(), image.width()), (1, 2));
         assert_eq!(image.into_values(), values);
+        Ok(())
+    }
+
+    #[test]
+    fn an_image_read_as_a_picture_has_its_size_and_its_values() -> Result<(), Error> {
+        let values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let image = Image::new(2, 1, &values)?;
+        let picture = image.as_picture();
+        assert_eq!((picture.height(), picture.width()), (2, 1));
+        assert_eq!(picture.values(), values);
         Ok(())
     }
 

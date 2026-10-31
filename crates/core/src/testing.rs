@@ -1,6 +1,6 @@
 //! What the unit tests of the core share: a registry that holds a `probe` effect (one parameter of every kind, see
 //! `params::probe`) and a `seams` effect that takes a partition and describes no parameters of its own, beside the
-//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`] and [`Counting`].
+//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`] and [`Shrinks`].
 //!
 //! Integration tests (`crates/core/tests/`) cannot reach this module: they use the core's own effects, or a double
 //! written against the public [`Effect`] trait.
@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use serde_json::Value;
 
 use crate::effect::{Category, Effect, FieldParam, Input, Meta, Native};
+use crate::params::Table;
 use crate::params::probe::Probe;
 use crate::registry::Registry;
 use crate::{Error, Image, Inputs, Picture};
@@ -90,17 +91,21 @@ impl Effect for Paint {
 /// What a [`Recorder`] was handed by one `apply`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Received {
+    pub(crate) picture: Vec<f32>,
+    pub(crate) params: Value,
     pub(crate) size_ratio: f64,
     pub(crate) partition: Option<Vec<i32>>,
     pub(crate) fields: BTreeMap<String, Vec<f32>>,
 }
 
-/// A foreign effect that declares the inputs it is made with, logs what it receives of them and returns the picture
-/// as it is: the oracle for "an undeclared input is absent".
+/// A foreign effect that declares the inputs it is made with, logs the parameters and inputs it receives and returns
+/// the picture as it is: the oracle for "an undeclared input is absent" and for the parameters a step resolves to. It
+/// describes no parameters unless given a table.
 pub(crate) struct Recorder {
     name: &'static str,
     inputs: &'static [Input],
     fields: Vec<FieldParam>,
+    table: Option<Table>,
     log: Mutex<Vec<Received>>,
 }
 
@@ -115,8 +120,16 @@ impl Recorder {
                 .iter()
                 .map(|parameter| FieldParam::new(*parameter, parameter.to_uppercase()))
                 .collect(),
+            table: None,
             log: Mutex::new(Vec::new()),
         }
+    }
+
+    /// This recorder describing its parameters by `table`, as a core effect does: the core then checks and scales a
+    /// step's values before it sees them.
+    pub(crate) fn with_table(mut self, table: Table) -> Self {
+        self.table = Some(table);
+        self
     }
 
     /// What each `apply` so far received, in order.
@@ -142,12 +155,18 @@ impl Effect for Recorder {
         &self.fields
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn params(&self) -> Option<Table> {
+        self.table.clone()
+    }
+
+    fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         let fields = inputs
             .field_parameters()
             .filter_map(|parameter| Some((parameter.to_owned(), inputs.field(parameter)?.values().to_vec())))
             .collect();
         self.log.lock().unwrap_or_else(PoisonError::into_inner).push(Received {
+            picture: picture.values().to_vec(),
+            params,
             size_ratio: inputs.size_ratio(),
             partition: inputs.partition().map(|labels| labels.values().to_vec()),
             fields,
@@ -191,5 +210,22 @@ impl Effect for Counting {
     fn apply(&self, picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(picture.map(|pixel| pixel))
+    }
+}
+
+/// A foreign effect that breaks the contract: it returns a single pixel, whatever the size of the picture.
+pub(crate) struct Shrinks;
+
+impl Effect for Shrinks {
+    fn name(&self) -> &'static str {
+        "shrinks"
+    }
+
+    fn category(&self) -> Category {
+        Category::Utilities
+    }
+
+    fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+        Image::new(1, 1, &[0.0; 3])
     }
 }

@@ -8,6 +8,9 @@
 //! against that declaration and the Python package builds the effect's model from it; [`Step::of`] builds a recipe step
 //! from an effect's typed `Params` (`effects::grade::Params`). There is no typed apply yet: [`apply`] takes JSON. Running an effect trusts its
 //! parameters (and, for now, expects them scaled by the Python package): check them first.
+//!
+//! A look runs on a picture with [`Photo::render`]: it checks the recipe, completes each step's parameters (preset,
+//! defaults) and runs the steps in order. [`apply`] runs one effect on parameters that are already complete.
 
 #![forbid(unsafe_code)]
 
@@ -21,6 +24,7 @@ mod picture;
 mod presets;
 mod recipe;
 mod registry;
+mod run;
 #[cfg(test)]
 mod testing;
 
@@ -31,6 +35,7 @@ pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
 pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, STEP_KEYS, Step};
 pub use registry::{effect, effects, register, unregister};
+pub use run::{Options, Photo};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
 /// image of the picture's size. `inputs` is what is on offer: the effect receives the part it declares.

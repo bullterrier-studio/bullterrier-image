@@ -176,7 +176,7 @@ impl Rules<'_> {
     fn step(&self, step: &Step, place: &str) -> Result<(), Error> {
         let effect = self.registry.effect(&step.effect)?;
         self.layer(place, step.mask.as_deref(), step.opacity, step.name.as_deref())?;
-        let params = self.with_preset(step, place)?;
+        let params = self.presets.under(step, place)?;
         for key in Input::ALL.iter().map(|input| input.name()) {
             if params.contains_key(key) {
                 return Err(Error::Recipe(format!(
@@ -317,28 +317,6 @@ impl Rules<'_> {
             "{place}: `{key}` names '{name}', which is no region; valid regions: {}",
             valid.join(", ")
         )))
-    }
-
-    /// The parameters of `step` with its preset's under them: the ones given win.
-    fn with_preset(&self, step: &Step, place: &str) -> Result<Map<String, Value>, Error> {
-        let Some(name) = &step.preset else {
-            return Ok(step.params.clone());
-        };
-        let Some(preset) = self.presets.get(&step.effect, name) else {
-            let names = self.presets.names(&step.effect);
-            let has = if names.is_empty() {
-                "it has no presets".to_owned()
-            } else {
-                format!("its presets: {}", names.join(", "))
-            };
-            return Err(Error::Recipe(format!(
-                "{place}: effect '{}' has no preset '{name}'; {has}",
-                step.effect
-            )));
-        };
-        let mut params = preset.params.clone();
-        params.extend(step.params.clone());
-        Ok(params)
     }
 }
 
