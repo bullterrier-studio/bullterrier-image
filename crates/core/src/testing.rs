@@ -1,6 +1,7 @@
 //! What the unit tests of the core share: a registry that holds a `probe` effect (one parameter of every kind, see
 //! `params::probe`) and a `seams` effect that takes a partition and describes no parameters of its own, beside the
-//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`], [`Shrinks`] and [`Replaces`].
+//! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`], [`Shrinks`] and [`Replaces`],
+//! and [`Finds`], a finder that counts its calls.
 //!
 //! Integration tests (`crates/core/tests/`) cannot reach this module: they use the core's own effects, or a double
 //! written against the public [`Effect`] trait.
@@ -16,7 +17,7 @@ use crate::effect::{Category, Effect, FieldParam, Input, Meta, Native};
 use crate::params::probe::Probe;
 use crate::params::{Params, Table};
 use crate::registry::Registry;
-use crate::{Error, Image, Inputs, Picture};
+use crate::{Error, Finder, Image, Inputs, Layer, Picture};
 
 static PROBE: Meta = Meta {
     category: Category::Utilities,
@@ -256,6 +257,43 @@ impl Effect for Replaces {
 
     fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Image::new(self.height, self.width, &self.values)
+    }
+}
+
+/// What a [`Finds`] answers: a map, or an error, for the picture it is asked about.
+type Answer = Box<dyn Fn(&Picture<'_>) -> Result<Layer, Error> + Send + Sync>;
+
+/// A finder that answers with what `answer` makes of the picture and counts its calls: the oracle for "the map was found
+/// once" and "the finder was never asked".
+pub(crate) struct Finds {
+    answer: Answer,
+    calls: AtomicUsize,
+}
+
+impl Finds {
+    /// A finder whose answer to every picture is `answer` of it.
+    pub(crate) fn new(answer: impl Fn(&Picture<'_>) -> Result<Layer, Error> + Send + Sync + 'static) -> Self {
+        Self {
+            answer: Box::new(answer),
+            calls: AtomicUsize::new(0),
+        }
+    }
+
+    /// A finder that answers a map of `level` everywhere, of the size of the picture it is asked about.
+    pub(crate) fn flat(level: f32) -> Self {
+        Self::new(move |picture| Layer::new(picture.height(), picture.width(), vec![level; picture.pixels().len()]))
+    }
+
+    /// How many times the finder was asked.
+    pub(crate) fn calls(&self) -> usize {
+        self.calls.load(Ordering::SeqCst)
+    }
+}
+
+impl Finder for Finds {
+    fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        (self.answer)(picture)
     }
 }
 

@@ -29,8 +29,9 @@ impl Recipe {
     /// - `opacity` from 0 to 1; a `name` of ASCII letters, digits and underscores starting with a letter, none of
     ///   `region`, `frame`, `each`, unique among the steps and not the name of an effect a step uses;
     /// - an each step has at least one look and a `feather` from 0 to 24; a look takes no `name`;
-    /// - what a step names is a region: a `mask`, a drive's `by` and a step's `partition` are one of `subject`,
-    ///   `background`, `depth`, `light` or declared in `regions`; an `each` is declared. The kind a region must be
+    /// - what a step names is a region: a `mask`, a drive's `by`, the field an effect's field parameter names (its
+    ///   default if the step sets none) and a step's `partition` are one of `subject`, `background`, `depth`, `light` or
+    ///   declared in `regions`; an `each` is declared. The kind a region must be
     ///   (a selection or a partition) is for the runner to check.
     ///
     /// # Errors
@@ -188,6 +189,12 @@ impl Rules<'_> {
         for (_, drive) in &drives {
             self.region(place, "by", &drive.by, true)?;
         }
+        for field in effect.fields() {
+            let name = field
+                .field_in(&params)
+                .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
+            self.region(place, &field.parameter, name, true)?;
+        }
         if let Some(partition) = &step.partition {
             self.region(place, "partition", partition, true)?;
         }
@@ -270,9 +277,11 @@ impl Rules<'_> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use serde_json::{Value, json};
 
-    use crate::testing::registry;
+    use crate::testing::{Recorder, registry};
     use crate::{BlendMode, Each, Entry, Error, Presets, Recipe, Step};
 
     /// A step of the probe effect: its parameters are checked against its table.
@@ -662,6 +671,44 @@ mod tests {
                 refused.as_deref().is_some_and(|text| text.contains(word)),
                 "{rule}: wanted {word:?}, got {refused:?}"
             );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_field_parameter_names_a_region_by_its_value_or_its_default_and_must_name_one() -> Result<(), Error> {
+        let registry = registry()?;
+        // one field parameter, `near`, whose default field is `NEAR`
+        registry.register(Arc::new(Recorder::new("fielded", &[], &["near"])))?;
+        let recipe = |step: Step, regions: Value| {
+            let mut recipe = Recipe::new([step]);
+            recipe.regions = regions.as_object().cloned().unwrap_or_default();
+            recipe
+        };
+        let declared = || json!({"NEAR": {"kind": "given"}, "star": {"kind": "given"}});
+        // (the step, the regions declared, a word of the refusal; none: accepted)
+        let rows = [
+            (Step::new("fielded"), declared(), None),
+            (Step::new("fielded").param("near", "star"), declared(), None),
+            (Step::new("fielded").param("near", "depth"), json!({}), None),
+            (Step::new("fielded"), json!({}), Some("no region")),
+            (
+                Step::new("fielded").param("near", "nowhere"),
+                declared(),
+                Some("'nowhere'"),
+            ),
+            (Step::new("fielded").param("near", 3), declared(), Some("names a field")),
+        ];
+        for (step, regions, said) in rows {
+            let result = recipe(step, regions).check_in(&registry, &Presets::new());
+            match said {
+                None => assert!(result.is_ok(), "{result:?}"),
+                Some(said) => assert!(
+                    matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains(said)
+                        && error.to_string().contains("step 1")),
+                    "{said}: {result:?}"
+                ),
+            }
         }
         Ok(())
     }

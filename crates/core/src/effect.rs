@@ -5,6 +5,7 @@
 //! value of a type that implements [`Effect`] and joins them in the registry (see [`crate::register`]).
 
 use serde::de::DeserializeOwned;
+use serde_json::{Map, Value};
 
 use crate::params::{Declared, Table};
 use crate::{Error, Image, Inputs, Picture};
@@ -118,6 +119,20 @@ impl FieldParam {
         Self {
             parameter: parameter.into(),
             default: default.into(),
+        }
+    }
+}
+
+impl FieldParam {
+    /// The field this parameter names in `given`, a step's values: the string it holds, else the default.
+    ///
+    /// # Errors
+    /// What is wrong, as text for the caller to place, if it holds something that is no name.
+    pub(crate) fn field_in<'a>(&'a self, given: &'a Map<String, Value>) -> Result<&'a str, String> {
+        match given.get(&self.parameter) {
+            None => Ok(&self.default),
+            Some(Value::String(name)) => Ok(name),
+            Some(other) => Err(format!("`{}` names a field, got {other}", self.parameter)),
         }
     }
 }

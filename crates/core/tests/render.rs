@@ -3,8 +3,10 @@
 
 use std::error::Error;
 
+use std::sync::Arc;
+
 use bullterrier_image::{
-    BlendMode, Drive, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply,
+    BlendMode, Drive, Finder, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, apply,
 };
 use serde_json::json;
 
@@ -108,7 +110,7 @@ fn a_masked_step_changes_the_picture_only_where_the_mask_is_above_0() -> Outcome
     let weights: Vec<f32> = (0..20 * 30)
         .map(|index| f32::from(u8::from(index % 30 >= 12)))
         .collect();
-    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("subject", Layer::new(20, 30, weights)?);
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("subject", Layer::new(20, 30, weights)?)?;
     let recipe = Recipe::new([Step::new("grade")
         .param("exposure", 1.0)
         .mask("subject")
@@ -138,7 +140,7 @@ fn a_parameter_driven_by_a_map_takes_its_start_where_the_map_is_0_and_its_end_wh
     let depth: Vec<f32> = (0..20 * 30)
         .map(|index| f32::from(u8::from(index % 30 >= 12)))
         .collect();
-    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("depth", Layer::new(20, 30, depth)?);
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_map("depth", Layer::new(20, 30, depth)?)?;
     let recipe = Recipe::new([Step::new("grade").param("exposure", Drive::new("depth", -1.0, 1.0).levels(2))]);
     let rendered = photo
         .render(&recipe, &Presets::new(), Options::default())?
@@ -151,6 +153,39 @@ fn a_parameter_driven_by_a_map_takes_its_start_where_the_map_is_0_and_its_end_wh
     let (darker, brighter) = (graded(-1.0)?, graded(1.0)?);
     for (index, pixel) in rendered.chunks(3).enumerate() {
         let expected = if index % 30 >= 12 { &brighter } else { &darker };
+        assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
+    }
+    Ok(())
+}
+
+/// A finder that takes the left 12 of 30 columns for the subject.
+struct LeftSide;
+
+impl Finder for LeftSide {
+    fn find(&self, picture: &Picture<'_>) -> Result<Layer, bullterrier_image::Error> {
+        let (height, width) = (picture.height(), picture.width());
+        let alpha = (0..height * width)
+            .map(|index| f32::from(u8::from(index % width < 12)))
+            .collect();
+        Layer::new(height, width, alpha)
+    }
+}
+
+#[test]
+fn a_step_masked_by_the_background_changes_the_picture_only_where_a_finder_found_no_subject() -> Outcome {
+    let values = wide_values();
+    let photo = Photo::new(Picture::new(20, 30, &values)?).with_finder("subject", Arc::new(LeftSide));
+    let recipe = Recipe::new([Step::new("grade").param("exposure", 1.0).mask("background")]);
+    let rendered = photo
+        .render(&recipe, &Presets::new(), Options::default())?
+        .into_values();
+    let graded = applied(
+        "grade",
+        json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
+               "vibrance": 0.0}),
+    )?;
+    for (index, pixel) in rendered.chunks(3).enumerate() {
+        let expected = if index % 30 < 12 { &values } else { &graded };
         assert_eq!(pixel, &expected[index * 3..index * 3 + 3], "pixel {index}");
     }
     Ok(())

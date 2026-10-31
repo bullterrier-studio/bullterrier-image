@@ -159,7 +159,7 @@ mod tests {
         }))?;
         let mut photo = Photo::new(Picture::new(1, width, backdrop)?);
         if let Some(mask) = mask {
-            photo = photo.with_map("subject", Layer::new(1, width, mask.to_vec())?);
+            photo = photo.with_map("subject", Layer::new(1, width, mask.to_vec())?)?;
         }
         let step = if mask.is_some() { step.mask("subject") } else { step };
         let image = photo.render_in(&registry, &Recipe::new([step]), &Presets::new(), Options::default())?;
