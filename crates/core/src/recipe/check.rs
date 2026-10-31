@@ -768,6 +768,30 @@ mod tests {
     }
 
     #[test]
+    fn no_parameter_is_named_like_a_key_of_the_step() -> Result<(), Error> {
+        // `partition` is also an input of the effect, which the check names first
+        for key in [
+            "effect",
+            "mask",
+            "opacity",
+            "blend_mode",
+            "preset",
+            "each",
+            "looks",
+            "name",
+        ] {
+            let refused = refusal(&Recipe::new([probe().param(key, json!("x"))]), &Presets::new())?;
+            let said = refused.map(|error| error.to_string());
+            assert!(
+                said.as_deref()
+                    .is_some_and(|text| text.contains(&format!("`{key}` is a key of the step"))),
+                "{key}: {said:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn the_refusal_of_a_later_step_names_its_place() -> Result<(), Error> {
         let recipe = Recipe::new([probe(), probe(), probe().mask("nowhere")]);
         let refused = refusal(&recipe, &Presets::new())?.map(|error| error.to_string());
