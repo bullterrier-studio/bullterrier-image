@@ -50,7 +50,7 @@ pub(super) struct Working<'a> {
 
 impl<'a> Working<'a> {
     /// The working picture for `photo`: framed by `frame`, then at the longest side `size` (none: as framed). `subject`
-    /// finds the subject map of the photo as given, asked only for a crop around it.
+    /// is the subject map of the photo as given, which a frame that [`needs_subject`](Frame::needs_subject) is given.
     ///
     /// # Errors
     /// [`Error::Recipe`] for a size of 0, or a size or frame that makes a picture of more than 178,956,970 pixels (twice
@@ -59,7 +59,7 @@ impl<'a> Working<'a> {
         photo: Picture<'a>,
         frame: &Frame,
         size: Option<u32>,
-        subject: impl FnOnce() -> Result<Arc<Layer>, Error>,
+        subject: Option<&Layer>,
     ) -> Result<Self, Error> {
         if size == Some(0) {
             return Err(Error::Recipe("`size` must be >= 1, got 0".to_owned()));

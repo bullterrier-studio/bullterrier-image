@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use super::Working;
-use super::maps::Maps;
 use crate::frame::Transparent;
 use crate::ops::cutout;
 use crate::ops::length::float;
@@ -20,11 +19,16 @@ pub(super) enum Cut {
 }
 
 impl Cut {
-    /// The cut `frame` asks for on the picture `working`, if any; `maps` gives the subject for a `Background` cut.
+    /// The cut `frame` asks for on the picture `working`, if any; `subject` is the subject map of the working picture
+    /// that a frame which [`needs_subject`](Frame::needs_subject) is given.
     ///
     /// # Errors
-    /// [`Error::MapNotFound`] if a `Background` cut has no subject map to work from.
-    pub(super) fn plan(frame: &Frame, working: &Working<'_>, maps: &Maps<'_, '_>) -> Result<Option<Self>, Error> {
+    /// [`Error::MapNotFound`] if a `Background` cut is given no subject map: a frame that needs one is always given it.
+    pub(super) fn plan(
+        frame: &Frame,
+        working: &Working<'_>,
+        subject: Option<Arc<Layer>>,
+    ) -> Result<Option<Self>, Error> {
         Ok(match frame.transparent {
             Transparent::None => None,
             Transparent::Circle => Some(Self::Circle),
@@ -34,7 +38,12 @@ impl Cut {
                     frame.corner_radius * float(picture.height().min(picture.width())),
                 ))
             }
-            Transparent::Background => Some(Self::Subject(maps.get("subject", "`frame`, `transparent`")?)),
+            Transparent::Background => Some(Self::Subject(subject.ok_or_else(|| {
+                Error::map_not_found(
+                    "subject",
+                    "a cut by the subject needs the subject map, which was not given",
+                )
+            })?)),
         })
     }
 

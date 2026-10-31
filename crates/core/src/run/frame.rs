@@ -8,7 +8,6 @@
 //! per channel.
 
 use std::borrow::Cow;
-use std::sync::Arc;
 
 use crate::frame::{Anchor, Flip};
 use crate::ops::frame::{self, Edges, Rect, Shape, Side};
@@ -32,8 +31,8 @@ pub(super) struct Geometry {
 }
 
 impl Geometry {
-    /// The geometry of `frame` on a `height` x `width` picture, or none when the frame changes no pixel. `subject` finds
-    /// the subject map (of the picture's size, as given), asked only if the frame crops around it.
+    /// The geometry of `frame` on a `height` x `width` picture, or none when the frame changes no pixel. `subject` is the
+    /// subject map (of the picture's size, as given) that a frame which [`needs_subject`](Frame::needs_subject) is given.
     ///
     /// Only sizes are worked out here, no pixel is made: a frame whose turned or finished picture would have more pixels than
     /// a picture may have (see [`within_limit`]) is refused before anything is allocated for it.
@@ -45,7 +44,7 @@ impl Geometry {
         frame: &Frame,
         height: usize,
         width: usize,
-        subject: impl FnOnce() -> Result<Arc<Layer>, Error>,
+        subject: Option<&Layer>,
     ) -> Result<Option<Self>, Error> {
         let turn = (frame.angle != 0.0).then(|| Turn::new(height, width, frame.angle, frame.fit, frame.resample));
         let mut geometry = Self {
@@ -64,7 +63,12 @@ impl Geometry {
         geometry.crop = match (frame.anchor, frame.aspect) {
             (Anchor::Subject, aspect) => {
                 // the box is found in the picture as flipped and turned, as the crop is cut from it
-                let subject = subject()?;
+                let subject = subject.ok_or_else(|| {
+                    Error::map_not_found(
+                        "subject",
+                        "a crop around the subject needs the subject map, which was not given",
+                    )
+                })?;
                 let turned = geometry.turned(subject.values(), 1, &[0.0]);
                 let around =
                     frame::subject_box(&turned, turned_height, turned_width, frame.margin).ok_or_else(|| {
@@ -755,7 +759,6 @@ mod tests {
                 frame.aspect = aspect;
             })
         };
-        let none = || Err(Error::Recipe("no subject was asked for".to_owned()));
         for (height, width, frame, over, row) in [
             (2675, 2675, all_sides(2.0), None, "borders just within the limit"),
             (
@@ -782,7 +785,7 @@ mod tests {
                 "a turn over it that a crop then makes small",
             ),
         ] {
-            let planned = Geometry::plan(&frame, height, width, none);
+            let planned = Geometry::plan(&frame, height, width, None);
             match over {
                 None => assert!(planned.is_ok_and(|geometry| geometry.is_some()), "{row}"),
                 Some(shape) => assert!(

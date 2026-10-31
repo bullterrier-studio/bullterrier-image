@@ -27,7 +27,6 @@ pub use trace::Stage;
 use serde_json::{Map, Value};
 
 use crate::effect::{self, Effect};
-use crate::frame::Anchor;
 use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
@@ -142,21 +141,22 @@ impl<'a> Photo<'a> {
         options: Options,
     ) -> Result<Run<'a>, Error> {
         recipe.check_in(registry, presets)?;
-        let subject_for_frame = || maps::stored(self, recipe, "subject", "`frame`, `anchor`");
+        // the subject the frame needs (a crop around it, a cut by it), found before anything is made
+        let needs_subject = recipe.frame.needs_subject();
+        let given_subject = needs_subject
+            .then(|| maps::stored(self, recipe, "subject", "`frame`"))
+            .transpose()?;
         let working = Working::new(
             self.picture,
             &recipe.frame,
             options.size().or(recipe.size),
-            subject_for_frame,
+            given_subject.as_deref(),
         )?;
         let ratio = working.ratio();
         let maps = Maps::new(self, recipe, &working)?;
-        if recipe.frame.anchor == Anchor::Subject {
-            // the framed subject is a map of the render like any a step uses: a trace shows it
-            maps.get("subject", "`frame`, `anchor`")?;
-        }
-        // a cut-out by the subject needs it, and a trace shows it like any other map
-        let cut = Cut::plan(&recipe.frame, &working, &maps)?;
+        // as the working picture has it, which a trace shows like a map a step uses
+        let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
+        let cut = Cut::plan(&recipe.frame, &working, framed_subject)?;
         let steps = recipe
             .steps
             .iter()

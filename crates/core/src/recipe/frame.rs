@@ -163,6 +163,13 @@ impl Frame {
         *self == Self::default()
     }
 
+    /// Whether running this frame needs the subject map: a crop around it (`anchor` `Subject`) or a cut by it
+    /// (`transparent` `Background`). The one place that says so; the runner finds the subject for a frame that does.
+    #[must_use]
+    pub fn needs_subject(&self) -> bool {
+        self.anchor == Anchor::Subject || self.transparent == Transparent::Background
+    }
+
     /// This frame if every number is within its range, else the first that is not.
     ///
     /// # Errors
@@ -248,6 +255,43 @@ mod tests {
         let mut recipe = Recipe::new([Step::new("grade")]);
         recipe.frame = frame;
         recipe.checked(&Presets::new()).map(|_| ())
+    }
+
+    #[test]
+    fn a_frame_needs_the_subject_for_a_crop_around_it_or_a_cut_by_it_and_for_nothing_else() {
+        let with = |frame: Frame| frame.needs_subject();
+        assert!(!with(Frame::default()));
+        assert!(with(Frame {
+            anchor: Anchor::Subject,
+            ..Frame::default()
+        }));
+        assert!(with(Frame {
+            transparent: Transparent::Background,
+            ..Frame::default()
+        }));
+        assert!(with(Frame {
+            anchor: Anchor::Subject,
+            transparent: Transparent::Background,
+            ..Frame::default()
+        }));
+        for other in [
+            Frame {
+                anchor: Anchor::Left,
+                aspect: Some(1.0),
+                ..Frame::default()
+            },
+            Frame {
+                transparent: Transparent::Circle,
+                ..Frame::default()
+            },
+            Frame {
+                transparent: Transparent::Rounded,
+                margin: 0.5,
+                ..Frame::default()
+            },
+        ] {
+            assert!(!with(other.clone()), "{other:?}");
+        }
     }
 
     #[test]
