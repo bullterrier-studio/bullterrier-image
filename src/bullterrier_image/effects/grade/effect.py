@@ -14,7 +14,7 @@ class GradeParams(EffectParams, core="grade"):  # noqa: D101  (documented by its
     pass
 
 
-@effect(category="colour", params=GradeParams)
+@effect(params=GradeParams)
 def grade(rgb: np.ndarray, params: GradeParams) -> np.ndarray:
     """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.
 

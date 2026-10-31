@@ -14,7 +14,7 @@ class PixelGridParams(EffectParams, core="pixel_grid"):  # noqa: D101  (document
     pass
 
 
-@effect(category="texture", params=PixelGridParams)
+@effect(params=PixelGridParams)
 def pixel_grid(rgb: np.ndarray, params: PixelGridParams) -> np.ndarray:
     """The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.
 

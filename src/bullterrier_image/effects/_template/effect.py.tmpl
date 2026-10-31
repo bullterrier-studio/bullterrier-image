@@ -22,7 +22,7 @@ class ${Name}Params(EffectParams, core="$name"):  # noqa: D101  (documented by i
 # the same shape and range out, the same for the same values, the input never modified. The work is done by its Rust
 # kernel, which `uv sync` rebuilds after a change. The kernel:
 # crates/core/src/effects/$name.rs
-@effect(category="$category", params=${Name}Params)
+@effect(params=${Name}Params)
 def $name(
     rgb: np.ndarray,
     params: ${Name}Params,

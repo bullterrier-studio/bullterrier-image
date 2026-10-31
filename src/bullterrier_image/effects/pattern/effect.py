@@ -14,7 +14,7 @@ class PatternParams(EffectParams, core="pattern"):  # noqa: D101  (documented by
     pass
 
 
-@effect(category="backgrounds", params=PatternParams)
+@effect(params=PatternParams)
 def pattern(rgb: np.ndarray, params: PatternParams) -> np.ndarray:
     """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.
 

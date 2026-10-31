@@ -49,7 +49,7 @@ import types
 import typing
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal, NamedTuple, Self, get_args, get_origin
+from typing import Annotated, Any, ClassVar, Literal, NamedTuple, Self, get_args, get_origin
 
 import annotated_types
 import numpy as np
@@ -548,6 +548,8 @@ class EffectParams(ValidatedModel):
 
     model_config = ConfigDict(validate_default=True)
 
+    _core_effect: ClassVar[str | None] = None  # the Rust core effect this model is declared by (`core="x"`), if any
+
     @classmethod
     def model_json_schema(
         cls,
@@ -570,6 +572,7 @@ class EffectParams(ValidatedModel):
         super().__init_subclass__(**kwargs)
         if core is not None:
             _declare_from_core(cls, core)
+            cls._core_effect = core
         annotations = cls.__annotations__  # this class's own, in definition order
         for name, annotation in inspect.get_annotations(cls, eval_str=True).items():
             if name.startswith("_"):  # private attributes are not parameters
@@ -711,6 +714,11 @@ def _into_turn(low: float) -> Callable[[Any], Any]:
 def _extra(info: Any) -> dict[str, Any]:
     """What `param` put in a field's JSON-schema extras (unit, advanced, drivable, cyclic)."""
     return info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+
+
+def core_effect(model: type[EffectParams]) -> str | None:
+    """The Rust core effect the model is declared by (`core="x"`), if any."""
+    return model._core_effect  # noqa: SLF001  (the model's own, read here beside its definition)
 
 
 def unit_of(info: FieldInfo) -> str | None:

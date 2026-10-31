@@ -297,6 +297,38 @@ def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(cat
     assert "gain_probe" not in registry.describe()
 
 
+class CoreGradeParams(EffectParams, core="grade"):
+    pass
+
+
+def probe_for_the_core(rgb: np.ndarray, params: CoreGradeParams) -> np.ndarray:
+    """Stands in for grade."""
+    return rgb
+
+
+@pytest.mark.parametrize("given", [{"category": "colour"}, {"opacity": 0.5}], ids=["category", "opacity"])
+def test_an_effect_the_core_runs_takes_its_category_and_opacity_from_the_core_and_refuses_its_own(
+    given, throwaway_effects
+):
+    def grade(rgb: np.ndarray, params: CoreGradeParams) -> np.ndarray:
+        return rgb
+
+    with pytest.raises(ValueError, match=r"grade.*core.*declares"):
+        effect(params=CoreGradeParams, **given)(grade)
+
+
+def test_an_effect_the_core_runs_is_named_like_its_core_effect(throwaway_effects):
+    with pytest.raises(ValueError, match=r"probe_for_the_core.*'grade'"):
+        effect(params=CoreGradeParams)(probe_for_the_core)
+    assert "probe_for_the_core" not in registry.describe()
+
+
+def test_an_effect_with_a_python_model_needs_a_category(throwaway_effects):
+    with pytest.raises(ValueError, match=r"gain_probe.*category"):
+        effect(params=GainParams)(gain_probe)
+    assert "gain_probe" not in registry.describe()
+
+
 def test_registering_an_effect_again_keeps_the_very_same_effect_with_what_it_now_declares(gain):
     assert effect(category="colour", params=GainParams, opacity=0.3)(gain) is gain
     assert registry.get("gain_probe") is gain

@@ -42,12 +42,13 @@ from typing import Any
 
 import numpy as np
 
+from bullterrier_image._native import _core
 from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
 from bullterrier_image.ops.maps import map_problem
 
 from . import looks as look_files
 from . import presets as preset_files
-from .params import EffectParams, field_name_fields, signature
+from .params import EffectParams, core_effect, field_name_fields, signature
 from .presets import Preset
 
 # The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
@@ -205,19 +206,22 @@ _LOADING = _Loading()
 
 
 def effect[P: EffectParams](
-    *, category: str, params: type[P], opacity: float = 1.0
+    *, category: str | None = None, params: type[P], opacity: float | None = None
 ) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
     """Decorator: `@effect(category="light", params=BloomParams)` makes `bloom(rgb, params) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
-    `category` must be one of `CATEGORIES`; `params` an `EffectParams` subclass, whose instance the function receives
-    as its second argument. Keyword-only parameters after it are injected inputs, each named in `INPUTS` and defaulted.
+    `params` is an `EffectParams` subclass, whose instance the function receives as its second argument.
+    `category` (required, one of `CATEGORIES`) is where the effect sits in the catalogue. Keyword-only parameters after
+    the model are injected inputs, each named in `INPUTS` and defaulted. An effect the Rust core runs (its model is
+    `EffectParams, core="x"`) is named like its core effect and takes category and opacity from the core, where its
+    file declares them: giving either here is a `ValueError`.
     `opacity` (0..1, default 1) is the opacity a step of this effect has when it sets none, in a recipe file, `Step`
     and `fx` alike: an effect that is meant to be mixed in partway (a shadow, rain) says so here, and a step's own
     `opacity` replaces it. `fx` signatures, `documentation` and the catalogue show it.
-    Raises `ValueError`, and registers nothing, when the category is unknown, `params` is not an `EffectParams`
-    subclass, the function has another shape, an input is unknown, a field is named like an input or a step key
-    (`STEP_KEYS`), `opacity` is not a number from 0 to 1, or a different function already has the same name.
+    Raises `ValueError`, and registers nothing, when the category is missing or unknown, `params` is not an
+    `EffectParams` subclass, the function has another shape, an input is unknown, a field is named like an input or a
+    step key (`STEP_KEYS`), `opacity` is not a number from 0 to 1, or a different function already has the same name.
     Registering the same function again, as reloading its module does, replaces the old one (category and opacity
     included); registering a `ModelledEffect` again keeps that very object.
     """
@@ -412,8 +416,25 @@ def _failure(entry_point: metadata.EntryPoint, error: Exception) -> str:
     return f"{message}; fix or uninstall it, or set {_PLUGINS_VARIABLE}=builtin to load only our own effects"
 
 
-def _register(fn: Any, category: str, params: Any, opacity: Any) -> ModelledEffect:
+def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> ModelledEffect:
     name = fn.__name__
+    core = core_effect(params) if isinstance(params, type) and issubclass(params, EffectParams) else None
+    if core is not None:
+        if category is not None or opacity is not None:
+            raise ValueError(
+                f"effect {name!r} is run by the Rust core, which declares its category and opacity: "
+                "leave category= and opacity= out"
+            )
+        if name != core:
+            raise ValueError(f"effect {name!r} is run by the Rust core effect {core!r}: name the function {core!r}")
+        declared = _core.effect(core)
+        category, opacity = declared["category"], declared["opacity"]
+    elif category is None:
+        raise ValueError(
+            f"effect {name!r} needs a category: write @effect(category=...) with one of: {', '.join(CATEGORIES)}"
+        )
+    elif opacity is None:
+        opacity = 1.0
     if category not in CATEGORIES:
         raise ValueError(
             f"effect {name!r} has the unknown category {category!r}: write @effect(category=...) with one of: "

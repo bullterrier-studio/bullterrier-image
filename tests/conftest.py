@@ -10,6 +10,7 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import onnx
@@ -17,7 +18,7 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import EffectParams, FieldName, Picture, param, scaled
+from bullterrier_image.core.params import EffectParams, FieldName, Picture, core_effect, param, scaled
 from bullterrier_image.core.registry import effect, unregister
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,7 +78,11 @@ def empty_registry() -> Iterator[None]:
         for name in registry.all_effects():
             unregister(name)
         for _, fn, category, opacity in real:
-            effect(category=category, params=fn.params_model, opacity=opacity)(fn)
+            # an effect the Rust core runs gets its category and opacity from the core
+            declared: dict[str, Any] = (
+                {} if core_effect(fn.params_model) else {"category": category, "opacity": opacity}
+            )
+            effect(params=fn.params_model, **declared)(fn)
 
 
 @pytest.fixture
