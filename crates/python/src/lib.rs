@@ -108,14 +108,26 @@ fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 /// and `params` a dict, as `apply` was given; the function returns a float32 array of the same shape. Then `apply`,
 /// `effects` and `effect` know it like the core's own. The name is not checked for form, only for being free.
 ///
-/// `ValueError` if the name is taken (by a core effect as well) or the category is unknown. A function that raises,
-/// or returns anything but a float32 array of the picture's shape, makes `apply` raise `ValueError` naming the effect.
+/// `ValueError` if the name is taken (by a core effect as well), the category is unknown, `opacity` is not a finite
+/// number from 0 to 1, or `function` is not callable. A function that raises, or returns anything but a float32 array
+/// of the picture's shape, makes `apply` raise `ValueError` naming the effect.
 #[pyfunction]
 fn register(name: &str, category: &str, opacity: f64, function: &Bound<'_, PyAny>) -> PyResult<()> {
     let category = Category::ALL
         .into_iter()
         .find(|known| known.name() == category)
         .ok_or_else(|| PyValueError::new_err(format!("{category:?} is not a category of effects")))?;
+    if !(0.0..=1.0).contains(&opacity) {
+        return Err(PyValueError::new_err(format!(
+            "opacity must be a number from 0 to 1, got {opacity}"
+        )));
+    }
+    if !function.is_callable() {
+        return Err(PyValueError::new_err(format!(
+            "function must be callable, got {}",
+            function.get_type()
+        )));
+    }
     let effect = PythonEffect {
         name: name.to_owned(),
         category,

@@ -168,6 +168,25 @@ def test_an_unknown_category_is_refused_and_registers_nothing():
     assert "probe_sepia" not in _core.effects()
 
 
+@pytest.mark.parametrize(
+    ("opacity", "function", "said"),
+    [
+        pytest.param(math.nan, fill(0.5), "opacity", id="a NaN opacity"),
+        pytest.param(math.inf, fill(0.5), "opacity", id="an infinite opacity"),
+        pytest.param(-0.1, fill(0.5), "opacity", id="an opacity below 0"),
+        pytest.param(1.5, fill(0.5), "opacity", id="an opacity above 1"),
+        pytest.param(1.0, "not callable", "callable", id="a function that is not callable"),
+        pytest.param(1.0, None, "callable", id="no function"),
+    ],
+)
+def test_an_opacity_outside_0_to_1_or_a_function_that_cannot_be_called_is_refused_and_registers_nothing(
+    opacity, function, said
+):
+    with pytest.raises(ValueError, match=said):
+        _core.register("probe_refused", "utilities", opacity, function)
+    assert "probe_refused" not in _core.effects()
+
+
 def test_a_foreign_effect_describes_its_own_parameters():
     with registered("probe_own", fill(0.5)), pytest.raises(ValueError, match="probe_own"):
         _core.params("probe_own")
