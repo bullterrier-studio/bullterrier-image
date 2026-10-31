@@ -9,9 +9,9 @@ use std::f64::consts::PI;
 
 use crate::Error;
 
-/// The most channels a resized thing has (the photo's colours; a map has one): the size of the largest result is
-/// checked against it.
-const MOST_CHANNELS: usize = 3; // constant: the photo's red, green and blue
+/// The most pixels a resized picture may have, so that a `size` no picture can have is refused before anything is
+/// allocated for it.
+const MOST_PIXELS: usize = 2 * 89_478_485; // constant: twice Pillow's `Image.MAX_IMAGE_PIXELS`, its decompression-bomb limit
 
 /// A kernel: the weight an input pixel at distance `x` (in output pixels' worth) from the output pixel's centre has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,7 +110,7 @@ impl Resize {
     /// A shrink uses the Lanczos kernel, a growth the bicubic one. None if it already has that size.
     ///
     /// # Errors
-    /// [`Error::Recipe`] if the new size has more pixels than a count can hold.
+    /// [`Error::Recipe`] if the new size has more pixels than a picture may have (178,956,970: twice Pillow's limit).
     pub(crate) fn to_longest_side(height: usize, width: usize, longest: u32) -> Result<Option<Self>, Error> {
         let scale = f64::from(longest) / float(height.max(width));
         let scaled = |side: usize| {
@@ -126,14 +126,10 @@ impl Resize {
         if to == (height, width) {
             return Ok(None);
         }
-        if to
-            .0
-            .checked_mul(to.1)
-            .and_then(|pixels| pixels.checked_mul(MOST_CHANNELS))
-            .is_none()
-        {
+        // saturating: a side near `u32::MAX` squared is still over the limit
+        if to.0.saturating_mul(to.1) > MOST_PIXELS {
             return Err(Error::Recipe(format!(
-                "`size` {longest} makes a picture of {} x {} pixels, more than can be held",
+                "`size` {longest} makes a picture of {} x {} pixels, more than the limit of {MOST_PIXELS} pixels",
                 to.1, to.0
             )));
         }
@@ -365,6 +361,37 @@ mod tests {
             matches!(&refused, Err(Error::Recipe(message)) if message.contains("`size`")),
             "{refused:?}"
         );
+    }
+
+    #[test]
+    fn a_picture_of_more_than_twice_pillows_pixel_limit_is_refused_and_one_within_it_is_planned() {
+        // Pillow's `Image.MAX_IMAGE_PIXELS` is 89,478,485: the limit is 178,956,970 pixels, and planning allocates no
+        // picture. A square of side 13,377 has 178,944,129 pixels and one of 13,378 has 178,970,884; 1 x 2 grown to
+        // 18,918 is 9,459 x 18,918 = 178,945,362 pixels and to 18,919 is 9,460 x 18,919 = 178,973,740; a 2-row picture
+        // grown to 89,478,485 columns has exactly 178,956,970 pixels, to 89,478,486 two more.
+        for (height, width, longest, within) in [
+            (1, 1, 13_377, true),
+            (1, 1, 13_378, false),
+            (1, 2, 18_918, true),
+            (1, 2, 18_919, false),
+            (2, 89_478_484, 89_478_485, true),
+            (2, 89_478_485, 89_478_486, false),
+            (1, 1, 2_000_000_000, false),
+            (1, 1, u32::MAX, false),
+        ] {
+            let planned = Resize::to_longest_side(height, width, longest);
+            if within {
+                assert!(
+                    planned.is_ok_and(|plan| plan.is_some()),
+                    "{height} x {width} at {longest}"
+                );
+            } else {
+                assert!(
+                    matches!(&planned, Err(Error::Recipe(said)) if said.contains("`size`") && said.contains("178956970")),
+                    "{height} x {width} at {longest}: {planned:?}"
+                );
+            }
+        }
     }
 
     proptest! {

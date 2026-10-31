@@ -16,9 +16,10 @@ pub struct Options {
 }
 
 impl Options {
-    /// These options with `size`, the longest side in px of the picture the render works on and returns (at least 1, else
-    /// the render is refused): the photo is resampled to it, its aspect kept, and so are its maps. It wins over the
-    /// recipe's own `size`; without either, the photo's own size is kept.
+    /// These options with `size`, the longest side in px of the picture the render works on and returns: the photo is
+    /// resampled to it, its aspect kept, and so are its maps. It wins over the recipe's own `size`; without either, the
+    /// photo's own size is kept. The render is refused for a size of 0 and for one that makes a picture of more than
+    /// 178,956,970 pixels (twice Pillow's decompression-bomb limit).
     ///
     /// A recipe's pixel values (`px`) are written for a longest side of 480; a render multiplies them by the working
     /// picture's longest side over 480, so the look is the same at any size.
@@ -47,7 +48,8 @@ impl<'a> Working<'a> {
     /// The working picture for `photo` at the longest side `size` (none: the photo as given).
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a size of 0, or one too large to hold.
+    /// [`Error::Recipe`] for a size of 0, or one that makes a picture of more than 178,956,970 pixels (twice Pillow's
+    /// decompression-bomb limit).
     pub(super) fn new(photo: Picture<'a>, size: Option<u32>) -> Result<Self, Error> {
         let Some(size) = size else {
             return Ok(Self::Photo(photo));
@@ -350,6 +352,30 @@ mod tests {
             assert_eq!(shape, (8, 12));
         }
         assert!(matches!(stages.last(), Some(Stage::Step { image, .. }) if image == &rendered));
+        Ok(())
+    }
+
+    #[test]
+    fn a_size_no_picture_can_have_is_refused_at_once_naming_the_size_and_the_limit() -> Result<(), Error> {
+        let (registry, recorder) = rig()?;
+        let values = vec![0.5; 3];
+        // a billion-pixel side asked of a one-pixel photo: refused without making a picture for it (which would take tens
+        // of gigabytes)
+        let photo = Photo::new(Picture::new(1, 1, &values)?).with_finder("subject", Arc::new(Finds::flat(0.5)));
+        let result = render(
+            &photo,
+            &registry,
+            &Recipe::new([uses("subject")]),
+            Options::default().with_size(2_000_000_000),
+        );
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe
+                && error.to_string().contains("`size` 2000000000")
+                && error.to_string().contains("2000000000 x 2000000000")
+                && error.to_string().contains("178956970")),
+            "{result:?}"
+        );
+        assert_eq!(recorder.received().len(), 0);
         Ok(())
     }
 
