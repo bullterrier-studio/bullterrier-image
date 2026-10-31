@@ -18,7 +18,7 @@ const ADDRESS_WORDS: [&str; 3] = ["region", "frame", "each"];
 impl Recipe {
     /// This recipe if it follows the rules of a look, else the first it breaks. A recipe must pass this before
     /// anything runs it. The rules:
-    /// - at least one step; a `size` of at least 1;
+    /// - at least one step; a `size` of at least 1; a `frame` whose numbers lie within their ranges (see [`Frame`](super::Frame));
     /// - a step's effect is registered; its parameters (with a `preset`'s under them: the ones given win) are the
     ///   effect's, as [`crate::params::Table::check`] says when the core describes them (an effect it does not
     ///   describe keeps them as given, its owner checks them), none named like a step key or an input;
@@ -65,6 +65,7 @@ impl Recipe {
         if self.size == Some(0) {
             return Err(Error::Recipe("`size` must be >= 1, got 0".to_owned()));
         }
+        self.frame.check()?;
         let rules = Rules {
             registry,
             presets,

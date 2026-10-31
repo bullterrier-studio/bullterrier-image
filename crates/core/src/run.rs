@@ -368,10 +368,11 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::frame::Flip;
     use crate::params::Declared;
     use crate::params::probe::Probe;
     use crate::testing::{Finds, Measured, Paint, Recorder, Shrinks, registry};
-    use crate::{Drive, Each, ErrorKind, Step};
+    use crate::{Drive, Each, ErrorKind, Frame, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
     fn values() -> Vec<f32> {
@@ -453,7 +454,10 @@ mod tests {
     fn what_the_core_does_not_run_yet_is_refused_naming_it() -> Result<(), Error> {
         let registry = registry()?;
         let mut recipe_with_frame = Recipe::new([Step::new("probe")]);
-        recipe_with_frame.frame = json!({"flip": "horizontal"}).as_object().cloned().unwrap_or_default();
+        recipe_with_frame.frame = Frame {
+            flip: Flip::X,
+            ..Frame::default()
+        };
         let mut recipe_with_size = Recipe::new([Step::new("probe")]);
         recipe_with_size.size = Some(480);
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);

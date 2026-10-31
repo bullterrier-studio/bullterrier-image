@@ -39,7 +39,7 @@ pub use error::{Constraint, Error, ErrorKind, MapKind};
 pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
-pub use recipe::{Assign, BlendMode, Drive, Each, Entry, Recipe, STEP_KEYS, Step};
+pub use recipe::{Assign, BlendMode, Drive, Each, Entry, Frame, Recipe, STEP_KEYS, Step, frame};
 pub use registry::{effect, effects, register, unregister};
 pub use run::{Finder, Options, Photo, Stage};
 

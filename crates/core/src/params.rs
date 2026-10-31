@@ -177,7 +177,7 @@ impl fmt::Display for Scalar {
 }
 
 /// A colour: red, green and blue, each 0..1. Given as a list of three numbers.
-#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Color(pub [f32; 3]);
 

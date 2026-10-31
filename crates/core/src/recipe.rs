@@ -4,7 +4,7 @@
 //! The types are the whole model, built in code (`Step::new("bloom").param("radius", 12)`) or read from JSON
 //! ([`Recipe::from_json`]); `serde_json` writes them back. A step keeps its parameters as written and says how its
 //! result is laid over the picture below it: a `mask`, an `opacity` (none: the effect's own default) and a
-//! [`BlendMode`]. Regions and the framing are tables the runner reads; here they are only tables.
+//! [`BlendMode`]. The framing is a typed [`Frame`]; regions are tables the runner reads; here they are only tables.
 //!
 //! Reading and building check nothing but the shape: an unknown key is refused by name, a wrong type too. The rules of
 //! a look (known effects, parameters within their ranges, names that resolve) are `Recipe::checked`.
@@ -22,8 +22,10 @@ use crate::params::EffectParams;
 mod check;
 pub(crate) mod drive;
 mod file;
+pub mod frame;
 
 pub use drive::Drive;
+pub use frame::Frame;
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an
 /// effect may be named like one.
@@ -303,9 +305,9 @@ pub struct Recipe {
     /// for a picture whose longest side is 480.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<u32>,
-    /// How the photo is framed before the steps and cut out after them: a table whose fields the runner reads.
-    #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub frame: Map<String, Value>,
+    /// How the photo is framed before the steps and cut out after them; the default frame changes nothing.
+    #[serde(default, skip_serializing_if = "Frame::is_empty")]
+    pub frame: Frame,
     /// The regions the steps can name besides the built-in ones, by name: tables whose kind the runner reads.
     #[serde(default, skip_serializing_if = "Map::is_empty", deserialize_with = "tables")]
     pub regions: Map<String, Value>,
@@ -448,6 +450,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::params::Color;
 
     fn read(text: &Value) -> Result<Recipe, Error> {
         Recipe::from_json(&text.to_string())
@@ -502,7 +505,13 @@ mod tests {
         recipe.name = Some("night".to_owned());
         recipe.description = Some("Dark and glowing.".to_owned());
         recipe.size = Some(1024);
-        recipe.frame = json!({"aspect": 1}).as_object().cloned().unwrap_or_default();
+        recipe.frame = Frame {
+            aspect: Some(1.0),
+            anchor: frame::Anchor::Subject,
+            pad_left: 0.25,
+            fill: Color([0.0, 0.5, 1.0]),
+            ..Frame::default()
+        };
         recipe.regions = json!({"panes": {"kind": "grid", "columns": 2}})
             .as_object()
             .cloned()
@@ -516,7 +525,10 @@ mod tests {
                  "blend_mode": "multiply", "name": "tiles"},
             ],
             "name": "night", "description": "Dark and glowing.", "size": 1024,
-            "frame": {"aspect": 1}, "regions": {"panes": {"kind": "grid", "columns": 2}},
+            "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
+                      "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
+                      "pad_left": 0.25, "fill": [0.0, 0.5, 1.0], "transparent": "none", "corner_radius": 0.2},
+            "regions": {"panes": {"kind": "grid", "columns": 2}},
         });
         assert_eq!(serde_json::to_value(&recipe).ok(), Some(written.clone()));
         assert_eq!(read(&written).ok(), Some(recipe));

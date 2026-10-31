@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use super::{Field, Kind, Scalar, Table};
+use super::{Color, Field, Kind, Scalar, Table};
 use crate::{Constraint, Error};
 
 impl Table {
@@ -139,6 +139,19 @@ fn colour(value: &Value) -> Option<[f64; 3]> {
                 .then_some(channels)
         }
         _ => None,
+    }
+}
+
+impl Color {
+    /// The colour `value` writes: `'#rrggbb'` or `'#rgb'` (either case, spaces around allowed) or three numbers from 0
+    /// to 1; none if it writes anything else. The one reading of a colour a person writes, shared by a parameter
+    /// ([`Table::check`]) and a recipe's frame.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a channel is from 0 to 1 and a colour holds f32"
+    )]
+    pub(crate) fn parse(value: &Value) -> Option<Self> {
+        colour(value).map(|channels| Self(channels.map(|channel| channel as f32)))
     }
 }
 

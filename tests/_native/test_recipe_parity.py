@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import get_args
 
+import numpy as np
 import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's engine
@@ -295,6 +296,142 @@ def test_a_file_python_loads_is_read_by_the_core_into_the_same_steps(tmp_path, t
     loaded = load_recipe(path)
     read = _core.read_recipe(text, "toml")
     assert [core_step(entry) for entry in read["steps"]] == [python_step(step) for step in loaded.steps]
+
+
+# --- the frame: Rust's `Frame` against Python's `Framing` -----------------------------------------------------------
+
+# (the frame as a recipe writes it, whether it is valid): the bounds of every number on both sides, every choice, the
+# colours, and what the shape refuses. The `valid` column is written by hand; Python's `Framing` and the core must both
+# agree with it.
+FRAME_ROWS = [
+    pytest.param({}, True, id="no field"),
+    pytest.param({"flip": "both", "angle": 30.5, "aspect": 1.5, "anchor": "top", "pad_left": 0.5}, True, id="distinct"),
+    *[pytest.param({"flip": choice}, True, id=f"flip {choice}") for choice in ("none", "x", "y", "both")],
+    pytest.param({"flip": "z"}, False, id="flip not listed"),
+    pytest.param({"flip": 1}, False, id="flip a number"),
+    *[pytest.param({"fit": choice}, True, id=f"fit {choice}") for choice in ("crop", "expand")],
+    pytest.param({"fit": "stretch"}, False, id="fit not listed"),
+    *[pytest.param({"resample": c}, True, id=f"resample {c}") for c in ("nearest", "bilinear", "bicubic")],
+    pytest.param({"resample": "lanczos"}, False, id="resample not listed"),
+    *[
+        pytest.param({"anchor": c}, True, id=f"anchor {c}")
+        for c in ("center", "top", "bottom", "left", "right", "subject")
+    ],
+    pytest.param({"anchor": "middle"}, False, id="anchor not listed"),
+    *[
+        pytest.param({"transparent": c}, True, id=f"transparent {c}")
+        for c in ("none", "background", "circle", "rounded")
+    ],
+    pytest.param({"transparent": "oval"}, False, id="transparent not listed"),
+    # an angle is any real: it wraps into -180..180
+    pytest.param({"angle": 270}, True, id="angle past the turn"),
+    pytest.param({"angle": -1e9}, True, id="angle far below"),
+    pytest.param({"angle": "up"}, False, id="angle text"),
+    pytest.param({"angle": True}, False, id="angle a bool"),
+    pytest.param({"aspect": 0.1}, True, id="aspect lowest"),
+    pytest.param({"aspect": 10}, True, id="aspect highest"),
+    pytest.param({"aspect": None}, True, id="aspect none"),
+    pytest.param({"aspect": 0.09}, False, id="aspect below"),
+    pytest.param({"aspect": 10.5}, False, id="aspect above"),
+    pytest.param({"aspect": "wide"}, False, id="aspect text"),
+    pytest.param({"margin": 0}, True, id="margin lowest"),
+    pytest.param({"margin": 1}, True, id="margin highest"),
+    pytest.param({"margin": -0.25}, False, id="margin below"),
+    pytest.param({"margin": 1.25}, False, id="margin above"),
+    pytest.param({"margin": True}, False, id="margin a bool"),
+    *[
+        pytest.param({side: value}, valid, id=f"{side} {value}")
+        for side in ("pad_top", "pad_right", "pad_bottom", "pad_left")
+        for value, valid in ((0, True), (2, True), (-0.5, False), (2.5, False))
+    ],
+    pytest.param({"corner_radius": 0}, True, id="corner_radius lowest"),
+    pytest.param({"corner_radius": 0.5}, True, id="corner_radius highest"),
+    pytest.param({"corner_radius": -0.25}, False, id="corner_radius below"),
+    pytest.param({"corner_radius": 0.75}, False, id="corner_radius above"),
+    pytest.param({"fill": "#abc"}, True, id="fill short hex"),
+    pytest.param({"fill": " #ABCDEF "}, True, id="fill capital hex with spaces"),
+    pytest.param({"fill": [0, 0.5, 1]}, True, id="fill three numbers"),
+    pytest.param({"fill": "#abcd"}, False, id="fill four hex digits"),
+    pytest.param({"fill": [0, 0, 2]}, False, id="fill a channel above 1"),
+    pytest.param({"fill": [0, 0]}, False, id="fill two channels"),
+    pytest.param({"fill": 7}, False, id="fill a number"),
+    pytest.param({"zoom": 2}, False, id="a field the frame lacks"),
+]
+
+PHOTO = np.zeros((1, 1, 3), np.float32)
+
+
+def python_accepts_frame(frame: dict) -> bool:
+    try:
+        Framing(**frame)
+    except ValueError:  # RecipeError, which is one
+        return False
+    return True
+
+
+def core_accepts_frame(frame: dict) -> bool:
+    """Whether the core takes `frame` through its checks. It has no entry that only checks a recipe, and cannot run a
+    non-empty frame yet (R4b commit 3), so the entry is a render: a frame it accepts is refused last, as not run yet."""
+    try:
+        _core.render(PHOTO, {"steps": [{"effect": "grade"}], "frame": frame})
+    except ValueError as error:
+        return "not run by the core yet" in str(error)
+    return True
+
+
+@pytest.mark.parametrize(("frame", "valid"), FRAME_ROWS)
+def test_the_core_and_python_accept_and_refuse_the_same_frames(frame, valid):
+    assert python_accepts_frame(frame) == valid, "Python's Framing"
+    assert core_accepts_frame(frame) == valid, "the core"
+
+
+def core_frame(frame: dict) -> dict:
+    """The frame as the core reads and writes it (every field), from a recipe file."""
+    return _core.read_recipe(json.dumps({"steps": [{"effect": "grade"}], "frame": frame}), "json").get("frame", {})
+
+
+def python_frame(frame: dict) -> dict:
+    """The same frame as Python's model dumps it, a colour as a list, like JSON."""
+    return {**Framing(**frame).model_dump(), "fill": list(Framing(**frame).fill)}
+
+
+ALL_FIELDS = {
+    "flip": "y",
+    "angle": -30.5,
+    "fit": "expand",
+    "resample": "nearest",
+    "aspect": 1.5,
+    "anchor": "subject",
+    "margin": 0.25,
+    "pad_top": 0.5,
+    "pad_right": 0.75,
+    "pad_bottom": 1.0,
+    "pad_left": 1.5,
+    "fill": [0.25, 0.5, 0.75],
+    "transparent": "rounded",
+    "corner_radius": 0.4,
+}
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        pytest.param(ALL_FIELDS, id="every field set to its own value"),
+        pytest.param({"aspect": 1}, id="one field set, the others at their defaults"),
+        pytest.param({"fill": "#a12"}, id="a colour written as short hex"),
+    ],
+)
+def test_the_core_names_the_fields_of_a_frame_and_defaults_them_as_python_does(frame):
+    core, python = core_frame(frame), python_frame(frame)
+    assert set(core) == set(Framing.model_fields)
+    assert {name: value for name, value in core.items() if name != "fill"} == {
+        name: value for name, value in python.items() if name != "fill"
+    }
+    assert core["fill"] == pytest.approx(python["fill"], abs=1e-6)
+
+
+def test_the_core_does_not_write_the_default_frame():
+    assert "frame" not in _core.read_recipe(json.dumps({"steps": [{"effect": "grade"}], "frame": {}}), "json")
 
 
 def test_the_core_names_the_vocabulary_of_recipes_in_the_order_the_package_lists_it():

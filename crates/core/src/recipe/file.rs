@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use super::{Each, Entry, Recipe, STEP_KEYS, Step, read};
+use super::{Each, Entry, Frame, Recipe, STEP_KEYS, Step, read};
 use crate::Error;
 
 /// The format versions this release reads; a file without `format` is the first. Format 2 added regions and the step
@@ -113,8 +113,10 @@ impl Recipe {
             ),
         };
         let frame = match file.get("frame") {
-            None => Map::new(),
-            Some(Value::Object(frame)) => frame.clone(),
+            None => Frame::default(),
+            Some(Value::Object(frame)) => {
+                read(Value::Object(frame.clone())).map_err(|why| Error::Recipe(format!("frame.{why}")))?
+            }
             Some(_) => return Err(Error::Recipe("write the framing as a [frame] table".to_owned())),
         };
         let regions = regions_of(&file, format)?;
@@ -404,7 +406,9 @@ looks = [
     fn a_recipe_file_reads_into_the_steps_it_writes() {
         let expected = json!({
             "name": "night market", "description": "Dark streets, bright signs.", "size": 1024,
-            "frame": {"aspect": 1, "anchor": "subject"},
+            "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
+                      "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
+                      "pad_left": 0.0, "fill": [0.0, 0.0, 0.0], "transparent": "none", "corner_radius": 0.2},
             "regions": {"panes": {"kind": "grid", "columns": 3, "rows": 2}},
             "steps": [
                 {"effect": "probe", "params": {"cell": 8, "angle": 90.0, "tint": [0.0, 0.5, 1.0]},
@@ -416,6 +420,22 @@ looks = [
             ],
         });
         assert_eq!(written(FULL).ok(), Some(expected));
+    }
+
+    #[test]
+    fn a_frame_is_read_as_every_field_with_the_defaults_for_the_ones_left_out() {
+        let frame = written("[frame]\npad_top = 0.5\nfill = \"#fff\"\nflip = \"both\"\n[[step]]\neffect = \"a\"\n")
+            .ok()
+            .and_then(|recipe| recipe.get("frame").cloned());
+        let expected = json!({
+            "flip": "both", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": null, "anchor": "center",
+            "margin": 0.0, "pad_top": 0.5, "pad_right": 0.0, "pad_bottom": 0.0, "pad_left": 0.0,
+            "fill": [1.0, 1.0, 1.0], "transparent": "none", "corner_radius": 0.2,
+        });
+        assert_eq!(frame, Some(expected));
+        // an empty table is the default frame, which is not written
+        let empty = written("[frame]\n[[step]]\neffect = \"a\"\n").ok();
+        assert_eq!(empty, Some(json!({"steps": [{"effect": "a"}]})));
     }
 
     #[test]
@@ -507,6 +527,10 @@ looks = [
             ("steps are step tables", "step = 3\n", "[[step]]"),
             ("each step is a table", "step = [1]\n", "[[step]]"),
             ("the frame is a table", "frame = \"x\"\n", "[frame]"),
+            ("a frame has only its fields", "[frame]\nzoom = 2\n", "zoom"),
+            ("a frame choice is a listed name", "[frame]\nflip = \"z\"\n", "flip"),
+            ("a frame number is a number", "[frame]\nangle = \"up\"\n", "angle"),
+            ("a frame fill is a colour", "[frame]\nfill = \"#abcd\"\n", "'#rrggbb'"),
             ("regions are tables", "format = 2\nregion = 3\n", "[region.NAME]"),
             (
                 "each region is a table",
