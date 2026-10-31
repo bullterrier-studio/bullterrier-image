@@ -189,7 +189,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         crate::params::Field {
             name: #label,
             kind: #kind,
-            doc: #doc,
+            meaning: #doc,
             default: #default,
             unit: #unit,
             min: #min,

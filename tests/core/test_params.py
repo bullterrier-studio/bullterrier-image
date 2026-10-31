@@ -874,7 +874,7 @@ def test_a_model_declared_in_rust_has_its_structs_fields_docs_defaults_and_range
     assert [doc.name for doc in docs] == [field["name"] for field in table["fields"]]
     for doc, field in zip(docs, table["fields"], strict=True):
         assert (doc.doc, doc.unit, doc.minimum, doc.maximum, doc.advanced, doc.cyclic) == (
-            field["doc"],
+            field["meaning"],
             field["unit"],
             field["min"],
             field["max"],

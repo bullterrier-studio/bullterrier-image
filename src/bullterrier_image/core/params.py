@@ -683,7 +683,7 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
     for entry in fields:
         spec = param(
             entry["default"],
-            doc=entry["doc"],
+            doc=entry["meaning"],
             unit=entry["unit"],
             min=entry["min"],
             max=entry["max"],

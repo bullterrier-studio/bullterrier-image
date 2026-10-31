@@ -50,7 +50,7 @@ def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
 
 # --- params: what an effect's Rust struct declares -----------------------------------------------------------------
 
-FIELD_KEYS = {"name", "kind", "doc", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
+FIELD_KEYS = {"name", "kind", "meaning", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
 KINDS = {"float", "int", "bool", "choice", "color"}
 
 
@@ -63,7 +63,7 @@ def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_wit
     for field in table["fields"]:
         assert set(field) == FIELD_KEYS
         assert field["kind"] in KINDS
-        assert field["doc"].strip()
+        assert field["meaning"].strip()
         assert (field["choices"] != []) == (field["kind"] == "choice")  # only a choice lists names
 
 

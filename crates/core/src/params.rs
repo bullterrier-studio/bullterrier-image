@@ -67,7 +67,7 @@ pub struct Field {
     /// What kind of value it holds.
     pub kind: Kind,
     /// What it does, its unit and range in words, what raising it does (its doc comment).
-    pub doc: &'static str,
+    pub meaning: &'static str,
     /// The value an effect uses when none is given: a colour as its `'#rrggbb'` text, a choice as its name.
     pub default: Scalar,
     /// The unit of a number.
@@ -219,22 +219,22 @@ mod tests {
         let expected = json!({
             "doc": "The parameters of a probe effect, which reads them as the Python package gives them.",
             "fields": [
-                {"name": "cell", "kind": "float", "doc": "The size of one cell in px, over two lines. Larger = coarser.",
+                {"name": "cell", "kind": "float", "meaning": "The size of one cell in px, over two lines. Larger = coarser.",
                  "default": 32.0, "unit": "px", "min": 2, "max": 512, "cyclic": false, "choices": [],
                  "drivable": true, "advanced": false},
-                {"name": "cells", "kind": "int", "doc": "How many cells.",
+                {"name": "cells", "kind": "int", "meaning": "How many cells.",
                  "default": 4, "unit": "count", "min": -3, "max": 32, "cyclic": false, "choices": [],
                  "drivable": false, "advanced": false},
-                {"name": "angle", "kind": "float", "doc": "The direction: 'stripes' or 'checks'.",
+                {"name": "angle", "kind": "float", "meaning": "The direction: 'stripes' or 'checks'.",
                  "default": 0.5, "unit": "degrees", "min": 0, "max": 360, "cyclic": true, "choices": [],
                  "drivable": true, "advanced": false},
-                {"name": "shape", "kind": "choice", "doc": "The shape.",
+                {"name": "shape", "kind": "choice", "meaning": "The shape.",
                  "default": "fourth_way", "unit": null, "min": null, "max": null, "cyclic": false,
                  "choices": ["stripes", "checks", "fourth_way"], "drivable": false, "advanced": true},
-                {"name": "keep", "kind": "bool", "doc": "Whether it is kept.",
+                {"name": "keep", "kind": "bool", "meaning": "Whether it is kept.",
                  "default": true, "unit": null, "min": null, "max": null, "cyclic": false, "choices": [],
                  "drivable": false, "advanced": false},
-                {"name": "tint", "kind": "color", "doc": "The colour.",
+                {"name": "tint", "kind": "color", "meaning": "The colour.",
                  "default": "#ff8000", "unit": null, "min": null, "max": null, "cyclic": false, "choices": [],
                  "drivable": false, "advanced": false},
             ],

@@ -29,6 +29,10 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("_native/test_recipe_parity.py", "bullterrier_image._native"): (
         "the extension's checks of parameters and recipe files are compared with Python's engine, the oracle"
     ),
+    ("_native/test_parameter_format.py", "bullterrier_image._native"): (
+        "the parameters an effect declares are judged against the parameter format's schema, for every effect the core "
+        "implements; only the core can say which, and what its structs declare"
+    ),
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"
     ),
