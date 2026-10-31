@@ -14,12 +14,24 @@ pub struct Layer {
     values: Vec<f32>,
 }
 
+/// Refuses a map of no row or no column: a map has the size of a picture, which has a pixel.
+fn no_empty_map(height: usize, width: usize) -> Result<(), Error> {
+    if height == 0 || width == 0 {
+        return Err(Error::Inputs(format!(
+            "a map has at least one row and one column, got {height} x {width}"
+        )));
+    }
+    Ok(())
+}
+
 impl Layer {
     /// The map of `height` x `width` pixels whose values are `values`, row after row.
     ///
     /// # Errors
-    /// [`Error::Inputs`] unless there are exactly `height * width` values and each is finite and within 0..=1.
+    /// [`Error::Inputs`] unless `height` and `width` are at least 1, there are exactly `height * width` values and each
+    /// is finite and within 0..=1.
     pub fn new(height: usize, width: usize, values: Vec<f32>) -> Result<Self, Error> {
+        no_empty_map(height, width)?;
         if height.checked_mul(width) != Some(values.len()) {
             return Err(Error::Inputs(format!(
                 "{} values do not make a map of {height} x {width} pixels",
@@ -75,8 +87,10 @@ impl Labels {
     /// (some of them may hold no pixel).
     ///
     /// # Errors
-    /// [`Error::Inputs`] unless there are exactly `height * width` labels and each is from 0 to `pieces` - 1.
+    /// [`Error::Inputs`] unless `height` and `width` are at least 1, there are exactly `height * width` labels and each
+    /// is from 0 to `pieces` - 1.
     pub fn new(height: usize, width: usize, labels: Vec<i32>, pieces: usize) -> Result<Self, Error> {
+        no_empty_map(height, width)?;
         if height.checked_mul(width) != Some(labels.len()) {
             return Err(Error::Inputs(format!(
                 "{} labels do not make a partition of {height} x {width} pixels",
@@ -287,6 +301,23 @@ mod tests {
         }
         // the closed ends are in
         assert!(Layer::new(1, 2, vec![0.0, 1.0]).is_ok());
+    }
+
+    #[test]
+    fn a_map_or_partition_with_no_row_or_no_column_is_refused_and_one_pixel_is_enough() {
+        for (height, width) in [(0, 5), (5, 0), (0, 0)] {
+            for result in [
+                Layer::new(height, width, Vec::new()).map(|_| ()),
+                Labels::new(height, width, Vec::new(), 1).map(|_| ()),
+            ] {
+                assert!(
+                    matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains("at least one")),
+                    "{height} x {width}: {result:?}"
+                );
+            }
+        }
+        assert!(Layer::new(1, 1, vec![0.5]).is_ok());
+        assert!(Labels::new(1, 1, vec![0], 1).is_ok());
     }
 
     #[test]

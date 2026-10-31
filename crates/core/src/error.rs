@@ -81,7 +81,7 @@ pub enum Error {
     /// An effect was given inputs that do not fit: one it declares is missing, or a partition or map is not of the
     /// picture's size, or a map or partition has values it must not.
     Inputs(String),
-    /// Channel values that do not make a picture of the given size (three per pixel).
+    /// Channel values that do not make a picture of the given size (three per pixel), or a size with no row or no column.
     Size {
         /// The number of rows given.
         height: usize,
@@ -290,6 +290,10 @@ impl fmt::Display for Error {
             | Self::MapNotFound { message, .. } => formatter.write_str(message),
             Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
+            Self::Size { height, width, .. } if *height == 0 || *width == 0 => write!(
+                formatter,
+                "a picture has at least one row and one column, got {height} x {width}"
+            ),
             Self::Size { height, width, values } => {
                 write!(
                     formatter,

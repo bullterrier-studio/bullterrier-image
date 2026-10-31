@@ -923,6 +923,37 @@ def test_a_recipe_that_breaks_a_rule_is_a_recipe_error_before_anything_runs(phot
         native.trace(photo, recipe)
 
 
+EMPTY_SHAPES = [(0, 5), (5, 0), (0, 0)]
+EMPTY_RECIPES = {
+    "as it is": STILL,
+    "at a size": STILL | {"size": 10},
+    "turned a quarter": STILL | {"frame": {"angle": 90}},
+    "turned": STILL | {"frame": {"angle": 30, "fit": "expand"}},
+    "flipped and padded": STILL | {"frame": {"flip": "x", "pad_top": 0.5}},
+}
+
+
+@pytest.mark.parametrize("recipe", EMPTY_RECIPES.values(), ids=EMPTY_RECIPES.keys())
+@pytest.mark.parametrize("shape", EMPTY_SHAPES, ids=[str(shape) for shape in EMPTY_SHAPES])
+def test_a_picture_with_no_pixel_is_an_invalid_image_not_a_panic(shape, recipe):
+    from bullterrier_image.errors import InvalidImageError
+
+    empty = np.zeros((*shape, 3), np.float32)
+    for run in (native.render, native.trace):
+        with pytest.raises(InvalidImageError, match="at least one"):
+            run(empty, recipe)
+    with pytest.raises(ValueError, match="at least one"):  # the extension's own error, a ValueError and no panic
+        _core.render(empty, recipe)
+
+
+def test_a_picture_of_one_pixel_is_rendered_at_any_size_and_turn(photo):
+    one = np.full((1, 1, 3), 0.25, np.float32)
+    for frame in ({}, {"angle": 90}, {"angle": 30, "fit": "expand"}, {"flip": "both", "pad_left": 1}):
+        made = _core.render(one, STILL | {"frame": frame}, size=7)
+        assert made.shape[2] == 3
+        assert made.size > 0
+
+
 PICTURE_FAULTS = {
     "a list": [[0.1, 0.2, 0.3]],
     "float64": np.zeros((2, 2, 3)),

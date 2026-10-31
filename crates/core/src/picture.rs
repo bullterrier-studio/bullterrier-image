@@ -15,10 +15,11 @@ impl<'a> Picture<'a> {
     /// The picture of `height` x `width` pixels whose channels are `values`, pixel after pixel, row after row.
     ///
     /// # Errors
-    /// [`Error::Size`] unless there are exactly `height * width * 3` values.
+    /// [`Error::Size`] unless `height` and `width` are at least 1 and there are exactly `height * width * 3` values: a
+    /// picture has a pixel, so nothing downstream has to ask whether it does.
     pub fn new(height: usize, width: usize, values: &'a [f32]) -> Result<Self, Error> {
         let (pixels, rest) = values.as_chunks::<3>();
-        if rest.is_empty() && height.checked_mul(width) == Some(pixels.len()) {
+        if height > 0 && width > 0 && rest.is_empty() && height.checked_mul(width) == Some(pixels.len()) {
             Ok(Self { height, width, pixels })
         } else {
             Err(Error::Size {
@@ -94,23 +95,10 @@ impl Image {
     /// effect that makes its pixels elsewhere.
     ///
     /// # Errors
-    /// [`Error::Size`] unless there are exactly `height * width * 3` values.
+    /// [`Error::Size`] as for [`Picture::new`].
     pub fn new(height: usize, width: usize, values: &[f32]) -> Result<Self, Error> {
-        let (pixels, rest) = values.as_chunks::<3>();
-        if rest.is_empty() && height.checked_mul(width) == Some(pixels.len()) {
-            Ok(Self {
-                height,
-                width,
-                pixels: pixels.to_vec(),
-                alpha: None,
-            })
-        } else {
-            Err(Error::Size {
-                height,
-                width,
-                values: values.len(),
-            })
-        }
+        let picture = Picture::new(height, width, values)?;
+        Ok(Self::from_pixels(height, width, picture.pixels().to_vec()))
     }
 
     /// The image of `height` x `width` `pixels`, row after row; the caller made exactly that many.
@@ -229,6 +217,22 @@ mod tests {
         assert_eq!(cut.as_picture().values(), colour);
         assert_eq!(cut.into_values(), [0.1, 0.2, 0.3, 0.7, 0.4, 0.5, 0.6, 0.9]);
         Ok(())
+    }
+
+    #[test]
+    fn a_picture_or_image_with_no_row_or_no_column_is_refused_and_one_pixel_is_enough() {
+        for (height, width) in [(0, 5), (5, 0), (0, 0)] {
+            let picture = Picture::new(height, width, &[]);
+            let image = Image::new(height, width, &[]);
+            for refused in [picture.map(|_| ()), image.map(|_| ())] {
+                assert!(
+                    matches!(&refused, Err(error @ Error::Size { .. }) if error.to_string().contains("at least one")),
+                    "{height} x {width}: {refused:?}"
+                );
+            }
+        }
+        assert!(Picture::new(1, 1, &[0.1, 0.2, 0.3]).is_ok());
+        assert!(Image::new(1, 1, &[0.1, 0.2, 0.3]).is_ok());
     }
 
     #[test]
