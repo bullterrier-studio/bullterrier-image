@@ -50,7 +50,8 @@ app        cli, pipeline, gallery, sheet, checks, fx, public API      (may impor
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
-core       params (EffectParams, param, Color), registry, recipe engine (may import ops)
+core       params (EffectParams, param, Color), registry, recipe engine, native (the extension's entry points),
+           bridge (a recipe run by the Rust core)                         (may import ops)
 ops        pure numeric primitives                                    (may import errors, _native)
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
@@ -60,20 +61,39 @@ ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` 
 bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect keeps its docstring and
 `@effect`; its body is `_core.apply("<name>", rgb, params.model_dump())` (`from bullterrier_image._native import
 _core`). Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
-opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params) -> Image`; its
+opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params, inputs: &Inputs) -> Image`; its
 Python model is `class XParams(EffectParams, core="x")`, built from that declaration. `@effect(params=XParams)` takes
 category and opacity from the core and refuses them if given. The core's registry (`Effect` trait, `register`) also
-takes foreign effects, such as a Python function (`_core.register`). Rust effects never refer to each other.
+takes foreign effects, such as a Python function (`_core.register(name, category, opacity, fn, *, inputs=, fields=)`; `fn(rgb,
+params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
+(1 if undeclared), `partition` (`Labels`) and, under each field parameter's name, a `Layer`. Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.read_recipe`). The Python `Step`, `Recipe`
-and loader still validate and run recipes until R4 makes them a facade over these types.
+and loader still validate and run recipes until R4e makes them a facade over these types.
+**The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
+a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; asked at most once per photo);
+`photo.render(&Recipe, &Presets, Options)` and `photo.trace(..) -> Vec<Stage>` run one engine (`Stage`: `Input`, `Subject`,
+`Depth`, `Step { number, image }`; labels are the facade's). Each step's parameters are completed (preset, defaults,
+`Table::check`) and scaled to `Options::with_size_ratio` (`Table::scaled`, from the declared units), the result is laid over its
+input by `ops/blend` (blend mode, opacity, mask), and a `Drive` is a mix of runs at `levels` values (`ops/levels`).
+`Layer` (an h x w map, finite, 0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of
+an error (`ErrorKind`, one mapping for every binding). **R4a state:** a recipe with `frame`, `size`, an `each` step, a step
+that takes a partition or a region other than `given` is refused with an error saying so; Python's runner still serves users
+until R4e.
+Python reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
+`kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
+`core/bridge.py` (`render`/`trace`: a `Recipe` as the dict the core reads; no consumer in `src` until R4e). The registry
+mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture` or
+`Lut` parameter travels as `{"$object": n}` (`registry.holding`). `_core.effects()` lists those mirrors too;
+`effects(declared=True)` only the effects whose parameters the core declares.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
-(`finders={"subject": ...}`). `subject`, `depth` and `light` (made from the picture) are built in; any other map is a recipe's `given` region.
+(`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made
+from the picture as given) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.
 `bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
 ## The rules
@@ -110,9 +130,10 @@ effect's `META` and `render`. Fields are `pub`, so rustc no longer reports one t
 another is set (as `grade.pivot` needs `contrast` other than 1): add a row to that test's `conditional` table. Adding a field to a
 `Params` breaks code that builds it without `..Default::default()`, accepted until the crate is published.
 A Python `ops` function and its Rust twin may coexist
-while unported effects use the Python one; delete it with its last Python user. Effect inputs in Rust arrive with the
-runner (R4). A user's values are checked by Rust code (`Table::check`, `Recipe::checked`, `Presets`), which Python
-calls only from R4 (until then it checks them itself); running an effect trusts its parameters.
+while unported effects use the Python one; delete it with its last Python user. `pub` also covers the runner's types
+(`Photo`, `Options`, `Finder`, `Stage`, `Layer`, `Labels`, `Inputs`, `Drive`, `ErrorKind`). A user's values are checked by Rust
+code (`Table::check`, `Recipe::checked`, `Presets`), which Python calls only from R4e (until then it checks them itself);
+running an effect trusts its parameters.
 
 ## Standards
 
@@ -156,6 +177,11 @@ and maximum. A map it works from (the subject, the depth, a region) is a field p
 input. The injected inputs, declared only if needed: `partition` (piece labels of a region, `(h, w)` int32) and `size_ratio`
 (float, working px per design px, default 1.0: declare it only if light or density is per working pixel). Contract tests
 check all of this for every effect.
+In the core the inputs arrive as `Inputs` (only those declared) and a field as a `Layer` under its parameter's name; a foreign
+(Python) effect gets them as keyword arguments of `fn(rgb, params, **inputs)`: `size_ratio`, `partition` (int32), each field a
+float32 `(h, w)` array. An effect the core cannot describe (no parameter table, as every Python one today) receives its values
+as written, in design pixels, unscaled, and scales them itself by `size_ratio`; the Python registry wrapper does (validate, scale,
+call).
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
 (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`, `name`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.

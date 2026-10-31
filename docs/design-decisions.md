@@ -540,7 +540,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   does: each effect is applied with each parameter changed and one that changes nothing fails; a parameter that matters
   only while another is set (`grade.pivot`, `pattern.radius`) has a row in its `conditional` table, checked both ways. A
   public `Params` has no `#[non_exhaustive]`, so `..Default::default()` works outside; adding a field to one is a
-  breaking change, accepted until the crate is published (R5). There is no typed apply: running a step is R4's runner.
+  breaking change, accepted until the crate is published (R5). There is no typed apply (`Effect::apply` takes the parameters
+  as JSON); running a step is the runner's (R4a).
   *Validation of a user's values is in Rust since R3* (`Table::check`, next to the recipe): running an effect still
   trusts its parameters, and Python's models keep validating what Python runs until R4 switches them to the Rust
   checks, so the rules live in two languages only while the parity tests (`tests/_native/test_recipe_parity.py`)
@@ -553,9 +554,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   reads category and opacity of a ported effect from the core (`@effect(params=...)` refuses them there), the
   vocabulary of categories and inputs comes from the core (`_core.vocabulary`), and a test keeps `CATEGORIES` and
   `INPUTS` equal to it. A Python function can be registered as an `Effect` (`_core.register`, which takes the
-  interpreter lock back, since `_core.apply` releases it): the trait fits it, but the Python registry does not mirror
-  its effects into the core's until the Rust runner (R4) needs to call one. *Reason:* one home for each fact. *Not
-  yet:* `Inputs` and a `render` that takes them wait for R4's runner, the first consumer. *Presets in Rust came with R3.*
+  interpreter lock back, since `_core.apply` releases it): the trait fits it. *Reason:* one home for each fact. *Presets in
+  Rust came with R3; `Inputs`, a `render` that takes them and the Python registry's mirror came with R4a.*
 - **A recipe is a Rust value with one check (R3).** `Recipe`, `Step` and `Each` (crate `recipe`) are plain public
   values, built in code (`Step::new("bloom").param("radius", 12).opacity(0.4)`) or read from TOML or JSON; serde's
   nested form `{effect, params, preset, partition, mask, opacity, blend_mode, name}` is the JSON form, and
@@ -568,11 +568,55 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   an earlier one. *Why presets and looks are not embedded yet:* a crate cannot `include_str!` files outside itself
   and still be published, so the data under `src/bullterrier_image/{presets,looks}` stays package data; Rust users
   pass text (`Presets::add_toml`), and shipping them in the crate is R5's (publish). *Moved:* rendering a step
-  (mask, opacity, blend, drives evaluated, each, framing, scaling) and the region kinds are R4's, hence the one-off
-  `fx.bloom(radius=12).apply(photo)` too; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) came
+  (mask, opacity, blend, drives, scaling) came with R4a; `each`, framing and the region kinds are still R4's, hence the
+  one-off `fx.bloom(radius=12).apply(photo)` too; a drive is the public `Drive` since R4a; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) came
   with R3b. *Known losses:* a Rust map keeps keys sorted,
   not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
   until R4.
+- **The runner is Rust (R4a): steps, maps, drives, blend, scaling.** `Photo::render`/`trace` run a checked recipe's
+  steps; the core refuses what it does not run yet (`frame`, `size`, `each`, a region other than `given`, a step that takes a
+  partition) with an error saying so. Python's runner serves users until R4e; `core/bridge.py` and the parity tests
+  (`tests/_native/test_runner_parity.py`) hold the core to it meanwhile. Decisions:
+  - *Inputs.* `Effect::apply(picture, params, &Inputs)`, and `render(&Picture, &Params, &Inputs)` for every ported effect
+    (unused: `_inputs`). The core hands an effect only what it declares; one it declares but is not offered, or of another
+    size than the picture, refuses the run. *Rejected:* two `render` shapes picked per `META` (a build-time switch to save
+    three lines).
+  - *Drives scale per level.* Each level's value is checked and scaled on its own, as Python's runner does, not the two
+    endpoints once: with a whole number rounded or a floor at `min`, scaled endpoints and a scaled middle level differ, and the
+    mix would differ from the plain step at that value. A level no pixel is on or next to is not run; the mix needs no clamp
+    (a pixel's weights add up to 1).
+  - *Whole numbers round half to even* (`round_ties_even`), as Python's `round`. A whole-number density is rounded too
+    (Python leaves it a float).
+  - *`Layer` has one form: finite and within 0..1 by construction* (`Layer::new` refuses, `Error::Inputs`), so the runner checks
+    only its size and no unchecked map exists. A binding that builds one from an array reports the failure as the map's kind
+    (`SubjectNotFoundError` for `subject`). *Rejected:* a checked and an unchecked type.
+  - *A finder is asked at most once per photo.* Its answer is kept behind a lock held across `find`, so threads sharing the
+    photo cannot both ask; an error is not kept (the next render asks again). `Finder` is `find` only: the identity only the
+    pipeline's fingerprint reads is the pipeline's. *Rejected:* releasing the lock before `find` (two asks).
+  - *`Photo` borrows the picture* (zero copy from numpy), and `light` is made from the picture as given, as Python's regions
+    do, not from a step's output. `background` is 1 - `subject`.
+  - *`render` and `trace` are one engine* (`Run::advance` replaces the newest image), so the last stage of a trace is
+    `render`'s result byte for byte and `render` keeps only the newest image, by construction. `Stage` is a flat
+    `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`); labels are the facade's, since they come
+    from Python's `describe()`.
+  - *Errors keep their class.* `Error::kind()` (`ErrorKind`) is the one mapping onto the package's exceptions. The extension,
+    a leaf that cannot import `errors`, raises `_core.CoreError(ValueError)` with a `kind`; one function (`native.entry`) wraps
+    every entry point and raises the exception of the kind (`other` stays the `CoreError`; a kind it lacks is a `KeyError`: the
+    two lists disagree). The exception a Python effect or finder raised is boxed in `Error::Foreign` and re-raised unchanged.
+    *Rejected:* a global `use_errors({kind: class})` (state set at import, order-dependent).
+  - *The registry mirrors Python effects into the core* at registration and `unregister`, in one place, so the two never
+    disagree; an effect with a Rust model is skipped (the core has it). The core runs the wrapper, which validates, scales and
+    calls the effect, and passes `size_ratio` on only if the effect declares it: a Python effect has no parameter table, so the
+    core hands it design values unscaled. A `Picture` or `Lut` parameter cannot be JSON: it travels as `{"$object": n}`, held
+    by `registry.holding` for the call (a `ContextVar`; the core calls back on the calling thread). `_core.effects()` therefore
+    lists mirrors too, and `effects(declared=True)` the effects whose parameters the core declares, which is what a model
+    declared with `core=` needs.
+  - *ClipColor deviates from the W3C text.* The `color` mode's ClipColor pulls toward the luminosity `SetLum` set instead of
+    recomputing `Lum(C)`: equal in exact arithmetic, but in `f32` a black backdrop under a grey source made 0 / 0 (NaN).
+    Found by a property test; pinned by a row of the reference table.
+  - *Not yet:* a step that takes a partition fails with `Error::Inputs` (a plain `ValueError`) until R4c adds partitions;
+    no `Photo::render_all` (the unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes needs
+    a union check: R4e); `as_image` (uint8/uint16, non-finite) stays Python's; no peak-memory test yet.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without
