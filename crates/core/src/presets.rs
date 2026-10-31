@@ -41,6 +41,22 @@ impl Presets {
         self.add_in(crate::registry::registry(), effect, table)
     }
 
+    /// As [`add`](Self::add), for the table that the TOML text `text` writes (one `[name]` table per preset):
+    ///
+    /// ```text
+    /// [sepia]
+    /// description = "Warm brown monochrome."
+    /// stops = ["#1a0f08", "#f4e4c1"]
+    /// ```
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] if the text is not TOML (the message keeps its line and column), or as [`add`](Self::add).
+    pub fn add_toml(&mut self, effect: &str, text: &str) -> Result<(), Error> {
+        let table = toml::from_str(text)
+            .map_err(|error: toml::de::Error| Error::Recipe(error.to_string().trim_end().to_owned()))?;
+        self.add(effect, &table)
+    }
+
     pub(crate) fn add_in(&mut self, registry: &Registry, effect: &str, table: &Value) -> Result<(), Error> {
         let Value::Object(written) = table else {
             return Err(Error::Recipe(format!(
@@ -214,5 +230,40 @@ mod tests {
         ] {
             assert!(matches!(added("probe", &table), Err(Error::Recipe(_))), "{rule}");
         }
+    }
+
+    #[test]
+    fn presets_are_read_from_toml_text_and_checked_like_any() -> Result<(), Error> {
+        let mut presets = Presets::new();
+        presets.add_toml(
+            "grade",
+            "# the warm one\n[warm]\ndescription = \"Golden hour.\"\ntemperature = 0.25\nexposure = 1\n\n[plain]\ndescription = \"Nothing.\"\n",
+        )?;
+        assert_eq!(presets.names("grade"), ["plain", "warm"]);
+        assert_eq!(
+            presets
+                .get("grade", "warm")
+                .map(|preset| (preset.description.as_str(), preset.params.clone())),
+            Some(("Golden hour.", params(&json!({"temperature": 0.25, "exposure": 1}))))
+        );
+        for (rule, text, word) in [
+            ("text that is TOML", "[warm", "line 1"),
+            ("a description", "[warm]\ntemperature = 0.25\n", "`description`"),
+            (
+                "a parameter the effect has",
+                "[warm]\ndescription = \"D.\"\nkelvin = 5000\n",
+                "kelvin",
+            ),
+        ] {
+            let refused = Presets::new()
+                .add_toml("grade", text)
+                .err()
+                .map(|error| error.to_string());
+            assert!(
+                refused.as_deref().is_some_and(|message| message.contains(word)),
+                "{rule}: {refused:?}"
+            );
+        }
+        Ok(())
     }
 }

@@ -16,6 +16,7 @@ use serde_json::{Map, Value};
 use crate::Error;
 
 mod check;
+mod file;
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an
 /// effect may be named like one.
@@ -246,16 +247,13 @@ impl<'de> Deserialize<'de> for Entry {
     /// An entry with an `each` key is an [`Each`], one with an `effect` key a [`Step`]; one with neither is refused
     /// saying so.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let written = Map::deserialize(deserializer)?;
-        let value = Value::Object(written);
+        let value = Value::Object(Map::deserialize(deserializer)?);
         let entry = if value.get("each").is_some() {
-            Each::deserialize(value).map(Self::Each)
+            read(value).map(Self::Each)
         } else if value.get("effect").is_some() {
-            Step::deserialize(value).map(Self::Step)
+            read(value).map(Self::Step)
         } else {
-            return Err(D::Error::custom(
-                "a step needs `effect` (an effect step) or `each` (an each step)",
-            ));
+            Err("a step needs `effect` (an effect step) or `each` (an each step)".to_owned())
         };
         entry.map_err(D::Error::custom)
     }
@@ -309,7 +307,24 @@ impl Recipe {
     /// # Errors
     /// [`Error::Recipe`] if the text is not JSON or not the shape of a recipe: an unknown or mistyped key is named.
     pub fn from_json(text: &str) -> Result<Self, Error> {
-        serde_json::from_str(text).map_err(|error| Error::Recipe(format!("not a recipe: {error}")))
+        let mut deserializer = serde_json::Deserializer::from_str(text);
+        serde_path_to_error::deserialize(&mut deserializer)
+            .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error))))
+    }
+}
+
+/// The `T` that `value` writes, or what is wrong, naming the key it is about.
+fn read<T: serde::de::DeserializeOwned>(value: Value) -> Result<T, String> {
+    serde_path_to_error::deserialize(value).map_err(|error| describe(&error))
+}
+
+/// `error` led by the key it is about (`opacity`, `steps[1]`), when it is about one.
+fn describe<E: std::fmt::Display>(error: &serde_path_to_error::Error<E>) -> String {
+    let path = error.path().to_string();
+    if path == "." {
+        error.inner().to_string()
+    } else {
+        format!("{path}: {}", error.inner())
     }
 }
 
@@ -488,30 +503,43 @@ mod tests {
     }
 
     #[test]
-    fn a_value_of_the_wrong_type_is_refused() {
-        for (what, text) in [
+    fn a_value_of_the_wrong_type_is_refused_naming_the_key() {
+        for (what, text, key) in [
             (
                 "an opacity as text",
                 json!({"steps": [{"effect": "a", "opacity": "half"}]}),
+                "opacity",
             ),
             (
                 "a blend mode that is none of the seven",
                 json!({"steps": [{"effect": "a", "blend_mode": "burn"}]}),
+                "blend_mode",
             ),
             (
                 "an assign that is none of the two",
                 json!({"steps": [{"each": "p", "looks": [], "assign": "shuffle"}]}),
+                "assign",
             ),
             (
                 "a seed beyond 32 bits",
                 json!({"steps": [{"each": "p", "looks": [], "seed": 4_294_967_296_u64}]}),
+                "seed",
             ),
-            ("a negative size", json!({"steps": [], "size": -1})),
-            ("steps that are not a list", json!({"steps": {"effect": "a"}})),
-            ("text that is not JSON", json!("steps")),
+            ("a negative size", json!({"steps": [], "size": -1}), "size"),
+            ("steps that are not a list", json!({"steps": {"effect": "a"}}), "steps"),
+            (
+                "a look that is not a step",
+                json!({"steps": [{"each": "p", "looks": [{"effect": 3}]}]}),
+                "effect",
+            ),
         ] {
-            assert!(matches!(read(&text), Err(Error::Recipe(_))), "{what}");
+            let result = read(&text);
+            assert!(
+                matches!(&result, Err(Error::Recipe(message)) if message.contains(key)),
+                "{what}: {result:?}"
+            );
         }
+        assert!(matches!(read(&json!("steps")), Err(Error::Recipe(_))));
         assert!(matches!(Recipe::from_json("{steps"), Err(Error::Recipe(_))));
         // the largest seed is allowed
         let seed = read(&json!({"steps": [{"each": "p", "looks": [], "seed": 4_294_967_295_u32}]}));
