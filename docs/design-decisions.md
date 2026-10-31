@@ -574,7 +574,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
   until R4.
 - **The runner is Rust (R4a): steps, maps, drives, blend, scaling.** `Photo::render`/`trace` run a checked recipe's
-  steps; the core refuses what it does not run yet (a non-default `frame`, `each`, a region other than `given`, a step that takes a
+  steps; the core refuses what it does not run yet (`each`, a region other than `given`, a step that takes a
   partition) with an error saying so. Python's runner serves users until R4e; `core/bridge.py` and the parity tests
   (`tests/_native/test_runner_parity.py`) hold the core to it meanwhile. Decisions:
   - *Inputs.* `Effect::apply(picture, params, &Inputs)`, and `render(&Picture, &Params, &Inputs)` for every ported effect
@@ -597,7 +597,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     do, not from a step's output. `background` is 1 - `subject`.
   - *`render` and `trace` are one engine* (`Run::advance` replaces the newest image), so the last stage of a trace is
     `render`'s result byte for byte and `render` keeps only the newest image, by construction. `Stage` is a flat
-    `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`); labels are the facade's, since they come
+    `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`, and from R4b `CutOut`); labels are the facade's, since they come
     from Python's `describe()`.
   - *Errors keep their class.* `Error::kind()` (`ErrorKind`) is the one mapping onto the package's exceptions. The extension,
     a leaf that cannot import `errors`, raises `_core.CoreError(ValueError)` with a `kind`; one function (`native.entry`) wraps
@@ -616,7 +616,33 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     Found by a property test; pinned by a row of the reference table.
   - *Not yet:* a step that takes a partition fails with `Error::Inputs` (a plain `ValueError`) until R4c adds partitions;
     no `Photo::render_all` (the unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes needs
-    a union check: R4e); `as_image` (uint8/uint16, non-finite) stays Python's; no peak-memory test yet.
+    a union check: R4e); `as_image` (uint8/uint16, non-finite) stays Python's.
+- **Framing, size and the cut-out are Rust (R4b).** A recipe's `frame` and `size` are run by the core; Python's runner still
+  serves users until R4e, and the parity tests hold the core to it. Decisions:
+  - *Size derives the ratio.* `Options` has `with_size(u32)`, not a ratio; the runner takes the working picture's longest side
+    over 480 (`DESIGN_SIZE`). *Reason:* with `frame` and `size` the working picture is made inside the render, so the ratio
+    cannot be an input; one source, and no caller can hand in a ratio that disagrees with the picture (which closed the
+    "huge `size_ratio`" item). *Rejected:* an override (tests build a picture of a known longest side instead).
+  - *Geometry is planned once and applied per plane.* Crop box, turn size and borders are computed once from the shape and the
+    (flipped, turned) subject map into a `Geometry`, then applied to the photo (3 channels) and to each map as it is first
+    used (1 channel). Every operation is per channel, so this equals Python's stacking without building the stack.
+  - *A size is limited to twice Pillow's decompression-bomb limit* (178,956,970 pixels), refused before anything is allocated
+    (`RecipeError`); a size no picture can hold would otherwise abort on allocation. *Reason:* Pillow refuses at its limit and
+    warns at half of it; the core serves video-sized work, so twice. A policy the owner may change.
+  - *A resized side is rounded exactly.* The other side is `side * longest / long` in integer arithmetic, halves to the even
+    pixel, so a tie is a tie (85 x 455 / 170 = 227.5 is 228; the float product 227.49999999999997 gave 227). It can differ by one
+    pixel from Python's float `round` on a float-inexact tie only.
+  - *Resample and turn follow Pillow, measured.* Resize (Lanczos shrinking, bicubic growing, support widened by the shrink) is
+    within 1.19e-7 of Pillow, pinned at 2e-7. A turn is Pillow's transform: nearest exact (16.16 fixed point as Pillow), bilinear
+    1.19e-7, bicubic 2.98e-7 (Keys' kernel at a = -1 for the transform, -0.5 for resize), pinned at 0, 2e-7, 4e-7. The cut-out
+    alpha is within 5.96e-8 of Python's, pinned at 2e-7.
+  - *`Image` has an optional alpha; effects never see it.* `channels()` is 3 or 4 and `into_values` gives that many per pixel
+    (straight alpha); only the cut-out after the last step makes one, so an effect's `Picture` is RGB by type. A trace ends with
+    `Stage::CutOut`, exactly what render returns. `background` uses the framed working subject as the alpha (the render needs the
+    subject, as a crop around it does); `circle` and `rounded` come from the working picture's shape (`corner_radius` of the
+    shorter side), a float32 pixel-centre signed distance with a one-pixel soft edge.
+  - *Memory is measured.* `crates/core/tests/memory.rs` counts the heap (dev-dependency `peak_alloc`): render of a 12-step chain
+    holds 2 pictures, trace 14.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without

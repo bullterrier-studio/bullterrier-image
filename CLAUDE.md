@@ -74,14 +74,17 @@ and loader still validate and run recipes until R4e makes them a facade over the
 **The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
 a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; asked at most once per photo);
 `photo.render(&Recipe, &Presets, Options)` and `photo.trace(..) -> Vec<Stage>` run one engine (`Stage`: `Input`, `Subject`,
-`Depth`, `Step { number, image }`; labels are the facade's). Each step's parameters are completed (preset, defaults,
-`Table::check`) and scaled to the working picture's longest side over 480 (`Table::scaled`, from the declared units; `Options::with_size`
-or the recipe's `size` resamples the photo and its maps first, `ops/resample`), the result is laid over its
-input by `ops/blend` (blend mode, opacity, mask), and a `Drive` is a mix of runs at `levels` values (`ops/levels`).
-`Layer` (an h x w map, finite, 0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of
-an error (`ErrorKind`, one mapping for every binding). **R4b state:** a recipe with a non-default `frame` (a typed `Frame`, checked by `Recipe::checked`), an `each` step, a step
-that takes a partition or a region other than `given` is refused with an error saying so; Python's runner still serves users
-until R4e.
+`Depth`, `Step { number, image }`, `CutOut(image)`; labels are the facade's). The recipe's `frame` (typed `Frame`, checked by
+`Recipe::checked`) frames the photo and its maps first (flip, turn, crop, borders: `ops/frame`, `ops/rotate`, one `Geometry`
+planned from the shape and the subject, applied to each plane), then `Options::with_size` or the recipe's `size` resamples them
+(`ops/resample`); the ratio of design px (480 on the longest side) is derived from that working picture, never passed in. Each
+step's parameters are completed (preset, defaults, `Table::check`) and scaled by it (`Table::scaled`, from the declared units),
+the result is laid over its input by `ops/blend` (blend mode, opacity, mask), and a `Drive` is a mix of runs at `levels` values
+(`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
+`channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
+0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
+for every binding). **R4b state:** only an `each` step, a step that takes a partition and a region other than `given` are refused
+with an error saying so; Python's runner still serves users until R4e.
 Python reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
 `kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
 `core/bridge.py` (`render`/`trace`: a `Recipe` as the dict the core reads; no consumer in `src` until R4e). The registry
