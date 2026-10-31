@@ -3,6 +3,7 @@
 import inspect
 import pickle
 import re
+import types
 from typing import Any, Literal
 
 import numpy as np
@@ -952,3 +953,19 @@ def test_a_rust_default_is_written_in_the_kind_of_its_field_a_decimal_for_a_floa
             assert type(field.default) is {"float": float, "int": int}[kind], (
                 f"{effect}.{field.name}: {field.default!r}"
             )
+
+
+@pytest.mark.parametrize(
+    "own_field",
+    [
+        pytest.param(("extra", float, param(1.0, unit="px", min=0, max=2, doc="Another.")), id="a field with param"),
+        pytest.param(("extra", float, 1.0), id="a field with a plain default"),
+        pytest.param(("extra", float, ...), id="a bare annotation"),
+    ],
+)
+def test_a_model_declared_from_rust_that_also_has_fields_of_its_own_fails_naming_the_class_and_core(own_field):
+    """The Rust declaration is the only one: fields written in the class body would be silently replaced by it."""
+    name, annotation, default = own_field
+    body = {"__annotations__": {name: annotation}} | ({} if default is ... else {name: default})
+    with pytest.raises(ValueError, match=r"Both.*core=.*extra"):
+        types.new_class("Both", (EffectParams,), {"core": "grade"}, lambda namespace: namespace.update(body))
