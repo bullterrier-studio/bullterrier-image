@@ -4,9 +4,9 @@
 //! one by name, [`effect`] gives it with what it declares (its [`Category`], default opacity, [`Input`]s and, for the
 //! core's own, its parameters described). The core's own effects are files in `src/effects/`, found by the build
 //! script; one that lives elsewhere implements [`Effect`] and joins them with [`register`]. A core effect's parameters
-//! are declared once, by its `Params` struct (see [`mod@params`]), and the Python package builds the effect's model
-//! from that description. They arrive validated and scaled by the Python package; the core trusts them and does not
-//! check their ranges again.
+//! are declared once, by its `Params` struct (see [`mod@params`]); [`params::Table::check`] checks a user's values
+//! against that declaration and the Python package builds the effect's model from it. Running an effect trusts its
+//! parameters (and, for now, expects them scaled by the Python package): check them first.
 
 #![forbid(unsafe_code)]
 
@@ -19,7 +19,7 @@ mod picture;
 mod registry;
 
 pub use effect::{Category, Effect, Input};
-pub use error::Error;
+pub use error::{Constraint, Error};
 pub use picture::{Image, Picture};
 pub use registry::{effect, effects, register, unregister};
 

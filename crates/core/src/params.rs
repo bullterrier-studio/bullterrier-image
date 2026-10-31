@@ -23,9 +23,16 @@
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
 //! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number. The struct and its fields are
 //! `pub(crate)`, so that rustc reports a field `render` never reads (they become `pub` with the core's typed entry
-//! point, which then needs a test that every parameter is read). Values are validated by the Python package, not here.
+//! point, which then needs a test that every parameter is read).
+//!
+//! A user's values are checked against the table, not against the struct: [`Table::check`] gives the complete parameters
+//! an effect takes or the first rule broken. Running an effect trusts what it is given.
+
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
+
+mod check;
 
 pub use bullterrier_image_derive::{Choice, Params};
 
@@ -131,20 +138,33 @@ pub enum Scalar {
     Text(&'static str),
 }
 
+impl fmt::Display for Scalar {
+    /// A number as a person writes it: `0`, `500`, `0.5`; a whole decimal loses its point.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int(whole) => write!(formatter, "{whole}"),
+            Self::Float(real) if real.fract() == 0.0 && real.abs() < 1e15 => write!(formatter, "{real:.0}"),
+            Self::Float(real) => write!(formatter, "{real}"),
+            Self::Bool(flag) => write!(formatter, "{flag}"),
+            Self::Text(text) => formatter.write_str(text),
+        }
+    }
+}
+
 /// A colour: red, green and blue, each 0..1. Given as a list of three numbers.
 #[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
 #[serde(transparent)]
 pub struct Color(pub [f32; 3]);
 
+/// A probe effect's parameters, one of every kind: what the tests of the declaration and of the validation read.
 #[cfg(test)]
-mod tests {
-    use super::{Choice, Color, Declared, Params};
+pub(crate) mod probe {
+    use super::{Choice, Color, Params};
     use serde::Deserialize;
-    use serde_json::json;
 
     /// The shapes of the probe.
     #[derive(Debug, Clone, Copy, PartialEq, Choice)]
-    enum Shape {
+    pub(crate) enum Shape {
         Stripes,
         Checks,
         FourthWay,
@@ -153,27 +173,34 @@ mod tests {
     /// The parameters of a probe effect, which reads them as the Python package gives them.
     #[derive(Debug, Deserialize, Params)]
     #[serde(deny_unknown_fields)]
-    struct Probe {
+    pub(crate) struct Probe {
         /// The size of one cell in px, over
         /// two lines. Larger = coarser.
         #[param(default = 32.0, unit = px, min = 2, max = 512)]
-        cell: f32,
+        pub(crate) cell: f32,
         /// How many cells.
         #[param(default = 4, unit = count, min = -3, max = 32)]
-        cells: i32,
+        pub(crate) cells: i32,
         /// The direction: 'stripes' or 'checks'.
         #[param(default = 0.5, unit = degrees, min = 0, max = 360, cyclic, drivable)]
-        angle: f32,
+        pub(crate) angle: f32,
         /// The shape.
         #[param(default = FourthWay, advanced)]
-        shape: Shape,
+        pub(crate) shape: Shape,
         /// Whether it is kept.
         #[param(default = true)]
-        keep: bool,
+        pub(crate) keep: bool,
         /// The colour.
         #[param(default = "#ff8000")]
-        tint: Color,
+        pub(crate) tint: Color,
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::probe::{Probe, Shape};
+    use super::{Color, Declared};
+    use serde_json::json;
 
     #[test]
     fn a_default_is_what_the_field_declares() {
