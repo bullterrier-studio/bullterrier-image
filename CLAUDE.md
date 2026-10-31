@@ -59,9 +59,11 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives) and `crates/python` (PyO3
 bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect keeps its docstring and
 `@effect`; its body is `_core.apply("<name>", rgb, params.model_dump())` (`from bullterrier_image._native import
-_core`). Its Rust file declares the parameters (`Params`, see "Parameters") and has `fn render(picture: &Picture,
-params: &Params) -> Image`; its Python model is `class XParams(EffectParams, core="x")`, built from that declaration.
-Rust effects never refer to each other.
+_core`). Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
+opacity and inputs (`pub(crate) const META: Meta`) and has `fn render(picture: &Picture, params: &Params) -> Image`; its
+Python model is `class XParams(EffectParams, core="x")`, built from that declaration. `@effect(params=XParams)` takes
+category and opacity from the core and refuses them if given. The core's registry (`Effect` trait, `register`) also
+takes foreign effects, such as a Python function (`_core.register`). Rust effects never refer to each other.
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
@@ -101,7 +103,8 @@ Rust. `pub` only for what the bindings use and the support types the derives wri
 an effect's module, `Params`, choice enums and `render`. A `pub(crate)` field is reported when unread, a `pub` one is not,
 so `Params` becomes `pub` with the core's typed entry point (R2/R3), which then needs a test that every parameter is read.
 A Python `ops` function and its Rust twin may coexist
-while unported effects use the Python one; delete it with its last Python user.
+while unported effects use the Python one; delete it with its last Python user. Effect inputs in Rust arrive with the
+runner (R4), presets and validation in Rust with recipe loading (R3).
 
 ## Standards
 
@@ -192,13 +195,13 @@ Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template
 defines the shape; `grade` (`effects/grade/`, `crates/core/src/effects/grade.rs`) is the worked example. An effect that
 works from a map keeps a Python body until the core takes maps (`effects/relight/`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with an
-   empty `core="<name>"` model, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`Params`
-   with one example field, `render`), `tests/effects/<name>/test_<name>.py` and `examples/effects/<name>.toml`. The model
-   is built from the kernel, so the effect imports only once the extension is rebuilt with it (`uv run` and `uv sync`
+   empty `core="<name>"` model, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
+   category, `Params` with one example field, `render`), `tests/effects/<name>/test_<name>.py` and
+   `examples/effects/<name>.toml`. The model is built from the kernel, so the effect imports only once the extension is rebuilt with it (`uv run` and `uv sync`
    do); then it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
-2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), and the kernel with the
-   effect (the Python docstring documents it; its first sentence is the summary); in the test file, the behaviour's
-   properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
+2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), `META` (opacity below 1
+   if its steps should be mixed in partway), and the kernel with the effect (the Python docstring documents it; its first
+   sentence is the summary); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.

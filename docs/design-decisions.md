@@ -535,6 +535,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Validation stays Python's for now:* the model checks every value (inclusive ranges, finiteness, the cyclic wrap) and
   Rust trusts it; a Rust `checked()` has no consumer until the core loads files and recipes, and then Python validation
   switches to it in the same move, instead of the rules living in two languages in between.
+- **An effect is a Rust value that knows its place in the catalogue (R2).** `Effect` is a trait (name, category, default
+  opacity, declared inputs, parameters described, `apply`); the core's registry holds the core's own effects and any
+  registered at run time under a lock, and refuses a name that is taken, native or not. A ported effect's file declares
+  `pub(crate) const META: Meta` (category, opacity, inputs) beside `Params` and `render`; `build.rs` makes the effect
+  from the three and the file's name, so a name is written once and adding an effect still edits nothing else. Python
+  reads category and opacity of a ported effect from the core (`@effect(params=...)` refuses them there), the
+  vocabulary of categories and inputs comes from the core (`_core.vocabulary`), and a test keeps `CATEGORIES` and
+  `INPUTS` equal to it. A Python function can be registered as an `Effect` (`_core.register`, which takes the
+  interpreter lock back, since `_core.apply` releases it): the trait fits it, but the Python registry does not mirror
+  its effects into the core's until the Rust runner (R4) needs to call one. *Reason:* one home for each fact. *Not
+  yet:* `Inputs` and a `render` that takes them wait for R4's runner, the first consumer. *Presets in Rust are
+  deferred to R3,* with `checked()`: presets are named `Params` read by file loading, which does not exist in Rust
+  yet, and a preset of an unported effect needs its Pydantic model anyway; preset files stay in the Python package.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without
