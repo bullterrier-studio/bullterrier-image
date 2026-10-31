@@ -5,9 +5,10 @@
 //! pixel under an output pixel counts (no aliasing), with each output pixel's weights summing to 1 (a constant stays
 //! that constant). A shrink uses the Lanczos kernel, a growth the bicubic one.
 
+use std::cmp::Ordering;
 use std::f64::consts::PI;
 
-use super::length::{float, whole};
+use super::length::float;
 use crate::Error;
 
 /// The most pixels a resized picture may have, so that a `size` no picture can have is refused before anything is
@@ -91,6 +92,20 @@ fn taps(filter: Filter, from: usize, to: usize) -> Vec<Tap> {
         .collect()
 }
 
+/// `side` scaled by `longest / long` and rounded to the nearest whole pixel, halves to the even one, at least 1. Integer
+/// arithmetic, so that an exact half (85 x 455 / 170 = 227.5) is a half, which a float product can land below. `side` is
+/// at most `long`, so the result is at most `longest`.
+fn proportional(side: usize, longest: u32, long: usize) -> usize {
+    let (side, longest, long) = (side as u128, u128::from(longest), long as u128);
+    let (quotient, rest) = ((side * longest) / long, (side * longest) % long);
+    let up = match (2 * rest).cmp(&long) {
+        Ordering::Greater => true,
+        Ordering::Equal => quotient % 2 == 1,
+        Ordering::Less => false,
+    };
+    ((quotient + u128::from(up)) as usize).max(1)
+}
+
 /// A change of a picture's or a map's size, planned once from the size it starts at, so that a picture and the maps of
 /// it (which have its size) are all resized to the same grid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,9 +123,9 @@ impl Resize {
     /// # Errors
     /// [`Error::Recipe`] if the new size has more pixels than a picture may have (178,956,970: twice Pillow's limit).
     pub(crate) fn to_longest_side(height: usize, width: usize, longest: u32) -> Result<Option<Self>, Error> {
-        let scale = f64::from(longest) / float(height.max(width));
-        // a side too long for a count saturates and is refused below
-        let scaled = |side: usize| whole(float(side) * scale).max(1);
+        let scale = f64::from(longest) / float(height.max(width)); // only picks the filter: shrink or growth
+        let long = height.max(width);
+        let scaled = |side: usize| proportional(side, longest, long);
         let to = (scaled(height), scaled(width));
         if to == (height, width) {
             return Ok(None);
@@ -319,7 +334,8 @@ mod tests {
     {
         // (height, width, longest side, the new height and width): 3 x 4 at 2 is 1.5 x 2, a half, to the even 2; 5 x 4
         // at 2 is 2 x 1.6 -> 2; 3 x 8 at 4 is 1.5 x 4 -> 2; 5 x 8 at 4 is 2.5 -> 2 (even); 7 x 8 at 4 is 3.5 -> 4; a
-        // very long picture keeps a pixel: 1 x 100 at 10 is 0.1 -> 1
+        // very long picture keeps a pixel: 1 x 100 at 10 is 0.1 -> 1; 85 x 170 at 455 is exactly 227.5 (85 * 455 / 170),
+        // which a float product lands below (227.49999999999997), so it is the integer arithmetic that gives the even 228
         for (height, width, longest, expected) in [
             (3, 4, 2, (2, 2)),
             (5, 4, 2, (2, 2)),
@@ -328,6 +344,8 @@ mod tests {
             (7, 8, 4, (4, 4)),
             (1, 100, 10, (1, 10)),
             (100, 1, 10, (10, 1)),
+            (85, 170, 455, (228, 455)),
+            (170, 85, 455, (455, 228)),
         ] {
             let resize = plan(height, width, longest)?;
             assert_eq!(
