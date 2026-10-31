@@ -15,6 +15,22 @@ use serde_json::{Map, Value};
 
 use crate::Error;
 
+mod check;
+
+/// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an
+/// effect may be named like one.
+pub const STEP_KEYS: &[&str] = &[
+    "effect",
+    "mask",
+    "opacity",
+    "blend_mode",
+    "preset",
+    "partition",
+    "each",
+    "looks",
+    "name",
+];
+
 /// How a step's result combines with the picture below it, as the W3C blend modes do.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

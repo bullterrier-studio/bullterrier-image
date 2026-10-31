@@ -70,6 +70,11 @@ impl Registry {
 
 static REGISTRY: LazyLock<Registry> = LazyLock::new(Registry::new);
 
+/// The registry the free functions of this module use.
+pub(crate) fn registry() -> &'static Registry {
+    &REGISTRY
+}
+
 /// Add `effect` to the registry under its name, beside the core's own: it then runs by that name like them.
 ///
 /// # Errors

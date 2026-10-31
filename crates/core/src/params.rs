@@ -176,7 +176,7 @@ pub(crate) mod probe {
     pub(crate) struct Probe {
         /// The size of one cell in px, over
         /// two lines. Larger = coarser.
-        #[param(default = 32.0, unit = px, min = 2, max = 512)]
+        #[param(default = 32.0, unit = px, min = 2, max = 512, drivable)]
         pub(crate) cell: f32,
         /// How many cells.
         #[param(default = 4, unit = count, min = -3, max = 32)]
@@ -221,7 +221,7 @@ mod tests {
             "fields": [
                 {"name": "cell", "kind": "float", "doc": "The size of one cell in px, over two lines. Larger = coarser.",
                  "default": 32.0, "unit": "px", "min": 2, "max": 512, "cyclic": false, "choices": [],
-                 "drivable": false, "advanced": false},
+                 "drivable": true, "advanced": false},
                 {"name": "cells", "kind": "int", "doc": "How many cells.",
                  "default": 4, "unit": "count", "min": -3, "max": 32, "cyclic": false, "choices": [],
                  "drivable": false, "advanced": false},

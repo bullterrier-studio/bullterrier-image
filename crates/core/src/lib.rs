@@ -16,13 +16,17 @@ mod error;
 mod ops;
 pub mod params;
 mod picture;
+mod presets;
 mod recipe;
 mod registry;
+#[cfg(test)]
+mod testing;
 
 pub use effect::{Category, Effect, Input};
 pub use error::{Constraint, Error};
 pub use picture::{Image, Picture};
-pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, Step};
+pub use presets::{Preset, Presets};
+pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, STEP_KEYS, Step};
 pub use registry::{effect, effects, register, unregister};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
