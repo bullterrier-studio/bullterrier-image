@@ -626,9 +626,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *Geometry is planned once and applied per plane.* Crop box, turn size and borders are computed once from the shape and the
     (flipped, turned) subject map into a `Geometry`, then applied to the photo (3 channels) and to each map as it is first
     used (1 channel). Every operation is per channel, so this equals Python's stacking without building the stack.
-  - *A size is limited to twice Pillow's decompression-bomb limit* (178,956,970 pixels), refused before anything is allocated
-    (`RecipeError`); a size no picture can hold would otherwise abort on allocation. *Reason:* Pillow refuses at its limit and
-    warns at half of it; the core serves video-sized work, so twice. A policy the owner may change.
+  - *A picture is limited to twice Pillow's decompression-bomb limit* (178,956,970 pixels; `ops/length::within_limit`, the one
+    definition). The size a `frame` plans (the turned picture, then the finished one: borders and an expanding turn can make
+    any size) and the size a `size` asks for are planned from numbers and refused (`RecipeError` naming `` `frame` `` or
+    `` `size` ``, the pixels and the limit) before a pixel of either picture is made; a picture no machine can hold would
+    otherwise abort on allocation. *Reason:* Pillow refuses at its limit and warns at half of it; the core serves video-sized
+    work, so twice. A policy the owner may change. It does not limit a photo handed in.
   - *A resized side is rounded exactly.* The other side is `side * longest / long` in integer arithmetic, halves to the even
     pixel, so a tie is a tie (85 x 455 / 170 = 227.5 is 228; the float product 227.49999999999997 gave 227). It can differ by one
     pixel from Python's float `round` on a float-inexact tie only.

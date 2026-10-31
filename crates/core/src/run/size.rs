@@ -21,7 +21,8 @@ impl Options {
     /// These options with `size`, the longest side in px of the picture the render works on and returns: the photo is
     /// resampled to it, its aspect kept, and so are its maps. It wins over the recipe's own `size`; without either, the
     /// photo's own size is kept. The render is refused for a size of 0 and for one that makes a picture of more than
-    /// 178,956,970 pixels (twice Pillow's decompression-bomb limit).
+    /// 178,956,970 pixels (twice Pillow's decompression-bomb limit), as it is for a `frame` that does: before a pixel of
+    /// either picture is made.
     ///
     /// A recipe's pixel values (`px`) are written for a longest side of 480; a render multiplies them by the working
     /// picture's longest side over 480, so the look is the same at any size.
@@ -52,8 +53,8 @@ impl<'a> Working<'a> {
     /// finds the subject map of the photo as given, asked only for a crop around it.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a size of 0, or one that makes a picture of more than 178,956,970 pixels (twice Pillow's
-    /// decompression-bomb limit), [`Error::MapNotFound`] for a subject a crop needs and the photo cannot give.
+    /// [`Error::Recipe`] for a size of 0, or a size or frame that makes a picture of more than 178,956,970 pixels (twice
+    /// Pillow's decompression-bomb limit), [`Error::MapNotFound`] for a subject a crop needs and the photo cannot give.
     pub(super) fn new(
         photo: Picture<'a>,
         frame: &Frame,
@@ -64,14 +65,15 @@ impl<'a> Working<'a> {
             return Err(Error::Recipe("`size` must be >= 1, got 0".to_owned()));
         }
         let framing = Geometry::plan(frame, photo.height(), photo.width(), subject)?;
-        let framed = framing.as_ref().map(|framing| framing.photo(photo.values()));
         let (height, width) = framing.as_ref().map_or((photo.height(), photo.width()), |framing| {
             (framing.height(), framing.width())
         });
+        // both pictures are planned, and refused if over the pixel limit, before either is made
         let resize = size
             .map(|size| Resize::to_longest_side(height, width, size))
             .transpose()?
             .flatten();
+        let framed = framing.as_ref().map(|framing| framing.photo(photo.values()));
         let values = framed.as_deref().unwrap_or_else(|| photo.values());
         let made = match &resize {
             Some(resize) => Some(Image::new(resize.height(), resize.width(), &resize.apply(values, 3))?),

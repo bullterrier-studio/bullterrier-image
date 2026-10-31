@@ -954,6 +954,23 @@ def test_a_picture_of_one_pixel_is_rendered_at_any_size_and_turn(photo):
         assert made.size > 0
 
 
+@pytest.mark.parametrize(
+    ("recipe", "size", "said"),
+    [
+        pytest.param(STILL | {"frame": {"angle": 45, "fit": "expand"}}, None, "`frame`", id="a turn that expands"),
+        pytest.param(
+            STILL | {"frame": {"angle": 45, "fit": "expand", "aspect": 1}}, None, "`frame`", id="a turn then a crop"
+        ),
+        pytest.param(STILL, 2_000_000_000, "`size` 2000000000", id="a size"),
+    ],
+)
+def test_a_picture_over_the_pixel_limit_is_a_recipe_error_before_any_is_made(recipe, size, said):
+    wide = np.zeros((1, 20_000, 3), np.float32)  # its bounding square turned 45 degrees is 200 million pixels
+    for run in (native.render, native.trace):
+        with pytest.raises(RecipeError, match=f"{said}.*178956970"):
+            run(wide, recipe, size=size)
+
+
 PICTURE_FAULTS = {
     "a list": [[0.1, 0.2, 0.3]],
     "float64": np.zeros((2, 2, 3)),

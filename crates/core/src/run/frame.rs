@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use crate::frame::{Anchor, Flip};
 use crate::ops::frame::{self, Edges, Rect, Shape, Side};
+use crate::ops::length::within_limit;
 use crate::ops::rotate::Turn;
 use crate::{Error, Frame, Layer};
 
@@ -34,8 +35,12 @@ impl Geometry {
     /// The geometry of `frame` on a `height` x `width` picture, or none when the frame changes no pixel. `subject` finds
     /// the subject map (of the picture's size, as given), asked only if the frame crops around it.
     ///
+    /// Only sizes are worked out here, no pixel is made: a frame whose turned or finished picture would have more pixels than
+    /// a picture may have (see [`within_limit`]) is refused before anything is allocated for it.
+    ///
     /// # Errors
-    /// Whatever `subject` fails with, and [`Error::MapNotFound`] of the subject if no pixel of it reaches one half.
+    /// Whatever `subject` fails with, [`Error::MapNotFound`] of the subject if no pixel of it reaches one half, and
+    /// [`Error::Recipe`] for a picture over the pixel limit.
     pub(super) fn plan(
         frame: &Frame,
         height: usize,
@@ -54,6 +59,8 @@ impl Geometry {
             to: turn.map_or((height, width), |turn| (turn.height(), turn.width())),
         };
         let (turned_height, turned_width) = geometry.to;
+        // the turned picture is made before it is cropped, so it is held to the limit too
+        within_limit("`frame`", turned_height, turned_width)?;
         geometry.crop = match (frame.anchor, frame.aspect) {
             (Anchor::Subject, aspect) => {
                 // the box is found in the picture as flipped and turned, as the crop is cut from it
@@ -85,6 +92,7 @@ impl Geometry {
             cropped_height + geometry.edges.top + geometry.edges.bottom,
             cropped_width + geometry.edges.left + geometry.edges.right,
         );
+        within_limit("`frame`", geometry.to.0, geometry.to.1)?;
         let changes_nothing = !(geometry.across
             || geometry.down
             || geometry.turn.is_some()
@@ -170,6 +178,7 @@ mod tests {
 
     use proptest::prelude::*;
 
+    use super::Geometry;
     use crate::effect::Input;
     use crate::frame::{Anchor, Flip};
     use crate::params::Color;
@@ -725,6 +734,81 @@ mod tests {
         });
         assert_picture(&framed(4, 6, frame)?, &(4, 6, picture_of(4, 6, px)), "unchanged");
         Ok(())
+    }
+
+    #[test]
+    fn a_frame_that_makes_a_picture_over_the_pixel_limit_is_refused_when_planned_before_any_pixel_is_made() {
+        // planning takes sizes, not pictures, so these photos (millions of pixels) are never made. The limit is 178,956,970
+        // pixels (twice Pillow's). Borders of 2 on every side make a picture 5 times the shorter side across: 2675 is
+        // 13,375 across (178,890,625 pixels, within), 2676 is 13,380 (179,024,400, over).
+        let all_sides = |share: f64| {
+            with(|frame| {
+                (frame.pad_top, frame.pad_right, frame.pad_bottom, frame.pad_left) = (share, share, share, share);
+            })
+        };
+        // a 1 x 20,000 photo turned by 45 degrees and expanded is 14,143 across, a bounding square of 200 million pixels
+        // (and 18,000 columns 12,729 across, 162 million, within); a crop to a square after the turn leaves it small
+        let turned = |angle: f64, aspect: Option<f64>| {
+            with(|frame| {
+                frame.angle = angle;
+                frame.fit = crate::frame::Fit::Expand;
+                frame.aspect = aspect;
+            })
+        };
+        let none = || Err(Error::Recipe("no subject was asked for".to_owned()));
+        for (height, width, frame, over, row) in [
+            (2675, 2675, all_sides(2.0), None, "borders just within the limit"),
+            (
+                2676,
+                2676,
+                all_sides(2.0),
+                Some("13380 x 13380"),
+                "borders just over it",
+            ),
+            (1, 18_000, turned(45.0, None), None, "a turn within the limit"),
+            (1, 20_000, turned(45.0, None), Some("14143 x 14143"), "a turn over it"),
+            (
+                1,
+                24_000,
+                turned(30.0, None),
+                Some("20786 x 12001"),
+                "a turn over it, wider than tall",
+            ),
+            (
+                1,
+                24_000,
+                turned(30.0, Some(10.0)),
+                Some("20786 x 12001"),
+                "a turn over it that a crop then makes small",
+            ),
+        ] {
+            let planned = Geometry::plan(&frame, height, width, none);
+            match over {
+                None => assert!(planned.is_ok_and(|geometry| geometry.is_some()), "{row}"),
+                Some(shape) => assert!(
+                    matches!(&planned, Err(Error::Recipe(said)) if said.contains("`frame`")
+                        && said.contains(shape) && said.contains("178956970")),
+                    "{row}: {planned:?}"
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn a_frame_over_the_pixel_limit_is_refused_through_a_render() {
+        let result = framed(
+            1,
+            20_000,
+            with(|frame| {
+                frame.angle = 45.0;
+                frame.fit = crate::frame::Fit::Expand;
+            }),
+        );
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe && error.to_string().contains("`frame`")),
+            "{:?}",
+            result.map(|made| (made.height, made.width))
+        );
     }
 
     proptest! {

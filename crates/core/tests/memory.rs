@@ -7,7 +7,8 @@
 
 use std::sync::{Mutex, PoisonError};
 
-use bullterrier_image::{Error, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::frame::Flip;
+use bullterrier_image::{Error, Frame, Options, Photo, Picture, Presets, Recipe, Step};
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -70,5 +71,25 @@ fn a_trace_holds_a_picture_for_every_step_which_is_what_the_measurement_must_see
         long / IMAGE
     );
     assert!(long >= short + 9 * IMAGE, "2 steps held {short} bytes, 12 held {long}");
+    Ok(())
+}
+
+#[test]
+fn a_size_no_picture_can_have_is_refused_before_the_framed_photo_is_made() -> Result<(), Error> {
+    // a flip makes a second picture of the photo's size, and a longest side of 100,000 asks for 100,000 x 66,667 pixels,
+    // over the limit: the refusal comes first, so no picture is made (the photo's own is not counted)
+    let peak = peak_of(1, |photo, recipe| {
+        let mut flipped = recipe.clone();
+        flipped.frame = Frame {
+            flip: Flip::X,
+            ..Frame::default()
+        };
+        Ok(photo.render(&flipped, &Presets::new(), Options::default().with_size(100_000)))
+    })?;
+    assert!(
+        peak < IMAGE / 10,
+        "the refusal held {peak} bytes, {} pictures",
+        peak / IMAGE
+    );
     Ok(())
 }

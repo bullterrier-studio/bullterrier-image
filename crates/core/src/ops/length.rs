@@ -1,4 +1,25 @@
-//! Pixel counts as numbers and back, rounded as Python's `round` is.
+//! Pixel counts as numbers and back, rounded as Python's `round` is, and the most pixels a picture may have.
+
+use crate::Error;
+
+/// The most pixels a picture the core makes may have. A recipe's `size`, `frame` borders and expanded turns can ask for any
+/// number, so what they ask is checked against this before a pixel is allocated.
+const MOST_PIXELS: usize = 2 * 89_478_485; // constant: twice Pillow's `Image.MAX_IMAGE_PIXELS`, its decompression-bomb limit
+
+/// Refuses a picture of `height` x `width` pixels if it has more than [`MOST_PIXELS`]; `asked_by` names what asked for
+/// it (as `` `size` 4000 `` or `` `frame` ``), so the error says where to look.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `asked_by`, the size and the limit.
+pub(crate) fn within_limit(asked_by: &str, height: usize, width: usize) -> Result<(), Error> {
+    // saturating: a side near `u32::MAX` squared is still over the limit
+    if height.saturating_mul(width) > MOST_PIXELS {
+        return Err(Error::Recipe(format!(
+            "{asked_by} makes a picture of {width} x {height} pixels, more than the limit of {MOST_PIXELS} pixels"
+        )));
+    }
+    Ok(())
+}
 
 /// `length` as a float: lengths are far below 2^53, so nothing is lost.
 #[expect(clippy::cast_precision_loss, reason = "a length is far below 2^53")]

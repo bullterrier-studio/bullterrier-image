@@ -8,12 +8,8 @@
 use std::cmp::Ordering;
 use std::f64::consts::PI;
 
-use super::length::float;
+use super::length::{float, within_limit};
 use crate::Error;
-
-/// The most pixels a resized picture may have, so that a `size` no picture can have is refused before anything is
-/// allocated for it.
-const MOST_PIXELS: usize = 2 * 89_478_485; // constant: twice Pillow's `Image.MAX_IMAGE_PIXELS`, its decompression-bomb limit
 
 /// A kernel: the weight an input pixel at distance `x` (in output pixels' worth) from the output pixel's centre has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -121,7 +117,7 @@ impl Resize {
     /// A shrink uses the Lanczos kernel, a growth the bicubic one. None if it already has that size.
     ///
     /// # Errors
-    /// [`Error::Recipe`] if the new size has more pixels than a picture may have (178,956,970: twice Pillow's limit).
+    /// [`Error::Recipe`] if the new size has more pixels than a picture may have (see [`within_limit`]).
     pub(crate) fn to_longest_side(height: usize, width: usize, longest: u32) -> Result<Option<Self>, Error> {
         let scale = f64::from(longest) / float(height.max(width)); // only picks the filter: shrink or growth
         let long = height.max(width);
@@ -130,13 +126,7 @@ impl Resize {
         if to == (height, width) {
             return Ok(None);
         }
-        // saturating: a side near `u32::MAX` squared is still over the limit
-        if to.0.saturating_mul(to.1) > MOST_PIXELS {
-            return Err(Error::Recipe(format!(
-                "`size` {longest} makes a picture of {} x {} pixels, more than the limit of {MOST_PIXELS} pixels",
-                to.1, to.0
-            )));
-        }
+        within_limit(&format!("`size` {longest}"), to.0, to.1)?;
         let filter = if scale < 1.0 { Filter::Lanczos } else { Filter::Bicubic };
         Ok(Some(Self {
             from: (height, width),
