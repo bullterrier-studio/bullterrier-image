@@ -6,7 +6,7 @@ use std::error::Error;
 use bullterrier_image::effects::grade;
 use bullterrier_image::effects::pattern::{self, Kind};
 use bullterrier_image::params::{Color, Declared};
-use bullterrier_image::{Picture, Presets, Recipe, Step, apply};
+use bullterrier_image::{Inputs, Picture, Presets, Recipe, Step, apply};
 use serde_json::{Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -86,14 +86,19 @@ fn typed_params_run_to_the_same_image_as_the_same_values_given_as_json() -> Outc
         .map(|index| f32::from(u8::try_from(index % 17).unwrap_or(0)) / 16.0)
         .collect();
     let picture = Picture::new(12, 12, &values)?;
-    let typed = apply("pattern", &picture, Value::Object(Step::of(dots()).params))?;
+    let typed = apply(
+        "pattern",
+        &picture,
+        Value::Object(Step::of(dots()).params),
+        &Inputs::default(),
+    )?;
     let as_json = json!({
         "kind": "dots", "cell": 20, "angle": 30, "foreground": [0.25, 0.5, 1.0], "background": [0.1, 0.0, 0.3],
         "thickness": 0.2, "radius": 0.4, "feather": 2.5,
     });
     let given = as_json.as_object().cloned().unwrap_or_default();
     let checked = pattern::Params::table().check("pattern", &given)?;
-    let by_json = apply("pattern", &picture, Value::Object(checked))?;
+    let by_json = apply("pattern", &picture, Value::Object(checked), &Inputs::default())?;
     assert_eq!(typed, by_json);
     Ok(())
 }

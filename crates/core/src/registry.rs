@@ -106,36 +106,9 @@ pub fn effects() -> Vec<String> {
 mod tests {
     use super::*;
     use crate::effect::{Category, Input};
-    use crate::{Image, Picture};
+    use crate::testing::Paint;
+    use crate::{Image, Inputs, Picture};
     use serde_json::{Value, json};
-
-    /// A foreign effect that paints the picture with the first number of its parameters; counts nothing, mocks nothing.
-    struct Paint {
-        name: &'static str,
-    }
-
-    impl Effect for Paint {
-        fn name(&self) -> &str {
-            self.name
-        }
-        fn category(&self) -> Category {
-            Category::Utilities
-        }
-        fn opacity(&self) -> f64 {
-            0.25
-        }
-        fn inputs(&self) -> &[Input] {
-            &[Input::SizeRatio]
-        }
-        fn apply(&self, picture: &Picture<'_>, params: Value) -> Result<Image, Error> {
-            let level = params["level"].as_f64().ok_or_else(|| Error::Foreign {
-                effect: self.name.to_owned(),
-                message: "no level".to_owned(),
-            })?;
-            #[expect(clippy::cast_possible_truncation, reason = "a test level is a small number")]
-            Ok(picture.map(|_| [level as f32; 3]))
-        }
-    }
 
     fn paint(name: &'static str) -> Arc<dyn Effect> {
         Arc::new(Paint { name })
@@ -188,7 +161,7 @@ mod tests {
         assert!((found.opacity() - 0.25).abs() < f64::EPSILON);
         assert!(found.params().is_none());
         let values = [0.0_f32; 12];
-        let image = found.apply(&Picture::new(2, 2, &values)?, json!({"level": 0.5}))?;
+        let image = found.apply(&Picture::new(2, 2, &values)?, json!({"level": 0.5}), &Inputs::default())?;
         assert_eq!(image.into_values(), vec![0.5_f32; 12]);
         Ok(())
     }
@@ -200,7 +173,7 @@ mod tests {
         let values = [0.0_f32; 3];
         let result = registry
             .effect("painter")?
-            .apply(&Picture::new(1, 1, &values)?, json!({}));
+            .apply(&Picture::new(1, 1, &values)?, json!({}), &Inputs::default());
         assert!(matches!(result, Err(Error::Foreign { effect, .. }) if effect == "painter"));
         Ok(())
     }
@@ -251,7 +224,7 @@ mod tests {
         fn inputs(&self) -> &[Input] {
             &[]
         }
-        fn apply(&self, picture: &Picture<'_>, _params: Value) -> Result<Image, Error> {
+        fn apply(&self, picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
             Ok(picture.map(|pixel| pixel))
         }
     }

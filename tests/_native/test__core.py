@@ -9,6 +9,7 @@ values are validated by the parameter model first).
 import math
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
 import numpy as np
 import pytest
@@ -97,7 +98,13 @@ def test_the_core_names_the_categories_and_inputs_in_the_order_the_package_lists
     [("grade", "colour"), ("pattern", "backgrounds"), ("pixel_grid", "texture")],
 )
 def test_a_core_effect_says_its_category_default_opacity_and_inputs(effect, category):
-    assert _core.effect(effect) == {"name": effect, "category": category, "opacity": 1.0, "inputs": []}
+    assert _core.effect(effect) == {
+        "name": effect,
+        "category": category,
+        "opacity": 1.0,
+        "inputs": [],
+        "fields": {},
+    }
 
 
 def test_the_metadata_of_an_unknown_effect_is_refused_by_name():
@@ -135,6 +142,7 @@ def test_a_python_function_registered_as_an_effect_is_listed_described_and_run_b
             "category": "light",
             "opacity": 0.5,
             "inputs": [],
+            "fields": {},
         }
         out = _core.apply("probe_double", PIXEL, {"amount": 3, "label": "x"})
     np.testing.assert_allclose(out, PIXEL * 2)
@@ -223,6 +231,146 @@ def test_a_foreign_effect_may_run_a_core_effect_itself():
 
     with registered("probe_nested", through_grade):
         np.testing.assert_allclose(_core.apply("probe_nested", PIXEL, {}), grade_with_contrast(2.0))
+
+
+# --- inputs: what a step offers an effect, and the part the effect declares ------------------------------------------
+
+PICTURE = np.full((2, 3, 3), 0.5, np.float32)
+PIECES = np.array([[0, 0, 1], [1, 2, 2]], np.int32)
+DEPTH = np.array([[0.0, 0.25, 0.5], [0.75, 1.0, 0.125]], np.float32)
+LIGHT = np.full((2, 3), 0.875, np.float32)
+
+
+def recording() -> tuple[list[dict[str, Any]], Callable[..., np.ndarray]]:
+    """A foreign effect that returns the picture as it is and logs the keyword inputs it received."""
+    received: list[dict[str, Any]] = []
+
+    def function(rgb, params, **inputs):
+        received.append(
+            {name: value.copy() if isinstance(value, np.ndarray) else value for name, value in inputs.items()}
+        )
+        return rgb
+
+    return received, function
+
+
+@contextmanager
+def registered_with(
+    name: str, function: Callable, inputs: list[str] | None = None, fields: dict[str, str] | None = None
+) -> Iterator[None]:
+    """`function` registered as `name` with the `inputs` and `fields` it declares, for the block."""
+    _core.register(name, "utilities", 1.0, function, inputs=inputs or [], fields=fields)
+    try:
+        yield
+    finally:
+        _core.unregister(name)
+
+
+def test_a_declared_partition_arrives_as_the_int32_array_and_an_undeclared_one_is_absent():
+    taken, takes = recording()
+    ignored, ignores = recording()
+    with registered_with("probe_takes", takes, inputs=["partition"]), registered_with("probe_ignores", ignores):
+        _core.apply("probe_takes", PICTURE, {}, partition=PIECES)
+        _core.apply("probe_ignores", PICTURE, {}, partition=PIECES)
+    assert list(taken[0]) == ["partition"]
+    assert taken[0]["partition"].dtype == np.int32
+    np.testing.assert_array_equal(taken[0]["partition"], PIECES)
+    assert ignored == [{}]
+
+
+def test_a_declared_field_arrives_as_a_float32_array_under_its_parameter_name_and_an_undeclared_one_is_absent():
+    taken, takes = recording()
+    ignored, ignores = recording()
+    # two parameters that hold fields, so a map arriving under the wrong parameter shows
+    with (
+        registered_with("probe_takes", takes, fields={"near": "depth", "lit": "light"}),
+        registered_with("probe_ignores", ignores),
+    ):
+        # offered under the parameter's name, so the field the step chose is the caller's business
+        offered = {"near": DEPTH, "lit": LIGHT, "extra": DEPTH}
+        _core.apply("probe_takes", PICTURE, {}, fields=offered)
+        _core.apply("probe_ignores", PICTURE, {}, fields=offered)
+    assert sorted(taken[0]) == ["lit", "near"]
+    assert {name: array.dtype for name, array in taken[0].items()} == {"near": np.float32, "lit": np.float32}
+    np.testing.assert_array_equal(taken[0]["near"], DEPTH)
+    np.testing.assert_array_equal(taken[0]["lit"], LIGHT)
+    assert ignored == [{}]
+
+
+def test_the_size_ratio_arrives_only_if_declared():
+    taken, takes = recording()
+    ignored, ignores = recording()
+    with registered_with("probe_takes", takes, inputs=["size_ratio"]), registered_with("probe_ignores", ignores):
+        _core.apply("probe_takes", PICTURE, {}, size_ratio=2.5)
+        _core.apply("probe_ignores", PICTURE, {}, size_ratio=2.5)
+    assert taken == [{"size_ratio": 2.5}]
+    assert ignored == [{}]
+
+
+def test_an_effect_says_the_fields_it_declares_with_their_defaults():
+    with registered_with("probe_fields", fill(0.5), inputs=["partition"], fields={"field": "depth", "mask": "subject"}):
+        assert _core.effect("probe_fields")["fields"] == {"field": "depth", "mask": "subject"}
+        assert _core.effect("probe_fields")["inputs"] == ["partition"]
+
+
+@pytest.mark.parametrize(
+    ("declared", "offered", "said"),
+    [
+        pytest.param({"inputs": ["partition"]}, {}, "partition", id="a partition declared and not offered"),
+        pytest.param({"fields": {"field": "depth"}}, {}, "field", id="a field declared and not offered"),
+        pytest.param(
+            {"inputs": ["partition"]},
+            {"partition": np.zeros((3, 2), np.int32)},
+            "3 x 2",
+            id="a partition of another size than the picture",
+        ),
+        pytest.param(
+            {"fields": {"field": "depth"}},
+            {"fields": {"field": np.zeros((1, 3), np.float32)}},
+            "1 x 3",
+            id="a field of another size than the picture",
+        ),
+    ],
+)
+def test_a_declared_input_that_is_missing_or_of_another_size_refuses_the_run_and_the_function_never_runs(
+    declared, offered, said
+):
+    calls, function = recording()
+    with registered_with("probe_picky", function, **declared), pytest.raises(ValueError, match=said):
+        _core.apply("probe_picky", PICTURE, {}, **offered)
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("offered", "said"),
+    [
+        pytest.param({"size_ratio": 0.0}, "size_ratio", id="a size ratio of 0"),
+        pytest.param({"size_ratio": math.nan}, "size_ratio", id="a size ratio that is NaN"),
+        pytest.param({"partition": PIECES.astype(np.int64)}, "int32", id="a partition that is not int32"),
+        pytest.param({"partition": np.zeros(6, np.int32)}, "shape", id="a partition that is not 2-dimensional"),
+        pytest.param({"partition": np.array([[0, -1, 1], [1, 1, 1]], np.int32)}, "-1", id="a negative piece number"),
+        pytest.param({"fields": {"field": DEPTH.astype(np.float64)}}, "float32", id="a field that is not float32"),
+        pytest.param({"fields": {"field": DEPTH + 1}}, "from 0 to 1", id="a field above 1"),
+        pytest.param({"fields": {"field": np.where(DEPTH > 0.5, np.nan, DEPTH).astype(np.float32)}}, "NaN", id="NaN"),
+    ],
+)
+def test_an_offered_input_that_is_no_valid_input_is_refused_naming_it(offered, said):
+    with registered_with("probe_any", fill(0.5)), pytest.raises(ValueError, match=said):
+        _core.apply("probe_any", PICTURE, {}, **offered)
+
+
+@pytest.mark.parametrize(
+    ("declared", "said"),
+    [
+        pytest.param({"inputs": ["seams"]}, "seams", id="an input that does not exist"),
+        pytest.param({"fields": {"partition": "depth"}}, "partition", id="a field parameter named like an input"),
+        pytest.param({"fields": {"field": 3}}, "str", id="a default field that is no name"),
+    ],
+)
+def test_a_declaration_that_is_no_inputs_or_fields_is_refused_and_registers_nothing(declared, said):
+    with pytest.raises((ValueError, TypeError), match=said):
+        _core.register("probe_declared", "utilities", 1.0, fill(0.5), **declared)
+    assert "probe_declared" not in _core.effects()
 
 
 # --- checking parameters and reading recipes ---------------------------------------------------------------------

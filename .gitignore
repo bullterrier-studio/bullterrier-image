@@ -26,5 +26,7 @@ examples/output/python-api/
 
 # Rust: the build folder, and the extension an editable install (`uv sync`) builds into the source tree
 target/
+# proptest keeps the cases it shrank to beside the test; they are local
+proptest-regressions
 src/bullterrier_image/_native/_core*.so
 src/bullterrier_image/_native/_core*.pyd

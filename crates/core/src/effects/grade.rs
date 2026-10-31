@@ -8,7 +8,7 @@ use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::{linear_to_srgb, srgb_to_linear};
 use crate::params::Params;
-use crate::{Image, Picture};
+use crate::{Image, Inputs, Picture};
 
 /// Where `grade` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -50,7 +50,7 @@ pub struct Params {
 }
 
 /// The graded picture.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let balance = colour_balance(params.temperature, params.tint);
     let gain = params.exposure.exp2(); // a stop is a factor of 2 (photographic definition)
     picture.map(|pixel| {

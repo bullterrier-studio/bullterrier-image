@@ -3,8 +3,10 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{BlendMode, Category, Effect, Error, Image, Input, Picture, Recipe, STEP_KEYS};
-use numpy::{PyArray1, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
+use bullterrier_image::{
+    BlendMode, Category, Effect, Error, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe, STEP_KEYS,
+};
+use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::IntoPyObjectExt as _;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -21,8 +23,14 @@ mod _core {
 /// Run the effect called `effect` on `rgb` (float32, C-contiguous, (height, width, 3)) with `params` (exactly the
 /// effect's parameters, validated and scaled); a new array of `rgb`'s shape. The effect runs without the GIL.
 ///
-/// `ValueError` if the effect, its parameters or the array are not what the core expects: a programming error, since
-/// the package validates a user's values before they get here.
+/// The keyword arguments are what is on offer to the effect, which receives the part it declares and nothing else:
+/// `size_ratio` (working pixels per design pixel, a finite number above 0), `partition` (an int32 `(height, width)`
+/// array of piece numbers from 0; the pieces are as many as the largest number plus one) and `fields` (a dict from a
+/// field parameter's name to a float32 `(height, width)` array of finite values within 0..1).
+///
+/// `ValueError` if the effect, its parameters, the array or an input are not what the core expects, or the effect
+/// declares an input that is not on offer: a programming error, since the package validates a user's values before
+/// they get here.
 ///
 /// The caller must not modify `rgb` while this runs. The effect reads the array's memory in place, with the GIL
 /// released, and numpy's borrow flags guard only against other Rust borrows: a Python thread that writes into `rgb`
@@ -30,11 +38,15 @@ mod _core {
 /// copied (a 1080p float32 frame is about 25 MB, as much work as a whole light effect); `numpy` works the same way on
 /// arrays it is given. A thread that renders must own its frame, or share it read-only.
 #[pyfunction]
+#[pyo3(signature = (effect, rgb, params, *, size_ratio=1.0, partition=None, fields=None))]
 fn apply<'py>(
     py: Python<'py>,
     effect: &str,
     rgb: &Bound<'py, PyAny>,
     params: &Bound<'py, PyDict>,
+    size_ratio: f64,
+    partition: Option<&Bound<'py, PyAny>>,
+    fields: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let array = rgb.cast::<PyArray3<f32>>().map_err(|_| picture_error(rgb))?;
     let &[height, width, 3] = array.shape() else {
@@ -46,8 +58,22 @@ fn apply<'py>(
     let readonly = array.try_readonly().map_err(value_error)?;
     let picture = Picture::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(value_error)?;
     let params = to_json(params.as_any())?;
+    if !(size_ratio.is_finite() && size_ratio > 0.0) {
+        return Err(PyValueError::new_err(format!(
+            "size_ratio must be a finite number above 0, got {size_ratio}"
+        )));
+    }
+    let labels = partition.map(labels_of).transpose()?;
+    let layers = fields.map(layers_of).transpose()?.unwrap_or_default();
+    let mut inputs = Inputs::default().with_size_ratio(size_ratio);
+    if let Some(labels) = &labels {
+        inputs = inputs.with_partition(labels);
+    }
+    for (parameter, layer) in &layers {
+        inputs = inputs.with_field(parameter.as_str(), layer);
+    }
     let image = py
-        .detach(|| bullterrier_image::apply(effect, &picture, params))
+        .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))
         .map_err(value_error)?;
     let shape = [image.height(), image.width(), 3];
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
@@ -76,13 +102,19 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
 }
 
 /// What the effect called `effect` says about itself: a dict `{"name": str, "category": str, "opacity": float,
-/// "inputs": [str]}`.
+/// "inputs": [str], "fields": {str: str}}`, where `fields` maps each parameter that names a field to the field a step
+/// that does not set it uses.
 ///
 /// `ValueError` if there is no effect of that name.
 #[pyfunction]
 fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
     let effect = bullterrier_image::effect(effect).map_err(value_error)?;
     let inputs: Vec<_> = effect.inputs().iter().map(|input| input.name()).collect();
+    let fields: Map<String, Value> = effect
+        .fields()
+        .iter()
+        .map(|field| (field.parameter.clone(), Value::from(field.default.clone())))
+        .collect();
     from_json(
         py,
         &json!({
@@ -90,6 +122,7 @@ fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
             "category": effect.category().name(),
             "opacity": effect.opacity(),
             "inputs": inputs,
+            "fields": fields,
         }),
     )
 }
@@ -152,16 +185,30 @@ fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound
     from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)
 }
 
-/// Add the Python function `function(rgb, params) -> rgb` to the core's effects as `name`, in `category` (a name from
-/// `vocabulary()`), with `opacity` as the default opacity of its steps. `rgb` is a float32 `(height, width, 3)` array
-/// and `params` a dict, as `apply` was given; the function returns a float32 array of the same shape. Then `apply`,
-/// `effects` and `effect` know it like the core's own. The name is not checked for form, only for being free.
+/// Add the Python function `function(rgb, params, **inputs) -> rgb` to the core's effects as `name`, in `category` (a
+/// name from `vocabulary()`), with `opacity` as the default opacity of its steps. `rgb` is a float32 `(height, width,
+/// 3)` array and `params` a dict, as `apply` was given; the function returns a float32 array of the same shape. Then
+/// `apply`, `effects` and `effect` know it like the core's own. The name is not checked for form, only for being free.
 ///
-/// `ValueError` if the name is taken (by a core effect as well), the category is unknown, `opacity` is not a finite
-/// number from 0 to 1, or `function` is not callable. A function that raises, or returns anything but a float32 array
-/// of the picture's shape, makes `apply` raise `ValueError` naming the effect.
+/// `inputs` names the inputs from `vocabulary()` that the function declares and `fields` maps each of its parameters
+/// that names a field to the field a step that does not set it uses. The function receives each declared input as a
+/// keyword argument and nothing else: `size_ratio` as a float, `partition` as an int32 `(height, width)` array, and
+/// each field parameter as a float32 `(height, width)` array under the parameter's name.
+///
+/// `ValueError` if the name is taken (by a core effect as well), the category or an input is unknown, `opacity` is not
+/// a finite number from 0 to 1, a field parameter is named like an input, or `function` is not callable. A function
+/// that raises, or returns anything but a float32 array of the picture's shape, makes `apply` raise `ValueError`
+/// naming the effect.
 #[pyfunction]
-fn register(name: &str, category: &str, opacity: f64, function: &Bound<'_, PyAny>) -> PyResult<()> {
+#[pyo3(signature = (name, category, opacity, function, *, inputs=Vec::new(), fields=None))]
+fn register(
+    name: &str,
+    category: &str,
+    opacity: f64,
+    function: &Bound<'_, PyAny>,
+    inputs: Vec<String>,
+    fields: Option<&Bound<'_, PyDict>>,
+) -> PyResult<()> {
     let category = Category::ALL
         .iter()
         .copied()
@@ -178,10 +225,39 @@ fn register(name: &str, category: &str, opacity: f64, function: &Bound<'_, PyAny
             function.get_type()
         )));
     }
+    let inputs = inputs
+        .into_iter()
+        .map(|given| {
+            Input::ALL
+                .iter()
+                .copied()
+                .find(|known| known.name() == given)
+                .ok_or_else(|| PyValueError::new_err(format!("{given:?} is not an input of effects")))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    let fields = fields
+        .map(|fields| {
+            fields
+                .iter()
+                .map(|(parameter, default)| {
+                    let parameter = parameter.extract::<String>()?;
+                    if Input::ALL.iter().any(|input| input.name() == parameter) {
+                        return Err(PyValueError::new_err(format!(
+                            "the field parameter {parameter:?} is named like an input"
+                        )));
+                    }
+                    Ok(FieldParam::new(parameter, default.extract::<String>()?))
+                })
+                .collect::<PyResult<Vec<_>>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
     let effect = PythonEffect {
         name: name.to_owned(),
         category,
         opacity,
+        inputs,
+        fields,
         function: function.clone().unbind(),
     };
     bullterrier_image::register(Arc::new(effect)).map_err(value_error)
@@ -202,20 +278,30 @@ struct PythonEffect {
     name: String,
     category: Category,
     opacity: f64,
+    inputs: Vec<Input>,
+    fields: Vec<FieldParam>,
     function: Py<PyAny>,
 }
 
 impl PythonEffect {
-    /// Call the function with `picture` and `params`; its result as an image of the picture's size, or what is wrong.
-    fn call(&self, py: Python<'_>, picture: &Picture<'_>, params: &Value) -> Result<Image, String> {
+    /// Call the function with `picture`, `params` and the inputs it declares; its result as an image of the picture's
+    /// size, or what is wrong.
+    fn call(
+        &self,
+        py: Python<'_>,
+        picture: &Picture<'_>,
+        params: &Value,
+        inputs: &Inputs<'_>,
+    ) -> Result<Image, String> {
         let shape = [picture.height(), picture.width(), 3];
         let rgb = PyArray1::from_slice(py, picture.values())
             .reshape(shape)
             .map_err(|error| error.to_string())?;
         let params = from_json(py, params).map_err(|error| error.to_string())?;
+        let given = self.keywords(py, picture, inputs).map_err(|error| error.to_string())?;
         let result = self
             .function
-            .call1(py, (rgb, params))
+            .call(py, (rgb, params), Some(&given))
             .map_err(|error| error.to_string())?;
         let result = result.bind(py);
         let wrong = || {
@@ -233,6 +319,38 @@ impl PythonEffect {
     }
 }
 
+impl PythonEffect {
+    /// The keyword arguments the function declares, from `inputs`.
+    fn keywords<'py>(
+        &self,
+        py: Python<'py>,
+        picture: &Picture<'_>,
+        inputs: &Inputs<'_>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let shape = [picture.height(), picture.width()];
+        let given = PyDict::new(py);
+        let absent = |input: &str| PyValueError::new_err(format!("`{input}` is declared but not given"));
+        if self.inputs.contains(&Input::SizeRatio) {
+            given.set_item(Input::SizeRatio.name(), inputs.size_ratio())?;
+        }
+        if self.inputs.contains(&Input::Partition) {
+            let labels = inputs.partition().ok_or_else(|| absent(Input::Partition.name()))?;
+            given.set_item(
+                Input::Partition.name(),
+                PyArray1::from_slice(py, labels.values()).reshape(shape)?,
+            )?;
+        }
+        for field in &self.fields {
+            let layer = inputs.field(&field.parameter).ok_or_else(|| absent(&field.parameter))?;
+            given.set_item(
+                &field.parameter,
+                PyArray1::from_slice(py, layer.values()).reshape(shape)?,
+            )?;
+        }
+        Ok(given)
+    }
+}
+
 impl Effect for PythonEffect {
     fn name(&self) -> &str {
         &self.name
@@ -246,9 +364,17 @@ impl Effect for PythonEffect {
         self.opacity
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value) -> Result<Image, Error> {
+    fn inputs(&self) -> &[Input] {
+        &self.inputs
+    }
+
+    fn fields(&self) -> &[FieldParam] {
+        &self.fields
+    }
+
+    fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         // `_core.apply` runs the core without the interpreter lock; the function needs it back
-        Python::attach(|py| self.call(py, picture, &params)).map_err(|message| Error::Foreign {
+        Python::attach(|py| self.call(py, picture, &params, inputs)).map_err(|message| Error::Foreign {
             effect: self.name.clone(),
             message,
         })
@@ -259,6 +385,54 @@ impl Effect for PythonEffect {
 #[expect(clippy::needless_pass_by_value, reason = "map_err passes the error by value")]
 fn value_error(error: impl ToString) -> PyErr {
     PyValueError::new_err(error.to_string())
+}
+
+/// The labelling `partition` (an int32 `(height, width)` array) makes, among as many pieces as its largest number plus
+/// one.
+fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
+    let array = partition.cast::<PyArray2<i32>>().map_err(|_| {
+        PyValueError::new_err(format!(
+            "partition must be an int32 array of shape (h, w), got {}",
+            found(partition)
+        ))
+    })?;
+    let &[height, width] = array.shape() else {
+        return Err(PyValueError::new_err(format!(
+            "partition must be an int32 array of shape (h, w), got {}",
+            found(partition)
+        )));
+    };
+    let labels: Vec<i32> = array.readonly().as_array().iter().copied().collect();
+    let pieces = labels
+        .iter()
+        .copied()
+        .max()
+        .map_or(0, |largest| usize::try_from(largest).map_or(0, |largest| largest + 1));
+    Labels::new(height, width, labels, pieces).map_err(value_error)
+}
+
+/// The map of every `(parameter, array)` in `fields`: float32 `(height, width)` arrays.
+fn layers_of(fields: &Bound<'_, PyDict>) -> PyResult<Vec<(String, Layer)>> {
+    fields
+        .iter()
+        .map(|(parameter, array)| {
+            let parameter = parameter.extract::<String>()?;
+            let wrong = || {
+                PyValueError::new_err(format!(
+                    "the field {parameter:?} must be a float32 array of shape (h, w), got {}",
+                    found(&array)
+                ))
+            };
+            let typed = array.cast::<PyArray2<f32>>().map_err(|_| wrong())?;
+            let &[height, width] = typed.shape() else {
+                return Err(wrong());
+            };
+            let values: Vec<f32> = typed.readonly().as_array().iter().copied().collect();
+            let layer = Layer::new(height, width, values)
+                .map_err(|error| PyValueError::new_err(format!("the field {parameter:?}: {error}")))?;
+            Ok((parameter, layer))
+        })
+        .collect()
 }
 
 /// The `ValueError` for an `rgb` that is not a C-contiguous float32 (height, width, 3) array.

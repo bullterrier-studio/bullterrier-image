@@ -50,6 +50,9 @@ pub enum Error {
         /// What serde found wrong with them.
         source: serde_json::Error,
     },
+    /// An effect was given inputs that do not fit: one it declares is missing, or a partition or map is not of the
+    /// picture's size, or a map or partition has values it must not.
+    Inputs(String),
     /// Channel values that do not make a picture of the given size (three per pixel).
     Size {
         /// The number of rows given.
@@ -144,7 +147,7 @@ impl fmt::Display for Error {
                     _ => write!(formatter, "effect '{effect}': `{field}` {constraint}, got {value}"),
                 }
             }
-            Self::Recipe(message) => formatter.write_str(message),
+            Self::Recipe(message) | Self::Inputs(message) => formatter.write_str(message),
             Self::Foreign { effect, message } => write!(formatter, "the effect {effect:?} failed: {message}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
             Self::Size { height, width, values } => {
@@ -165,6 +168,7 @@ impl std::error::Error for Error {
             | Self::Duplicate(_)
             | Self::Invalid { .. }
             | Self::Recipe(_)
+            | Self::Inputs(_)
             | Self::Foreign { .. }
             | Self::Size { .. } => None,
         }

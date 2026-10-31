@@ -6,10 +6,11 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
 use crate::params::Params;
-use crate::{Image, Picture};
+use crate::{Image, Inputs, Picture};
 
 // What the effect declares besides its parameters: its section of the catalogue, the opacity of a step of it that sets
-// none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet).
+// none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet: list `Input::Partition`
+// or `Input::SizeRatio` to receive them in `render`'s `inputs`).
 pub(crate) const META: Meta = Meta {
     category: Category::$Category,
     opacity: 1.0,
@@ -44,7 +45,8 @@ pub struct Params {
 
 /// The picture mixed toward its negative by `amount`. Replace with the effect: pixel by pixel as here, or over the
 /// whole picture. Every number is a `Params` field, a trivial operand, or carries `// constant: <reason>`; what two
-/// effects share goes in `crate::ops`, never in another effect's file.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
+/// effects share goes in `crate::ops`, never in another effect's file. `inputs` holds only the inputs `META` declares
+/// (rename it when `render` reads it).
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     picture.map(|pixel| pixel.map(|value| value * (1.0 - params.amount) + (1.0 - value) * params.amount))
 }

@@ -9,7 +9,7 @@
 use std::error::Error;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
-use bullterrier_image::{Category, Effect, Image, Picture, effect, effects};
+use bullterrier_image::{Category, Effect, Image, Inputs, Picture, effect, effects};
 use serde_json::{Map, Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -112,7 +112,9 @@ fn render(
     picture: &Picture<'_>,
 ) -> Result<Vec<f32>, Box<dyn Error>> {
     let params = table.check(effect.name(), given)?;
-    Ok(effect.apply(picture, Value::Object(params))?.into_values())
+    Ok(effect
+        .apply(picture, Value::Object(params), &Inputs::default())?
+        .into_values())
 }
 
 fn differs(left: &[f32], right: &[f32]) -> bool {
@@ -217,7 +219,12 @@ impl Effect for Brighten {
         })
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value) -> Result<Image, bullterrier_image::Error> {
+    fn apply(
+        &self,
+        picture: &Picture<'_>,
+        params: Value,
+        _inputs: &Inputs<'_>,
+    ) -> Result<Image, bullterrier_image::Error> {
         let gain = params["gain"].as_f64().unwrap_or(1.0);
         #[expect(clippy::cast_possible_truncation, reason = "a gain between 0 and 2 fits an f32")]
         let gain = gain as f32;

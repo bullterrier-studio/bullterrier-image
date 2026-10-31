@@ -14,6 +14,7 @@
 mod effect;
 pub mod effects;
 mod error;
+mod inputs;
 mod ops;
 pub mod params;
 mod picture;
@@ -23,27 +24,34 @@ mod registry;
 #[cfg(test)]
 mod testing;
 
-pub use effect::{Category, Effect, Input};
+pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error};
+pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
 pub use recipe::{Assign, BlendMode, Each, Entry, Recipe, STEP_KEYS, Step};
 pub use registry::{effect, effects, register, unregister};
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
-/// image of the picture's size.
+/// image of the picture's size. `inputs` is what is on offer: the effect receives the part it declares.
 ///
 /// # Errors
 /// [`Error::UnknownEffect`] if there is no effect of that name, [`Error::Params`] if `params` misses one of a core
-/// effect's parameters, has one it does not know, or one of the wrong type, and [`Error::Foreign`] if an effect run
+/// effect's parameters, has one it does not know, or one of the wrong type, [`Error::Inputs`] if the effect declares
+/// an input that `inputs` lacks or that is not of the picture's size, and [`Error::Foreign`] if an effect run
 /// elsewhere fails.
-pub fn apply(effect: &str, picture: &Picture<'_>, params: serde_json::Value) -> Result<Image, Error> {
-    registry::effect(effect)?.apply(picture, params)
+pub fn apply(
+    effect: &str,
+    picture: &Picture<'_>,
+    params: serde_json::Value,
+    inputs: &Inputs<'_>,
+) -> Result<Image, Error> {
+    effect::run(&*registry::effect(effect)?, picture, params, inputs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Picture, apply, effects::grade};
+    use super::{Error, Inputs, Picture, apply, effects::grade};
     use serde_json::json;
 
     fn grade_params() -> serde_json::Value {
@@ -58,7 +66,12 @@ mod tests {
         let values = [
             0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,
         ];
-        let image = apply("grade", &Picture::new(2, 3, &values)?, grade_params())?;
+        let image = apply(
+            "grade",
+            &Picture::new(2, 3, &values)?,
+            grade_params(),
+            &Inputs::default(),
+        )?;
         assert_eq!((image.height(), image.width()), (2, 3));
         let out = image.into_values();
         assert_eq!(out.len(), values.len());
@@ -77,7 +90,12 @@ mod tests {
         let values = [
             0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9,
         ];
-        let out = grade::render(&Picture::new(2, 3, &values)?, &grade::Params::default()).into_values();
+        let out = grade::render(
+            &Picture::new(2, 3, &values)?,
+            &grade::Params::default(),
+            &Inputs::default(),
+        )
+        .into_values();
         assert!(
             out.iter()
                 .zip(values)
@@ -90,7 +108,12 @@ mod tests {
     #[test]
     fn an_unknown_effect_is_refused_by_name() -> Result<(), Error> {
         let values = [0.0_f32; 3];
-        let result = apply("no_such_effect", &Picture::new(1, 1, &values)?, json!({}));
+        let result = apply(
+            "no_such_effect",
+            &Picture::new(1, 1, &values)?,
+            json!({}),
+            &Inputs::default(),
+        );
         assert!(matches!(result, Err(Error::UnknownEffect(name)) if name == "no_such_effect"));
         Ok(())
     }
@@ -110,7 +133,7 @@ mod tests {
             (extra, "kelvin"),
             (json!({"temperature": "warm"}), "string"),
         ] {
-            let result = apply("grade", &picture, params);
+            let result = apply("grade", &picture, params, &Inputs::default());
             assert!(
                 matches!(&result, Err(error @ Error::Params { effect: "grade", .. }) if error.to_string().contains(field)),
                 "{field}: {result:?}"

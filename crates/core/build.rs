@@ -34,7 +34,8 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
 }
 
 /// The Rust source of the list: a module per effect file, the `EffectParams` impl that names the effect of its `Params`,
-/// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters) and its `render`.
+/// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters) and its `render`
+/// (`fn(&Picture, &Params, &Inputs) -> Image`).
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {

@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
 use crate::params::Params;
-use crate::{Image, Picture};
+use crate::{Image, Inputs, Picture};
 
 /// Where `pixel_grid` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -47,7 +47,7 @@ pub struct Params {
 /// The picture on the grid. The share of each pixel a stripe lights is worked out in `f64`, as the shares of whole
 /// rows and columns, then mixed in with `amount`.
 #[expect(clippy::cast_possible_truncation, reason = "the gain is applied to f32 pictures")]
-pub(crate) fn render(picture: &Picture<'_>, params: &Params) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let cell = f64::from(params.cell);
     let amount = f64::from(params.amount);
     let gap = f64::from(params.gap);
