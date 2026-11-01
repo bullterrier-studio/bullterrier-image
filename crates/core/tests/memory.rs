@@ -5,10 +5,11 @@
 //! `trace`, which keeps a picture per step by design, is the measurement that can fail: it shows the counter sees a
 //! picture that is kept.
 
+use std::fmt::Write as _;
 use std::sync::{Mutex, PoisonError};
 
 use bullterrier_image::frame::Flip;
-use bullterrier_image::region::{Band, Grid, Shares};
+use bullterrier_image::region::{Band, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Region, Shards, Shares, Svg};
 use bullterrier_image::{Each, Entry, Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use peak_alloc::PeakAlloc;
 
@@ -192,5 +193,126 @@ fn a_trace_of_an_each_step_keeps_the_picture_of_every_step_which_is_what_the_mea
         "the trace held {peak} bytes, {} pictures",
         peak / IMAGE
     );
+    Ok(())
+}
+
+/// The most bytes, beyond the photo's own, that rendering a one-look `each` over the partition `region` (or a step masked by
+/// it, for a selection) holds at once.
+fn laid_peak(region: impl Into<Region>) -> Result<usize, Error> {
+    let region = region.into();
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+    let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
+    let step = if matches!(region, Region::Path(_)) {
+        Entry::from(Step::new("grade").param("exposure", 0.5).mask("r"))
+    } else {
+        Entry::from(Each::new("r", [None]))
+    };
+    let recipe = Recipe::new([step]).with_region("r", region);
+    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    photo.render(&recipe, &Presets::new(), Options::default())?;
+    Ok(HEAP.peak_usage() - before)
+}
+
+#[test]
+fn a_region_laid_over_a_frame_holds_a_few_pictures_however_much_its_numbers_ask_for() -> Result<(), Error> {
+    let torn = Edge {
+        style: EdgeStyle::Torn,
+        amount: 48.0,
+        scale: 1.0,
+        octaves: 8,
+        ..Edge::default()
+    };
+    let folder = std::env::temp_dir().join(format!("bt-image-memory-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).map_err(|error| Error::Recipe(error.to_string()))?;
+    let file = folder.join("hundred.svg");
+    let mut rects = String::new();
+    for at in 0..100 {
+        let _ = write!(
+            rects,
+            r#"<rect x="{}" y="{}" width="30" height="30"/>"#,
+            (at % 10) * 20,
+            (at / 10) * 20
+        );
+    }
+    std::fs::write(
+        &file,
+        format!(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">{rects}</svg>"#),
+    )
+    .map_err(|error| Error::Recipe(error.to_string()))?;
+    let cuts = Cuts {
+        lines: (0..32)
+            .map(|at| {
+                if at % 2 == 0 {
+                    Line {
+                        x: 0.5,
+                        y: 0.5,
+                        angle: 5.0 * f64::from(at),
+                    }
+                    .into()
+                } else {
+                    Curve {
+                        path: format!("M {} 0 L {} 1", 0.03 * f64::from(at), 0.03 * f64::from(at) + 0.02),
+                    }
+                    .into()
+                }
+            })
+            .collect(),
+        ..Cuts::default()
+    };
+    // (what it is, the region, the most pictures it may hold at once beyond the photo's own: the picture a step makes, and
+    // the bend of a torn edge, the raster of a drawing or the mask of a path, which measured 1.3 to 2.4)
+    let rows: Vec<(&str, Region, usize)> = vec![
+        (
+            "500 torn shards",
+            Shards {
+                count: 500,
+                edge: torn.clone(),
+                ..Shards::default()
+            }
+            .into(),
+            2,
+        ),
+        (
+            "100 svg shapes",
+            Svg {
+                file: file.to_string_lossy().into_owned(),
+                edge: torn.clone(),
+                ..Svg::default()
+            }
+            .into(),
+            2,
+        ),
+        (
+            "a path of 16 samples",
+            Path {
+                samples: 16,
+                edge: torn.clone(),
+                ..Path::default()
+            }
+            .into(),
+            3,
+        ),
+        ("32 cuts", cuts.into(), 2),
+        (
+            "a torn grid",
+            Grid {
+                edge: torn,
+                ..Grid::default()
+            }
+            .into(),
+            2,
+        ),
+    ];
+    for (what, region, pictures) in rows {
+        let peak = laid_peak(region)?;
+        assert!(
+            peak <= pictures * IMAGE,
+            "{what} held {peak} bytes, {} pictures",
+            peak / IMAGE
+        );
+    }
+    std::fs::remove_dir_all(&folder).ok();
     Ok(())
 }

@@ -83,3 +83,67 @@ impl Drawing {
         Ok(Pieces { labels, count, ids })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ops::outlines::Limits;
+    use crate::ops::svg::{Drawing, read};
+
+    /// Three 10 x 10 rects, one of them half outside the picture (it starts 5 px left of it), in a 100 x 100 picture.
+    fn drawing() -> Result<Drawing, String> {
+        let text = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <rect x="0" y="0" width="10" height="10"/><rect x="20" y="20" width="10" height="10"/>
+            <rect x="-5" y="40" width="10" height="10"/></svg>"#;
+        read(text.as_bytes(), [0.0, 0.0, 100.0, 100.0], 10, &Limits::STANDARD)
+    }
+
+    #[test]
+    fn painted_pixels_are_limited_by_the_boxes_clipped_to_the_picture_at_the_limit_and_one_past_it()
+    -> Result<(), String> {
+        // 100 + 100 + 50 pixels: the third rect's box is clipped at the left edge of the picture
+        let drawn = drawing()?;
+        let with = |painted| {
+            drawn.pieces(
+                100,
+                100,
+                None,
+                &Limits {
+                    painted,
+                    ..Limits::STANDARD
+                },
+            )
+        };
+        assert_eq!(with(250).map(|pieces| pieces.count), Ok(4));
+        let refused = with(249).err();
+        assert!(
+            matches!(&refused, Some(said) if said.contains("250 pixels") && said.contains("limit of 249")),
+            "{refused:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn crossings_are_limited_to_the_rows_each_vertical_edge_crosses_at_the_limit_and_one_past_it() -> Result<(), String>
+    {
+        // a rect has two edges that cross a scanline, and 10 rows of the picture to cross
+        let drawn = drawing()?;
+        let with = |crossings| {
+            drawn.pieces(
+                100,
+                100,
+                None,
+                &Limits {
+                    crossings,
+                    ..Limits::STANDARD
+                },
+            )
+        };
+        assert_eq!(with(60).map(|pieces| pieces.count), Ok(4));
+        let refused = with(59).err();
+        assert!(
+            matches!(&refused, Some(said) if said.contains("60 crossings") && said.contains("limit of 59")),
+            "{refused:?}"
+        );
+        Ok(())
+    }
+}
