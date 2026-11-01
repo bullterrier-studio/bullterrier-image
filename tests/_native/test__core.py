@@ -357,6 +357,14 @@ def test_a_declared_input_that_is_missing_or_of_another_size_refuses_the_run_and
         pytest.param({"partition": PIECES.astype(np.int64)}, "int32", id="a partition that is not int32"),
         pytest.param({"partition": np.zeros(6, np.int32)}, "shape", id="a partition that is not 2-dimensional"),
         pytest.param({"partition": np.array([[0, -1, 1], [1, 1, 1]], np.int32)}, "-1", id="a negative piece number"),
+        pytest.param(
+            {"partition": np.array([[0, 1, 2], [3, 4, 6]], np.int32)}, "6", id="a piece number past one for each pixel"
+        ),
+        pytest.param(
+            {"partition": np.array([[0, 1, 2], [3, 4, 2**31 - 1]], np.int32)},
+            "2147483647",
+            id="the largest piece number",
+        ),
         pytest.param({"fields": {"field": DEPTH.astype(np.float64)}}, "float32", id="a field that is not float32"),
         pytest.param({"fields": {"field": DEPTH + 1}}, "from 0 to 1", id="a field above 1"),
         pytest.param({"fields": {"field": np.where(DEPTH > 0.5, np.nan, DEPTH).astype(np.float32)}}, "NaN", id="NaN"),
@@ -365,6 +373,14 @@ def test_a_declared_input_that_is_missing_or_of_another_size_refuses_the_run_and
 def test_an_offered_input_that_is_no_valid_input_is_refused_naming_it(offered, said):
     with registered_with("probe_any", fill(0.5)), pytest.raises(ValueError, match=said):
         _core.apply("probe_any", PICTURE, {}, **offered)
+
+
+def test_a_partition_may_number_every_pixel_its_own_piece():
+    taken, takes = recording()
+    every_pixel = np.arange(6, dtype=np.int32).reshape(2, 3)
+    with registered_with("probe_takes", takes, inputs=["partition"]):
+        _core.apply("probe_takes", PICTURE, {}, partition=every_pixel)
+    np.testing.assert_array_equal(taken[0]["partition"], every_pixel)
 
 
 @pytest.mark.parametrize(

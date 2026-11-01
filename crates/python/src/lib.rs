@@ -441,7 +441,8 @@ fn value_error(error: impl ToString) -> PyErr {
 }
 
 /// The labelling `partition` (an int32 `(height, width)` array) makes, among as many pieces as its largest number plus
-/// one.
+/// one, but no more than it has pixels: a larger number is refused (`Labels::new` names it), so no label can make a
+/// consumer allocate a piece for each number up to it.
 fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
     let array = partition.cast::<PyArray2<i32>>().map_err(|_| {
         PyValueError::new_err(format!(
@@ -460,7 +461,8 @@ fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
         .iter()
         .copied()
         .max()
-        .map_or(0, |largest| usize::try_from(largest).map_or(0, |largest| largest + 1));
+        .map_or(0, |largest| usize::try_from(largest).map_or(0, |largest| largest + 1))
+        .min(labels.len());
     Labels::new(height, width, labels, pieces).map_err(core_error)
 }
 
