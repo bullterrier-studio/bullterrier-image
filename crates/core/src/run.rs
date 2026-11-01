@@ -12,6 +12,7 @@ use std::fmt;
 use std::sync::Arc;
 
 mod cut;
+mod each;
 mod frame;
 mod maps;
 mod regions;
@@ -105,8 +106,13 @@ impl<'a> Photo<'a> {
     /// the pieces of the region it names (a selection is split into the pixels it chooses, above one half, and the
     /// others). A `subject` region found `per` piece needs the photo's `subject` finder (a handed in `subject` map does
     /// not do) and asks it about each piece's crop of the working picture. A recipe whose steps use a region the core
-    /// does not make yet (`shards`, `cuts`, `path`, `svg`, a torn edge) or an `each` step is refused before anything
-    /// runs, and so is one that needs the subject finder of a photo that has none.
+    /// does not make yet (`shards`, `cuts`, `path`, `svg`, a torn edge) is refused before anything runs, and so is one
+    /// that needs the subject finder of a photo that has none.
+    ///
+    /// An `each` step gives each piece of its partition a look (see [`Each`](crate::Each)): every look that has a piece is run once
+    /// over the whole working picture and shown by the weights of its pieces, which are 1 inside them and 0 outside,
+    /// softened across the borders by a Gaussian of `feather` design pixels; a piece with no look keeps what the step
+    /// received. The step's `mask`, `opacity` (none: 1) and `blend_mode` lay the result over its input.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
     /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the

@@ -8,8 +8,8 @@
 use std::sync::{Mutex, PoisonError};
 
 use bullterrier_image::frame::Flip;
-use bullterrier_image::region::Band;
-use bullterrier_image::{Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::region::{Band, Grid, Shares};
+use bullterrier_image::{Each, Entry, Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -138,6 +138,58 @@ fn a_trace_of_masked_steps_holds_every_picture_which_is_what_the_measurement_mus
     assert!(
         peak >= 8 * IMAGE,
         "8 masked steps held {peak} bytes, {} pictures",
+        peak / IMAGE
+    );
+    Ok(())
+}
+
+/// The most bytes, beyond the photo's own, that `run` holds at once while it works on a `grade` step followed by an each
+/// step of three looks over a grid of 12 columns, blended over 24 design pixels.
+fn each_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Result<usize, Error> {
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+    let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
+    let look = |exposure: f64| Some(Step::new("grade").param("exposure", exposure).opacity(1.0));
+    let mut each = Each::new("cells", [look(0.2), look(0.4), look(0.6)]);
+    each.feather = 24.0;
+    let recipe = Recipe::new([
+        Entry::from(Step::new("grade").param("exposure", 0.1)),
+        Entry::from(each),
+    ])
+    .with_region(
+        "cells",
+        Grid {
+            columns: Shares::equal(12),
+            ..Grid::default()
+        },
+    );
+    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    run(&photo, &recipe)?;
+    Ok(HEAP.peak_usage() - before)
+}
+
+#[test]
+fn an_each_step_holds_its_input_the_blend_so_far_one_look_and_one_weight_map_at_a_time() -> Result<(), Error> {
+    // the first step's picture, the blend so far, the look being run and its weights and the piece numbers (a third of a
+    // picture each): 3.76 pictures. The results and weights of all three looks kept would be 7
+    let peak = each_peak(|photo, recipe| photo.render(recipe, &Presets::new(), Options::default()).map(drop))?;
+    assert!(
+        peak <= 4 * IMAGE,
+        "an each of 3 looks held {peak} bytes, {} pictures",
+        peak / IMAGE
+    );
+    Ok(())
+}
+
+#[test]
+fn a_trace_of_an_each_step_keeps_the_picture_of_every_step_which_is_what_the_measurement_must_see() -> Result<(), Error>
+{
+    // the known-bad of the test above: a run that keeps the picture of each step as well
+    let peak = each_peak(|photo, recipe| photo.trace(recipe, &Presets::new(), Options::default()).map(drop))?;
+    assert!(
+        peak > 4 * IMAGE,
+        "the trace held {peak} bytes, {} pictures",
         peak / IMAGE
     );
     Ok(())

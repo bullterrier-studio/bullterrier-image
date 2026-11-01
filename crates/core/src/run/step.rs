@@ -5,15 +5,16 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
+use super::each::EachRun;
 use super::regions::Evaluator;
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets};
+use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets, Step};
 
-/// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete and scaled, the regions it names, or why
-/// the core does not run it yet.
+/// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
+/// names, for an `each` step its looks the same.
 pub(super) fn prepare(
     registry: &Registry,
     presets: &Presets,
@@ -21,49 +22,36 @@ pub(super) fn prepare(
     entry: &Entry,
     place: &str,
 ) -> Result<Prepared, Error> {
-    let Entry::Step(step) = entry else {
-        return Err(Error::Recipe(format!(
-            "{place}: an `each` step is not run by the core yet"
-        )));
-    };
-    let effect = registry.effect(&step.effect)?;
-    let given = presets.under(step, place)?;
-    let mut fields = Vec::new();
-    for field in effect.fields() {
-        let name = field
-            .field_in(&given)
-            .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
-        fields.push((field.parameter.clone(), name.to_owned()));
-    }
-    let drives = drive::in_params(&step.effect, &given, place)?;
-    let runs = if let Some((_, first)) = drives.first() {
-        // one run for each level of the drives, each with its values checked and scaled like a plain step's
-        let levels = (0..first.levels)
-            .map(|level| {
-                let mut values = given.clone();
-                for (name, drive) in &drives {
-                    values.insert(name.clone(), Value::from(drive.value(level)));
-                }
-                complete(&*effect, &step.effect, values, ratio, place)
-            })
-            .collect::<Result<_, _>>()?;
-        Runs::Driven {
-            by: first.by.clone(),
-            top: first.levels - 1,
-            levels,
-        }
-    } else {
-        Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
-    };
-    Ok(Prepared {
-        opacity: step.opacity.unwrap_or_else(|| effect.opacity()),
-        blend_mode: step.blend_mode,
-        mask: step.mask.clone(),
-        partition: step.partition.clone(),
-        fields,
-        effect,
-        runs,
+    Ok(match entry {
+        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, step, place)?),
+        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, each, place)?),
     })
+}
+
+/// An entry of a recipe ready to run.
+pub(super) enum Prepared {
+    Step(StepRun),
+    Each(EachRun),
+}
+
+impl Prepared {
+    /// This entry run on `before`, with the selections it names made by `regions` for `working`, the picture the render
+    /// works on, and the result laid over `before`; `ratio` is the working picture's size over the design size.
+    ///
+    /// # Errors
+    /// Why a region could not be made, or an effect failed.
+    pub(super) fn apply(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+    ) -> Result<Image, Error> {
+        match self {
+            Self::Step(step) => step.apply(before, ratio, regions, working),
+            Self::Each(each) => each.apply(before, ratio, regions, working),
+        }
+    }
 }
 
 /// The complete parameters a step's effect is run with.
@@ -75,18 +63,64 @@ enum Runs {
     Driven { by: String, top: u8, levels: Vec<Value> },
 }
 
+/// How the result of a step is laid over its input: by a blend mode, mixed in by an opacity and, where there is a `mask`,
+/// only as far as the mask says.
+pub(super) struct Laid {
+    opacity: f64,
+    blend_mode: BlendMode,
+    /// The name of the region that limits it.
+    mask: Option<String>,
+}
+
+impl Laid {
+    pub(super) fn new(opacity: f64, blend_mode: BlendMode, mask: Option<&String>) -> Self {
+        Self {
+            opacity,
+            blend_mode,
+            mask: mask.cloned(),
+        }
+    }
+
+    /// `after`, the result for `before`, laid over `before`. A plain step (blend mode normal, opacity 1, no mask) is its
+    /// result as it is, uncopied.
+    pub(super) fn over(
+        &self,
+        before: &Picture<'_>,
+        after: Image,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+    ) -> Result<Image, Error> {
+        let mask = self
+            .mask
+            .as_ref()
+            .map(|mask| regions.selection(mask, working))
+            .transpose()?;
+        Ok(
+            if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
+                after
+            } else {
+                blend::lay(
+                    before,
+                    &after.as_picture(),
+                    self.blend_mode,
+                    self.opacity,
+                    mask.as_deref(),
+                )
+            },
+        )
+    }
+}
+
 /// A step ready to run: its effect, the complete parameters it receives, the selections it works from (by region name)
 /// and how its result is laid over its input.
-pub(super) struct Prepared {
+pub(super) struct StepRun {
     effect: Arc<dyn Effect>,
     runs: Runs,
     /// The field parameters of the effect, each with the name of its region.
     fields: Vec<(String, String)>,
     /// The region whose pieces the effect receives, if it takes a partition.
     partition: Option<String>,
-    opacity: f64,
-    blend_mode: BlendMode,
-    mask: Option<String>,
+    laid: Laid,
 }
 
 /// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes them, checked
@@ -104,12 +138,59 @@ fn complete(
     }))
 }
 
-impl Prepared {
-    /// This step's effect run on `before`, with the selections it names made by `regions` for `working`, the picture the
-    /// render works on, and the result laid over `before`.
-    ///
-    /// # Errors
-    /// Why a region could not be made, or the effect failed.
+impl StepRun {
+    /// The step `step` (at `place`, as `step 2`) resolved.
+    pub(super) fn new(
+        registry: &Registry,
+        presets: &Presets,
+        ratio: f64,
+        step: &Step,
+        place: &str,
+    ) -> Result<Self, Error> {
+        let effect = registry.effect(&step.effect)?;
+        let given = presets.under(step, place)?;
+        let mut fields = Vec::new();
+        for field in effect.fields() {
+            let name = field
+                .field_in(&given)
+                .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
+            fields.push((field.parameter.clone(), name.to_owned()));
+        }
+        let drives = drive::in_params(&step.effect, &given, place)?;
+        let runs = if let Some((_, first)) = drives.first() {
+            // one run for each level of the drives, each with its values checked and scaled like a plain step's
+            let levels = (0..first.levels)
+                .map(|level| {
+                    let mut values = given.clone();
+                    for (name, drive) in &drives {
+                        values.insert(name.clone(), Value::from(drive.value(level)));
+                    }
+                    complete(&*effect, &step.effect, values, ratio, place)
+                })
+                .collect::<Result<_, _>>()?;
+            Runs::Driven {
+                by: first.by.clone(),
+                top: first.levels - 1,
+                levels,
+            }
+        } else {
+            Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
+        };
+        Ok(Self {
+            laid: Laid::new(
+                step.opacity.unwrap_or_else(|| effect.opacity()),
+                step.blend_mode,
+                step.mask.as_ref(),
+            ),
+            partition: step.partition.clone(),
+            fields,
+            effect,
+            runs,
+        })
+    }
+
+    /// This step's effect run on `before`, with the selections it names made by `regions` for `working`, and the result
+    /// laid over `before`.
     pub(super) fn apply(
         &self,
         before: &Picture<'_>,
@@ -140,12 +221,7 @@ impl Prepared {
                 self.driven(before, &offered, &by, *top, levels)?
             }
         };
-        let mask = self
-            .mask
-            .as_ref()
-            .map(|mask| regions.selection(mask, working))
-            .transpose()?;
-        Ok(self.lay(before, after, mask.as_deref()))
+        self.laid.over(before, after, regions, working)
     }
 
     /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the
@@ -175,17 +251,6 @@ impl Prepared {
         }
         Ok(Image::from_pixels(before.height(), before.width(), mixed))
     }
-
-    /// `after`, the effect's result for `before`, laid over `before` as the step says: by its blend mode, mixed in by its
-    /// opacity and, where `mask` is given, only as far as the mask says. A plain step (blend mode normal, opacity 1, no
-    /// mask) is its result as it is, uncopied.
-    fn lay(&self, before: &Picture<'_>, after: Image, mask: Option<&Layer>) -> Image {
-        if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
-            after
-        } else {
-            blend::lay(before, &after.as_picture(), self.blend_mode, self.opacity, mask)
-        }
-    }
 }
 
 #[cfg(test)]
@@ -196,9 +261,8 @@ mod tests {
 
     use super::*;
     use crate::params::Declared;
-    use crate::region::Grid;
     use crate::testing::{Measured, Paint, Recorder, registry, with_recorder};
-    use crate::{Drive, Each, Options, Photo, Recipe, Step};
+    use crate::{Drive, Options, Photo, Recipe, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel.
     fn values() -> Vec<f32> {
@@ -272,19 +336,6 @@ mod tests {
         assert_close(&own.into_values(), &expected);
         let full = rendered(&registry, &Recipe::new([paint().opacity(1.0)]), &Presets::new())?;
         assert_eq!(full.into_values(), vec![0.5; 72]);
-        Ok(())
-    }
-
-    #[test]
-    fn an_each_step_is_refused_naming_it_because_the_core_does_not_run_it_yet() -> Result<(), Error> {
-        let registry = registry()?;
-        let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
-        recipe_with_each.regions.insert("panes", Grid::default());
-        let result = rendered(&registry, &recipe_with_each, &Presets::new());
-        assert!(
-            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("step 1: an `each` step")),
-            "{result:?}"
-        );
         Ok(())
     }
 

@@ -779,6 +779,33 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn a_release_drops_the_maps_no_later_step_needs_including_one_no_step_ever_asked_for() -> Result<(), Error> {
+        // `frame` is a map only the frame needed (no step names it, so `last` has no entry), `late` is needed by step 2
+        let map = || Layer::new(1, 2, vec![0.5; 2]).map(Arc::new);
+        let held = BTreeMap::from([("frame".to_owned(), map()?), ("late".to_owned(), map()?)]);
+        let mut evaluator = Evaluator::new(
+            &Regions::default(),
+            held,
+            BTreeMap::from([("late".to_owned(), 2)]),
+            None,
+        );
+        evaluator.release(0);
+        assert!(evaluator.held("frame").is_none(), "a map no step needs is kept");
+        assert!(
+            evaluator.held("late").is_some(),
+            "a map step 2 needs was dropped after step 0"
+        );
+        evaluator.release(1);
+        assert!(
+            evaluator.held("late").is_some(),
+            "a map step 2 needs was dropped after step 1"
+        );
+        evaluator.release(2);
+        assert!(evaluator.held("late").is_none(), "a map no later step needs is kept");
+        Ok(())
+    }
+
     proptest! {
         #[test]
         fn every_selection_a_region_makes_lies_within_0_and_1_whatever_its_numbers(
