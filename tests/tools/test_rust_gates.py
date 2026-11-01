@@ -38,6 +38,8 @@ def workspace(tmp_path_factory) -> Path:
     for name in WORKSPACE_FILES:
         shutil.copy(ROOT / name, root)
     shutil.copytree(ROOT / "crates", root / "crates")
+    (root / "tools").mkdir()
+    shutil.copy(ROOT / "tools" / "run_capped.py", root / "tools")  # `rust-test` runs under it
     return root
 
 
