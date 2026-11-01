@@ -280,7 +280,7 @@ def load_recipe(path: str | Path) -> Recipe:
         )
     if raw.get("format", _FORMATS[0]) < 3 and isinstance(tables, dict):
         for name, table in tables.items():
-            if isinstance(table, dict) and table.get("kind") in _KINDS_NEW_IN_3:
+            if isinstance(table, dict) and isinstance(table.get("kind"), str) and table["kind"] in _KINDS_NEW_IN_3:
                 raise RecipeError(
                     f"{path.name}: region {name!r}: `kind` {table['kind']!r} needs `format = 3` at the top of the file"
                 )
@@ -333,7 +333,7 @@ def _regions(tables: object, file: str, folder: Path) -> dict[str, Kind]:
     for name, table in tables.items():
         fields = dict(table)
         kind = fields.pop("kind", None)
-        if kind in _REPLACED_IN_3:
+        if isinstance(kind, str) and kind in _REPLACED_IN_3:
             raise RecipeError(f"{file}: region {name!r}: `kind` {kind!r} is gone; {_REPLACED_IN_3[kind]} (format = 3)")
         if not isinstance(kind, str) or kind not in _KINDS:
             raise RecipeError(

@@ -634,3 +634,9 @@ def test_a_name_that_is_nothing_gets_no_location_and_no_close_match():
     assert "look" not in message
     assert "did you mean" not in message
     assert "grade" in message  # the effects are listed
+
+
+@pytest.mark.parametrize("name", [None, 5, ["grade"], {"grade": 1}], ids=["None", "number", "list", "table"])
+def test_a_name_that_is_not_a_string_is_an_unknown_effect_not_a_crash(name):
+    with pytest.raises(UnknownEffectError, match="string"):
+        registry.get(name)

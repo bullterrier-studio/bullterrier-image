@@ -246,6 +246,8 @@ def get(name: str) -> ModelledEffect:
     effect's summary (quoted whole); else it offers the close matches among effects, presets and looks. Recipes, `fx`,
     the command line and the gallery all name effects through here, so they all give this message."""
     _load_effect_packages()
+    if not isinstance(name, str):  # a recipe file may write any value
+        raise UnknownEffectError(f"an effect is named by a string, got {name!r}")
     try:
         return _EFFECTS[name]
     except KeyError:

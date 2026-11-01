@@ -151,6 +151,7 @@ class Step(_Layer):
 
     def __init__(
         self,
+        /,
         effect: str,
         *,
         params: Mapping[str, Any] | None = None,
@@ -173,7 +174,7 @@ class Step(_Layer):
         values = {name: _as_drive(effect, name, value) for name, value in (params or {}).items()}
         if preset is not None:
             found = registry.presets(effect)  # an unknown effect: UnknownEffectError listing them
-            if preset not in found:
+            if not isinstance(preset, str) or preset not in found:  # a recipe file may write any value
                 has = f"its presets: {', '.join(found)}" if found else "it has no presets"
                 raise RecipeError(f"effect {effect!r} has no preset {preset!r}; {has}")
             values = {**found[preset].params, **values}
@@ -308,6 +309,7 @@ class Each(_Layer):
 
     def __init__(
         self,
+        /,
         each: str,
         *,
         looks: Sequence[Step | None],
@@ -597,6 +599,7 @@ class Recipe(ValidatedModel):
 
     def __init__(
         self,
+        /,
         steps: Sequence[Step | Each],
         *,
         name: str | None = None,

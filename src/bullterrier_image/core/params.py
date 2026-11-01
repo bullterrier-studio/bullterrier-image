@@ -449,7 +449,7 @@ class ValidatedModel(BaseModel):
             return super().model_copy(deep=deep)
         return type(self).model_validate({**dict(self), **update})
 
-    def _init_checked(self, owner: str, **values: Any) -> None:
+    def _init_checked(self, owner: str, /, **values: Any) -> None:
         """For a subclass's own (positional) constructor: validate `values` into this instance; RecipeError like
         `parse`."""
         try:

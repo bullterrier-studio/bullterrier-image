@@ -137,6 +137,13 @@ BROKEN = {
     "steps for step": ("steps = 2\n" + STEP, "`steps`"),
     "an [animation] table, which no longer exists": ("[animation]\nseconds = 2\n" + STEP, "`animation`"),
     "a single [step] table instead of a list": ("[step]\neffect = 'grade'\n", r"\[\[step\]\]"),
+    "an effect written as a list": ("[[step]]\neffect = ['grade']\n", r"step 1: .*effect.*'grade'"),
+    "an effect written as a number": ("[[step]]\neffect = 5\n", r"step 1: .*effect.*5"),
+    "a preset written as a list": ("[[step]]\neffect = 'grade'\npreset = ['sepia']\n", r"step 1: .*preset.*sepia"),
+    "a region kind written as a list, in format 2": (
+        "format = 2\n[region.g]\nkind = ['grid']\n" + STEP,
+        r"region 'g': `kind` is \['grid'\]",
+    ),
     "an animated value, which no longer exists": (STEP + "exposure = { from = 0, to = 1 }\n", "step 1: .*exposure"),
 }
 
@@ -170,6 +177,8 @@ FRAME_MISTAKES = {
     "a misspelt key": ("[frame]\nrotate = 10\n", r"\[frame\]: .*`rotate`.*angle"),
     "frame given as a list of tables": ("[[frame]]\naspect = 1\n", r"\[frame\] table"),
     "frame given as a value": ("frame = 'square'\n", r"\[frame\] table"),
+    "a key called self": ("[frame]\nself = 1\n", r"\[frame\]: .*`self`"),
+    "a key called owner": ("[frame]\nowner = 1\n", r"\[frame\]: .*`owner`"),
 }
 
 
@@ -566,6 +575,14 @@ DRIVE_MISTAKES = {
         'effect = "bloom"\nradius = { by = "g", start = 0, end = 9 }',
         r"step 1: `by` names 'g', a partition, but it needs a selection",
     ),
+    "a drive with a key called self": (
+        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, self = 1 }',
+        r"step 1: .*`self`",
+    ),
+    "a drive with a key called owner": (
+        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, owner = 1 }',
+        r"step 1: .*`owner`",
+    ),
     "two fields in one step": (
         'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9 }\n'
         'amount = { by = "light", start = 0, end = 1 }',
@@ -735,6 +752,9 @@ REGION_MISTAKES = {
         '[region.g]\nkind = "radial_gradient"\nradius = 0\n',
         r"region 'g'.*`radius`.*0",
     ),
+    "a field called self": ('[region.g]\nkind = "grid"\nself = 1\n', r"region 'g'.*`self`"),
+    "a field called owner": ('[region.g]\nkind = "grid"\nowner = 1\n', r"region 'g'.*`owner`"),
+    "a kind written as a list": ('[region.g]\nkind = ["grid"]\n', r"region 'g': `kind` is \['grid'\]"),
     "a name taken by the built-in light": ('[region.light]\nkind = "grid"\n', r"region 'light' is a built-in"),
 }
 
@@ -790,6 +810,8 @@ EACH_MISTAKES = {
         '[[step]]\neach = "g"\nlooks = ["none"]\nexposure = 1\n',
         r"step 1: .*`exposure`",
     ),
+    "a key called self": ('[[step]]\neach = "g"\nlooks = ["none"]\nself = 1\n', r"step 1: .*`self`"),
+    "a key called owner": ('[[step]]\neach = "g"\nlooks = ["none"]\nowner = 1\n', r"step 1: .*`owner`"),
     "a look that is a word other than none": (
         '[[step]]\neach = "g"\nlooks = ["grade"]\n',
         r"step 1: look 1 is 'grade'.*none",
