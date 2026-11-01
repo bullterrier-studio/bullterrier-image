@@ -490,7 +490,7 @@ def edge(**fields: object) -> dict:
 # (what the row is about, the kind, the fields as a recipe writes them, whether they are valid): both ends of every
 # range and the first value beyond each, and the shapes each kind refuses. The `valid` column is written by hand;
 # Python's declaration and the core must both agree with it. Left out until the core reads them (R4d): the syntax of
-# `Path.d`, `Svg.file` and the names of `Shards.preset`. Left out because Python's declaration is laxer
+# `Path.d` and `Svg.file`. Left out because Python's declaration is laxer
 # than the rule and is replaced (R4e): a share written as text ("2") and a piece that is a switch (`True` is 1 to it);
 # the core refuses both (Rust tests).
 REGION_ROWS = [
@@ -540,6 +540,10 @@ REGION_ROWS = [
     ("a decimal count", "grid", {"columns": 2.5}, False),
     ("columns as a switch", "grid", {"columns": True}, False),
     # shards
+    ("a preset", "shards", {"preset": "glass"}, True),
+    ("a preset and a field given beside it", "shards", {"preset": "torn", "count": 3, "edge": {"amount": 1}}, True),
+    ("a preset that is no preset", "shards", {"preset": "shattered"}, False),
+    ("a preset's values are checked with the given ones", "shards", {"preset": "glass", "count": 501}, False),
     ("one shard", "shards", {"count": 1}, True),
     ("500 shards", "shards", {"count": 500}, True),
     ("no shard", "shards", {"count": 0}, False),

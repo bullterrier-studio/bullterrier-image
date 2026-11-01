@@ -150,7 +150,8 @@ pub struct Shards {
     /// Random seed for where the seeds lie: the same seed always cuts the same shards.
     pub seed: u32,
     /// The name of a shipped set of these fields (`glass`, `torn`, `stone` or `mosaic`), used for every field not
-    /// given beside it. None: the defaults.
+    /// given beside it (a given `edge` replaces the preset's whole `edge`). None: the defaults. It is laid under the
+    /// fields when a recipe is read, which then holds them all: a region built in code names a preset for the record only.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
 }

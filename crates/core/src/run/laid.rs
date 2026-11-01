@@ -6,8 +6,9 @@ use crate::ops::cuts::{self, Cut as Laid};
 use crate::ops::noise::{self, Tear};
 use crate::ops::outlines::{self, Frame, Limits};
 use crate::ops::pieces::{self, Bounds};
-use crate::ops::{cast, grid, length, raster};
-use crate::region::{Cut, Cuts, Edge, EdgeStyle, Grid, Path};
+use crate::ops::sites::{self, Honeycomb};
+use crate::ops::{cast, grid, length, nearest, raster};
+use crate::region::{Cut, Cuts, Edge, EdgeStyle, Grid, Path, Shards};
 use crate::{Error, Layer, Picture};
 
 /// How a torn edge moves the pixel centres of a picture before a kind classifies them: the shifts in px of the working
@@ -155,4 +156,30 @@ pub(super) fn cuts(
         limits.crossings,
     )
     .map_err(|said| refuse(name, &said))
+}
+
+/// The pieces of `picture` that the shards `spec` (the region `name`) make, and their number: the cells round `spec.count`
+/// seeds scattered over the box of `fit` (the selection `spec.fit` names) if it has one, and in its chosen pixels. A torn
+/// edge moves the pixel centres before they are given to the nearest seed.
+///
+/// # Errors
+/// As [`frame`].
+pub(super) fn shards(
+    name: &str,
+    spec: &Shards,
+    fit: Option<&Layer>,
+    picture: &Picture<'_>,
+) -> Result<(Vec<i32>, usize), Error> {
+    let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
+    let honeycomb = Honeycomb {
+        count: spec.count,
+        jitter: spec.jitter,
+        impact: spec.impact,
+        focus: spec.focus,
+        seed: spec.seed,
+    };
+    let (height, width) = (picture.height(), picture.width());
+    let seeds = sites::sites(&honeycomb, frame, fit.map(Layer::values), height, width);
+    let bend = Bend::of(&spec.edge, picture);
+    Ok(nearest::cells(height, width, &seeds, bend.as_ref().map(Bend::shifts)))
 }

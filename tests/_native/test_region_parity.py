@@ -587,11 +587,11 @@ def test_a_random_assignment_uses_every_look_and_favours_none_over_many_seeds(ph
 
 # --- the shipped looks and examples -------------------------------------------------------------------------------
 
-UNMADE_YET = (Shards, Svg)
+UNMADE_YET = (Svg,)
 
 
 def unmade(region: object) -> bool:
-    """Whether the core does not make this kind of region yet: shards or svg."""
+    """Whether the core does not make this kind of region yet: svg."""
     return isinstance(region, UNMADE_YET)
 
 
@@ -609,14 +609,17 @@ def declares_regions(recipe: Recipe) -> bool:
     return bool(recipe.regions) or any(isinstance(step, Each) for step in recipe.steps)
 
 
-def tears(recipe: Recipe) -> bool:
-    """Whether a region the steps use has a torn edge, whose noise is the core's own stream, not numpy's."""
-    return any(getattr(recipe.regions[name], "edge", Edge()).style == "torn" for name in used_regions(recipe))
+def seeded(recipe: Recipe) -> bool:
+    """Whether a region the steps use is shards or torn: both draw from the core's own stream, not numpy's."""
+    return any(
+        isinstance(recipe.regions[name], Shards) or getattr(recipe.regions[name], "edge", Edge()).style == "torn"
+        for name in used_regions(recipe)
+    )
 
 
 RUNNABLE = [path for path in FILES if declares_regions(load_recipe(path)) and not uses_unmade_region(load_recipe(path))]
-MADE = [path for path in RUNNABLE if not tears(load_recipe(path))]
-TORN = [path for path in RUNNABLE if tears(load_recipe(path))]
+MADE = [path for path in RUNNABLE if not seeded(load_recipe(path))]
+SEEDED = [path for path in RUNNABLE if seeded(load_recipe(path))]
 UNMADE = [path for path in FILES if uses_unmade_region(load_recipe(path))]
 
 
@@ -637,8 +640,8 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
         "diagonal",
         "bezier-cut",
     }
-    assert {path.stem for path in TORN} >= {"tear"}
-    assert {path.stem for path in UNMADE} >= {"glass", "svg", "torn"}
+    assert {path.stem for path in SEEDED} >= {"tear", "glass", "torn"}
+    assert {path.stem for path in UNMADE} >= {"svg"}
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
@@ -657,17 +660,17 @@ def test_a_shipped_file_that_uses_regions_renders_as_the_python_engine_renders_i
         assert np.abs(made - photo).max() > 1e-3  # the look does something
 
 
-@pytest.mark.parametrize("path", TORN, ids=ID)
-def test_a_shipped_file_with_a_torn_edge_renders_the_same_every_time_and_does_something(path, photo, subject):
-    # seeded: the tear is not numpy's, so only properties are compared (the python engine's tear is another one)
+@pytest.mark.parametrize("path", SEEDED, ids=ID)
+def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_and_does_something(path, photo):
+    # seeded: the shards and the tear are not numpy's, so only properties are compared (the python engine's differ)
     recipe = load_recipe(path)
-    maps = {"subject": subject, "depth": depth_of(photo)}
-    made = core_render(photo, recipe, maps=maps)
+    given = {"maps": {"depth": depth_of(photo)}, "finders": {"subject": Truth()}}
+    made = core_render(photo, recipe, **given)
     assert made.dtype == np.float32
     assert np.isfinite(made).all()
     assert made.min() >= 0
     assert made.max() <= 1
-    np.testing.assert_array_equal(core_render(photo, recipe, maps=maps), made)
+    np.testing.assert_array_equal(core_render(photo, recipe, **given), made)
     if recipe.frame == Framing() and recipe.size is None:
         assert np.abs(made - photo).max() > 1e-3
 
@@ -684,7 +687,6 @@ def test_a_shipped_file_that_uses_a_region_the_core_does_not_make_yet_is_refused
 
 
 UNPORTED = {
-    "shards": (Shards(count=5), "each"),
     "svg": (Svg(file="shape.svg"), "each"),
 }
 
@@ -713,6 +715,21 @@ def test_a_torn_grid_is_cut_by_the_core_the_same_for_a_seed_differently_for_anot
     assert (first != torn(seed=2, amount=24)).any()
     assert (first != straight).any()
     np.testing.assert_array_equal(torn(seed=1, amount=0), straight)
+
+
+def test_shards_are_at_most_as_many_pieces_as_asked_in_reading_order_the_same_for_a_seed_and_not_for_another(
+    photo, partition_probe
+):
+    def shards(**fields: Any) -> np.ndarray:
+        return labels_made(photo, probing(r=Shards(**fields)))
+
+    first = shards(count=9, seed=1)
+    assert 1 < first.max() + 1 <= 9
+    np.testing.assert_array_equal(first, first_pixel_numbers(first))
+    np.testing.assert_array_equal(first, shards(count=9, seed=1))
+    assert (first != shards(count=9, seed=2)).any()
+    assert shards(count=1).max() == 0
+    assert shards(preset="mosaic", seed=3).max() + 1 > 40  # 70 tiles on 96 x 128 px
 
 
 # --- what a recipe needs of the photo -------------------------------------------------------------------------------

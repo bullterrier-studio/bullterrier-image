@@ -4,6 +4,8 @@
 //! of state filled from the seed by `SplitMix64` (<https://prng.di.unimi.it/splitmix64.c>), as its authors advise. It is
 //! not the stream of numpy's `default_rng(seed)`: a seed draws other numbers than that does.
 
+use std::collections::BTreeSet;
+
 /// A random stream.
 pub(crate) struct Rng {
     state: [u64; 4], // constant: xoshiro256++ keeps four words of state
@@ -57,6 +59,25 @@ impl Rng {
         let first = first ^ fourth;
         self.state = [first, second, third ^ moved, fourth.rotate_left(45)]; // constant: xoshiro256++ state rotation
         word
+    }
+
+    /// The next number from 0 up to but not including 1 (see [`unit`]).
+    pub(crate) fn uniform(&mut self) -> f64 {
+        unit(self.next_word())
+    }
+
+    /// `count` different numbers below `bound`, every choice equally likely, in ascending order (Floyd's algorithm, "Sampling
+    /// with the rule of Bentley and Floyd", 1987: `count` draws, whatever the bound). `count` is at most `bound`.
+    pub(crate) fn sample(&mut self, bound: usize, count: usize) -> Vec<usize> {
+        let mut chosen = BTreeSet::new();
+        for last in bound.saturating_sub(count)..bound {
+            let drawn = self.below(last + 1);
+            // a number drawn before stands for `last`, which no draw has been able to reach yet
+            if !chosen.insert(drawn) {
+                chosen.insert(last);
+            }
+        }
+        chosen.into_iter().collect()
     }
 
     /// A number from 0 to `bound` - 1, every one equally likely (Lemire's unbiased bounded draw, "Fast Random Integer
@@ -201,5 +222,53 @@ mod tests {
         assert!((0..100).all(|_| rng.below(1) == 0));
         let huge = usize::MAX / 3 * 2;
         assert!((0..100).all(|_| rng.below(huge) < huge));
+    }
+
+    #[test]
+    fn uniform_gives_the_top_53_bits_as_a_fraction_of_one_the_published_way() {
+        // seed 0, from a transcription of the reference generators with Vigna's recipe (word >> 11) * 2^-53
+        let mut rng = Rng::seeded(0);
+        let drawn: Vec<f64> = (0..3).map(|_| rng.uniform()).collect();
+        assert_eq!(
+            drawn,
+            [
+                0.324_575_268_031_406_7,
+                0.382_239_296_511_673_43,
+                0.359_617_207_647_355_3
+            ]
+        );
+    }
+
+    #[test]
+    fn uniform_stays_in_zero_to_one_and_averages_a_half() {
+        let mut rng = Rng::seeded(3);
+        let draws: Vec<f64> = (0..100_000).map(|_| rng.uniform()).collect();
+        assert!(draws.iter().all(|draw| (0.0..1.0).contains(draw)));
+        let mean = draws.iter().sum::<f64>() / 100_000.0;
+        assert!((mean - 0.5).abs() < 0.01, "{mean}");
+    }
+
+    #[test]
+    fn sample_gives_the_numbers_of_a_transcription_of_the_algorithm() {
+        // 3 of 10 from seed 5, all 10 of 10, and 4 of 1000 from seed 9, from a transcription of Floyd's algorithm over the
+        // reference generator
+        assert_eq!(Rng::seeded(5).sample(10, 3), [0, 2, 5]);
+        assert_eq!(Rng::seeded(5).sample(10, 10), (0..10).collect::<Vec<_>>());
+        assert_eq!(Rng::seeded(9).sample(1000, 4), [198, 428, 597, 883]);
+    }
+
+    #[test]
+    fn sample_is_ascending_different_in_range_and_every_number_is_as_likely() {
+        let mut counts = [0_u32; 10];
+        for seed in 0..3000 {
+            let drawn = Rng::seeded(seed).sample(10, 3);
+            assert!(drawn.windows(2).all(|pair| pair[0] < pair[1]) && drawn.len() == 3 && drawn[2] < 10);
+            for number in drawn {
+                counts[number] += 1;
+            }
+        }
+        // 9000 picks over 10 numbers: 900 each when fair; the margin of 20 % is far wider than chance
+        assert!(counts.iter().all(|count| (720..=1080).contains(count)), "{counts:?}");
+        assert_eq!(Rng::seeded(1).sample(7, 0), Vec::<usize>::new());
     }
 }

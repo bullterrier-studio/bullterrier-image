@@ -106,11 +106,7 @@ pub(crate) fn pieces(
                 let (sin, cos) = angle.to_radians().sin_cos();
                 let (across, down) = (left + x * (right - left), top + y * (bottom - top));
                 for (at, side) in sides.iter_mut().enumerate() {
-                    let (mut x, mut y) = (length::float(at % width) + 0.5, length::float(at / width) + 0.5); // constant: a pixel's centre is half a pixel in
-                    if let Some([along_x, along_y]) = shift {
-                        x += f64::from(along_x[at]);
-                        y += f64::from(along_y[at]);
-                    }
+                    let [x, y] = raster::centre(at, width, shift);
                     // the line runs along (cos, sin) on the screen, where y points down, so its normal is (-sin, cos)
                     *side |= u32::from((y - down) * cos - (x - across) * sin > 0.0) << bit;
                 }

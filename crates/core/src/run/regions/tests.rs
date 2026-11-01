@@ -419,10 +419,7 @@ fn a_kind_the_core_cannot_make_yet_refuses_the_render_before_any_step_runs_when_
     let pixels = vec![0.5; 4 * 6 * 3];
     let photo = grey(4, 6, &pixels, &[])?;
     // (what is declared as `p`, which an `each` step uses, what the refusal says)
-    let rows = [
-        ("shards", json!({"p": {"kind": "shards"}}), "kind shards"),
-        ("svg", json!({"p": {"kind": "svg"}}), "kind svg"),
-    ];
+    let rows = [("svg", json!({"p": {"kind": "svg"}}), "kind svg")];
     for (what, declared, said) in rows {
         let mut recipe = Recipe::new([Step::new("paint").param("level", 0.5)]);
         recipe.steps.push(Each::new("p", [None]).into());

@@ -244,6 +244,17 @@ pub(crate) fn paint(
     Ok(())
 }
 
+/// The centre of pixel `at` of a picture `width` pixels wide (row after row), in px; moved by `shift` (the shifts along x and
+/// along y, row after row) if there is one.
+pub(crate) fn centre(at: usize, width: usize, shift: Option<[&[f32]; 2]>) -> [f64; 2] {
+    // constant: a pixel's centre is half a pixel in
+    let [x, y] = [length::float(at % width) + 0.5, length::float(at / width) + 0.5];
+    match shift {
+        None => [x, y],
+        Some([along_x, along_y]) => [x + f64::from(along_x[at]), y + f64::from(along_y[at])],
+    }
+}
+
 /// `values` (a `height` x `width` map) read bilinearly at the pixel centres moved by `shift` (along x and along y, row after
 /// row): at each pixel the map interpolated between the four pixel centres round the moved centre, a centre moved beyond
 /// the picture reading the pixel at its edge.

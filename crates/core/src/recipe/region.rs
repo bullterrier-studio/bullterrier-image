@@ -19,6 +19,7 @@
 mod check;
 mod derived;
 mod laid;
+mod presets;
 
 use std::collections::HashMap;
 use std::fmt;
@@ -133,9 +134,9 @@ impl Region {
     /// steps use such a region, before anything runs; one declared and unused renders.
     pub(crate) fn not_yet(&self) -> Option<&'static str> {
         match self {
-            Self::Shards(_) => Some("kind shards"),
             Self::Svg(_) => Some("kind svg"),
             Self::Grid(_)
+            | Self::Shards(_)
             | Self::Path(_)
             | Self::Cuts(_)
             | Self::Pick(_)
@@ -200,6 +201,9 @@ impl<'de> Deserialize<'de> for Region {
                 )));
             }
         };
+        if kind == "shards" {
+            presets::lay_under(&mut table).map_err(D::Error::custom)?;
+        }
         let table = Value::Object(table);
         let region = match kind.as_str() {
             "grid" => read(table).map(Self::Grid),
