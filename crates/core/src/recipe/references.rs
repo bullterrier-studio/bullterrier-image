@@ -102,10 +102,7 @@ pub(super) fn check_regions(regions: &Regions) -> Result<(), Error> {
 /// call stack, so a chain of thousands of regions, or of paths that all lead to one region, is no trouble.
 fn no_cycle(regions: &Regions) -> Result<(), Error> {
     let names: Vec<&str> = regions.iter().map(|(name, _)| name).collect();
-    let made_from: Vec<Vec<&str>> = regions
-        .iter()
-        .map(|(_, region)| region.refers_to().into_iter().map(|(_, name, _)| name).collect())
-        .collect();
+    let made_from: Vec<Vec<&str>> = names.iter().map(|name| regions.made_from(name)).collect();
     let index: HashMap<&str, usize> = names.iter().enumerate().map(|(at, name)| (*name, at)).collect();
     let mut done = vec![false; names.len()];
     let mut on_path = vec![false; names.len()];

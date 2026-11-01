@@ -20,6 +20,7 @@ mod check;
 mod derived;
 mod laid;
 
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::de::{Error as _, MapAccess, Visitor};
@@ -228,7 +229,12 @@ impl<'de> Deserialize<'de> for Region {
 /// The regions of a recipe by name, in the order they were declared (a file's order is data: it is the order a
 /// refusal lists them in and the order a trace shows them in).
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Regions(Vec<(String, Region)>);
+pub struct Regions {
+    /// The regions in the order they were declared.
+    list: Vec<(String, Region)>,
+    /// Where in `list` each name is: derived from it, so that a lookup is one hash, not a scan of every region.
+    at: HashMap<String, usize>,
+}
 
 impl Regions {
     /// No regions.
@@ -241,39 +247,54 @@ impl Regions {
     /// it stands and returned.
     pub fn insert(&mut self, name: impl Into<String>, region: impl Into<Region>) -> Option<Region> {
         let (name, region) = (name.into(), region.into());
-        if let Some((_, declared)) = self.0.iter_mut().find(|(declared, _)| *declared == name) {
-            return Some(std::mem::replace(declared, region));
+        if let Some(&at) = self.at.get(&name) {
+            return Some(std::mem::replace(&mut self.list[at].1, region));
         }
-        self.0.push((name, region));
+        self.at.insert(name.clone(), self.list.len());
+        self.list.push((name, region));
         None
     }
 
     /// The region called `name`, if one is declared.
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&Region> {
-        self.0
-            .iter()
-            .find(|(declared, _)| declared == name)
-            .map(|(_, region)| region)
+        self.at.get(name).map(|&at| &self.list[at].1)
+    }
+
+    /// The names of what the region `name` is made from, which must exist before it can be made: the regions its fields
+    /// name (see [`Region::refers_to`]), the built-in `subject` for a `Subject` found without `per` and for the built-in
+    /// `background` (1 - the subject). Nothing for any other name: the other built-in regions are maps. The one
+    /// definition of "made from": checking for cycles, making the regions and deciding when each is last needed all use it.
+    pub(crate) fn made_from(&self, name: &str) -> Vec<&str> {
+        match self.get(name) {
+            Some(Region::Subject(Subject { per: None, .. })) => vec!["subject"],
+            Some(region) => region
+                .refers_to()
+                .into_iter()
+                .map(|(_, made_from, _)| made_from)
+                .collect(),
+            None if name == "background" => vec!["subject"],
+            None => Vec::new(),
+        }
     }
 
     /// The regions with their names, in the order they were declared.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Region)> {
-        self.0.iter().map(|(name, region)| (name.as_str(), region))
+        self.list.iter().map(|(name, region)| (name.as_str(), region))
     }
 
     /// Whether no region is declared.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.list.is_empty()
     }
 }
 
 impl Serialize for Regions {
     /// A table from name to region, in declaration order.
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut table = serializer.serialize_map(Some(self.0.len()))?;
-        for (name, region) in &self.0 {
+        let mut table = serializer.serialize_map(Some(self.list.len()))?;
+        for (name, region) in &self.list {
             table.serialize_entry(name, region)?;
         }
         table.end()

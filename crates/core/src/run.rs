@@ -30,7 +30,7 @@ use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::registry::Registry;
-use crate::{Error, Image, Layer, Picture, Presets, Recipe, Region};
+use crate::{Error, Image, Layer, Picture, Presets, Recipe};
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
 /// or found by a [`Finder`]. It borrows the picture: rendering never copies or changes it.
@@ -155,18 +155,11 @@ impl<'a> Photo<'a> {
         options: Options,
     ) -> Result<Run<'a>, Error> {
         let reach = recipe.check_in(registry, presets)?.reach(&recipe.regions);
-        // a region the core cannot make refuses the render before anything is made or found
-        for reached in &reach {
-            if let Some(what) = recipe.regions.get(&reached.name).and_then(Region::not_yet) {
-                return Err(Error::Recipe(format!(
-                    "region '{}' ({what}), used at {}, is not run by the core yet",
-                    reached.name, reached.place
-                )));
-            }
-        }
-        regions::check_finder(
+        regions::check_makeable(
             &recipe.regions,
-            reach.iter().map(|reached| reached.name.as_str()),
+            reach
+                .iter()
+                .map(|reached| (reached.name.as_str(), reached.place.as_str())),
             self.finders.contains_key("subject"),
         )?;
         // the subject the frame needs (a crop around it, a cut by it), found before anything is made

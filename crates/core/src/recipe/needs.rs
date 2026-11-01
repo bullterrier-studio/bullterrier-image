@@ -50,53 +50,50 @@ pub(crate) struct Reach {
     /// The first place that uses it, written like "step 2, `mask`"; for a region only used through another, with that
     /// region's name added, like "step 2, `mask` (through 'near')".
     pub(crate) place: String,
-    /// The last step (from 0) that uses it or uses a region made from it: when it can be dropped.
+    /// The last step (from 0) that names it, or that first needs a region made from it: when it can be dropped.
     pub(crate) last: usize,
 }
 
-/// What `name` is made from: `background` and a `Subject` region without `per` from the subject, another declared region
-/// from the regions it refers to, nothing else (the other built-in regions are maps).
-fn made_from<'a>(regions: &'a Regions, name: &str) -> Vec<&'a str> {
-    match regions.get(name) {
-        Some(Region::Subject(Subject { per: None, .. })) => vec!["subject"],
-        Some(region) => region
-            .refers_to()
-            .into_iter()
-            .map(|(_, made_from, _)| made_from)
-            .collect(),
-        None if name == "background" => vec!["subject"],
-        None => Vec::new(),
-    }
-}
-
 impl Uses {
-    /// Every region these uses reach, in the order they are first reached, each once: one walk that keeps no call
-    /// stack and visits a region once however many paths lead to it (the uses come in step order, so a region already
-    /// reached by this step has had everything it is made from reached too).
+    /// Every region these uses reach, in the order they are first reached, each once, and the last step that needs it.
+    ///
+    /// One walk that visits a region once however many steps and paths lead to it and keeps no call stack. A region is
+    /// needed up to the last step that names it and up to the first step that needs a region made from it: from then on
+    /// that region is made and kept, and what it was made from is no longer needed for it.
     pub(crate) fn reach(&self, regions: &Regions) -> Vec<Reach> {
         let mut reached: Vec<Reach> = Vec::new();
+        // the step each region was first reached in
+        let mut first: Vec<usize> = Vec::new();
         let mut at: HashMap<&str, usize> = HashMap::new();
         for used in &self.0 {
             let place = format!("{}, `{}`", used.place, used.key);
             let mut todo = vec![used.name.as_str()];
             while let Some(name) = todo.pop() {
-                match at.get(name) {
-                    Some(&seen) if reached[seen].last == used.step => continue,
-                    Some(&seen) => reached[seen].last = used.step,
-                    None => {
-                        at.insert(name, reached.len());
-                        reached.push(Reach {
-                            name: name.to_owned(),
-                            place: if name == used.name {
-                                place.clone()
-                            } else {
-                                format!("{place} (through '{}')", used.name)
-                            },
-                            last: used.step,
-                        });
-                    }
+                if at.contains_key(name) {
+                    continue;
                 }
-                todo.extend(made_from(regions, name));
+                at.insert(name, reached.len());
+                reached.push(Reach {
+                    name: name.to_owned(),
+                    place: if name == used.name {
+                        place.clone()
+                    } else {
+                        format!("{place} (through '{}')", used.name)
+                    },
+                    last: used.step,
+                });
+                first.push(used.step);
+                todo.extend(regions.made_from(name));
+            }
+        }
+        for used in &self.0 {
+            let last = &mut reached[at[used.name.as_str()]].last;
+            *last = (*last).max(used.step);
+        }
+        for (maker, step) in first.iter().enumerate() {
+            for made_from in regions.made_from(&reached[maker].name) {
+                let last = &mut reached[at[made_from]].last;
+                *last = (*last).max(*step);
             }
         }
         reached
@@ -424,12 +421,38 @@ mod tests {
             reached(&recipe)?,
             [
                 place("near", "step 1, `mask`", 3),
-                // reached through `near`, first at step 1, needed until `far` has been used by step 3 and `near` by step 4
-                place("depth", "step 1, `mask` (through 'near')", 3),
+                // reached through `near`, first at step 1; `near` and `far` are made at steps 1 and 3 and kept, so the depth is
+                // needed up to step 3 (index 2) and not up to the later step that uses `near` again
+                place("depth", "step 1, `mask` (through 'near')", 2),
                 place("subject", "step 2, `mask`", 4),
                 place("far", "step 3, `mask`", 2),
                 place("background", "step 5, `by`", 4),
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn what_a_region_is_made_from_is_needed_only_until_the_first_step_that_makes_it() -> Result<(), Error> {
+        // `b` is made from `a`, which is made from the depth; all three steps use `b` alone. `b` is made at step 1 and kept,
+        // so `a` and the depth are not needed after it, and `b` until step 3
+        let recipe = Recipe::new([
+            Step::new("probe").mask("b"),
+            Step::new("probe").mask("b"),
+            Step::new("probe").mask("b"),
+        ]);
+        let mut recipe = recipe;
+        recipe.regions = regions(json!({
+            "a": {"kind": "band", "of": "depth"},
+            "b": {"kind": "band", "of": "a"},
+        }));
+        let lasts: Vec<(String, usize)> = reached(&recipe)?
+            .into_iter()
+            .map(|(name, _, last)| (name, last))
+            .collect();
+        assert_eq!(
+            lasts,
+            [("b".to_owned(), 2), ("a".to_owned(), 0), ("depth".to_owned(), 0)]
         );
         Ok(())
     }

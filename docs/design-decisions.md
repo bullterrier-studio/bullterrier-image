@@ -660,8 +660,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     `maps_needed`, `needs_finder` and `derived_maps`) and when each region is last used. A preset can set a field parameter, so
     `needs` takes the presets.
   - *Maps up front, regions on demand, dropped after their last use.* A missing map or an unfit finder answer fails before step 1;
-    any other region is made when its step comes and released after the last step that uses it or a region made from it, so a
-    render holds the regions the steps ahead need, not all it made (measured in `tests/memory.rs`). A region the core cannot make
+    any other region is made when its step comes and released after the last step that names it or the first step that needs a
+    region made from it (that one is made and kept, so what it was made from is not needed for it again), so a render holds
+    the regions the steps ahead need, not all it made (measured in `tests/memory.rs`). A recipe's work before its first pixel
+    is linear in its regions and steps (`tests/scale.rs`): lookups by name are indexed, and "made from" and "needed until" are
+    worked out once per region. A region the core cannot make
     yet, and a `Subject` found per piece with no subject finder, are refused before step 1, which Python did at first use.
   - *Precision follows the data.* `Band` and `Combine` work in `f32` with the parameters narrowed to `f32` first, as NumPy does
     with float32 maps (a depth of `f32(0.7)` is inside a band from 0.7; a double comparison would drop it); `Bands` and `Grid`

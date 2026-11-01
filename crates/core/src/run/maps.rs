@@ -5,7 +5,7 @@
 //! picture's size (finite and within 0..=1 a [`Layer`] is by construction).
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use super::{Photo, Working};
@@ -100,6 +100,8 @@ pub(super) struct Maps<'r, 'a> {
     recipe: &'r Recipe,
     /// The picture the render works on, whose size every map is given at.
     working: &'r Working<'a>,
+    /// The names the photo can be given a map under (see [`Recipe::known_maps`]), worked out once.
+    known: HashSet<&'r str>,
     resolved: RefCell<BTreeMap<String, Arc<Layer>>>,
 }
 
@@ -110,20 +112,22 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// [`Error::Recipe`] if the photo was given a map or a finder under a name that is no map of the recipe: `subject`,
     /// `depth`, or a region of kind `given`. Names the maps there are.
     pub(super) fn new(photo: &'r Photo<'a>, recipe: &'r Recipe, working: &'r Working<'a>) -> Result<Self, Error> {
-        let known = recipe.known_maps();
+        let listed = recipe.known_maps();
+        let known: HashSet<&str> = listed.iter().copied().collect();
         let handed = photo.maps.keys().map(|name| ("map", name));
         let finders = photo.finders.keys().map(|name| ("finder", name));
-        if let Some((what, name)) = handed.chain(finders).find(|(_, name)| !known.contains(&name.as_str())) {
+        if let Some((what, name)) = handed.chain(finders).find(|(_, name)| !known.contains(name.as_str())) {
             return Err(Error::Recipe(format!(
                 "the photo has a {what} '{name}', which is no map of the recipe; its maps: {} (`subject` and `depth` are \
                  built in; any other is a region with `kind = \"given\"`)",
-                known.join(", ")
+                listed.join(", ")
             )));
         }
         Ok(Self {
             photo,
             recipe,
             working,
+            known,
             resolved: RefCell::new(BTreeMap::new()),
         })
     }
@@ -156,7 +160,7 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// Whether the photo gives the map `name` (handed in or found) or it is made from the picture: `subject`, `depth`,
     /// `background`, `light` and the `Given` regions, the names [`get`](Self::get) answers.
     pub(super) fn gives(&self, name: &str) -> bool {
-        matches!(name, "background" | "light") || self.recipe.known_maps().contains(&name)
+        matches!(name, "background" | "light") || self.known.contains(name)
     }
 
     /// The map `name` if this render has made it.

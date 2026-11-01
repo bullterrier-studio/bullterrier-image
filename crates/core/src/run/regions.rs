@@ -8,7 +8,7 @@
 //! A region is a selection (a [`Layer`]) or a partition (the pieces of the picture, [`Labels`]); a selection can also be
 //! asked for as a partition, which splits it into the pixels it chooses and the others.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use super::Stage;
@@ -27,8 +27,11 @@ enum Made {
 pub(super) struct Evaluator {
     declared: Regions,
     made: BTreeMap<String, Made>,
-    /// The last step (from 0) that needs each region; a region not named here is needed by none.
-    last: BTreeMap<String, usize>,
+    /// The regions the steps use, or that a region they use is made from.
+    used: HashSet<String>,
+    /// The regions to drop after each step (from 0): those that no step after it needs. A map held that no step needs
+    /// (the subject only a frame used) goes after the first.
+    due: BTreeMap<usize, Vec<String>>,
     /// The photo's subject finder, which a region that finds the subject in each piece asks about crops of the picture.
     finder: Option<Arc<dyn Finder>>,
 }
@@ -45,16 +48,32 @@ fn no_finder(name: &str, per: &str) -> Error {
     )
 }
 
-/// `Ok` if the photo has a subject finder (`has_finder`) whenever one of the `reached` regions needs one.
+/// The refusal of the region `name`, which the core cannot make (`what`: its kind, or a torn edge), needed at `place`.
+fn refuse(name: &str, what: &str, place: &str) -> Error {
+    Error::Recipe(format!(
+        "region '{name}' ({what}), used at {place}, is not run by the core yet"
+    ))
+}
+
+/// `Ok` if the core can make every region in `reached` (each a name and the place that first needs it): none is of a kind
+/// it does not make yet, and a subject found in each piece has a finder to ask (`has_finder`). The one place a render
+/// refuses a region, before anything is made or found.
 ///
 /// # Errors
-/// [`Error::MapNotFound`] of the subject, naming the first region that finds the subject in each piece of a partition.
-pub(super) fn check_finder<'a>(
+/// [`Error::Recipe`] naming the first such region and the place that needs it; [`Error::MapNotFound`] of the subject for a
+/// region that finds it in each piece of a partition when there is no finder.
+pub(super) fn check_makeable<'a>(
     declared: &Regions,
-    reached: impl IntoIterator<Item = &'a str>,
+    reached: impl IntoIterator<Item = (&'a str, &'a str)>,
     has_finder: bool,
 ) -> Result<(), Error> {
-    for name in reached {
+    let reached: Vec<(&str, &str)> = reached.into_iter().collect();
+    for (name, place) in &reached {
+        if let Some(what) = declared.get(name).and_then(Region::not_yet) {
+            return Err(refuse(name, what, place));
+        }
+    }
+    for (name, _) in reached {
         if let (Some(Region::Subject(Subject { per: Some(per), .. })), false) = (declared.get(name), has_finder) {
             return Err(no_finder(name, per));
         }
@@ -72,13 +91,21 @@ impl Evaluator {
         last: BTreeMap<String, usize>,
         finder: Option<Arc<dyn Finder>>,
     ) -> Self {
+        let mut due: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+        for name in held.keys().filter(|name| !last.contains_key(*name)) {
+            due.entry(0).or_default().push(name.clone());
+        }
+        for (name, step) in &last {
+            due.entry(*step).or_default().push(name.clone());
+        }
         Self {
             declared: declared.clone(),
             made: held
                 .into_iter()
                 .map(|(name, map)| (name, Made::Selection(map)))
                 .collect(),
-            last,
+            used: last.into_keys().collect(),
+            due,
             finder,
         }
     }
@@ -125,7 +152,7 @@ impl Evaluator {
             .declared
             .iter()
             .map(|(name, _)| name)
-            .filter(|name| self.last.contains_key(*name))
+            .filter(|name| self.used.contains(*name))
             .map(str::to_owned)
             .collect();
         let mut stages = Vec::with_capacity(names.len());
@@ -148,9 +175,9 @@ impl Evaluator {
 
     /// Drops the regions that no step after `step` (from 0) needs.
     pub(super) fn release(&mut self, step: usize) {
-        let last = &self.last;
-        self.made
-            .retain(|name, _| last.get(name).is_some_and(|needed| *needed > step));
+        for name in self.due.remove(&step).into_iter().flatten() {
+            self.made.remove(&name);
+        }
     }
 
     /// Makes the region `name` and everything it is made from that is not made yet.
@@ -162,15 +189,13 @@ impl Evaluator {
                 todo.pop();
                 continue;
             }
-            let missing: Vec<String> = self.declared.get(next).map_or_else(Vec::new, |region| {
-                region
-                    .refers_to()
-                    .into_iter()
-                    .map(|(_, made_from, _)| made_from)
-                    .filter(|made_from| !self.made.contains_key(*made_from))
-                    .map(str::to_owned)
-                    .collect()
-            });
+            let missing: Vec<String> = self
+                .declared
+                .made_from(next)
+                .into_iter()
+                .filter(|made_from| !self.made.contains_key(*made_from))
+                .map(str::to_owned)
+                .collect();
             if missing.is_empty() {
                 let region = self.make(next, picture)?;
                 self.made.insert(next.clone(), region);
@@ -286,7 +311,11 @@ impl Evaluator {
                 }
                 selection(pieces::pick(labels.values(), labels.pieces(), &numbers))
             }
-            _ => Err(Error::Recipe(format!("region '{name}' is not made by the core"))),
+            // a map the photo gives is held, never made, and a render refuses the kinds the core cannot make before it
+            // makes anything (`check_makeable`)
+            Some(Region::Given(_) | Region::Shards(_) | Region::Cuts(_) | Region::Path(_) | Region::Svg(_)) | None => {
+                Err(Error::Recipe(format!("region '{name}' is not made from other regions")))
+            }
         }
     }
 }
