@@ -8,6 +8,7 @@ values are validated by the parameter model first).
 
 import math
 import pickle
+import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -515,3 +516,86 @@ def test_a_recipe_that_is_not_one_is_a_value_error_naming_the_key():
 def test_a_recipe_in_json_with_a_repeated_key_or_a_region_that_is_no_table_is_a_value_error(text, named):
     with pytest.raises(ValueError, match=named):
         _core.read_recipe(text, "json")
+
+
+SMALLEST_STACK = 256  # KB; the least a thread needs to read and check the deepest recipe the core accepts
+
+
+def on_the_smallest_stack(work: Callable[[], Any]) -> Any:
+    """What `work` returns (or raises) in a thread with `SMALLEST_STACK`. A stack overflow in the core kills the
+    process, which is how a test here fails."""
+    outcome: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            outcome["value"] = work()
+        except BaseException as error:  # noqa: BLE001  handed to the caller below
+            outcome["error"] = error
+
+    previous = threading.stack_size(SMALLEST_STACK * 1024)
+    try:
+        thread = threading.Thread(target=run)
+        thread.start()
+        thread.join()
+    finally:
+        threading.stack_size(previous)
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["value"]
+
+
+NESTED_JSON = 123  # the deepest a step's parameter can nest in a JSON recipe: serde_json allows 128 levels in all
+NESTED_TOML = 80  # the deepest the toml crate reads, in arrays or in inline tables
+
+
+def nested_in_lists(levels: int) -> Any:
+    value: Any = 1
+    for _ in range(levels):
+        value = [value]
+    return value
+
+
+@pytest.mark.parametrize(
+    ("text", "syntax"),
+    [
+        pytest.param(
+            '{"steps": [{"effect": "grade", "params": {"exposure": '
+            + "[" * NESTED_JSON
+            + "1"
+            + "]" * NESTED_JSON
+            + "}}]}",
+            "json",
+            id="arrays as deep as JSON allows",
+        ),
+        pytest.param(
+            "format = 3\n[[step]]\neffect = 'grade'\nexposure = "
+            + "{a=" * NESTED_TOML
+            + "1"
+            + "}" * NESTED_TOML
+            + "\n",
+            "toml",
+            id="inline tables as deep as TOML allows",
+        ),
+    ],
+)
+def test_a_recipe_nested_as_deep_as_its_syntax_allows_is_read_and_checked_on_a_small_stack(text, syntax):
+    def work():
+        recipe = _core.read_recipe(text, syntax)
+        with pytest.raises(ValueError, match="exposure"):
+            _core.check_recipe(recipe)
+        return recipe
+
+    assert "exposure" in on_the_smallest_stack(work)["steps"][0]["params"]
+
+
+@pytest.mark.parametrize(
+    ("levels", "named"),
+    [
+        pytest.param(NESTED_JSON, "exposure", id="as deep as JSON allows: the core refuses the value, not the depth"),
+        pytest.param(100_000, "nested", id="deeper than JSON allows: refused before anything walks it"),
+    ],
+)
+def test_a_recipe_dict_is_walked_to_the_depth_json_allows_and_no_further(levels, named):
+    recipe = {"steps": [{"effect": "grade", "params": {"exposure": nested_in_lists(levels)}}]}
+    with pytest.raises(ValueError, match=named):
+        on_the_smallest_stack(lambda: _core.check_recipe(recipe))

@@ -521,8 +521,22 @@ fn found(value: &Bound<'_, PyAny>) -> String {
     }
 }
 
+/// The most levels a value handed to the core may nest: `serde_json`'s own limit on a JSON document, which a recipe is the
+/// form of, so the core refuses what it could not read back anyway before anything walks it.
+const MOST_NESTING: usize = 128; // constant: serde_json's recursion limit
+
 /// `value` (parameters as Pydantic's `model_dump` gives them) as JSON, for the core to read with serde.
 fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
+    json_at(value, 1)
+}
+
+/// `value`, which lies `level` levels down (1 for the outermost), as JSON.
+fn json_at(value: &Bound<'_, PyAny>, level: usize) -> PyResult<Value> {
+    if level > MOST_NESTING {
+        return Err(PyValueError::new_err(format!(
+            "a parameter is nested more than {MOST_NESTING} levels deep"
+        )));
+    }
     if value.is_none() {
         Ok(Value::Null)
     } else if let Ok(flag) = value.cast::<PyBool>() {
@@ -540,18 +554,18 @@ fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
         Ok(Value::String(text.to_str()?.to_owned()))
     } else if let Ok(list) = value.cast::<PyList>() {
         list.iter()
-            .map(|item| to_json(&item))
+            .map(|item| json_at(&item, level + 1))
             .collect::<PyResult<_>>()
             .map(Value::Array)
     } else if let Ok(tuple) = value.cast::<PyTuple>() {
         tuple
             .iter()
-            .map(|item| to_json(&item))
+            .map(|item| json_at(&item, level + 1))
             .collect::<PyResult<_>>()
             .map(Value::Array)
     } else if let Ok(dict) = value.cast::<PyDict>() {
         dict.iter()
-            .map(|(key, item)| Ok((key.extract::<String>()?, to_json(&item)?)))
+            .map(|(key, item)| Ok((key.extract::<String>()?, json_at(&item, level + 1)?)))
             .collect::<PyResult<_>>()
             .map(Value::Object)
     } else {

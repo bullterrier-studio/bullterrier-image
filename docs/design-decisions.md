@@ -668,6 +668,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   macOS x86_64 wheel, so on Intel Macs pip picks an older onnxruntime (1.23.2 when this was written). A Windows arm64
   wheel waits for someone to ask. A user on a common platform never needs a compiler, and nothing published goes
   untried.
+- **The smallest supported thread stack is 256 KB.** The walks over regions are iterative (a chain of 50,000 regions and
+  a diamond of 20,000 levels are read, checked, rendered, traced and dropped on 64 KB). The depth of a value inside a
+  step is not ours: serde_json (128 levels in all) and toml (80) recurse, and the Python dict reaches the core through
+  `to_json`, which refuses more than 128 levels (the readers' own limit) before anything walks it. The deepest such value
+  needs 160 KB in the shipped build and overflows at 128 KB. *Reason:* glibc, macOS and Windows threads have 512 KB or
+  more and musl (128 KB) is unsupported; `stacker` around the readers fixed the read but not the later `check`, which
+  still overflowed at 128 KB. *Consequence:* `tests/_native/test__core.py` reads and checks the deepest
+  JSON and TOML recipe and the deepest dict on a 256 KB thread.
 - **Printing a picture or a map shows its shape, never its pixels** (`Picture`, `Image`, `Layer`, `Labels` write their own
   `Debug`). *Reason:* a derived `Debug` printed every pixel (15 MB for a 4-stage trace of a 300 x 400 photo) into any
   assertion message, `unwrap` or `dbg!`; at 1080p one value is about 40 MB. *Consequence:* a test keeps its pictures small and never
