@@ -9,7 +9,7 @@ shape or its format version must be refused by the core too.
 
 import json
 from pathlib import Path
-from typing import get_args
+from typing import Any, get_args
 
 import pytest
 
@@ -195,8 +195,28 @@ def test_a_shipped_look_or_example_reads_into_the_steps_python_loads(path):
     assert read.get("name", path.stem) == loaded.name
     assert read.get("description") == loaded.description
     assert read.get("size") == loaded.size
-    assert set(read.get("regions", {})) == set(loaded.regions)  # the core keeps no file order
+    assert list(read.get("regions", {})) == list(loaded.regions)  # in the order the file declares them
     assert bool(read.get("frame")) == (loaded.frame != Framing())
+
+
+def test_the_regions_of_a_file_are_read_in_the_order_it_declares_them(tmp_path):
+    text = "format = 2\n[region.zeta]\nkind = 'grid'\n[region.alpha]\nkind = 'grid'\n" + STEP
+    path = tmp_path / "order.toml"
+    path.write_text(text, encoding="utf-8")
+    assert list(_core.read_recipe(text, "toml")["regions"]) == list(load_recipe(path).regions) == ["zeta", "alpha"]
+
+
+def test_a_python_dict_keeps_its_order_into_the_core_and_back():
+    given: dict[str, Any] = {
+        "steps": [{"effect": "grade", "params": {"zebra": 1, "apple": 2}}],
+        "regions": {"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}},
+    }
+    read = _core.read_recipe(json.dumps(given), "json")
+    assert list(read["regions"]) == ["zeta", "alpha"]
+    assert list(read["steps"][0]["params"]) == ["zebra", "apple"]
+    given["steps"][0]["mask"] = "nowhere"
+    with pytest.raises(ValueError, match=r"valid regions: subject, background, depth, light, zeta, alpha"):
+        _core.check_recipe(given)
 
 
 def test_there_are_looks_and_examples_to_compare():

@@ -283,7 +283,8 @@ fn each_of(written: &Map<String, Value>) -> Result<Each, Error> {
             "`looks` needs `each`, the name of the partition whose pieces get them".to_owned(),
         ));
     }
-    let Some(Value::Array(looks)) = each.remove("looks") else {
+    // `shift_remove` keeps the file's order of the other keys, so the first unknown one is the one named
+    let Some(Value::Array(looks)) = each.shift_remove("looks") else {
         return Err(Error::Recipe(
             "an each step needs `looks`, a list of tables (one effect each) or \"none\"".to_owned(),
         ));
@@ -420,6 +421,41 @@ looks = [
             ],
         });
         assert_eq!(written(FULL).ok(), Some(expected));
+    }
+
+    #[test]
+    fn regions_and_parameters_are_read_in_the_order_the_file_has_them() {
+        let text = "format = 2\n[region.zeta]\nkind = \"grid\"\n[region.alpha]\nkind = \"grid\"\n\
+                    [[step]]\neffect = \"a\"\nzebra = 1\napple = 2\nmango = 3\n";
+        let written = written(text).ok().map(|recipe| recipe.to_string());
+        let written = written.unwrap_or_default();
+        assert!(
+            written.contains(r#""regions":{"zeta":{"kind":"grid"},"alpha":{"kind":"grid"}}"#),
+            "the regions: {written}"
+        );
+        assert!(
+            written.contains(r#""params":{"zebra":1,"apple":2,"mango":3}"#),
+            "the parameters: {written}"
+        );
+    }
+
+    #[test]
+    fn of_several_keys_that_are_no_recipe_key_the_first_in_the_file_is_named() {
+        let refused = read("zebra = 1\napple = 2\n").err().map(|error| error.to_string());
+        assert!(
+            refused.as_deref().is_some_and(|message| message.contains("`zebra`")),
+            "{refused:?}"
+        );
+    }
+
+    #[test]
+    fn of_several_keys_an_each_step_does_not_have_the_first_in_the_file_is_named() {
+        let text = "format = 2\n[[step]]\neach = \"p\"\nlooks = []\nzebra = 1\napple = 2\nmango = 3\n";
+        let refused = read(text).err().map(|error| error.to_string());
+        assert!(
+            refused.as_deref().is_some_and(|message| message.contains("`zebra`")),
+            "{refused:?}"
+        );
     }
 
     #[test]

@@ -715,6 +715,32 @@ mod tests {
     }
 
     #[test]
+    fn the_regions_a_refusal_lists_are_in_the_order_they_were_declared() -> Result<(), Error> {
+        let mut recipe = Recipe::new([probe().mask("nowhere")]);
+        recipe.regions = json!({"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}})
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let said = refusal(&recipe, &Presets::new())?.map(|error| error.to_string());
+        assert!(
+            said.as_deref()
+                .is_some_and(|text| text.ends_with("valid regions: subject, background, depth, light, zeta, alpha")),
+            "{said:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn of_two_drives_that_break_a_rule_the_first_written_is_named() -> Result<(), Error> {
+        let broken = |by: &str| json!({"by": by, "start": 4, "end": 9, "levels": 1});
+        // `cell` is written before `angle`, against the alphabet
+        let step = probe().param("cell", broken("depth")).param("angle", broken("light"));
+        let said = refusal(&Recipe::new([step]), &Presets::new())?.map(|error| error.to_string());
+        assert!(said.as_deref().is_some_and(|text| text.contains("`cell`")), "{said:?}");
+        Ok(())
+    }
+
+    #[test]
     fn no_parameter_is_named_like_a_key_of_the_step() -> Result<(), Error> {
         // `partition` is also an input of the effect, which the check names first
         for key in [

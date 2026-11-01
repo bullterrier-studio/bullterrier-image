@@ -560,11 +560,37 @@ mod tests {
         let text = serde_json::to_string(&recipe).ok();
         assert_eq!(
             text.as_deref(),
-            Some(r#"{"steps":[{"effect":"a","params":{"decimal":4.0,"whole":4}}]}"#)
+            Some(r#"{"steps":[{"effect":"a","params":{"whole":4,"decimal":4.0}}]}"#)
         );
         assert_eq!(
             Recipe::from_json(text.as_deref().unwrap_or_default()).ok(),
             Some(recipe)
+        );
+    }
+
+    #[test]
+    fn a_recipe_is_written_in_the_order_it_was_read_in() {
+        // names that are not in alphabetical order, at every table a recipe has
+        let text = r#"{"steps": [{"effect": "a", "params": {"zebra": 1, "apple": 2, "mango": 3}}],
+                       "regions": {"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}, "mid": {"kind": "grid"}}}"#;
+        let recipe = Recipe::from_json(text).ok();
+        let regions = recipe
+            .as_ref()
+            .map(|recipe| recipe.regions.keys().cloned().collect::<Vec<_>>());
+        assert_eq!(
+            regions,
+            Some(vec!["zeta".to_owned(), "alpha".to_owned(), "mid".to_owned()])
+        );
+        let written = recipe
+            .and_then(|recipe| serde_json::to_string(&recipe).ok())
+            .unwrap_or_default();
+        assert!(
+            written.contains(r#""params":{"zebra":1,"apple":2,"mango":3}"#),
+            "the parameters: {written}"
+        );
+        assert!(
+            written.contains(r#""regions":{"zeta":{"kind":"grid"},"alpha":{"kind":"grid"},"mid":{"kind":"grid"}}"#),
+            "the regions: {written}"
         );
     }
 
