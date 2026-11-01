@@ -489,10 +489,9 @@ def edge(**fields: object) -> dict:
 
 # (what the row is about, the kind, the fields as a recipe writes them, whether they are valid): both ends of every
 # range and the first value beyond each, and the shapes each kind refuses. The `valid` column is written by hand;
-# Python's declaration and the core must both agree with it. Left out until the core reads them (R4d): the syntax of
-# `Path.d` and `Svg.file`. Left out because Python's declaration is laxer
+# Python's declaration and the core must both agree with it. Left out because Python's declaration is laxer
 # than the rule and is replaced (R4e): a share written as text ("2") and a piece that is a switch (`True` is 1 to it);
-# the core refuses both (Rust tests).
+# the core refuses both (Rust tests). `Svg.file` is read when the region is made, so any text passes the check.
 REGION_ROWS = [
     # the borders every laid kind has (a grid stands for them)
     ("edge amount, lowest", "grid", edge(amount=0), True),
@@ -595,6 +594,26 @@ REGION_ROWS = [
     ("samples, below", "path", {"samples": 0}, False),
     ("samples, above", "path", {"samples": 17}, False),
     ("a path of its own", "path", {"d": "M 0.1 0.4 C 0.1 0.2, 0.4 0.2, 0.4 0.4 Z"}, True),
+    ("a path of relative commands", "path", {"d": "m.1.1l.4 0v.4h-.4z"}, True),
+    ("a path of two subpaths", "path", {"d": "M 0 0 L 1 0 L 1 1 Z M 0.2 0.2 L 0.4 0.2 L 0.4 0.4 Z"}, True),
+    ("a path of arcs", "path", {"d": "M 0.2 0.5 A 0.3 0.3 0 1 0 0.8 0.5 A 0.3 0.3 0 1 0 0.2 0.5 Z"}, True),
+    ("a path of nothing", "path", {"d": ""}, False),
+    ("a path of blanks", "path", {"d": "  "}, False),
+    ("a path that does not start with a move", "path", {"d": "L 0.5 0.5"}, False),
+    ("a path with a stray word", "path", {"d": "M 0 0 L foo"}, False),
+    ("a path with an unknown command", "path", {"d": "M 0 0 X 1 1"}, False),
+    ("a path with a missing coordinate", "path", {"d": "M 0 0 L 1"}, False),
+    ("a path with an infinite number", "path", {"d": "M 0 0 L 1e999 0"}, False),
+    ("a path with a bad arc flag", "path", {"d": "M 0 0 A 1 1 0 2 0 1 1"}, False),
+    ("a path ending in a move", "path", {"d": "M 0 0 L 0.5 0.5 Z M"}, False),
+    ("a path far beyond the frame", "path", {"d": "M 0 0 C 0 0 1e9 1e9 0 0"}, False),
+    ("a path that is no text", "path", {"d": 3}, False),
+    ("a curve of relative commands", "cuts", {"lines": [{"path": "m.5 0 l0 1"}]}, True),
+    ("a curve of nothing", "cuts", {"lines": [{"path": ""}]}, False),
+    ("a curve that does not start with a move", "cuts", {"lines": [{"path": "L 1 1"}]}, False),
+    ("a curve far beyond the frame", "cuts", {"lines": [{"path": "M 0 0 C 0 0 1e9 1e9 1 1"}]}, False),
+    ("an svg file not named yet", "svg", {"file": ""}, True),
+    ("an svg file that is no text", "svg", {"file": 3}, False),
     ("an svg file", "svg", {"file": "shapes.svg", "max_shapes": 1, "max_kilobytes": 100000}, True),
     ("max shapes, highest", "svg", {"max_shapes": 100000}, True),
     ("max shapes, below", "svg", {"max_shapes": 0}, False),
@@ -726,6 +745,18 @@ def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": kind}}}), "json")["regions"]["r"]
     python = without_none(plain(PYTHON_KINDS[kind]().model_dump()))
     assert read == {"kind": kind, **python}
+
+
+@pytest.mark.parametrize("preset", ["glass", "torn", "stone", "mosaic"])
+def test_a_shards_preset_expands_when_read_to_the_fields_of_python_s_model_and_a_given_field_wins(preset):
+    read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "shards", "preset": preset}}}), "json")
+    expanded = read["regions"]["r"]
+    python = without_none(plain(regions.Shards.parse({"preset": preset}, "region 'r'").model_dump()))
+    assert {key: value for key, value in expanded.items() if key != "kind"} == python
+    given = _core.read_recipe(
+        json.dumps({"steps": [], "regions": {"r": {"kind": "shards", "preset": preset, "count": 7}}}), "json"
+    )
+    assert given["regions"]["r"]["count"] == 7
 
 
 def test_a_count_of_shares_is_the_same_list_in_the_core_and_in_python():

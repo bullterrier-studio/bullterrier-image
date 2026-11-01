@@ -332,6 +332,74 @@ def test_the_pieces_of_a_partition_are_numbered_as_defined_and_the_python_engine
     )
 
 
+MOSAIC = ROOT / "examples" / "assets" / "mosaic.svg"
+RECTANGLES = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 96">'
+    '<rect id="a" x="10" y="10" width="40" height="30"/><rect id="b" x="30" y="20" width="50" height="50"/></svg>'
+)
+
+
+def rectangles_made(tmp_path: Path) -> Svg:
+    """The svg region of two overlapping rectangles on whole pixels of the 128 x 96 photo (b lies on top of a)."""
+    path = tmp_path / "rectangles.svg"
+    path.write_text(RECTANGLES, encoding="utf-8")
+    return Svg(file=str(path))
+
+
+def test_the_pieces_of_an_svg_are_numbered_as_defined_and_the_python_engine_agrees(photo, partition_probe, tmp_path):
+    drawn = np.zeros(photo.shape[:2], int)  # 0 outside, 1 a, 2 b: the later shape lies on top
+    drawn[10:40, 10:50] = 1
+    drawn[20:70, 30:80] = 2
+    recipe = probing(r=rectangles_made(tmp_path))
+    np.testing.assert_array_equal(labels_made(photo, recipe), first_pixel_numbers(drawn))
+    np.testing.assert_allclose(core_render(photo, recipe), runner.render(photo, recipe), atol=1e-6)
+
+
+def test_picking_shapes_of_an_svg_by_id_chooses_the_pieces_they_show_and_the_python_engine_agrees(photo, tmp_path):
+    drawn = np.zeros(photo.shape[:2], bool)  # a without what b covers
+    drawn[10:40, 10:50] = True
+    drawn[20:70, 30:80] = False
+    recipe = masked_by("p", s=rectangles_made(tmp_path), p=Pick(of="s", pieces=("a",)))
+    made = core_render(photo, recipe)
+    np.testing.assert_allclose(made, over(photo, stops(photo, 1), drawn), atol=2e-6)
+    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-6)
+
+
+def test_an_id_the_svg_lacks_is_refused_by_the_core_and_by_python_listing_the_ids(photo, tmp_path):
+    recipe = masked_by("p", s=rectangles_made(tmp_path), p=Pick(of="s", pieces=("c",)))
+    for render in (core_render, runner.render):
+        with pytest.raises(RecipeError, match=r"region 'p'.*'c'.*'s'.*a, b"):
+            render(photo, recipe)
+
+
+# of the 12,288 pixels of the photo, those on a border of the mosaic that the two readers place a pixel apart
+# (svgelements flattens its curves its own way): measured 0, here at most 0.1 % for the platform's own floats
+MOSAIC_BORDER = 1e-3
+
+
+def test_a_realistic_svg_is_cut_as_the_python_engine_cuts_it_but_for_pixels_on_a_border(photo, partition_probe):
+    recipe = probing(r=Svg(file=str(MOSAIC)))
+    core = labels_made(photo, recipe)
+    python = np.rint(runner.render(photo, recipe)[..., 0] * 255).astype(int)
+    assert core.max() == python.max() == 11  # the outside and the 11 shapes
+    assert (core != python).mean() <= MOSAIC_BORDER
+
+
+def test_a_torn_svg_is_cut_the_same_for_a_seed_differently_for_another_and_straight_for_no_tear(
+    photo, partition_probe, tmp_path
+):
+    def torn(**edge: Any) -> np.ndarray:
+        svg = rectangles_made(tmp_path)
+        return labels_made(photo, probing(r=Svg(file=svg.file, edge=Edge(style="torn", **edge))))
+
+    straight = labels_made(photo, probing(r=rectangles_made(tmp_path)))
+    first = torn(seed=1, amount=24)
+    np.testing.assert_array_equal(first, torn(seed=1, amount=24))
+    assert (first != torn(seed=2, amount=24)).any()
+    assert (first != straight).any()
+    np.testing.assert_array_equal(torn(seed=1, amount=0), straight)
+
+
 @pytest.mark.parametrize("field", ["columns", "rows"])
 def test_shares_that_add_up_to_more_than_the_most_are_refused_naming_the_field_and_huge_ones_within_it_are_fine(
     photo, partition_probe, field
