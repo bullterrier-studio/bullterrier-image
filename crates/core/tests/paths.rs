@@ -208,3 +208,26 @@ fn a_curve_that_the_frame_stretches_to_too_many_chords_is_refused_when_the_regio
         "{refused:?}"
     );
 }
+
+#[test]
+fn a_slanting_path_is_selected_at_any_number_of_samples_and_size_with_every_value_from_0_to_1() -> Result<(), Error> {
+    // the coverage of a pixel is a difference of running sums, which for an empty pixel next to a full one can come out a
+    // hair below 0; a selection holds 0 to 1, so such a render used to be refused
+    let shapes = [
+        "M 0.5 0.05 L 0.95 0.95 L 0.05 0.95 Z",
+        "M 0.5 0.02 L 0.61 0.35 L 0.98 0.35 L 0.68 0.57 L 0.79 0.91 L 0.5 0.7 L 0.21 0.91 L 0.32 0.57 L 0.02 0.35 L 0.39 0.35 Z",
+    ];
+    for d in shapes {
+        for samples in [1, 2, 3, 5, 7, 16] {
+            for (height, width) in [(3, 3), (5, 7), (16, 9), (40, 40)] {
+                let region = Path { samples, ..path(d) };
+                let values = selected(height, width, None, region)?;
+                assert!(
+                    values.iter().all(|value| (0.0..=1.0).contains(value)),
+                    "{d} at {samples} samples on {height} x {width}"
+                );
+            }
+        }
+    }
+    Ok(())
+}

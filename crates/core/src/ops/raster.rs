@@ -359,7 +359,9 @@ fn finish_row(steps: &mut [f64], row: &mut [f32]) {
         ramps.push(ramp);
     }
     for (pixel, pair) in row.iter_mut().zip(ramps.windows(2)) {
-        *pixel = super::cast::single(pair[1] - pair[0]);
+        // the difference of two running sums cancels to a hair below 0 (about -5e-17) beside a full pixel, or above 1; the
+        // coverage is 0 to 1, and this is where it is cast, so the one place it is held there
+        *pixel = super::cast::single((pair[1] - pair[0]).clamp(0.0, 1.0));
     }
     steps.fill(0.0);
 }
