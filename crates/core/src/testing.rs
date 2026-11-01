@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::effect::{Category, Effect, FieldParam, Input, Meta, Native};
 use crate::params::probe::Probe;
-use crate::params::{Params, Table};
+use crate::params::{Declared, Params, Table};
 use crate::registry::Registry;
 use crate::{Error, Finder, Image, Inputs, Layer, Picture, Regions};
 
@@ -62,6 +62,14 @@ pub(crate) fn registry() -> Result<Registry, Error> {
     )))?;
     registry.register(Arc::new(Seams))?;
     Ok(registry)
+}
+
+/// The test registry with a recorder of the probe's parameters, called `recorder`.
+pub(crate) fn with_recorder() -> Result<(Registry, Arc<Recorder>), Error> {
+    let registry = registry()?;
+    let recorder = Arc::new(Recorder::new("recorder", &[], &[]).with_table(Probe::table()));
+    registry.register(recorder.clone())?;
+    Ok((registry, recorder))
 }
 
 /// A foreign effect that paints the picture with the `level` of its parameters; its steps default to an opacity of
