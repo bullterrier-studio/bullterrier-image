@@ -24,6 +24,8 @@ pub(crate) struct Limits {
     pub(crate) painted: u64,
     /// The most nodes (elements, texts, comments) an SVG file may have.
     pub(crate) nodes: u32,
+    /// The most elements an SVG drawing may visit, each counted as often as a `use` repeats it.
+    pub(crate) drawn: u64,
     /// The deepest nesting of elements, a `use` counting as the parent of what it uses.
     pub(crate) depth: usize,
 }
@@ -37,6 +39,7 @@ impl Limits {
         crossings: 1 << 28, // constant: about a second of filling
         painted: 1 << 30, // constant: a billion pixels is a few seconds of painting, far beyond a drawing on a picture
         nodes: 1 << 21, // constant: two million nodes is an arena of about 100 MB, far beyond a drawing
+        drawn: 1 << 22, // constant: four million visits is a few seconds of walking, far beyond a drawing
         depth: 64, // constant: drawings nest under 20 levels, and the walk below stays within a few frames of it
     };
 }

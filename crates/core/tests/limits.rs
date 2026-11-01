@@ -458,6 +458,34 @@ fn shapes_are_counted_before_uses_are_expanded_and_the_count_may_be_the_limit_bu
 }
 
 #[test]
+fn uses_of_groups_of_uses_are_counted_by_the_elements_they_visit_before_anything_is_drawn() -> Outcome {
+    let folder = Folder::new()?;
+    // every group holds two uses of the group below: one shape in all, and 2^levels visits of empty groups. Nesting counts a
+    // use as the parent of what it uses, so 30 levels fit the depth limit of 64
+    let nested = |levels: usize| {
+        let mut groups = String::from(r#"<g id="g0"/>"#);
+        for level in 1..=levels {
+            let below = level - 1;
+            let _ = write!(
+                groups,
+                r##"<g id="g{level}"><use href="#g{below}"/><use href="#g{below}"/></g>"##
+            );
+        }
+        drawing(&format!(r##"<defs>{groups}</defs>{RECT}<use href="#g{levels}"/>"##))
+    };
+    assert!(read_standard(&folder, nested(10)).is_ok());
+    let started = std::time::Instant::now();
+    let result = read_standard(&folder, nested(30));
+    assert!(refused(&result, &["would draw", "elements", "4194304"]), "{result:?}");
+    assert!(
+        started.elapsed().as_secs() < 5,
+        "refused only after {:?}",
+        started.elapsed()
+    );
+    Ok(())
+}
+
+#[test]
 fn a_use_that_contains_itself_is_refused() -> Outcome {
     let folder = Folder::new()?;
     let result = read_standard(

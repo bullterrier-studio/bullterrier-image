@@ -914,8 +914,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   is output-sensitive but three times the code for the case a budget refuses: crossings of edges with scanlines (2^28, all
   shapes together), painted pixels (2^30, each shape's box clipped to the picture) and corners (2^20) are counted before
   anything is painted, and a refusal names the limit and the count. The real constants are reviewed, not run; the tests
-  run the same code at a small `Limits`. Shapes are counted (`max_shapes`) before any `use` is expanded, by memoised sizes,
-  so a small file cannot become 10^10 shapes; a `use` that contains itself and nesting past 64 levels (a `use` is the parent
+  run the same code at a small `Limits`. Shapes (`max_shapes`) and visited elements (2^22; a group of uses of groups
+  repeats elements though it adds no shape) are counted before any `use` is expanded, by memoised sizes,
+  so a small file cannot become 10^10 shapes or visits; a `use` that contains itself and nesting past 64 levels (a `use` is the parent
   of what it uses) are refused.
 - **A torn edge is hashed-lattice value noise sampled by Catmull-Rom, not a port of Python's spline.** Python fits a
   `RectBivariateSpline` (a global banded solve, a lattice array of points^2 for each octave: 30 GB at octave 7 on a big
@@ -936,7 +937,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/limits.rs`):
   `Shards.count` 500, `Cuts.lines` 32, `Path.samples` 16, `Edge.octaves` 8, `Edge.scale` 480, `Edge.amount` 48, `Grid` shares
   1000 and 10000 pieces, `Bands.count` 100, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,
-  nodes 2^21, nesting 64, chords 1024, coordinates 10^7 px, corners 2^20, crossings 2^28, painted pixels 2^30. The new regions
+  nodes 2^21, visited elements 2^22, nesting 64, chords 1024, coordinates 10^7 px, corners 2^20, crossings 2^28, painted pixels 2^30. The new regions
   hold a bend (8 bytes a pixel) and a raster (4) beside the picture, at any size of photo: the pixel limit applies to `size`
   only, and no cap is added now.
 - The plan and the deferred list of regions (each item with the need that would justify it) are in

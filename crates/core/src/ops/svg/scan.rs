@@ -62,38 +62,58 @@ impl<'a, 'i> Index<'a, 'i> {
     }
 }
 
-/// How many shapes drawing `root` makes, each `use` counting as the shapes of what it uses; nothing is expanded, and
-/// what a `use` repeats is worked out once.
+/// What drawing an element makes: its shapes, and every element it visits (itself, what is inside it, and what each `use`
+/// in it draws), each counted as often as a `use` repeats it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Count {
+    pub(super) shapes: u64,
+    pub(super) visits: u64,
+}
+
+impl Count {
+    fn add(self, other: Self) -> Self {
+        Self {
+            shapes: self.shapes.saturating_add(other.shapes),
+            visits: self.visits.saturating_add(other.visits),
+        }
+    }
+}
+
+/// How many shapes drawing `root` makes and how many elements it visits, each `use` counting as what it uses; nothing is
+/// expanded, and what a `use` repeats is worked out once.
 struct Counter<'a, 'i> {
     index: &'a Index<'a, 'i>,
     depth: usize,
     /// The shapes a `use` of an element draws, for the elements used so far.
-    sizes: HashMap<NodeId, u64>,
+    sizes: HashMap<NodeId, Count>,
     /// The elements being counted through a `use`: one met again contains itself.
     working: HashSet<NodeId>,
 }
 
 impl<'a, 'i> Counter<'a, 'i> {
-    /// The shapes in `node` and below, at `depth` levels of nesting (a `use` is the parent of what it uses).
-    fn size(&mut self, node: Node<'a, 'i>, depth: usize) -> Result<u64, String> {
+    /// What drawing `node` makes, at `depth` levels of nesting (a `use` is the parent of what it uses).
+    fn size(&mut self, node: Node<'a, 'i>, depth: usize) -> Result<Count, String> {
         if depth > self.depth {
             return Err(format!(
                 "is nested deeper than {} levels (deep nesting is refused)",
                 self.depth
             ));
         }
-        let mut total = u64::from(is_shape(tag(node)));
+        let mut total = Count {
+            shapes: u64::from(is_shape(tag(node))),
+            visits: 1, // constant: the element itself
+        };
         for child in drawn_children(node) {
-            total = total.saturating_add(self.size(child, depth + 1)?);
+            total = total.add(self.size(child, depth + 1)?);
         }
         if let (true, Some(target)) = (tag(node) == "use", self.index.target(node)) {
-            total = total.saturating_add(self.used(target, depth + 1)?);
+            total = total.add(self.used(target, depth + 1)?);
         }
         Ok(total)
     }
 
-    /// The shapes a `use` of `target` draws.
-    fn used(&mut self, target: Node<'a, 'i>, depth: usize) -> Result<u64, String> {
+    /// What a `use` of `target` draws.
+    fn used(&mut self, target: Node<'a, 'i>, depth: usize) -> Result<Count, String> {
         if let Some(&known) = self.sizes.get(&target.id()) {
             return Ok(known);
         }
@@ -107,12 +127,12 @@ impl<'a, 'i> Counter<'a, 'i> {
     }
 }
 
-/// How many shapes drawing `root` makes, counting what each `use` repeats before anything is expanded. Nesting is followed
+/// What drawing `root` makes, counting what each `use` repeats before anything is expanded. Nesting is followed
 /// at most `depth` levels down, so the recursion is as shallow.
 ///
 /// # Errors
 /// A message if elements nest deeper than `depth` (a `use` is the parent of what it uses) or a `use` contains itself.
-pub(super) fn shapes(root: Node<'_, '_>, index: &Index<'_, '_>, depth: usize) -> Result<u64, String> {
+pub(super) fn count(root: Node<'_, '_>, index: &Index<'_, '_>, depth: usize) -> Result<Count, String> {
     Counter {
         index,
         depth,

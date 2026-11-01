@@ -15,7 +15,8 @@
 //! specification. Refused: a file that is not UTF-8 or declares XML entities (a billion laughs, an external entity); XML
 //! that is not well formed or has more nodes than the limit; a root that is no `svg` in the SVG namespace, with a
 //! `transform` or no size; elements nested deeper than the limit; a `use` that contains itself; more shapes than
-//! `max_shapes`, counted before any `use` is expanded; a transform, length or path that cannot be read; a coordinate not
+//! `max_shapes`, counted before any `use` is expanded, or a drawing that visits more elements than `Limits::drawn` (a `use`
+//! repeats everything it uses, groups included); a transform, length or path that cannot be read; a coordinate not
 //! finite or too far outside the frame; too many corners; a file with no shape.
 
 mod paint;
@@ -234,9 +235,19 @@ pub(crate) fn read(bytes: &[u8], frame: Frame, max_shapes: u32, limits: &Limits)
     }
     let base = root_map(root, frame)?;
     let index = scan::Index::new(&document);
-    let count = scan::shapes(root, &index, limits.depth)?;
-    if count > u64::from(max_shapes) {
-        return Err(format!("has {count} shapes, over the limit max_shapes = {max_shapes}"));
+    let count = scan::count(root, &index, limits.depth)?;
+    if count.shapes > u64::from(max_shapes) {
+        return Err(format!(
+            "has {} shapes, over the limit max_shapes = {max_shapes}",
+            count.shapes
+        ));
+    }
+    // a use of a group of uses of groups repeats elements, not only shapes: the work is the visits
+    if count.visits > limits.drawn {
+        return Err(format!(
+            "would draw {} elements, over the limit of {} (a use repeats everything it uses)",
+            count.visits, limits.drawn
+        ));
     }
     let shapes = draw(root, base, &index, limits)?;
     if shapes.is_empty() {
@@ -822,6 +833,33 @@ mod tests {
             matches!(&refused, Some(said) if said.contains("max_shapes = 1000")),
             "{refused:?}"
         );
+    }
+
+    #[test]
+    fn visits_are_limited_at_the_limit_and_one_past_it_counting_what_a_use_repeats() -> Result<(), String> {
+        let text = svg(
+            r#"viewBox="0 0 10 10""#,
+            r##"<defs><g id="b"><rect width="1" height="1"/></g></defs><g><rect width="1" height="1"/><use href="#b"/><use href="#b"/></g>"##,
+        );
+        let with = |drawn| {
+            read(
+                text.as_bytes(),
+                SQUARE,
+                100,
+                &Limits {
+                    drawn,
+                    ..Limits::STANDARD
+                },
+            )
+        };
+        // visited: the svg, the group and its rect (3), then each of the two uses with the group b and its rect it draws (3)
+        assert_eq!(with(9)?.shapes.len(), 3);
+        let refused = with(8).err();
+        assert!(
+            matches!(&refused, Some(said) if said.contains("9 elements") && said.contains("limit of 8")),
+            "{refused:?}"
+        );
+        Ok(())
     }
 
     #[test]
