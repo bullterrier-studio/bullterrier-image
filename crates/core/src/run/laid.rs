@@ -3,9 +3,10 @@
 
 use super::size;
 use crate::ops::noise::{self, Tear};
+use crate::ops::outlines::{self, Limits};
 use crate::ops::pieces::{self, Bounds};
-use crate::ops::{cast, grid, length};
-use crate::region::{Edge, EdgeStyle, Grid};
+use crate::ops::{cast, grid, length, raster};
+use crate::region::{Edge, EdgeStyle, Grid, Path};
 use crate::{Error, Layer, Picture};
 
 /// How a torn edge moves the pixel centres of a picture before a kind classifies them: the shifts in px of the working
@@ -85,4 +86,28 @@ pub(super) fn grid(
         &spec.rows.0,
         bend.as_ref().map(Bend::shifts),
     ))
+}
+
+/// How much of each pixel of `picture` the path `spec` (the region `name`) covers, soft at its border, laid over the box of
+/// `fit` (the selection `spec.fit` names) if it has one. A torn edge reads the coverage, bilinearly, at the bent centres.
+///
+/// # Errors
+/// As [`frame`]; [`Error::Recipe`] naming the region if the path data cannot be drawn (see [`outlines::path`]) or would
+/// take too long to fill.
+pub(super) fn path(name: &str, spec: &Path, fit: Option<&Layer>, picture: &Picture<'_>) -> Result<Vec<f32>, Error> {
+    let (height, width) = (picture.height(), picture.width());
+    let Bounds {
+        left,
+        top,
+        right,
+        bottom,
+    } = frame(name, spec.fit.as_deref(), fit, picture)?;
+    let limits = Limits::STANDARD;
+    let refuse = |said: String| Error::Recipe(format!("region '{name}': {said}"));
+    let shape = outlines::path(&spec.d, [left, top, right, bottom].map(length::float), &limits).map_err(refuse)?;
+    let covered = raster::coverage(height, width, &shape, spec.samples as usize, limits.crossings).map_err(refuse)?;
+    Ok(match Bend::of(&spec.edge, picture) {
+        None => covered,
+        Some(bend) => raster::read_bent(&covered, height, width, bend.shifts()),
+    })
 }

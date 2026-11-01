@@ -418,20 +418,15 @@ fn a_kind_the_core_cannot_make_yet_refuses_the_render_before_any_step_runs_when_
     let rig = rig()?;
     let pixels = vec![0.5; 4 * 6 * 3];
     let photo = grey(4, 6, &pixels, &[])?;
-    // (what is declared as `p`, whether a step reaches it by an `each` rather than a mask, what the refusal says)
+    // (what is declared as `p`, which an `each` step uses, what the refusal says)
     let rows = [
-        ("shards", json!({"p": {"kind": "shards"}}), true, "kind shards"),
-        ("cuts", json!({"p": {"kind": "cuts"}}), true, "kind cuts"),
-        ("svg", json!({"p": {"kind": "svg"}}), true, "kind svg"),
-        ("path", json!({"p": {"kind": "path"}}), false, "kind path"),
+        ("shards", json!({"p": {"kind": "shards"}}), "kind shards"),
+        ("cuts", json!({"p": {"kind": "cuts"}}), "kind cuts"),
+        ("svg", json!({"p": {"kind": "svg"}}), "kind svg"),
     ];
-    for (what, declared, by_each, said) in rows {
+    for (what, declared, said) in rows {
         let mut recipe = Recipe::new([Step::new("paint").param("level", 0.5)]);
-        recipe.steps.push(if by_each {
-            Each::new("p", [None]).into()
-        } else {
-            Step::new("paint").param("level", 0.5).mask("p").into()
-        });
+        recipe.steps.push(Each::new("p", [None]).into());
         recipe.regions = regions(declared);
         let result = rig.render(&photo, &recipe, Options::default());
         assert!(

@@ -34,9 +34,6 @@ from bullterrier_image.core.regions import (
     Svg,
     used,
 )
-from bullterrier_image.core.regions import (
-    Path as PathRegion,
-)
 from bullterrier_image.core.runner import Finder
 from bullterrier_image.core.steps import Each, Recipe, Step, references
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
@@ -566,11 +563,11 @@ def test_a_random_assignment_uses_every_look_and_favours_none_over_many_seeds(ph
 
 # --- the shipped looks and examples -------------------------------------------------------------------------------
 
-UNMADE_YET = (Shards, Cuts, PathRegion, Svg)
+UNMADE_YET = (Shards, Cuts, Svg)
 
 
 def unmade(region: object) -> bool:
-    """Whether the core does not make this kind of region yet: shards, cuts, a path or svg."""
+    """Whether the core does not make this kind of region yet: shards, cuts or svg."""
     return isinstance(region, UNMADE_YET)
 
 
@@ -605,8 +602,9 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
         "depth-haze",
         "one-cell",
         "focus_blur",
+        "bezier-shape",
     }
-    assert {path.stem for path in UNMADE} >= {"glass", "svg", "torn", "tear", "diagonal", "bezier-cut", "bezier-shape"}
+    assert {path.stem for path in UNMADE} >= {"glass", "svg", "torn", "tear", "diagonal", "bezier-cut"}
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
@@ -639,7 +637,6 @@ def test_a_shipped_file_that_uses_a_region_the_core_does_not_make_yet_is_refused
 UNPORTED = {
     "shards": (Shards(count=5), "each"),
     "cuts": (Cuts(lines=({"x": 0.5, "y": 0.5, "angle": 30},)), "each"),
-    "a path": (PathRegion(d="M 0 0 L 1 0 L 1 1 Z"), "mask"),
     "svg": (Svg(file="shape.svg"), "each"),
 }
 

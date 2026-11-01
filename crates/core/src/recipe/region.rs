@@ -135,9 +135,9 @@ impl Region {
         match self {
             Self::Shards(_) => Some("kind shards"),
             Self::Cuts(_) => Some("kind cuts"),
-            Self::Path(_) => Some("kind path"),
             Self::Svg(_) => Some("kind svg"),
             Self::Grid(_)
+            | Self::Path(_)
             | Self::Pick(_)
             | Self::Bands(_)
             | Self::Subject(_)

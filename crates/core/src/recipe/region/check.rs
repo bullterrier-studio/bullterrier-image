@@ -5,6 +5,7 @@ use super::super::check::outside;
 use super::laid::{MOST_CUTS, MOST_SHARES, MOST_TOTAL};
 use super::{Cut, Edge, Piece, Region, Regions, Shares};
 use crate::Error;
+use crate::ops::outlines;
 
 /// The most pieces a partition made of a grid may have, and the most a `Pick` may list: each piece is a number in a
 /// label map and a unit of work for a step that goes piece by piece (an `each` look, a subject found in each piece).
@@ -17,8 +18,8 @@ impl Region {
     /// Whether every number of this region, the declared region `name` (one of `declared`), lies within its range (see
     /// the field's documentation), and every piece a `Pick` names by `id` is of an `Svg` region.
     ///
-    /// What is not checked here: that a name the region refers to is a region, and the syntax of a path (`Path.d`,
-    /// `Curve.path`), an SVG file (`Svg.file`) and a shard preset (`Shards.preset`), which the runner reads.
+    /// What is not checked here: that a name the region refers to is a region, and the syntax of a curve's path
+    /// (`Curve.path`), an SVG file (`Svg.file`) and a shard preset (`Shards.preset`), which the runner reads.
     ///
     /// # Errors
     /// [`Error::Recipe`] naming the region, the field (`edge.amount`), the value and the rule.
@@ -60,7 +61,10 @@ impl Region {
             }
             Self::Path(path) => {
                 at.edge(&path.edge)?;
-                at.within("samples", path.samples, 1, 16)
+                at.within("samples", path.samples, 1, 16)?;
+                outlines::check_syntax(&path.d)
+                    .map(drop)
+                    .map_err(|said| at.refuse(&format!("`d`: {said}")))
             }
             Self::Svg(svg) => {
                 at.edge(&svg.edge)?;
@@ -408,6 +412,37 @@ mod tests {
             ("path", json!({"samples": 16}), None),
             ("path", json!({"samples": 0}), Some("`samples` must be >= 1, got 0")),
             ("path", json!({"samples": 17}), Some("`samples` must be <= 16, got 17")),
+            (
+                "path",
+                json!({"d": "M 0.1 0.1 h 0.4 v 0.4 z M 0.6 0.6 c 0.1 0 0.2 0 0.3 0.1 Z"}),
+                None,
+            ),
+            ("path", json!({"d": ""}), Some("`d`: path data is empty")),
+            (
+                "path",
+                json!({"d": "L 0.5 0.5"}),
+                Some("`d`: path data must start with M"),
+            ),
+            (
+                "path",
+                json!({"d": "M 0 0 L foo"}),
+                Some("`d`: path data is not valid SVG path data"),
+            ),
+            (
+                "path",
+                json!({"d": "M 0 0 L 1"}),
+                Some("`d`: path data is not valid SVG path data"),
+            ),
+            (
+                "path",
+                json!({"d": "M 0 0 L 1e999 0"}),
+                Some("`d`: path data is not valid SVG path data"),
+            ),
+            (
+                "path",
+                json!({"d": "M 0 0 C 0 0 1e9 1e9 0 0"}),
+                Some("`d`: a coordinate is not finite or reaches too far"),
+            ),
             ("svg", json!({"max_shapes": 1, "max_kilobytes": 100_000}), None),
             ("svg", json!({"max_shapes": 100_000, "max_kilobytes": 1}), None),
             (

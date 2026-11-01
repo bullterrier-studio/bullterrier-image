@@ -273,6 +273,10 @@ impl Evaluator {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
                 partition(laid::grid(name, spec, fit.as_deref(), picture)?)
             }
+            Some(Region::Path(spec)) => {
+                let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
+                selection(laid::path(name, spec, fit.as_deref(), picture)?)
+            }
             // the subject of the whole picture is the built-in one, which is held
             Some(Region::Subject(Subject { per: None, .. })) => self.selected("subject").map(Made::Selection),
             Some(Region::Subject(Subject {
@@ -309,7 +313,7 @@ impl Evaluator {
             }
             // a map the photo gives is held, never made, and a render refuses the kinds the core cannot make before it
             // makes anything (`check_makeable`)
-            Some(Region::Given(_) | Region::Shards(_) | Region::Cuts(_) | Region::Path(_) | Region::Svg(_)) | None => {
+            Some(Region::Given(_) | Region::Shards(_) | Region::Cuts(_) | Region::Svg(_)) | None => {
                 Err(Error::Recipe(format!("region '{name}' is not made from other regions")))
             }
         }

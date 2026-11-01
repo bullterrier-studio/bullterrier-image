@@ -27,6 +27,7 @@ quote = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }  # a recipe file's order is data (regions, first offender)
 serde_path_to_error = "0.1"
+svgtypes = { version = "0.16", default-features = false, features = ["std"] }  # path data, for the path regions
 syn = "3"
 toml = { version = "1", default-features = false, features = ["std", "parse", "serde", "preserve_order"] }
 

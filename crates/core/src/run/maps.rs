@@ -221,11 +221,11 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use crate::region::{Given, Path};
+    use crate::region::{Cuts, Given};
 
     use crate::registry::Registry;
     use crate::testing::{Finds, Paint, Recorder, registry};
-    use crate::{Error, ErrorKind, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
+    use crate::{Each, Error, ErrorKind, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 
     /// The values of a 4 x 6 picture, a different one in every channel (up to 71 / 80).
     fn values() -> Vec<f32> {
@@ -614,21 +614,22 @@ mod tests {
     fn a_region_of_a_kind_the_core_does_not_run_yet_is_refused_by_name_when_a_step_uses_it() -> Result<(), Error> {
         let rig = rig()?;
         let values = values();
-        let mut look = Recipe::new([uses("cut")]);
-        look.regions.insert("cut", Path::default());
+        let mut look = Recipe::new([paint()]);
+        look.steps.push(Each::new("cut", [None]).into());
+        look.regions.insert("cut", Cuts::default());
         let photo = Photo::new(Picture::new(4, 6, &values)?);
         assert_refused(
             &rig.render(&photo, &look),
             ErrorKind::Recipe,
-            &["'cut'", "kind path", "not run"],
-            "path",
+            &["'cut'", "kind cuts", "not run"],
+            "cuts",
         );
         // nothing runs for a recipe that is refused
         assert_eq!(rig.recorder.received().len(), 0);
         // declared and not used, it costs nothing and the recipe renders; nothing makes a map of it, so one handed in is
         // no map of the recipe
         let mut unused = Recipe::new([paint()]);
-        unused.regions.insert("cut", Path::default());
+        unused.regions.insert("cut", Cuts::default());
         rig.render(&photo, &unused)?;
         assert_refused(
             &rig.render(
