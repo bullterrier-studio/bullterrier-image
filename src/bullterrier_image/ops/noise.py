@@ -55,42 +55,6 @@ def fractal(
     return standardise(field)
 
 
-def frame_fractal(
-    shape: tuple[int, int],
-    *,
-    scale: float,
-    octaves: int,
-    persistence: float,
-    lacunarity: float,
-    seed: int | Sequence[int],
-) -> np.ndarray:
-    """Seeded fractal value noise of `shape` (height, width) laid on the frame, so that the same field comes out at
-    any resolution: float32, zero mean and unit standard deviation.
-
-    Like `fractal`, but `scale` is a share of the picture's long side and the lattice is fixed in the frame: octave i
-    has independent standard-normal values spaced `scale / lacunarity**i` of the long side apart, covering the square
-    that holds the picture whatever its size, and each pixel samples the interpolating bicubic spline through them at
-    its centre. Two sizes of one picture share the lattice and differ only by sampling, and by the octaves finer than
-    a pixel, which a small picture leaves out (with every later one). A crop of the long side's square (shape
-    `(h, w)` against `(w, w)`) is the same field, apart from the final standardisation over the whole picture.
-    """
-    long_side = max(shape)
-    rng = np.random.default_rng(seed)
-    field = np.zeros(shape)
-    for octave in range(octaves):
-        spacing = scale / lacunarity**octave
-        if spacing * long_side < 1:
-            break
-        # lattice points to reach the far side of the square
-        # constant: a cubic spline needs at least four points along each axis
-        points = max(math.ceil(1 / spacing) + 1, 4)
-        lattice = rng.standard_normal((points, points))
-        spline = RectBivariateSpline(np.arange(points), np.arange(points), lattice)
-        rows, cols = ((np.arange(size) + 0.5) / long_side / spacing for size in shape)  # pixel centres
-        field += persistence**octave * spline(rows, cols)
-    return standardise(field)
-
-
 def clumped_noise(
     shape: tuple[int, int],
     *,

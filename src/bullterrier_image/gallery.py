@@ -24,7 +24,7 @@ import numpy as np
 
 from . import fx, imageio
 from .core import registry
-from .core.steps import maps_needed
+from .core.bridge import maps_needed
 from .errors import ProjectError
 from .finding.depth import depth_map
 from .finding.subject import subject_matte

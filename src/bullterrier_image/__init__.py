@@ -19,7 +19,7 @@ Layers, each importing only from the ones below it (import-linter checks this in
                checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
     adapters   imageio (files and the one in-memory image type), finding (the subject and depth), loader (recipe files)
     effects    the effect library: pure functions image -> image, found automatically
-    core       the registry and the recipe engine (steps, runner)
+    core       the registry, the recipe model (steps) and its run by the Rust core (bridge)
     ops        shared numeric primitives, named by concept
 
 Importing bullterrier_image is cheap: each public name loads its module the first time it is used, and the effects load

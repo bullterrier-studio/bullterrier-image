@@ -14,9 +14,9 @@ _RGBA = 4  # constant: the channels of RGB with straight alpha last
 
 
 def as_image(picture: object, *, alpha: bool = False) -> np.ndarray:
-    """`picture`, a numpy array a caller hands in, as the image every effect takes: float32, C-contiguous, (h, w, 3)
-    RGB in 0..1; with `alpha`, (h, w, 4) with straight alpha last is taken too. The one check of a picture where it
-    enters (`render`, `trace`, `render_all`, `Step.apply`, `imageio.save`).
+    """`picture`, a numpy array a caller hands in, as the image every effect takes: float32, C-contiguous and aligned,
+    (h, w, 3) RGB in 0..1; with `alpha`, (h, w, 4) with straight alpha last is taken too. The one check of a picture
+    where it enters (`render`, `trace`, `render_all`, `Step.apply`, `imageio.save`).
 
     Unsigned integer levels are divided by their type's largest value (uint8 by 255, uint16 by 65535); floats are kept
     as they are. InvalidImageError, naming what was found and the fix, for anything that is not such an array (a Pillow
@@ -42,6 +42,10 @@ def as_image(picture: object, *, alpha: bool = False) -> np.ndarray:
             "it, e.g. picture.astype(np.float32) / largest, where largest is the value that means white"
         )
     image = np.ascontiguousarray(picture, dtype=np.float32)
+    if (
+        not image.flags.aligned
+    ):  # a view onto a received buffer may start off its dtype's alignment; the core borrows it
+        image = image.copy()
     finite = np.isfinite(image)
     if not finite.all():
         row, column = np.argwhere(~finite)[0][:2]

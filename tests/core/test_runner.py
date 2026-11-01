@@ -18,10 +18,10 @@ from bullterrier_image import (
     SubjectNotFoundError,
 )
 from bullterrier_image import recipe as facade
-from bullterrier_image.core import registry
+from bullterrier_image.core import bridge, registry
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Each, Recipe, Step, derived_maps, maps_needed
+from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.ops.resample import resize
 from bullterrier_image.recipe import Band, Bands, Combine, Finder, Framing, Given, Grid, Pick, Shards, Subject
 
@@ -352,21 +352,20 @@ def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, dep
 
 
 @pytest.mark.parametrize(
-    ("keys", "by_hand"),
+    ("keys", "by_hand", "atol"),
     [
-        pytest.param({"frame": Framing(flip="x")}, lambda a: a[:, ::-1], id="a flip"),
-        pytest.param({"frame": Framing(aspect=1.0)}, lambda a: a[:, 16:112], id="a square crop"),
-        pytest.param({"frame": Framing(angle=-90, fit="expand")}, np.rot90, id="a quarter turn"),
+        pytest.param({"frame": Framing(flip="x")}, lambda a: a[:, ::-1], 0, id="a flip"),
+        pytest.param({"frame": Framing(aspect=1.0)}, lambda a: a[:, 16:112], 0, id="a square crop"),
+        pytest.param({"frame": Framing(angle=-90, fit="expand")}, np.rot90, 0, id="a quarter turn"),
         pytest.param(
-            {"frame": Framing(pad_top=0.5)},
-            lambda a: np.concatenate([np.zeros((48, 128), np.float32), a]),
-            id="a border is farthest",
+            {"frame": Framing(pad_top=0.5)}, lambda a: np.pad(a, ((48, 0), (0, 0))), 0, id="a border is farthest"
         ),
-        pytest.param({"size": 64}, lambda a: resize(a, 64), id="the size"),
+        pytest.param({"size": 64}, lambda a: resize(a, 64), 1e-6, id="the size (Pillow's resampler: a last bit apart)"),
     ],
 )
-def test_the_depth_map_is_framed_and_scaled_with_the_photo(photo, depth_probe, keys, by_hand):
-    np.testing.assert_array_equal(facade.render(photo, deep(**keys), maps={"depth": RAMP})[..., 0], by_hand(RAMP))
+def test_the_depth_map_is_framed_and_scaled_with_the_photo(photo, depth_probe, keys, by_hand, atol):
+    made = facade.render(photo, deep(**keys), maps={"depth": RAMP})[..., 0]
+    np.testing.assert_allclose(made, by_hand(RAMP), rtol=0, atol=atol)
 
 
 def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, depth_probe):
@@ -520,8 +519,7 @@ def red_where_dark(picture: np.ndarray) -> np.ndarray:
 
 
 def test_a_recipe_that_uses_light_needs_no_map_from_anyone(photo):
-    assert maps_needed(DARK) == frozenset()
-    assert derived_maps(DARK) == frozenset({"light"})
+    assert bridge.maps_needed(DARK) == frozenset()
     np.testing.assert_array_equal(facade.render(photo, DARK), red_where_dark(photo))  # no maps, no finders
 
 
@@ -565,7 +563,7 @@ def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subj
             "lit_subject": Combine(of=("subject", "bright")),
         },
     )
-    assert maps_needed(lit_subject) == frozenset({"subject"})
+    assert bridge.maps_needed(lit_subject) == frozenset({"subject"})
     bright = (photo @ LUMA > 0.5).astype(np.float64)
     weight = (subject * bright)[..., None]
     np.testing.assert_allclose(

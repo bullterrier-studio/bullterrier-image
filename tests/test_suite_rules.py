@@ -27,7 +27,7 @@ ALLOWED: dict[tuple[str, str], str] = {
         "only the core can say which, and what its structs declare"
     ),
     ("_native/test_recipe_parity.py", "bullterrier_image._native"): (
-        "the extension's checks of parameters and recipe files are compared with Python's engine, the oracle"
+        "the extension's checks of parameters and recipe files are compared with Python's models and loader, the oracle"
     ),
     ("_native/test_parameter_format.py", "bullterrier_image._native"): (
         "the parameters an effect declares are judged against the parameter format's schema, for every effect the core "
@@ -38,9 +38,8 @@ ALLOWED: dict[tuple[str, str], str] = {
         "and the kinds the core lists are compared with the ones the facade knows"
     ),
     ("_native/test_runner_parity.py", "bullterrier_image._native"): (
-        "the extension's runner (`_core.render`, `_core.trace`) is compared with the definitions and with Python's "
-        "engine, the second oracle; `_core.apply` is the oracle for a scaled effect, and only the core can say which "
-        "effects it runs"
+        "the extension's runner (`_core.render`, `_core.trace`) is compared with the definitions; `_core.apply` is "
+        "the oracle for a scaled effect, and only the core can say which effects it runs"
     ),
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"

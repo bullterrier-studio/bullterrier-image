@@ -82,14 +82,6 @@ UNITS = (
     "cycles",
     "density",
 )  # also `Unit` in crates/core/src/params.rs
-DESIGN_SIZE = 480  # px: the long side every px value is written for (the effects' defaults are tuned for it)
-
-
-def design_scale(shape: tuple[int, int]) -> float:
-    """The factor from design px to the px of a picture of `shape` (height, width): its long side over `DESIGN_SIZE`.
-    The one decision of how a px value (of an effect, a region or a step) follows the picture's size."""
-    return max(shape) / DESIGN_SIZE
-
 
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
 

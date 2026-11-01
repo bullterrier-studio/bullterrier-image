@@ -1,4 +1,4 @@
-"""The Rust core's checks of parameters and recipe files against the Python engine, which is the oracle.
+"""The Rust core's checks of parameters and recipe files against Python's models and loader, which are the oracle.
 
 The extension is the public contract here (`_core.check`, `_core.read_recipe`, `_core.vocabulary`); Python's own models
 and loader say what is right. Parameters: for each row both accept it and give the same complete values, or both
@@ -13,12 +13,12 @@ from typing import Any, get_args
 
 import pytest
 
-from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's engine
+from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's models
 from bullterrier_image.core import regions, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.presets import SHIPPED as SHIPPED_PRESETS
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
-from bullterrier_image.core.steps import Each, Step
+from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.ops.composite import BlendMode
 
@@ -682,8 +682,11 @@ REGION_ROWS = [
 
 
 def python_accepts_region(kind: str, fields: dict) -> bool:
+    """Whether Python makes the region and a recipe that declares it (the recipe's check is the core's, which alone
+    reads a path)."""
     try:
-        PYTHON_KINDS[kind].parse(fields, "region 'r'")
+        region = PYTHON_KINDS[kind].parse(fields, "region 'r'")
+        Recipe([Step("grade")], regions={"p": regions.Grid(), "r": region})
     except ValueError:  # RecipeError, which is one
         return False
     return True

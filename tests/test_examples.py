@@ -7,7 +7,8 @@ import pytest
 
 from bullterrier_image import Finder, Recipe, Step, gallery, load_project, load_recipe, render
 from bullterrier_image.core import registry
-from bullterrier_image.core.steps import maps_needed, runs
+from bullterrier_image.core.bridge import maps_needed
+from bullterrier_image.core.steps import runs
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 

@@ -2,18 +2,18 @@
 
 Every row has an independent column: a pixel worked by hand, a numpy formula written from the definition (the W3C
 compositing formulas, the Rec. 709 weights, a tent-weighted mix of two renders) or a property (outside the mask the
-photo stays; opacity 0 is the photo). The Python engine (`core.runner`) is the second comparison only, within 1e-5, and
-goes when the engine does. Errors are compared through the facade, which raises the package's exceptions.
+photo stays; opacity 0 is the photo). Errors are compared through the facade, which raises the package's exceptions.
 """
 
+import tomllib
 from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import pytest
 
-from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with Python's
-from bullterrier_image.core import bridge, native, registry, runner
+from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with the definitions
+from bullterrier_image.core import bridge, native, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.presets import SHIPPED
@@ -188,13 +188,12 @@ def core_render(photo: np.ndarray, recipe: Recipe, **given: object) -> np.ndarra
 
 
 @pytest.mark.parametrize("row", ROWS.values(), ids=ROWS.keys())
-def test_the_core_makes_the_picture_the_definition_says_and_the_python_engine_agrees(row, photo, subject):
+def test_the_core_makes_the_picture_the_definition_says(row, photo, subject):
     photo, recipe, maps, expected = row(photo, subject)
     made = core_render(photo, recipe, maps=maps)
     assert made.shape == photo.shape
     assert made.dtype == np.float32
     np.testing.assert_allclose(made, expected, atol=2e-6)
-    np.testing.assert_allclose(made, runner.render(photo, recipe, maps=maps), atol=1e-5)
 
 
 def test_outside_the_mask_the_photo_is_exactly_what_it_was(photo, subject):
@@ -269,7 +268,6 @@ def test_pixel_values_are_written_for_480_and_scaled_to_the_photo(photo, effect,
     recipe = Recipe([Step(effect, params=design, opacity=1)])
     expected = applied(effect, photo, **working)
     np.testing.assert_allclose(core_render(photo, recipe), expected, atol=1e-6)
-    np.testing.assert_allclose(core_render(photo, recipe), runner.render(photo, recipe), atol=1e-5)
 
 
 def photo_of(height: int, width: int) -> np.ndarray:
@@ -342,20 +340,6 @@ def test_a_photo_of_the_size_asked_for_is_rendered_exactly_as_it_was(photo):
     np.testing.assert_array_equal(_core.render(photo, STILL, size=128), photo)
 
 
-def test_the_core_and_the_python_engine_make_the_same_picture_of_a_recipe_at_a_size(photo, subject):
-    recipe = Recipe(
-        [
-            Step("pixel_grid", params={"cell": 30}, opacity=1),
-            Step("grade", params={"exposure": 1}, mask="subject", blend_mode="screen"),
-        ]
-    )
-    for size in (64, 200, 480):
-        made = core_render(photo, recipe, maps={"subject": subject}, size=size)
-        python = runner.render(photo, recipe, maps={"subject": subject}, size=size)
-        assert made.shape[:2] == python.shape[:2] == (round(96 * size / 128), size)
-        np.testing.assert_allclose(made, python, atol=1e-5, err_msg=f"size {size}")
-
-
 def test_the_size_is_the_calls_else_the_recipes_else_the_photos(photo):
     recipe = {**STILL, "size": 64}
     assert _core.render(photo, recipe).shape == (48, 64, 3)
@@ -371,45 +355,9 @@ def test_a_trace_shows_every_stage_at_the_working_size(photo, subject):
 
 # --- the frame: flip, crop and border ---------------------------------------------------------------------------------
 
-# Every frame here is exact (nothing is resampled): the core's picture and the maps it shows equal the Python engine's
-# (`core.framing`) to the last bit.
-FRAMES = {
-    "flip x": {"flip": "x"},
-    "flip y": {"flip": "y"},
-    "flip both": {"flip": "both"},
-    "a square, centred": {"aspect": 1},
-    "a square against each side": {"aspect": 1, "anchor": "right"},
-    "a wide crop at the bottom": {"aspect": 2.5, "anchor": "bottom"},
-    "a tall crop at the top": {"aspect": 0.4, "anchor": "top"},
-    "a very wide aspect": {"aspect": 10},
-    "borders": {"pad_top": 0.1, "pad_right": 0.375, "pad_bottom": 0.125, "pad_left": 0.625, "fill": "#336699"},
-    "a crop and then a border": {"aspect": 1, "pad_left": 0.3},
-    "a flip and then a crop": {"flip": "x", "aspect": 0.8, "anchor": "left"},
-    "the subject's box": {"anchor": "subject"},
-    "the subject at an aspect with a margin": {"anchor": "subject", "aspect": 1.5, "margin": 0.1},
-    "the flipped subject, then a border": {"flip": "both", "anchor": "subject", "aspect": 1, "pad_top": 0.25},
-    "a subject too big for the aspect": {"anchor": "subject", "aspect": 5, "margin": 1},
-}
-
 
 def frame_recipe(frame: dict) -> dict:
     return {"steps": [{"effect": "grade", "opacity": 0.0, "mask": "subject"}], "frame": frame}
-
-
-def python_framed(photo: np.ndarray, frame: dict, subject: np.ndarray) -> list:
-    recipe = Recipe([Step("grade", opacity=0.0, mask="subject")], frame=Framing(**frame))
-    return runner.trace(photo, recipe, maps={"subject": subject})
-
-
-@pytest.mark.parametrize("frame", FRAMES.values(), ids=FRAMES.keys())
-def test_the_core_frames_the_photo_and_its_map_exactly_as_the_python_engine_does(frame, photo, subject):
-    stages = _core.trace(photo, frame_recipe(frame), maps={"subject": subject})
-    python = python_framed(photo, frame, subject)
-    core_picture, core_subject = stages[0][2], stages[1][2]
-    assert core_picture.shape == python[0].image.shape
-    np.testing.assert_array_equal(core_picture, python[0].image)
-    np.testing.assert_array_equal(core_subject, python[1].image[..., 0])
-    np.testing.assert_array_equal(_core.render(photo, frame_recipe(frame), maps={"subject": subject}), python[-1].image)
 
 
 def test_a_flip_is_a_reversed_view_of_the_rows_or_columns(photo):
@@ -458,9 +406,6 @@ def test_a_tie_in_a_crops_place_goes_to_the_even_pixel_as_pythons_round_does():
     # 5 columns of room, the middle is 2.5: Python's round puts the crop at column 2 (round half away would say 3)
     made = _core.render(photo, STILL | {"frame": {"aspect": 1}})
     np.testing.assert_array_equal(made, photo[:, 2:6])
-    np.testing.assert_array_equal(
-        made, runner.render(photo, Recipe([Step("grade", opacity=0.0)], frame=Framing(aspect=1)))
-    )
 
 
 def test_a_crop_around_a_subject_that_is_not_there_is_the_subject_not_found(photo):
@@ -508,20 +453,6 @@ CUTS = {
 }
 
 
-@pytest.mark.parametrize("size", [None, 33, 200], ids=["as is", "shrunk", "grown"])
-@pytest.mark.parametrize("frame", CUTS.values(), ids=CUTS.keys())
-def test_the_core_cuts_the_picture_out_as_the_python_engine_does(frame, size, photo, subject):
-    recipe = Recipe([Step("grade", params={"exposure": 1}, mask="subject")], frame=Framing(**frame))
-    maps = {"subject": subject}
-    made = bridge.render(photo, recipe, maps=maps, size=size)
-    python = runner.render(photo, recipe, maps=maps, size=size)
-    assert made.shape == python.shape
-    assert made.shape[2] == 4
-    assert made.dtype == np.float32
-    np.testing.assert_allclose(made[..., :3], python[..., :3], atol=1e-5)  # the steps' own tolerance
-    np.testing.assert_allclose(made[..., 3], python[..., 3], atol=CUT_TOLERANCE)
-
-
 @pytest.mark.parametrize("frame", CUTS.values(), ids=CUTS.keys())
 def test_a_cut_leaves_the_colour_as_the_uncut_render_made_it_and_gives_alpha_within_0_and_1(frame, photo, subject):
     recipe = Recipe([Step("grade", params={"exposure": 1})], frame=Framing(**frame))
@@ -558,32 +489,6 @@ def test_a_background_cut_needs_the_subject_and_a_circle_does_not(photo):
 
 
 # --- the turn: angle, fit and resample ------------------------------------------------------------------------------
-
-# The core's turn against the Python engine's, which is Pillow's `Image.transform`. The sizes are equal in every case;
-# the nearest pixel is exact (the core does Pillow's 16.16 fixed-point arithmetic) and bilinear and bicubic are within a
-# few float32 ulps. Measured over 10 shapes (odd sizes, one row, one column, 2 x 2) x 3 kinds of picture (noise, hard
-# edges, smooth) x 26 angles x 2 fits x 3 resamples = 4,680 cases: every size equal, and the largest |core - Python|
-# was 0 (nearest), 1.19e-7 (bilinear) and 2.98e-7 (bicubic), photo and map alike. The rows below are a subset.
-TURN_TOLERANCE = {"nearest": 0.0, "bilinear": 2e-7, "bicubic": 4e-7}
-TURN_ANGLES = [0.5, 3, 17.3, 30, 45, 89, 91, 135, -135, 179.5, -10, -45.5, 90, -90, 180, 270, 360, 720.5]
-TURN_SHAPES = [(96, 128), (97, 131), (1, 40), (7, 9), (2, 2), (33, 50)]
-
-
-@pytest.mark.parametrize("resample", TURN_TOLERANCE)
-@pytest.mark.parametrize("fit", ["crop", "expand"])
-@pytest.mark.parametrize("shape", TURN_SHAPES, ids=[str(shape) for shape in TURN_SHAPES])
-def test_the_core_turns_the_photo_and_its_map_as_the_python_engine_does(shape, fit, resample):
-    for kind in ("noise", "hard edges"):
-        photo = picture_like(kind, shape)
-        subject = np.ascontiguousarray(photo[..., 0])
-        for angle in TURN_ANGLES:
-            frame = {"angle": angle, "fit": fit, "resample": resample, "fill": "#336699"}
-            stages = _core.trace(photo, frame_recipe(frame), maps={"subject": subject})
-            python = python_framed(photo, frame, subject)
-            where = f"{kind} {shape} at {angle}"
-            assert stages[0][2].shape == python[0].image.shape, where
-            for made, expected in [(stages[0][2], python[0].image), (stages[1][2], python[1].image[..., 0])]:
-                np.testing.assert_allclose(made, expected, atol=TURN_TOLERANCE[resample], rtol=0, err_msg=where)
 
 
 @pytest.mark.parametrize(
@@ -647,12 +552,13 @@ def test_the_steps_own_value_wins_over_its_preset(photo):
     np.testing.assert_allclose(made, np.clip(photo * 0.5, 0, 1), atol=1e-6)
 
 
-def test_a_shipped_preset_renders_as_the_python_engine_renders_its_step(photo):
+def test_a_shipped_preset_renders_as_its_parameters_written_out(photo):
     name = next(iter(registry.presets("grade")))
     shipped = (SHIPPED / "grade.toml").read_text(encoding="utf-8")
     made = native.render(photo, {"steps": [{"effect": "grade", "preset": name}]}, presets={"grade": shipped})
-    expected = runner.render(photo, Recipe([Step("grade", preset=name)]))
-    np.testing.assert_allclose(made, expected, atol=1e-5)
+    written_out = {key: value for key, value in tomllib.loads(shipped)[name].items() if key != "description"}
+    expected = native.render(photo, {"steps": [{"effect": "grade", "params": written_out}]})
+    np.testing.assert_allclose(made, expected, atol=1e-6)  # a preset is its parameters, written out
     assert not np.allclose(made, photo)  # the preset is a look, not the identity
 
 
@@ -721,8 +627,8 @@ def test_the_core_finds_the_depth_and_a_given_region_by_their_finders_too(photo,
         regions={"sky": Given()},
     )
     got = core_render(photo, recipe, finders={"sky": Finds(subject), "depth": Finds(ramp(photo))})
-    expected = runner.render(photo, recipe, maps={"sky": subject, "depth": ramp(photo)})
-    np.testing.assert_allclose(got, expected, atol=1e-5)
+    expected = core_render(photo, recipe, maps={"sky": subject, "depth": ramp(photo)})
+    np.testing.assert_array_equal(got, expected)
 
 
 MISSING = {
@@ -746,8 +652,6 @@ def test_a_map_nobody_gave_is_the_error_of_that_map(photo, recipe, error, name):
     with pytest.raises(error, match=name) as caught:
         core_render(photo, recipe)
     assert type(caught.value) is error
-    with pytest.raises(error):  # and so does Python's engine
-        runner.render(photo, recipe)
 
 
 def bad_maps(photo: np.ndarray) -> dict[str, np.ndarray]:
@@ -838,18 +742,6 @@ def test_a_finder_must_have_a_find(photo):
 # --- trace ----------------------------------------------------------------------------------------------------------
 
 
-def kind_of(label: str) -> str:
-    """The kind of a stage of the Python engine's trace, from its label."""
-    if label.startswith("input"):
-        return "input"
-    if label.startswith("subject"):
-        return "subject"
-    if label.startswith("depth"):
-        return "depth"
-    assert label[0].isdigit(), label
-    return "cut_out" if "transparent" in label else "step"
-
-
 def test_a_trace_shows_the_photo_the_maps_used_and_the_picture_after_each_step(photo, subject):
     recipe = Recipe(
         [
@@ -859,23 +751,11 @@ def test_a_trace_shows_the_photo_the_maps_used_and_the_picture_after_each_step(p
     )
     maps = {"subject": subject, "depth": ramp(photo)}
     stages = bridge.trace(photo, recipe, maps=maps)
-    python = runner.trace(photo, recipe, maps=maps)
-    assert (
-        [kind for kind, _, _ in stages]
-        == [kind_of(stage.label) for stage in python]
-        == [
-            "input",
-            "subject",
-            "depth",
-            "step",
-            "step",
-        ]
-    )
+    assert [kind for kind, _, _ in stages] == ["input", "subject", "depth", "step", "step"]
     assert [number for _, number, _ in stages] == [None, None, None, 1, 2]
-    for (kind, _, array), stage in zip(stages, python, strict=True):
-        assert array.dtype == np.float32
-        shown = stage.image[..., 0] if kind in {"subject", "depth"} else stage.image  # Python shows a map as grey
-        np.testing.assert_allclose(array, shown, atol=1e-5)
+    assert all(array.dtype == np.float32 for _, _, array in stages)
+    np.testing.assert_array_equal(stages[1][2], subject)
+    np.testing.assert_array_equal(stages[2][2], ramp(photo))
     assert stages[0][2].shape == photo.shape
     assert stages[1][2].shape == photo.shape[:2]  # a map is (h, w)
 
@@ -889,12 +769,7 @@ def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject
 def test_a_trace_ends_with_the_cut_out_picture_when_the_frame_cuts_one_out(photo, subject):
     recipe = Recipe([Step("grade", params={"exposure": 1})], frame=Framing(transparent="background"))
     stages = bridge.trace(photo, recipe, maps={"subject": subject})
-    python = runner.trace(photo, recipe, maps={"subject": subject})
-    assert (
-        [kind for kind, _, _ in stages]
-        == [kind_of(stage.label) for stage in python]
-        == ["input", "subject", "step", "cut_out"]
-    )
+    assert [kind for kind, _, _ in stages] == ["input", "subject", "step", "cut_out"]
     assert [number for _, number, _ in stages] == [None, None, 1, None]
     assert stages[2][2].shape == photo.shape
     assert stages[3][2].shape == (*photo.shape[:2], 4)
@@ -1039,8 +914,6 @@ def test_a_python_effect_is_scaled_by_its_wrapper_and_told_the_ratio_only_if_it_
     np.testing.assert_allclose(made[..., 2], 0.5, atol=1e-7)
     plain = core_render(photo, reach_recipe("plain_probe"))  # a function with no size_ratio would fail if given one
     np.testing.assert_allclose(plain, 0.12, atol=1e-7)
-    for name in ("reach_probe", "plain_probe"):
-        np.testing.assert_allclose(core_render(photo, reach_recipe(name)), runner.render(photo, reach_recipe(name)))
 
 
 def test_the_ratio_a_python_effect_sees_is_that_of_the_picture(reach_probes):
@@ -1107,7 +980,6 @@ def test_a_python_effect_with_a_field_receives_the_map_its_step_names_or_its_def
     maps = {"subject": subject, "depth": depth}
     made = core_render(photo, recipe, maps=maps)
     np.testing.assert_allclose(made, np.repeat(painted(photo, subject, depth)[..., None], 3, axis=2), atol=1e-6)
-    np.testing.assert_allclose(made, runner.render(photo, recipe, maps=maps), atol=1e-6)
 
 
 def test_a_python_effect_that_works_from_the_depth_asks_for_the_depth(photo, depth_probe):
@@ -1129,7 +1001,6 @@ def test_an_effect_that_takes_a_partition_is_given_the_pieces_of_the_region_it_n
     row, column = (np.arange(height) + 0.5 >= height / 2), (np.arange(width) + 0.5 >= width / 2)
     piece = 2 * row[:, None].astype(int) + column[None, :].astype(int)
     np.testing.assert_allclose(made, np.repeat((piece / 255)[..., None], 3, axis=2), atol=1e-6)
-    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-6)
 
 
 # --- a Picture or a Lut cannot be written in a recipe: the call holds it -------------------------------------------
@@ -1147,7 +1018,6 @@ def test_two_pictures_in_two_steps_reach_their_own_steps(photo, layer_probe):
     made = core_render(photo, Recipe([first, second]))
     # (0.2, 0.4, 0.6) with (1, 0, 0) laid over it at one half
     np.testing.assert_allclose(made, np.broadcast_to([0.6, 0.2, 0.3], photo.shape), atol=1e-6)
-    np.testing.assert_allclose(made, runner.render(photo, Recipe([first, second])), atol=1e-6)
 
 
 def test_a_lut_in_a_step_reaches_its_effect(photo):
@@ -1170,7 +1040,6 @@ def test_the_gradient_runs_from_its_first_colour_to_its_last_across_the_picture(
     np.testing.assert_allclose(made[:, -1:], 1.0, atol=0.02)
     assert (np.diff(made[0, :, 0]) >= -1e-6).all()  # and it never goes back
     np.testing.assert_allclose(made, made[:1].repeat(photo.shape[0], axis=0), atol=1e-6)  # the same on every row
-    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-5)
 
 
 def test_relighting_a_flat_field_changes_nothing_and_a_slope_does(photo):
@@ -1180,7 +1049,6 @@ def test_relighting_a_flat_field_changes_nothing_and_a_slope_does(photo):
     slope = {"depth": ramp(photo)}
     lit = core_render(photo, recipe, maps=slope)
     assert np.abs(lit - photo).max() > 0.05
-    np.testing.assert_allclose(lit, runner.render(photo, recipe, maps=slope), atol=1e-5)
 
 
 # --- the two registries are one list -------------------------------------------------------------------------------

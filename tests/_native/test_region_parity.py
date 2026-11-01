@@ -2,11 +2,9 @@
 
 Every row has an independent column: a numpy formula written from the definition (a gradient's position along its
 direction, the cell a pixel's centre falls in, a Gaussian of the pieces' indicator by `scipy.ndimage`) or a property.
-The Python engine (`core.runner`, `core.steps`) is the second comparison only, within 1e-5, and goes with the engine.
 `each` with `assign="random"` draws from the core's own stream, not numpy's: it is tested by properties only.
 """
 
-import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -15,7 +13,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image.core import bridge, runner, steps
+from bullterrier_image.core import bridge
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
 from bullterrier_image.core.regions import (
@@ -32,9 +30,7 @@ from bullterrier_image.core.regions import (
     Shards,
     Subject,
     Svg,
-    used,
 )
-from bullterrier_image.core.runner import Finder
 from bullterrier_image.core.steps import Each, Recipe, Step, references
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.loader import load_recipe
@@ -236,11 +232,10 @@ for _degrees in (0, 90, 180, 270, 45, -30, 725):
 
 
 @pytest.mark.parametrize(("recipe", "alpha"), SELECTIONS.values(), ids=SELECTIONS.keys())
-def test_a_selection_chooses_what_its_definition_says_and_the_python_engine_agrees(photo, subject, recipe, alpha):
+def test_a_selection_chooses_what_its_definition_says(photo, subject, recipe, alpha):
     maps = {"subject": subject, "depth": depth_of(photo)}
     made = core_render(photo, recipe, maps=maps)
     np.testing.assert_allclose(made, over(photo, stops(photo, 1), alpha(photo, subject)), atol=2e-6)
-    np.testing.assert_allclose(made, runner.render(photo, recipe, maps=maps), atol=1e-5)
 
 
 def test_a_gradient_turned_a_whole_number_of_turns_is_the_same_gradient(photo):
@@ -256,7 +251,6 @@ def test_a_band_on_a_border_is_chosen_when_the_map_holds_the_border_as_a_float32
     recipe = masked_by("r", r=Band(of="depth", low=0.7, high=0.9, feather=0))
     made = core_render(photo, recipe, maps={"depth": depth})
     np.testing.assert_allclose(made, stops(photo, 1), atol=2e-6)  # chosen everywhere
-    np.testing.assert_allclose(made, runner.render(photo, recipe, maps={"depth": depth}), atol=1e-5)
 
 
 # --- partitions, seen through an effect that paints each pixel with its piece number -------------------------------
@@ -321,15 +315,10 @@ PARTITIONS: dict[str, tuple[dict[str, Any], Callable[[np.ndarray, np.ndarray], n
 
 
 @pytest.mark.parametrize(("regions", "expected"), PARTITIONS.values(), ids=PARTITIONS.keys())
-def test_the_pieces_of_a_partition_are_numbered_as_defined_and_the_python_engine_agrees(
-    photo, subject, partition_probe, regions, expected
-):
+def test_the_pieces_of_a_partition_are_numbered_as_defined(photo, subject, partition_probe, regions, expected):
     recipe = probing(**regions)
     maps = {"subject": subject, "depth": depth_of(photo)}
     np.testing.assert_array_equal(labels_made(photo, recipe, maps=maps), expected(photo, subject))
-    np.testing.assert_allclose(
-        core_render(photo, recipe, maps=maps), runner.render(photo, recipe, maps=maps), atol=1e-6
-    )
 
 
 MOSAIC = ROOT / "examples" / "assets" / "mosaic.svg"
@@ -346,43 +335,32 @@ def rectangles_made(tmp_path: Path) -> Svg:
     return Svg(file=str(path))
 
 
-def test_the_pieces_of_an_svg_are_numbered_as_defined_and_the_python_engine_agrees(photo, partition_probe, tmp_path):
+def test_the_pieces_of_an_svg_are_numbered_as_defined(photo, partition_probe, tmp_path):
     drawn = np.zeros(photo.shape[:2], int)  # 0 outside, 1 a, 2 b: the later shape lies on top
     drawn[10:40, 10:50] = 1
     drawn[20:70, 30:80] = 2
     recipe = probing(r=rectangles_made(tmp_path))
     np.testing.assert_array_equal(labels_made(photo, recipe), first_pixel_numbers(drawn))
-    np.testing.assert_allclose(core_render(photo, recipe), runner.render(photo, recipe), atol=1e-6)
 
 
-def test_picking_shapes_of_an_svg_by_id_chooses_the_pieces_they_show_and_the_python_engine_agrees(photo, tmp_path):
+def test_picking_shapes_of_an_svg_by_id_chooses_the_pieces_they_show(photo, tmp_path):
     drawn = np.zeros(photo.shape[:2], bool)  # a without what b covers
     drawn[10:40, 10:50] = True
     drawn[20:70, 30:80] = False
     recipe = masked_by("p", s=rectangles_made(tmp_path), p=Pick(of="s", pieces=("a",)))
     made = core_render(photo, recipe)
     np.testing.assert_allclose(made, over(photo, stops(photo, 1), drawn), atol=2e-6)
-    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-6)
 
 
-def test_an_id_the_svg_lacks_is_refused_by_the_core_and_by_python_listing_the_ids(photo, tmp_path):
+def test_an_id_the_svg_lacks_is_refused_listing_the_ids(photo, tmp_path):
     recipe = masked_by("p", s=rectangles_made(tmp_path), p=Pick(of="s", pieces=("c",)))
-    for render in (core_render, runner.render):
-        with pytest.raises(RecipeError, match=r"region 'p'.*'c'.*'s'.*a, b"):
-            render(photo, recipe)
+    with pytest.raises(RecipeError, match=r"region 'p'.*'c'.*'s'.*a, b"):
+        core_render(photo, recipe)
 
 
-# of the 12,288 pixels of the photo, those on a border of the mosaic that the two readers place a pixel apart
-# (svgelements flattens its curves its own way): measured 0, here at most 0.1 % for the platform's own floats
-MOSAIC_BORDER = 1e-3
-
-
-def test_a_realistic_svg_is_cut_as_the_python_engine_cuts_it_but_for_pixels_on_a_border(photo, partition_probe):
+def test_a_realistic_svg_is_cut_into_the_outside_and_its_11_shapes(photo, partition_probe):
     recipe = probing(r=Svg(file=str(MOSAIC)))
-    core = labels_made(photo, recipe)
-    python = np.rint(runner.render(photo, recipe)[..., 0] * 255).astype(int)
-    assert core.max() == python.max() == 11  # the outside and the 11 shapes
-    assert (core != python).mean() <= MOSAIC_BORDER
+    assert labels_made(photo, recipe).max() == 11  # piece 0 is the outside
 
 
 def test_a_torn_svg_is_cut_the_same_for_a_seed_differently_for_another_and_straight_for_no_tear(
@@ -404,9 +382,8 @@ def test_a_torn_svg_is_cut_the_same_for_a_seed_differently_for_another_and_strai
 def test_shares_that_add_up_to_more_than_the_most_are_refused_naming_the_field_and_huge_ones_within_it_are_fine(
     photo, partition_probe, field
 ):
-    refused = probing(r=Grid(**{field: (1e307, 1e307)}))
     with pytest.raises(RecipeError, match=f"`{field}` shares must add up to at most 1e100"):
-        core_render(photo, refused)
+        probing(r=Grid(**{field: (1e307, 1e307)}))
     equal = probing(r=Grid(**{field: (5e99, 5e99)}))
     np.testing.assert_array_equal(labels_made(photo, equal), labels_made(photo, probing(r=Grid(**{field: 2}))))
 
@@ -450,10 +427,6 @@ def test_the_subject_found_in_each_piece_is_united_into_the_truth_whatever_the_p
     made = core_render(photo, recipe, finders={"subject": finder})
     np.testing.assert_allclose(made, over(photo, stops(photo, 1), found_in_pieces(photo)), atol=2e-6)
     assert len(finder.shapes) == 4  # once for each piece
-    python = Truth()
-    np.testing.assert_allclose(
-        made, runner.render(photo, recipe, finders={"subject": Finder("truth", python.find)}), atol=1e-5
-    )
 
 
 def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_unaffected(photo):
@@ -477,9 +450,6 @@ def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_una
     assert expected.any()
     assert not np.array_equal(expected, found_in_pieces(photo))  # some piece really found nothing
     np.testing.assert_allclose(made, over(photo, stops(photo, 1), expected), atol=2e-6)
-    np.testing.assert_allclose(
-        made, runner.render(photo, recipe, finders={"subject": Finder("truth", Truth(0.9).find)}), atol=1e-5
-    )
     traced = bridge.trace(
         photo, recipe, finders={"subject": Truth(at_least=0.9)}
     )  # a trace asks the finder the same way
@@ -499,15 +469,10 @@ def test_only_the_subject_not_being_found_leaves_a_piece_empty_the_others_are_th
     recipe = masked_by("found", **PER_PIECE)
     if error is None:  # every piece adds nothing: the mask chooses nothing and the photo is as it was
         np.testing.assert_array_equal(core_render(photo, recipe, finders={"subject": Finds()}), photo)
-        np.testing.assert_array_equal(
-            runner.render(photo, recipe, finders={"subject": Finder("f", Finds().find)}), photo
-        )
         return
     with pytest.raises(error, match="not in this piece") as caught:
         core_render(photo, recipe, finders={"subject": Finds()})
     assert type(caught.value) is error
-    with pytest.raises(error):  # and so does Python's engine
-        runner.render(photo, recipe, finders={"subject": Finder("f", Finds().find)})
 
 
 def test_an_exception_that_only_looks_like_the_cores_not_found_error_is_a_failure_as_any_other(photo):
@@ -585,7 +550,7 @@ EACH_PIECES = {
 @pytest.mark.parametrize("scale", [1, 2], ids=["the photo", "twice the photo"])
 @pytest.mark.parametrize("feather", [0, 0.5, 5])
 @pytest.mark.parametrize(("region", "pieces"), EACH_PIECES.values(), ids=EACH_PIECES.keys())
-def test_each_gives_the_pieces_their_looks_in_turn_blended_across_the_borders_and_the_python_engine_agrees(
+def test_each_gives_the_pieces_their_looks_in_turn_blended_across_the_borders(
     photo, subject, region, pieces, feather, scale
 ):
     photo = photo.repeat(scale, axis=0).repeat(scale, axis=1)
@@ -596,7 +561,6 @@ def test_each_gives_the_pieces_their_looks_in_turn_blended_across_the_borders_an
     made = core_render(photo, recipe, maps=maps)
     assignment = [piece % 3 for piece in range(labels.max() + 1)]
     np.testing.assert_allclose(made, blended(photo, labels, assignment, feather), atol=FEATHER_ATOL)
-    np.testing.assert_allclose(made, runner.render(photo, recipe, maps=maps), atol=FEATHER_ATOL)
 
 
 def test_each_with_hard_borders_leaves_the_piece_of_a_none_look_exactly_as_it_was(photo):
@@ -658,7 +622,16 @@ def test_a_random_assignment_uses_every_look_and_favours_none_over_many_seeds(ph
 
 def used_regions(recipe: Recipe) -> list[str]:
     """The regions the steps use, or that those are made from."""
-    names = used(recipe.regions, [name for step in recipe.steps for _, name, _ in references(step)])
+    todo = [name for step in recipe.steps for _, name, _ in references(step)]
+    names: set[str] = set()
+    while todo:
+        name = todo.pop()
+        if name in names or name not in recipe.regions:
+            continue
+        names.add(name)
+        for field in ("of", "per", "fit"):  # the fields of a region that name the regions it is made from
+            made_from = getattr(recipe.regions[name], field, None)
+            todo += [made_from] if isinstance(made_from, str) else list(made_from or ())
     return [name for name in recipe.regions if name in names]
 
 
@@ -707,7 +680,7 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
-def test_a_shipped_file_that_uses_regions_renders_as_the_python_engine_renders_it(path, photo, subject):
+def test_a_shipped_file_that_uses_regions_renders_a_picture_that_the_look_changed(path, photo, subject):
     recipe = load_recipe(path)
     maps = {"subject": subject, "depth": depth_of(photo)}
     made = core_render(photo, recipe, maps=maps)
@@ -715,23 +688,14 @@ def test_a_shipped_file_that_uses_regions_renders_as_the_python_engine_renders_i
     assert np.isfinite(made).all()
     assert made.min() >= 0
     assert made.max() <= 1
-    assert np.abs(made - runner.render(photo, recipe, maps=maps)).max() <= FEATHER_ATOL
     last = bridge.trace(photo, recipe, maps=maps)[-1]
     np.testing.assert_array_equal(last[2], made)  # the last stage of a trace is the render
     if recipe.frame == Framing() and recipe.size is None:
         assert np.abs(made - photo).max() > 1e-3  # the look does something
 
 
-# the two readers place a border within a pixel of each other (svgelements flattens its curves its own way), so a pixel
-# on a border may take the piece, and so the look, next to it: of the pixels of the shipped example 0.033 % differ by
-# more than FEATHER_ATOL (measured on the synthetic photo), here at most 0.1 %
-BORDER_FRACTION = 1e-3
-
-
 @pytest.mark.parametrize("path", DRAWN, ids=ID)
-def test_a_shipped_file_that_draws_an_svg_renders_as_the_python_engine_renders_it_but_for_pixels_on_a_border(
-    path, photo, subject
-):
+def test_a_shipped_file_that_draws_an_svg_renders_the_same_every_time_and_stays_a_picture(path, photo, subject):
     recipe = load_recipe(path)
     maps = {"subject": subject, "depth": depth_of(photo)}
     made = core_render(photo, recipe, maps=maps)
@@ -739,8 +703,6 @@ def test_a_shipped_file_that_draws_an_svg_renders_as_the_python_engine_renders_i
     assert np.isfinite(made).all()
     assert made.min() >= 0
     assert made.max() <= 1
-    differing = (np.abs(made - runner.render(photo, recipe, maps=maps)).max(axis=-1) > FEATHER_ATOL).mean()
-    assert differing <= BORDER_FRACTION
     np.testing.assert_array_equal(bridge.trace(photo, recipe, maps=maps)[-1][2], made)
     np.testing.assert_array_equal(core_render(photo, recipe, maps=maps), made)
 
@@ -829,23 +791,9 @@ NEEDS: dict[str, tuple[Recipe, set[str], bool]] = {
 }
 
 
-def python_needs(recipe: Recipe) -> tuple[set[str], bool]:
-    return set(steps.maps_needed(recipe)), steps.needs_finder(recipe)
-
-
 @pytest.mark.parametrize(("recipe", "maps", "finds"), NEEDS.values(), ids=NEEDS.keys())
-def test_what_a_recipe_needs_is_the_maps_and_finders_its_steps_use_and_the_python_engine_agrees(recipe, maps, finds):
-    needs = bridge.needs(recipe)
-    assert (set(needs["maps"]), needs["finds_pieces"]) == (maps, finds)
-    assert list(needs["maps"]) == sorted(needs["maps"])
-    assert python_needs(recipe) == (maps, finds)
-
-
-@pytest.mark.parametrize("path", FILES, ids=ID)
-def test_what_a_shipped_file_needs_is_what_the_python_engine_says(path):
-    recipe = load_recipe(path)
-    needs = bridge.needs(recipe)
-    assert (set(needs["maps"]), needs["finds_pieces"]) == python_needs(recipe)
+def test_what_a_recipe_needs_is_the_maps_and_finders_its_steps_use(recipe, maps, finds):
+    assert (set(bridge.maps_needed(recipe)), bridge.needs_finder(recipe)) == (maps, finds)
 
 
 def test_the_names_a_photo_can_be_given_are_the_subject_the_depth_and_the_given_regions_in_declaration_order():
@@ -864,45 +812,44 @@ def region_stages(stages: list) -> list[tuple[str, str]]:
     return [(kind, name) for kind, name, _ in stages if kind in ("selection", "partition")]
 
 
-def python_region_stages(stages: list) -> list[tuple[str, str]]:
-    labels = [re.match(r"region '(\w+)' \((white = chosen|\d+ pieces, numbered)\)", stage.label) for stage in stages]
-    return [("selection" if "white" in match.group(2) else "partition", match.group(1)) for match in labels if match]
-
-
 TRACED = {
-    "regions in no order of the alphabet": Recipe(
-        [Step("grade", params={"exposure": 1}, mask="both"), Each(each="mid", looks=(DOUBLED, None))],
-        regions={
-            "zeta": Band(of="depth", low=0.5, high=1, feather=0.25),
-            "mid": Grid(columns=3),
-            "alpha": LinearGradient(angle=0),
-            "both": Combine(op="multiply", of=("alpha", "zeta")),
-            "unused": RadialGradient(),
-        },
+    "regions in no order of the alphabet": (
+        Recipe(
+            [Step("grade", params={"exposure": 1}, mask="both"), Each(each="mid", looks=(DOUBLED, None))],
+            regions={
+                "zeta": Band(of="depth", low=0.5, high=1, feather=0.25),
+                "mid": Grid(columns=3),
+                "alpha": LinearGradient(angle=0),
+                "both": Combine(op="multiply", of=("alpha", "zeta")),
+                "unused": RadialGradient(),
+            },
+        ),
+        [("selection", "zeta"), ("partition", "mid"), ("selection", "alpha"), ("selection", "both")],
     ),
-    "a given region": Recipe([Step("grade", mask="sky")], regions={"sky": Given(), "spare": Given()}),
+    "a given region": (
+        Recipe([Step("grade", mask="sky")], regions={"sky": Given(), "spare": Given()}),
+        [("selection", "sky")],
+    ),
 }
 
 
-@pytest.mark.parametrize("recipe", TRACED.values(), ids=TRACED.keys())
-def test_a_trace_shows_the_regions_the_steps_use_in_the_order_the_python_engine_does_with_the_same_maps(photo, recipe):
+@pytest.mark.parametrize(("recipe", "shown"), TRACED.values(), ids=TRACED.keys())
+def test_a_trace_shows_the_regions_the_steps_use_in_the_order_they_are_declared(photo, recipe, shown):
     sky = np.full(photo.shape[:2], 0.25, np.float32)
     maps = {"depth": depth_of(photo), "sky": sky} if "sky" in recipe.regions else {"depth": depth_of(photo)}
-    core = bridge.trace(photo, recipe, maps=maps)
-    python = runner.trace(photo, recipe, maps=maps)
-    assert region_stages(core) == python_region_stages(python)
-    assert region_stages(core)  # the rows really have regions to show
-    by_label = {
-        match.group(1): stage for stage in python if (match := re.match(r"region '(\w+)' \(white", stage.label))
-    }
-    for kind, name, array in core:
+    stages = bridge.trace(photo, recipe, maps=maps)
+    assert region_stages(stages) == shown
+    for kind, name, array in stages:
         if kind == "selection":
-            np.testing.assert_allclose(array, by_label[name].image[..., 0], atol=1e-6)
             assert array.dtype == np.float32
+            assert array.shape == photo.shape[:2]
+            assert 0 <= array.min() <= array.max() <= 1
+            if name == "sky":
+                np.testing.assert_array_equal(array, sky)  # a given map is shown as it was given
         if kind == "partition":
             assert array.dtype == np.int32
             assert array.shape == photo.shape[:2]
-    assert [kind for kind, _, _ in core][-1] == "step"
+    assert [kind for kind, _, _ in stages][-1] == "step"
 
 
 def test_the_stage_of_a_partition_holds_the_labels_of_its_pieces(photo):

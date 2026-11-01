@@ -15,7 +15,7 @@ import pytest
 from pydantic import BaseModel
 
 import bullterrier_image
-import bullterrier_image.core.runner
+import bullterrier_image.core.bridge
 import bullterrier_image.effects
 import bullterrier_image.gallery as gallery
 import bullterrier_image.plugin
@@ -151,10 +151,9 @@ def test_the_version_is_looked_up_when_asked_for_not_on_import():
 @pytest.mark.parametrize("name", ["render", "trace", "render_all"])
 def test_the_render_family_has_one_public_home_and_core_does_not_offer_its_own(name):
     """`bullterrier_image.render` is `bullterrier_image.recipe.render` (with the default subject finder); the core's
-    version, which
-    finds no subject by itself, is reachable only by its module path."""
+    version, which finds no subject by itself, is reachable only by its module path."""
     assert getattr(bullterrier_image, name) is getattr(bullterrier_image.recipe, name)
-    assert getattr(bullterrier_image, name) is not getattr(bullterrier_image.core.runner, name)
+    assert getattr(bullterrier_image, name) is not getattr(bullterrier_image.core.bridge, name)
     assert not hasattr(bullterrier_image.core, name)
 
 

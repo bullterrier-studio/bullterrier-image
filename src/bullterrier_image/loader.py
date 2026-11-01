@@ -105,7 +105,7 @@ Looks. The recipes that ship with the package (`bt-image effects` lists them und
 `load_recipe("./crt")` or pass a `Path`.
 
 Dependency direction: imports `core` (steps, framing, regions, registry, params, looks), `imageio` and `errors`; it does
-not know `runner`.
+not know `bridge`.
 """
 
 import difflib

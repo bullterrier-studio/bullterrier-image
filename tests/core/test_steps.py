@@ -15,20 +15,11 @@ from pydantic import model_validator
 
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
+from bullterrier_image.core.bridge import maps_needed, needs_finder
 from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import (
-    Recipe,
-    Step,
-    derived_maps,
-    drives,
-    fixed,
-    maps_needed,
-    needs_finder,
-    references,
-    runs,
-)
+from bullterrier_image.core.steps import Recipe, Step, drives, fixed, references, runs
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
@@ -341,7 +332,6 @@ def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed)
         size=None,
     )
     assert maps_needed(recipe) == frozenset(needed)
-    assert derived_maps(recipe) == (frozenset({"light"}) if by == "light" else frozenset())
 
 
 # --- addresses: every number of a recipe has a name, and a copy of the recipe can have any of them set ----------------

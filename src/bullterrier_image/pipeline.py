@@ -53,12 +53,12 @@ from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import finding, imageio
 from .checks import matte_warnings, still_warnings
-from .core.outlines import svg_bytes
+from .core.bridge import known_maps, maps_needed, needs_finder
+from .core.finder import Finder, find_map
 from .core.params import Lut, Picture, describe_error
 from .core.regions import FOUND_MAPS, Svg
-from .core.runner import Finder, find_map, known_maps
-from .core.steps import file_name, maps_needed, needs_finder, runs
-from .errors import BullterrierImageError, ProjectError, SubjectNotFoundError
+from .core.steps import file_name, runs
+from .errors import BullterrierImageError, ProjectError, RecipeError, SubjectNotFoundError
 from .ops.maps import map_problem
 from .ops.resample import resize
 from .recipe import Recipe, default_finder, load_recipe, render, trace
@@ -386,7 +386,7 @@ def _finders_of(given: dict[str, Finder], recipes: list[Recipe]) -> dict[str, Fi
     """The finder of every map `recipes` need: the one given, else the default for the subject and the depth, built only
     when a recipe needs it. ProjectError for a finder named for no map of the recipes (the built-in `subject` and
     `depth`, or a `Given` region of one), and for a recipe that needs a map that has no finder."""
-    known = known_maps(recipes)
+    known = {name for recipe in recipes for name in known_maps(recipe)}
     if unknown := sorted(set(given) - known):
         raise ProjectError(
             f"`finders` names {unknown[0]!r}, which is no map of the recipes; their maps: {', '.join(sorted(known))}"
@@ -584,10 +584,27 @@ def _picture_digests(recipe: Recipe) -> list[str]:
 def _svg_digests(recipe: Recipe) -> list[str]:
     """The content digest of every svg file the recipe's regions read, in order; RecipeError when one cannot be read."""
     return [
-        hashlib.sha256(svg_bytes(kind.file, kind.max_kilobytes)).hexdigest()
+        hashlib.sha256(_svg_bytes(kind.file, kind.max_kilobytes)).hexdigest()
         for kind in recipe.regions.values()
         if isinstance(kind, Svg)
     ]
+
+
+def _svg_bytes(file: str, max_kilobytes: int) -> bytes:
+    """The content of the SVG `file`; RecipeError naming the file when it cannot be read or is over `max_kilobytes`
+    (no more than that and one byte is ever read, so a device that never ends is refused too)."""
+    path = Path(file)
+    limit = max_kilobytes * 1024
+    try:
+        with path.open("rb") as handle:
+            data = handle.read(limit + 1)
+    except OSError as error:
+        raise RecipeError(f"svg file {path.name!r} cannot be read: {error.strerror or error}") from None
+    except ValueError as error:  # a name with a null character
+        raise RecipeError(f"svg file {path.name!r} cannot be read: {error}") from None
+    if len(data) > limit:
+        raise RecipeError(f"svg file {path.name!r} is over the limit max_kilobytes = {max_kilobytes}")
+    return data
 
 
 def _fingerprint(*parts: str) -> str:

@@ -3,21 +3,26 @@
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
 regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
 `RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of one its own look. The
-machinery lives in `bullterrier_image.core` (`steps`, `runner`) and `bullterrier_image.loader`; this module re-exports
-its public names and binds what the core leaves open: how the subject and the depth are found. `render`, `trace` and
-`render_all` take the same arguments as the core's, but when a recipe will ask for the subject (it needs the subject and
-no `subject` map is given, or it finds the subject piece by piece) and `finders` has no `subject`, they find it with
-`bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a `depth` map nor a `depth`
-finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is built only then, so a recipe that needs
-neither never depends on the model settings. Any other map (a `Given` region's) is handed in by name in `maps`.
+machinery lives in `bullterrier_image.core` (`steps`, and `bridge`, which runs a recipe in the Rust core) and
+`bullterrier_image.loader`; this module re-exports its public names and binds what the core leaves open: how the
+subject and the depth are found. When a recipe will ask for the subject (it needs the subject and no `subject` map is
+given, or it finds the subject piece by piece) and `finders` has no `subject`, `render`, `trace` and `render_all` find
+it with `bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a `depth` map nor a
+`depth` finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is built only then, so a recipe
+that needs neither never depends on the model settings. Any other map (a `Given` region's) is handed in by name in
+`maps`.
 """
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 
+from .core import bridge
 from .core import looks as shipped_looks
-from .core import runner
+from .core.bridge import maps_needed, needs_finder
+from .core.finder import Finder
 from .core.framing import Framing
 from .core.params import Drive
 from .core.regions import (
@@ -39,12 +44,12 @@ from .core.regions import (
     Subject,
     Svg,
 )
-from .core.runner import Finder, Stage
-from .core.steps import Each, Parameter, Recipe, Step, maps_needed, needs_finder
+from .core.steps import Each, Parameter, Recipe, Step
 from .errors import RecipeError
 from .finding import subject
 from .finding.depth import depth_finder
 from .loader import load_recipe
+from .ops.pieces import number_pieces
 
 __all__ = [
     "Band",
@@ -85,6 +90,14 @@ def looks() -> dict[str, str]:
     return {name: look.description for name, look in shipped_looks.read().items()}
 
 
+@dataclass(frozen=True)
+class Stage:
+    """One picture from inside a render: what the photo looked like at some point on its way through the recipe."""
+
+    label: str
+    image: np.ndarray
+
+
 def render(
     rgb: np.ndarray,
     recipe: Recipe | Step,
@@ -93,11 +106,42 @@ def render(
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
 ) -> np.ndarray:
-    """One still of `recipe` on `rgb`: `bullterrier_image.core.runner.render` with the default finders. `size` is the
-    longest side of the result in px: the recipe's pixel values (written for 480) are scaled to it. `rgb` is read in
-    place, not copied: do not modify it from another thread while it renders."""
+    """Run `recipe` on the photo `rgb` and return the result as a new image.
+
+    The photo is first framed (`recipe.frame`: flip, turn, crop, borders) and scaled to `size`, else `recipe.size`,
+    else kept as it is; its maps are framed and scaled with it. Steps run in order, each on the previous step's output,
+    which the step's result is laid over: combined by its `blend_mode`, mixed in by its `opacity` and, for a masked
+    step, through the selection its `mask` names (the subject, the background or a region of the recipe), so only
+    that changes. An `Each` step renders each of its looks once over the whole picture and shows it through the pieces
+    of its partition that have it, blending the looks across the borders. An effect with a field parameter gets the
+    map it names (`field = "subject"`: the subject's silhouette; `"depth"`: the depth map). After the last step a
+    recipe whose framing is `transparent` is cut out: the result then has four channels, RGB and straight alpha
+    (h, w, 4), instead of three. A `Step` given as the recipe is the recipe of that one step: `render(photo, step)` is
+    `step.apply(photo)`.
+
+    rgb: the photo, a numpy array (h, w, 3): floats in 0..1, or unsigned integer levels (uint8 over 255, uint16 over
+    65535); anything else is an InvalidImageError naming what was found and the fix (NaN or an infinity a
+    NonFiniteImageError). It is read in place, not copied, and never modified: do not modify it from another thread
+    while it renders. recipe: what to run. maps: the photo's maps by name, each float32 (h, w) with the photo's height
+    and width, 0..1: `subject` (white = subject), `depth` (1 = nearest), and one for each `Given` region the recipe
+    declares, under that region's name; None for none. A map given or found must be finite and within 0..1. finders: a
+    `Finder` by map name, called with the photo as given (before it is framed or scaled) once, when the recipe needs
+    that map and it was not handed in; the `subject` finder is also called with the crop of the working picture of each
+    piece for a `Subject` region with `per` (see `Finder`). Without a `subject` finder, the subject is found by
+    `finding.subject.subject_finder()` if needed; without a `depth` map or finder, the depth by
+    `finding.depth.depth_finder()`. Raises RecipeError for a name in `maps` or `finders` that is no map of the recipe
+    (naming the ones it has); the map's error (SubjectNotFoundError for the subject, DepthNotFoundError for the depth,
+    else MapNotFoundError), naming the map, when the recipe needs it and neither the map nor a finder was given, the
+    finder returns None, the map is not (h, w) or not within 0..1; a `per` region has no `subject` finder or the
+    finder's map does not fit its crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a
+    subject that is not there.
+
+    size: the longest side of the result in px, 1 to 16384 (the recipe's own size when None; RecipeError for anything
+    else). The recipe's pixel values are written for 480 and multiplied by the result's longest side over 480, so one
+    recipe gives the same look at any size; a value stops at its minimum when shrinking.
+    """
     recipe = _one_recipe(recipe)
-    return runner.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+    return bridge.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
 
 
 def trace(
@@ -108,10 +152,22 @@ def trace(
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
 ) -> list[Stage]:
-    """Every stage of a render: `bullterrier_image.core.runner.trace` with the default finders; `size` as for
-    `render`."""
+    """Every stage of a render, so you can see what each step did and where something went wrong.
+
+    The stages are the photo as the recipe receives it (framed and scaled), the subject matte if the recipe uses one
+    (white = subject), the depth map if it uses one (white = nearest), each region of the recipe that its steps use, in
+    the order declared (a selection in white where it chooses, which shows a `Given` map too; a partition as the dimmed
+    photo with its borders and the number of each piece, which is what `Pick` and `Each` count by), the image after
+    each step, in order, and, when the recipe's framing cuts the picture out, that cut (an RGBA picture, four
+    channels). The last stage is exactly what `render` returns. Every stage stays in memory: one picture per step, plus
+    the input and the maps.
+
+    rgb, recipe, maps, finders, size: as for `render`.
+    """
     recipe = _one_recipe(recipe)
-    return runner.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+    stages = bridge.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+    photo = stages[0][2]
+    return [_stage(recipe, photo, *stage) for stage in stages]
 
 
 def render_all(
@@ -122,10 +178,42 @@ def render_all(
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
 ) -> list[np.ndarray]:
-    """Several recipes on one photo: `bullterrier_image.core.runner.render_all` with the default finders. `size` as for
-    `render`."""
+    """Run several recipes on one photo; each map is found at most once, however many recipes need it.
+
+    rgb: the photo (see `render`). recipes: the recipes to run; the results come back in the same order, one still each.
+    maps: the photo's maps by name, used by every recipe that needs them (see `render`), or None. finders: each `find`
+    is called once with the photo as given when any recipe needs its map and the map was not handed in (the map's error
+    if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
+    `render`. A name that is no map of any recipe is a RecipeError. size: as for `render`, for every recipe.
+    """
     recipes = _recipes(recipes)
-    return runner.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size)
+    return bridge.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size)
+
+
+def _stage(recipe: Recipe, photo: np.ndarray, kind: str, place: int | str | None, picture: np.ndarray) -> Stage:
+    """The core's stage as a labelled picture: a map as grey, a partition as the dimmed photo with its borders and the
+    number of each of its pieces."""
+    match kind:
+        case "subject":
+            return Stage("subject matte (white = subject)", _grey(picture))
+        case "depth":
+            return Stage("depth (white = nearest)", _grey(picture))
+        case "selection":
+            return Stage(f"region {place!r} (white = chosen)", _grey(picture))
+        case "partition":
+            pieces = int(picture.max()) + 1
+            return Stage(f"region {place!r} ({pieces} pieces, numbered)", number_pieces(photo, picture, pieces))
+        case "step":
+            return Stage(f"{place}. {recipe.steps[cast(int, place) - 1].describe()}", picture)
+        case "cut_out":
+            return Stage(f"{len(recipe.steps) + 1}. transparent({recipe.frame.transparent!r})", picture)
+        case _:
+            return Stage(kind, picture)
+
+
+def _grey(layer: np.ndarray) -> np.ndarray:
+    """The map `layer` (h, w) as a grey picture (h, w, 3)."""
+    return np.repeat(layer[..., None], 3, axis=2)
 
 
 def _one_recipe(recipe: object) -> Recipe:
@@ -177,19 +265,3 @@ def default_finder(name: str) -> Finder:
     """The default finder of the built-in map `name` (`subject` or `depth`): `finding.subject.subject_finder()`, or
     `finding.depth.depth_finder()`. Built when called, so a setting nobody uses cannot stop a run."""
     return {"subject": subject.subject_finder, "depth": depth_finder}[name]()
-
-
-# Each function above is the core's, with the default finders bound (and, for one picture, a `Step` taken as the recipe
-# of that one step): its one-line docstring is replaced by the core's full documentation, plus that.
-_ONE_STEP = (
-    " A `Step` given as the recipe is the recipe of that one step: `render(photo, step)` is `step.apply(photo)`."
-)
-for _public in (render, trace, render_all):
-    _public.__doc__ = (
-        getattr(runner, _public.__name__).__doc__.rstrip()
-        + "\n\n    Without a `subject` finder, the subject is found by `finding.subject.subject_finder()` if needed;"
-        + " without a `depth` map or finder, the depth by `finding.depth.depth_finder()`."
-        + ("" if _public is render_all else _ONE_STEP)
-        + "\n    "
-    )
-del _public

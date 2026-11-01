@@ -9,8 +9,9 @@ import pytest
 from PIL import Image
 
 from bullterrier_image.core import looks, registry
+from bullterrier_image.core.bridge import maps_needed
 from bullterrier_image.core.params import Drive
-from bullterrier_image.core.steps import Each, Recipe, Step, drives, maps_needed, runs
+from bullterrier_image.core.steps import Each, Recipe, Step, drives, runs
 from bullterrier_image.errors import ImageReadError, RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (

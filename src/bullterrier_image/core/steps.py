@@ -18,15 +18,15 @@ Promises:
   made. Every number of a recipe has an address (`Recipe.parameters`, `Recipe.parameter`), and `Recipe.with_values`
   returns a copy with some set; a step's optional `name` addresses its numbers.
 
-Dependency direction: imports the effect registry, `framing`, `params`, `regions`, `ops.composite` (the blend modes'
-names) and `errors` only. The recipe-file reader
-`loader` (TOML to `Recipe`, in the adapters layer) and `runner` (running a `Recipe` on a photo) both build on this
-module and do not know each other.
+Dependency direction: imports the effect registry, `native` (the core's rules, which a recipe is held to when it is
+made), `framing`, `params`, `regions`, `ops.composite` (the blend modes' names) and `errors` only. The recipe-file
+reader `loader` (TOML to `Recipe`, in the adapters layer) and `bridge` (running a `Recipe` on a photo in the Rust core)
+both build on this module and do not know each other.
 """
 
 import difflib
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from importlib import import_module
 from typing import Any, Literal
@@ -38,12 +38,13 @@ from pydantic.fields import FieldInfo
 from bullterrier_image.errors import RecipeError
 from bullterrier_image.ops.composite import BlendMode
 
-from . import registry
+from . import native, registry
 from .framing import Framing
-from .framing import needs_subject as _framing_needs_subject
 from .params import (
     Drive,
     EffectParams,
+    Lut,
+    Picture,
     ValidatedModel,
     arrays_as_values,
     bounds,
@@ -52,9 +53,7 @@ from .params import (
     unit_of,
     whole_number_fields,
 )
-from .regions import Kind, check, maps_used, needs
-from .regions import derived_maps as _derived_from
-from .regions import needs_finder as _finds_pieces
+from .regions import Kind, check, needs
 
 MAX_SIZE = 16384  # constant: longest side, px; the core also caps the pixels of a picture
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
@@ -358,7 +357,7 @@ class Each(_Layer):
         return self.describe()
 
 
-# What the runner (and the recipe's own checks) ask of steps and recipes, kept out of the public classes.
+# What the recipe's own checks and the bridge ask of steps and recipes, kept out of the public classes.
 
 
 def runs(step: Step | Each) -> tuple[Step, ...]:
@@ -398,41 +397,71 @@ def references(step: Step | Each) -> list[Reference]:
     return [*masked, *driving, *working, *drawn]
 
 
-def assignment(each: Each, pieces: int) -> list[int]:
-    """The look (an index into `each.looks`) of each of `pieces` pieces, piece 0 first."""
-    if each.assign == "cycle":
-        return [piece % len(each.looks) for piece in range(pieces)]
-    return np.random.default_rng(each.seed).integers(0, len(each.looks), pieces).tolist()
+Hold = Callable[[object], dict[str, int]]  # `registry.holding`'s: keeps an object, returns the reference to it
 
 
-def maps_needed(recipe: "Recipe") -> frozenset[str]:
-    """The names of the maps of the photo that rendering `recipe` must be given or find: `subject` when the framing
-    crops around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it (the
-    built-in `subject` or `background`, a `Subject` without `per`, or a region laid over one); `depth` likewise (the
-    built-in `depth` or a region made from it, however indirectly); and the name of every `Given` region a step uses.
-    Regions that are declared but not used need nothing; a `Subject` with `per` needs a finder, not a map (see
-    `needs_finder`)."""
-    framed = {"subject"} if _framing_needs_subject(recipe.frame) else set()
-    return frozenset(framed | maps_used(recipe.regions, _names_used(recipe)))
+def recipe_dict(recipe: "Recipe", hold: Hold) -> dict[str, Any]:
+    """`recipe` as the dict the core reads (the form of `_core.read_recipe`): a key is there when it is set. A step's
+    preset is already in its parameters. A parameter that cannot be written as data, a `Picture` or a `Lut`, is
+    `hold`'s (`registry.holding`): the dict has the reference `hold` returns."""
+    document: dict[str, Any] = {"steps": [_entry(step, hold) for step in recipe.steps]}
+    for key in ("name", "description", "size"):
+        if (value := getattr(recipe, key)) is not None:
+            document[key] = value
+    if recipe.frame != Framing():
+        document["frame"] = recipe.frame.model_dump()
+    if recipe.regions:
+        document["regions"] = {name: _region(region) for name, region in recipe.regions.items()}
+    return document
 
 
-def derived_maps(recipe: "Recipe") -> frozenset[str]:
-    """The names of the maps a render of `recipe` makes from the working picture itself (`regions.DERIVED`: `light`,
-    the picture's brightness) because a region a step uses is made from them, however indirectly. Nobody supplies
-    these: they are not in `maps_needed`."""
-    return frozenset(_derived_from(recipe.regions, _names_used(recipe)))
+def _entry(step: "Step | Each | None", hold: Hold) -> dict[str, Any] | None:
+    if step is None:  # a piece of an `each` step left as it was
+        return None
+    if isinstance(step, Each):
+        entry: dict[str, Any] = {
+            "each": step.each,
+            "looks": [_entry(look, hold) for look in step.looks],
+            "assign": step.assign,
+            "seed": step.seed,
+            "feather": step.feather,
+        }
+    else:
+        entry = {"effect": step.effect}
+        if step.params:
+            entry["params"] = {name: _value(value, hold) for name, value in step.params.items()}
+        if step.partition is not None:
+            entry["partition"] = step.partition
+    entry |= {"opacity": step.opacity, "blend_mode": step.blend_mode}
+    for key in ("mask", "name"):
+        if (value := getattr(step, key)) is not None:
+            entry[key] = value
+    return entry
 
 
-def needs_finder(recipe: "Recipe") -> bool:
-    """True if a region a step of `recipe` uses finds the subject piece by piece (a `Subject` with `per`): rendering
-    must be given a subject finder, whatever else it is given, because it is asked about parts of the working picture,
-    which no map of the whole photo answers."""
-    return _finds_pieces(recipe.regions, _names_used(recipe))
+def _region(region: Kind) -> dict[str, Any]:
+    """A region as the core reads it: its fields and its `kind`, the class's name in snake case (`LinearGradient` is
+    `linear_gradient`)."""
+    kind = re.sub(r"(?<!^)(?=[A-Z])", "_", type(region).__name__).lower()
+    return {"kind": kind, **region.model_dump()}
 
 
-def _names_used(recipe: "Recipe") -> list[str]:
-    """The names of the regions the steps of `recipe` refer to."""
-    return [name for step in recipe.steps for _, name, _ in references(step)]
+def _value(value: object, hold: Hold) -> object:
+    """A parameter value as the plain data it is written as: a drive as its table, an array as a list, a `Picture` or
+    a `Lut` as the reference `hold` gives."""
+    if isinstance(value, Picture | Lut):
+        return hold(value)
+    if isinstance(value, Drive):
+        return value.model_dump()
+    if isinstance(value, Mapping):
+        return {key: _value(item, hold) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_value(item, hold) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 def _step_from_dict(written: Mapping[str, Any]) -> Step | Each:
@@ -671,6 +700,8 @@ class Recipe(ValidatedModel):
             for key, name, wanted in references(step):
                 needs(f"step {number}", key, name, wanted, self.regions)
         self._check_names()
+        with registry.holding() as hold:  # the rules the core runs by, those of a region's path among them
+            native.check_recipe(recipe_dict(self, hold))
         return self
 
     def _check_names(self) -> None:

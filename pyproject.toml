@@ -44,7 +44,6 @@ dependencies = [
     "pyobjc-framework-quartz>=10.0 ; sys_platform == 'darwin'",
     "pyobjc-framework-vision>=10.0 ; sys_platform == 'darwin'",
     "scipy>=1.16.0",
-    "svgelements>=1.9.6",
 ]
 
 [project.urls]
@@ -188,8 +187,6 @@ source = 1000
 tests = 1500
 
 [tool.file-size.exempt]
-"src/bullterrier_image/core/params.py" = 1003
-"src/bullterrier_image/core/regions.py" = 1272
 "tests/core/test_runner.py" = 1557
 
 # Read by tools/run_capped.py: the memory cap (MB, summed over a command's whole process group) the poe tasks that run
@@ -315,7 +312,7 @@ show_error_codes = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "svgelements", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*"]
+module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -335,9 +332,20 @@ ignore_decorators = [
     "@field_validator",
 ]
 ignore_names = [
-    "StartDoctypeDeclHandler",  # expat calls the function assigned to each of these callback attributes
-    "StartElementHandler",
-    "EndElementHandler",
+    # fields of the `Framing` and region models: `steps.recipe_dict` writes them to the core with `model_dump`, which reads
+    # every field by name, so no line of Python does
+    "flip",
+    "aspect",
+    "anchor",
+    "pad_top",
+    "pad_right",
+    "pad_bottom",
+    "pad_left",
+    "corner_radius",
+    "style",
+    "max_shapes",
+    "context",
+    "op",
     "model_config",  # pydantic reads each model's settings from this class attribute
     "model_construct",  # `ValidatedModel.model_construct` overrides pydantic's to raise: a guard, called by no one
     "ignored_warning_kinds",  # pydantic reads it from a JSON schema generator class
@@ -408,7 +416,7 @@ type = "independence"
 modules = ["bullterrier_image.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core: runner|bridge > steps > framing|registry|regions > presets|looks|outlines > params|vocabulary > native > types"
+name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native > types"
 type = "layers"
 containers = ["bullterrier_image.core"]
 exhaustive = true  # a new core module must be placed in a layer here
@@ -416,10 +424,10 @@ exhaustive = true  # a new core module must be placed in a layer here
 # (types); the registry lists an effect's presets, which are read and checked with its parameter model, and names the
 # looks it finds beside them; a recipe's
 # framing is declared with the same parameter model and used by the steps' recipe; the region kinds are declared with it
-# too, read their presets, and are built into regions the runner uses. Each edge points down, so each gets a layer of its
-# own (the framing, the registry and the regions side by side: none knows another); nothing else changes. The bridge (a
-# recipe as the dict the Rust core runs) sits beside the runner: both run a recipe, neither knows the other.
-layers = ["runner | bridge", "steps", "framing | registry | regions", "presets | looks | outlines", "params | vocabulary", "native", "types"]
+# too and read their presets. Each edge points down, so each gets a layer of its own (the framing, the registry, the
+# regions and the finder side by side: none knows another); the bridge runs a recipe in the Rust core, with the finders
+# it is given.
+layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "native", "types"]
 # `native` (the extension's entry points, raising the package's exceptions) imports no core module; params and registry call it.
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since

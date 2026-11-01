@@ -4,7 +4,7 @@ import sees. Each layer may import only the layers below it:
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, finding, loader (recipe files)
     effects    one folder per effect; never import each other
-    core       runner | bridge > steps > framing | registry | regions > presets | outlines > params | vocabulary
+    core       bridge > steps > framing | registry | regions | finder > presets | looks > params | vocabulary
                > native > types
     ops        may import errors
     errors     the exceptions; import nothing from bullterrier_image, so every layer may raise them
@@ -36,8 +36,7 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
 CORE_ORDER = (
-    "Core: runner|bridge > steps > framing|registry|regions > presets|looks|outlines > params|vocabulary"
-    " > native > types"
+    "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native > types"
 )
 CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
 
@@ -87,7 +86,7 @@ FORBIDDEN = {
     "errors to ops": ("errors.py", "import bullterrier_image.ops.cells", "bullterrier_image.errors", LAYERS),
     "errors to core": ("errors.py", "import bullterrier_image.core.params", "bullterrier_image.errors", LAYERS),
     "core to effects": ("core/steps.py", "import bullterrier_image.effects", "bullterrier_image.core.steps", LAYERS),
-    "core to imageio": ("core/runner.py", "import bullterrier_image.imageio", "bullterrier_image.core.runner", LAYERS),
+    "core to imageio": ("core/bridge.py", "import bullterrier_image.imageio", "bullterrier_image.core.bridge", LAYERS),
     "effects to imageio": (
         "effects/grade/effect.py",
         "import bullterrier_image.imageio",
@@ -222,7 +221,7 @@ def test_importing_one_core_module_alone_finds_every_effect_on_the_first_query()
     """`core` never imports `effects`: the registry loads them through their entry point the first time it is asked."""
     code = (
         "import json, sys\n"
-        "import bullterrier_image.core.runner\n"
+        "import bullterrier_image.core.bridge\n"
         "from bullterrier_image.core import registry\n"
         "json.dump(sorted(registry.all_effects()), sys.stdout)\n"
     )

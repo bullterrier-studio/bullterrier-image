@@ -475,16 +475,19 @@ def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> Model
 def _mirror(effect: "ModelledEffect") -> None:
     """Make `effect` known to the Rust core, so that a recipe the core runs can use it; replaces the core's copy of an
     earlier registration of the name. The core calls `run` with the parameters as a step wrote them (a Python effect
-    describes none to the core) and `size_ratio`, always declared: the wrapper validates and scales them as the Python
-    runner does, and passes the ratio on only to an effect that declares it. An effect the core runs itself is not
-    mirrored (`_register`): the core has it."""
+    describes none to the core) and `size_ratio`, always declared: the wrapper validates and scales them, passes the
+    ratio on only to an effect that declares it, and refuses a result of another shape. An effect the core runs itself
+    is not mirrored (`_register`): the core has it."""
     name = effect.__name__
 
     def run(rgb: np.ndarray, params: dict[str, Any], *, size_ratio: float, **inputs: Any) -> np.ndarray:
         values = effect.validate(_resolved(params))
         if "size_ratio" in effect.inputs:
             inputs["size_ratio"] = size_ratio
-        return effect(rgb, scaled(values, size_ratio), **inputs)
+        result = effect(rgb, scaled(values, size_ratio), **inputs)
+        if result.shape != rgb.shape:
+            raise RuntimeError(f"effect {name!r} changed the image shape {rgb.shape} -> {result.shape}")
+        return result
 
     if name in native.effects():
         native.unregister(name)

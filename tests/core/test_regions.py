@@ -504,19 +504,24 @@ def test_a_preset_sets_the_fields_and_a_field_given_beside_it_wins():
 
 @pytest.mark.parametrize(
     ("d", "complaint"),
-    [("", "empty"), ("L 1 1", "start with M"), ("M 0 0 L x", "no path command"), ("M 0 0 Q", "valid")],
+    [("", "empty"), ("L 1 1", "start with M"), ("M 0 0 L x", "invalid number"), ("M 0 0 Q", "valid")],
     ids=["empty", "no start", "not a number", "missing numbers"],
 )
-def test_a_path_that_is_not_path_data_is_refused_when_it_is_declared_naming_the_field(d, complaint):
-    with pytest.raises(RecipeError, match=rf"path.*{complaint}|d.*{complaint}"):
-        Path(d=d)
+def test_a_path_that_is_not_path_data_is_refused_when_the_recipe_is_made_naming_the_region_and_field(d, complaint):
+    with pytest.raises(RecipeError, match=rf"region 'blob'.*`d`.*{complaint}"):
+        Recipe([Step("grade")], regions={"blob": Path(d=d)})
+
+
+def test_a_cut_of_two_subpaths_is_refused_when_the_recipe_is_made_naming_the_region_and_field():
+    cut = Cuts(lines=[{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}])
+    with pytest.raises(RecipeError, match=r"region 'cut'.*`lines\[0\].path`.*single M"):
+        Recipe([Step("grade")], regions={"cut": cut})
 
 
 @pytest.mark.parametrize(
     "lines",
-    [[{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}], [{"x": 0.5, "path": "M 0 0 L 1 1"}], [{"x": 2}], [{"angle": "up"}], []],
+    [[{"x": 0.5, "path": "M 0 0 L 1 1"}], [{"x": 2}], [{"angle": "up"}], []],
     ids=[
-        "two subpaths",
         "a line and a curve at once",
         "a position outside the frame",
         "an angle that is not a number",

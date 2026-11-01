@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from bullterrier_image.core.runner import Finder
+from bullterrier_image.core.finder import Finder
 from bullterrier_image.errors import BackendUnavailableError
 from bullterrier_image.ops.resample import stretch
 

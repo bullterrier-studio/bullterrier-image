@@ -5,8 +5,8 @@
     types       the forms a colour may be written in
     vocabulary  parameter names effects must not use, and what to use instead
     steps       `Step` and `Recipe`: the data model of a look and its validation
-    runner      running a recipe on a photo; its maps are given to it (by name, as arrays or as `Finder`s)
-    bridge      the same, run by the Rust core: a recipe as the dict the core reads (transitional, see its docstring)
+    finder      `Finder`, how a map is found in a photo
+    bridge      running a recipe on a photo in the Rust core; maps are given by name, as arrays or as `Finder`s
 
 `core` imports only `ops` from the rest of bullterrier_image (import-linter enforces it), so it stays small and stable
 while effects, adapters and the app change around it. Its names are imported from their modules
@@ -15,6 +15,6 @@ home. Users import from `bullterrier_image` / `bullterrier_image.recipe`, whose 
 subject.
 """
 
-from . import params, registry, runner, steps, types, vocabulary
+from . import bridge, finder, params, registry, steps, types, vocabulary
 
-__all__ = ["params", "registry", "runner", "steps", "types", "vocabulary"]
+__all__ = ["bridge", "finder", "params", "registry", "steps", "types", "vocabulary"]
