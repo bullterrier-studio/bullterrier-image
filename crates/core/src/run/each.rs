@@ -64,7 +64,8 @@ impl EachRun {
     /// `before` with each piece of the partition replaced by its look, and the result laid over `before`.
     ///
     /// Every look that has a piece is run once over the whole picture and shown by the weights of its pieces: 1 inside
-    /// them, 0 outside, blurred by a Gaussian of `feather` design pixels across the borders. The weights of all the looks
+    /// them, 0 outside, blurred by a Gaussian of `feather` design pixels across the borders (three box blurs that stand for it, whose cost does
+    /// not grow with the feather). The weights of all the looks
     /// add up to 1 with the share of the pieces left as they were (a `None` look), so a pixel is
     /// `before + sum of weight x (look - before)`: where a look's pieces are far from every border that look alone.
     /// A look no piece has is not run. Only one look's weights and result are held at a time.

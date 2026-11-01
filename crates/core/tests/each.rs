@@ -259,10 +259,12 @@ fn a_none_look_leaves_its_piece_and_fades_into_its_neighbours_only_near_the_bord
 }
 
 #[test]
-fn the_weights_are_the_pieces_blurred_by_a_gaussian_of_feather_design_pixels_with_the_edge_repeated() -> Outcome {
+fn the_weights_are_the_pieces_blurred_by_a_gaussian_of_feather_design_pixels_within_a_few_hundredths() -> Outcome {
     let paint = Paint::register("each_gauss", 0.8)?;
     // 3 pieces (columns 0..160, 160..320, 320..480) of a 480-wide photo, the middle one with the painted look: the weight
-    // row is the indicator of the middle third blurred, down every column the same, so the vertical pass changes nothing
+    // row is the indicator of the middle third blurred, down every column the same, so the vertical pass changes nothing.
+    // The blur is three boxes that stand for the Gaussian: its weights are within 0.035 of the Gaussian's (measured 0.03),
+    // so a pixel is within 0.035 of the 0.8 it is mixed with
     let values = ramp(3, 480);
     let recipe = recipe_of(3, each_of(vec![None, Some(paint.step()), None], 2.0));
     let out = render(&values, 3, 480, &recipe, Options::default())?;
@@ -273,7 +275,7 @@ fn the_weights_are_the_pieces_blurred_by_a_gaussian_of_feather_design_pixels_wit
             let before = f64::from(at(&values, 480, row, column));
             let expected = before + weight * (0.8 - before);
             assert!(
-                (f64::from(at(&out, 480, row, column)) - expected).abs() <= 1e-5,
+                (f64::from(at(&out, 480, row, column)) - expected).abs() <= 0.035,
                 "row {row}, column {column}: {} is not {expected}",
                 at(&out, 480, row, column)
             );

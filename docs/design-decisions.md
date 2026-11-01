@@ -681,9 +681,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     text), not as the same object; every other exception still comes back as it was.
   - *`each` holds one look at a time.* A look that has a piece is run once over the whole picture and added as
     `weight x (look - before)`; the weights of all looks and of the pieces left as they were add up to 1. The Gaussian
-    (`feather` design px times the ratio) is the direct separable kernel of scipy (radius `int(4 sigma + 0.5)`, edge repeated),
-    in place, and a pixel whose window is one run of equal values skips the sum, so cost follows the borders. *Rejected:* FFT
-    or an IIR approximation (E2): the direct kernel equals scipy, which parity and an independent oracle need.
+    (`feather` design px times the ratio) is three box blurs of matched variance (`ops/blur`, Kovesi 2010; the edge repeated
+    beyond the picture, made once before the boxes), so the cost does not depend on the feather: a 3 x 3 grid with feather
+    24 took 0.32 s at 1024 x 1024 and 9.6 s at 3000 x 3000 with scipy's direct kernel, and takes 0.02 s and 0.16 s. *Cost:*
+    the weights differ from the Gaussian's by at most 0.035 from a sigma of 1.5 working px (0.12 at 1; under 0.6 the
+    blur is none), so a pixel differs from scipy's by that share of (look - photo). *Rejected:* the direct kernel (cost
+    grows with the feather, so a 3000 px photo took seconds); an IIR filter (more code, edge conditions to match).
   - *Random streams are new.* `assign = "random"` draws with xoshiro256++ seeded through SplitMix64 (`ops/random`; Lemire's
     unbiased bounded draw): the same seed gives the same picture, not the picture NumPy's generator gave. Published vectors
     pin the generators; the assignment is tested by properties.

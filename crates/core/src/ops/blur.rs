@@ -1,38 +1,44 @@
-//! Gaussian blur of a one-channel map, equal to `scipy.ndimage.gaussian_filter` with the edge pixel repeated beyond the
-//! picture (`mode='nearest'`) and a kernel cut off at four sigmas.
+//! Gaussian blur of a one-channel map, approximated by three box blurs (Kovesi, "Fast Almost-Gaussian Filtering", 2010),
+//! so that it costs the same at every radius: a few additions per pixel, however wide the blur.
 
-/// How far the Gaussian is cut off, in sigmas.
-const REACH: f64 = 4.0; // constant: scipy's default `truncate`; the weights beyond it add up to less than 1e-4
+use super::length::float;
 
-/// How many pixels each way the Gaussian of `sigma` px reaches: `int(4 sigma + 0.5)` as in scipy, so a sigma under 0.125
-/// px reaches none and leaves a map as it is.
-#[expect(clippy::cast_possible_truncation, reason = "a small radius")]
-fn radius_of(sigma: f64) -> i32 {
-    (REACH * sigma + 0.5).floor() as i32
-}
+/// How many box blurs make the Gaussian: three are within about 1% of it (see the tests).
+const PASSES: usize = 3; // constant: Kovesi's n; the variance of the boxes is matched to sigma, the shape is near-Gaussian
 
-/// The weights of the Gaussian of `sigma` px, one for each offset from `-radius` to `radius`, normalised to add up to 1.
-fn kernel(sigma: f64, radius: i32) -> Vec<f64> {
-    let weights: Vec<f64> = (-radius..=radius)
-        .map(|offset| (-0.5 * (f64::from(offset) / sigma).powi(2)).exp())
-        .collect();
-    let total: f64 = weights.iter().sum();
-    weights.into_iter().map(|weight| weight / total).collect()
+/// The radius in pixels of each box blur of the `PASSES` that together have the variance of a Gaussian of `sigma` px: a
+/// box of radius `r` is `2 r + 1` pixels wide and has variance `r (r + 1) / 3`. Two widths (odd, two apart) are mixed
+/// to meet the variance as nearly as whole pixels allow; a sigma under about 0.6 px gets none (radius 0 each), which
+/// leaves a map as it is.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "a width in pixels, small and positive"
+)]
+fn radii(sigma: f64) -> [usize; PASSES] {
+    let passes = PASSES as f64;
+    let ideal = (12.0 * sigma * sigma / passes + 1.0).sqrt();
+    let mut narrow = ideal.floor() as usize;
+    if narrow % 2 == 0 {
+        narrow -= 1;
+    }
+    let (narrow_f, wide) = (narrow as f64, narrow + 2);
+    // how many of the boxes are the narrow width so that the variances add up to 12 sigma^2 / 12... (Kovesi, eq. 5)
+    let narrow_count = ((12.0 * sigma * sigma - passes * narrow_f * narrow_f - 4.0 * passes * narrow_f - 3.0 * passes)
+        / (-4.0 * narrow_f - 4.0))
+        .round() as usize;
+    std::array::from_fn(|pass| (if pass < narrow_count { narrow } else { wide } - 1) / 2)
 }
 
 /// Blurs the `height` x `width` map `values` (row after row) by a Gaussian of `sigma` px, first along the rows, then down
-/// the columns, each pass rounded to `f32` as scipy's is. A weighted mean of its neighbours, so a value never leaves the
+/// the columns, the edge pixel repeated beyond the picture. A weighted mean of its neighbours, so a value never leaves the
 /// range of the map's. `sigma` is finite and at least 0; 0 leaves the map as it is.
-///
-/// A pixel whose whole window holds one value takes that value without the sum (the weights add up to 1, so the sum
-/// would give the same), so a map of long runs, as a piece's indicator is, costs by the length of its borders rather
-/// than by its size.
 pub(crate) fn gaussian(values: &mut [f32], height: usize, width: usize, sigma: f64) {
-    let radius = radius_of(sigma);
-    if radius == 0 {
+    let radii = radii(sigma);
+    if radii.iter().all(|&radius| radius == 0) {
         return;
     }
-    let mut smoother = Smoother::new(kernel(sigma, radius), height.max(width));
+    let mut smoother = Smoother::new(radii);
     for row in values.chunks_exact_mut(width) {
         smoother.smooth(row);
     }
@@ -48,84 +54,61 @@ pub(crate) fn gaussian(values: &mut [f32], height: usize, width: usize, sigma: f
     }
 }
 
-/// One-dimensional smoothing of lines of a map, with the scratch space it needs kept between lines.
+/// Smoothing of lines by the box blurs `radii`, with the scratch space it needs kept between lines.
 struct Smoother {
-    weights: Vec<f64>,
-    radius: usize,
-    /// The line as it was before smoothing.
+    radii: [usize; PASSES],
+    /// The line with its edge values repeated by the reach of all the boxes on both sides.
+    padded: Vec<f32>,
+    /// The padded line as it was before a box blur.
     before: Vec<f32>,
-    /// For each position of the line, the last position of the run of equal values it is in.
-    run_end: Vec<usize>,
 }
 
 impl Smoother {
-    /// A smoother by `weights` (the window, `2 radius + 1` long) of lines up to `longest` long.
-    fn new(weights: Vec<f64>, longest: usize) -> Self {
+    const fn new(radii: [usize; PASSES]) -> Self {
         Self {
-            radius: weights.len() / 2,
-            weights,
-            before: Vec::with_capacity(longest),
-            run_end: Vec::with_capacity(longest),
+            radii,
+            padded: Vec::new(),
+            before: Vec::new(),
         }
     }
 
-    /// `line` smoothed, the edge value repeated beyond its ends.
-    #[expect(clippy::float_cmp, reason = "a run is made of values that are exactly equal")]
+    /// `line` blurred, the edge value repeated beyond its ends. The repeat is made once, wide enough that each box
+    /// reads only the repeated values and the blurred ones (what blurring the line extended forever would give), not an
+    /// edge repeated again after each box.
     fn smooth(&mut self, line: &mut [f32]) {
-        self.before.clear();
-        self.before.extend_from_slice(line);
-        let last = line.len() - 1;
-        self.run_end.clear();
-        self.run_end.resize(line.len(), last);
-        for position in (0..last).rev() {
-            self.run_end[position] = if self.before[position] == self.before[position + 1] {
-                self.run_end[position + 1]
-            } else {
-                position
-            };
+        let reach: usize = self.radii.iter().sum();
+        let (first, last) = (line[0], line[line.len() - 1]);
+        self.padded.clear();
+        self.padded.resize(reach, first);
+        self.padded.extend_from_slice(line);
+        self.padded.resize(reach + line.len() + reach, last);
+        for radius in self.radii {
+            self.before.clone_from(&self.padded);
+            boxed(&self.before, radius, &mut self.padded);
         }
-        for (position, out) in line.iter_mut().enumerate() {
-            let first = position.saturating_sub(self.radius);
-            let end = (position + self.radius).min(last);
-            *out = if self.run_end[first] >= end {
-                // the whole window, edge repeats included, is one value
-                self.before[first]
-            } else if first + 2 * self.radius == end {
-                // a window inside the line
-                narrow(
-                    self.weights
-                        .iter()
-                        .zip(&self.before[first..=end])
-                        .map(|(weight, value)| weight * f64::from(*value))
-                        .sum(),
-                )
-            } else {
-                // a window over an end: the positions beyond it are the edge value
-                narrow(
-                    self.weights
-                        .iter()
-                        .enumerate()
-                        .map(|(offset, weight)| {
-                            let at = (position + offset).saturating_sub(self.radius).min(last);
-                            weight * f64::from(self.before[at])
-                        })
-                        .sum(),
-                )
-            };
-        }
+        line.copy_from_slice(&self.padded[reach..reach + line.len()]);
     }
 }
 
-/// A sum of products of `f32` values and weights that add up to 1, as the `f32` it rounds to.
-#[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
-const fn narrow(sum: f64) -> f32 {
-    sum as f32
+/// `out` as the mean of the `2 radius + 1` values of `line` around each position, the window slid along so that the
+/// cost does not depend on `radius`; the positions within `radius` of an end read the end value, which the caller has
+/// padded so far that this is not seen in the line it keeps.
+fn boxed(line: &[f32], radius: usize, out: &mut [f32]) {
+    let last = line.len() - 1;
+    let width = float(2 * radius + 1);
+    // the window of position 0 is the first value `radius + 1` times and the next `radius` values
+    let mut sum = f64::from(line[0]) * float(radius) + (0..=radius).map(|at| f64::from(line[at.min(last)])).sum::<f64>();
+    for (position, out) in out.iter_mut().enumerate() {
+        #[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
+        {
+            *out = (sum / width) as f32;
+        }
+        sum += f64::from(line[(position + radius + 1).min(last)]) - f64::from(line[position.saturating_sub(radius)]);
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use proptest::prelude::*;
-
     use super::gaussian;
 
     /// The blur by brute force: every output the sum over `-radius..=radius` of the normalised `exp(-x^2 / 2 sigma^2)`
@@ -174,79 +157,81 @@ mod tests {
             .collect()
     }
 
-    fn assert_matches(values: &[f32], height: usize, width: usize, sigma: f64) {
+    /// The most any value of `gaussian` differs from the brute-force Gaussian over a map.
+    fn worst_gap(values: &[f32], height: usize, width: usize, sigma: f64) -> f64 {
         let mut blurred = values.to_vec();
         gaussian(&mut blurred, height, width, sigma);
         let expected = reference(values, height, width, sigma);
-        for (index, (got, want)) in blurred.iter().zip(&expected).enumerate() {
-            assert!(
-                (f64::from(*got) - want).abs() <= 1e-6,
-                "{height} x {width} at sigma {sigma}: value {index} is {got}, not {want}"
-            );
-        }
+        blurred
+            .iter()
+            .zip(&expected)
+            .map(|(got, want)| (f64::from(*got) - want).abs())
+            .fold(0.0, f64::max)
     }
 
-    proptest! {
-        #[test]
-        fn it_equals_the_brute_force_blur_of_any_small_map_at_any_sigma(
-            height in 1_usize..9,
-            width in 1_usize..9,
-            sigma in prop::sample::select(vec![0.0, 0.1, 0.5, 1.9, 7.3]),
-            seed in prop::collection::vec(0.0_f32..=1.0, 64),
-        ) {
-            assert_matches(&seed[..height * width], height, width, sigma);
+    /// A 0/1 map of blocks, as a piece's indicator is: `height` x `width`, ones in two blocks and the last column.
+    fn blocks(height: usize, width: usize) -> Vec<f32> {
+        (0..height * width)
+            .map(|index| {
+                let (row, column) = (index / width, index % width);
+                f32::from(u8::from(
+                    (row < height * 2 / 5 && column < width * 9 / 20)
+                        || (row >= height * 2 / 3 && column >= width * 5 / 8)
+                        || column == width - 1,
+                ))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn it_is_within_a_few_hundredths_of_the_brute_force_gaussian_on_blocks_at_any_width() {
+        // the weights of an `each` step, at feathers from a few pixels to wider than the map. Three boxes are not a
+        // Gaussian: measured gaps are 0.03 at most from sigma 1.5, and 0.11 at sigma 1, where whole-pixel boxes cannot
+        // meet the variance
+        let values = blocks(60, 80);
+        for (sigma, most) in [
+            (1.0, 0.12),
+            (1.5, 0.035),
+            (2.0, 0.035),
+            (3.0, 0.035),
+            (5.0, 0.035),
+            (12.0, 0.035),
+            (40.0, 0.035),
+            (150.0, 0.035),
+        ] {
+            let gap = worst_gap(&values, 60, 80, sigma);
+            assert!(gap <= most, "sigma {sigma}: {gap}");
         }
     }
 
     #[test]
-    fn a_single_row_a_single_column_and_a_single_pixel_blur_as_a_line_does() {
-        let line = [0.0, 1.0, 0.25, 0.75, 0.5, 0.0, 1.0];
-        for sigma in [0.5, 1.9, 7.3] {
-            assert_matches(&line, 1, 7, sigma);
-            assert_matches(&line, 7, 1, sigma);
+    fn a_row_a_column_and_maps_narrower_than_the_blur_are_blurred_as_the_gaussian_is() {
+        for (height, width) in [(1, 40), (40, 1), (3, 9), (9, 3), (1, 1)] {
+            let values = blocks(height, width);
+            let gap = worst_gap(&values, height, width, 3.0);
+            assert!(gap <= 0.035, "{height} x {width}: {gap}");
         }
-        assert_matches(&[0.3], 1, 1, 2.0);
     }
 
     #[test]
-    fn a_sigma_under_an_eighth_of_a_pixel_leaves_the_map_exactly_as_it_is() {
+    fn a_sigma_too_small_to_reach_a_neighbour_leaves_the_map_exactly_as_it_is() {
         let values = [0.1, 0.9, 0.3, 0.7, 0.5, 0.2];
-        for sigma in [0.0, 0.05, 0.124] {
+        for sigma in [0.0, 0.05, 0.3] {
             let mut blurred = values;
             gaussian(&mut blurred, 2, 3, sigma);
             assert_eq!(blurred, values, "sigma {sigma}");
         }
-        // 0.25 has a radius of one pixel: the map changes
         let mut blurred = values;
-        gaussian(&mut blurred, 2, 3, 0.25);
+        gaussian(&mut blurred, 2, 3, 1.0);
         assert_ne!(blurred, values);
     }
 
     #[test]
-    fn a_map_of_long_runs_equals_the_brute_force_blur_though_most_pixels_skip_the_sum() {
-        // a 0/1 map of three blocks, 30 x 40, blurred by a kernel of radius 22: most windows are one run
-        let (height, width) = (30, 40);
-        let values: Vec<f32> = (0..height * width)
-            .map(|index| {
-                let (row, column) = (index / width, index % width);
-                f32::from(u8::from(
-                    (row < 12 && column < 18) || (row >= 20 && column >= 25) || column == 39,
-                ))
-            })
-            .collect();
-        assert_matches(&values, height, width, 5.0);
-        assert_matches(&values, height, width, 1.0);
-    }
-
-    #[test]
-    fn a_constant_map_stays_that_constant_exactly_and_an_impulse_keeps_its_total() {
+    fn a_constant_map_stays_that_constant_and_an_impulse_keeps_its_total() {
         for sigma in [0.5, 3.0, 40.0] {
             let mut flat = vec![0.3_f32; 12 * 17];
             gaussian(&mut flat, 12, 17, sigma);
-            assert!(
-                flat.iter().all(|value| value.to_bits() == 0.3_f32.to_bits()),
-                "sigma {sigma}"
-            );
+            assert!(flat.iter().all(|value| (value - 0.3).abs() <= 1e-6), "sigma {sigma}");
         }
         // an impulse in the middle of a map larger than the kernel: the weights add up to 1
         let mut impulse = vec![0.0_f32; 41 * 41];
