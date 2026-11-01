@@ -796,14 +796,26 @@ def test_a_finder_that_answers_something_that_is_no_map_is_the_error_of_its_map(
         core_render(photo, grade_one_stop(mask="subject"), finders={"subject": Finds("a subject")})
 
 
-def test_a_finder_that_raises_has_its_own_exception_come_back_as_it_was(photo):
-    raised = SubjectNotFoundError("nobody is in this picture")
+def test_a_finder_that_finds_nothing_has_the_error_of_its_map_with_its_words_come_back(photo):
+    # "found nothing" (the package's not-found errors) is told to the core as such, because a subject found piece by
+    # piece treats it as a piece with nothing in it: the error is rebuilt from its kind and text, not the same object
+    class Fails:
+        def find(self, photo: np.ndarray) -> np.ndarray:
+            raise SubjectNotFoundError("nobody is in this picture")
+
+    with pytest.raises(SubjectNotFoundError, match="nobody is in this picture") as caught:
+        core_render(photo, grade_one_stop(mask="subject"), finders={"subject": Fails()})
+    assert type(caught.value) is SubjectNotFoundError
+
+
+def test_a_finder_that_raises_another_exception_has_that_very_exception_come_back(photo):
+    raised = ZeroDivisionError("the model fell over")
 
     class Fails:
         def find(self, photo: np.ndarray) -> np.ndarray:
             raise raised
 
-    with pytest.raises(SubjectNotFoundError) as caught:
+    with pytest.raises(ZeroDivisionError) as caught:
         core_render(photo, grade_one_stop(mask="subject"), finders={"subject": Fails()})
     assert caught.value is raised
 

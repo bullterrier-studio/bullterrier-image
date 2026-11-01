@@ -2,13 +2,14 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{Error, Finder, Image, Layer, Options, Photo, Presets, Recipe, Stage};
+use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, Options, Photo, Presets, Recipe, Stage};
 use numpy::{AllowTypeChange, PyArray1, PyArray3, PyArrayLike2, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
+use serde_json::json;
 
-use super::{core_error, found, photo_array, picture_of, to_json, value_error};
+use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to_json, value_error};
 
 /// Run `recipe` on `rgb` (float32, C-contiguous, `(height, width, 3)`) and return the picture it makes: a new float32
 /// array `(height, width, 3)`, or `(height, width, 4)` (straight alpha last) when the recipe's frame has a `transparent`
@@ -17,14 +18,19 @@ use super::{core_error, found, photo_array, picture_of, to_json, value_error};
 ///
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
-/// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe with a
-/// `each` step is refused: the core does not run it yet.
+/// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe whose
+/// steps use a region of kind `shards`, `cuts`, `path`, `svg` or with a torn edge is refused: the core does not make
+/// those yet. An `each` step with `assign` `random` draws its looks from the core's own seeded stream, which is not
+/// numpy's.
 ///
 /// `maps` hands the photo's maps in by name: `subject` (white = subject), `depth` (1 = nearest) and one for each region
 /// of kind `given` the recipe declares, each a float array `(height, width)` of finite values within 0..1. `finders`
 /// gives, by the same names, an object with a method `find(rgb)`, which is called with the photo as given (a float32
 /// array) at most once, when a step uses the map and none was handed in, and returns the map or raises: its exception
-/// comes back from `render` as it was. `background` and `light` are made from the photo. A name that is no map of the
+/// comes back from `render` as it was, except a `CoreError` whose `kind` is `subject_not_found`, `depth_not_found` or
+/// `map_not_found`, which says the finder found nothing: the render fails as for any map that is missing. The
+/// `subject` finder is also asked about the crop of each piece for a `subject` region found `per` piece; there,
+/// "found nothing" means the piece adds nothing. `background` and `light` are made from the photo. A name that is no map of the
 /// recipe is refused.
 ///
 /// `presets` holds the presets the steps name, by effect: the TOML text of the effect's presets file, one `[name]` table
@@ -74,12 +80,43 @@ pub(crate) fn check_recipe(recipe: &Bound<'_, PyDict>, presets: Option<&Bound<'_
         .map_err(core_error)
 }
 
+/// What rendering `recipe` (a dict, as for `render`) asks of the photo: `{"maps": [str], "finds_pieces": bool}`. `maps`
+/// are the names the photo must be handed or find a map under (sorted): `subject` for the built-in `subject` and
+/// `background`, a `subject` region found without `per` and a frame that crops around it or cuts by it, `depth`, and the
+/// name of each `given` region a step uses, however indirectly; never `light`, which is made from the photo. A region
+/// that is declared and used by no step needs nothing. `finds_pieces` says a region the steps use finds the subject in
+/// each piece of a partition, so the photo needs a `subject` finder (a map of the whole photo does not do). `presets` as
+/// for `render`: a preset can set the field a step works from.
+///
+/// `CoreError` for whatever makes the recipe invalid, as `check_recipe`.
+#[pyfunction]
+#[pyo3(signature = (recipe, *, presets=None))]
+pub(crate) fn needs<'py>(
+    py: Python<'py>,
+    recipe: &Bound<'py, PyDict>,
+    presets: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let needs = recipe_of(recipe)?.needs(&presets_of(presets)?).map_err(core_error)?;
+    from_json(py, &json!({"maps": needs.maps, "finds_pieces": needs.finds_pieces}))
+}
+
+/// The names a photo can be handed a map or a finder under for `recipe` (a dict, as for `render`): `subject`, `depth`,
+/// then each region of kind `given` in the order it was declared. A render refuses a photo with any other. Nothing is
+/// checked.
+#[pyfunction]
+pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
+    Ok(recipe_of(recipe)?.known_maps().into_iter().map(str::to_owned).collect())
+}
+
 /// Every stage of rendering `recipe` on `rgb`, with the arguments and the failures of `render`: a list of `(kind,
-/// number, array)`, in this order. `("input", None, rgb)` is the photo, `("subject", None, map)` and `("depth", None,
-/// map)` are the maps the recipe uses (float32 `(height, width)`, if it uses them), `("step", n, picture)` is the
-/// picture after step `n`, counting from 1, and `("cut_out", None, picture)`, only when the recipe's frame cuts the
-/// picture out, is that picture with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left
-/// to the caller.
+/// number or name, array)`, in this order. `("input", None, rgb)` is the photo, `("subject", None, map)` and
+/// `("depth", None, map)` are the maps the recipe uses (float32 `(height, width)`, if it uses them),
+/// `("selection", name, map)` and `("partition", name, labels)` are each region the steps use, or that a region they use
+/// is made from, in the order the recipe declares them (a selection is a float32 `(height, width)` map; a partition an
+/// int32 `(height, width)` array of piece numbers from 0), `("step", n, picture)` is the picture after step `n`,
+/// counting from 1, and `("cut_out", None, picture)`, only when the recipe's frame cuts the picture out, is that picture
+/// with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left to
+/// the caller.
 #[pyfunction]
 #[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
 pub(crate) fn trace<'py>(
@@ -180,6 +217,31 @@ impl PyFinder {
     fn who(&self) -> String {
         format!("the finder of '{}'", self.name)
     }
+
+    /// The error for what the finder raised: "found nothing" if it is a `CoreError` of one of the not-found kinds (the
+    /// map is missing, as for any map nobody gave, with the finder's own words), else the exception itself, to come
+    /// back as it was.
+    fn failed(&self, py: Python<'_>, raised: PyErr) -> Error {
+        let value = raised.value(py);
+        let nothing = raised.is_instance_of::<CoreError>(py)
+            && value
+                .getattr("kind")
+                .and_then(|kind| kind.extract::<String>())
+                .is_ok_and(|kind| {
+                    [
+                        ErrorKind::SubjectNotFound,
+                        ErrorKind::DepthNotFound,
+                        ErrorKind::MapNotFound,
+                    ]
+                    .iter()
+                    .any(|not_found| not_found.name() == kind)
+                });
+        if nothing {
+            Error::map_not_found(&self.name, value.to_string())
+        } else {
+            Error::foreign(self.who(), raised)
+        }
+    }
 }
 
 impl Finder for PyFinder {
@@ -194,7 +256,7 @@ impl Finder for PyFinder {
             let answer = self
                 .finder
                 .call_method1(py, "find", (rgb,))
-                .map_err(|raised| Error::foreign(self.who(), raised))?;
+                .map_err(|raised| self.failed(py, raised))?;
             let answer = answer.bind(py);
             if answer.is_none() {
                 return Err(Error::map_not_found(
@@ -217,14 +279,28 @@ fn image_array(py: Python<'_>, image: Image) -> PyResult<Bound<'_, PyArray3<f32>
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
 }
 
-/// The tuple `(kind, number, array)` a stage is shown as.
+/// The tuple `(kind, number or name, array)` a stage is shown as: the number of a step, the name of a region.
 fn stage_of(py: Python<'_>, stage: Stage) -> PyResult<Bound<'_, PyTuple>> {
     let map = |layer: Layer| PyArray1::from_slice(py, layer.values()).reshape([layer.height(), layer.width()]);
-    let (kind, number, array) = match stage {
+    let (kind, place, array): (_, Option<Bound<'_, PyAny>>, _) = match stage {
         Stage::Input(image) => ("input", None, image_array(py, image)?.into_any()),
         Stage::Subject(layer) => ("subject", None, map(layer)?.into_any()),
         Stage::Depth(layer) => ("depth", None, map(layer)?.into_any()),
-        Stage::Step { number, image } => ("step", Some(number), image_array(py, image)?.into_any()),
+        Stage::Selection { name, layer } => (
+            "selection",
+            Some(name.into_pyobject(py)?.into_any()),
+            map(layer)?.into_any(),
+        ),
+        Stage::Partition { name, labels } => {
+            let shape = [labels.height(), labels.width()];
+            let array = PyArray1::from_slice(py, labels.values()).reshape(shape)?;
+            ("partition", Some(name.into_pyobject(py)?.into_any()), array.into_any())
+        }
+        Stage::Step { number, image } => (
+            "step",
+            Some(number.into_pyobject(py)?.into_any()),
+            image_array(py, image)?.into_any(),
+        ),
         Stage::CutOut(image) => ("cut_out", None, image_array(py, image)?.into_any()),
         other => {
             return Err(value_error(format!(
@@ -236,7 +312,7 @@ fn stage_of(py: Python<'_>, stage: Stage) -> PyResult<Bound<'_, PyTuple>> {
         py,
         [
             kind.into_pyobject(py)?.into_any(),
-            number.into_pyobject(py)?.into_any(),
+            place.unwrap_or_else(|| py.None().into_bound(py)),
             array,
         ],
     )

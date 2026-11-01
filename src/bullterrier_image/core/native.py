@@ -34,6 +34,17 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
 }
 
 
+_KIND_OF = {raised: kind for kind, raised in _RAISED_AS.items()}
+
+
+def found_nothing(error: MapNotFoundError) -> _core.CoreError:
+    """`error`, a map the package could not find, as the `CoreError` that tells the core a finder found nothing: of the
+    kind of `error` (`subject_not_found`, `depth_not_found` or `map_not_found`)."""
+    raised = _core.CoreError(str(error))
+    raised.kind = next(_KIND_OF[cls] for cls in type(error).__mro__ if cls in _KIND_OF)
+    return raised
+
+
 def entry[**P, R](function: Callable[P, R]) -> Callable[P, R]:
     """`function`, an entry point of the core, raising the exception of the kind of any error the core reports (the
     `CoreError` is its `__cause__`). A kind the package has no exception for is a `KeyError`: the core and this table
@@ -58,3 +69,5 @@ register = entry(_core.register)
 unregister = entry(_core.unregister)
 render = entry(_core.render)
 trace = entry(_core.trace)
+needs = entry(_core.needs)
+known_maps = entry(_core.known_maps)
