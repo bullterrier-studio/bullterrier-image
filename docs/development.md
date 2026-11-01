@@ -66,8 +66,9 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
                            _template/ is what `poe new-effect` copies
   plugin.py                effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
   core/          core      registry.py, params.py (parameter models), presets.py, looks.py, types.py, vocabulary.py, and the
-                           recipe engine: steps.py (`Step`, `Recipe`), regions.py, framing.py (`Framing`), runner.py
-                           (render, render_all, trace; given the photo and the subject)
+                           recipe model: steps.py (`Step`, `Recipe`), regions.py and framing.py (their declarations),
+                           finder.py (`Finder`), bridge.py (render, render_all, trace in the Rust core; given the photo
+                           and its maps)
   ops/           ops       shared numeric primitives named by concept: one module per concept (`blur`, `noise`, `warp`,
                            `edges`, `colorspace`...; internal; core may import ops; ops imports nothing above)
   errors.py      errors    BullterrierImageError and subclasses: bottom layer, importable from every other

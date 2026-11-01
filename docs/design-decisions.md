@@ -543,8 +543,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   breaking change, accepted until the crate is published (R5). There is no typed apply (`Effect::apply` takes the parameters
   as JSON); running a step is the runner's (R4a).
   *Validation of a user's values is in Rust since R3* (`Table::check`, next to the recipe): running an effect still
-  trusts its parameters, and Python's models keep validating what Python runs until R4 switches them to the Rust
-  checks, so the rules live in two languages only while the parity tests (`tests/_native/test_recipe_parity.py`)
+  trusts its parameters, and Python's models keep validating a user's values when a step is made; since R4e a `Recipe` is then held to the
+  core's `Recipe::checked` too, so the rules live in two languages while the parity tests (`tests/_native/test_recipe_parity.py`)
   hold them equal.
 - **An effect is a Rust value that knows its place in the catalogue (R2).** `Effect` is a trait (name, category, default
   opacity, declared inputs, parameters described, `apply`); the core's registry holds the core's own effects and any
@@ -561,7 +561,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   nested form `{effect, params, preset, partition, mask, opacity, blend_mode, name}` is the JSON form, and
   unknown keys are refused by name. A step keeps its parameters as written (a preset's lie under them only in the
   check), an opacity left out stays unset until the runner resolves it, and regions and the framing are opaque
-  tables the runner (R4) reads. `Recipe::checked(&Presets)` is the one place the rules of a look live (known effects,
+  tables the runner reads. `Recipe::checked(&Presets)` is the one place the rules of a look live (known effects,
   parameters through `Table::check`, drives, partitions, names, opacity, regions that resolve) and `checked_look` adds
   the description a look needs; every consumer calls it first. `from_toml` does what the Python loader does: a step's
   other keys become its parameters, `"none"` a skipped look, and a feature a later format version added is refused in
@@ -575,8 +575,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   "Regions and `each` are Rust"); Python keeps its Pydantic model until R4.
 - **The runner is Rust (R4a): steps, maps, drives, blend, scaling.** `Photo::render`/`trace` run a checked recipe's
   steps; the core refuses what it does not run yet (`each`, a region other than `given`, a step that takes a
-  partition) with an error saying so. Python's runner serves users until R4e; `core/bridge.py` and the parity tests
-  (`tests/_native/test_runner_parity.py`) hold the core to it meanwhile. Decisions:
+  partition) with an error saying so (every kind runs since R4d). `core/bridge.py` runs a recipe for users; the parity
+  tests (`tests/_native/test_runner_parity.py`) hold the core to the definitions. Decisions:
   - *Inputs.* `Effect::apply(picture, params, &Inputs)`, and `render(&Picture, &Params, &Inputs)` for every ported effect
     (unused: `_inputs`). The core hands an effect only what it declares; one it declares but is not offered, or of another
     size than the picture, refuses the run. *Rejected:* two `render` shapes picked per `META` (a build-time switch to save
@@ -616,10 +616,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *ClipColor deviates from the W3C text.* The `color` mode's ClipColor pulls toward the luminosity `SetLum` set instead of
     recomputing `Lum(C)`: equal in exact arithmetic, but in `f32` a black backdrop under a grey source made 0 / 0 (NaN).
     Found by a property test; pinned by a row of the reference table.
-  - *Not yet:* no `Photo::render_all` (the unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes needs
-    a union check: R4e); `as_image` (uint8/uint16, non-finite) stays Python's.
-- **Framing, size and the cut-out are Rust (R4b).** A recipe's `frame` and `size` are run by the core; Python's runner still
-  serves users until R4e, and the parity tests hold the core to it. Decisions:
+  - *No `Photo::render_all`.* The unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes
+    needs a union check; `bridge.render_all` does it (R4e), finds each map once and hands each recipe the maps it knows.
+    `as_image` (uint8/uint16, non-finite) stays Python's.
+- **Framing, size and the cut-out are Rust (R4b).** A recipe's `frame` and `size` are run by the core. Decisions:
   - *Size derives the ratio.* `Options` has `with_size(u32)`, not a ratio; the runner takes the working picture's longest side
     over 480 (`DESIGN_SIZE`). *Reason:* with `frame` and `size` the working picture is made inside the render, so the ratio
     cannot be an input; one source, and no caller can hand in a ratio that disagrees with the picture (which closed the
@@ -651,8 +651,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     shorter side), a float32 pixel-centre signed distance with a one-pixel soft edge.
   - *Memory is measured.* `crates/core/tests/memory.rs` counts the heap (dev-dependency `peak_alloc`): render of a 12-step chain
     holds 2 pictures, trace 14.
-- **Regions and `each` are Rust (R4c).** Python's runner still serves users until R4e; the parity tests hold the core to numpy
-  definitions first and to it second. Decisions:
+- **Regions and `each` are Rust (R4c).** The parity tests hold the core to numpy definitions. Decisions:
   - *Order is data.* `serde_json` and `toml` keep file order (`preserve_order`; `Zlib` is allowed in `deny.toml` for `foldhash`,
     which serde_json then hashes with); `Regions` is an ordered list. *Reason:* the order regions are declared in is the order a
     trace shows them and the order a refusal names the first offender, for a TOML file and a Python dict alike.
@@ -747,6 +746,27 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   patch where a failure shows (fallbacks, defaults, swallowed exceptions, extra checks), which "makes the system less understandable while appearing more robust" and keeps the cause (Armin Ronacher,
   "The Coming Loop", 2026); the repo's own instances were library options hidden behind `# constant:` and two copies of the same edge table. *Consequence:* the rules live in `CLAUDE.md` ("Fixing defects"),
   duplicated knowledge (code or tests) is merged, and what a tool can see becomes a gate (blind `except`, literal library options, the marker rule).
+
+- **Python is a facade over the core (R4e).** `recipe.render`, `trace` and `render_all` call `core/bridge.py`, which runs the
+  core; the Python runner, the region and framing engine, `ops/frame`, `ops/raster`, `core/outlines` and `svgelements` are
+  deleted. Decisions:
+  - *The models stay Pydantic builders.* `Recipe`, `Step`, the region kinds and `Framing` keep their field declarations and
+    range checks (they document, type and error-word the API; moving the ranges would change wording public tests pin), and
+    `steps.recipe_dict` writes them as the dict the core reads. The one rule that left Python is a path's syntax
+    (`Path.d`, `Curve.path`): only the core reads path data, so `Recipe(...)` calls `_core.check_recipe` and a bad path is
+    refused when the recipe is made, not when the region is. *Cost:* every `Recipe` (and so every `with_values`) is checked
+    twice, by its models and by the core. *Revisit when* the models are generated from the core's declarations (R5).
+  - *`Recipe.parameters` and `with_values` stay a Python walk* over the steps, regions and frame (addresses are file-order
+    data, but the walk is 150 lines against a Rust twin plus a binding).
+  - *`render_all` finds, the core renders.* Each map the recipes need is handed in or found once by `find_map`, then each
+    recipe is rendered with the maps it knows; a single `render` takes the same path. The core is only asked for a
+    finder for the subject of each piece of a `Subject` region with `per`.
+  - *The facade owns what the core cannot:* `size` a whole number (a `bool` or a float is not), the names in `maps` and
+    `finders` against all the recipes, the wording of a missing map (`maps=`/`finders=`), a Python effect's result of
+    another shape (`RuntimeError`, in the registry's wrapper), the labels of a trace's stages and the drawing of numbered
+    pieces (`ops/pieces`), and `svg_bytes` (the pipeline's digest of a file). `Stage` and `Finder` keep their public names.
+  - *`as_image` returns an aligned array,* since the extension borrows the buffer and a misaligned one (a view onto a
+    received buffer) cannot be a Rust slice.
 
 ## Regions
 
@@ -881,8 +901,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   straight on to the nearest. Every kind reads its drawing at the noise-shifted coordinates, so `edge = torn` works on
   all of them. *Reason:* one rule for position and one for borders; a library rasteriser would add a dependency for a
   fill that is a page of numpy.
-- **SVG files are read by `svgelements` (MIT), behind a guard in `core/outlines` (the Python engine; the core has its own reader, below).** We never write an SVG reader;
-  the library handles shapes, transforms, `use`, arcs and `viewBox`. A shape is a piece: colours and strokes are
+- **SVG files were read by `svgelements` (MIT) behind a guard (the Python engine, deleted in R4e with the dependency; the core's reader is below).** We never wrote an SVG reader;
+  the library handled shapes, transforms, `use`, arcs and `viewBox`. A shape is a piece: colours and strokes are
   ignored, `display="none"` shapes are skipped, the `fill-rule` is kept, later shapes lie on top, and the area outside
   every shape is one more piece, numbered like any by its first pixel (0 unless the top left pixel is inside a shape). `Pick` takes a number
   or an `id` (every piece of every shape with it; an id the file lacks is an error, a shape too small or too covered to

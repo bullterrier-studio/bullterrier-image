@@ -50,8 +50,9 @@ app        cli, pipeline, gallery, sheet, checks, fx, public API      (may impor
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
-core       params (EffectParams, param, Color), registry, recipe engine, native (the extension's entry points),
-           bridge (a recipe run by the Rust core)                         (may import ops)
+core       params (EffectParams, param, Color), registry, steps (the recipe model: Step, Each, Recipe), regions and
+           framing (its declarations), finder (Finder), native (the extension's entry points), bridge (a recipe
+           run by the Rust core)                                          (may import ops)
 ops        pure numeric primitives                                    (may import errors, _native)
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
@@ -69,8 +70,9 @@ params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect 
 (1 if undeclared), `partition` (`Labels`) and, under each field parameter's name, a `Layer`. Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
-look, `Table::check` those of an effect's parameters (`_core.check`, `_core.read_recipe`). The Python `Step`, `Recipe`
-and loader still validate and run recipes until R4e makes them a facade over these types.
+look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python
+`Step`, `Recipe`, regions and `Framing` are Pydantic builders over these types: their models validate (and document) first,
+and a `Recipe` is then held to `Recipe::checked`, which alone reads a region's path data.
 **The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
 a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; its answer for the whole photo is kept and asked once;
 a `Subject` region found `per` piece also asks the `subject` finder, uncached, about the crop of each piece);
@@ -85,21 +87,24 @@ the result is laid over its input by `ops/blend` (blend mode, opacity, mask), an
 (`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
 `channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
 0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
-for every binding). **Regions (R4c):** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
+for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
 (`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
 `Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
 time a step asks (`run/regions.rs`, `Evaluator`) and dropped after the last step that needs it. `each` is `run/each.rs`
-(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). **R4d state:** every region kind runs in the core, a torn `edge`
+(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). Every region kind runs in the core, a torn `edge`
 included. The core opens one file, `Svg.file` (`run/laid.rs`: read through `take(max_kilobytes * 1024 + 1)`; `ops/svg` takes the
 bytes: UTF-8 only, `<!ENTITY` refused before the parser, nothing in the file opened or run), and its limits are `Limits` in
 `ops/outlines` (`Limits::STANDARD`; tests pass a small one). `Pick` by `id` reads the ids an `Svg` made (`Made::Pieces`);
 a relative file path in a recipe file is the loader's to resolve. `Shards.preset` is expanded when the region is read
 (`recipe/region/presets.rs`, from `src/bullterrier_image/presets/regions/shards.toml`). Every user number that drives
 allocation or work has a maximum and a row in `crates/core/tests/limits.rs`; its completeness test fails for a bound of
-`Region::check` with neither a row nor a reason. Python's runner still serves users until R4e.
-Python reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
+`Region::check` with neither a row nor a reason.
+Python is a facade over the core and runs no recipe itself. It reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
 `kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
-`core/bridge.py` (`render`/`trace`/`needs`/`known_maps`: a `Recipe` as the dict the core reads, a finder's not-found errors told to the core; no consumer in `src` until R4e). The registry
+`core/bridge.py` (`render`, `render_all`, `trace`, `maps_needed`, `needs_finder`, `known_maps`: a `Recipe` as the dict
+`steps.recipe_dict` writes; `size` a whole number, a name in `maps` or `finders` no recipe has, and each map the recipes need
+found once, by `core/finder.py`'s `find_map`, are its checks; a finder's not-found error is told to the core). `recipe.py`
+binds the default finders and names a trace's stages (drawing the numbered pieces is `ops/pieces`). The registry
 mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture` or
 `Lut` parameter travels as `{"$object": n}` (`registry.holding`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
@@ -148,8 +153,8 @@ another is set (as `grade.pivot` needs `contrast` other than 1): add a row to th
 A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user. `pub` also covers the runner's types
 (`Photo`, `Options`, `Finder`, `Stage`, `Layer`, `Labels`, `Inputs`, `Drive`, `ErrorKind`). A user's values are checked by Rust
-code (`Table::check`, `Recipe::checked`, `Presets`), which Python calls only from R4e (until then it checks them itself);
-running an effect trusts its parameters.
+code (`Table::check`, `Recipe::checked`, `Presets`), which Python calls when a `Recipe` is made; running an effect trusts
+its parameters.
 
 ## Standards
 
@@ -212,8 +217,8 @@ doc is the model's docstring, a field's doc its help text in Python: plain text,
 becomes a double space. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
 error; that a choice's doc names every variant is checked when Python builds the model). The Python class is
 `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
-declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python validates a
-user's values until R4 moves it; `Table::check` in Rust is the same rules, compared with Python's by parity tests
+declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python's model validates a
+user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests
 (`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `bool`, `Color`, a choice; an
 effect with any other (`FieldName`, `Picture`, `Lut`, lists, optional colours) keeps a Python model, each field `param(default, doc=...)`, until its port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
