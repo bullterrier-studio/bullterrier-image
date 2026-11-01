@@ -238,7 +238,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   should not need a recipe. *Consequence:* the default subject and depth finders live above the core (they know
   `finding`), so `Step.apply` imports `bullterrier_image.recipe` when it is called, a deliberate upward import that
   import-linter cannot see; done at call time it also works in a fresh process (an unpickled step in a pool worker).
-  Later: the structural fix is runner-owned default finders, found through entry points, so the core needs no import.
+  Later: the structural fix is core-owned default finders, found through entry points, so the core needs no import.
 - **A recipe's name is free text; whoever writes files makes it safe.** `Recipe(steps, name=None, description=None)`; a
   file without `name` takes its file stem as it is. The command line and the pipeline name files `safe_name(name)` (runs
   of characters other than letters, digits, `.`, `_`, `-` become one `-`, no leading dot or dash, at most 64, never a
