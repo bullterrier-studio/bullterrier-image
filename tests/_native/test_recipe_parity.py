@@ -16,6 +16,7 @@ import pytest
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's engine
 from bullterrier_image.core import regions, registry
 from bullterrier_image.core.framing import Framing
+from bullterrier_image.core.presets import SHIPPED as SHIPPED_PRESETS
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Step
 from bullterrier_image.loader import load_recipe
@@ -209,13 +210,13 @@ def test_the_regions_of_a_file_are_read_in_the_order_it_declares_them(tmp_path):
 def test_a_python_dict_keeps_its_order_into_the_core_and_back():
     given: dict[str, Any] = {
         "steps": [{"effect": "grade", "params": {"zebra": 1, "apple": 2}}],
-        "regions": {"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}},
+        "regions": {"zeta": {"kind": "given"}, "alpha": {"kind": "given"}},
     }
     read = _core.read_recipe(json.dumps(given), "json")
     assert list(read["regions"]) == ["zeta", "alpha"]
     assert list(read["steps"][0]["params"]) == ["zebra", "apple"]
     given["steps"][0]["mask"] = "nowhere"
-    with pytest.raises(ValueError, match=r"valid regions: subject, background, depth, light, zeta, alpha"):
+    with pytest.raises(ValueError, match=r"valid selections: subject, background, depth, light, zeta, alpha"):
         _core.check_recipe(given)
 
 
@@ -660,7 +661,13 @@ def python_accepts_region(kind: str, fields: dict) -> bool:
 def core_accepts_region(kind: str, fields: dict) -> bool:
     """Whether the core's check of a recipe takes the region (it does not run it)."""
     try:
-        _core.check_recipe({"steps": [{"effect": "grade"}], "regions": {"r": {"kind": kind, **fields}}})
+        _core.check_recipe(
+            {
+                "steps": [{"effect": "grade"}],
+                # `p` is a partition for a pick or a subject to refer to
+                "regions": {"p": {"kind": "grid"}, "r": {"kind": kind, **fields}},
+            }
+        )
     except ValueError:  # CoreError, which is one
         return False
     return True
@@ -678,7 +685,13 @@ def test_every_kind_has_rows_with_a_known_good_and_a_known_bad_one():
 
 
 def test_the_core_has_the_kinds_python_has():
-    refused = [kind for kind in PYTHON_KINDS if not core_accepts_region(kind, {})]
+    names: dict[str, dict] = {
+        "pick": {"of": "p"},
+        "band": {"of": "depth"},
+        "bands": {"of": "depth"},
+        "combine": {"of": ["subject", "depth"]},
+    }
+    refused = [kind for kind in PYTHON_KINDS if not core_accepts_region(kind, names.get(kind, {}))]
     assert refused == []
     assert not core_accepts_region("lattice", {})
 
@@ -706,3 +719,123 @@ def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(
 def test_a_count_of_shares_is_the_same_list_in_the_core_and_in_python():
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "grid", "columns": 3}}}), "json")
     assert read["regions"]["r"]["columns"] == list(regions.Grid(columns=3).columns) == [1.0, 1.0, 1.0]
+
+
+# --- references: what a name must name, in Python's checks and the core's ---------------------------------------------
+
+OPEN = "format = 3\n[region.panes]\nkind = 'grid'\n[region.cutout]\nkind = 'path'\n"
+GRADE = "[[step]]\neffect = 'grade'\n"
+SEAMS = "[[step]]\neffect = 'seams'\n"
+
+
+def laid(kind_and_fields: str) -> str:
+    """The recipe with the regions panes (a partition) and cutout (a selection), and `r` as written, over one step."""
+    return OPEN + f"[region.r]\n{kind_and_fields}" + GRADE
+
+
+# (what the row is about, the recipe file, whether every name in it names a region of the form its place needs)
+REFERENCE_ROWS = [
+    ("mask a selection", OPEN + GRADE + "mask = 'cutout'\n", True),
+    ("mask a built-in selection", OPEN + GRADE + "mask = 'subject'\n", True),
+    ("mask a partition", OPEN + GRADE + "mask = 'panes'\n", False),
+    ("mask nothing", OPEN + GRADE + "mask = 'nowhere'\n", False),
+    ("a drive by a selection", OPEN + GRADE + "exposure = { by = 'cutout', start = 0, end = 1 }\n", True),
+    ("a drive by a partition", OPEN + GRADE + "exposure = { by = 'panes', start = 0, end = 1 }\n", False),
+    ("a drive by nothing", OPEN + GRADE + "exposure = { by = 'nowhere', start = 0, end = 1 }\n", False),
+    ("a partition that is one", OPEN + SEAMS + "partition = 'panes'\n", True),
+    ("a partition that is a selection (two pieces)", OPEN + SEAMS + "partition = 'cutout'\n", True),
+    ("a partition that is a built-in", OPEN + SEAMS + "partition = 'subject'\n", True),
+    ("a partition that is nothing", OPEN + SEAMS + "partition = 'nowhere'\n", False),
+    ("each over a partition", OPEN + "[[step]]\neach = 'panes'\nlooks = ['none']\n", True),
+    ("each over a selection", OPEN + "[[step]]\neach = 'cutout'\nlooks = ['none']\n", False),
+    ("each over a built-in", OPEN + "[[step]]\neach = 'subject'\nlooks = ['none']\n", False),
+    ("each over nothing", OPEN + "[[step]]\neach = 'nowhere'\nlooks = ['none']\n", False),
+    ("each masked by a selection", OPEN + "[[step]]\neach = 'panes'\nmask = 'cutout'\nlooks = ['none']\n", True),
+    ("each masked by a partition", OPEN + "[[step]]\neach = 'panes'\nmask = 'panes'\nlooks = ['none']\n", False),
+    (
+        "a look masked by a partition",
+        OPEN + "[[step]]\neach = 'panes'\nlooks = [{ effect = 'grade', mask = 'panes' }]\n",
+        False,
+    ),
+    (
+        "a look masked by a selection",
+        OPEN + "[[step]]\neach = 'panes'\nlooks = [{ effect = 'grade', mask = 'cutout' }]\n",
+        True,
+    ),
+    ("a grid fit to a selection", laid("kind = 'grid'\nfit = 'cutout'\n"), True),
+    ("a grid fit to a built-in", laid("kind = 'grid'\nfit = 'subject'\n"), True),
+    ("a grid fit to a partition", laid("kind = 'grid'\nfit = 'panes'\n"), False),
+    ("a grid fit to nothing", laid("kind = 'grid'\nfit = 'nowhere'\n"), False),
+    ("a band of a selection", laid("kind = 'band'\nof = 'cutout'\n"), True),
+    ("a band of the depth", laid("kind = 'band'\nof = 'depth'\n"), True),
+    ("a band of a partition", laid("kind = 'band'\nof = 'panes'\n"), False),
+    ("a band of nothing", laid("kind = 'band'\nof = 'nowhere'\n"), False),
+    ("a band with no `of`", laid("kind = 'band'\n"), False),
+    ("bands of a selection", laid("kind = 'bands'\nof = 'cutout'\n"), True),
+    ("bands of a partition", laid("kind = 'bands'\nof = 'panes'\n"), False),
+    ("combine of selections", laid("kind = 'combine'\nof = ['cutout', 'subject']\n"), True),
+    ("combine with a partition", laid("kind = 'combine'\nof = ['cutout', 'panes']\n"), False),
+    ("combine with nothing", laid("kind = 'combine'\nof = ['cutout', 'nowhere']\n"), False),
+    ("a pick of a partition", laid("kind = 'pick'\nof = 'panes'\n"), True),
+    ("a pick of a selection", laid("kind = 'pick'\nof = 'cutout'\n"), False),
+    ("a pick of a built-in", laid("kind = 'pick'\nof = 'subject'\n"), False),
+    ("a pick of nothing", laid("kind = 'pick'\nof = 'nowhere'\n"), False),
+    ("the subject found in a partition", laid("kind = 'subject'\nper = 'panes'\n"), True),
+    ("the subject found in a selection", laid("kind = 'subject'\nper = 'cutout'\n"), False),
+    ("the subject found in nothing", laid("kind = 'subject'\nper = 'nowhere'\n"), False),
+    ("a region called subject", OPEN + "[region.subject]\nkind = 'grid'\n" + GRADE, False),
+    ("a region called light", OPEN + "[region.light]\nkind = 'given'\n" + GRADE, False),
+    ("a region called like a built-in in capitals", OPEN + "[region.Subject]\nkind = 'grid'\n" + GRADE, True),
+    ("a band of itself", laid("kind = 'band'\nof = 'r'\n"), False),
+    (
+        "two bands of each other",
+        OPEN + "[region.a]\nkind = 'band'\nof = 'b'\n[region.b]\nkind = 'band'\nof = 'a'\n" + GRADE,
+        False,
+    ),
+    (
+        "a chain that ends",
+        OPEN + "[region.a]\nkind = 'band'\nof = 'b'\n[region.b]\nkind = 'band'\nof = 'depth'\n" + GRADE,
+        True,
+    ),
+    (
+        "a circle through fit and per",
+        OPEN + "[region.s]\nkind = 'subject'\nper = 'g'\n[region.g]\nkind = 'grid'\nfit = 's'\n" + GRADE,
+        False,
+    ),
+    ("a bad reference in a region no step uses", laid("kind = 'band'\nof = 'nowhere'\n"), False),
+]
+
+
+def python_accepts_file(tmp_path, text: str) -> bool:
+    path = tmp_path / "recipe.toml"
+    path.write_text(text, encoding="utf-8")
+    try:
+        load_recipe(path)
+    except ValueError:  # RecipeError, which is one
+        return False
+    return True
+
+
+def core_accepts_file(text: str, presets: dict | None = None) -> bool:
+    registry.all_effects()  # loads the effects, which mirrors the Python ones into the core
+    try:
+        _core.check_recipe(_core.read_recipe(text, "toml"), presets=presets)
+    except ValueError:  # CoreError, which is one
+        return False
+    return True
+
+
+@pytest.mark.parametrize(("what", "text", "valid"), REFERENCE_ROWS, ids=[row[0] for row in REFERENCE_ROWS])
+def test_the_core_and_python_accept_and_refuse_the_same_references(tmp_path, what, text, valid):
+    assert python_accepts_file(tmp_path, text) == valid, "Python's checks"
+    assert core_accepts_file(text) == valid, "the core"
+
+
+def test_the_references_have_known_good_and_known_bad_rows():
+    assert {valid for _, _, valid in REFERENCE_ROWS} == {True, False}
+
+
+@pytest.mark.parametrize("path", FILES)
+def test_the_core_accepts_every_shipped_look_and_example_as_python_does(path):
+    presets = {file.stem: file.read_text(encoding="utf-8") for file in SHIPPED_PRESETS.glob("*.toml")}
+    assert core_accepts_file(path.read_text(encoding="utf-8"), presets)

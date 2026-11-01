@@ -4,13 +4,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
+use super::needs::Uses;
+use super::references::{self, Form};
 use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
 use crate::registry::Registry;
 use crate::{Error, Presets};
-
-/// The selections every picture has, which a recipe need not declare.
-const BUILT_IN: [&str; 4] = ["subject", "background", "depth", "light"];
 
 /// What an address of a step's numbers starts with besides a step's name: a step cannot be called so.
 const ADDRESS_WORDS: [&str; 3] = ["region", "frame", "each"];
@@ -58,7 +57,8 @@ impl Recipe {
         Ok(look)
     }
 
-    pub(crate) fn check_in(&self, registry: &Registry, presets: &Presets) -> Result<(), Error> {
+    /// The rules of [`checked`](Self::checked) against `registry`, and the names of the regions the steps refer to.
+    pub(crate) fn check_in(&self, registry: &Registry, presets: &Presets) -> Result<Uses, Error> {
         if self.steps.is_empty() {
             return Err(Error::Recipe("a recipe needs at least one step".to_owned()));
         }
@@ -69,10 +69,12 @@ impl Recipe {
         for (name, region) in self.regions.iter() {
             region.check(name)?;
         }
-        let rules = Rules {
+        references::check_regions(&self.regions)?;
+        let mut rules = Rules {
             registry,
             presets,
             regions: &self.regions,
+            uses: Vec::new(),
         };
         for (index, entry) in self.steps.iter().enumerate() {
             let place = format!("step {}", index + 1);
@@ -81,7 +83,8 @@ impl Recipe {
                 Entry::Each(each) => rules.each(each, &place)?,
             }
         }
-        self.check_names()
+        self.check_names()?;
+        Ok(Uses(rules.uses))
     }
 
     /// The names of the steps are unique and none is the name of an effect a step uses (it would be taken for that
@@ -123,10 +126,12 @@ struct Rules<'a> {
     registry: &'a Registry,
     presets: &'a Presets,
     regions: &'a Regions,
+    /// The names of the regions the steps checked so far refer to.
+    uses: Vec<String>,
 }
 
 impl Rules<'_> {
-    fn step(&self, step: &Step, place: &str) -> Result<(), Error> {
+    fn step(&mut self, step: &Step, place: &str) -> Result<(), Error> {
         let effect = self.registry.effect(&step.effect)?;
         self.layer(place, step.mask.as_deref(), step.opacity, step.name.as_deref())?;
         let params = self.presets.under(step, place)?;
@@ -191,21 +196,21 @@ impl Rules<'_> {
             _ => {}
         }
         for (_, drive) in &drives {
-            self.region(place, "by", &drive.by, true)?;
+            self.refer(place, "by", &drive.by, Some(Form::Selection))?;
         }
         for field in effect.fields() {
             let name = field
                 .field_in(&params)
                 .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
-            self.region(place, &field.parameter, name, true)?;
+            self.refer(place, &field.parameter, name, Some(Form::Selection))?;
         }
         if let Some(partition) = &step.partition {
-            self.region(place, "partition", partition, true)?;
+            self.refer(place, "partition", partition, None)?;
         }
         Ok(())
     }
 
-    fn each(&self, each: &Each, place: &str) -> Result<(), Error> {
+    fn each(&mut self, each: &Each, place: &str) -> Result<(), Error> {
         self.layer(place, each.mask.as_deref(), each.opacity, each.name.as_deref())?;
         if each.looks.is_empty() {
             return Err(Error::Recipe(format!("{place}: an each step needs at least one look")));
@@ -216,7 +221,7 @@ impl Rules<'_> {
                 each.feather
             )));
         }
-        self.region(place, "each", &each.each, false)?;
+        self.refer(place, "each", &each.each, Some(Form::Partition))?;
         for (index, look) in each.looks.iter().enumerate() {
             let Some(look) = look else { continue };
             let place = format!("{place}, look {}", index + 1);
@@ -231,7 +236,13 @@ impl Rules<'_> {
     }
 
     /// What a step and an each step share: how the result is laid over the picture below.
-    fn layer(&self, place: &str, mask: Option<&str>, opacity: Option<f64>, name: Option<&str>) -> Result<(), Error> {
+    fn layer(
+        &mut self,
+        place: &str,
+        mask: Option<&str>,
+        opacity: Option<f64>,
+        name: Option<&str>,
+    ) -> Result<(), Error> {
         if let Some(opacity) = opacity
             && !(0.0..=1.0).contains(&opacity)
         {
@@ -255,27 +266,17 @@ impl Rules<'_> {
             }
         }
         match mask {
-            Some(mask) => self.region(place, "mask", mask, true),
+            Some(mask) => self.refer(place, "mask", mask, Some(Form::Selection)),
             None => Ok(()),
         }
     }
 
-    /// `name` (what `key` of the step at `place` refers to) is a region: one the recipe declares, or, when
-    /// `built_in` allows, one every picture has.
-    fn region(&self, place: &str, key: &str, name: &str, built_in: bool) -> Result<(), Error> {
-        if self.regions.get(name).is_some() || (built_in && BUILT_IN.contains(&name)) {
-            return Ok(());
-        }
-        let valid: Vec<&str> = built_in
-            .then_some(BUILT_IN.iter().copied())
-            .into_iter()
-            .flatten()
-            .chain(self.regions.iter().map(|(name, _)| name))
-            .collect();
-        Err(Error::Recipe(format!(
-            "{place}: `{key}` names '{name}', which is no region; valid regions: {}",
-            valid.join(", ")
-        )))
+    /// `name`, what `key` of the step at `place` refers to, is a region of the `wanted` form (none: either), and is
+    /// remembered as used.
+    fn refer(&mut self, place: &str, key: &str, name: &str, wanted: Option<Form>) -> Result<(), Error> {
+        references::refer(self.regions, place, key, name, wanted)?;
+        self.uses.push(name.to_owned());
+        Ok(())
     }
 }
 
@@ -717,11 +718,11 @@ mod tests {
     #[test]
     fn the_regions_a_refusal_lists_are_in_the_order_they_were_declared() -> Result<(), Error> {
         let mut recipe = Recipe::new([probe().mask("nowhere")]);
-        recipe.regions = regions(json!({"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}}));
+        recipe.regions = regions(json!({"zeta": {"kind": "given"}, "alpha": {"kind": "given"}}));
         let said = refusal(&recipe, &Presets::new())?.map(|error| error.to_string());
         assert!(
             said.as_deref()
-                .is_some_and(|text| text.ends_with("valid regions: subject, background, depth, light, zeta, alpha")),
+                .is_some_and(|text| text.ends_with("valid selections: subject, background, depth, light, zeta, alpha")),
             "{said:?}"
         );
         Ok(())

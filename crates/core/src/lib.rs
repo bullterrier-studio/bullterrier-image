@@ -43,7 +43,7 @@ pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
 pub use recipe::{
-    Assign, BlendMode, Drive, Each, Entry, Frame, Recipe, Region, Regions, STEP_KEYS, Step, frame, region,
+    Assign, BlendMode, Drive, Each, Entry, Frame, Needs, Recipe, Region, Regions, STEP_KEYS, Step, frame, region,
 };
 pub use registry::{effect, effects, register, unregister};
 pub use run::{Finder, Options, Photo, Stage};

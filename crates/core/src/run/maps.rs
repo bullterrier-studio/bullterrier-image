@@ -5,12 +5,12 @@
 //! picture's size (finite and within 0..=1 a [`Layer`] is by construction).
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use super::{Photo, Working};
 use crate::ops::color::luminance;
-use crate::{Error, Layer, Picture, Recipe, Region};
+use crate::{Error, Layer, Picture, Recipe};
 
 /// Finds a map in a picture: the subject, the depth, or a region a recipe declares as given.
 ///
@@ -82,9 +82,6 @@ pub(super) fn fits(name: &str, layer: Layer, picture: &Picture<'_>) -> Result<La
     }
 }
 
-/// The maps found in a photo, which a recipe can be given by name.
-const FOUND: [&str; 2] = ["subject", "depth"];
-
 /// The maps one render of a recipe on a photo works from, by name. What is made from the picture (`light`, `background`)
 /// is made once per render and not kept beyond it.
 pub(super) struct Maps<'r, 'a> {
@@ -102,23 +99,14 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// [`Error::Recipe`] if the photo was given a map or a finder under a name that is no map of the recipe: `subject`,
     /// `depth`, or a region of kind `given`. Names the maps there are.
     pub(super) fn new(photo: &'r Photo<'a>, recipe: &'r Recipe, working: &'r Working<'a>) -> Result<Self, Error> {
-        let known: BTreeSet<&str> = FOUND
-            .into_iter()
-            .chain(
-                recipe
-                    .regions
-                    .iter()
-                    .filter(|(_, region)| matches!(region, Region::Given(_)))
-                    .map(|(name, _)| name),
-            )
-            .collect();
+        let known = recipe.known_maps();
         let handed = photo.maps.keys().map(|name| ("map", name));
         let finders = photo.finders.keys().map(|name| ("finder", name));
-        if let Some((what, name)) = handed.chain(finders).find(|(_, name)| !known.contains(name.as_str())) {
+        if let Some((what, name)) = handed.chain(finders).find(|(_, name)| !known.contains(&name.as_str())) {
             return Err(Error::Recipe(format!(
                 "the photo has a {what} '{name}', which is no map of the recipe; its maps: {} (`subject` and `depth` are \
                  built in; any other is a region with `kind = \"given\"`)",
-                known.into_iter().collect::<Vec<_>>().join(", ")
+                known.join(", ")
             )));
         }
         Ok(Self {
@@ -167,7 +155,7 @@ impl<'r, 'a> Maps<'r, 'a> {
 /// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit,
 /// [`Error::Recipe`] for a region the core does not run yet.
 pub(super) fn stored(photo: &Photo<'_>, recipe: &Recipe, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
-    if !FOUND.contains(&name) && !matches!(recipe.regions.get(name), Some(Region::Given(_))) {
+    if !recipe.known_maps().contains(&name) {
         return Err(Error::Recipe(format!(
             "{place}: the region '{name}' is not run by the core yet; only the regions of kind `given` are"
         )));
@@ -592,13 +580,13 @@ mod tests {
             assert_refused(
                 &rig.render(&given(name)?, &look),
                 ErrorKind::Recipe,
-                &[&format!("a map '{name}'"), "depth, star, subject"],
+                &[&format!("a map '{name}'"), "subject, depth, star"],
                 name,
             );
             assert_refused(
                 &rig.render(&found(name)?, &look),
                 ErrorKind::Recipe,
-                &[&format!("a finder '{name}'"), "depth, star, subject"],
+                &[&format!("a finder '{name}'"), "subject, depth, star"],
                 name,
             );
         }

@@ -161,19 +161,32 @@ mod tests {
     use super::super::{Band, Cuts, Grid, Line, LinearGradient, Region, Shares};
     use crate::{Error, Presets, Recipe, Step};
 
-    /// The refusal of the recipe that declares `region` as `r` and has one step (no step uses it), or None.
+    /// The refusal of the recipe that declares `region` as `r` (and a grid `p`, to pick from) and has one step (no step
+    /// uses it), or None.
     fn refusal(region: Region) -> Option<String> {
-        let recipe = Recipe::new([Step::new("grade")]).with_region("r", region);
+        let recipe = Recipe::new([Step::new("grade")])
+            .with_region("p", Grid::default())
+            .with_region("r", region);
         match recipe.checked(&Presets::new()) {
             Err(Error::Recipe(message)) => Some(message),
             other => other.err().map(|error| error.to_string()),
         }
     }
 
-    /// `kind` of the JSON `fields`, read as a region.
+    /// `kind` of the JSON `fields`, read as a region. A kind that must name regions names ones that exist (`p`, `depth`
+    /// and `subject`) unless the row says otherwise, so that only its numbers are in question.
     fn region(kind: &str, fields: &Value) -> Region {
         let mut table = fields.clone();
         table["kind"] = json!(kind);
+        let existing = match kind {
+            "pick" => json!("p"),
+            "band" | "bands" => json!("depth"),
+            "combine" => json!(["subject", "depth"]),
+            _ => Value::Null,
+        };
+        if !existing.is_null() && table.get("of").is_none() {
+            table["of"] = existing;
+        }
         serde_json::from_value(table).unwrap_or_else(|error| {
             Region::Grid(Grid {
                 fit: Some(error.to_string()),
@@ -441,11 +454,11 @@ mod tests {
             ("bands", json!({"count": 100}), None),
             ("bands", json!({"count": 0}), Some("`count` must be >= 1, got 0")),
             ("bands", json!({"count": 101}), Some("`count` must be <= 100, got 101")),
-            ("combine", json!({"of": ["a", "b"]}), None),
-            ("combine", json!({"of": ["a", "b", "c"]}), None),
+            ("combine", json!({"of": ["subject", "depth"]}), None),
+            ("combine", json!({"of": ["subject", "depth", "light"]}), None),
             (
                 "combine",
-                json!({"of": ["a"]}),
+                json!({"of": ["subject"]}),
                 Some("`of` needs at least 2 entries, got 1"),
             ),
             (

@@ -31,6 +31,7 @@ pub use derived::{Band, Bands, Combine, CombineOp, Given, LinearGradient, Pick, 
 pub use laid::{Curve, Cut, Cuts, Edge, EdgeStyle, Grid, Line, Path, Shards, Shares, Svg};
 
 use super::read;
+use super::references::Form;
 
 /// One region of a recipe. The kinds are told apart by the key `kind` in a recipe's JSON and TOML forms
 /// (`linear_gradient`), which the variants' names spell in snake case.
@@ -109,6 +110,54 @@ regions_from!(
     RadialGradient,
     Given
 );
+
+impl Region {
+    /// What this region is: a partition into pieces, or a selection of pixels.
+    pub(crate) fn form(&self) -> Form {
+        match self {
+            Self::Grid(_) | Self::Shards(_) | Self::Cuts(_) | Self::Svg(_) | Self::Bands(_) => Form::Partition,
+            Self::Path(_)
+            | Self::Pick(_)
+            | Self::Subject(_)
+            | Self::Band(_)
+            | Self::Combine(_)
+            | Self::LinearGradient(_)
+            | Self::RadialGradient(_)
+            | Self::Given(_) => Form::Selection,
+        }
+    }
+
+    /// The regions this one is made from, each as (the field that names it, its name, the form it must have): the one
+    /// a kind is laid over (`fit`), the one a `Pick` picks from, the ones a `Band`, `Bands` or `Combine` is cut or put
+    /// together from, the one a `Subject` is found in each piece of.
+    pub(crate) fn refers_to(&self) -> Vec<(&'static str, &str, Form)> {
+        fn laid(fit: Option<&String>) -> Vec<(&'static str, &str, Form)> {
+            fit.into_iter()
+                .map(|fit| ("fit", fit.as_str(), Form::Selection))
+                .collect()
+        }
+        match self {
+            Self::Grid(Grid { fit, .. })
+            | Self::Shards(Shards { fit, .. })
+            | Self::Cuts(Cuts { fit, .. })
+            | Self::Path(Path { fit, .. })
+            | Self::Svg(Svg { fit, .. }) => laid(fit.as_ref()),
+            Self::Pick(pick) => vec![("of", pick.of.as_str(), Form::Partition)],
+            Self::Subject(subject) => subject
+                .per
+                .iter()
+                .map(|per| ("per", per.as_str(), Form::Partition))
+                .collect(),
+            Self::Band(Band { of, .. }) | Self::Bands(Bands { of, .. }) => vec![("of", of.as_str(), Form::Selection)],
+            Self::Combine(combine) => combine
+                .of
+                .iter()
+                .map(|of| ("of", of.as_str(), Form::Selection))
+                .collect(),
+            Self::LinearGradient(_) | Self::RadialGradient(_) | Self::Given(_) => Vec::new(),
+        }
+    }
+}
 
 impl<'de> Deserialize<'de> for Region {
     /// A table whose `kind` names the kind, with that kind's fields beside it; every field has a default.
