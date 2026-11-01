@@ -124,10 +124,8 @@ impl Recipe {
     /// checked.
     #[must_use]
     pub fn known_maps(&self) -> Vec<&str> {
-        BuiltIn::ALL
+        BuiltIn::found()
             .into_iter()
-            .filter(|built_in| built_in.origin() == Origin::Found)
-            .map(|built_in| built_in.name())
             .chain(
                 self.regions
                     .iter()

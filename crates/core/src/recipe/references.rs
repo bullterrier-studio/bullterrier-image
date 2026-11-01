@@ -46,9 +46,8 @@ pub(super) fn refer(regions: &Regions, place: &str, key: &str, name: &str, wante
     if have.is_some() && (wanted.is_none() || wanted == have) {
         return Ok(());
     }
-    let valid: Vec<&str> = BuiltIn::ALL
+    let valid: Vec<&str> = BuiltIn::names()
         .into_iter()
-        .map(|built_in| built_in.name())
         .chain(regions.iter().map(|(declared, _)| declared))
         .filter(|candidate| wanted.is_none() || form_of(regions, candidate) == wanted)
         .collect();
@@ -86,7 +85,7 @@ pub(super) fn check_regions(regions: &Regions) -> Result<(), Error> {
         if BuiltIn::named(name).is_some() {
             return Err(Error::Recipe(format!(
                 "region '{name}' is a built-in region ({}) and cannot be declared",
-                BuiltIn::ALL.map(BuiltIn::name).join(", ")
+                BuiltIn::names().join(", ")
             )));
         }
         for (key, target, form) in region.refers_to() {
@@ -494,7 +493,7 @@ mod tests {
 
     #[test]
     fn a_region_cannot_be_called_like_a_built_in_one() -> Result<(), Error> {
-        for name in BuiltIn::ALL.map(BuiltIn::name) {
+        for name in BuiltIn::names() {
             let recipe = Recipe::new([Step::new("probe")]).with_region(name, Grid::default());
             let message = refusal(&recipe)?.unwrap_or_default();
             assert!(

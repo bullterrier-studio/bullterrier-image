@@ -43,6 +43,20 @@ impl BuiltIn {
         }
     }
 
+    /// The names of all of them, in the order of [`ALL`](Self::ALL). A list, so that it chains with borrowed names.
+    pub(crate) fn names<'a>() -> Vec<&'a str> {
+        Self::ALL.map(Self::name).to_vec()
+    }
+
+    /// The names of those the photo is handed or finds.
+    pub(crate) fn found<'a>() -> Vec<&'a str> {
+        Self::ALL
+            .into_iter()
+            .filter(|built_in| built_in.origin() == Origin::Found)
+            .map(Self::name)
+            .collect()
+    }
+
     /// Where it comes from.
     pub(crate) const fn origin(self) -> Origin {
         match self {
