@@ -13,10 +13,11 @@ Promises:
   or run.
 - The file is placed by its `viewBox` and `preserveAspectRatio` (default `xMidYMid meet`: fitted inside, centred) into
   the frame; without a `viewBox` its `width` and `height` are the view box. A `transform` on the root is refused.
-- Refused with a `RecipeError`: a file over `max_kilobytes`; one declaring XML entities (a DOCTYPE with an internal
-  subset: the way of the billion laughs and of external entities, never expanded or followed); one with more than
-  `max_shapes` shapes, counting what each `use` repeats before anything is expanded; nesting deeper than
-  `_MAX_DEPTH`; XML that is not well formed; no shape; and a curve or point far outside the frame.
+- Refused with a `RecipeError`: a file over `max_kilobytes` (never read past it); one declaring XML entities (a
+  DOCTYPE with an internal subset: the way of the billion laughs and of external entities, never expanded or
+  followed); one with more than `max_shapes` shapes, counting what each `use` repeats before anything is expanded;
+  nesting deeper than `_MAX_DEPTH`; XML that is not well formed; a size, viewBox or transform that is no number; no
+  shape; and a curve or point far outside the frame.
 
 Dependency direction: imports `ops` and `errors` only.
 """
@@ -154,17 +155,19 @@ def path_outlines(d: str, box: Box) -> list[np.ndarray]:
 
 def svg_bytes(file: str | Path, max_kilobytes: int) -> bytes:
     """The content of the SVG `file`; RecipeError naming the file when it cannot be read or is over `max_kilobytes`
-    (the size is judged before the file is read into memory)."""
+    (no more than that and one byte is ever read, so a device that never ends is refused too)."""
     path = Path(file)
+    limit = max_kilobytes * 1024
     try:
-        size = path.stat().st_size
-        if size > max_kilobytes * 1024:
-            raise RecipeError(
-                f"svg file {path.name!r} is {size / 1024:.0f} KB, over the limit max_kilobytes = {max_kilobytes}"
-            )
-        return path.read_bytes()
+        with path.open("rb") as handle:
+            data = handle.read(limit + 1)
     except OSError as error:
         raise RecipeError(f"svg file {path.name!r} cannot be read: {error.strerror or error}") from None
+    except ValueError as error:  # a name with a null character
+        raise RecipeError(f"svg file {path.name!r} cannot be read: {error}") from None
+    if len(data) > limit:
+        raise RecipeError(f"svg file {path.name!r} is over the limit max_kilobytes = {max_kilobytes}")
+    return data
 
 
 @dataclass
@@ -209,6 +212,8 @@ def _tree(data: bytes, what: str) -> _Node:
         parser.Parse(data, True)
     except expat.ExpatError as error:
         raise RecipeError(f"{what} is not well-formed XML: {expat.ErrorString(error.code)}") from None
+    except LookupError:  # the declared encoding is unknown to Python
+        raise RecipeError(f"{what} declares an encoding that is not known") from None
     if not root.children or root.children[0].tag != "svg":
         raise RecipeError(f"{what} is not an svg file (its root element is not <svg> in the SVG namespace)")
     return root.children[0]
@@ -262,7 +267,10 @@ def read_svg(file: str | Path, box: Box, *, max_kilobytes: int, max_shapes: int)
     count = _shape_count(_tree(data, what), what)
     if count > max_shapes:
         raise RecipeError(f"{what} has {count} shapes, over the limit max_shapes = {max_shapes}")
-    document = SVG.parse(io.BytesIO(data), reify=True)
+    try:
+        document = SVG.parse(io.BytesIO(data), reify=True)
+    except (IndexError, ValueError):  # a transform or length svgelements cannot read
+        raise RecipeError(f"{what} has a transform or length that cannot be read") from None
     if document.values.get("transform"):
         raise RecipeError(f"{what}: a transform on the root <svg> element is not supported (put it on a group)")
     view = document.viewbox
@@ -270,8 +278,8 @@ def read_svg(file: str | Path, box: Box, *, max_kilobytes: int, max_shapes: int)
         if "width" not in document.values or "height" not in document.values:
             raise RecipeError(f"{what} has no viewBox and no width and height, so it has no size to place")
         view = Viewbox(f"0 0 {document.width} {document.height}")
-    elif not (view.width > 0 and view.height > 0):
-        raise RecipeError(f"{what} has a viewBox without area: {view}")
+    if not (view.width and view.height and view.width > 0 and view.height > 0):  # None when a number is unreadable
+        raise RecipeError(f"{what} has a viewBox or size that is no number or has no area: {view}")
     left, top, right, bottom = box
     # the library has already placed everything by the file's own width and height; move from there to the frame
     placed = Matrix(document.viewbox_transform) if document.viewbox is not None else Matrix()

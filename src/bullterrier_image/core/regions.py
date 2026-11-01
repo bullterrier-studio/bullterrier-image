@@ -472,7 +472,7 @@ class Svg(_Laid):
         min=1,
         max=100000,
         advanced=True,
-        doc="The largest file to read, in kilobytes (1 to 100000); a bigger one is refused without being read.",
+        doc="The largest file to read, in kilobytes (1 to 100000); a bigger one is refused, reading no more than that.",
     )
 
 

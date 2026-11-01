@@ -8,6 +8,7 @@ would fail.
 
 import math
 import socket
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -427,3 +428,51 @@ def test_svg_bytes_gives_the_file_for_a_digest_and_refuses_what_read_svg_refuses
         svg_bytes(path, 1)
     with pytest.raises(RecipeError, match="nowhere"):
         svg_bytes(tmp_path / "nowhere.svg", 4)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="/dev/zero is a POSIX device")
+def test_a_file_that_never_ends_is_refused_after_reading_only_the_limit():
+    with pytest.raises(RecipeError, match="max_kilobytes"):
+        svg_bytes("/dev/zero", 4)
+
+
+@pytest.mark.parametrize(
+    ("size", "refused"),
+    [pytest.param(4096, False, id="exactly at the limit"), pytest.param(4097, True, id="one byte over")],
+)
+def test_svg_bytes_refuses_a_file_one_byte_over_the_limit(tmp_path, size, refused):
+    path = write(tmp_path, "<svg/>" + " " * (size - 6))
+    if refused:
+        with pytest.raises(RecipeError, match="max_kilobytes"):
+            svg_bytes(path, 4)
+    else:
+        assert len(svg_bytes(path, 4)) == size
+
+
+SQUARE = f'<svg {SVG} viewBox="0 0 10 10">'
+HOSTILE = {
+    "zero width and height": f'<svg {SVG} width="0" height="0"><rect width="1" height="1"/></svg>',
+    "width that is no number": f'<svg {SVG} width="abc" height="10"><rect width="1" height="1"/></svg>',
+    "view box of letters": f'<svg {SVG} viewBox="a b c d"><rect width="1" height="1"/></svg>',
+    "view box of nan": f'<svg {SVG} viewBox="0 0 nan nan"><rect width="1" height="1"/></svg>',
+    "view box without area": f'<svg {SVG} viewBox="0 0 0 5"><rect width="1" height="1"/></svg>',
+    "transform without numbers": f'{SQUARE}<g transform="rotate(a)"><rect width="5" height="5"/></g></svg>',
+    "unknown encoding": f'<?xml version="1.0" encoding="bogus"?>{SQUARE}<rect width="1" height="1"/></svg>',
+}
+
+
+@pytest.mark.parametrize("text", HOSTILE.values(), ids=HOSTILE.keys())
+def test_a_hostile_file_is_refused_with_a_recipe_error_naming_the_file(tmp_path, text):
+    with pytest.raises(RecipeError, match=r"hostile\.svg"):
+        read(write(tmp_path, text, "hostile.svg"))
+
+
+def test_a_file_name_with_a_null_character_is_refused_not_crashed():
+    with pytest.raises(RecipeError, match="cannot be read"):
+        read(Path("a\0b.svg"))
+
+
+def test_a_sized_file_without_a_view_box_is_placed_by_its_width_and_height(tmp_path):
+    text = f'<svg {SVG} width="100" height="50"><rect width="100" height="50"/></svg>'
+    (shape,) = read(write(tmp_path, text))
+    assert extent(shape.outlines) == pytest.approx((0, 50, 200, 150))
