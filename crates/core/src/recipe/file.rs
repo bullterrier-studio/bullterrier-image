@@ -160,7 +160,7 @@ impl Recipe {
 /// The file's table as the model's values. TOML has what a recipe has no use for and `serde_json::Value` cannot hold:
 /// a number that is not finite would turn into `null` and a date into a table of its own, both unseen, so they are
 /// refused here, naming the key.
-fn model_of(table: toml::Table) -> Result<Map<String, Value>, Error> {
+pub(crate) fn model_of(table: toml::Table) -> Result<Map<String, Value>, Error> {
     let mut path = String::new();
     table
         .into_iter()

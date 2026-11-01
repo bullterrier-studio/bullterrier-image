@@ -21,7 +21,7 @@ use crate::params::EffectParams;
 
 mod check;
 pub(crate) mod drive;
-mod file;
+pub(crate) mod file;
 pub mod frame;
 mod needs;
 mod references;

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
+use crate::recipe::file::model_of;
 use crate::registry::Registry;
 use crate::{Error, Step};
 
@@ -50,11 +51,12 @@ impl Presets {
     /// ```
     ///
     /// # Errors
-    /// [`Error::Recipe`] if the text is not TOML (the message keeps its line and column), or as [`add`](Self::add).
+    /// [`Error::Recipe`] if the text is not TOML (the message keeps its line and column) or holds a value a recipe has no use for (`nan`, `inf`, a date or time),
+    /// as a recipe file's would; or as [`add`](Self::add).
     pub fn add_toml(&mut self, effect: &str, text: &str) -> Result<(), Error> {
-        let table = toml::from_str(text)
+        let table: toml::Table = toml::from_str(text)
             .map_err(|error: toml::de::Error| Error::Recipe(error.to_string().trim_end().to_owned()))?;
-        self.add(effect, &table)
+        self.add(effect, &Value::Object(model_of(table)?))
     }
 
     pub(crate) fn add_in(&mut self, registry: &Registry, effect: &str, table: &Value) -> Result<(), Error> {
@@ -288,5 +290,58 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    #[test]
+    fn toml_a_recipe_has_no_use_for_is_refused_as_a_recipe_file_does() {
+        for (rule, effect, text, words) in [
+            (
+                "nan, effect described",
+                "grade",
+                "[w]\ndescription = \"D.\"\nexposure = nan\n",
+                ["w.exposure", "finite"],
+            ),
+            (
+                "inf, effect described",
+                "grade",
+                "[w]\ndescription = \"D.\"\nexposure = inf\n",
+                ["w.exposure", "finite"],
+            ),
+            (
+                "nan, effect not described",
+                "seams",
+                "[w]\ndescription = \"D.\"\nradius = nan\n",
+                ["w.radius", "finite"],
+            ),
+            (
+                "a date, effect described",
+                "grade",
+                "[w]\ndescription = \"D.\"\nexposure = 2024-01-01\n",
+                ["w.exposure", "date"],
+            ),
+            (
+                "a date, effect not described",
+                "seams",
+                "[w]\ndescription = \"D.\"\nwhen = 2024-01-01\n",
+                ["w.when", "date"],
+            ),
+            (
+                "nan in a list",
+                "seams",
+                "[w]\ndescription = \"D.\"\nstops = [1.0, nan]\n",
+                ["w.stops[1]", "finite"],
+            ),
+        ] {
+            let refused = Presets::new()
+                .add_toml(effect, text)
+                .err()
+                .map(|error| error.to_string());
+            assert!(
+                refused
+                    .as_deref()
+                    .is_some_and(|message| words.iter().all(|word| message.contains(word))),
+                "{rule}: {refused:?}"
+            );
+        }
     }
 }
