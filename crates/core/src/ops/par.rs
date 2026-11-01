@@ -57,14 +57,16 @@ pub(crate) fn install<R>(threads: usize, op: impl FnOnce() -> R) -> Result<R, Er
     } else {
         threads
     };
-    if threads == 1 {
-        return Ok(op());
-    }
-    let pool = ThreadPoolBuilder::new()
-        .num_threads(threads)
-        .build()
-        .map_err(|error| Error::Recipe(format!("could not start {threads} threads: {error}")))?;
-    let _restore = Restore(POOL.replace(Some(pool)));
+    // one thread: no pool, and none left by a render this one runs inside of
+    let pool = (threads > 1)
+        .then(|| {
+            ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .map_err(|error| Error::Recipe(format!("could not start {threads} threads: {error}")))
+        })
+        .transpose()?;
+    let _restore = Restore(POOL.replace(pool));
     Ok(op())
 }
 
@@ -138,6 +140,25 @@ mod tests {
             "{refused:?}"
         );
         assert!(install(MOST_THREADS, || ()).is_ok());
+    }
+
+    #[test]
+    fn a_render_of_one_thread_inside_a_render_of_more_runs_its_bands_on_the_calling_thread_alone() -> Result<(), Error>
+    {
+        let caller = std::thread::current().id();
+        let mut out = vec![0_usize; 1000 * 40];
+        install(4, || {
+            install(1, || {
+                rows(&mut out, 40, |_, band| {
+                    band.fill(usize::from(std::thread::current().id() == caller));
+                });
+            })
+        })??;
+        assert!(
+            out.iter().all(|&ran_on_caller| ran_on_caller == 1),
+            "a band ran on the outer render's pool"
+        );
+        Ok(())
     }
 
     #[test]
