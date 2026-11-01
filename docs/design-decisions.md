@@ -668,6 +668,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   macOS x86_64 wheel, so on Intel Macs pip picks an older onnxruntime (1.23.2 when this was written). A Windows arm64
   wheel waits for someone to ask. A user on a common platform never needs a compiler, and nothing published goes
   untried.
+- **Printing a picture or a map shows its shape, never its pixels** (`Picture`, `Image`, `Layer`, `Labels` write their own
+  `Debug`). *Reason:* a derived `Debug` printed every pixel (15 MB for a 4-stage trace of a 300 x 400 photo) into any
+  assertion message, `unwrap` or `dbg!`; at 1080p one value is about 40 MB. *Consequence:* a test keeps its pictures small and never
+  `assert_eq!`s a large buffer.
 
 ## Effects
 

@@ -1,14 +1,27 @@
 //! The picture an effect reads and the image it makes.
 
+use std::fmt;
+
 use crate::Error;
 
 /// A picture borrowed from its owner: `height` rows of `width` pixels, row after row, each pixel three channels (red,
 /// green, blue), nominally 0..1.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Picture<'a> {
     height: usize,
     width: usize,
     pixels: &'a [[f32; 3]],
+}
+
+impl fmt::Debug for Picture<'_> {
+    /// The shape only: a picture can hold millions of pixels.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Picture")
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> Picture<'a> {
@@ -82,12 +95,24 @@ impl<'a> Picture<'a> {
 /// A render can end in an image with a fourth channel, alpha (0 transparent, 1 opaque; straight, the colour not
 /// multiplied by it): the recipe's `frame.transparent` cut-out, made after the last step. An effect never sees one:
 /// what it reads is a [`Picture`], whose colour channels are all of it.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Image {
     height: usize,
     width: usize,
     pixels: Vec<[f32; 3]>,
     alpha: Option<Vec<f32>>,
+}
+
+impl fmt::Debug for Image {
+    /// The shape only: an image can hold millions of pixels.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Image")
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .field("channels", &(if self.alpha.is_some() { 4 } else { 3 }))
+            .finish_non_exhaustive()
+    }
 }
 
 impl Image {

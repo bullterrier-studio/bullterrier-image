@@ -2,12 +2,13 @@
 //! the numbers about the render ([`Inputs`]).
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use crate::effect::{Effect, Input};
 use crate::{Error, Picture};
 
 /// A map over the picture: one value from 0 to 1 for every pixel (a subject's alpha, a depth, a light), row after row.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Layer {
     height: usize,
     width: usize,
@@ -22,6 +23,17 @@ fn no_empty_map(height: usize, width: usize) -> Result<(), Error> {
         )));
     }
     Ok(())
+}
+
+impl fmt::Debug for Layer {
+    /// The shape only: a map can hold millions of values.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Layer")
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Layer {
@@ -74,12 +86,24 @@ impl Layer {
 
 /// The pieces a region cuts the picture into: the number of the piece every pixel belongs to, row after row, pieces
 /// numbered from 0.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Labels {
     height: usize,
     width: usize,
     values: Vec<i32>,
     pieces: usize,
+}
+
+impl fmt::Debug for Labels {
+    /// The shape and the number of pieces only: a labelling can hold millions of values.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Labels")
+            .field("height", &self.height)
+            .field("width", &self.width)
+            .field("pieces", &self.pieces)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Labels {
