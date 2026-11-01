@@ -105,7 +105,7 @@ class ModelledEffect[P: EffectParams]:
     and keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
     naming the effect, the field, the constraint and the value. Injected inputs (`partition`, `size_ratio`) are passed
     by keyword in every form. So is the array of each field parameter (`FieldName`), required: float (h, w) of the
-    picture's size, 0..1, else a `MapNotFoundError` naming the parameter.
+    picture's size, 0..1, else a `MapNotFoundError` naming the parameter. The result is held within 0..1.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
@@ -158,7 +158,8 @@ class ModelledEffect[P: EffectParams]:
         # place: the values were checked where the photo entered (`ops.image.as_image`); only the layout is made here,
         # for the output of a step before (a view, or float64) or a direct call. `np.require` copies only when one of
         # the three is wrong, where `np.ascontiguousarray` would hand a misaligned float32 array on as it is
-        return self._function(_for_the_core(rgb), params, **given)
+        # the contract's one clamp: whatever the effect returns, a picture stays within 0..1
+        return np.clip(self._function(_for_the_core(rgb), params, **given), 0.0, 1.0)
 
     def _field_array(self, name: str, rgb: np.ndarray, array: object) -> np.ndarray:
         """The array given for the field parameter `name`, as the float32 the effect receives; MapNotFoundError unless

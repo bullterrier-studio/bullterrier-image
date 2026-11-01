@@ -52,6 +52,22 @@ def test_a_modelled_effect_can_be_called_with_keywords_a_model_or_nothing(gain):
     np.testing.assert_allclose(registry.apply("gain_probe", GREY, gain=3.0), 0.75, atol=1e-6)
 
 
+@pytest.mark.parametrize(
+    ("gain_value", "offset", "expected"),
+    [(1.0, 0.0, 0.25), (4.0, 0.5, 1.0), (1.0, -1.0, 0.0)],
+    ids=["in range: untouched", "above 1: held at 1", "below 0: held at 0"],
+)
+def test_the_wrapper_holds_the_result_of_any_effect_within_0_to_1(throwaway_effects, gain_value, offset, expected):
+    def unclamped(rgb: np.ndarray, params: GainParams) -> np.ndarray:
+        """Gain and offset without the clip."""
+        return (rgb * params.gain + params.offset).astype(np.float32)
+
+    probe = effect(category="light", params=GainParams)(unclamped)
+    out = probe(GREY, gain=gain_value, offset=offset)
+    np.testing.assert_allclose(out, expected, atol=1e-6)
+    assert out.dtype == np.float32
+
+
 def test_giving_both_a_model_and_keywords_is_an_error(gain):
     with pytest.raises(TypeError, match="gain_probe"):
         gain(GREY, GainParams(gain=2.0), offset=0.1)

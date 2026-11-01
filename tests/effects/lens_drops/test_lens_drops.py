@@ -173,3 +173,11 @@ def test_a_highlight_brightens_the_upper_rim_of_a_drop_and_leaves_its_middle_and
 def test_a_flat_picture_stays_flat_without_a_highlight() -> None:
     flat = np.full((60, 60, 3), 0.4, np.float32)
     np.testing.assert_allclose(registry.apply(NAME, flat, count=5, seed=1, highlight=0.0), 0.4, atol=1e-6)
+
+
+def test_tiny_bright_drops_stay_within_the_range_of_a_picture() -> None:
+    """The smallest drops, many of them, at full highlight: the shine divides by the drop's size, which nears zero."""
+    photo = np.random.default_rng(0).random((64, 64, 3), dtype=np.float32)
+    out = registry.apply(NAME, photo, radius=1, highlight=1, size_variation=1, count=200)
+    assert out.min() >= 0
+    assert out.max() <= 1
