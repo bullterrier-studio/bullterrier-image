@@ -79,6 +79,7 @@ def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
         pytest.param("", None, id="absent: left unset, not defaulted to some size"),
         pytest.param("size = 1024\n", 1024, id="given: kept"),
         pytest.param("size = 64\n", 64, id="given small: kept"),
+        pytest.param("size = 16384\n", 16384, id="given at the largest: kept"),
     ],
 )
 def test_a_files_size_is_what_it_says_and_unset_when_it_says_none(tmp_path, written, size):
@@ -86,9 +87,11 @@ def test_a_files_size_is_what_it_says_and_unset_when_it_says_none(tmp_path, writ
 
 
 @pytest.mark.parametrize(
-    ("written", "shown"), [("0", "0"), ("-5", "-5"), ("'64'", "'64'"), ("64.0", "64.0"), ("true", "True")]
+    ("written", "shown"),
+    [("0", "0"), ("-5", "-5"), ("'64'", "'64'"), ("64.0", "64.0"), ("true", "True"), ("16385", "16385")],
+    ids=["zero", "negative", "text", "fraction", "boolean", "above the largest, 16384"],
 )
-def test_a_size_that_is_not_a_positive_whole_number_is_refused_naming_it(tmp_path, written, shown):
+def test_a_size_that_is_not_a_whole_number_from_1_to_16384_is_refused_naming_it(tmp_path, written, shown):
     with pytest.raises(RecipeError, match=rf"^look\.toml: .*size.*{re.escape(shown)}"):
         load_recipe(_write(tmp_path, f"size = {written}\n" + STEP))
 

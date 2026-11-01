@@ -245,6 +245,12 @@ def test_size_scales_photo_and_matte_together(photo, subject):
     assert out.shape == (48, 64, 3)
 
 
+@pytest.mark.parametrize("size", [0, -1, 16385, 10**8, 1.5, True], ids=repr)
+def test_a_render_size_that_is_no_whole_number_from_1_to_16384_is_refused_before_anything_is_made(photo, size):
+    with pytest.raises(RecipeError, match="size"):
+        render(photo, Recipe([Step("grade")], name="s"), size=size)
+
+
 BLUR = '[[step]]\neffect = "gaussian_blur"\nradius = 3\n'
 
 

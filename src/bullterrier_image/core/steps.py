@@ -56,6 +56,7 @@ from .regions import Kind, check, maps_used, needs
 from .regions import derived_maps as _derived_from
 from .regions import needs_finder as _finds_pieces
 
+MAX_SIZE = 16384  # constant: longest side, px; the core also caps the pixels of a picture
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besides a step: a step cannot be called so
 
@@ -569,7 +570,7 @@ class Recipe(ValidatedModel):
         for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`,
         `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked here, and
         made for each picture only when a step uses them.
-    size: longest side of the working image in px, >= 1; None (the default) keeps the photo's own size. The photo
+    size: longest side of the working image in px, 1 to 16384; None (the default) keeps the photo's own size. The photo
         is framed first (flip, turn, crop, borders) and then scaled. It only sets how big the result is: the recipe's
         pixel values (a radius, a cell) are always written for a picture whose longest side is 480, so the same look
         results at any size; `render(..., size=)` renders at another size.
@@ -589,9 +590,10 @@ class Recipe(ValidatedModel):
     size: int | None = Field(
         None,
         ge=1,
+        le=MAX_SIZE,
         strict=True,
-        description="The longest side in px the recipe renders at; None: the photo's own. Its px values are always "
-        "written for 480.",
+        description="The longest side in px the recipe renders at, 1 to 16384; None: the photo's own. Its px values "
+        "are always written for 480.",
     )
     frame: Framing = Field(
         default_factory=Framing, description="How the photo is framed before the steps and cut out after them."

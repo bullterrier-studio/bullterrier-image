@@ -58,6 +58,7 @@ from .regions import (
     used,
 )
 from .steps import (
+    MAX_SIZE,
     Each,
     Recipe,
     Step,
@@ -127,10 +128,9 @@ def render(
     map is not (h, w) or not within 0..1; a `per` region has no `subject` finder or the finder's map does not fit its
     crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a subject that is not there.
 
-    size: the longest side of the result in px, 1 or more (the recipe's own size when None; RecipeError for anything
+    size: the longest side of the result in px, 1 to 16384 (the recipe's own size when None; RecipeError for anything
     else). The recipe's pixel values are written for 480 and multiplied by the result's longest side over 480, so one
-    recipe gives the same look at any size; a value stops at its minimum when shrinking and has no ceiling when
-    growing.
+    recipe gives the same look at any size; a value stops at its minimum when shrinking.
     """
     rgb = as_image(rgb)
     _check_size(size)
@@ -139,9 +139,9 @@ def render(
 
 
 def _check_size(size: int | None) -> None:
-    """RecipeError unless `size` is None or a whole number of pixels, 1 or more (a bool is not a number here)."""
-    if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size < 1):
-        raise RecipeError(f"size must be a whole number of pixels, 1 or more, or None, got {size!r}")
+    """RecipeError unless `size` is None or a whole number of pixels, 1 to `MAX_SIZE` (a bool is not a number here)."""
+    if size is not None and (isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= MAX_SIZE):
+        raise RecipeError(f"size must be a whole number of pixels, 1 to {MAX_SIZE}, or None, got {size!r}")
 
 
 def _render(
