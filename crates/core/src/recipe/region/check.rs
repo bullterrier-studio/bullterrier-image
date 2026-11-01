@@ -1,28 +1,42 @@
 //! The ranges of the fields of a [`Region`]: the rules [`Recipe::checked`](crate::Recipe::checked) applies to each region
 //! before it looks at the steps.
 
-use std::fmt::Display;
-
+use super::super::check::outside;
 use super::laid::{MOST_CUTS, MOST_SHARES, MOST_TOTAL};
-use super::{Cut, Edge, Region, Shares};
+use super::{Cut, Edge, Piece, Region, Regions, Shares};
 use crate::Error;
 
+/// The most pieces a partition made of a grid may have, and the most a `Pick` may list: each piece is a number in a
+/// label map and a unit of work for a step that goes piece by piece (an `each` look, a subject found in each piece).
+const MOST_PIECES: usize = 10_000; // constant: 100 x 100, a finer mosaic than a picture of 480 px can show
+
+/// The most regions a `Combine` puts together: one pass over the picture for each.
+const MOST_COMBINED: usize = MOST_SHARES;
+
 impl Region {
-    /// Whether every number of this region, the declared region `name`, lies within its range (see the field's
-    /// documentation).
+    /// Whether every number of this region, the declared region `name` (one of `declared`), lies within its range (see
+    /// the field's documentation), and every piece a `Pick` names by `id` is of an `Svg` region.
     ///
     /// What is not checked here: that a name the region refers to is a region, and the syntax of a path (`Path.d`,
     /// `Curve.path`), an SVG file (`Svg.file`) and a shard preset (`Shards.preset`), which the runner reads.
     ///
     /// # Errors
     /// [`Error::Recipe`] naming the region, the field (`edge.amount`), the value and the rule.
-    pub(crate) fn check(&self, name: &str) -> Result<(), Error> {
+    pub(crate) fn check(&self, name: &str, declared: &Regions) -> Result<(), Error> {
         let at = Field { region: name };
         match self {
             Self::Grid(grid) => {
                 at.edge(&grid.edge)?;
                 at.shares("columns", &grid.columns)?;
-                at.shares("rows", &grid.rows)
+                at.shares("rows", &grid.rows)?;
+                // each is at most MOST_SHARES, so the product cannot overflow
+                let pieces = grid.columns.0.len() * grid.rows.0.len();
+                if pieces > MOST_PIECES {
+                    return Err(at.refuse(&format!(
+                        "`columns` x `rows` make {pieces} pieces, more than the limit of {MOST_PIECES}"
+                    )));
+                }
+                Ok(())
             }
             Self::Shards(shards) => {
                 at.edge(&shards.edge)?;
@@ -53,7 +67,21 @@ impl Region {
                 at.within("max_shapes", svg.max_shapes, 1, 100_000)?;
                 at.within("max_kilobytes", svg.max_kilobytes, 1, 100_000)
             }
-            Self::Pick(pick) => at.count("pieces", pick.pieces.len(), 1, usize::MAX),
+            Self::Pick(pick) => {
+                at.count("pieces", pick.pieces.len(), 1, MOST_PIECES)?;
+                // only an svg has ids, and a render would find that out at the step that uses the pick
+                let id = pick.pieces.iter().find_map(|piece| match piece {
+                    Piece::Id(id) => Some(id),
+                    Piece::Number(_) => None,
+                });
+                match (id, declared.get(&pick.of)) {
+                    (Some(id), found) if !matches!(found, Some(Self::Svg(_))) => Err(at.refuse(&format!(
+                        "`pieces` names the id '{id}', but '{}' is not an svg region",
+                        pick.of
+                    ))),
+                    _ => Ok(()),
+                }
+            }
             Self::Subject(subject) => {
                 at.within("context", subject.context, 0, 1)?;
                 at.within("threshold", subject.threshold, 0, 1)
@@ -71,7 +99,7 @@ impl Region {
                 Ok(())
             }
             Self::Bands(bands) => at.within("count", bands.count, 1, 100),
-            Self::Combine(combine) => at.count("of", combine.of.len(), 2, usize::MAX),
+            Self::Combine(combine) => at.count("of", combine.of.len(), 2, MOST_COMBINED),
             Self::LinearGradient(gradient) => at.finite("angle", gradient.angle),
             Self::RadialGradient(gradient) => {
                 at.within("x", gradient.x, 0, 1)?;
@@ -96,28 +124,20 @@ impl Field<'_> {
 
     /// `value`, the number `field`, if it is finite.
     fn finite(&self, field: &str, value: f64) -> Result<(), Error> {
-        if value.is_finite() {
-            Ok(())
-        } else {
-            Err(self.refuse(&format!("`{field}` must be a finite number, got {value}")))
-        }
+        self.within(field, value, f64::NEG_INFINITY, f64::INFINITY)
     }
 
     /// `value`, the number `field`, if it is finite and lies from `min` to `max`, both inclusive.
-    fn within<T: Into<f64> + Display + Copy>(
+    fn within(
         &self,
         field: &str,
-        value: T,
-        min: impl Into<f64> + Display + Copy,
-        max: impl Into<f64> + Display + Copy,
+        value: impl Into<f64>,
+        min: impl Into<f64>,
+        max: impl Into<f64>,
     ) -> Result<(), Error> {
-        self.finite(field, value.into())?;
-        if value.into() < min.into() {
-            Err(self.refuse(&format!("`{field}` must be >= {min}, got {value}")))
-        } else if value.into() > max.into() {
-            Err(self.refuse(&format!("`{field}` must be <= {max}, got {value}")))
-        } else {
-            Ok(())
+        match outside(value.into(), min.into(), max.into()) {
+            None => Ok(()),
+            Some(said) => Err(self.refuse(&format!("`{field}` {said}"))),
         }
     }
 
@@ -164,7 +184,7 @@ impl Field<'_> {
 mod tests {
     use serde_json::{Value, json};
 
-    use super::super::{Band, Cuts, Grid, Line, LinearGradient, Region, Shares};
+    use super::super::{Band, Cuts, Grid, Line, LinearGradient, Region, Shares, Svg};
     use crate::{Error, Presets, Recipe, Step};
 
     /// The refusal of the recipe that declares `region` as `r` (and a grid `p`, to pick from) and has one step (no step
@@ -172,6 +192,7 @@ mod tests {
     fn refusal(region: Region) -> Option<String> {
         let recipe = Recipe::new([Step::new("grade")])
             .with_region("p", Grid::default())
+            .with_region("s", Svg::default())
             .with_region("r", region);
         match recipe.checked(&Presets::new()) {
             Err(Error::Recipe(message)) => Some(message),
@@ -409,12 +430,48 @@ mod tests {
                 json!({"max_kilobytes": 100_001}),
                 Some("`max_kilobytes` must be <= 100000, got 100001"),
             ),
-            // pick: at least one piece
+            // pick: 1 to 10,000 pieces, and an id only of an svg
+            ("pick", json!({"pieces": vec![0; 10_000]}), None),
+            (
+                "pick",
+                json!({"pieces": vec![0; 10_001]}),
+                Some("`pieces` allows at most 10000 entries, got 10001"),
+            ),
+            ("pick", json!({"of": "s", "pieces": ["logo", 2]}), None),
+            (
+                "pick",
+                json!({"of": "p", "pieces": [0, "logo"]}),
+                Some("`pieces` names the id 'logo', but 'p' is not an svg region"),
+            ),
+            (
+                "pick",
+                json!({"of": "depth", "pieces": ["logo"]}),
+                Some("`pieces` names the id 'logo', but 'depth' is not an svg region"),
+            ),
             ("pick", json!({"pieces": [0]}), None),
             (
                 "pick",
                 json!({"pieces": []}),
                 Some("`pieces` needs at least 1 entries, got 0"),
+            ),
+            // grid: at most 10,000 pieces in all, whatever the shape
+            ("grid", json!({"columns": 100, "rows": 100}), None),
+            ("grid", json!({"columns": 1000, "rows": 10}), None),
+            ("grid", json!({"columns": 10, "rows": 1000}), None),
+            (
+                "grid",
+                json!({"columns": 101, "rows": 100}),
+                Some("`columns` x `rows` make 10100 pieces, more than the limit of 10000"),
+            ),
+            (
+                "grid",
+                json!({"columns": 1000, "rows": 1000}),
+                Some("`columns` x `rows` make 1000000 pieces, more than the limit of 10000"),
+            ),
+            (
+                "grid",
+                json!({"columns": vec![1; 1000], "rows": vec![2; 11]}),
+                Some("make 11000 pieces"),
             ),
             // subject
             ("subject", json!({"context": 0, "threshold": 1}), None),
@@ -471,7 +528,13 @@ mod tests {
                 json!({"low": 0.5, "high": 0.4999}),
                 Some("`low` 0.5 is above `high` 0.4999"),
             ),
-            // bands, combine
+            // bands, combine: 2 to 1000 regions
+            ("combine", json!({"of": vec!["subject"; 1000]}), None),
+            (
+                "combine",
+                json!({"of": vec!["subject"; 1001]}),
+                Some("`of` allows at most 1000 entries, got 1001"),
+            ),
             ("bands", json!({"count": 1}), None),
             ("bands", json!({"count": 100}), None),
             ("bands", json!({"count": 0}), Some("`count` must be >= 1, got 0")),
@@ -527,13 +590,15 @@ mod tests {
     fn every_number_of_a_region_lies_within_its_range_both_ends_included() {
         for (kind, fields, said) in rows() {
             let refused = refusal(region(kind, &fields));
+            // a row may hold thousands of entries: show the start of it
+            let shown: String = fields.to_string().chars().take(100).collect();
             match said {
-                None => assert_eq!(refused, None, "{kind} {fields} is within its ranges"),
+                None => assert_eq!(refused, None, "{kind} {shown} is within its ranges"),
                 Some(said) => assert!(
                     refused
                         .as_deref()
                         .is_some_and(|message| message.starts_with("region 'r': ") && message.contains(said)),
-                    "{kind} {fields}: wanted {said:?}, got {refused:?}"
+                    "{kind} {shown}: wanted {said:?}, got {refused:?}"
                 ),
             }
         }

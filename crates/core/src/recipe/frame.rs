@@ -8,6 +8,7 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
+use super::check::outside;
 use crate::params::Color;
 use crate::{Constraint, Error};
 
@@ -201,24 +202,14 @@ impl Frame {
 
 /// `value`, the number `field` of the frame, if it is a number (not infinite, not NaN).
 fn finite(field: &str, value: f64) -> Result<(), Error> {
-    if value.is_finite() {
-        Ok(())
-    } else {
-        Err(Error::Recipe(format!(
-            "`frame.{field}` must be a finite number, got {value}"
-        )))
-    }
+    within(field, value, f64::NEG_INFINITY, f64::INFINITY)
 }
 
 /// `value`, the number `field` of the frame, if it lies within `min` and `max`, both inclusive.
 fn within(field: &str, value: f64, min: f64, max: f64) -> Result<(), Error> {
-    finite(field, value)?;
-    if value < min {
-        Err(Error::Recipe(format!("`frame.{field}` must be >= {min}, got {value}")))
-    } else if value > max {
-        Err(Error::Recipe(format!("`frame.{field}` must be <= {max}, got {value}")))
-    } else {
-        Ok(())
+    match outside(value, min, max) {
+        None => Ok(()),
+        Some(said) => Err(Error::Recipe(format!("`frame.{field}` {said}"))),
     }
 }
 

@@ -245,14 +245,14 @@ impl Evaluator {
                 partition(bands::partition(self.selected(of)?.values(), *count))
             }
             Some(Region::Combine(Combine { op, of })) => {
-                // a combine of at least two regions is a rule of the check; naming it if that guarantee breaks
-                let Some((first, rest)) = of.split_first() else {
-                    return Err(Error::Recipe(format!(
-                        "region '{name}': a combine needs at least two regions"
-                    )));
+                // selections lie in 0..1, so the value that leaves the others as they are is 1 for the product and the
+                // minimum, 0 for the maximum
+                let none = match op {
+                    CombineOp::Multiply | CombineOp::Min => 1.0,
+                    CombineOp::Max => 0.0,
                 };
-                let mut combined = self.selected(first)?.values().to_vec();
-                for other in rest {
+                let mut combined = vec![none; height * width];
+                for other in of {
                     for (value, other) in combined.iter_mut().zip(self.selected(other)?.values()) {
                         *value = match op {
                             CombineOp::Multiply => *value * other,
@@ -303,11 +303,11 @@ impl Evaluator {
                 for piece in picked {
                     match piece {
                         Piece::Number(number) => numbers.push(*number),
-                        // the partitions the core makes have no ids; only an `Svg` region does
+                        // the check lets an id through only for an `Svg` region, which the core cannot make yet and a
+                        // render refuses before it makes anything (`check_makeable`)
                         Piece::Id(id) => {
                             return Err(Error::Recipe(format!(
-                                "region '{name}': `pieces` names '{id}', which is no id of '{of}'; it has no ids (only svg \
-                                 regions do)"
+                                "region '{name}': `pieces` names the id '{id}' of '{of}', which the core cannot read yet"
                             )));
                         }
                     }

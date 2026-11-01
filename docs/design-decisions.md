@@ -687,6 +687,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     the weights differ from the Gaussian's by at most 0.035 from a sigma of 1.5 working px (0.12 at 1; under 0.6 the
     blur is none), so a pixel differs from scipy's by that share of (look - photo). *Rejected:* the direct kernel (cost
     grows with the feather, so a 3000 px photo took seconds); an IIR filter (more code, edge conditions to match).
+  - *Region sizes are bounded by `Recipe::checked`.* A grid has at most 10,000 pieces in all (100 x 100; a list of shares
+    alone allows 1000), a `Pick` lists at most 10,000 pieces and a `Combine` joins at most 1000 regions: a `Subject` found
+    `per` piece asks the finder once for each, an `each` look runs once, so 1000 x 1000 pieces was a million finder calls.
+    A `Pick` names a piece by `id` only of an `Svg` region, so the render cannot fail at the step that uses it.
   - *Random streams are new.* `assign = "random"` draws with xoshiro256++ seeded through SplitMix64 (`ops/random`; Lemire's
     unbiased bounded draw): the same seed gives the same picture, not the picture NumPy's generator gave. Published vectors
     pin the generators; the assignment is tested by properties.

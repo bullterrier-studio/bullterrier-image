@@ -67,7 +67,7 @@ impl Recipe {
         }
         self.frame.check()?;
         for (name, region) in self.regions.iter() {
-            region.check(name)?;
+            region.check(name, &self.regions)?;
         }
         references::check_regions(&self.regions)?;
         let mut rules = Rules {
@@ -120,6 +120,20 @@ impl Recipe {
             first.insert(name, number);
         }
         Ok(())
+    }
+}
+
+/// Why `value`, a number of the recipe, is not within `min` and `max` (both inclusive), as words that follow the number's
+/// name (`must be >= 0, got -1`); none if it is. A number that is not finite is outside any range.
+pub(super) fn outside(value: f64, min: f64, max: f64) -> Option<String> {
+    if !value.is_finite() {
+        Some(format!("must be a finite number, got {value}"))
+    } else if value < min {
+        Some(format!("must be >= {min}, got {value}"))
+    } else if value > max {
+        Some(format!("must be <= {max}, got {value}"))
+    } else {
+        None
     }
 }
 

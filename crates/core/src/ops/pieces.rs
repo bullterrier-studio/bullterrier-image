@@ -111,7 +111,8 @@ pub(crate) fn pick(labels: &[i32], pieces: usize, numbers: &[u32]) -> Vec<f32> {
 }
 
 /// The smallest rectangle round each of the `pieces` pieces of `labels` (a `height` x `width` partition), piece by piece.
-/// Every piece has a pixel, so every rectangle exists.
+/// Every piece of a partition the core makes has a pixel (see the module's note: no number is unused), so every rectangle
+/// exists and the rectangles are numbered as the pieces are; a piece without a pixel would shift the numbers.
 pub(crate) fn piece_bounds(labels: &[i32], height: usize, width: usize, pieces: usize) -> Vec<Bounds> {
     let mut boxes: Vec<Option<Bounds>> = vec![None; pieces];
     for (row, line) in labels.chunks_exact(width).enumerate().take(height) {

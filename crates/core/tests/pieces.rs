@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use bullterrier_image::region::{Bands, Given, Grid, Pick, Shares, Subject};
+use bullterrier_image::region::{Bands, Given, Grid, Pick, Shares, Subject, Svg};
 use bullterrier_image::{
     Category, Effect, Error, ErrorKind, FieldParam, Finder, Image, Input, Inputs, Layer, Options, Photo, Picture,
     Presets, Recipe, Step, register,
@@ -524,21 +524,42 @@ fn a_pick_chooses_the_pixels_of_the_pieces_it_numbers_and_a_number_beyond_the_pi
     assert_eq!(pick(&[5])?, [[off; 6], [off, off, off, off, on, on]].concat());
     assert_eq!(pick(&[6])?, vec![off; 12]);
     assert_eq!(pick(&[1000])?, vec![off; 12]);
-    // an id names a shape of an svg region; a grid has none
+    // an id names a shape of an svg region; a grid has none, and the recipe is refused before step 1 runs
     let by_id = Pick {
         of: "g".to_owned(),
-        pieces: vec!["roof".into()],
+        pieces: vec![0.into(), "roof".into()],
     };
-    let result = photo.render(
-        &asking("pick_hand", "p").with_region("g", grid).with_region("p", by_id),
-        &Presets::new(),
-        Options::default(),
-    );
+    let photo = photo.with_map("subject", Layer::new(2, 6, vec![1.0; 12])?)?;
+    let recipe = Recipe::new([
+        Step::new("pick_hand").param("near", "subject"),
+        Step::new("pick_hand").param("near", "subject"),
+        Step::new("pick_hand").param("near", "subject"),
+        Step::new("pick_hand").param("near", "p"),
+    ])
+    .with_region("g", grid)
+    .with_region("p", by_id);
+    spy.clear();
+    let result = photo.render(&recipe, &Presets::new(), Options::default());
     assert!(
         matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe
-            && ["'p'", "'roof'", "only svg regions do"].iter().all(|word| error.to_string().contains(word))),
+            && ["'p'", "'roof'", "'g'", "not an svg"].iter().all(|word| error.to_string().contains(word))),
         "{result:?}"
     );
+    assert_eq!(spy.seen().len(), 0, "a step ran before the recipe was refused");
+    // of an svg region an id passes the check, and the render is refused for the svg, which the core cannot run yet
+    let of_svg = Pick {
+        of: "s".to_owned(),
+        pieces: vec!["roof".into()],
+    };
+    let recipe = asking("pick_hand", "p")
+        .with_region("s", Svg::default())
+        .with_region("p", of_svg);
+    let result = photo.render(&recipe, &Presets::new(), Options::default());
+    assert!(
+        matches!(&result, Err(error) if error.to_string().contains("kind svg") && error.to_string().contains("not run by the core yet")),
+        "{result:?}"
+    );
+    assert_eq!(spy.seen().len(), 0);
     Ok(())
 }
 
