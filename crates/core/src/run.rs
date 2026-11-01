@@ -97,10 +97,12 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the picture the steps work on). A region made from them (`band`, `combine`, the
-    /// gradients) is made for the working picture when its step comes and dropped after the last step that needs it;
-    /// one declared and not used costs nothing. A recipe whose steps use a region of a kind the core does not make yet
-    /// (everything but `given`, `band`, `combine` and the gradients) or an `each` step is refused before anything runs.
+    /// (the Rec. 709 brightness of the picture the steps work on). A region made from them (`band`, `bands`, `combine`,
+    /// the gradients, `grid`, `pick`) is made for the working picture when its step comes and dropped after the last
+    /// step that needs it; one declared and not used costs nothing. A step that takes a `partition` receives the pieces
+    /// of the region it names (a selection is split into the pixels it chooses, above one half, and the others). A recipe
+    /// whose steps use a region the core does not make yet (`shards`, `cuts`, `path`, `svg`, a `subject` found `per`
+    /// piece, a torn edge) or an `each` step is refused before anything runs.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
     /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the

@@ -4,18 +4,28 @@
 //! handed to [`Evaluator::new`]. Every other region is made from the regions it refers to the first time a step asks for
 //! it, for the working picture (framed and sized), and kept until the last step that uses it, or uses a region made from
 //! it, has run: a render holds the regions the steps still ahead of it need, not all it has made.
+//!
+//! A region is a selection (a [`Layer`]) or a partition (the pieces of the picture, [`Labels`]); a selection can also be
+//! asked for as a partition, which splits it into the pixels it chooses and the others.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::ops::{bands, gradient};
-use crate::region::{Band, Combine, CombineOp, LinearGradient, RadialGradient};
-use crate::{Error, Layer, Picture, Region, Regions};
+use crate::ops::pieces::{self, Bounds};
+use crate::ops::{bands, gradient, grid};
+use crate::region::{Band, Bands, Combine, CombineOp, Grid, LinearGradient, Pick, Piece, RadialGradient};
+use crate::{Error, Labels, Layer, Picture, Region, Regions};
 
-/// The selections of a render by region name.
+/// A region once made.
+enum Made {
+    Selection(Arc<Layer>),
+    Pieces(Arc<Labels>),
+}
+
+/// The regions of a render by name.
 pub(super) struct Evaluator {
     declared: Regions,
-    made: BTreeMap<String, Arc<Layer>>,
+    made: BTreeMap<String, Made>,
     /// The last step (from 0) that needs each region; a region not named here is needed by none.
     last: BTreeMap<String, usize>,
 }
@@ -26,7 +36,10 @@ impl Evaluator {
     pub(super) fn new(declared: &Regions, held: BTreeMap<String, Arc<Layer>>, last: BTreeMap<String, usize>) -> Self {
         Self {
             declared: declared.clone(),
-            made: held,
+            made: held
+                .into_iter()
+                .map(|(name, map)| (name, Made::Selection(map)))
+                .collect(),
             last,
         }
     }
@@ -36,8 +49,42 @@ impl Evaluator {
     /// handed to [`new`](Self::new), the others are declared.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a region the core cannot make, which a render refuses before it starts.
+    /// [`Error::Recipe`] for a region the core cannot make, which a render refuses before it starts, for a `fit` that
+    /// chooses nothing, and for a partition (which a recipe's check does not let a selection be taken from).
     pub(super) fn selection(&mut self, name: &str, picture: &Picture<'_>) -> Result<Arc<Layer>, Error> {
+        self.ensure(name, picture)?;
+        self.selected(name)
+    }
+
+    /// The region `name` as pieces of `picture`: a partition as it is, a selection split into the pixels it chooses (more
+    /// than half) and the others, numbered by first pixel (one piece if it chooses all or none).
+    ///
+    /// # Errors
+    /// As [`selection`](Self::selection).
+    pub(super) fn pieces(&mut self, name: &str, picture: &Picture<'_>) -> Result<Arc<Labels>, Error> {
+        self.ensure(name, picture)?;
+        if let Some(Made::Pieces(labels)) = self.made.get(name) {
+            return Ok(Arc::clone(labels));
+        }
+        let layer = self.selected(name)?;
+        let (labels, count) = pieces::of_selection(layer.values());
+        Ok(Arc::new(Labels::new(picture.height(), picture.width(), labels, count)?))
+    }
+
+    /// The selection `name` as it is held now, if it is: what a trace shows.
+    pub(super) fn held(&self, name: &str) -> Option<Arc<Layer>> {
+        self.selected(name).ok()
+    }
+
+    /// Drops the regions that no step after `step` (from 0) needs.
+    pub(super) fn release(&mut self, step: usize) {
+        let last = &self.last;
+        self.made
+            .retain(|name, _| last.get(name).is_some_and(|needed| *needed > step));
+    }
+
+    /// Makes the region `name` and everything it is made from that is not made yet.
+    fn ensure(&mut self, name: &str, picture: &Picture<'_>) -> Result<(), Error> {
         // what a region is made from comes first; no recursion, so a long chain of regions needs no deep call stack
         let mut todo = vec![name.to_owned()];
         while let Some(next) = todo.last() {
@@ -55,47 +102,55 @@ impl Evaluator {
                     .collect()
             });
             if missing.is_empty() {
-                let layer = Arc::new(self.make(next, picture)?);
-                self.made.insert(next.clone(), layer);
+                let region = self.make(next, picture)?;
+                self.made.insert(next.clone(), region);
                 todo.pop();
             } else {
                 todo.extend(missing);
             }
         }
-        self.input(name)
-    }
-
-    /// The map `name` as it is held now, if it is: what a trace shows.
-    pub(super) fn held(&self, name: &str) -> Option<Arc<Layer>> {
-        self.made.get(name).cloned()
-    }
-
-    /// Drops the regions that no step after `step` (from 0) needs.
-    pub(super) fn release(&mut self, step: usize) {
-        let last = &self.last;
-        self.made
-            .retain(|name, _| last.get(name).is_some_and(|needed| *needed > step));
+        Ok(())
     }
 
     /// The selection `name`, which is made already.
-    fn input(&self, name: &str) -> Result<Arc<Layer>, Error> {
-        self.made
-            .get(name)
-            .cloned()
-            .ok_or_else(|| Error::Recipe(format!("region '{name}' is needed before it is made")))
+    fn selected(&self, name: &str) -> Result<Arc<Layer>, Error> {
+        match self.made.get(name) {
+            Some(Made::Selection(layer)) => Ok(Arc::clone(layer)),
+            Some(Made::Pieces(_)) => Err(Error::Recipe(format!(
+                "region '{name}' is a partition, but a selection is needed here"
+            ))),
+            None => Err(Error::Recipe(format!("region '{name}' is needed before it is made"))),
+        }
     }
 
-    /// The region `name`, made from the selections it refers to, which are made already.
-    fn make(&self, name: &str, picture: &Picture<'_>) -> Result<Layer, Error> {
+    /// The partition `name`, which is made already.
+    fn partitioned(&self, name: &str) -> Result<Arc<Labels>, Error> {
+        match self.made.get(name) {
+            Some(Made::Pieces(labels)) => Ok(Arc::clone(labels)),
+            Some(Made::Selection(_)) => Err(Error::Recipe(format!(
+                "region '{name}' is a selection, but a partition is needed here"
+            ))),
+            None => Err(Error::Recipe(format!("region '{name}' is needed before it is made"))),
+        }
+    }
+
+    /// The region `name`, made from the regions it refers to, which are made already.
+    fn make(&self, name: &str, picture: &Picture<'_>) -> Result<Made, Error> {
         let (height, width) = (picture.height(), picture.width());
+        let selection =
+            |values: Vec<f32>| Layer::new(height, width, values).map(|layer| Made::Selection(Arc::new(layer)));
+        let partition = |(labels, count): (Vec<i32>, usize)| {
+            Labels::new(height, width, labels, count).map(|labels| Made::Pieces(Arc::new(labels)))
+        };
         match self.declared.get(name) {
-            Some(Region::Band(Band { of, low, high, feather })) => Layer::new(
-                height,
-                width,
-                bands::band(self.input(of)?.values(), *low, *high, *feather),
-            ),
+            Some(Region::Band(Band { of, low, high, feather })) => {
+                selection(bands::band(self.selected(of)?.values(), *low, *high, *feather))
+            }
+            Some(Region::Bands(Bands { of, count })) => {
+                partition(bands::partition(self.selected(of)?.values(), *count))
+            }
             Some(Region::Combine(Combine { op, of })) => {
-                let mut layers = of.iter().map(|of| self.input(of));
+                let mut layers = of.iter().map(|of| self.selected(of));
                 let first = layers.next().transpose()?.map(|layer| layer.values().to_vec());
                 let mut combined = first.unwrap_or_default();
                 for layer in layers {
@@ -108,13 +163,41 @@ impl Evaluator {
                         };
                     }
                 }
-                Layer::new(height, width, combined)
+                selection(combined)
             }
             Some(Region::LinearGradient(LinearGradient { angle })) => {
-                Layer::new(height, width, gradient::linear(height, width, *angle))
+                selection(gradient::linear(height, width, *angle))
             }
             Some(Region::RadialGradient(RadialGradient { x, y, radius })) => {
-                Layer::new(height, width, gradient::radial(height, width, *x, *y, *radius))
+                selection(gradient::radial(height, width, *x, *y, *radius))
+            }
+            Some(Region::Grid(Grid { fit, columns, rows, .. })) => {
+                let frame = match fit {
+                    None => Bounds::whole(height, width),
+                    Some(fit) => pieces::bounds(self.selected(fit)?.values(), height, width).ok_or_else(|| {
+                        Error::Recipe(format!(
+                            "region '{name}': `fit` '{fit}' chooses nothing in this picture, so it has no frame"
+                        ))
+                    })?,
+                };
+                partition(grid::grid(height, width, frame, &columns.0, &rows.0))
+            }
+            Some(Region::Pick(Pick { of, pieces: picked })) => {
+                let labels = self.partitioned(of)?;
+                let mut numbers = Vec::with_capacity(picked.len());
+                for piece in picked {
+                    match piece {
+                        Piece::Number(number) => numbers.push(*number),
+                        // the partitions the core makes have no ids; only an `Svg` region does
+                        Piece::Id(id) => {
+                            return Err(Error::Recipe(format!(
+                                "region '{name}': `pieces` names '{id}', which is no id of '{of}'; it has no ids (only svg \
+                                 regions do)"
+                            )));
+                        }
+                    }
+                }
+                selection(pieces::pick(labels.values(), labels.pieces(), &numbers))
             }
             _ => Err(Error::Recipe(format!("region '{name}' is not made by the core"))),
         }
@@ -554,19 +637,6 @@ mod tests {
                 json!({"p": {"kind": "grid", "edge": torn["edge"]}}),
                 true,
                 "a torn edge",
-            ),
-            ("a grid", json!({"p": {"kind": "grid"}}), true, "kind grid"),
-            (
-                "bands",
-                json!({"p": {"kind": "bands", "of": "depth"}}),
-                true,
-                "kind bands",
-            ),
-            (
-                "pick",
-                json!({"g": {"kind": "grid"}, "p": {"kind": "pick", "of": "g"}}),
-                false,
-                "kind pick",
             ),
             (
                 "a subject per piece",

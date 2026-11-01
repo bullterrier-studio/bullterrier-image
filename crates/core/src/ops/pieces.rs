@@ -1,0 +1,109 @@
+//! Pieces: numbering the parts a region cuts a picture into, and what is made from the numbers.
+//!
+//! A partition numbers its pieces from 0 with no number unused, and, except bands, in reading order: piece `k + 1` is
+//! the one whose first pixel comes later in the raster scan (left to right along each row, rows from the top) than the
+//! first pixel of piece `k`.
+
+/// A rectangle of a picture, in pixels: columns `left..right` of rows `top..bottom`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Bounds {
+    pub(crate) left: usize,
+    pub(crate) top: usize,
+    pub(crate) right: usize,
+    pub(crate) bottom: usize,
+}
+
+impl Bounds {
+    /// The whole of a `height` x `width` picture.
+    pub(crate) const fn whole(height: usize, width: usize) -> Self {
+        Self {
+            left: 0,
+            top: 0,
+            right: width,
+            bottom: height,
+        }
+    }
+}
+
+/// The labels of pixels that `raw` gives a kind each (a number below `kinds`), renumbered by the first pixel of each
+/// kind in the raster scan, and the number of pieces. Kinds no pixel has leave no gap.
+pub(crate) fn renumber(kinds: usize, raw: impl Iterator<Item = usize>) -> (Vec<i32>, usize) {
+    let mut numbered: Vec<Option<i32>> = vec![None; kinds];
+    let mut next = 0_i32; // constant: pieces are numbered from 0
+    let labels = raw
+        .map(|kind| {
+            *numbered[kind].get_or_insert_with(|| {
+                next += 1;
+                next - 1
+            })
+        })
+        .collect();
+    (labels, count(next))
+}
+
+/// A number of pieces, counted as the `i32` labels are.
+#[expect(clippy::cast_sign_loss, reason = "a count of pieces is not negative")]
+pub(crate) const fn count(pieces: i32) -> usize {
+    pieces as usize
+}
+
+/// The piece a label names, for indexing: labels are never negative (see [`Labels`](crate::Labels)).
+#[expect(clippy::cast_sign_loss, reason = "a label is not negative")]
+pub(crate) const fn piece(label: i32) -> usize {
+    label as usize
+}
+
+/// Whether a pixel the selection chooses to the degree `value` is chosen: more than half.
+pub(crate) fn chosen(value: f32) -> bool {
+    value > 0.5
+}
+
+/// The two pieces of a hard-edged selection: the pixels it chooses (more than half) and the others, numbered by first
+/// pixel; one piece if it chooses all or none.
+pub(crate) fn of_selection(values: &[f32]) -> (Vec<i32>, usize) {
+    renumber(2, values.iter().map(|&value| usize::from(chosen(value))))
+}
+
+/// The smallest rectangle that holds every pixel `values` (a `height` x `width` selection) chooses; none if it chooses
+/// no pixel.
+pub(crate) fn bounds(values: &[f32], height: usize, width: usize) -> Option<Bounds> {
+    let mut found: Option<Bounds> = None;
+    for (row, line) in values.chunks_exact(width).enumerate().take(height) {
+        let (Some(first), Some(last)) = (
+            line.iter().position(|&value| chosen(value)),
+            line.iter().rposition(|&value| chosen(value)),
+        ) else {
+            continue;
+        };
+        found = Some(found.map_or(
+            Bounds {
+                left: first,
+                top: row,
+                right: last + 1,
+                bottom: row + 1,
+            },
+            |so_far| Bounds {
+                left: so_far.left.min(first),
+                right: so_far.right.max(last + 1),
+                bottom: row + 1,
+                ..so_far
+            },
+        ));
+    }
+    found
+}
+
+/// The selection of the pixels whose piece is one of `numbers`: 1 there, 0 elsewhere. A number the partition (of
+/// `pieces` pieces) has no piece for chooses nothing.
+pub(crate) fn pick(labels: &[i32], pieces: usize, numbers: &[u32]) -> Vec<f32> {
+    let mut picked = vec![false; pieces];
+    for number in numbers {
+        if let Some(slot) = picked.get_mut(*number as usize) {
+            *slot = true;
+        }
+    }
+    labels
+        .iter()
+        .map(|&label| f32::from(u8::from(picked[piece(label)])))
+        .collect()
+}

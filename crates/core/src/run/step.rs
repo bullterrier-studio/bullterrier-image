@@ -59,6 +59,7 @@ pub(super) fn prepare(
         opacity: step.opacity.unwrap_or_else(|| effect.opacity()),
         blend_mode: step.blend_mode,
         mask: step.mask.clone(),
+        partition: step.partition.clone(),
         fields,
         effect,
         runs,
@@ -81,6 +82,8 @@ pub(super) struct Prepared {
     runs: Runs,
     /// The field parameters of the effect, each with the name of its region.
     fields: Vec<(String, String)>,
+    /// The region whose pieces the effect receives, if it takes a partition.
+    partition: Option<String>,
     opacity: f64,
     blend_mode: BlendMode,
     mask: Option<String>,
@@ -121,6 +124,14 @@ impl Prepared {
         let mut offered = Inputs::default().with_size_ratio(ratio);
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
+        }
+        let partition = self
+            .partition
+            .as_ref()
+            .map(|region| regions.pieces(region, working))
+            .transpose()?;
+        if let Some(pieces) = &partition {
+            offered = offered.with_partition(pieces);
         }
         let after = match &self.runs {
             Runs::One(params) => effect::run(&*self.effect, before, params.clone(), &offered)?,
@@ -271,7 +282,7 @@ mod tests {
         recipe_with_each.regions.insert("panes", Grid::default());
         let result = rendered(&registry, &recipe_with_each, &Presets::new());
         assert!(
-            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("not run by the core yet")),
+            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("step 1: an `each` step")),
             "{result:?}"
         );
         Ok(())

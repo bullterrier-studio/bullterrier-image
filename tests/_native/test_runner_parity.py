@@ -1109,12 +1109,15 @@ def test_a_python_effect_that_takes_a_partition_is_known_to_the_core_with_it(par
     assert _core.effect("depth_probe")["fields"] == {"field": "depth"}
 
 
-def test_an_effect_that_takes_a_partition_is_refused_until_the_core_runs_the_regions_that_make_one(
-    photo, partition_probe
-):
-    recipe = Recipe([Step("partition_probe", partition="panes")], regions={"panes": Grid()})
-    with pytest.raises(ValueError, match="partition"):  # the core has no partition to give it yet
-        core_render(photo, recipe)
+def test_an_effect_that_takes_a_partition_is_given_the_pieces_of_the_region_it_names(photo, partition_probe):
+    recipe = Recipe([Step("partition_probe", partition="panes", opacity=1)], regions={"panes": Grid(columns=2, rows=2)})
+    made = core_render(photo, recipe)
+    height, width = photo.shape[:2]
+    # a pixel is in the second column when its centre is at or beyond the middle: a centre on the border is in the later
+    row, column = (np.arange(height) + 0.5 >= height / 2), (np.arange(width) + 0.5 >= width / 2)
+    piece = 2 * row[:, None].astype(int) + column[None, :].astype(int)
+    np.testing.assert_allclose(made, np.repeat((piece / 255)[..., None], 3, axis=2), atol=1e-6)
+    np.testing.assert_allclose(made, runner.render(photo, recipe), atol=1e-6)
 
 
 # --- a Picture or a Lut cannot be written in a recipe: the call holds it -------------------------------------------

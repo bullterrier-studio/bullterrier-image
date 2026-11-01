@@ -132,15 +132,15 @@ impl Region {
     pub(crate) fn not_yet(&self) -> Option<&'static str> {
         let torn = |edge: &Edge| (edge.style == EdgeStyle::Torn).then_some("a torn edge");
         match self {
-            Self::Grid(Grid { edge, .. }) => torn(edge).or(Some("kind grid")),
+            Self::Grid(Grid { edge, .. }) => torn(edge),
             Self::Shards(_) => Some("kind shards"),
             Self::Cuts(_) => Some("kind cuts"),
             Self::Path(_) => Some("kind path"),
             Self::Svg(_) => Some("kind svg"),
-            Self::Pick(_) => Some("kind pick"),
-            Self::Bands(_) => Some("kind bands"),
             Self::Subject(Subject { per: Some(_), .. }) => Some("kind subject with `per`"),
-            Self::Subject(_)
+            Self::Pick(_)
+            | Self::Bands(_)
+            | Self::Subject(_)
             | Self::Band(_)
             | Self::Combine(_)
             | Self::LinearGradient(_)
