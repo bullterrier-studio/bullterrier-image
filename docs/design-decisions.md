@@ -903,6 +903,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **The gates are the review.** `uv run poe check` runs format, lint, dead code, dependencies, build, types and tests;
   each gate has a known-bad test proving it can fail. *Reason:* reviews stay light and consistent. *Consequence:* a
   defect a review finds twice becomes a gate.
+- **Tests run under a memory cap, not only a timeout.** `tools/run_capped.py` sums the RSS of the test command's process
+  group and kills the group, exit 99, past `[tool.run-capped] cap-mb`; the poe test tasks use it, so `poe check` and CI have it.
+  *Reason:* a runaway (43, 152 and 57 GB; the last was a mutant) freezes the machine in seconds, far before any timeout
+  fires, and macOS enforces no `RLIMIT_AS`. The tool is polling and `ps`, so it works the same on macOS and Linux; Windows
+  runs uncapped (no process groups or `ps`). *Consequence:* a mutation run counts exit 99 (cap) and 98 (`--deadline`) as
+  killed. A process that leaves the group is not seen.
 - **Files have a size budget.** Source files up to 1000 lines, test files up to 1500, checked by `tools/check_file_size.py`.
   A file already over when the gate began is recorded at its size and may only shrink; an entry for a file that is gone or
   within budget fails the gate, so the list empties as files are split or deleted. *Reason:* agents read in chunks, and a

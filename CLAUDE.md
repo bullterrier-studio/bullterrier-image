@@ -301,6 +301,11 @@ contracts, the effect contract at odd sizes and across every number's range, and
 `ops`: a number is a `param`, a trivial operand or index, or carries `# constant: <reason>`; a library option never gets a
 marker). Each gate has a test proving it fails on a known-bad input.
 
+Every poe task that runs tests (`rust-test`, `test`, `check-min-deps`, `check-scaffold`) runs under `tools/run_capped.py`, which
+kills the command's process group and exits 99 when its summed RSS passes the cap (`[tool.run-capped]`), so a runaway fails the
+gate instead of freezing the machine. Mutation runs use it too, 99 counting as killed: `uv run python tools/run_capped.py
+--cap-mb 3000 --deadline 120 -- CMD` (deadline exit 98). macOS and Linux; on Windows the cap is not enforced.
+
 `ruff` wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI.
 `mypy` checks `src` and `tests` (not the generated `fx.pyi`, so a misspelt `fx.<effect>` or parameter is caught only at run
 time). Fix findings properly; for a false positive use a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`
