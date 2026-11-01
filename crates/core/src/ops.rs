@@ -16,6 +16,7 @@ pub(crate) mod levels;
 pub(crate) mod nearest;
 pub(crate) mod noise;
 pub(crate) mod outlines;
+pub(crate) mod par;
 pub(crate) mod pieces;
 pub(crate) mod random;
 pub(crate) mod raster;

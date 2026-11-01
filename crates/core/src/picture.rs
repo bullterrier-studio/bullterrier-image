@@ -3,6 +3,7 @@
 use std::fmt;
 
 use crate::Error;
+use crate::ops::par;
 
 /// A picture borrowed from its owner: `height` rows of `width` pixels, row after row, each pixel three channels (red,
 /// green, blue), nominally 0..1.
@@ -78,26 +79,27 @@ impl<'a> Picture<'a> {
     }
 
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an
-    /// effect that works pixel by pixel.
+    /// effect that works pixel by pixel. `change` is called for pixels in any order, and from the threads the render was
+    /// given ([`Options::with_threads`](crate::Options::with_threads)): the pixel it gives must depend only on its arguments.
     #[must_use]
-    pub fn map(&self, change: impl Fn([f32; 3]) -> [f32; 3]) -> Image {
+    pub fn map(&self, change: impl Fn([f32; 3]) -> [f32; 3] + Sync) -> Image {
         self.map_at(|_, _, pixel| change(pixel))
     }
 
     /// Like [`Picture::map`], for an effect that also depends on where a pixel is: `change` is given the pixel's row
     /// (from the top), its column (from the left) and the pixel. An effect that ignores the picture's content uses
-    /// only the position.
+    /// only the position. As for [`map`](Self::map), `change` is called in any order and from any of the render's threads.
     #[must_use]
-    pub fn map_at(&self, change: impl Fn(usize, usize, [f32; 3]) -> [f32; 3]) -> Image {
-        Image::from_pixels(
-            self.height,
-            self.width,
-            self.pixels
-                .iter()
-                .enumerate()
-                .map(|(index, &pixel)| change(index / self.width, index % self.width, pixel))
-                .collect(),
-        )
+    pub fn map_at(&self, change: impl Fn(usize, usize, [f32; 3]) -> [f32; 3] + Sync) -> Image {
+        let mut pixels = vec![[0.0; 3]; self.pixels.len()];
+        par::rows(&mut pixels, self.width, |first_row, band| {
+            let first = first_row * self.width;
+            for (index, (out, &pixel)) in band.iter_mut().zip(&self.pixels[first..]).enumerate() {
+                let index = first + index;
+                *out = change(index / self.width, index % self.width, pixel);
+            }
+        });
+        Image::from_pixels(self.height, self.width, pixels)
     }
 }
 

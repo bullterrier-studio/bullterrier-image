@@ -20,6 +20,22 @@
 //! by that picture's longest side over 480. A parameter an effect declares drivable may be a [`Drive`], which varies it across the picture by
 //! such a map. [`Photo::trace`] runs the same code and returns every [`Stage`]: the photo, the maps used, and the picture
 //! after each step. [`apply`] runs one effect on parameters that are already complete.
+//!
+//! A render runs on the calling thread unless it is given more: [`Options::with_threads`] shares the rows of the work that
+//! is the same for every row (laying a step over its input, framing and resizing the photo, an effect that works pixel by
+//! pixel) between that many threads, and the picture is the same bytes at any number. To render many pictures, share the
+//! [`Photo`]s, [`Recipe`] and [`Presets`] between your own threads, one render each (they are `Send` and `Sync`), and
+//! leave the default of one thread for each render; for one picture, ask for every core:
+//!
+//! ```text
+//! let image = photo.render(&look, &presets, Options::default().with_threads(0))?;
+//! // many pictures: one render per thread of yours, sharing `look` and `presets`
+//! std::thread::scope(|scope| {
+//!     for photo in &photos {
+//!         scope.spawn(|| photo.render(&look, &presets, Options::default()));
+//!     }
+//! });
+//! ```
 
 #![forbid(unsafe_code)]
 

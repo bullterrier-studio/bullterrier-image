@@ -30,6 +30,7 @@ use size::Working;
 use step::{Prepared, prepare};
 pub use trace::Stage;
 
+use crate::ops::par;
 use crate::registry::Registry;
 use crate::{Error, Image, Layer, Picture, Presets, Recipe};
 
@@ -142,9 +143,11 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Image, Error> {
-        let mut run = self.start(registry, recipe, presets, options)?;
-        while run.advance()?.is_some() {}
-        run.finish()
+        par::install(options.threads(), || {
+            let mut run = self.start(registry, recipe, presets, options)?;
+            while run.advance()?.is_some() {}
+            run.finish()
+        })?
     }
 
     /// `recipe` checked and every step of it prepared, with all the maps they use found: ready to run.

@@ -3,6 +3,7 @@
 //! Every function works on one pixel, `[red, green, blue]` in 0..1. A mode's formula `B(Cb, Cs)` takes the base `Cb` and
 //! the source `Cs`; the result is `Co = Cb + alpha (B(Cb, Cs) - Cb)` (section 5.1 for an opaque base), clipped to 0..1.
 
+use super::par;
 use crate::{BlendMode, Image, Layer, Picture};
 
 /// `source` laid over `base` (both of one size) by `mode`, mixed in by `opacity` (0..1) times, where there is a `mask`,
@@ -22,15 +23,28 @@ pub(crate) fn lay(
         // Cb (1 - alpha) + B alpha is Cb + alpha (B - Cb), exact at alpha 0 and 1
         std::array::from_fn(|channel| (base[channel] * (1.0 - alpha) + blended[channel] * alpha).clamp(0.0, 1.0))
     };
-    let pairs = base.pixels().iter().zip(source.pixels());
-    let pixels = match mask {
-        Some(mask) => pairs
-            .zip(mask.values())
-            .map(|((&base, &source), &weight)| blend(base, source, opacity * weight))
-            .collect(),
-        None => pairs.map(|(&base, &source)| blend(base, source, opacity)).collect(),
-    };
-    Image::from_pixels(base.height(), base.width(), pixels)
+    let width = base.width();
+    let mut pixels = vec![[0.0; 3]; base.pixels().len()];
+    par::rows(&mut pixels, width, |first_row, band| {
+        let first = first_row * width;
+        let pairs = band
+            .iter_mut()
+            .zip(&base.pixels()[first..])
+            .zip(&source.pixels()[first..]);
+        match mask {
+            Some(mask) => {
+                for (((out, &base), &source), &weight) in pairs.zip(&mask.values()[first..]) {
+                    *out = blend(base, source, opacity * weight);
+                }
+            }
+            None => {
+                for ((out, &base), &source) in pairs {
+                    *out = blend(base, source, opacity);
+                }
+            }
+        }
+    });
+    Image::from_pixels(base.height(), width, pixels)
 }
 
 /// `B(Cb, Cs)` of `mode` for one pixel.

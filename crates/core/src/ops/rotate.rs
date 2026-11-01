@@ -10,6 +10,7 @@
 
 use super::frame::{Rect, Shape, window};
 use super::length::{float, whole};
+use super::par;
 use crate::frame::{Fit, Resample};
 
 /// Degrees in a quarter turn.
@@ -91,9 +92,11 @@ impl Turn {
         if self.fit == Fit::Expand {
             self.soften_edge(&mut turned, shape, fill);
         }
-        for sample in &mut turned {
-            *sample = sample.clamp(0.0, 1.0);
-        }
+        par::rows(&mut turned, self.to.1 * shape.channels, |_, band| {
+            for sample in band {
+                *sample = sample.clamp(0.0, 1.0);
+            }
+        });
         turned
     }
 
@@ -170,15 +173,17 @@ impl Turn {
             Resample::Bicubic => Smooth::Cubic,
         };
         let affine = self.affine();
-        let mut turned = Vec::with_capacity(self.to.0 * self.to.1 * shape.channels);
-        for row in 0..self.to.0 {
-            for column in 0..self.to.1 {
-                let (from_x, from_y) = affine.at(float(column) + 0.5, float(row) + 0.5);
-                for channel in 0..shape.channels {
-                    turned.push(sample(values, shape, smooth, from_x, from_y, channel));
+        let mut turned = vec![0.0; self.to.0 * self.to.1 * shape.channels];
+        par::rows(&mut turned, self.to.1 * shape.channels, |first_row, band| {
+            for (row, out_row) in band.chunks_exact_mut(self.to.1 * shape.channels).enumerate() {
+                for (column, out) in out_row.chunks_exact_mut(shape.channels).enumerate() {
+                    let (from_x, from_y) = affine.at(float(column) + 0.5, float(first_row + row) + 0.5);
+                    for (channel, out) in out.iter_mut().enumerate() {
+                        *out = sample(values, shape, smooth, from_x, from_y, channel);
+                    }
                 }
             }
-        }
+        });
         turned
     }
 
@@ -194,26 +199,26 @@ impl Turn {
         let (xx, xy, yx, yy) = (fixed(moved.xx), fixed(moved.xy), fixed(moved.yx), fixed(moved.yy));
         let x0 = fixed(moved.x0 + moved.xx / 2.0 + moved.xy / 2.0);
         let y0 = fixed(moved.y0 + moved.yx / 2.0 + moved.yy / 2.0);
-        let mut turned = Vec::with_capacity(self.to.0 * self.to.1 * shape.channels);
-        for row in 0..self.to.0 {
-            for column in 0..self.to.1 {
-                let (x, y) = (
-                    i64::try_from(column).unwrap_or(i64::MAX),
-                    i64::try_from(row).unwrap_or(i64::MAX),
-                );
-                let (from_x, from_y) = (
-                    (x0 + x * xx + y * xy) >> FIXED_BITS,
-                    (y0 + x * yx + y * yy) >> FIXED_BITS,
-                );
-                let inside = usize::try_from(from_x).ok().zip(usize::try_from(from_y).ok());
-                match inside.filter(|&(x, y)| x < shape.width && y < shape.height) {
-                    Some((x, y)) => {
-                        turned.extend_from_slice(&values[(y * shape.width + x) * shape.channels..][..shape.channels]);
+        let mut turned = vec![0.0; self.to.0 * self.to.1 * shape.channels];
+        par::rows(&mut turned, self.to.1 * shape.channels, |first_row, band| {
+            for (row, out_row) in band.chunks_exact_mut(self.to.1 * shape.channels).enumerate() {
+                for (column, out) in out_row.chunks_exact_mut(shape.channels).enumerate() {
+                    let (x, y) = (
+                        i64::try_from(column).unwrap_or(i64::MAX),
+                        i64::try_from(first_row + row).unwrap_or(i64::MAX),
+                    );
+                    let (from_x, from_y) = (
+                        (x0 + x * xx + y * xy) >> FIXED_BITS,
+                        (y0 + x * yx + y * yy) >> FIXED_BITS,
+                    );
+                    let inside = usize::try_from(from_x).ok().zip(usize::try_from(from_y).ok());
+                    // a pixel whose centre falls outside the picture stays 0
+                    if let Some((x, y)) = inside.filter(|&(x, y)| x < shape.width && y < shape.height) {
+                        out.copy_from_slice(&values[(y * shape.width + x) * shape.channels..][..shape.channels]);
                     }
-                    None => turned.extend(std::iter::repeat_n(0.0, shape.channels)),
                 }
             }
-        }
+        });
         turned
     }
 
@@ -228,18 +233,20 @@ impl Turn {
             y0: height / 2.0,
             ..self.affine()
         };
-        for row in 0..self.to.0 {
-            for column in 0..self.to.1 {
-                let (from_x, from_y) = about_centre.at(float(column) + 0.5 - centre_x, float(row) + 0.5 - centre_y);
-                let inside = from_x.min(width - from_x).min(from_y.min(height - from_y));
-                #[expect(clippy::cast_possible_truncation, reason = "a share from 0 to 1 is stored as f32")]
-                let covered = (inside + 0.5).clamp(0.0, 1.0) as f32;
-                let pixel = (row * self.to.1 + column) * shape.channels;
-                for (sample, fill) in turned[pixel..][..shape.channels].iter_mut().zip(fill) {
-                    *sample = *sample * covered + fill * (1.0 - covered);
+        par::rows(turned, self.to.1 * shape.channels, |first_row, band| {
+            for (row, out_row) in band.chunks_exact_mut(self.to.1 * shape.channels).enumerate() {
+                for (column, pixel) in out_row.chunks_exact_mut(shape.channels).enumerate() {
+                    let (from_x, from_y) =
+                        about_centre.at(float(column) + 0.5 - centre_x, float(first_row + row) + 0.5 - centre_y);
+                    let inside = from_x.min(width - from_x).min(from_y.min(height - from_y));
+                    #[expect(clippy::cast_possible_truncation, reason = "a share from 0 to 1 is stored as f32")]
+                    let covered = (inside + 0.5).clamp(0.0, 1.0) as f32;
+                    for (sample, fill) in pixel.iter_mut().zip(fill) {
+                        *sample = *sample * covered + fill * (1.0 - covered);
+                    }
                 }
             }
-        }
+        });
     }
 }
 

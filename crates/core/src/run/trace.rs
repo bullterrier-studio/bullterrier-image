@@ -1,6 +1,7 @@
 //! Seeing a render step by step: [`Photo::trace`].
 
 use super::Photo;
+use crate::ops::par;
 use crate::registry::Registry;
 use crate::{Error, Image, Labels, Layer, Options, Presets, Recipe};
 
@@ -75,36 +76,38 @@ impl Photo<'_> {
         presets: &Presets,
         options: Options,
     ) -> Result<Vec<Stage>, Error> {
-        let mut run = self.start(registry, recipe, presets, options)?;
-        let picture = run.working.picture();
-        let mut stages = vec![Stage::Input(Image::new(
-            picture.height(),
-            picture.width(),
-            picture.values(),
-        )?)];
-        stages.extend(
-            run.regions
-                .held("subject")
-                .map(|layer| Stage::Subject(Layer::clone(&layer))),
-        );
-        stages.extend(
-            run.regions
-                .held("depth")
-                .map(|layer| Stage::Depth(Layer::clone(&layer))),
-        );
-        stages.extend(run.regions.shown(&picture)?);
-        let mut number = 0;
-        while let Some(image) = run.advance()? {
-            number += 1;
-            stages.push(Stage::Step {
-                number,
-                image: image.clone(),
-            });
-        }
-        if run.cut.is_some() {
-            stages.push(Stage::CutOut(run.finish()?));
-        }
-        Ok(stages)
+        par::install(options.threads(), || {
+            let mut run = self.start(registry, recipe, presets, options)?;
+            let picture = run.working.picture();
+            let mut stages = vec![Stage::Input(Image::new(
+                picture.height(),
+                picture.width(),
+                picture.values(),
+            )?)];
+            stages.extend(
+                run.regions
+                    .held("subject")
+                    .map(|layer| Stage::Subject(Layer::clone(&layer))),
+            );
+            stages.extend(
+                run.regions
+                    .held("depth")
+                    .map(|layer| Stage::Depth(Layer::clone(&layer))),
+            );
+            stages.extend(run.regions.shown(&picture)?);
+            let mut number = 0;
+            while let Some(image) = run.advance()? {
+                number += 1;
+                stages.push(Stage::Step {
+                    number,
+                    image: image.clone(),
+                });
+            }
+            if run.cut.is_some() {
+                stages.push(Stage::CutOut(run.finish()?));
+            }
+            Ok(stages)
+        })?
     }
 }
 

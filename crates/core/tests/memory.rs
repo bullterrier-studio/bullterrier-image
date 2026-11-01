@@ -44,6 +44,12 @@ fn render_peak(steps: u32) -> Result<usize, Error> {
     })
 }
 
+fn threaded_render_peak(steps: u32, threads: usize) -> Result<usize, Error> {
+    peak_of(steps, |photo, recipe| {
+        photo.render(recipe, &Presets::new(), Options::default().with_threads(threads))
+    })
+}
+
 fn trace_peak(steps: u32) -> Result<usize, Error> {
     peak_of(steps, |photo, recipe| {
         photo.trace(recipe, &Presets::new(), Options::default())
@@ -60,6 +66,18 @@ fn a_render_holds_a_few_pictures_however_many_steps_it_has() -> Result<(), Error
         long / IMAGE
     );
     assert!(long <= short + IMAGE / 10, "2 steps held {short} bytes, 12 held {long}");
+    Ok(())
+}
+
+#[test]
+fn a_render_on_ten_threads_holds_no_more_pictures_than_one_on_a_single_thread() -> Result<(), Error> {
+    // the pool's own memory and a band's working space are far below a picture; a render that gave each thread a copy would not be
+    let ten = threaded_render_peak(12, 10)?;
+    assert!(
+        ten <= 2 * IMAGE + IMAGE / 10,
+        "12 steps on 10 threads held {ten} bytes, {} pictures",
+        ten / IMAGE
+    );
     Ok(())
 }
 

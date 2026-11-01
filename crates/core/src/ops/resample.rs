@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::f64::consts::PI;
 
 use super::length::{float, within_limit};
+use super::par;
 use crate::Error;
 
 /// A kernel: the weight an input pixel at distance `x` (in output pixels' worth) from the output pixel's centre has.
@@ -160,9 +161,11 @@ impl Resize {
                 &taps(self.filter, rows, new_rows),
             )
         };
-        for sample in out.iter_mut().flatten() {
-            *sample = sample.clamp(0.0, 1.0);
-        }
+        par::rows(&mut out, new_columns, |_, band| {
+            for sample in band.iter_mut().flatten() {
+                *sample = sample.clamp(0.0, 1.0);
+            }
+        });
         out
     }
 }
@@ -170,41 +173,49 @@ impl Resize {
 /// `pixels` (`rows` rows) with every row resampled to the columns `taps` make. The sums are in f64 and rounded once to
 /// f32, as Pillow does.
 fn across<const C: usize>(pixels: &[[f32; C]], rows: usize, taps: &[Tap]) -> Vec<[f32; C]> {
-    let mut out = Vec::with_capacity(rows * taps.len());
-    for row in pixels.chunks_exact(pixels.len() / rows) {
-        for tap in taps {
-            out.push(std::array::from_fn(|channel| {
-                #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
-                let sample = tap
-                    .weights
-                    .iter()
-                    .enumerate()
-                    .map(|(offset, weight)| f64::from(row[tap.first + offset][channel]) * weight)
-                    .sum::<f64>() as f32;
-                sample
-            }));
+    let columns = pixels.len() / rows;
+    let mut out = vec![[0.0; C]; rows * taps.len()];
+    par::rows(&mut out, taps.len(), |first_row, band| {
+        for (row, out_row) in band.chunks_exact_mut(taps.len()).enumerate() {
+            let row = &pixels[(first_row + row) * columns..][..columns];
+            for (out, tap) in out_row.iter_mut().zip(taps) {
+                *out = std::array::from_fn(|channel| {
+                    #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
+                    let sample = tap
+                        .weights
+                        .iter()
+                        .enumerate()
+                        .map(|(offset, weight)| f64::from(row[tap.first + offset][channel]) * weight)
+                        .sum::<f64>() as f32;
+                    sample
+                });
+            }
         }
-    }
+    });
     out
 }
 
 /// `pixels` (rows of `columns` pixels) with the rows resampled to the rows `taps` make.
 fn down<const C: usize>(pixels: &[[f32; C]], columns: usize, taps: &[Tap]) -> Vec<[f32; C]> {
-    let mut out = Vec::with_capacity(taps.len() * columns);
-    let mut sums = vec![[0.0_f64; C]; columns];
-    for tap in taps {
-        sums.fill([0.0; C]);
-        for (offset, weight) in tap.weights.iter().enumerate() {
-            let row = &pixels[(tap.first + offset) * columns..][..columns];
-            for (sum, pixel) in sums.iter_mut().zip(row) {
-                for (sum, &sample) in sum.iter_mut().zip(pixel) {
-                    *sum += f64::from(sample) * weight;
+    let mut out = vec![[0.0; C]; taps.len() * columns];
+    par::rows(&mut out, columns, |first_row, band| {
+        let mut sums = vec![[0.0_f64; C]; columns];
+        for (tap, out_row) in taps[first_row..].iter().zip(band.chunks_exact_mut(columns)) {
+            sums.fill([0.0; C]);
+            for (offset, weight) in tap.weights.iter().enumerate() {
+                let row = &pixels[(tap.first + offset) * columns..][..columns];
+                for (sum, pixel) in sums.iter_mut().zip(row) {
+                    for (sum, &sample) in sum.iter_mut().zip(pixel) {
+                        *sum += f64::from(sample) * weight;
+                    }
                 }
             }
+            #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
+            for (out, sum) in out_row.iter_mut().zip(&sums) {
+                *out = sum.map(|sample| sample as f32);
+            }
         }
-        #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
-        out.extend(sums.iter().map(|sum| sum.map(|sample| sample as f32)));
-    }
+    });
     out
 }
 

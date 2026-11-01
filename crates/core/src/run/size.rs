@@ -18,10 +18,18 @@ pub(super) fn ratio_of(picture: &Picture<'_>) -> f64 {
 }
 
 /// What a render is asked for besides the recipe.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Options {
     size: Option<u32>,
+    threads: usize,
+}
+
+impl Default for Options {
+    /// No size asked for, one thread.
+    fn default() -> Self {
+        Self { size: None, threads: 1 }
+    }
 }
 
 impl Options {
@@ -36,6 +44,30 @@ impl Options {
     pub const fn with_size(mut self, size: u32) -> Self {
         self.size = Some(size);
         self
+    }
+
+    /// These options with `threads`, how many threads the render may use: 1 (the default) runs everything on the calling
+    /// thread and starts none, 0 uses one for each core of the machine, and no more than 256 are allowed (the render is
+    /// refused, naming the number, before anything runs). The picture a render returns does not depend on it: the
+    /// same bytes at any number of threads. Only work that is the same for every row of the picture, such as laying a
+    /// step over its input, framing and resizing the photo, and an effect that works pixel by pixel, is shared out.
+    ///
+    /// The default is one because the usual use of more cores is to render several pictures at once (see
+    /// [`Photo`](crate::Photo), which can be shared between threads), where each render using every core would
+    /// only compete with the others. A single picture, or a few, wants more:
+    ///
+    /// ```text
+    /// let image = photo.render(&look, &presets, Options::default().with_threads(0))?;
+    /// ```
+    #[must_use]
+    pub const fn with_threads(mut self, threads: usize) -> Self {
+        self.threads = threads;
+        self
+    }
+
+    /// The number of threads asked for.
+    pub(super) const fn threads(self) -> usize {
+        self.threads
     }
 
     /// The size asked for, if any.

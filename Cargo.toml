@@ -21,6 +21,7 @@ numpy = "0.30"
 peak_alloc = "0.3"
 proc-macro2 = "1"
 proptest = "1.12"
+rayon = "1"  # the threads of a render (`Options::with_threads`)
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)
 pyo3 = { version = "0.30", features = ["abi3-py312"] }
 quote = "1"
