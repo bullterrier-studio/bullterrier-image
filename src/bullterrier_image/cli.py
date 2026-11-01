@@ -474,7 +474,7 @@ def _steps(args: argparse.Namespace) -> int:
     recipe = load_recipe(args.recipe)
     folder = Path(args.out) if args.out else Path("out") / "steps" / f"{Path(args.photo).stem}__{file_name(recipe)}"
     maps, finders = _maps(args)
-    stages = trace(imageio.load(args.photo), recipe, maps=maps, finders=finders)
+    stages = trace(imageio.load(args.photo), recipe, maps=maps, finders=finders, threads=0)
     for stage in stages:
         _progress(args, f"  {stage.label}")
     print(write_stages(stages, folder))

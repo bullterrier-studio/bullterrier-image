@@ -109,7 +109,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
         recipe = load_recipe(files.example)
         for needed in maps_needed(recipe) - maps.keys():
             maps[needed] = _FINDERS[needed](photo)  # once for all the recipes that need it
-        picture = render(photo, recipe, maps=maps)
+        picture = render(photo, recipe, maps=maps, threads=0)  # one picture at a time: every core
         files.picture.parent.mkdir(parents=True, exist_ok=True)
         imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo

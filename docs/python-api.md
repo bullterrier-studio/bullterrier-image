@@ -41,7 +41,8 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
 - **Threads.** `render(photo, recipe, threads=0)` (also `trace`, `render_all`) lets one render use every core for the work
   the core shares out by rows; `threads` is a whole number from 0, default 1 (none started), and the picture is the same
   bytes at any number. To render many photos at once keep 1 and use your own threads: the GIL is released while the core
-  works. `step.apply` and `fx.<effect>` use 1. `bt-image` renders one picture at a time, so it uses every core.
+  works. `step.apply` and `fx.<effect>` use 1. `bt-image` (`render`, `sheet`, `sweep`, `steps`, `run`) and the gallery render one picture at a
+  time, so they use every core.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too. The recipe is a `Recipe` or a `Step`, `render_all` takes a list
   or tuple of `Recipe`; anything else (a list of steps, a look's name, swapped arguments) is a `RecipeError` naming the fix.
