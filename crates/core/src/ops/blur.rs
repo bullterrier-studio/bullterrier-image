@@ -17,13 +17,14 @@ const PASSES: usize = 3; // constant: Kovesi's n; the variance of the boxes is m
 )]
 fn radii(sigma: f64) -> [usize; PASSES] {
     let passes = float(PASSES);
-    let ideal = (12.0 * sigma * sigma / passes + 1.0).sqrt();
+    let ideal = (12.0 * sigma * sigma / passes + 1.0).sqrt(); // constant: Kovesi eq. 3, the ideal box width
     let mut narrow = ideal.floor() as usize;
     if narrow.is_multiple_of(2) {
         narrow -= 1;
     }
     let (narrow_f, wide) = (float(narrow), narrow + 2);
     // how many of the boxes are the narrow width, so that their variances add up to sigma^2 (Kovesi, eq. 5)
+    // constant: the numbers 12, 4 and 3 are Kovesi's eq. 5
     let narrow_count = ((12.0 * sigma * sigma - passes * narrow_f * narrow_f - 4.0 * passes * narrow_f - 3.0 * passes)
         / (-4.0 * narrow_f - 4.0))
         .round() as usize;

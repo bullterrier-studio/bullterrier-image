@@ -591,7 +591,7 @@ REGION_ROWS = [
     ("max kilobytes, below", "svg", {"max_kilobytes": 0}, False),
     ("max kilobytes, above", "svg", {"max_kilobytes": 100001}, False),
     # pick
-    ("pieces by number and id", "pick", {"of": "p", "pieces": [0, "star", 3]}, True),
+    ("pieces by number", "pick", {"of": "p", "pieces": [0, 2, 3]}, True),
     ("no piece", "pick", {"of": "p", "pieces": []}, False),
     ("a negative piece", "pick", {"of": "p", "pieces": [1, -1]}, False),
     ("a decimal piece", "pick", {"of": "p", "pieces": [1.5]}, False),

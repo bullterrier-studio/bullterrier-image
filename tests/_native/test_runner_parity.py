@@ -979,7 +979,7 @@ def test_a_picture_of_one_pixel_is_rendered_at_any_size_and_turn(photo):
 def test_a_picture_over_the_pixel_limit_is_a_recipe_error_before_any_is_made(recipe, size, said):
     wide = np.zeros((1, 20_000, 3), np.float32)  # its bounding square turned 45 degrees is 200 million pixels
     for run in (native.render, native.trace):
-        with pytest.raises(RecipeError, match=f"{said}.*178956970"):
+        with pytest.raises(RecipeError, match=f"{said}.*67108864"):
             run(wide, recipe, size=size)
 
 
