@@ -7,7 +7,7 @@
 use super::length;
 use super::outlines::Frame;
 use super::pieces;
-use super::raster::{self, Polygons};
+use super::raster::{self, Polygons, Rule};
 
 /// The corners of a frame, numbered clockwise from the top left; also the edges, numbered from the top.
 const CORNERS: usize = 4; // constant: a rectangle has four corners
@@ -113,7 +113,15 @@ pub(crate) fn pieces(
             }
             Cut::Curve(curve) => {
                 let mut beyond = vec![0_i32; height * width];
-                raster::paint(&mut beyond, height, width, &closed(curve.outline(0), frame), 1, budget)?;
+                raster::paint(
+                    &mut beyond,
+                    height,
+                    width,
+                    &closed(curve.outline(0), frame),
+                    Rule::NonZero,
+                    1,
+                    budget,
+                )?;
                 if let Some(shift) = shift {
                     beyond = raster::read_floor(&beyond, height, width, shift);
                 }

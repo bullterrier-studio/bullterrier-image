@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A drawing as bullterrier-vector writes one: a sized view box, absolute path commands, an opacity and a blend mode on each
+     path, no ids, groups or transforms. Plain data; one fixture of that shape, not a contract. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80" style="isolation:isolate">
+  <path d="M 10 10 L 70 10 L 70 50 L 10 50 Z" fill="#c33" opacity="0.8" style="mix-blend-mode:multiply"/>
+  <path d="M 40 30 L 110 30 L 110 70 L 40 70 Z" fill="#3c3" opacity="0.5" style="mix-blend-mode:multiply"/>
+  <path d="M 60 5 L 100 75 L 20 75 Z" fill="#33c" opacity="0.6" style="mix-blend-mode:multiply"/>
+</svg>

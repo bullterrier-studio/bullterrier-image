@@ -17,8 +17,15 @@ pub(crate) struct Limits {
     pub(crate) far: f64,
     /// The most corners all the outlines of one path may have.
     pub(crate) corners: usize,
-    /// The most crossings of an edge with a scanline that filling may take.
+    /// The most crossings of an edge with a scanline that filling may take (all the shapes of a drawing together).
     pub(crate) crossings: u64,
+    /// The most pixels that painting all the shapes of a drawing may set, each shape counted by its box clipped to the
+    /// picture.
+    pub(crate) painted: u64,
+    /// The most nodes (elements, texts, comments) an SVG file may have.
+    pub(crate) nodes: u32,
+    /// The deepest nesting of elements, a `use` counting as the parent of what it uses.
+    pub(crate) depth: usize,
 }
 
 impl Limits {
@@ -28,6 +35,9 @@ impl Limits {
         far: 1e7, // constant: three orders more than any picture side, which keeps every coordinate exact enough to fill
         corners: 1 << 20, // constant: a million corners is a path of 9 MB, far beyond a drawing
         crossings: 1 << 28, // constant: about a second of filling
+        painted: 1 << 30, // constant: a billion pixels is a few seconds of painting, far beyond a drawing on a picture
+        nodes: 1 << 21, // constant: two million nodes is an arena of about 100 MB, far beyond a drawing
+        depth: 64, // constant: drawings nest under 20 levels, and the walk below stays within a few frames of it
     };
 }
 
@@ -82,19 +92,35 @@ fn chords(points: Cubic, limits: &Limits) -> Result<Vec<[f64; 2]>, String> {
 /// on from where the closed subpath began.
 ///
 /// # Errors
+/// As [`flatten`].
+pub(crate) fn path(d: &str, frame: Frame, limits: &Limits) -> Result<Polygons, String> {
+    let [left, top, right, bottom] = frame;
+    flatten(d, limits, 0, |x, y| {
+        [left + x * (right - left), top + y * (bottom - top)]
+    })
+}
+
+/// The polygons of the SVG path data `d` with every point moved to px by `to_px`, as [`path`]; `spent` corners of other
+/// outlines already count against `limits.corners`.
+///
+/// # Errors
 /// A message naming the problem if `d` is empty, does not start with `M`, is not path data (the message gives the position),
 /// or reaches beyond `limits`: a corner or control point not finite or farther than `far`, a curve that needs more than
 /// `chords` chords, more than `corners` corners.
-pub(crate) fn path(d: &str, frame: Frame, limits: &Limits) -> Result<Polygons, String> {
+pub(crate) fn flatten(
+    d: &str,
+    limits: &Limits,
+    spent: usize,
+    to_px: impl Fn(f64, f64) -> [f64; 2],
+) -> Result<Polygons, String> {
     if d.trim().is_empty() {
         return Err("path data is empty: write it like 'M 0.1 0.1 L 0.9 0.1 L 0.5 0.9 Z'".to_owned());
     }
     if !d.trim_start().starts_with(['M', 'm']) {
         return Err("path data must start with M (a move to the first point)".to_owned());
     }
-    let [left, top, right, bottom] = frame;
     let to_px = |x: f64, y: f64| -> Result<[f64; 2], String> {
-        let point = [left + x * (right - left), top + y * (bottom - top)];
+        let point = to_px(x, y);
         if point.iter().all(|value| value.abs() <= limits.far) {
             Ok(point)
         } else {
@@ -135,7 +161,7 @@ pub(crate) fn path(d: &str, frame: Frame, limits: &Limits) -> Result<Polygons, S
             }
             SimplePathSegment::ClosePath => {}
         }
-        if polygons.corners() > limits.corners {
+        if spent + polygons.corners() > limits.corners {
             return Err(format!("path data has more than {} corners", limits.corners));
         }
     }

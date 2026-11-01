@@ -1,5 +1,8 @@
 //! The region kinds laid over a frame, made for the working picture: the frame they are laid over, and the bend of a torn
-//! edge.
+//! edge. The one place the core opens a file: the `file` of an `Svg` region.
+
+use std::fs::File;
+use std::io::Read;
 
 use super::size;
 use crate::ops::cuts::{self, Cut as Laid};
@@ -7,8 +10,9 @@ use crate::ops::noise::{self, Tear};
 use crate::ops::outlines::{self, Frame, Limits};
 use crate::ops::pieces::{self, Bounds};
 use crate::ops::sites::{self, Honeycomb};
+use crate::ops::svg::{self, Pieces};
 use crate::ops::{cast, grid, length, nearest, raster};
-use crate::region::{Cut, Cuts, Edge, EdgeStyle, Grid, Path, Shards};
+use crate::region::{Cut, Cuts, Edge, EdgeStyle, Grid, Path, Shards, Svg};
 use crate::{Error, Layer, Picture};
 
 /// How a torn edge moves the pixel centres of a picture before a kind classifies them: the shifts in px of the working
@@ -182,4 +186,51 @@ pub(super) fn shards(
     let seeds = sites::sites(&honeycomb, frame, fit.map(Layer::values), height, width);
     let bend = Bend::of(&spec.edge, picture);
     Ok(nearest::cells(height, width, &seeds, bend.as_ref().map(Bend::shifts)))
+}
+
+/// The bytes of the file `file`, no more than `max_kilobytes` of 1024 bytes: one byte past that is read to tell a file of
+/// the limit from a longer one, and a file that never ends (a device) is read no further.
+///
+/// # Errors
+/// A message completing "svg file 'x' ..." if the file cannot be read or is over the limit.
+fn read_limited(file: &str, max_kilobytes: u32) -> Result<Vec<u8>, String> {
+    let limit = u64::from(max_kilobytes) * 1024; // constant: a kilobyte is 1024 bytes
+    let mut bytes = Vec::new();
+    File::open(file)
+        .and_then(|handle| handle.take(limit + 1).read_to_end(&mut bytes))
+        .map_err(|error| format!("cannot be read: {error}"))?;
+    if bytes.len() as u64 > limit {
+        return Err(format!("is over the limit max_kilobytes = {max_kilobytes}"));
+    }
+    Ok(bytes)
+}
+
+/// The pieces of `picture` that the shapes of the SVG file `spec.file` (the region `name`) make, and the pieces of each `id`:
+/// the file placed in the box of `fit` (the selection `spec.fit` names) if it has one. A torn edge moves the pixel centres
+/// before the shapes are looked up.
+///
+/// # Errors
+/// As [`frame`]; [`Error::Recipe`] naming the region and the file (its name only) if there is no `file`, it cannot be read, or
+/// the drawing is refused (see [`svg::read`]) or would take too long to paint.
+pub(super) fn svg(name: &str, spec: &Svg, fit: Option<&Layer>, picture: &Picture<'_>) -> Result<Pieces, Error> {
+    let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
+    if spec.file.is_empty() {
+        return Err(refuse(name, "`file` is not set: name the svg file to read"));
+    }
+    let shown = std::path::Path::new(&spec.file)
+        .file_name()
+        .map_or_else(|| spec.file.clone(), |shown| shown.to_string_lossy().into_owned());
+    let refused = |said: &str| refuse(name, &format!("svg file '{shown}' {said}"));
+    let limits = Limits::STANDARD;
+    let bytes = read_limited(&spec.file, spec.max_kilobytes).map_err(|said| refused(&said))?;
+    let drawing = svg::read(&bytes, frame, spec.max_shapes, &limits).map_err(|said| refused(&said))?;
+    let bend = Bend::of(&spec.edge, picture);
+    drawing
+        .pieces(
+            picture.height(),
+            picture.width(),
+            bend.as_ref().map(Bend::shifts),
+            &limits,
+        )
+        .map_err(|said| refused(&said))
 }

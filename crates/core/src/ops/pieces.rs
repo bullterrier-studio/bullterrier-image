@@ -115,10 +115,10 @@ pub(crate) fn bounds(values: &[f32], height: usize, width: usize) -> Option<Boun
 
 /// The selection of the pixels whose piece is one of `numbers`: 1 there, 0 elsewhere. A number the partition (of
 /// `pieces` pieces) has no piece for chooses nothing.
-pub(crate) fn pick(labels: &[i32], pieces: usize, numbers: &[u32]) -> Vec<f32> {
+pub(crate) fn pick(labels: &[i32], pieces: usize, numbers: &[usize]) -> Vec<f32> {
     let mut picked = vec![false; pieces];
     for number in numbers {
-        if let Some(slot) = picked.get_mut(*number as usize) {
+        if let Some(slot) = picked.get_mut(*number) {
             *slot = true;
         }
     }

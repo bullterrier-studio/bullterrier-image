@@ -24,6 +24,7 @@ proptest = "1.12"
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)
 pyo3 = { version = "0.30", features = ["abi3-py312"] }
 quote = "1"
+roxmltree = { version = "0.21", default-features = false, features = ["std"] }  # the svg region reads a file
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }  # a recipe file's order is data (regions, first offender)
 serde_path_to_error = "0.1"

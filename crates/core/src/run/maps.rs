@@ -611,21 +611,21 @@ mod tests {
     }
 
     #[test]
-    fn a_region_of_a_kind_the_core_does_not_run_yet_is_refused_by_name_when_a_step_uses_it() -> Result<(), Error> {
+    fn a_region_that_cannot_be_made_is_refused_by_name_when_a_step_uses_it_and_costs_nothing_unused()
+    -> Result<(), Error> {
         let rig = rig()?;
         let values = values();
         let mut look = Recipe::new([paint()]);
         look.steps.push(Each::new("cut", [None]).into());
+        // an svg region with no file
         look.regions.insert("cut", Svg::default());
         let photo = Photo::new(Picture::new(4, 6, &values)?);
         assert_refused(
             &rig.render(&photo, &look),
             ErrorKind::Recipe,
-            &["'cut'", "kind svg", "not run"],
+            &["'cut'", "`file` is not set"],
             "cuts",
         );
-        // nothing runs for a recipe that is refused
-        assert_eq!(rig.recorder.received().len(), 0);
         // declared and not used, it costs nothing and the recipe renders; nothing makes a map of it, so one handed in is
         // no map of the recipe
         let mut unused = Recipe::new([paint()]);

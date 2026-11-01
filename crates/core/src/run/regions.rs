@@ -12,15 +12,19 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use super::{Stage, laid};
-use crate::ops::pieces;
-use crate::ops::{bands, cast, gradient};
+use crate::ops::svg::Ids;
+use crate::ops::{bands, cast, gradient, pieces};
 use crate::region::{Band, Bands, Combine, CombineOp, LinearGradient, Pick, Piece, RadialGradient, Subject};
 use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
 /// A region once made.
 enum Made {
     Selection(Arc<Layer>),
-    Pieces(Arc<Labels>),
+    /// The pieces of a partition, and the pieces each `id` names (only an `Svg` has ids).
+    Pieces {
+        labels: Arc<Labels>,
+        ids: Arc<Ids>,
+    },
 }
 
 /// The regions of a render by name.
@@ -48,31 +52,16 @@ fn no_finder(name: &str, per: &str) -> Error {
     )
 }
 
-/// The refusal of the region `name`, which the core cannot make (`what`: its kind), needed at `place`.
-fn refuse(name: &str, what: &str, place: &str) -> Error {
-    Error::Recipe(format!(
-        "region '{name}' ({what}), used at {place}, is not run by the core yet"
-    ))
-}
-
-/// `Ok` if the core can make every region in `reached` (each a name and the place that first needs it): none is of a kind
-/// it does not make yet, and a subject found in each piece has a finder to ask (`has_finder`). The one place a render
-/// refuses a region, before anything is made or found.
+/// `Ok` if a subject found in each piece by a region in `reached` (each a name and the place that first needs it) has a
+/// finder to ask (`has_finder`): the one place a render refuses a region, before anything is made or found.
 ///
 /// # Errors
-/// [`Error::Recipe`] naming the first such region and the place that needs it; [`Error::MapNotFound`] of the subject for a
-/// region that finds it in each piece of a partition when there is no finder.
+/// [`Error::MapNotFound`] of the subject for a region that finds it in each piece of a partition when there is no finder.
 pub(super) fn check_makeable<'a>(
     declared: &Regions,
     reached: impl IntoIterator<Item = (&'a str, &'a str)>,
     has_finder: bool,
 ) -> Result<(), Error> {
-    let reached: Vec<(&str, &str)> = reached.into_iter().collect();
-    for (name, place) in &reached {
-        if let Some(what) = declared.get(name).and_then(Region::not_yet) {
-            return Err(refuse(name, what, place));
-        }
-    }
     for (name, _) in reached {
         if let (Some(Region::Subject(Subject { per: Some(per), .. })), false) = (declared.get(name), has_finder) {
             return Err(no_finder(name, per));
@@ -129,7 +118,7 @@ impl Evaluator {
     /// As [`selection`](Self::selection).
     pub(super) fn pieces(&mut self, name: &str, picture: &Picture<'_>) -> Result<Arc<Labels>, Error> {
         self.ensure(name, picture)?;
-        if let Some(Made::Pieces(labels)) = self.made.get(name) {
+        if let Some(Made::Pieces { labels, .. }) = self.made.get(name) {
             return Ok(Arc::clone(labels));
         }
         let layer = self.selected(name)?;
@@ -163,7 +152,7 @@ impl Evaluator {
                     layer: Layer::clone(layer),
                     name,
                 },
-                Some(Made::Pieces(labels)) => Stage::Partition {
+                Some(Made::Pieces { labels, .. }) => Stage::Partition {
                     labels: Labels::clone(labels),
                     name,
                 },
@@ -211,17 +200,17 @@ impl Evaluator {
     fn selected(&self, name: &str) -> Result<Arc<Layer>, Error> {
         match self.made.get(name) {
             Some(Made::Selection(layer)) => Ok(Arc::clone(layer)),
-            Some(Made::Pieces(_)) => Err(Error::Recipe(format!(
+            Some(Made::Pieces { .. }) => Err(Error::Recipe(format!(
                 "region '{name}' is a partition, but a selection is needed here"
             ))),
             None => Err(Error::Recipe(format!("region '{name}' is needed before it is made"))),
         }
     }
 
-    /// The partition `name`, which is made already.
-    fn partitioned(&self, name: &str) -> Result<Arc<Labels>, Error> {
+    /// The partition `name`, which is made already, and the pieces its ids name.
+    fn partitioned(&self, name: &str) -> Result<(Arc<Labels>, Arc<Ids>), Error> {
         match self.made.get(name) {
-            Some(Made::Pieces(labels)) => Ok(Arc::clone(labels)),
+            Some(Made::Pieces { labels, ids }) => Ok((Arc::clone(labels), Arc::clone(ids))),
             Some(Made::Selection(_)) => Err(Error::Recipe(format!(
                 "region '{name}' is a selection, but a partition is needed here"
             ))),
@@ -235,7 +224,10 @@ impl Evaluator {
         let selection =
             |values: Vec<f32>| Layer::new(height, width, values).map(|layer| Made::Selection(Arc::new(layer)));
         let partition = |(labels, count): (Vec<i32>, usize)| {
-            Labels::new(height, width, labels, count).map(|labels| Made::Pieces(Arc::new(labels)))
+            Labels::new(height, width, labels, count).map(|labels| Made::Pieces {
+                labels: Arc::new(labels),
+                ids: Arc::default(),
+            })
         };
         match self.declared.get(name) {
             Some(Region::Band(Band { of, low, high, feather })) => {
@@ -293,7 +285,7 @@ impl Evaluator {
                 threshold,
             })) => {
                 let finder = self.finder.as_ref().ok_or_else(|| no_finder(name, per))?;
-                let labels = self.partitioned(per)?;
+                let (labels, _) = self.partitioned(per)?;
                 selection(found_in_pieces(
                     finder.as_ref(),
                     picture,
@@ -303,29 +295,51 @@ impl Evaluator {
                 )?)
             }
             Some(Region::Pick(Pick { of, pieces: picked })) => {
-                let labels = self.partitioned(of)?;
+                let (labels, ids) = self.partitioned(of)?;
                 let mut numbers = Vec::with_capacity(picked.len());
                 for piece in picked {
                     match piece {
-                        Piece::Number(number) => numbers.push(*number),
-                        // the check lets an id through only for an `Svg` region, which the core cannot make yet and a
-                        // render refuses before it makes anything (`check_makeable`)
-                        Piece::Id(id) => {
-                            return Err(Error::Recipe(format!(
-                                "region '{name}': `pieces` names the id '{id}' of '{of}', which the core cannot read yet"
-                            )));
-                        }
+                        Piece::Number(number) => numbers.push(*number as usize),
+                        Piece::Id(id) => match ids.iter().find(|(named, _)| named == id) {
+                            Some((_, named)) => numbers.extend(named),
+                            None => return Err(unknown_id(name, id, of, &ids)),
+                        },
                     }
                 }
                 selection(pieces::pick(labels.values(), labels.pieces(), &numbers))
             }
-            // a map the photo gives is held, never made, and a render refuses the kinds the core cannot make before it
-            // makes anything (`check_makeable`)
-            Some(Region::Given(_) | Region::Svg(_)) | None => {
+            Some(Region::Svg(spec)) => {
+                let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
+                let drawn = laid::svg(name, spec, fit.as_deref(), picture)?;
+                Labels::new(height, width, drawn.labels, drawn.count).map(|labels| Made::Pieces {
+                    labels: Arc::new(labels),
+                    ids: Arc::new(drawn.ids),
+                })
+            }
+            // a map the photo gives is held, never made
+            Some(Region::Given(_)) | None => {
                 Err(Error::Recipe(format!("region '{name}' is not made from other regions")))
             }
         }
     }
+}
+
+/// The refusal of the region `name`, a `Pick` of the partition `of` that has no piece for the `id`.
+fn unknown_id(name: &str, id: &str, of: &str, ids: &Ids) -> Error {
+    let known = if ids.is_empty() {
+        "it has no ids (only svg regions do)".to_owned()
+    } else {
+        format!(
+            "its ids: {}",
+            ids.iter()
+                .map(|(named, _)| named.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    Error::Recipe(format!(
+        "region '{name}': `pieces` names '{id}', which is no id of '{of}'; {known}"
+    ))
 }
 
 /// The subject of `picture` found piece by piece: for each piece of `labels`, in order, the finder is asked about the crop

@@ -546,7 +546,7 @@ fn a_pick_chooses_the_pixels_of_the_pieces_it_numbers_and_a_number_beyond_the_pi
         "{result:?}"
     );
     assert_eq!(spy.seen().len(), 0, "a step ran before the recipe was refused");
-    // of an svg region an id passes the check, and the render is refused for the svg, which the core cannot run yet
+    // of an svg region an id passes the check; this svg has no file, so making it is what refuses the render
     let of_svg = Pick {
         of: "s".to_owned(),
         pieces: vec!["roof".into()],
@@ -556,10 +556,9 @@ fn a_pick_chooses_the_pixels_of_the_pieces_it_numbers_and_a_number_beyond_the_pi
         .with_region("p", of_svg);
     let result = photo.render(&recipe, &Presets::new(), Options::default());
     assert!(
-        matches!(&result, Err(error) if error.to_string().contains("kind svg") && error.to_string().contains("not run by the core yet")),
+        matches!(&result, Err(error) if error.to_string().contains("region 's'") && error.to_string().contains("`file` is not set")),
         "{result:?}"
     );
-    assert_eq!(spy.seen().len(), 0);
     Ok(())
 }
 

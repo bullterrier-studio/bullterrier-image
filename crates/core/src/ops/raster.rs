@@ -1,10 +1,19 @@
-//! Polygons on a pixel grid: how much of each pixel a set of closed outlines covers by the nonzero rule.
+//! Polygons on a pixel grid: how much of each pixel a set of closed outlines covers, and the pixels they paint.
 //!
 //! Coordinates are px with pixel `(row, column)` covering `[column, column + 1) x [row, row + 1)`. An outline is a list of
 //! corners, closed by itself; several outlines in one [`Polygons`] are one shape (a hole is an outline drawn the other way
 //! round inside another). Work goes one scanline at a time, so memory stays at a few rows however big the outline is.
 
 use super::length;
+
+/// What decides that a point is inside outlines that cross each other or wind round it more than once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Rule {
+    /// Inside when the outlines wind round the point a net number of times (a hole is an outline drawn the other way).
+    NonZero,
+    /// Inside when a ray from the point crosses the outlines an odd number of times (any inner outline is a hole).
+    EvenOdd,
+}
 
 /// Closed outlines in px, each closed by an edge from its last corner back to its first.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -108,7 +117,7 @@ fn crossed(edge: &Edge, count: usize, samples: usize) -> std::ops::Range<usize> 
 
 /// How many crossings of an edge with a scanline filling `shape` in a picture of `height` rows takes, with `samples`
 /// scanlines a row: the work of [`coverage`] and [`paint`].
-fn crossings(shape: &Polygons, height: usize, samples: usize) -> u64 {
+pub(crate) fn crossings(shape: &Polygons, height: usize, samples: usize) -> u64 {
     let count = height * samples;
     shape
         .slanting()
@@ -117,6 +126,28 @@ fn crossings(shape: &Polygons, height: usize, samples: usize) -> u64 {
             (scans.end - scans.start) as u64
         })
         .fold(0, u64::saturating_add)
+}
+
+/// How many pixels of a `height` x `width` picture the box round `shape` holds: what painting it can set at most.
+pub(crate) fn box_pixels(shape: &Polygons, height: usize, width: usize) -> u64 {
+    let (mut low, mut high) = ([f64::MAX; 2], [f64::MIN; 2]);
+    for number in 0..shape.outlines() {
+        for corner in shape.outline(number) {
+            for axis in [0, 1] {
+                low[axis] = low[axis].min(corner[axis]);
+                high[axis] = high[axis].max(corner[axis]);
+            }
+        }
+    }
+    // the part of the box inside the picture along an axis, in whole pixels
+    let inside = |axis: usize, size: usize| {
+        length::whole(
+            (high[axis].min(length::float(size)) - low[axis].max(0.0))
+                .max(0.0)
+                .ceil(),
+        )
+    };
+    inside(0, width) as u64 * inside(1, height) as u64
 }
 
 /// Whether filling takes no more than `budget` crossings: the work `shape` makes of `height` rows with `samples` scanlines
@@ -131,10 +162,9 @@ fn affordable(shape: &Polygons, height: usize, samples: usize, budget: u64, advi
     Ok(())
 }
 
-/// The stretches `(from, to)` in px across each scanline of `count` (`samples` a row) that `shape` covers by the nonzero
-/// rule (a point is inside when the outlines wind round it a net number of times), as `(scanline, stretches)` for every
-/// scanline from the first an edge crosses to the end of the row of the last.
-fn scans(shape: &Polygons, count: usize, samples: usize) -> impl Iterator<Item = (usize, Vec<(f64, f64)>)> {
+/// The stretches `(from, to)` in px across each scanline of `count` (`samples` a row) that `shape` covers by `rule`, as
+/// `(scanline, stretches)` for every scanline from the first an edge crosses to the end of the row of the last.
+fn scans(shape: &Polygons, rule: Rule, count: usize, samples: usize) -> impl Iterator<Item = (usize, Vec<(f64, f64)>)> {
     // the edges by the first scanline they cross, so the ones a scanline crosses are found by moving on a cursor
     let mut edges: Vec<(Edge, std::ops::Range<usize>)> = shape
         .slanting()
@@ -170,12 +200,16 @@ fn scans(shape: &Polygons, count: usize, samples: usize) -> impl Iterator<Item =
         }));
         hits.sort_by(|one, other| one.0.total_cmp(&other.0));
         // Every closed outline crosses a scanline as often one way as the other, so the running sum returns to 0 at the end
-        // of the scanline: a stretch begins at each crossing after which it is not 0 and ends at the next.
+        // of the scanline: a stretch begins at each crossing after which the point is inside and ends at the next.
         let mut winding = 0; // constant: no crossing has turned yet
         let mut stretches = Vec::new();
         for (at, &(x, direction)) in hits.iter().enumerate() {
             winding += direction;
-            if winding != 0 {
+            let inside = match rule {
+                Rule::NonZero => winding != 0,
+                Rule::EvenOdd => at % 2 == 0, // constant: odd crossings so far, counting from 1
+            };
+            if inside {
                 stretches.push((x, hits.get(at + 1).map_or(x, |next| next.0)));
             }
         }
@@ -208,7 +242,7 @@ pub(crate) fn coverage(
     let mut out = vec![0.0_f32; height * width];
     // constant: the ramp of a row has width + 1 pixel boundaries and two more cells for the second difference
     let mut steps = vec![0.0_f64; width + 3];
-    for (scan, stretches) in scans(shape, height * samples, samples) {
+    for (scan, stretches) in scans(shape, Rule::NonZero, height * samples, samples) {
         for (from, to) in stretches {
             add_stretch(&mut steps, width, from, to, 1.0 / length::float(samples));
         }
@@ -220,8 +254,8 @@ pub(crate) fn coverage(
     Ok(out)
 }
 
-/// Sets `target` (a `height` x `width` map, row after row) to `value` at every pixel whose centre `shape` covers by the
-/// nonzero rule. A centre exactly on an edge is covered when the shape is to its right or below it.
+/// Sets `target` (a `height` x `width` map, row after row) to `value` at every pixel whose centre `shape` covers by `rule`.
+/// A centre exactly on an edge is covered when the shape is to its right or below it.
 ///
 /// # Errors
 /// A message if the fill would take more than `budget` crossings of an edge with a scanline, before any work is done.
@@ -230,18 +264,24 @@ pub(crate) fn paint(
     height: usize,
     width: usize,
     shape: &Polygons,
+    rule: Rule,
     value: i32,
     budget: u64,
 ) -> Result<(), String> {
     affordable(shape, height, 1, budget, "use fewer corners")?;
+    fill(target, height, width, shape, rule, value);
+    Ok(())
+}
+
+/// As [`paint`] for a caller that has counted the crossings (see [`crossings`]) against its own budget.
+pub(crate) fn fill(target: &mut [i32], height: usize, width: usize, shape: &Polygons, rule: Rule, value: i32) {
     // the first pixel whose centre (at i + 1/2) is at or past `x`, kept in the row
     let pixel = |x: f64| length::whole((x - 0.5).ceil().clamp(0.0, length::float(width)));
-    for (row, stretches) in scans(shape, height, 1) {
+    for (row, stretches) in scans(shape, rule, height, 1) {
         for (from, to) in stretches {
             target[row * width + pixel(from)..row * width + pixel(to)].fill(value);
         }
     }
-    Ok(())
 }
 
 /// The centre of pixel `at` of a picture `width` pixels wide (row after row), in px; moved by `shift` (the shifts along x and

@@ -414,25 +414,19 @@ fn a_map_stays_while_any_later_step_uses_it_directly_or_through_a_region() -> Re
 }
 
 #[test]
-fn a_kind_the_core_cannot_make_yet_refuses_the_render_before_any_step_runs_when_a_step_uses_it() -> Result<(), Error> {
+fn an_svg_region_without_a_file_refuses_the_render_naming_the_region_when_a_step_makes_it() -> Result<(), Error> {
     let rig = rig()?;
     let pixels = vec![0.5; 4 * 6 * 3];
     let photo = grey(4, 6, &pixels, &[])?;
-    // (what is declared as `p`, which an `each` step uses, what the refusal says)
-    let rows = [("svg", json!({"p": {"kind": "svg"}}), "kind svg")];
-    for (what, declared, said) in rows {
-        let mut recipe = Recipe::new([Step::new("paint").param("level", 0.5)]);
-        recipe.steps.push(Each::new("p", [None]).into());
-        recipe.regions = regions(declared);
-        let result = rig.render(&photo, &recipe, Options::default());
-        assert!(
-            matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe
-                && ["'p'", said, "not run by the core yet", "step 2"].iter().all(|word| error.to_string().contains(word))),
-            "{what}: {result:?}"
-        );
-    }
-    // the first step is fine and never ran
-    assert_eq!(rig.recorder.received().len(), 0);
+    let mut recipe = Recipe::new([Step::new("paint").param("level", 0.5)]);
+    recipe.steps.push(Each::new("p", [None]).into());
+    recipe.regions = regions(json!({"p": {"kind": "svg"}}));
+    let result = rig.render(&photo, &recipe, Options::default());
+    assert!(
+        matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe
+            && ["region 'p'", "`file` is not set"].iter().all(|word| error.to_string().contains(word))),
+        "{result:?}"
+    );
     Ok(())
 }
 

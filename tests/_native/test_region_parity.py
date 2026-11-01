@@ -587,22 +587,11 @@ def test_a_random_assignment_uses_every_look_and_favours_none_over_many_seeds(ph
 
 # --- the shipped looks and examples -------------------------------------------------------------------------------
 
-UNMADE_YET = (Svg,)
-
-
-def unmade(region: object) -> bool:
-    """Whether the core does not make this kind of region yet: svg."""
-    return isinstance(region, UNMADE_YET)
-
 
 def used_regions(recipe: Recipe) -> list[str]:
     """The regions the steps use, or that those are made from."""
     names = used(recipe.regions, [name for step in recipe.steps for _, name, _ in references(step)])
     return [name for name in recipe.regions if name in names]
-
-
-def uses_unmade_region(recipe: Recipe) -> bool:
-    return any(unmade(recipe.regions[name]) for name in used_regions(recipe))
 
 
 def declares_regions(recipe: Recipe) -> bool:
@@ -617,10 +606,15 @@ def seeded(recipe: Recipe) -> bool:
     )
 
 
-RUNNABLE = [path for path in FILES if declares_regions(load_recipe(path)) and not uses_unmade_region(load_recipe(path))]
-MADE = [path for path in RUNNABLE if not seeded(load_recipe(path))]
+def draws_svg(recipe: Recipe) -> bool:
+    """Whether a region the steps use is read from an svg file (the core reads it with its own reader)."""
+    return any(isinstance(recipe.regions[name], Svg) for name in used_regions(recipe))
+
+
+RUNNABLE = [path for path in FILES if declares_regions(load_recipe(path))]
+DRAWN = [path for path in RUNNABLE if draws_svg(load_recipe(path))]
+MADE = [path for path in RUNNABLE if not seeded(load_recipe(path)) and path not in DRAWN]
 SEEDED = [path for path in RUNNABLE if seeded(load_recipe(path))]
-UNMADE = [path for path in FILES if uses_unmade_region(load_recipe(path))]
 
 
 def ID(path: Path) -> str:
@@ -641,7 +635,7 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
         "bezier-cut",
     }
     assert {path.stem for path in SEEDED} >= {"tear", "glass", "torn"}
-    assert {path.stem for path in UNMADE} >= {"svg"}
+    assert {path.stem for path in DRAWN} >= {"svg"}
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
@@ -660,6 +654,29 @@ def test_a_shipped_file_that_uses_regions_renders_as_the_python_engine_renders_i
         assert np.abs(made - photo).max() > 1e-3  # the look does something
 
 
+# the two readers place a border within a pixel of each other (svgelements flattens its curves its own way), so a pixel
+# on a border may take the piece, and so the look, next to it: of the pixels of the shipped example 0.033 % differ by
+# more than FEATHER_ATOL (measured on the synthetic photo), here at most 0.1 %
+BORDER_FRACTION = 1e-3
+
+
+@pytest.mark.parametrize("path", DRAWN, ids=ID)
+def test_a_shipped_file_that_draws_an_svg_renders_as_the_python_engine_renders_it_but_for_pixels_on_a_border(
+    path, photo, subject
+):
+    recipe = load_recipe(path)
+    maps = {"subject": subject, "depth": depth_of(photo)}
+    made = core_render(photo, recipe, maps=maps)
+    assert made.dtype == np.float32
+    assert np.isfinite(made).all()
+    assert made.min() >= 0
+    assert made.max() <= 1
+    differing = (np.abs(made - runner.render(photo, recipe, maps=maps)).max(axis=-1) > FEATHER_ATOL).mean()
+    assert differing <= BORDER_FRACTION
+    np.testing.assert_array_equal(bridge.trace(photo, recipe, maps=maps)[-1][2], made)
+    np.testing.assert_array_equal(core_render(photo, recipe, maps=maps), made)
+
+
 @pytest.mark.parametrize("path", SEEDED, ids=ID)
 def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_and_does_something(path, photo):
     # seeded: the shards and the tear are not numpy's, so only properties are compared (the python engine's differ)
@@ -673,34 +690,6 @@ def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_a
     np.testing.assert_array_equal(core_render(photo, recipe, **given), made)
     if recipe.frame == Framing() and recipe.size is None:
         assert np.abs(made - photo).max() > 1e-3
-
-
-@pytest.mark.parametrize("path", UNMADE, ids=ID)
-def test_a_shipped_file_that_uses_a_region_the_core_does_not_make_yet_is_refused_naming_the_region(
-    path, photo, subject
-):
-    recipe = load_recipe(path)
-    refused = [name for name in used_regions(recipe) if unmade(recipe.regions[name])]
-    with pytest.raises(RecipeError, match="not run by the core yet") as caught:
-        core_render(photo, recipe, maps={"subject": subject, "depth": depth_of(photo)})
-    assert any(f"region '{name}'" in str(caught.value) for name in refused)
-
-
-UNPORTED = {
-    "svg": (Svg(file="shape.svg"), "each"),
-}
-
-
-@pytest.mark.parametrize(("region", "by"), UNPORTED.values(), ids=UNPORTED.keys())
-def test_a_region_the_core_does_not_make_yet_is_refused_where_used_and_renders_where_declared_and_unused(
-    photo, region, by
-):
-    step = Each(each="r", looks=(DOUBLED,)) if by == "each" else Step("grade", mask="r")
-    refused = Recipe([step], regions={"r": region})
-    with pytest.raises(RecipeError, match=r"region 'r'.*not run by the core yet"):
-        core_render(photo, refused)
-    unused = Recipe([DOUBLED], regions={"r": region})
-    np.testing.assert_allclose(core_render(photo, unused), stops(photo, 1), atol=2e-6)
 
 
 def test_a_torn_grid_is_cut_by_the_core_the_same_for_a_seed_differently_for_another_and_straight_for_no_tear(
