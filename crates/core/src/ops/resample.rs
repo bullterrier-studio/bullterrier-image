@@ -145,65 +145,61 @@ impl Resize {
         self.to.1
     }
 
-    /// `values`, the samples of the thing the change was planned for (`channels` of them for each pixel, pixel after
-    /// pixel, row after row), resampled: the same layout at the new size, every sample within 0..1 (a sharp kernel
-    /// overshoots near an edge, which a picture cannot show).
-    pub(crate) fn apply(&self, values: &[f32], channels: usize) -> Vec<f32> {
+    /// `pixels`, the pixels of the thing the change was planned for (`C` samples each, row after row), resampled: the
+    /// same layout at the new size, every sample within 0..1 (a sharp kernel overshoots near an edge, which a picture
+    /// cannot show). A change of the size is planned, so at least one side differs.
+    pub(crate) fn apply<const C: usize>(&self, pixels: &[[f32; C]]) -> Vec<[f32; C]> {
         let ((rows, columns), (new_rows, new_columns)) = (self.from, self.to);
-        let across = if columns == new_columns {
-            None
-        } else {
-            Some(across(values, rows, channels, &taps(self.filter, columns, new_columns)))
-        };
-        let wide = across.as_deref().unwrap_or(values);
+        let wide = (columns != new_columns).then(|| across(pixels, rows, &taps(self.filter, columns, new_columns)));
         let mut out = if rows == new_rows {
-            wide.to_vec()
+            wide.unwrap_or_else(|| pixels.to_vec())
         } else {
-            down(wide, new_columns * channels, &taps(self.filter, rows, new_rows))
+            down(wide.as_deref().unwrap_or(pixels), new_columns, &taps(self.filter, rows, new_rows))
         };
-        for sample in &mut out {
+        for sample in out.iter_mut().flatten() {
             *sample = sample.clamp(0.0, 1.0);
         }
         out
     }
 }
 
-/// `values` (`rows` rows of pixels of `channels` samples) with every row resampled to the columns `taps` make. The
-/// sums are in f64 and rounded once to f32, as Pillow does.
-fn across(values: &[f32], rows: usize, channels: usize, taps: &[Tap]) -> Vec<f32> {
-    let line = values.len() / rows;
-    let mut out = Vec::with_capacity(rows * taps.len() * channels);
-    for row in values.chunks_exact(line) {
+/// `pixels` (`rows` rows) with every row resampled to the columns `taps` make. The sums are in f64 and rounded once to
+/// f32, as Pillow does.
+fn across<const C: usize>(pixels: &[[f32; C]], rows: usize, taps: &[Tap]) -> Vec<[f32; C]> {
+    let mut out = Vec::with_capacity(rows * taps.len());
+    for row in pixels.chunks_exact(pixels.len() / rows) {
         for tap in taps {
-            for channel in 0..channels {
+            out.push(std::array::from_fn(|channel| {
                 #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
                 let sample = tap
                     .weights
                     .iter()
                     .enumerate()
-                    .map(|(offset, weight)| f64::from(row[(tap.first + offset) * channels + channel]) * weight)
+                    .map(|(offset, weight)| f64::from(row[tap.first + offset][channel]) * weight)
                     .sum::<f64>() as f32;
-                out.push(sample);
-            }
+                sample
+            }));
         }
     }
     out
 }
 
-/// `values` (rows of `line` samples) with the rows resampled to the rows `taps` make.
-fn down(values: &[f32], line: usize, taps: &[Tap]) -> Vec<f32> {
-    let mut out = Vec::with_capacity(taps.len() * line);
-    let mut sums = vec![0.0_f64; line];
+/// `pixels` (rows of `columns` pixels) with the rows resampled to the rows `taps` make.
+fn down<const C: usize>(pixels: &[[f32; C]], columns: usize, taps: &[Tap]) -> Vec<[f32; C]> {
+    let mut out = Vec::with_capacity(taps.len() * columns);
+    let mut sums = vec![[0.0_f64; C]; columns];
     for tap in taps {
-        sums.fill(0.0);
+        sums.fill([0.0; C]);
         for (offset, weight) in tap.weights.iter().enumerate() {
-            let row = &values[(tap.first + offset) * line..][..line];
-            for (sum, &sample) in sums.iter_mut().zip(row) {
-                *sum += f64::from(sample) * weight;
+            let row = &pixels[(tap.first + offset) * columns..][..columns];
+            for (sum, pixel) in sums.iter_mut().zip(row) {
+                for (sum, &sample) in sum.iter_mut().zip(pixel) {
+                    *sum += f64::from(sample) * weight;
+                }
             }
         }
         #[expect(clippy::cast_possible_truncation, reason = "the sum of f32 samples is stored as f32")]
-        out.extend(sums.iter().map(|&sum| sum as f32));
+        out.extend(sums.iter().map(|sum| sum.map(|sample| sample as f32)));
     }
     out
 }
@@ -221,6 +217,11 @@ mod tests {
             .ok_or_else(|| Error::Recipe(format!("{height} x {width} is already {longest} on its longest side")))
     }
 
+    /// `samples` (`C` per pixel) resampled by `resize`, as flat samples again.
+    fn flat<const C: usize>(resize: &Resize, samples: &[f32]) -> Vec<f32> {
+        resize.apply(samples.as_chunks::<C>().0).into_flattened()
+    }
+
     /// `actual` is `expected` to within `tolerance`.
     fn assert_close(actual: &[f32], expected: &[f64], tolerance: f64) {
         assert_eq!(actual.len(), expected.len());
@@ -235,7 +236,7 @@ mod tests {
         let resize = plan(1, 2, 1)?;
         assert_eq!((resize.height(), resize.width()), (1, 1));
         assert_close(
-            &resize.apply(&[0.2, 0.9, 0.0, 0.6, 0.1, 1.0], 3),
+            &flat::<3>(&resize, &[0.2, 0.9, 0.0, 0.6, 0.1, 1.0]),
             &[0.4, 0.5, 0.5],
             1e-7,
         );
@@ -250,7 +251,7 @@ mod tests {
         // 37/34 and -3/34 for out 0, 111/140 and 29/140 for out 1; out 2 and out 3 mirror them.
         let resize = plan(1, 2, 4)?;
         assert_eq!((resize.height(), resize.width()), (2, 4));
-        let out = resize.apply(&[0.2, 0.6], 1);
+        let out = flat::<1>(&resize, &[0.2, 0.6]);
         let row = [
             (37.0 * 0.2 - 3.0 * 0.6) / 34.0,
             (111.0 * 0.2 + 29.0 * 0.6) / 140.0,
@@ -276,7 +277,7 @@ mod tests {
         // the cubic kernel is exact for a straight line, so the line's value there is the output. Within 2 pixels of
         // either end the kernel is cut off and renormalised, which is allowed to bend the line.
         let resize = plan(1, 10, 25)?;
-        let out = resize.apply(&ramp(10), 1);
+        let out = flat::<1>(&resize, &ramp(10));
         assert_eq!((resize.height(), resize.width()), (2, 25));
         for x in 5..20_u8 {
             let at = (f64::from(x) + 0.5) * 0.4 - 0.5;
@@ -297,7 +298,7 @@ mod tests {
         // 30 to 8 pixels: output pixel `x` looks at the input at (x + 0.5) 3.75 - 0.5. The sharp kernel sampled at whole
         // pixels is not exactly symmetric about that point, so the line is met to 1e-5 (3.5e-6 measured), not exactly.
         let resize = plan(1, 30, 8)?;
-        let out = resize.apply(&ramp(30), 1);
+        let out = flat::<1>(&resize, &ramp(30));
         assert_eq!((resize.height(), resize.width()), (1, 8));
         for x in 3..5_u8 {
             let at = (f64::from(x) + 0.5) * 3.75 - 0.5;
@@ -362,17 +363,14 @@ mod tests {
 
     #[test]
     fn a_picture_of_more_than_twice_pillows_pixel_limit_is_refused_and_one_within_it_is_planned() {
-        // Pillow's `Image.MAX_IMAGE_PIXELS` is 89,478,485: the limit is 178,956,970 pixels, and planning allocates no
-        // picture. A square of side 13,377 has 178,944,129 pixels and one of 13,378 has 178,970,884; 1 x 2 grown to
-        // 18,918 is 9,459 x 18,918 = 178,945,362 pixels and to 18,919 is 9,460 x 18,919 = 178,973,740; a 2-row picture
-        // grown to 89,478,485 columns has exactly 178,956,970 pixels, to 89,478,486 two more.
+        // the limit is 2^26 = 67,108,864 pixels (8192 x 8192), and planning allocates no picture. A square of side 8192
+        // is the limit and one of 8193 has 67,125,249; a 2-row picture grown to 33,554,432 columns has exactly 2^26
+        // pixels, to 33,554,433 two more.
         for (height, width, longest, within) in [
-            (1, 1, 13_377, true),
-            (1, 1, 13_378, false),
-            (1, 2, 18_918, true),
-            (1, 2, 18_919, false),
-            (2, 89_478_484, 89_478_485, true),
-            (2, 89_478_485, 89_478_486, false),
+            (1, 1, 8_192, true),
+            (1, 1, 8_193, false),
+            (2, 33_554_431, 33_554_432, true),
+            (2, 33_554_432, 33_554_433, false),
             (1, 1, 2_000_000_000, false),
             (1, 1, u32::MAX, false),
         ] {
@@ -384,7 +382,7 @@ mod tests {
                 );
             } else {
                 assert!(
-                    matches!(&planned, Err(Error::Recipe(said)) if said.contains("`size`") && said.contains("178956970")),
+                    matches!(&planned, Err(Error::Recipe(said)) if said.contains("`size`") && said.contains("67108864")),
                     "{height} x {width} at {longest}: {planned:?}"
                 );
             }
@@ -399,7 +397,8 @@ mod tests {
         ) {
             let channels = if three { 3 } else { 1 };
             let Some(resize) = Resize::to_longest_side(height, width, longest)? else { return Ok(()) };
-            let out = resize.apply(&vec![level; height * width * channels], channels);
+            let samples = vec![level; height * width * channels];
+            let out = if three { flat::<3>(&resize, &samples) } else { flat::<1>(&resize, &samples) };
             prop_assert_eq!(out.len(), resize.height() * resize.width() * channels);
             prop_assert!(out.iter().all(|sample| (sample - level).abs() < 1e-6), "{:?}", out);
         }
@@ -412,7 +411,7 @@ mod tests {
             let Some(resize) = Resize::to_longest_side(height, width, longest)? else { return Ok(()) };
             // hard edges: every sample 0 or 1
             let values: Vec<f32> = seed.iter().cycle().take(height * width).map(|&on| f32::from(u8::from(on))).collect();
-            let out = resize.apply(&values, 1);
+            let out = flat::<1>(&resize, &values);
             prop_assert!(out.iter().all(|sample| (0.0..=1.0).contains(sample)), "{:?}", out);
         }
 

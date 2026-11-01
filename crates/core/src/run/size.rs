@@ -21,8 +21,7 @@ impl Options {
     /// These options with `size`, the longest side in px of the picture the render works on and returns: the photo is
     /// resampled to it, its aspect kept, and so are its maps. It wins over the recipe's own `size`; without either, the
     /// photo's own size is kept. The render is refused for a size of 0 and for one that makes a picture of more than
-    /// 178,956,970 pixels (twice Pillow's decompression-bomb limit), as it is for a `frame` that does: before a pixel of
-    /// either picture is made.
+    /// 67,108,864 pixels (8192 x 8192), as it is for a `frame` that does: before a pixel of either picture is made.
     ///
     /// A recipe's pixel values (`px`) are written for a longest side of 480; a render multiplies them by the working
     /// picture's longest side over 480, so the look is the same at any size.
@@ -53,8 +52,8 @@ impl<'a> Working<'a> {
     /// is the subject map of the photo as given, which a frame that [`needs_subject`](Frame::needs_subject) is given.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a size of 0, or a size or frame that makes a picture of more than 178,956,970 pixels (twice
-    /// Pillow's decompression-bomb limit), [`Error::MapNotFound`] for a subject a crop needs and the photo cannot give.
+    /// [`Error::Recipe`] for a size of 0, or a size or frame that makes a picture of more than 67,108,864 pixels,
+    /// [`Error::MapNotFound`] for a subject a crop needs and the photo cannot give.
     pub(super) fn new(
         photo: Picture<'a>,
         frame: &Frame,
@@ -76,7 +75,11 @@ impl<'a> Working<'a> {
         let framed = framing.as_ref().map(|framing| framing.photo(photo.values()));
         let values = framed.as_deref().unwrap_or_else(|| photo.values());
         let made = match &resize {
-            Some(resize) => Some(Image::new(resize.height(), resize.width(), &resize.apply(values, 3))?),
+            Some(resize) => Some(Image::from_pixels(
+                resize.height(),
+                resize.width(),
+                resize.apply(values.as_chunks::<3>().0),
+            )),
             None => framed
                 .as_deref()
                 .map(|values| Image::new(height, width, values))
@@ -117,7 +120,7 @@ impl<'a> Working<'a> {
         Ok(Arc::new(Layer::new(
             resize.height(),
             resize.width(),
-            resize.apply(current.values(), 1),
+            resize.apply(current.values().as_chunks::<1>().0).into_flattened(),
         )?))
     }
 }
@@ -400,7 +403,7 @@ mod tests {
             matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe
                 && error.to_string().contains("`size` 2000000000")
                 && error.to_string().contains("2000000000 x 2000000000")
-                && error.to_string().contains("178956970")),
+                && error.to_string().contains("67108864")),
             "{result:?}"
         );
         assert_eq!(recorder.received().len(), 0);

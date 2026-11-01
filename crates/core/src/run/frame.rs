@@ -742,16 +742,16 @@ mod tests {
 
     #[test]
     fn a_frame_that_makes_a_picture_over_the_pixel_limit_is_refused_when_planned_before_any_pixel_is_made() {
-        // planning takes sizes, not pictures, so these photos (millions of pixels) are never made. The limit is 178,956,970
-        // pixels (twice Pillow's). Borders of 2 on every side make a picture 5 times the shorter side across: 2675 is
-        // 13,375 across (178,890,625 pixels, within), 2676 is 13,380 (179,024,400, over).
+        // planning takes sizes, not pictures, so these photos (millions of pixels) are never made. The limit is 67,108,864
+        // pixels (8192 x 8192). Borders of 2 on every side make a picture 5 times the shorter side across: 1638 is
+        // 8,190 across (67,076,100 pixels, within), 1639 is 8,195 (67,158,025, over).
         let all_sides = |share: f64| {
             with(|frame| {
                 (frame.pad_top, frame.pad_right, frame.pad_bottom, frame.pad_left) = (share, share, share, share);
             })
         };
-        // a 1 x 20,000 photo turned by 45 degrees and expanded is 14,143 across, a bounding square of 200 million pixels
-        // (and 18,000 columns 12,729 across, 162 million, within); a crop to a square after the turn leaves it small
+        // a 1 x 12,000 photo turned by 45 degrees and expanded is 8,486 across, a bounding square of 72 million pixels
+        // (and 11,000 columns 7,779 across, 60.5 million, within); a crop to a square after the turn leaves it small
         let turned = |angle: f64, aspect: Option<f64>| {
             with(|frame| {
                 frame.angle = angle;
@@ -760,16 +760,16 @@ mod tests {
             })
         };
         for (height, width, frame, over, row) in [
-            (2675, 2675, all_sides(2.0), None, "borders just within the limit"),
+            (1638, 1638, all_sides(2.0), None, "borders just within the limit"),
             (
-                2676,
-                2676,
+                1639,
+                1639,
                 all_sides(2.0),
-                Some("13380 x 13380"),
+                Some("8195 x 8195"),
                 "borders just over it",
             ),
-            (1, 18_000, turned(45.0, None), None, "a turn within the limit"),
-            (1, 20_000, turned(45.0, None), Some("14143 x 14143"), "a turn over it"),
+            (1, 11_000, turned(45.0, None), None, "a turn within the limit"),
+            (1, 12_000, turned(45.0, None), Some("8486 x 8486"), "a turn over it"),
             (
                 1,
                 24_000,
@@ -790,7 +790,7 @@ mod tests {
                 None => assert!(planned.is_ok_and(|geometry| geometry.is_some()), "{row}"),
                 Some(shape) => assert!(
                     matches!(&planned, Err(Error::Recipe(said)) if said.contains("`frame`")
-                        && said.contains(shape) && said.contains("178956970")),
+                        && said.contains(shape) && said.contains("67108864")),
                     "{row}: {planned:?}"
                 ),
             }

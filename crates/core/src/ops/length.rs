@@ -3,8 +3,10 @@
 use crate::Error;
 
 /// The most pixels a picture the core makes may have. A recipe's `size`, `frame` borders and expanded turns can ask for any
-/// number, so what they ask is checked against this before a pixel is allocated.
-const MOST_PIXELS: usize = 2 * 89_478_485; // constant: twice Pillow's `Image.MAX_IMAGE_PIXELS`, its decompression-bomb limit
+/// number, so what they ask is checked against this before a pixel is allocated. A render holds up to three pictures of the
+/// working size at once (the working picture, a step's result and the blend of the two, 12 bytes a pixel each), so this is
+/// about 2.4 GB of pictures; it does not limit a photo handed in.
+const MOST_PIXELS: usize = 1 << 26; // constant: 8192 x 8192; keeps a render near 3 GB, safe on a 16 GB machine
 
 /// Refuses a picture of `height` x `width` pixels if it has more than [`MOST_PIXELS`]; `asked_by` names what asked for
 /// it (as `` `size` 4000 `` or `` `frame` ``), so the error says where to look.
