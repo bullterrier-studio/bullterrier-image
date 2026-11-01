@@ -736,7 +736,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   *Default 1:* the usual use of several cores is rendering many pictures at once (a video renders frames side by side),
   where each render taking every core only competes; one picture asks for 0 (every core). `Photo`, `Recipe`, `Presets`,
   `Options` and `Image` are `Send + Sync`, so frame-level parallelism needs no API. *An installed pool, not a parameter on
-  `Effect::apply`:* the render installs one rayon pool and a kernel calls `par::rows`, so no signature of the 113 Python
+  `Effect::apply`:* the render installs one rayon pool and a kernel calls `par::rows`, so no signature of the Python
   effects or the ported ones changes and an effect joins when it is ported, only if its output rows depend on input rows
   alone (per-pixel work, separable passes); a global reduction or a sequential scan stays single-threaded, and a
   reduction chunks by the data so the sum is the same at any count. *The render stays on the calling thread:*
