@@ -38,6 +38,10 @@ def workspace(tmp_path_factory) -> Path:
     for name in WORKSPACE_FILES:
         shutil.copy(ROOT / name, root)
     shutil.copytree(ROOT / "crates", root / "crates")
+    # files outside the crates that the core embeds (`include_str!`) or its tests read
+    for outside in (Path("src/bullterrier_image/presets/regions/shards.toml"), Path("examples/assets/mosaic.svg")):
+        (root / outside).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / outside, root / outside)
     (root / "tools").mkdir()
     shutil.copy(ROOT / "tools" / "run_capped.py", root / "tools")  # `rust-test` runs under it
     return root
