@@ -72,7 +72,8 @@ The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.read_recipe`). The Python `Step`, `Recipe`
 and loader still validate and run recipes until R4e makes them a facade over these types.
 **The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
-a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; asked at most once per photo);
+a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; its answer for the whole photo is kept and asked once;
+a `Subject` region found `per` piece also asks the `subject` finder, uncached, about the crop of each piece);
 `photo.render(&Recipe, &Presets, Options)` and `photo.trace(..) -> Vec<Stage>` run one engine (`Stage`: `Input`, `Subject`,
 `Depth`, `Selection { name, layer }`, `Partition { name, labels }` (each region the steps use, in declaration order),
 `Step { number, image }`, `CutOut(image)`; numbered-piece drawing and labels are the facade's). The recipe's `frame` (typed `Frame`, checked by

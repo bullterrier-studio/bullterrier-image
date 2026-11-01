@@ -570,9 +570,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   pass text (`Presets::add_toml`), and shipping them in the crate is R5's (publish). *Moved:* rendering a step
   (mask, opacity, blend, drives, scaling) came with R4a; `each`, framing and the region kinds are still R4's, hence the
   one-off `fx.bloom(radius=12).apply(photo)` too; a drive is the public `Drive` since R4a; the typed per-effect `Params` entry (`Step::of(grade::Params {..})`) came
-  with R3b. *Known losses:* a Rust map keeps keys sorted,
-  not in file order (regions, and so the order of addresses once R4 ports them); Python keeps its Pydantic model
-  until R4.
+  with R3b. *Known losses:* a Rust map kept keys sorted,
+  not in file order, until R4c: both readers now keep file order (`preserve_order`) and `Regions` is an ordered list (see
+  "Regions and `each` are Rust"); Python keeps its Pydantic model until R4.
 - **The runner is Rust (R4a): steps, maps, drives, blend, scaling.** `Photo::render`/`trace` run a checked recipe's
   steps; the core refuses what it does not run yet (`each`, a region other than `given`, a step that takes a
   partition) with an error saying so. Python's runner serves users until R4e; `core/bridge.py` and the parity tests
@@ -590,8 +590,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *`Layer` has one form: finite and within 0..1 by construction* (`Layer::new` refuses, `Error::Inputs`), so the runner checks
     only its size and no unchecked map exists. A binding that builds one from an array reports the failure as the map's kind
     (`SubjectNotFoundError` for `subject`). *Rejected:* a checked and an unchecked type.
-  - *A finder is asked at most once per photo.* Its answer is kept behind a lock held across `find`, so threads sharing the
-    photo cannot both ask; an error is not kept (the next render asks again). `Finder` is `find` only: the identity only the
+  - *A finder's answer for the whole photo is kept: it is asked once.* The answer is kept behind a lock held across `find`, so
+    threads sharing the photo cannot both ask; an error is not kept (the next render asks again). R4c adds one exception: a
+    `Subject` region found `per` piece asks the `subject` finder about the crop of each piece, uncached, whatever was handed in
+    or kept (see "Regions and `each` are Rust"). `Finder` is `find` only: the identity only the
     pipeline's fingerprint reads is the pipeline's. *Rejected:* releasing the lock before `find` (two asks).
   - *`Photo` borrows the picture* (zero copy from numpy), and `light` is made from the working picture (framed and sized, before
     any step; the pictures as given are only what a finder is asked about), not from a step's output. `background` is 1 - `subject`.
@@ -705,8 +707,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   macOS x86_64 wheel, so on Intel Macs pip picks an older onnxruntime (1.23.2 when this was written). A Windows arm64
   wheel waits for someone to ask. A user on a common platform never needs a compiler, and nothing published goes
   untried.
-- **The smallest supported thread stack is 256 KB.** The walks over regions are iterative (a chain of 50,000 regions and
-  a diamond of 20,000 levels are read, checked, rendered, traced and dropped on 64 KB). The depth of a value inside a
+- **The smallest supported thread stack is 256 KB.** The walks over regions are iterative: `tests/deep.rs` pins a chain of
+  2,000 regions and a diamond of 2,000 levels, read, checked, rendered, traced and dropped on a 128 KB thread. (Measured
+  once, not guaranteed by a test: a chain of 50,000 and a diamond of 20,000 on 64 KB, in a debug build, 355 s.) The depth of a value inside a
   step is not ours: serde_json (128 levels in all) and toml (80) recurse, and the Python dict reaches the core through
   `to_json`, which refuses more than 128 levels (the readers' own limit) before anything walks it. The deepest such value
   needs 160 KB in the shipped build and overflows at 128 KB. *Reason:* glibc, macOS and Windows threads have 512 KB or
