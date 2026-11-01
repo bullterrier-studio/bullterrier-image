@@ -1,7 +1,8 @@
 """Reading a recipe from a small TOML file: `load_recipe(path)` returns a validated `Recipe`.
 
 Promises: every error is a `RecipeError` that starts with the file's name, then names the step and the offending key
-(a TOML syntax error keeps its line and column); nothing is read except that one file. The format (UTF-8 TOML):
+(a TOML syntax error keeps its line and column); the files read are that one and the pictures and lookup tables
+it names. The format (UTF-8 TOML):
 
     format = 3                     # optional: the recipe format version; this release reads 1 (the default), 2 and 3
     name = "green terminal"        # optional, free text (default: the file name without `.toml`)

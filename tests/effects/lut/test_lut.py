@@ -5,6 +5,7 @@ here row by row in the format's own order (red changes fastest), and a table of 
 is a mean of two entries.
 """
 
+import sys
 from collections.abc import Callable
 from itertools import product
 from pathlib import Path
@@ -134,7 +135,7 @@ BAD_FILES = {
     "too many rows": ("LUT_3D_SIZE 2\n" + ROWS + "0 0 0\n", r"needs 8 rows.*has 9"),
     "a row of two numbers": ("LUT_3D_SIZE 2\n0 0\n", r"line 2.*needs 3 numbers"),
     "a word in a row": ("LUT_3D_SIZE 2\n0 0 x\n", r"line 2.*cannot read"),
-    "unknown keyword": ("LUT_3D_SIZE 2\nGAMMA 2.2\n", r"line 2.*unknown keyword 'GAMMA'"),
+    "unknown keyword": ("LUT_3D_SIZE 2\nGAMMA 2.2\n", r"line 2.*unknown keyword"),
     "domain upside down": ("DOMAIN_MIN 1 1 1\nDOMAIN_MAX 0 0 0\nLUT_3D_SIZE 2\n" + ROWS, r"domain"),
     "infinite value": ("LUT_3D_SIZE 2\n" + ROWS.replace("0 0 0", "1e999 0 0", 1), r"finite"),
     "empty file": ("", r"no LUT_3D_SIZE"),
@@ -153,6 +154,42 @@ def test_a_cube_that_is_not_text_or_not_there_fails_naming_the_file(tmp_path, na
     (tmp_path / "binary.cube").write_bytes(b"\xff\xfe\x00\x01")
     with pytest.raises(LutError, match=name):
         load_lut(tmp_path / name)
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["127.0.0.1\tsecret-host", "root:secret:0:0:/var/root", "3 secret 5", "SECRET 1 2 3"],
+    ids=["a row with a word", "a line of another file", "a row with a word between numbers", "an unknown keyword"],
+)
+def test_a_fault_names_the_line_number_and_never_quotes_a_line_of_the_file(tmp_path, line):
+    (tmp_path / "other.txt").write_text(f"LUT_3D_SIZE 2\n{line}\n", encoding="utf-8")
+    with pytest.raises(LutError, match=r"line 2") as caught:
+        load_lut(tmp_path / "other.txt")
+    assert "secret" not in str(caught.value).lower()
+
+
+LIMIT = 64 * 1024 * 1024  # the documented limit of `load_lut`, in bytes
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="/dev/zero is a POSIX device")
+def test_a_file_that_never_ends_is_refused_after_reading_only_the_limit():
+    with pytest.raises(LutError, match="64 MiB"):
+        load_lut("/dev/zero")
+
+
+@pytest.mark.parametrize(
+    ("size", "refused"),
+    [pytest.param(LIMIT, False, id="exactly at the limit"), pytest.param(LIMIT + 1, True, id="one byte over")],
+)
+def test_a_file_over_the_limit_is_refused_and_one_at_it_is_read(tmp_path, size, refused):
+    cube = tmp_path / "big.cube"
+    head = "LUT_3D_SIZE 2\n" + ROWS
+    cube.write_text(head + "#" * (size - len(head)), encoding="utf-8")  # the rest is one long comment
+    if refused:
+        with pytest.raises(LutError, match="64 MiB"):
+            load_lut(cube)
+    else:
+        assert load_lut(cube).size == 2
 
 
 def test_a_recipe_with_a_bad_cube_fails_at_load_naming_step_parameter_and_file(tmp_path):

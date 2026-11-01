@@ -100,18 +100,28 @@ def load_picture(path: str | Path) -> np.ndarray:
         return np.concatenate([rgb, alpha], axis=2)
 
 
+_MAX_CUBE_BYTES = 64 * 1024 * 1024  # constant: text of a size-128 table is about 50 MB; the common sizes are 17 to 65
+
+
 def load_lut(path: str | Path) -> Lut:
     """Read a 3D colour lookup table from an Adobe/Resolve `.cube` file (UTF-8 text).
 
     Understood: `TITLE`, `DOMAIN_MIN` and `DOMAIN_MAX` (three numbers each, default 0 and 1), `LUT_3D_SIZE` (2 to 256)
     and `LUT_3D_INPUT_RANGE` (a minimum and a maximum for all channels), `#` comments, and then the size cubed rows of
-    three numbers, red changing fastest. The `Lut` is labelled with `path` as given. LutError naming the file, and the
-    line of a fault in it, for a file that is missing, not UTF-8, 1D (`LUT_1D_SIZE`), has a keyword or row it cannot
-    read, or has too few or too many rows.
+    three numbers, red changing fastest. The `Lut` is labelled with `path` as given. At most 64 MiB is read. LutError
+    naming the file, and the number (never the text) of the line of a fault in it, for a file that is missing, over
+    64 MiB, not UTF-8, 1D (`LUT_1D_SIZE`), has a keyword or row it cannot read, or has too few or too many rows.
     """
     try:
-        text = Path(path).read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as error:
+        with Path(path).open("rb") as handle:
+            data = handle.read(_MAX_CUBE_BYTES + 1)
+    except OSError as error:
+        raise LutError(f"cannot read {path} as a .cube file: {error}") from error
+    if len(data) > _MAX_CUBE_BYTES:
+        raise LutError(f"cannot read {path} as a .cube file: it is over 64 MiB")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
         raise LutError(f"cannot read {path} as a .cube file: {error}") from error
     size = 0
     domain: dict[str, tuple[float, ...]] = {"DOMAIN_MIN": (0.0, 0.0, 0.0), "DOMAIN_MAX": (1.0, 1.0, 1.0)}
@@ -129,11 +139,11 @@ def load_lut(path: str | Path) -> Lut:
         if key == "LUT_1D_SIZE":
             raise fault(number, "a 1D lookup table is not supported, only LUT_3D_SIZE")
         if not is_row and key not in counts:
-            raise fault(number, f"unknown keyword {key!r}")
+            raise fault(number, "unknown keyword")
         try:
             numbers = tuple(float(word) for word in (words if is_row else words[1:]))
         except ValueError:
-            raise fault(number, f"cannot read the numbers in {line.strip()!r}") from None
+            raise fault(number, "cannot read the numbers") from None
         if is_row and size == 0:
             raise fault(number, "a row of numbers before LUT_3D_SIZE")
         wanted = 3 if is_row else counts[key]  # constant: a row holds red, green and blue
