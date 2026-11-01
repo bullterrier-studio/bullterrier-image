@@ -26,7 +26,12 @@ use crate::{Error, Layer, Picture, Recipe};
 /// ```
 ///
 /// A photo asks its finder for a map at most once, with the picture as it was given, and only when a recipe rendered
-/// on it uses the map and none was handed in (see [`Photo::with_finder`]). The map must be of the picture's size. When
+/// on it uses the map and none was handed in (see [`Photo::with_finder`]). The map must be of the picture's size.
+///
+/// The finder of `subject` is also asked, whether or not a `subject` map was handed in, by a recipe that declares a
+/// `subject` region with `per`: once for each piece of the partition, with the crop of the working picture round the
+/// piece, and each answer must be of the crop's size. Returning [`Error::map_not_found`] for `subject` there means the
+/// piece holds no subject. When
 /// there is nothing to find, return [`Error::map_not_found`] with the map's name, so the package raises the exception
 /// of that map (`SubjectNotFoundError` for `subject`).
 pub trait Finder: Send + Sync {
@@ -50,6 +55,12 @@ impl Found {
             finder,
             answer: Mutex::new(None),
         }
+    }
+
+    /// The finder itself, which a region made from the subject of each piece of a partition asks about crops of the
+    /// picture: it is not the photo's one answer, which is for the whole picture.
+    pub(super) fn finder(&self) -> Arc<dyn Finder> {
+        Arc::clone(&self.finder)
     }
 
     /// The map `name` of `picture`: the kept answer, else the finder's, which must fit the picture.

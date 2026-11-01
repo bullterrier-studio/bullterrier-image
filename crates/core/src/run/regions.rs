@@ -12,9 +12,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::ops::pieces::{self, Bounds};
-use crate::ops::{bands, gradient, grid};
-use crate::region::{Band, Bands, Combine, CombineOp, Grid, LinearGradient, Pick, Piece, RadialGradient};
-use crate::{Error, Labels, Layer, Picture, Region, Regions};
+use crate::ops::{bands, cast, gradient, grid};
+use crate::region::{Band, Bands, Combine, CombineOp, Grid, LinearGradient, Pick, Piece, RadialGradient, Subject};
+use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
 /// A region once made.
 enum Made {
@@ -28,12 +28,49 @@ pub(super) struct Evaluator {
     made: BTreeMap<String, Made>,
     /// The last step (from 0) that needs each region; a region not named here is needed by none.
     last: BTreeMap<String, usize>,
+    /// The photo's subject finder, which a region that finds the subject in each piece asks about crops of the picture.
+    finder: Option<Arc<dyn Finder>>,
+}
+
+/// The refusal of a `Subject` region with `per` (the region `name`, finding the subject in the pieces of `per`) when
+/// the photo has no subject finder: a subject map of the whole photo cannot answer for a part of it.
+fn no_finder(name: &str, per: &str) -> Error {
+    Error::map_not_found(
+        "subject",
+        format!(
+            "region '{name}' finds the subject in each piece of '{per}', but no subject finder was given: give the photo \
+             one with `Photo::with_finder(\"subject\", ..)`"
+        ),
+    )
+}
+
+/// `Ok` if the photo has a subject finder (`has_finder`) whenever one of the `reached` regions needs one.
+///
+/// # Errors
+/// [`Error::MapNotFound`] of the subject, naming the first region that finds the subject in each piece of a partition.
+pub(super) fn check_finder<'a>(
+    declared: &Regions,
+    reached: impl IntoIterator<Item = &'a str>,
+    has_finder: bool,
+) -> Result<(), Error> {
+    for name in reached {
+        if let (Some(Region::Subject(Subject { per: Some(per), .. })), false) = (declared.get(name), has_finder) {
+            return Err(no_finder(name, per));
+        }
+    }
+    Ok(())
 }
 
 impl Evaluator {
     /// The evaluator of the `declared` regions of a recipe, holding `held`, the maps of the photo that the steps use, and
-    /// told by `last` when each region is no longer needed.
-    pub(super) fn new(declared: &Regions, held: BTreeMap<String, Arc<Layer>>, last: BTreeMap<String, usize>) -> Self {
+    /// told by `last` when each region is no longer needed. `finder` is the photo's subject finder, if it has one (see
+    /// [`check_finder`]).
+    pub(super) fn new(
+        declared: &Regions,
+        held: BTreeMap<String, Arc<Layer>>,
+        last: BTreeMap<String, usize>,
+        finder: Option<Arc<dyn Finder>>,
+    ) -> Self {
         Self {
             declared: declared.clone(),
             made: held
@@ -41,6 +78,7 @@ impl Evaluator {
                 .map(|(name, map)| (name, Made::Selection(map)))
                 .collect(),
             last,
+            finder,
         }
     }
 
@@ -182,6 +220,23 @@ impl Evaluator {
                 };
                 partition(grid::grid(height, width, frame, &columns.0, &rows.0))
             }
+            // the subject of the whole picture is the built-in one, which is held
+            Some(Region::Subject(Subject { per: None, .. })) => self.selected("subject").map(Made::Selection),
+            Some(Region::Subject(Subject {
+                per: Some(per),
+                context,
+                threshold,
+            })) => {
+                let finder = self.finder.as_ref().ok_or_else(|| no_finder(name, per))?;
+                let labels = self.partitioned(per)?;
+                selection(found_in_pieces(
+                    finder.as_ref(),
+                    picture,
+                    &labels,
+                    *context,
+                    *threshold,
+                )?)
+            }
             Some(Region::Pick(Pick { of, pieces: picked })) => {
                 let labels = self.partitioned(of)?;
                 let mut numbers = Vec::with_capacity(picked.len());
@@ -202,6 +257,63 @@ impl Evaluator {
             _ => Err(Error::Recipe(format!("region '{name}' is not made by the core"))),
         }
     }
+}
+
+/// The subject of `picture` found piece by piece: for each piece of `labels`, in order, the finder is asked about the crop
+/// of the picture round the piece (the piece's box grown by `context` of its own size on each side, clipped), and of its
+/// answer the pixels of the piece itself that it is surer of than `threshold` are kept, as it gave them. A piece the
+/// finder finds no subject in adds nothing.
+///
+/// # Errors
+/// What the finder fails with other than "no subject" ([`ErrorKind::SubjectNotFound`]); [`Error::MapNotFound`] of the
+/// subject, naming the piece, for an answer of another size than the crop.
+fn found_in_pieces(
+    finder: &dyn Finder,
+    picture: &Picture<'_>,
+    labels: &Labels,
+    context: f64,
+    threshold: f64,
+) -> Result<Vec<f32>, Error> {
+    let (height, width) = (picture.height(), picture.width());
+    // the same single precision as the matte it is compared with
+    let threshold = cast::single(threshold);
+    let mut found = vec![0.0_f32; height * width];
+    let boxes = pieces::piece_bounds(labels.values(), height, width, labels.pieces());
+    for (piece, window) in boxes.into_iter().enumerate() {
+        let window = pieces::grown(window, context, height, width);
+        let (rows, columns) = (window.bottom - window.top, window.right - window.left);
+        let crop = pieces::crop(picture.pixels(), width, window);
+        let matte = match finder.find(&Picture::new(rows, columns, crop.as_flattened())?) {
+            Ok(matte) => matte,
+            // nothing stands out in this piece: it adds nothing
+            Err(error) if error.kind() == ErrorKind::SubjectNotFound => continue,
+            Err(error) => return Err(error),
+        };
+        if (matte.height(), matte.width()) != (rows, columns) {
+            return Err(Error::map_not_found(
+                "subject",
+                format!(
+                    "the subject finder gave a map of {} x {} for piece {piece}, whose view (rows {}..{}, columns \
+                     {}..{}) is {rows} x {columns}",
+                    matte.height(),
+                    matte.width(),
+                    window.top,
+                    window.bottom,
+                    window.left,
+                    window.right
+                ),
+            ));
+        }
+        for (row, line) in matte.values().chunks_exact(columns).enumerate() {
+            for (column, &sure) in line.iter().enumerate() {
+                let at = (window.top + row) * width + window.left + column;
+                if pieces::piece(labels.values()[at]) == piece && sure > threshold {
+                    found[at] = sure;
+                }
+            }
+        }
+    }
+    Ok(found)
 }
 
 #[cfg(test)]
@@ -469,6 +581,14 @@ mod tests {
     }
 
     #[test]
+    fn a_subject_region_without_per_is_the_subject_of_the_photo() -> Result<(), Error> {
+        let declared = json!({"me": {"kind": "subject", "context": 0.5, "threshold": 0.2}});
+        let subject = vec![0.0, 0.25, 0.5, 1.0];
+        assert_eq!(made(1, 4, &declared, "me", &[("subject", subject.clone())])?, subject);
+        Ok(())
+    }
+
+    #[test]
     fn a_long_chain_of_regions_is_made_without_a_deep_call_stack() -> Result<(), Error> {
         // 3000 bands, each of the one before: the last is the depth passed through every one of them
         let mut declared = serde_json::Map::new();
@@ -637,12 +757,6 @@ mod tests {
                 json!({"p": {"kind": "grid", "edge": torn["edge"]}}),
                 true,
                 "a torn edge",
-            ),
-            (
-                "a subject per piece",
-                json!({"g": {"kind": "grid"}, "p": {"kind": "subject", "per": "g"}}),
-                false,
-                "kind subject with `per`",
             ),
         ];
         for (what, declared, by_each, said) in rows {

@@ -54,19 +54,19 @@ pub(crate) struct Reach {
     pub(crate) last: usize,
 }
 
-/// What `name` is made from: `background` from the subject, a declared region from the regions it refers to, nothing
-/// else (the other built-in regions are maps).
+/// What `name` is made from: `background` and a `Subject` region without `per` from the subject, another declared region
+/// from the regions it refers to, nothing else (the other built-in regions are maps).
 fn made_from<'a>(regions: &'a Regions, name: &str) -> Vec<&'a str> {
-    if name == "background" {
-        return vec!["subject"];
-    }
-    regions.get(name).map_or_else(Vec::new, |region| {
-        region
+    match regions.get(name) {
+        Some(Region::Subject(Subject { per: None, .. })) => vec!["subject"],
+        Some(region) => region
             .refers_to()
             .into_iter()
             .map(|(_, made_from, _)| made_from)
-            .collect()
-    })
+            .collect(),
+        None if name == "background" => vec!["subject"],
+        None => Vec::new(),
+    }
 }
 
 impl Uses {
@@ -112,9 +112,6 @@ impl Uses {
             match (name.as_str(), regions.get(&name)) {
                 ("subject" | "depth", _) | (_, Some(Region::Given(_))) => {
                     needs.maps.insert(name);
-                }
-                (_, Some(Region::Subject(Subject { per: None, .. }))) => {
-                    needs.maps.insert("subject".to_owned());
                 }
                 (_, Some(Region::Subject(Subject { per: Some(_), .. }))) => needs.finds_pieces = true,
                 // `background` and the regions made from other regions need what those need; `light` is made from the

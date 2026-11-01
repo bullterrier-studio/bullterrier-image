@@ -81,7 +81,9 @@ impl<'a> Photo<'a> {
 
     /// This photo with `finder` to find the map `name` (as for [`with_map`](Self::with_map)). It is asked, with the picture
     /// as it was given, when a recipe rendered on the photo uses the map and none was handed in under that name, and not
-    /// again: its answer is kept for every later render. Share one finder between photos with an [`Arc`].
+    /// again: its answer is kept for every later render. (A recipe with a `subject` region found `per` piece also asks
+    /// the finder of `subject`, whatever was handed in, about the crop of each piece, and those answers are not kept.)
+    /// Share one finder between photos with an [`Arc`].
     #[must_use]
     pub fn with_finder(mut self, name: impl Into<String>, finder: Arc<dyn Finder>) -> Self {
         self.finders.insert(name.into(), Found::new(finder));
@@ -98,11 +100,13 @@ impl<'a> Photo<'a> {
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
     /// (the Rec. 709 brightness of the picture the steps work on). A region made from them (`band`, `bands`, `combine`,
-    /// the gradients, `grid`, `pick`) is made for the working picture when its step comes and dropped after the last
-    /// step that needs it; one declared and not used costs nothing. A step that takes a `partition` receives the pieces
-    /// of the region it names (a selection is split into the pixels it chooses, above one half, and the others). A recipe
-    /// whose steps use a region the core does not make yet (`shards`, `cuts`, `path`, `svg`, a `subject` found `per`
-    /// piece, a torn edge) or an `each` step is refused before anything runs.
+    /// the gradients, `grid`, `pick`, `subject`) is made for the working picture when its step comes and dropped after
+    /// the last step that needs it; one declared and not used costs nothing. A step that takes a `partition` receives
+    /// the pieces of the region it names (a selection is split into the pixels it chooses, above one half, and the
+    /// others). A `subject` region found `per` piece needs the photo's `subject` finder (a handed in `subject` map does
+    /// not do) and asks it about each piece's crop of the working picture. A recipe whose steps use a region the core
+    /// does not make yet (`shards`, `cuts`, `path`, `svg`, a torn edge) or an `each` step is refused before anything
+    /// runs, and so is one that needs the subject finder of a photo that has none.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
     /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the
@@ -154,6 +158,11 @@ impl<'a> Photo<'a> {
                 )));
             }
         }
+        regions::check_finder(
+            &recipe.regions,
+            reach.iter().map(|reached| reached.name.as_str()),
+            self.finders.contains_key("subject"),
+        )?;
         // the subject the frame needs (a crop around it, a cut by it), found before anything is made
         let needs_subject = recipe.frame.needs_subject();
         let given_subject = needs_subject
@@ -192,7 +201,12 @@ impl<'a> Photo<'a> {
             ran: 0,
             current: None,
             cut,
-            regions: Evaluator::new(&recipe.regions, held, last),
+            regions: Evaluator::new(
+                &recipe.regions,
+                held,
+                last,
+                self.finders.get("subject").map(Found::finder),
+            ),
         })
     }
 }

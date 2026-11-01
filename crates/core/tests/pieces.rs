@@ -3,10 +3,10 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use bullterrier_image::region::{Bands, Given, Grid, Pick, Shares};
+use bullterrier_image::region::{Bands, Given, Grid, Pick, Shares, Subject};
 use bullterrier_image::{
-    Category, Effect, Error, ErrorKind, FieldParam, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets,
-    Recipe, Step, register,
+    Category, Effect, Error, ErrorKind, FieldParam, Finder, Image, Input, Inputs, Layer, Options, Photo, Picture,
+    Presets, Recipe, Step, register,
 };
 use proptest::prelude::*;
 use proptest::test_runner::TestRunner;
@@ -604,5 +604,376 @@ fn a_grid_is_laid_over_the_bounding_box_of_a_selection_that_is_no_rectangle() ->
     // column (centre 4.5) is the middle one
     let (labels, count) = at(&[(1, 4), (4, 4)], 3, 1)?;
     assert_eq!((labels[..8].to_vec(), count), (vec![0, 0, 0, 0, 1, 2, 2, 2], 3));
+    Ok(())
+}
+
+/// What a [`Looks`] finder is asked and answers.
+type Answer = Box<dyn Fn(&Picture<'_>) -> Result<Layer, Error> + Send + Sync>;
+
+/// A subject finder that logs the size of each crop it is asked about, in order, and answers with `answer` of it.
+struct Looks {
+    asked: Mutex<Vec<(usize, usize)>>,
+    answer: Answer,
+}
+
+impl Looks {
+    fn new(answer: impl Fn(&Picture<'_>) -> Result<Layer, Error> + Send + Sync + 'static) -> Arc<Self> {
+        Arc::new(Self {
+            asked: Mutex::new(Vec::new()),
+            answer: Box::new(answer),
+        })
+    }
+
+    /// A finder that knows the truth: 0 where the crop's red is up to one half, else the red.
+    fn truth() -> Arc<Self> {
+        Self::new(|picture| {
+            Layer::new(
+                picture.height(),
+                picture.width(),
+                picture
+                    .values()
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .map(|pixel| if pixel[0] > 0.5 { pixel[0] } else { 0.0 })
+                    .collect(),
+            )
+        })
+    }
+
+    fn asked(&self) -> Vec<(usize, usize)> {
+        self.asked.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+}
+
+impl Finder for Looks {
+    fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
+        self.asked
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((picture.height(), picture.width()));
+        (self.answer)(picture)
+    }
+}
+
+/// `grid` as `g` and the subject of each of its pieces as `found`, which a step of `spy` works from.
+fn per_piece(spy: &str, grid: Grid, context: f64, threshold: f64) -> Recipe {
+    asking(spy, "found").with_region("g", grid).with_region(
+        "found",
+        Subject {
+            per: Some("g".to_owned()),
+            context,
+            threshold,
+        },
+    )
+}
+
+fn columns(across: &[f64]) -> Grid {
+    Grid {
+        columns: shares(across),
+        ..Grid::default()
+    }
+}
+
+/// A picture of `height` x `width` pixels whose red channel takes the values `reds` in turn, the others 0.5.
+fn reddish(height: usize, width: usize, reds: &[f32]) -> Vec<f32> {
+    (0..height * width)
+        .flat_map(|at| [reds[at % reds.len()], 0.5, 0.5])
+        .collect()
+}
+
+/// The truth about `pixels` (a finder that knows it): the red where it is above one half, else 0.
+fn truth(pixels: &[f32]) -> Vec<f32> {
+    pixels
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| if pixel[0] > 0.5 { pixel[0] } else { 0.0 })
+        .collect()
+}
+
+#[test]
+fn the_finds_of_all_the_pieces_are_united_into_what_a_finder_that_knows_the_truth_finds_in_the_whole() -> Outcome {
+    let spy = Spy::register("per_truth", false)?;
+    let reds = [0.9, 0.1, 0.55, 0.5, 0.3, 0.7, 0.2, 0.95, 0.5001];
+    let pixels = reddish(9, 11, &reds);
+    let mut runner = TestRunner::default();
+    runner.run(
+        &(
+            1_usize..=4,
+            1_usize..=3,
+            prop::sample::select(vec![0.0, 0.1, 0.25, 0.5, 1.0]),
+        ),
+        |(across, down, context)| {
+            let fail = |error: Error| TestCaseError::fail(error.to_string());
+            let photo = Photo::new(Picture::new(9, 11, &pixels).map_err(fail)?).with_finder("subject", Looks::truth());
+            let grid = Grid {
+                columns: Shares::equal(across),
+                rows: Shares::equal(down),
+                ..Grid::default()
+            };
+            let made = near_of(&spy, &photo, &per_piece("per_truth", grid, context, 0.0)).map_err(fail)?;
+            prop_assert!(made == truth(&pixels), "{across} x {down} pieces, context {context}");
+            Ok(())
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+fn a_piece_is_looked_at_in_its_box_grown_by_the_context_rounded_to_the_even_pixel_and_clipped() -> Outcome {
+    // (the spy is the effect of the steps, which the test does not look into)
+    Spy::register("per_crops", false)?;
+    let pixels = grey(4, 10);
+    let asked = |across: &[f64], context: f64, options: Options| -> Result<Vec<(usize, usize)>, Error> {
+        let finder = Looks::truth();
+        let photo = Photo::new(Picture::new(4, 10, &pixels)?).with_finder("subject", finder.clone());
+        photo.render(
+            &per_piece("per_crops", columns(across), context, 0.0),
+            &Presets::new(),
+            options,
+        )?;
+        Ok(finder.asked())
+    };
+    let plain = Options::default();
+    // two pieces of 4 x 5: the context is 2.5 pixels across, which goes to 2 (the even one, not 3), and 2 pixels down,
+    // clipped at both ends of the 4 rows
+    assert_eq!(asked(&[1.0, 1.0], 0.5, plain)?, [(4, 7), (4, 7)]);
+    assert_eq!(asked(&[1.0, 1.0], 0.0, plain)?, [(4, 5), (4, 5)]);
+    assert_eq!(asked(&[1.0, 1.0], 1.0, plain)?, [(4, 10), (4, 10)]);
+    // the pieces are asked about in order, whatever their size: 3 wide, then 7
+    assert_eq!(asked(&[1.0, 2.0], 0.0, plain)?, [(4, 3), (4, 7)]);
+    // 0.25 of 3 is 0.75, which goes to 1; of 7 it is 1.75, which goes to 2 (clipped at the right edge)
+    assert_eq!(asked(&[1.0, 2.0], 0.25, plain)?, [(4, 4), (4, 9)]);
+    // the crop is of the working picture: at a size of 20 wide it is 8 high and the pieces are 10 wide each
+    assert_eq!(
+        asked(&[1.0, 1.0], 0.0, Options::default().with_size(20))?,
+        [(8, 10), (8, 10)]
+    );
+    // down the picture it is the pieces' height that counts, not their width: a 10 x 6 picture in two rows of 5, context
+    // 0.5 is 2.5 down (2) and 3 across (clipped to the 6)
+    let tall = grey(10, 6);
+    let finder = Looks::truth();
+    let photo = Photo::new(Picture::new(10, 6, &tall)?).with_finder("subject", finder.clone());
+    let rows = Grid {
+        rows: shares(&[1.0, 1.0]),
+        ..Grid::default()
+    };
+    photo.render(&per_piece("per_crops", rows, 0.5, 0.0), &Presets::new(), plain)?;
+    assert_eq!(finder.asked(), [(7, 6), (7, 6)]);
+    Ok(())
+}
+
+#[test]
+fn every_piece_is_asked_once_however_often_the_region_is_used_and_a_handed_in_subject_does_not_stop_it() -> Outcome {
+    let spy = Spy::register("per_once", false)?;
+    let pixels = reddish(4, 6, &[0.9, 0.2, 0.7]);
+    let finder = Looks::truth();
+    let photo = Photo::new(Picture::new(4, 6, &pixels)?)
+        .with_finder("subject", finder.clone())
+        .with_map("subject", Layer::new(4, 6, vec![0.25; 24])?)?;
+    let mut recipe = per_piece("per_once", columns(&[1.0, 1.0, 1.0]), 0.0, 0.0);
+    recipe.steps.extend([
+        Step::new("per_once").param("near", "found").into(),
+        Step::new("per_once").param("near", "found").mask("found").into(),
+    ]);
+    photo.render(&recipe, &Presets::new(), Options::default())?;
+    assert_eq!(finder.asked(), [(4, 2); 3]);
+    // all three steps got the same map, which is the finds, not the handed in subject
+    let seen = spy.seen();
+    assert_eq!(seen.len(), 3);
+    assert!(
+        seen.iter()
+            .all(|seen| seen.near.as_deref() == Some(truth(&pixels).as_slice()))
+    );
+    Ok(())
+}
+
+#[test]
+fn only_the_pixels_of_the_piece_itself_count_whatever_else_its_view_shows() -> Outcome {
+    let spy = Spy::register("per_own", false)?;
+    let pixels = grey(4, 9);
+    // every crop is answered with 1 over its width: 0.2 for the 5 wide crops, 1/7 for the middle one
+    let finder = Looks::new(|picture| {
+        Layer::new(
+            picture.height(),
+            picture.width(),
+            vec![1.0 / 7.0; picture.height() * picture.width()],
+        )
+    });
+    let photo = Photo::new(Picture::new(4, 9, &pixels)?).with_finder("subject", finder);
+    let made = near_of(&spy, &photo, &per_piece("per_own", columns(&[1.0, 1.0, 1.0]), 0.5, 0.0))?;
+    assert!(made.iter().all(|value| (value - 1.0 / 7.0).abs() < 1e-7), "{made:?}");
+    // answered by the width of the crop (0.2, 1/7, 0.2), each piece's own columns carry its own answer
+    let wide = Looks::new(|picture| {
+        #[expect(clippy::cast_precision_loss, reason = "a test width")]
+        let width = picture.width() as f32;
+        Layer::new(
+            picture.height(),
+            picture.width(),
+            vec![1.0 / width; picture.height() * picture.width()],
+        )
+    });
+    let photo = Photo::new(Picture::new(4, 9, &pixels)?).with_finder("subject", wide);
+    let made = near_of(&spy, &photo, &per_piece("per_own", columns(&[1.0, 1.0, 1.0]), 0.5, 0.0))?;
+    let row: Vec<f32> = [vec![0.2; 3], vec![1.0 / 7.0; 3], vec![0.2; 3]].concat();
+    for line in made.as_chunks::<9>().0 {
+        assert!(line.iter().zip(&row).all(|(a, b)| (a - b).abs() < 1e-7), "{line:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_unaffected() -> Outcome {
+    let spy = Spy::register("per_none", false)?;
+    let pixels = reddish(4, 9, &[0.9, 0.8, 0.7]);
+    // nothing in the narrow piece (the first, 4 wide with its context), the truth in the others
+    let finder = Looks::new(|picture| {
+        if picture.width() == 4 {
+            Err(Error::map_not_found("subject", "nothing stands out"))
+        } else {
+            Layer::new(
+                picture.height(),
+                picture.width(),
+                picture
+                    .values()
+                    .as_chunks::<3>()
+                    .0
+                    .iter()
+                    .map(|pixel| pixel[0])
+                    .collect(),
+            )
+        }
+    });
+    let photo = Photo::new(Picture::new(4, 9, &pixels)?).with_finder("subject", finder.clone());
+    // pieces of 2, 3 and 4 columns; context 0 so the crops are 2, 3 and 4 wide: only the last is 4
+    let made = near_of(
+        &spy,
+        &photo,
+        &per_piece("per_none", columns(&[2.0, 3.0, 4.0]), 0.0, 0.0),
+    )?;
+    assert_eq!(finder.asked(), [(4, 2), (4, 3), (4, 4)]);
+    for line in made.as_chunks::<9>().0 {
+        assert_eq!(line[..5], [0.9, 0.8, 0.7, 0.9, 0.8]);
+        assert_eq!(line[5..], [0.0; 4]);
+    }
+    Ok(())
+}
+
+#[test]
+fn an_answer_of_the_wrong_size_and_any_other_failure_stop_the_render() -> Outcome {
+    let spy = Spy::register("per_bad", false)?;
+    let pixels = grey(4, 6);
+    let photo_with = |finder: Arc<Looks>| -> Result<Photo<'_>, Error> {
+        Ok(Photo::new(Picture::new(4, 6, &pixels)?).with_finder("subject", finder))
+    };
+    let recipe = per_piece("per_bad", columns(&[1.0, 1.0]), 0.0, 0.0);
+    // a map of 1 x 1 for a view of 4 x 3: the subject's error, naming the piece and both sizes
+    let small = photo_with(Looks::new(|_| Layer::new(1, 1, vec![0.5])))?;
+    let result = small.render(&recipe, &Presets::new(), Options::default());
+    assert!(
+        matches!(&result, Err(error) if error.kind() == ErrorKind::SubjectNotFound
+            && ["piece 0", "1 x 1", "4 x 3"].iter().all(|word| error.to_string().contains(word))),
+        "{result:?}"
+    );
+    // what is not "nothing found" is the render's error, as it is
+    let broken = photo_with(Looks::new(|_| Err(Error::foreign("segmenter", "the model failed"))))?;
+    let result = broken.render(&recipe, &Presets::new(), Options::default());
+    assert!(
+        matches!(&result, Err(error) if error.kind() == ErrorKind::Other && error.to_string().contains("the model failed")),
+        "{result:?}"
+    );
+    assert_eq!(spy.seen().len(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_pixel_counts_only_when_the_finder_is_surer_of_it_than_the_threshold_and_keeps_its_value() -> Outcome {
+    let spy = Spy::register("per_threshold", false)?;
+    let pixels = grey(1, 6);
+    let answer = vec![0.0, 0.3, 0.31, 0.5, 0.8, 1.0];
+    let at = |threshold: f64| {
+        let answered = answer.clone();
+        let finder = Looks::new(move |_| Layer::new(1, 6, answered.clone()));
+        let photo = Photo::new(Picture::new(1, 6, &pixels)?).with_finder("subject", finder);
+        near_of(
+            &spy,
+            &photo,
+            &per_piece("per_threshold", Grid::default(), 0.0, threshold),
+        )
+    };
+    // above the threshold, as found; a value equal to it is dropped (0.3 as the maps hold it is the threshold 0.3)
+    assert_eq!(at(0.3)?, [0.0, 0.0, 0.31, 0.5, 0.8, 1.0]);
+    assert_eq!(at(0.0)?, [0.0, 0.3, 0.31, 0.5, 0.8, 1.0]);
+    assert_eq!(at(0.8)?, [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]);
+    assert_eq!(at(1.0)?, [0.0; 6]);
+    Ok(())
+}
+
+#[test]
+fn a_photo_without_a_subject_finder_is_refused_before_anything_runs_even_with_a_subject_map() -> Outcome {
+    let spy = Spy::register("per_nofinder", false)?;
+    let pixels = grey(2, 2);
+    let mut recipe = per_piece("per_nofinder", Grid::default(), 0.0, 0.0);
+    recipe
+        .steps
+        .insert(0, Step::new("per_nofinder").param("near", "subject").into());
+    for photo in [
+        Photo::new(Picture::new(2, 2, &pixels)?),
+        Photo::new(Picture::new(2, 2, &pixels)?).with_map("subject", Layer::new(2, 2, vec![1.0; 4])?)?,
+    ] {
+        let result = photo.render(&recipe, &Presets::new(), Options::default());
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::SubjectNotFound
+                && ["'found'", "'g'", "no subject finder"].iter().all(|word| error.to_string().contains(word))),
+            "{result:?}"
+        );
+    }
+    assert_eq!(spy.seen().len(), 0);
+    // a region that is declared and not used needs no finder
+    let unused = Recipe::new([Step::new("per_nofinder").param("near", "subject")])
+        .with_region("g", Grid::default())
+        .with_region(
+            "found",
+            Subject {
+                per: Some("g".to_owned()),
+                ..Subject::default()
+            },
+        );
+    Photo::new(Picture::new(2, 2, &pixels)?)
+        .with_map("subject", Layer::new(2, 2, vec![1.0; 4])?)?
+        .render(&unused, &Presets::new(), Options::default())?;
+    Ok(())
+}
+
+#[test]
+fn the_subject_can_be_found_in_the_pieces_of_bands_whose_boxes_are_not_rectangles_of_equal_size() -> Outcome {
+    let spy = Spy::register("per_bands", false)?;
+    let pixels = reddish(1, 5, &[0.9, 0.2, 0.7, 0.3, 0.6]);
+    let depth = Layer::new(1, 5, vec![0.9, 0.9, 0.2, 0.2, 0.9])?;
+    let finder = Looks::truth();
+    let photo = Photo::new(Picture::new(1, 5, &pixels)?)
+        .with_finder("subject", finder.clone())
+        .with_map("depth", depth)?;
+    let recipe = asking("per_bands", "found")
+        .with_region(
+            "b",
+            Bands {
+                of: "depth".to_owned(),
+                count: 2,
+            },
+        )
+        .with_region(
+            "found",
+            Subject {
+                per: Some("b".to_owned()),
+                context: 0.0,
+                threshold: 0.0,
+            },
+        );
+    let made = near_of(&spy, &photo, &recipe)?;
+    // the near band holds pixels 0, 1 and 4: its box is the whole row; the far band holds 2 and 3
+    assert_eq!(finder.asked(), [(1, 5), (1, 2)]);
+    assert_eq!(made, truth(&pixels));
     Ok(())
 }

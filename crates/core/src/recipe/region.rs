@@ -137,7 +137,6 @@ impl Region {
             Self::Cuts(_) => Some("kind cuts"),
             Self::Path(_) => Some("kind path"),
             Self::Svg(_) => Some("kind svg"),
-            Self::Subject(Subject { per: Some(_), .. }) => Some("kind subject with `per`"),
             Self::Pick(_)
             | Self::Bands(_)
             | Self::Subject(_)
