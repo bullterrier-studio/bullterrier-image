@@ -134,10 +134,10 @@ impl Region {
     pub(crate) fn not_yet(&self) -> Option<&'static str> {
         match self {
             Self::Shards(_) => Some("kind shards"),
-            Self::Cuts(_) => Some("kind cuts"),
             Self::Svg(_) => Some("kind svg"),
             Self::Grid(_)
             | Self::Path(_)
+            | Self::Cuts(_)
             | Self::Pick(_)
             | Self::Bands(_)
             | Self::Subject(_)

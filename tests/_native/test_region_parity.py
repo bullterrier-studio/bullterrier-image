@@ -131,6 +131,16 @@ def grid_cells(
     return first_pixel_numbers(down[:, None] * len(columns) + across[None, :])
 
 
+def side_of_line(shape: tuple[int, int], x: float, y: float, degrees: float) -> np.ndarray:
+    """The side of the line through (`x` of the width, `y` of the height) at `degrees` clockwise from the right that
+    each pixel's centre is on, as pieces numbered by first pixel: the sign of its offset along the line's normal."""
+    height, width = shape
+    across = np.arange(width)[None, :] + 0.5 - x * width
+    down = np.arange(height)[:, None] + 0.5 - y * height
+    radians = np.radians(degrees)
+    return first_pixel_numbers(down * np.cos(radians) - across * np.sin(radians) > 0)
+
+
 def bands_of(depth: np.ndarray, count: int) -> np.ndarray:
     """The band of each pixel: the highest first, a value on a border in the lower band, an empty band left out."""
     index = np.minimum(np.floor((1 - depth.astype(np.float64)) * count), count - 1).astype(int)
@@ -288,6 +298,20 @@ PARTITIONS: dict[str, tuple[dict[str, Any], Callable[[np.ndarray, np.ndarray], n
     "a band that leaves bands empty": (
         {"r": Bands(of="depth", count=100)},
         lambda photo, subject: bands_of(depth_of(photo), 100),
+    ),
+    "a line through a point at an angle": (
+        {"r": Cuts(lines=({"x": 0.4, "y": 0.6, "angle": 30},))},
+        lambda photo, subject: side_of_line(photo.shape[:2], 0.4, 0.6, 30),
+    ),
+    "two lines crossing": (
+        {"r": Cuts(lines=({"x": 0.4, "y": 0.6, "angle": 30}, {"x": 0.7, "y": 0.3, "angle": 100}))},
+        lambda photo, subject: first_pixel_numbers(
+            side_of_line(photo.shape[:2], 0.4, 0.6, 30) + 2 * side_of_line(photo.shape[:2], 0.7, 0.3, 100)
+        ),
+    ),
+    "a straight curve down the picture": (
+        {"r": Cuts(lines=({"path": "M 0.25 0 L 0.25 1"},))},
+        lambda photo, subject: first_pixel_numbers(np.broadcast_to(np.arange(128)[None, :] + 0.5 > 32, (96, 128))),
     ),
     "a selection used as a partition": (
         {"r": Band(of="depth", low=0.25, high=0.75, feather=0.1)},
@@ -563,11 +587,11 @@ def test_a_random_assignment_uses_every_look_and_favours_none_over_many_seeds(ph
 
 # --- the shipped looks and examples -------------------------------------------------------------------------------
 
-UNMADE_YET = (Shards, Cuts, Svg)
+UNMADE_YET = (Shards, Svg)
 
 
 def unmade(region: object) -> bool:
-    """Whether the core does not make this kind of region yet: shards, cuts or svg."""
+    """Whether the core does not make this kind of region yet: shards or svg."""
     return isinstance(region, UNMADE_YET)
 
 
@@ -585,7 +609,14 @@ def declares_regions(recipe: Recipe) -> bool:
     return bool(recipe.regions) or any(isinstance(step, Each) for step in recipe.steps)
 
 
-MADE = [path for path in FILES if declares_regions(load_recipe(path)) and not uses_unmade_region(load_recipe(path))]
+def tears(recipe: Recipe) -> bool:
+    """Whether a region the steps use has a torn edge, whose noise is the core's own stream, not numpy's."""
+    return any(getattr(recipe.regions[name], "edge", Edge()).style == "torn" for name in used_regions(recipe))
+
+
+RUNNABLE = [path for path in FILES if declares_regions(load_recipe(path)) and not uses_unmade_region(load_recipe(path))]
+MADE = [path for path in RUNNABLE if not tears(load_recipe(path))]
+TORN = [path for path in RUNNABLE if tears(load_recipe(path))]
 UNMADE = [path for path in FILES if uses_unmade_region(load_recipe(path))]
 
 
@@ -603,8 +634,11 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
         "one-cell",
         "focus_blur",
         "bezier-shape",
+        "diagonal",
+        "bezier-cut",
     }
-    assert {path.stem for path in UNMADE} >= {"glass", "svg", "torn", "tear", "diagonal", "bezier-cut"}
+    assert {path.stem for path in TORN} >= {"tear"}
+    assert {path.stem for path in UNMADE} >= {"glass", "svg", "torn"}
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
@@ -623,6 +657,21 @@ def test_a_shipped_file_that_uses_regions_renders_as_the_python_engine_renders_i
         assert np.abs(made - photo).max() > 1e-3  # the look does something
 
 
+@pytest.mark.parametrize("path", TORN, ids=ID)
+def test_a_shipped_file_with_a_torn_edge_renders_the_same_every_time_and_does_something(path, photo, subject):
+    # seeded: the tear is not numpy's, so only properties are compared (the python engine's tear is another one)
+    recipe = load_recipe(path)
+    maps = {"subject": subject, "depth": depth_of(photo)}
+    made = core_render(photo, recipe, maps=maps)
+    assert made.dtype == np.float32
+    assert np.isfinite(made).all()
+    assert made.min() >= 0
+    assert made.max() <= 1
+    np.testing.assert_array_equal(core_render(photo, recipe, maps=maps), made)
+    if recipe.frame == Framing() and recipe.size is None:
+        assert np.abs(made - photo).max() > 1e-3
+
+
 @pytest.mark.parametrize("path", UNMADE, ids=ID)
 def test_a_shipped_file_that_uses_a_region_the_core_does_not_make_yet_is_refused_naming_the_region(
     path, photo, subject
@@ -636,7 +685,6 @@ def test_a_shipped_file_that_uses_a_region_the_core_does_not_make_yet_is_refused
 
 UNPORTED = {
     "shards": (Shards(count=5), "each"),
-    "cuts": (Cuts(lines=({"x": 0.5, "y": 0.5, "angle": 30},)), "each"),
     "svg": (Svg(file="shape.svg"), "each"),
 }
 

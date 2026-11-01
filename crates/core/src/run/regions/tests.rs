@@ -421,7 +421,6 @@ fn a_kind_the_core_cannot_make_yet_refuses_the_render_before_any_step_runs_when_
     // (what is declared as `p`, which an `each` step uses, what the refusal says)
     let rows = [
         ("shards", json!({"p": {"kind": "shards"}}), "kind shards"),
-        ("cuts", json!({"p": {"kind": "cuts"}}), "kind cuts"),
         ("svg", json!({"p": {"kind": "svg"}}), "kind svg"),
     ];
     for (what, declared, said) in rows {

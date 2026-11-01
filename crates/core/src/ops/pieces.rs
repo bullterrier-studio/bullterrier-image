@@ -4,6 +4,8 @@
 //! the one whose first pixel comes later in the raster scan (left to right along each row, rows from the top) than the
 //! first pixel of piece `k`.
 
+use std::collections::HashMap;
+
 use super::length;
 
 /// A rectangle of a picture, in pixels: columns `left..right` of rows `top..bottom`.
@@ -35,6 +37,22 @@ pub(crate) fn renumber(kinds: usize, raw: impl Iterator<Item = usize>) -> (Vec<i
     let labels = raw
         .map(|kind| {
             *numbered[kind].get_or_insert_with(|| {
+                next += 1;
+                next - 1
+            })
+        })
+        .collect();
+    (labels, count(next))
+}
+
+/// As [`renumber`] for kinds that are too many to list: any `u64`, as the 32 bits of a region whose every cut adds one.
+/// The kinds that occur are remembered, not all that could.
+pub(crate) fn renumber_sparse(raw: impl Iterator<Item = u64>) -> (Vec<i32>, usize) {
+    let mut numbered: HashMap<u64, i32> = HashMap::new();
+    let mut next = 0_i32; // constant: pieces are numbered from 0
+    let labels = raw
+        .map(|kind| {
+            *numbered.entry(kind).or_insert_with(|| {
                 next += 1;
                 next - 1
             })
@@ -157,4 +175,32 @@ pub(crate) fn crop(pixels: &[[f32; 3]], width: usize, window: Bounds) -> Vec<[f3
         out.extend_from_slice(&pixels[row * width + window.left..row * width + window.right]);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::{renumber, renumber_sparse};
+
+    #[test]
+    fn a_kind_as_large_as_two_to_the_forty_needs_no_table_of_all_kinds() {
+        let huge = 1_u64 << 40;
+        assert_eq!(
+            renumber_sparse([huge + 7, 3, huge + 7, u64::MAX, 3].into_iter()),
+            (vec![0, 1, 0, 2, 1], 3)
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn the_sparse_numbering_is_the_dense_one_whatever_the_kinds(
+            raw in proptest::collection::vec(0_usize..9, 0..40)
+        ) {
+            prop_assert_eq!(
+                renumber_sparse(raw.iter().map(|&kind| kind as u64)),
+                renumber(9, raw.iter().copied())
+            );
+        }
+    }
 }

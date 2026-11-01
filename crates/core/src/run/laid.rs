@@ -2,11 +2,12 @@
 //! edge.
 
 use super::size;
+use crate::ops::cuts::{self, Cut as Laid};
 use crate::ops::noise::{self, Tear};
-use crate::ops::outlines::{self, Limits};
+use crate::ops::outlines::{self, Frame, Limits};
 use crate::ops::pieces::{self, Bounds};
 use crate::ops::{cast, grid, length, raster};
-use crate::region::{Edge, EdgeStyle, Grid, Path};
+use crate::region::{Cut, Cuts, Edge, EdgeStyle, Grid, Path};
 use crate::{Error, Layer, Picture};
 
 /// How a torn edge moves the pixel centres of a picture before a kind classifies them: the shifts in px of the working
@@ -65,6 +66,16 @@ fn frame(name: &str, fit_name: Option<&str>, fit: Option<&Layer>, picture: &Pict
     })
 }
 
+/// `bounds` as a frame in px.
+fn in_px(bounds: Bounds) -> Frame {
+    [bounds.left, bounds.top, bounds.right, bounds.bottom].map(length::float)
+}
+
+/// The refusal of the region `name` for the reason `said`.
+fn refuse(name: &str, said: &str) -> Error {
+    Error::Recipe(format!("region '{name}': {said}"))
+}
+
 /// The pieces of `picture` that the grid `spec` (the region `name`) makes, and their number, laid over the box of `fit`
 /// (the selection `spec.fit` names) if it has one.
 ///
@@ -96,18 +107,52 @@ pub(super) fn grid(
 /// take too long to fill.
 pub(super) fn path(name: &str, spec: &Path, fit: Option<&Layer>, picture: &Picture<'_>) -> Result<Vec<f32>, Error> {
     let (height, width) = (picture.height(), picture.width());
-    let Bounds {
-        left,
-        top,
-        right,
-        bottom,
-    } = frame(name, spec.fit.as_deref(), fit, picture)?;
+    let bounds = frame(name, spec.fit.as_deref(), fit, picture)?;
     let limits = Limits::STANDARD;
-    let refuse = |said: String| Error::Recipe(format!("region '{name}': {said}"));
-    let shape = outlines::path(&spec.d, [left, top, right, bottom].map(length::float), &limits).map_err(refuse)?;
-    let covered = raster::coverage(height, width, &shape, spec.samples as usize, limits.crossings).map_err(refuse)?;
+    let shape = outlines::path(&spec.d, in_px(bounds), &limits).map_err(|said| refuse(name, &said))?;
+    let covered = raster::coverage(height, width, &shape, spec.samples as usize, limits.crossings)
+        .map_err(|said| refuse(name, &said))?;
     Ok(match Bend::of(&spec.edge, picture) {
         None => covered,
         Some(bend) => raster::read_bent(&covered, height, width, bend.shifts()),
     })
+}
+
+/// The pieces of `picture` that the cuts `spec` (the region `name`) make, and their number, laid over the box of `fit` (the
+/// selection `spec.fit` names) if it has one. A torn edge moves the pixel centres before they are sorted by side.
+///
+/// # Errors
+/// As [`frame`]; [`Error::Recipe`] naming the region if a curve's path data cannot be drawn (see [`outlines::path`]) or its
+/// side would take too long to paint.
+pub(super) fn cuts(
+    name: &str,
+    spec: &Cuts,
+    fit: Option<&Layer>,
+    picture: &Picture<'_>,
+) -> Result<(Vec<i32>, usize), Error> {
+    let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
+    let limits = Limits::STANDARD;
+    let lines = spec
+        .lines
+        .iter()
+        .map(|cut| match cut {
+            Cut::Line(line) => Ok(Laid::Line {
+                x: line.x,
+                y: line.y,
+                angle: line.angle,
+            }),
+            Cut::Curve(curve) => outlines::path(&curve.path, frame, &limits).map(Laid::Curve),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|said| refuse(name, &said))?;
+    let bend = Bend::of(&spec.edge, picture);
+    cuts::pieces(
+        picture.height(),
+        picture.width(),
+        frame,
+        &lines,
+        bend.as_ref().map(Bend::shifts),
+        limits.crossings,
+    )
+    .map_err(|said| refuse(name, &said))
 }

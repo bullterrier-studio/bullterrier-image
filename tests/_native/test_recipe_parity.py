@@ -490,7 +490,7 @@ def edge(**fields: object) -> dict:
 # (what the row is about, the kind, the fields as a recipe writes them, whether they are valid): both ends of every
 # range and the first value beyond each, and the shapes each kind refuses. The `valid` column is written by hand;
 # Python's declaration and the core must both agree with it. Left out until the core reads them (R4d): the syntax of
-# `Path.d` and `Curve.path`, `Svg.file` and the names of `Shards.preset`. Left out because Python's declaration is laxer
+# `Path.d`, `Svg.file` and the names of `Shards.preset`. Left out because Python's declaration is laxer
 # than the rule and is replaced (R4e): a share written as text ("2") and a piece that is a switch (`True` is 1 to it);
 # the core refuses both (Rust tests).
 REGION_ROWS = [
@@ -577,6 +577,14 @@ REGION_ROWS = [
     ("a line with a path", "cuts", {"lines": [{"x": 0.5, "path": "M 0 0 L 1 1"}]}, False),
     ("a curve with an angle", "cuts", {"lines": [{"path": "M 0 0 L 1 1", "angle": 4}]}, False),
     ("a cut that is not a table", "cuts", {"lines": [3]}, False),
+    ("a curve of two subpaths", "cuts", {"lines": [{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}]}, False),
+    ("a curve that is no path data", "cuts", {"lines": [{"path": "M 0 0 L foo"}]}, False),
+    (
+        "a curve with arcs and Beziers",
+        "cuts",
+        {"lines": [{"path": "M 0.4 0 C 0.1 0.4 0.9 0.6 0.6 1 A 1 1 0 0 1 0.6 1"}]},
+        True,
+    ),
     # path, svg
     ("samples, lowest", "path", {"samples": 1}, True),
     ("samples, highest", "path", {"samples": 16}, True),

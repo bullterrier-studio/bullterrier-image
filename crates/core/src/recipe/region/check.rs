@@ -18,8 +18,8 @@ impl Region {
     /// Whether every number of this region, the declared region `name` (one of `declared`), lies within its range (see
     /// the field's documentation), and every piece a `Pick` names by `id` is of an `Svg` region.
     ///
-    /// What is not checked here: that a name the region refers to is a region, and the syntax of a curve's path
-    /// (`Curve.path`), an SVG file (`Svg.file`) and a shard preset (`Shards.preset`), which the runner reads.
+    /// What is not checked here: that a name the region refers to is a region, and an SVG file (`Svg.file`) and a shard
+    /// preset (`Shards.preset`), which the runner reads.
     ///
     /// # Errors
     /// [`Error::Recipe`] naming the region, the field (`edge.amount`), the value and the rule.
@@ -51,10 +51,22 @@ impl Region {
                 at.edge(&cuts.edge)?;
                 at.count("lines", cuts.lines.len(), 1, MOST_CUTS)?;
                 for (index, cut) in cuts.lines.iter().enumerate() {
-                    if let Cut::Line(line) = cut {
-                        at.within(&format!("lines[{index}].x"), line.x, 0, 1)?;
-                        at.within(&format!("lines[{index}].y"), line.y, 0, 1)?;
-                        at.finite(&format!("lines[{index}].angle"), line.angle)?;
+                    match cut {
+                        Cut::Line(line) => {
+                            at.within(&format!("lines[{index}].x"), line.x, 0, 1)?;
+                            at.within(&format!("lines[{index}].y"), line.y, 0, 1)?;
+                            at.finite(&format!("lines[{index}].angle"), line.angle)?;
+                        }
+                        Cut::Curve(curve) => match outlines::check_syntax(&curve.path) {
+                            Ok(1) => {}
+                            Ok(subpaths) => {
+                                return Err(at.refuse(&format!(
+                                    "`lines[{index}].path` must be one path with a single M (a cut is one curve from border to \
+                                     border), got {subpaths} subpaths"
+                                )));
+                            }
+                            Err(said) => return Err(at.refuse(&format!("`lines[{index}].path`: {said}"))),
+                        },
                     }
                 }
                 Ok(())
@@ -407,6 +419,21 @@ mod tests {
             ),
             ("cuts", json!({"lines": [{"angle": 725}, {"angle": -90}]}), None),
             ("cuts", json!({"lines": [{"path": "M 0 0 L 1 1"}]}), None),
+            (
+                "cuts",
+                json!({"lines": [{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}]}),
+                Some("`lines[0].path` must be one path with a single M"),
+            ),
+            (
+                "cuts",
+                json!({"lines": [{}, {"path": "M 0 0 L foo"}]}),
+                Some("`lines[1].path`: path data is not valid SVG path data"),
+            ),
+            (
+                "cuts",
+                json!({"lines": [{"path": ""}]}),
+                Some("`lines[0].path`: path data is empty"),
+            ),
             // path, svg
             ("path", json!({"samples": 1}), None),
             ("path", json!({"samples": 16}), None),

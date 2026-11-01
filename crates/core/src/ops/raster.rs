@@ -36,8 +36,7 @@ impl Polygons {
         self.starts.len()
     }
 
-    /// The corners of each outline.
-    #[cfg(test)]
+    /// The corners of the outline `number`.
     pub(crate) fn outline(&self, number: usize) -> &[[f64; 2]] {
         let end = self.starts.get(number + 1).copied().unwrap_or(self.corners.len());
         &self.corners[self.starts[number]..end]
@@ -108,7 +107,7 @@ fn crossed(edge: &Edge, count: usize, samples: usize) -> std::ops::Range<usize> 
 }
 
 /// How many crossings of an edge with a scanline filling `shape` in a picture of `height` rows takes, with `samples`
-/// scanlines a row: the work of [`coverage`].
+/// scanlines a row: the work of [`coverage`] and [`paint`].
 fn crossings(shape: &Polygons, height: usize, samples: usize) -> u64 {
     let count = height * samples;
     shape
@@ -120,8 +119,71 @@ fn crossings(shape: &Polygons, height: usize, samples: usize) -> u64 {
         .fold(0, u64::saturating_add)
 }
 
-/// How much of each pixel of a `height` x `width` picture `shape` covers by the nonzero rule (a point is inside when the
-/// outlines wind round it a net number of times): 0 to 1, row after row.
+/// Whether filling takes no more than `budget` crossings: the work `shape` makes of `height` rows with `samples` scanlines
+/// a row, before any is done; else the refusal, ending in `advice`.
+fn affordable(shape: &Polygons, height: usize, samples: usize, budget: u64, advice: &str) -> Result<(), String> {
+    let work = crossings(shape, height, samples);
+    if work > budget {
+        return Err(format!(
+            "filling would take {work} crossings of its edges with scanlines, over the limit of {budget}: {advice}"
+        ));
+    }
+    Ok(())
+}
+
+/// The stretches `(from, to)` in px across each scanline of `count` (`samples` a row) that `shape` covers by the nonzero
+/// rule (a point is inside when the outlines wind round it a net number of times), as `(scanline, stretches)` for every
+/// scanline from the first an edge crosses to the end of the row of the last.
+fn scans(shape: &Polygons, count: usize, samples: usize) -> impl Iterator<Item = (usize, Vec<(f64, f64)>)> {
+    // the edges by the first scanline they cross, so the ones a scanline crosses are found by moving on a cursor
+    let mut edges: Vec<(Edge, std::ops::Range<usize>)> = shape
+        .slanting()
+        .map(|edge| {
+            let scans = crossed(&edge, count, samples);
+            (edge, scans)
+        })
+        .filter(|(_, scans)| !scans.is_empty())
+        .collect();
+    edges.sort_by_key(|(_, scans)| scans.start);
+    // whole rows: the one the last scanline is in is finished
+    let range = match (
+        edges.first().map(|(_, scans)| scans.start),
+        edges.iter().map(|(_, scans)| scans.end).max(),
+    ) {
+        (Some(first), Some(last)) => first..last.div_ceil(samples) * samples,
+        _ => 0..0,
+    };
+    let mut next = 0; // constant: no edge has begun yet
+    let mut active: Vec<usize> = Vec::new();
+    let mut hits: Vec<(f64, i32)> = Vec::new();
+    range.map(move |scan| {
+        while next < edges.len() && edges[next].1.start <= scan {
+            active.push(next);
+            next += 1;
+        }
+        active.retain(|&at| edges[at].1.end > scan);
+        let y = scanline(scan, samples);
+        hits.clear();
+        hits.extend(active.iter().map(|&at| {
+            let edge = &edges[at].0;
+            (edge.at(y), if edge.descends() { 1 } else { -1 })
+        }));
+        hits.sort_by(|one, other| one.0.total_cmp(&other.0));
+        // Every closed outline crosses a scanline as often one way as the other, so the running sum returns to 0 at the end
+        // of the scanline: a stretch begins at each crossing after which it is not 0 and ends at the next.
+        let mut winding = 0; // constant: no crossing has turned yet
+        let mut stretches = Vec::new();
+        for (at, &(x, direction)) in hits.iter().enumerate() {
+            winding += direction;
+            if winding != 0 {
+                stretches.push((x, hits.get(at + 1).map_or(x, |next| next.0)));
+            }
+        }
+        (scan, stretches)
+    })
+}
+
+/// How much of each pixel of a `height` x `width` picture `shape` covers by the nonzero rule: 0 to 1, row after row.
 ///
 /// Horizontally the share is exact; vertically each pixel row is measured at `samples` evenly spaced scanlines, so the error
 /// of a slanting border shrinks as `samples` grows (1 looks at the middle of the row only).
@@ -136,65 +198,50 @@ pub(crate) fn coverage(
     samples: usize,
     budget: u64,
 ) -> Result<Vec<f32>, String> {
-    let work = crossings(shape, height, samples);
-    if work > budget {
-        return Err(format!(
-            "filling the path would take {work} crossings of its edges with scanlines, over the limit of {budget}: use fewer \
-             corners or a smaller `samples`"
-        ));
-    }
-    let count = height * samples;
-    // the edges by the first scanline they cross, so the ones a scanline crosses are found by moving on a cursor
-    let mut edges: Vec<(Edge, std::ops::Range<usize>)> = shape
-        .slanting()
-        .map(|edge| {
-            let scans = crossed(&edge, count, samples);
-            (edge, scans)
-        })
-        .filter(|(_, scans)| !scans.is_empty())
-        .collect();
-    edges.sort_by_key(|(_, scans)| scans.start);
+    affordable(
+        shape,
+        height,
+        samples,
+        budget,
+        "use fewer corners or a smaller `samples`",
+    )?;
     let mut out = vec![0.0_f32; height * width];
-    let mut next = 0;
-    let mut active: Vec<usize> = Vec::new();
     // constant: the ramp of a row has width + 1 pixel boundaries and two more cells for the second difference
     let mut steps = vec![0.0_f64; width + 3];
-    let mut hits: Vec<(f64, i32)> = Vec::new();
-    let (Some(first), Some(last)) = (
-        edges.first().map(|(_, scans)| scans.start),
-        edges.iter().map(|(_, scans)| scans.end).max(),
-    ) else {
-        return Ok(out);
-    };
-    // whole rows: the one the last scanline is in is finished
-    for scan in first..last.div_ceil(samples) * samples {
-        while next < edges.len() && edges[next].1.start <= scan {
-            active.push(next);
-            next += 1;
-        }
-        active.retain(|&at| edges[at].1.end > scan);
-        let (row, y) = (scan / samples, scanline(scan, samples));
-        hits.clear();
-        hits.extend(active.iter().map(|&at| {
-            let edge = &edges[at].0;
-            (edge.at(y), if edge.descends() { 1 } else { -1 })
-        }));
-        hits.sort_by(|one, other| one.0.total_cmp(&other.0));
-        // Every closed outline crosses a scanline as often one way as the other, so the running sum returns to 0 at the end
-        // of the scanline: a stretch begins at each crossing after which it is not 0 and ends at the next.
-        let mut winding = 0;
-        for (at, &(x, direction)) in hits.iter().enumerate() {
-            winding += direction;
-            if winding != 0 {
-                let end = hits.get(at + 1).map_or(x, |next| next.0);
-                add_stretch(&mut steps, width, x, end, 1.0 / length::float(samples));
-            }
+    for (scan, stretches) in scans(shape, height * samples, samples) {
+        for (from, to) in stretches {
+            add_stretch(&mut steps, width, from, to, 1.0 / length::float(samples));
         }
         if (scan + 1) % samples == 0 {
+            let row = scan / samples;
             finish_row(&mut steps, &mut out[row * width..(row + 1) * width]);
         }
     }
     Ok(out)
+}
+
+/// Sets `target` (a `height` x `width` map, row after row) to `value` at every pixel whose centre `shape` covers by the
+/// nonzero rule. A centre exactly on an edge is covered when the shape is to its right or below it.
+///
+/// # Errors
+/// A message if the fill would take more than `budget` crossings of an edge with a scanline, before any work is done.
+pub(crate) fn paint(
+    target: &mut [i32],
+    height: usize,
+    width: usize,
+    shape: &Polygons,
+    value: i32,
+    budget: u64,
+) -> Result<(), String> {
+    affordable(shape, height, 1, budget, "use fewer corners")?;
+    // the first pixel whose centre (at i + 1/2) is at or past `x`, kept in the row
+    let pixel = |x: f64| length::whole((x - 0.5).ceil().clamp(0.0, length::float(width)));
+    for (row, stretches) in scans(shape, height, 1) {
+        for (from, to) in stretches {
+            target[row * width + pixel(from)..row * width + pixel(to)].fill(value);
+        }
+    }
+    Ok(())
 }
 
 /// `values` (a `height` x `width` map) read bilinearly at the pixel centres moved by `shift` (along x and along y, row after
@@ -216,6 +263,22 @@ pub(crate) fn read_bent(values: &[f32], height: usize, width: usize, shift: [&[f
             let bottom = read(down, column) * (1.0 - across_column) + read(down, right) * across_column;
             super::cast::single(top * (1.0 - across_row) + bottom * across_row)
         })
+        .collect()
+}
+
+/// `values` (a `height` x `width` map) read at the pixel holding each pixel centre moved by `shift` (along x and along y,
+/// row after row): a centre moved beyond the picture reads the pixel at its edge.
+pub(crate) fn read_floor<T: Copy>(values: &[T], height: usize, width: usize, shift: [&[f32]; 2]) -> Vec<T> {
+    // the pixel holding the centre of pixel `at` moved by `moved`: a centre sits half a pixel in
+    let place = |at: usize, moved: f32, size: usize| {
+        length::whole(
+            (length::float(at) + 0.5 + f64::from(moved))
+                .floor()
+                .clamp(0.0, length::float(size - 1)),
+        )
+    };
+    (0..height * width)
+        .map(|at| values[place(at / width, shift[1][at], height) * width + place(at % width, shift[0][at], width)])
         .collect()
 }
 

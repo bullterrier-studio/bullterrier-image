@@ -221,7 +221,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use crate::region::{Cuts, Given};
+    use crate::region::{Given, Svg};
 
     use crate::registry::Registry;
     use crate::testing::{Finds, Paint, Recorder, registry};
@@ -616,12 +616,12 @@ mod tests {
         let values = values();
         let mut look = Recipe::new([paint()]);
         look.steps.push(Each::new("cut", [None]).into());
-        look.regions.insert("cut", Cuts::default());
+        look.regions.insert("cut", Svg::default());
         let photo = Photo::new(Picture::new(4, 6, &values)?);
         assert_refused(
             &rig.render(&photo, &look),
             ErrorKind::Recipe,
-            &["'cut'", "kind cuts", "not run"],
+            &["'cut'", "kind svg", "not run"],
             "cuts",
         );
         // nothing runs for a recipe that is refused
@@ -629,7 +629,7 @@ mod tests {
         // declared and not used, it costs nothing and the recipe renders; nothing makes a map of it, so one handed in is
         // no map of the recipe
         let mut unused = Recipe::new([paint()]);
-        unused.regions.insert("cut", Cuts::default());
+        unused.regions.insert("cut", Svg::default());
         rig.render(&photo, &unused)?;
         assert_refused(
             &rig.render(
