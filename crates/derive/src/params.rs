@@ -301,14 +301,14 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
         ));
     };
     let whole = shape == Shape::Int;
-    let check = |number: Number, what: &str| {
-        if whole && matches!(number, Number::Float(_)) {
-            Err(broken(&format!(
-                "a whole number takes whole numbers, and its {what} is a decimal"
-            )))
-        } else {
-            Ok(number)
+    let check = |number: Number, what: &str| match number {
+        Number::Float(_) if whole => Err(broken(&format!(
+            "a whole number takes whole numbers, and its {what} is a decimal"
+        ))),
+        Number::Int(value) if whole && i32::try_from(value).is_err() => {
+            Err(broken(&format!("its {what} does not fit i32")))
         }
+        _ => Ok(number),
     };
     let (number, low, high) = (
         check(number, "default")?,
@@ -521,6 +521,8 @@ mod tests {
         let good = [
             documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, drivable, advanced)] cell: f32, },
             documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: i32, },
+            // a whole number may span all of i32
+            documented! { #[param(default = 0, unit = count, min = -2147483648, max = 2147483647)] cells: i32, },
             // the bounds are inclusive: a default may sit on either
             documented! { #[param(default = 0.0, unit = px, min = 0, max = 32)] low: f32, },
             documented! { #[param(default = 32.0, unit = px, min = 0, max = 32)] high: f32, },
@@ -636,6 +638,21 @@ mod tests {
                 "a decimal bound for a whole number",
                 documented! { #[param(default = 4, unit = count, min = 3, max = 32.0)] cells: i32, },
                 &["cells", "whole"],
+            ),
+            (
+                "a whole number whose max is beyond i32",
+                documented! { #[param(default = 4, unit = count, min = 3, max = 5000000000)] cells: i32, },
+                &["cells", "max", "i32"],
+            ),
+            (
+                "a whole number whose min is beyond i32",
+                documented! { #[param(default = 4, unit = count, min = -2147483649, max = 32)] cells: i32, },
+                &["cells", "min", "i32"],
+            ),
+            (
+                "a whole number whose default is beyond i32",
+                documented! { #[param(default = 5000000000, unit = count, min = 3, max = 6000000000)] cells: i32, },
+                &["cells", "i32"],
             ),
             (
                 "a whole number that is drivable",
