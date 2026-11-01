@@ -245,12 +245,15 @@ impl Evaluator {
                 partition(bands::partition(self.selected(of)?.values(), *count))
             }
             Some(Region::Combine(Combine { op, of })) => {
-                let mut layers = of.iter().map(|of| self.selected(of));
-                let first = layers.next().transpose()?.map(|layer| layer.values().to_vec());
-                let mut combined = first.unwrap_or_default();
-                for layer in layers {
-                    let layer = layer?;
-                    for (value, other) in combined.iter_mut().zip(layer.values()) {
+                // a combine of at least two regions is a rule of the check; naming it if that guarantee breaks
+                let Some((first, rest)) = of.split_first() else {
+                    return Err(Error::Recipe(format!(
+                        "region '{name}': a combine needs at least two regions"
+                    )));
+                };
+                let mut combined = self.selected(first)?.values().to_vec();
+                for other in rest {
+                    for (value, other) in combined.iter_mut().zip(self.selected(other)?.values()) {
                         *value = match op {
                             CombineOp::Multiply => *value * other,
                             CombineOp::Min => value.min(*other),

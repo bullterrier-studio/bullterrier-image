@@ -105,26 +105,26 @@ fn no_cycle(regions: &Regions) -> Result<(), Error> {
     let made_from: Vec<Vec<&str>> = names.iter().map(|name| regions.made_from(name)).collect();
     let index: HashMap<&str, usize> = names.iter().enumerate().map(|(at, name)| (*name, at)).collect();
     let mut done = vec![false; names.len()];
-    let mut on_path = vec![false; names.len()];
+    // where each region on the current path stands in it, so that a cycle is the path from there
+    let mut on_path: Vec<Option<usize>> = vec![None; names.len()];
     for start in 0..names.len() {
         if done[start] {
             continue;
         }
         let mut path = vec![start];
         let mut walks = vec![made_from[start].iter()];
-        on_path[start] = true;
+        on_path[start] = Some(0);
         while let Some(walk) = walks.last_mut() {
             let Some(target) = walk.next() else {
                 if let Some(finished) = path.pop() {
-                    (done[finished], on_path[finished]) = (true, false);
+                    (done[finished], on_path[finished]) = (true, None);
                 }
                 walks.pop();
                 continue;
             };
             // a built-in or an unknown name is no region of ours: typing says what is wrong with an unknown one
             let Some(&next) = index.get(target) else { continue };
-            if on_path[next] {
-                let from = path.iter().position(|region| *region == next).unwrap_or_default();
+            if let Some(from) = on_path[next] {
                 let cycle: Vec<String> = path[from..]
                     .iter()
                     .chain([&next])
@@ -136,8 +136,8 @@ fn no_cycle(regions: &Regions) -> Result<(), Error> {
                 )));
             }
             if !done[next] {
+                on_path[next] = Some(path.len());
                 path.push(next);
-                on_path[next] = true;
                 walks.push(made_from[next].iter());
             }
         }
@@ -594,6 +594,11 @@ mod tests {
                 "'a' -> 'b' -> 'c' -> 'a'",
             ),
             (
+                "reached through a lead-in that is not part of it",
+                declare(&[("lead", band("a")), ("a", band("b")), ("b", band("a"))]),
+                "'a' -> 'b' -> 'a'",
+            ),
+            (
                 "by `fit`",
                 declare(&[("p", path("q")), ("q", path("p"))]),
                 "'p' -> 'q' -> 'p'",
@@ -604,7 +609,7 @@ mod tests {
             assert!(
                 message
                     .as_deref()
-                    .is_some_and(|message| message.contains("cycle") && message.contains(circle)),
+                    .is_some_and(|message| message.ends_with(&format!("in a cycle: {circle}"))),
                 "{what}: wanted {circle}, got {message:?}"
             );
         }
