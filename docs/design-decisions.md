@@ -731,6 +731,25 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   assertion message, `unwrap` or `dbg!`; at 1080p one value is about 40 MB. *Consequence:* a test keeps its pictures small and never
   `assert_eq!`s a large buffer.
 
+- **Threads are a run option, default 1, and never change the result.** `Options::with_threads` (Python `threads=`),
+  not an effect parameter: a thread count is no property of a look, and a look must give the same bytes on any machine.
+  *Default 1:* the usual use of several cores is rendering many pictures at once (a video renders frames side by side),
+  where each render taking every core only competes; one picture asks for 0 (every core). `Photo`, `Recipe`, `Presets`,
+  `Options` and `Image` are `Send + Sync`, so frame-level parallelism needs no API. *An installed pool, not a parameter on
+  `Effect::apply`:* the render installs one rayon pool and a kernel calls `par::rows`, so no signature of the 113 Python
+  effects or the ported ones changes and an effect joins when it is ported, only if its output rows depend on input rows
+  alone (per-pixel work, separable passes); a global reduction or a sequential scan stays single-threaded, and a
+  reduction chunks by the data so the sum is the same at any count. *The render stays on the calling thread:*
+  `pool.install(render)` would run Python effects on a pool thread, where the `ContextVar` behind picture parameters is
+  empty, and `use_current_thread` leaks the pool's registry and fails a second render on the thread; the bands alone run
+  on the pool (an install per `par::rows` call, 4 to 16 us). *A pool per render, no cache:* creating, using and dropping
+  10 threads took 0.1 ms (M4), under 1 percent of a 16 ms frame. *No feature flag:* rayon is a plain dependency (MIT or
+  Apache-2.0, small). *No GPU yet:* the CPU benchmark below is the baseline to beat, and the effects are still mostly
+  numpy; revisit after the E-batches. *Numbers* (M4, 1080p, 12-step all-native look, 543 ms at 1 thread): 294 ms at 2,
+  204 at 4, 145 at 10 (3.7x); laying a step is memory bound (2.4x at 10), grade 4.3x. In the Python-bodied recipes of
+  today, effects are about 70 percent of the time and stay single-threaded, so the gain is small until they are ported;
+  whole renders from Python threads side by side scale 2.8x at 4 and 3.6x at 10.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*

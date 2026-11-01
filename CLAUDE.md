@@ -108,6 +108,15 @@ binds the default finders and names a trace's stages (drawing the numbered piece
 mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture` or
 `Lut` parameter travels as `{"$object": n}` (`registry.holding`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
+**Threads:** `Options::with_threads(n)` (default 1: none started; 0: every core; at most 256, else refused) makes `render` and
+`trace` install a rayon pool of that size (`ops/par.rs`); the render stays on the calling thread, only row bands run on the
+pool, and rayon's global pool is never used. A kernel fills its output with `par::rows(out, row_len, |first_row, band| ..)`
+(`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
+`Effect::apply` takes no thread parameter. Rule: the output is byte-identical at any thread count, so a band reads only
+input rows and carries nothing from one row to the next, and a reduction chunks by the data, never by the thread count.
+Tests: render at threads 1, 2, 3, 10 and compare bytes (`crates/core/tests/threads.rs`). Python: `render`/`trace`/`render_all`
+take `threads=`; `Step.apply` and `fx` use 1.
+
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
