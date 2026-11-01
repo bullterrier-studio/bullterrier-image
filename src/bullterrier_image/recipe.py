@@ -142,8 +142,8 @@ def render(
     recipe gives the same look at any size; a value stops at its minimum when shrinking.
 
     threads: how many threads the render may use for the rows of its work (laying a step over its input, framing and
-    resizing the photo, an effect that works pixel by pixel), a whole number from 0 (RecipeError for anything else, or
-    a number the machine cannot start). 1, the default, starts none; 0 is one for each core. The result is the same
+    resizing the photo, an effect that works pixel by pixel), a whole number from 0 to 256 (RecipeError for anything
+    else). 1, the default, starts none; 0 is one for each core. The result is the same
     bytes at any number, so ask for more when you render one picture and keep 1 when you render many at once from your
     own threads (each render using every core would only compete with the others). The GIL is released while the
     core works, so renders from several Python threads run side by side.

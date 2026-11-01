@@ -55,6 +55,7 @@ from .params import (
 )
 from .regions import Kind, check, needs
 
+MAX_THREADS = 256  # constant: the most threads a render may ask for; the core refuses more (`par::MOST_THREADS`)
 MAX_SIZE = 16384  # constant: longest side, px; the core also caps the pixels of a picture
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besides a step: a step cannot be called so

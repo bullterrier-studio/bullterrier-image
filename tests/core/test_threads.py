@@ -64,7 +64,9 @@ def test_a_trace_on_more_threads_shows_the_same_stages_as_on_one(big_photo, thre
         pytest.param("2", "got '2'", id="text"),
         pytest.param(True, "got True", id="bool"),
         pytest.param(None, "got None", id="none"),
-        pytest.param(257, "257", id="more than the core allows"),
+        pytest.param(257, "got 257", id="one more than allowed"),
+        pytest.param(1000, "got 1000", id="a typo"),
+        pytest.param(2**70, str(2**70), id="more than a machine word"),
     ],
 )
 @pytest.mark.parametrize(
@@ -87,3 +89,7 @@ def test_renders_from_several_python_threads_with_threads_each_give_each_photos_
         together = list(pool.map(lambda photo: facade.render(photo, threaded_look(), threads=2).tobytes(), photos))
     assert together == alone
     assert len(set(alone)) == len(alone), "the photos give different pictures"
+
+
+def test_the_most_threads_allowed_renders(photo):
+    assert facade.render(photo, PLAIN, threads=256).shape == photo.shape

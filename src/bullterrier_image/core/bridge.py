@@ -25,7 +25,7 @@ from bullterrier_image.ops.image import as_image
 
 from . import native, registry
 from .finder import answered, check_map, find_map
-from .steps import MAX_SIZE, Recipe, recipe_dict
+from .steps import MAX_SIZE, MAX_THREADS, Recipe, recipe_dict
 
 Stage = tuple[str, int | str | None, np.ndarray]  # (kind, step number or region name, picture or map); see `trace`
 
@@ -51,8 +51,8 @@ def render(
     not handed in; the `subject`
     finder is also called with the crop of the working picture of each piece for a `Subject` region with `per`. size:
     the longest side of the result in px, 1 to 16384 (the recipe's own size when None). threads: how many threads the
-    core may use for the rows of its work, a whole number from 0: 1 starts none, 0 is one for each core (the result is
-    the same at any number).
+    core may use for the rows of its work, a whole number from 0 to 256: 1 starts none, 0 is one for each core (the
+    result is the same at any number).
 
     Raises RecipeError for a recipe the core refuses, a `size` or `threads` that is no whole number, or a name in `maps`
     or `finders` that is no map of the recipe (naming the ones it has); the map's error (SubjectNotFoundError for the
@@ -127,10 +127,11 @@ def _check_size(size: object) -> None:
 
 
 def _check_threads(threads: object) -> None:
-    """RecipeError unless `threads` is a whole number, 0 or more (a bool is not a number here); the core refuses a
-    number it cannot start."""
-    if isinstance(threads, bool) or not isinstance(threads, int) or threads < 0:
-        raise RecipeError(f"threads must be a whole number of threads, 0 (every core) or more, got {threads!r}")
+    """RecipeError unless `threads` is a whole number from 0 to `MAX_THREADS` (a bool is not a number here)."""
+    if isinstance(threads, bool) or not isinstance(threads, int) or not 0 <= threads <= MAX_THREADS:
+        raise RecipeError(
+            f"threads must be a whole number of threads, 0 (every core) to {MAX_THREADS}, got {threads!r}"
+        )
 
 
 def _each(
