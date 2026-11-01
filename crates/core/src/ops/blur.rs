@@ -16,14 +16,14 @@ const PASSES: usize = 3; // constant: Kovesi's n; the variance of the boxes is m
     reason = "a width in pixels, small and positive"
 )]
 fn radii(sigma: f64) -> [usize; PASSES] {
-    let passes = PASSES as f64;
+    let passes = float(PASSES);
     let ideal = (12.0 * sigma * sigma / passes + 1.0).sqrt();
     let mut narrow = ideal.floor() as usize;
-    if narrow % 2 == 0 {
+    if narrow.is_multiple_of(2) {
         narrow -= 1;
     }
-    let (narrow_f, wide) = (narrow as f64, narrow + 2);
-    // how many of the boxes are the narrow width so that the variances add up to 12 sigma^2 / 12... (Kovesi, eq. 5)
+    let (narrow_f, wide) = (float(narrow), narrow + 2);
+    // how many of the boxes are the narrow width, so that their variances add up to sigma^2 (Kovesi, eq. 5)
     let narrow_count = ((12.0 * sigma * sigma - passes * narrow_f * narrow_f - 4.0 * passes * narrow_f - 3.0 * passes)
         / (-4.0 * narrow_f - 4.0))
         .round() as usize;
@@ -97,7 +97,8 @@ fn boxed(line: &[f32], radius: usize, out: &mut [f32]) {
     let last = line.len() - 1;
     let width = float(2 * radius + 1);
     // the window of position 0 is the first value `radius + 1` times and the next `radius` values
-    let mut sum = f64::from(line[0]) * float(radius) + (0..=radius).map(|at| f64::from(line[at.min(last)])).sum::<f64>();
+    let mut sum =
+        f64::from(line[0]) * float(radius) + (0..=radius).map(|at| f64::from(line[at.min(last)])).sum::<f64>();
     for (position, out) in out.iter_mut().enumerate() {
         #[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
         {
