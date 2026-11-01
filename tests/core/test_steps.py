@@ -15,7 +15,6 @@ from pydantic import model_validator
 
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
-from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
@@ -38,6 +37,7 @@ from bullterrier_image.recipe import (
     Cuts,
     Each,
     Edge,
+    Framing,
     Given,
     Grid,
     LinearGradient,

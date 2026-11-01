@@ -3,11 +3,10 @@ import pytest
 from PIL import Image
 
 from bullterrier_image import RecipeError
-from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import runs
-from bullterrier_image.recipe import Band, Each, Grid, Recipe, Stage, Step, render
+from bullterrier_image.recipe import Band, Each, Framing, Grid, Recipe, Stage, Step, render
 from bullterrier_image.sheet import contact_sheet, sweep, write_stages
 
 SLIDE_PARAMS = {"bands": 3, "seed": 5}

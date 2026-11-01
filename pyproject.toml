@@ -190,8 +190,7 @@ tests = 1500
 [tool.file-size.exempt]
 "src/bullterrier_image/core/params.py" = 1003
 "src/bullterrier_image/core/regions.py" = 1272
-"tests/core/test_regions.py" = 1901
-"tests/core/test_runner.py" = 1689
+"tests/core/test_runner.py" = 1557
 
 # Read by tools/run_capped.py: the memory cap (MB, summed over a command's whole process group) the poe tasks that run
 # tests give it. A command past it is killed and the gate fails with status 99. The full suite's group peaks at about

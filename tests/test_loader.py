@@ -9,7 +9,6 @@ import pytest
 from PIL import Image
 
 from bullterrier_image.core import looks, registry
-from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
 from bullterrier_image.core.steps import Each, Recipe, Step, drives, maps_needed, runs
 from bullterrier_image.errors import ImageReadError, RecipeError, UnknownEffectError
@@ -21,6 +20,7 @@ from bullterrier_image.recipe import (
     Cuts,
     Edge,
     Finder,
+    Framing,
     Given,
     Grid,
     Line,
@@ -370,7 +370,7 @@ def test_a_format_2_file_with_regions_and_an_each_step_loads_as_the_recipe_writt
 
 
 def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, subject):
-    from bullterrier_image.core.runner import render
+    from bullterrier_image.recipe import render
 
     loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
     finder = lambda crop: np.where(crop[..., 0] > 0.5, 1.0, 0.0).astype(np.float32)  # noqa: E731  (a stand-in model)
@@ -462,7 +462,7 @@ SHAPES_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
 def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_svg_is_found_beside_the_file(
     tmp_path, photo, subject
 ):
-    from bullterrier_image.core.runner import render
+    from bullterrier_image.recipe import render
 
     (tmp_path / "assets").mkdir()
     (tmp_path / "assets" / "shapes.svg").write_text(SHAPES_SVG, encoding="utf-8")

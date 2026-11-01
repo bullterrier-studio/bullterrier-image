@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from bullterrier_image.core import registry, runner
+from bullterrier_image import recipe as facade
+from bullterrier_image.core import registry
 from bullterrier_image.core.steps import Recipe, Step
 
 NAME = "relight"
@@ -185,7 +186,7 @@ def test_a_grey_relief_from_a_grazing_light_spans_black_to_white(photo: np.ndarr
         name="emboss",
         size=max(photo.shape[:2]),
     )
-    out = runner.render(photo, recipe)
+    out = facade.render(photo, recipe)
     np.testing.assert_array_equal(out[..., 0], out[..., 2])
     assert out.min() < 0.1
     assert out.max() > 0.9
@@ -197,6 +198,6 @@ def test_the_light_field_lights_the_pictures_own_brightness_as_a_relief() -> Non
     x = np.arange(480, dtype=np.float64)
     picture = np.broadcast_to((0.2 + 0.001 * x)[None, :, None], (12, 480, 3)).astype(np.float32)
     recipe = Recipe([Step(NAME, params={"field": "light", "angle": 180, "height": 500, "blur": 0})], name="lit")
-    out = runner.render(picture, recipe)
+    out = facade.render(picture, recipe)
     gain = hand_gain(0.5, 0, 180, 45)
     np.testing.assert_allclose(out[:, 2:-2], picture[:, 2:-2] * gain, atol=2e-4)

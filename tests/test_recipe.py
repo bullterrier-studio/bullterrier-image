@@ -23,7 +23,7 @@ from bullterrier_image import (
     trace,
 )
 from bullterrier_image import recipe as facade
-from bullterrier_image.core import looks, registry, runner
+from bullterrier_image.core import looks, registry
 from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import maps_needed, runs
@@ -292,9 +292,9 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     masking = Step("gradient", params={"colors": ["#000000"]}, mask="background")
     masked = Recipe((masking,), name="m", size=None)
     alpha = subject_matte(photo)
-    expected = runner.render(photo, masked, maps={"subject": alpha})
+    expected = facade.render(photo, masked, maps={"subject": alpha})
     assert not np.array_equal(
-        expected, runner.render(photo, masked, maps={"subject": np.ones_like(alpha)})
+        expected, facade.render(photo, masked, maps={"subject": np.ones_like(alpha)})
     )  # the subject matters
     np.testing.assert_array_equal(facade.render(photo, masked), expected)
     np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
@@ -387,8 +387,8 @@ def test_a_step_applies_in_a_fresh_process_that_imported_nothing_else(tmp_path, 
 def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):
     masked = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="m", size=None)
     found = facade.render(photo, masked, finders={"subject": Finder("stand-in", lambda rgb: 1.0 - subject)})
-    np.testing.assert_array_equal(found, runner.render(photo, masked, maps={"subject": 1.0 - subject}))
-    assert not np.array_equal(found, runner.render(photo, masked, maps={"subject": subject}))
+    np.testing.assert_array_equal(found, facade.render(photo, masked, maps={"subject": 1.0 - subject}))
+    assert not np.array_equal(found, facade.render(photo, masked, maps={"subject": subject}))
 
 
 PLAIN = Recipe((Step("grade", params={"exposure": 0.5}),), name="plain", size=None)
@@ -452,9 +452,9 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     run by a stand-in model (the external boundary, see `depth_echo_model`)."""
     depth_echo_model(0)
     photo = resize(imageio.load(EXAMPLE_PHOTO), 160)
-    expected = runner.render(photo, DEEP, maps={"depth": depth_map(photo)})
+    expected = facade.render(photo, DEEP, maps={"depth": depth_map(photo)})
     flat = np.zeros(photo.shape[:2], np.float32)
-    assert not np.array_equal(expected, runner.render(photo, DEEP, maps={"depth": flat}))  # the depth matters
+    assert not np.array_equal(expected, facade.render(photo, DEEP, maps={"depth": flat}))  # the depth matters
     np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
     np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)

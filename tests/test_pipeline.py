@@ -11,10 +11,10 @@ from PIL import Image
 
 from bullterrier_image import Each, Finder, Grid, Picture, Project, Recipe, fx, imageio
 from bullterrier_image.cli import main
-from bullterrier_image.core.framing import Framing
 from bullterrier_image.errors import BackendUnavailableError, ProjectError, RecipeError, SubjectNotFoundError
 from bullterrier_image.finding.subject import subject_finder
 from bullterrier_image.pipeline import init_project, load_project, run
+from bullterrier_image.recipe import Framing
 
 
 def write_recipe(folder: Path, name: str, step: str, file: str | None = None) -> None:
@@ -218,6 +218,27 @@ def test_changing_an_svg_file_a_recipe_reads_redoes_that_recipe_and_nothing_else
     (folder / "assets" / "cut.svg").write_text(shape.format(9), encoding="utf-8")  # same name, other shapes
     redone = sorted((i.recipe, i.status) for i in run(project) if i.status == "done")
     assert redone == [("cut", "done")] * 2
+
+
+@pytest.mark.parametrize(
+    ("file", "limit", "naming"),
+    [
+        pytest.param("cut.svg", 1, "max_kilobytes", id="a file over the limit of its region"),
+        pytest.param("nowhere.svg", 4, "nowhere", id="a file that is not there"),
+    ],
+)
+def test_a_project_whose_recipe_reads_an_svg_it_may_not_read_is_refused_naming_the_file_or_the_limit(
+    folder, file, limit, naming
+):
+    (folder / "assets").mkdir()
+    (folder / "assets" / "cut.svg").write_text("<svg/>" + " " * 3000, encoding="utf-8")
+    (folder / "recipes" / "cut.toml").write_text(
+        f'format = 2\nname = "cut"\nsize = 64\n[region.s]\nkind = "svg"\nfile = "../assets/{file}"\n'
+        f'max_kilobytes = {limit}\n[[step]]\neach = "s"\nlooks = ["none", {{ effect = "grade", exposure = 0.4 }}]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(RecipeError, match=naming):
+        run(load_project(folder / "bt-image.toml"))
 
 
 @pytest.mark.parametrize(

@@ -13,8 +13,9 @@ import pytest
 from scipy import ndimage
 
 from bullterrier_image import fx
+from bullterrier_image import recipe as facade
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
-from bullterrier_image.core import registry, runner
+from bullterrier_image.core import registry
 from bullterrier_image.core.params import (
     UNITS,
     Drive,
@@ -28,7 +29,7 @@ from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step, drives
-from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
+from bullterrier_image.errors import MapNotFoundError, RecipeError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
 
@@ -727,8 +728,8 @@ def test_a_drivable_field_says_so_in_the_documentation_and_the_signature(name, f
 def test_a_constant_field_gives_the_plain_effect_at_that_levels_value(name, field, level, photo):
     least, greatest = _range(name, field)
     driven, plain, maps = _driven_and_plain(name, field, 5, photo)
-    expected = runner.render(photo, plain(least + (greatest - least) * level / 4), maps=maps)
-    got = runner.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
+    expected = facade.render(photo, plain(least + (greatest - least) * level / 4), maps=maps)
+    got = facade.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
     np.testing.assert_allclose(got, expected, atol=1e-6, rtol=0)
 
 
@@ -737,8 +738,8 @@ def test_two_levels_mix_the_effect_at_the_least_and_the_greatest_value_by_the_fi
     least, greatest = _range(name, field)
     driven, plain, maps = _driven_and_plain(name, field, 2, photo)
     ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
-    at_least, at_greatest = (runner.render(photo, plain(value), maps=maps) for value in (least, greatest))
-    got = runner.render(photo, driven, maps={**maps, "f": ramp})
+    at_least, at_greatest = (facade.render(photo, plain(value), maps=maps) for value in (least, greatest))
+    got = facade.render(photo, driven, maps={**maps, "f": ramp})
     np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_least + ramp[..., None] * at_greatest, atol=1e-6, rtol=0)
 
 
@@ -812,9 +813,9 @@ def test_a_drive_of_a_cyclic_angle_may_run_past_the_turn_each_level_being_the_pl
     )
     maps = _inputs(name, photo)
     for level, written in enumerate([least, least + 180, least + 360, least + 540, least + 720]):
-        got = runner.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
+        got = facade.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
         plain = Recipe([Step(name, params={field: written})], name="plain", size=None)
-        np.testing.assert_allclose(got, runner.render(photo, plain, maps=maps), atol=1e-6, rtol=0)
+        np.testing.assert_allclose(got, facade.render(photo, plain, maps=maps), atol=1e-6, rtol=0)
 
 
 # --- a field parameter: the recipe names a selection, the effect gets its array --------------------------------------
@@ -867,7 +868,7 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
 ):
     maps = field_maps(photo, subject)
     recipe = Recipe([Step("field_probe", params={"field": name})], name="named", size=None, regions=FIELD_REGIONS)
-    named = runner.render(photo, recipe, maps=maps)
+    named = facade.render(photo, recipe, maps=maps)
     direct = registry.apply("field_probe", photo, field=the_field(name, photo, maps))
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
     assert np.abs(named - photo).max() > 0.01  # the field darkened something: this is not a comparison of two copies
@@ -885,7 +886,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name
     recipe = Recipe(
         [Step(name, params={field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS
     )
-    named = runner.render(photo, recipe, maps=maps)
+    named = facade.render(photo, recipe, maps=maps)
     direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     assert_a_picture_like(named, photo)
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
@@ -897,7 +898,7 @@ def test_some_effects_have_a_field_parameter():
 
 def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(field_probe, photo, subject):
     recipe = Recipe([Step("field_probe", params={"field": "g"})], name="small", size=48, regions=FIELD_REGIONS)
-    assert runner.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
+    assert facade.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
 
 
 FIELD_PARAMETERS = [(name, field) for name in ALL for field in field_name_fields(registry.parameters(name))]
@@ -914,7 +915,7 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_
     recipe = Recipe(
         [Step(name, params={field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS
     )
-    named = runner.render(photo, recipe, maps=maps)
+    named = facade.render(photo, recipe, maps=maps)
     direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
 
@@ -941,7 +942,7 @@ def test_the_runner_builds_only_the_fields_a_step_names(step_params, asked, fiel
         return Finder(f"{map_name} stand-in", find)
 
     recipe = Recipe([Step("field_probe", params=step_params)], name="only", size=None, regions=FIELD_REGIONS)
-    runner.render(photo, recipe, finders={"depth": stand_in("depth"), "subject": stand_in("subject")})
+    facade.render(photo, recipe, finders={"depth": stand_in("depth"), "subject": stand_in("subject")})
     assert calls == asked
 
 
@@ -987,22 +988,13 @@ def test_a_field_and_a_drive_on_another_parameter_equal_the_mix_of_two_renders_a
     at_start = registry.apply("field_probe", photo, field=maps["depth"], gain=0.5)
     at_end = registry.apply("field_probe", photo, field=maps["depth"], gain=2.0)
     expected = (1 - weight) * at_start + weight * at_end
-    np.testing.assert_allclose(runner.render(photo, recipe, maps=maps), expected, atol=1e-6, rtol=0)
+    np.testing.assert_allclose(facade.render(photo, recipe, maps=maps), expected, atol=1e-6, rtol=0)
 
 
-@pytest.mark.parametrize(
-    ("name", "error", "naming"),
-    [
-        ("depth", DepthNotFoundError, "field_probe"),
-        ("subject", SubjectNotFoundError, "subject"),
-        ("g", MapNotFoundError, "'g'"),
-    ],
-    ids=["depth", "subject", "a given map"],
-)
-def test_a_field_whose_map_nobody_gave_is_a_map_not_found_error_naming_the_map(name, error, naming, field_probe, photo):
-    recipe = Recipe([Step("field_probe", params={"field": name})], name="lost", size=None, regions=FIELD_REGIONS)
-    with pytest.raises(error, match=naming):
-        runner.render(photo, recipe)
+def test_a_field_whose_map_nobody_gave_is_a_map_not_found_error_naming_the_map(field_probe, photo):
+    recipe = Recipe([Step("field_probe", params={"field": "g"})], name="lost", size=None, regions=FIELD_REGIONS)
+    with pytest.raises(MapNotFoundError, match="'g'"):
+        facade.render(photo, recipe)
 
 
 def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, photo, subject, tmp_path):
@@ -1011,7 +1003,7 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
         'format = 3\nname = "lit"\nsize = 128\n[[step]]\neffect = "field_probe"\nfield = "light"\n', encoding="utf-8"
     )
     direct = registry.apply("field_probe", photo, field=the_field("light", photo, field_maps(photo, subject)))
-    np.testing.assert_allclose(runner.render(photo, load_recipe(file)), direct, atol=1e-6, rtol=0)
+    np.testing.assert_allclose(facade.render(photo, load_recipe(file)), direct, atol=1e-6, rtol=0)
 
 
 def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
@@ -1022,7 +1014,7 @@ def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
         size=None,
         regions={"halves": Grid(columns=2), "g": Given()},
     )
-    got = runner.render(photo, recipe, maps=maps)
+    got = facade.render(photo, recipe, maps=maps)
     np.testing.assert_allclose(got[:, :64], registry.apply("field_probe", photo, field=maps["g"])[:, :64], atol=1e-6)
     np.testing.assert_array_equal(got[:, 64:], photo[:, 64:])
 
@@ -1323,8 +1315,8 @@ def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dic
     look = Recipe([step], name=name)
     return {
         size: (
-            runner.render(picture, untouched, maps=maps, size=size),
-            runner.render(picture, look, maps=maps, size=size),
+            facade.render(picture, untouched, maps=maps, size=size),
+            facade.render(picture, look, maps=maps, size=size),
         )
         for size in (DESIGN_SIZE, LARGE_SIZE)
     }

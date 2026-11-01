@@ -6,8 +6,8 @@ import pytest
 
 from bullterrier_image.core import registry
 from bullterrier_image.core.presets import read
-from bullterrier_image.core.regions import Shards
 from bullterrier_image.errors import RecipeError
+from bullterrier_image.recipe import Shards
 
 MODEL = registry.parameters("gradient_map")
 

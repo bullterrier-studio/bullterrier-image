@@ -6,9 +6,8 @@ import numpy as np
 import pytest
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.runner import render
 from bullterrier_image.core.steps import Each, Recipe, Step
-from bullterrier_image.recipe import Grid, Pick
+from bullterrier_image.recipe import Grid, Pick, render
 
 NAME = "seams"
 RED = (1.0, 0.0, 0.0)

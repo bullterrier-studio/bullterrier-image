@@ -1,8 +1,7 @@
-"""Tests of `core/runner.py`: the runner is given the subject (a subject, or a `Finder` that finds it); it never looks
-for the subject itself."""
+"""Tests of rendering a recipe through `bullterrier_image.recipe`: the subject and the depth are given as a map or as a
+`Finder`, and every step, region, drive, framing and size behaves as the recipe says."""
 
 import math
-import tracemalloc
 from contextlib import nullcontext
 
 import numpy as np
@@ -18,13 +17,13 @@ from bullterrier_image import (
     RecipeError,
     SubjectNotFoundError,
 )
-from bullterrier_image.core import registry, runner
-from bullterrier_image.core.framing import Framing
+from bullterrier_image import recipe as facade
+from bullterrier_image.core import registry
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step, derived_maps, maps_needed
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Band, Bands, Combine, Finder, Given, Grid, Pick, Shards, Subject
+from bullterrier_image.recipe import Band, Bands, Combine, Finder, Framing, Given, Grid, Pick, Shards, Subject
 
 MASKED = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="masked", size=None)
 PLAIN = Recipe((Step("grade", params={"exposure": 0.5}),), name="plain", size=None)
@@ -60,20 +59,10 @@ def test_a_finder_needs_an_identity_and_a_function(identity, find, outcome):
 
 
 RUNS = {
-    "render": lambda photo, recipe, **k: runner.render(photo, recipe, **k),
-    "trace": lambda photo, recipe, **k: runner.trace(photo, recipe, **k),
-    "render_all": lambda photo, recipe, **k: runner.render_all(photo, [PLAIN, recipe], **k),
+    "render": lambda photo, recipe, **k: facade.render(photo, recipe, **k),
+    "trace": lambda photo, recipe, **k: facade.trace(photo, recipe, **k),
+    "render_all": lambda photo, recipe, **k: facade.render_all(photo, [PLAIN, recipe], **k),
 }
-
-
-@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
-def test_a_masked_recipe_without_the_subject_map_or_a_finder_is_refused_naming_both_ways(run, photo):
-    with pytest.raises(SubjectNotFoundError, match="needs the subject") as raised:
-        run(photo, MASKED)
-    message = str(raised.value)  # names the recipe and both ways to give the subject
-    assert f"'{MASKED.name}'" in message
-    assert "maps={'subject'" in message
-    assert "finders={'subject'" in message
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -85,28 +74,28 @@ def test_the_finder_is_called_exactly_once_per_render(run, photo, subject):
 
 def test_render_all_asks_once_however_many_recipes_need_the_subject(photo, subject):
     finder = CountingFinder(subject)
-    assert len(runner.render_all(photo, [MASKED, PLAIN, MASKED], finders={"subject": Finder("stand-in", finder)})) == 3
+    assert len(facade.render_all(photo, [MASKED, PLAIN, MASKED], finders={"subject": Finder("stand-in", finder)})) == 3
     assert len(finder.seen) == 1
 
 
 def test_the_finder_is_not_called_when_nothing_needs_the_subject_or_the_matte_is_given(photo, subject):
     finder = CountingFinder(subject)
-    runner.render(photo, PLAIN, finders={"subject": Finder("stand-in", finder)})
-    runner.render_all(photo, [PLAIN, PLAIN], finders={"subject": Finder("stand-in", finder)})
-    runner.render(photo, MASKED, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)})
+    facade.render(photo, PLAIN, finders={"subject": Finder("stand-in", finder)})
+    facade.render_all(photo, [PLAIN, PLAIN], finders={"subject": Finder("stand-in", finder)})
+    facade.render(photo, MASKED, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)})
     assert finder.seen == []
 
 
 def test_the_finders_matte_is_the_one_the_recipe_uses(photo, subject):
-    found = runner.render(photo, MASKED, finders={"subject": Finder("stand-in", CountingFinder(subject))})
-    np.testing.assert_array_equal(found, runner.render(photo, MASKED, maps={"subject": subject}))
-    assert not np.array_equal(found, runner.render(photo, MASKED, maps={"subject": 1.0 - subject}))
+    found = facade.render(photo, MASKED, finders={"subject": Finder("stand-in", CountingFinder(subject))})
+    np.testing.assert_array_equal(found, facade.render(photo, MASKED, maps={"subject": subject}))
+    assert not np.array_equal(found, facade.render(photo, MASKED, maps={"subject": 1.0 - subject}))
 
 
 def test_the_finder_sees_the_photo_as_given_before_it_is_framed_or_scaled(photo, subject):
     finder = CountingFinder(subject)
     small = Recipe(MASKED.steps, name="small", size=64, frame=Framing(aspect=1.0))
-    assert runner.render(photo, small, finders={"subject": Finder("stand-in", finder)}).shape == (64, 64, 3)
+    assert facade.render(photo, small, finders={"subject": Finder("stand-in", finder)}).shape == (64, 64, 3)
     assert finder.seen == [(96, 128, 3)]  # not the 64 px square it is rendered as
 
 
@@ -119,7 +108,7 @@ WITH_SUBJECT = {
 @pytest.mark.parametrize("given", WITH_SUBJECT.values(), ids=WITH_SUBJECT.keys())
 def test_a_matte_of_another_size_than_the_photo_is_refused_naming_both_sizes(photo, subject, given):
     with pytest.raises(SubjectNotFoundError, match=r"subject is \(48, 64\).*\(96, 128\)"):
-        runner.render(photo, MASKED, **given(subject[::2, ::2]))
+        facade.render(photo, MASKED, **given(subject[::2, ::2]))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -283,12 +272,12 @@ NEEDING_DEPTH = {  # a recipe that needs depth, and what the error for no depth 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
 def test_an_effect_that_takes_depth_is_given_the_depth_map(photo, depth_probe, given):
-    np.testing.assert_array_equal(runner.render(photo, deep(), **given(RAMP))[..., 0], RAMP)
+    np.testing.assert_array_equal(facade.render(photo, deep(), **given(RAMP))[..., 0], RAMP)
 
 
 @pytest.mark.parametrize(
     "run",
-    [*RUNS.values(), lambda photo, recipe, **k: runner.render_all(photo, [recipe, PLAIN, recipe], **k)],
+    [*RUNS.values(), lambda photo, recipe, **k: facade.render_all(photo, [recipe, PLAIN, recipe], **k)],
     ids=[*RUNS.keys(), "render_all of two recipes that need it"],
 )
 def test_the_depth_finder_is_asked_once_with_the_photo_as_given(run, photo, depth_probe):
@@ -300,24 +289,11 @@ def test_the_depth_finder_is_asked_once_with_the_photo_as_given(run, photo, dept
 def test_the_depth_finder_is_not_asked_when_nothing_needs_depth(photo, subject, depth_probe):
     finder = CountingFinder(RAMP)
     asked = Finder("stand-in depth", finder)
-    runner.render(photo, PLAIN, finders={"depth": asked})
-    runner.trace(photo, MASKED, maps={"subject": subject}, finders={"depth": asked})
-    runner.render_all(photo, [PLAIN, MASKED], maps={"subject": subject}, finders={"depth": asked})
-    runner.render(photo, deep(), maps={"depth": RAMP}, finders={"depth": asked})
+    facade.render(photo, PLAIN, finders={"depth": asked})
+    facade.trace(photo, MASKED, maps={"subject": subject}, finders={"depth": asked})
+    facade.render_all(photo, [PLAIN, MASKED], maps={"subject": subject}, finders={"depth": asked})
+    facade.render(photo, deep(), maps={"depth": RAMP}, finders={"depth": asked})
     assert finder.seen == []
-
-
-@pytest.mark.parametrize(("recipe", "named"), NEEDING_DEPTH.values(), ids=NEEDING_DEPTH.keys())
-@pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
-def test_a_recipe_that_needs_depth_without_a_map_or_a_finder_is_refused_naming_the_step_and_both_ways(
-    run, photo, depth_probe, recipe, named
-):
-    with pytest.raises(DepthNotFoundError, match="step 1") as raised:
-        run(photo, recipe())
-    message = str(raised.value)
-    assert named in message
-    assert "maps={'depth'" in message
-    assert "finders={'depth'" in message
 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
@@ -333,7 +309,7 @@ def test_a_depth_map_of_another_size_than_the_photo_is_refused_naming_both_sizes
     photo, depth_probe, given, wrong, size, recipe
 ):
     with pytest.raises(DepthNotFoundError, match=size + r".*\(96, 128\)"):
-        runner.render(photo, recipe(), **given(wrong))
+        facade.render(photo, recipe(), **given(wrong))
 
 
 def spoilt(value: float) -> np.ndarray:
@@ -362,10 +338,10 @@ EITHER_MAP = {  # a recipe needing the map, how it is given or found, and its er
 @pytest.mark.parametrize(("recipe", "given", "error"), EITHER_MAP.values(), ids=EITHER_MAP.keys())
 def test_a_map_must_be_finite_and_within_0_and_1(photo, layer, complaint, recipe, given, error):
     if complaint is None:
-        assert runner.render(photo, recipe, **given(layer)).shape == photo.shape
+        assert facade.render(photo, recipe, **given(layer)).shape == photo.shape
         return
     with pytest.raises(error, match=r"^(subject|depth) has .*" + complaint):
-        runner.render(photo, recipe, **given(layer))
+        facade.render(photo, recipe, **given(layer))
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -390,11 +366,11 @@ def test_a_depth_finder_that_finds_nothing_is_an_error_naming_it(run, photo, dep
     ],
 )
 def test_the_depth_map_is_framed_and_scaled_with_the_photo(photo, depth_probe, keys, by_hand):
-    np.testing.assert_array_equal(runner.render(photo, deep(**keys), maps={"depth": RAMP})[..., 0], by_hand(RAMP))
+    np.testing.assert_array_equal(facade.render(photo, deep(**keys), maps={"depth": RAMP})[..., 0], by_hand(RAMP))
 
 
 def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, depth_probe):
-    out = runner.render(
+    out = facade.render(
         photo, deep(frame=Framing(angle=30, fit="expand")), maps={"depth": np.ones((96, 128), np.float32)}
     )
     assert out.shape == (148, 159, 3)
@@ -404,14 +380,14 @@ def test_a_turn_that_expands_the_picture_leaves_the_corners_farthest(photo, dept
 
 def test_a_recipe_whose_only_need_for_depth_is_a_region_asks_the_finder_and_traces_the_depth(photo):
     finder = CountingFinder(DOWN)
-    stages = runner.trace(photo, FRONT, finders={"depth": Finder("stand-in depth", finder)})
+    stages = facade.trace(photo, FRONT, finders={"depth": Finder("stand-in depth", finder)})
     assert finder.seen == [(96, 128, 3)]
     assert "depth (white = nearest)" in [stage.label for stage in stages]
 
 
 def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, subject, depth_probe):
     recipe = deep(frame=Framing(transparent="background"))
-    stages = runner.trace(photo, recipe, maps={"subject": subject, "depth": RAMP})
+    stages = facade.trace(photo, recipe, maps={"subject": subject, "depth": RAMP})
     assert [stage.label for stage in stages[:3]] == [
         "input",
         "subject matte (white = subject)",
@@ -419,10 +395,10 @@ def test_trace_shows_the_depth_after_the_subject_and_ends_in_the_render(photo, s
     ]
     np.testing.assert_array_equal(stages[2].image, np.repeat(RAMP[..., None], 3, axis=2))
     np.testing.assert_array_equal(
-        stages[-1].image, runner.render(photo, recipe, maps={"subject": subject, "depth": RAMP})
+        stages[-1].image, facade.render(photo, recipe, maps={"subject": subject, "depth": RAMP})
     )
     assert "depth" not in " ".join(
-        stage.label for stage in runner.trace(photo, MASKED, maps={"subject": subject, "depth": RAMP})
+        stage.label for stage in facade.trace(photo, MASKED, maps={"subject": subject, "depth": RAMP})
     )
 
 
@@ -454,7 +430,7 @@ def red_where(star: np.ndarray, photo: np.ndarray) -> np.ndarray:
     ],
 )
 def test_a_given_map_limits_a_step_to_where_it_is(photo, given):
-    np.testing.assert_array_equal(runner.render(photo, STAR_RED, **given(STAR)), red_where(STAR, photo))
+    np.testing.assert_array_equal(facade.render(photo, STAR_RED, **given(STAR)), red_where(STAR, photo))
 
 
 @pytest.mark.parametrize(
@@ -468,14 +444,14 @@ def test_a_given_map_limits_a_step_to_where_it_is(photo, given):
 def test_a_given_map_moves_with_the_photo_through_the_framing(photo, frame, by_hand):
     framed = Recipe(STAR_RED.steps, name="framed", size=None, frame=frame, regions=STAR_RED.regions)
     np.testing.assert_array_equal(
-        runner.render(photo, framed, maps={"star": STAR}), red_where(by_hand(STAR), by_hand(photo))
+        facade.render(photo, framed, maps={"star": STAR}), red_where(by_hand(STAR), by_hand(photo))
     )
 
 
 def test_a_given_map_is_scaled_with_the_photo_to_the_recipes_size(photo):
     scaled = Recipe(STAR_RED.steps, name="scaled", size=64, regions=STAR_RED.regions)
-    expected = runner.render(resize(photo, 64), STAR_RED, maps={"star": resize(STAR, 64)})
-    np.testing.assert_array_equal(runner.render(photo, scaled, maps={"star": STAR}), expected)
+    expected = facade.render(resize(photo, 64), STAR_RED, maps={"star": resize(STAR, 64)})
+    np.testing.assert_array_equal(facade.render(photo, scaled, maps={"star": STAR}), expected)
 
 
 @pytest.mark.parametrize("run", RUNS.values(), ids=RUNS.keys())
@@ -490,7 +466,7 @@ def test_a_recipe_that_uses_a_given_map_that_nobody_gave_is_refused_naming_the_m
 
 def test_a_given_map_that_no_step_uses_is_not_needed(photo):
     unused = Recipe(PLAIN.steps, name="unused", size=None, regions={"star": Given()})
-    np.testing.assert_array_equal(runner.render(photo, unused), runner.render(photo, PLAIN))
+    np.testing.assert_array_equal(facade.render(photo, unused), facade.render(photo, PLAIN))
 
 
 @pytest.mark.parametrize("keyword", ["maps", "finders"])
@@ -504,33 +480,27 @@ def test_a_name_that_is_no_map_of_the_recipe_is_refused_listing_the_maps_it_has(
 
 def test_a_map_of_the_wrong_size_is_refused_naming_it_even_when_no_step_uses_it(photo):
     with pytest.raises(MapNotFoundError, match=r"star is \(48, 64\).*\(96, 128\)"):
-        runner.render(photo, STAR_RED, maps={"star": STAR[::2, ::2]})
+        facade.render(photo, STAR_RED, maps={"star": STAR[::2, ::2]})
     with pytest.raises(DepthNotFoundError, match=r"depth is \(48, 64\).*\(96, 128\)"):
-        runner.render(photo, PLAIN, maps={"depth": RAMP[::2, ::2]})
+        facade.render(photo, PLAIN, maps={"depth": RAMP[::2, ::2]})
 
 
 def test_a_given_maps_values_must_be_finite_and_within_0_and_1(photo):
     with pytest.raises(MapNotFoundError, match=r"^star has .*above 1"):
-        runner.render(photo, STAR_RED, maps={"star": STAR * 1.5})
+        facade.render(photo, STAR_RED, maps={"star": STAR * 1.5})
 
 
 def test_a_finder_of_a_given_map_is_asked_once_with_the_photo_as_given_however_many_recipes_use_the_map(photo):
     finder = CountingFinder(STAR)
     small = Recipe(STAR_RED.steps, name="small", size=64, frame=Framing(aspect=1.0), regions=STAR_RED.regions)
-    runner.render_all(photo, [small, PLAIN, STAR_RED], finders={"star": Finder("stand-in star", finder)})
+    facade.render_all(photo, [small, PLAIN, STAR_RED], finders={"star": Finder("stand-in star", finder)})
     assert finder.seen == [(96, 128, 3)]
 
 
 def test_a_finder_of_a_map_that_answers_none_is_an_error_naming_the_map(photo):
     broken = Finder("stand-in star", lambda rgb: None)  # type: ignore[arg-type,return-value]  # broken on purpose
     with pytest.raises(MapNotFoundError, match="finder of 'star' returned None"):
-        runner.render(photo, STAR_RED, finders={"star": broken})
-
-
-@pytest.mark.parametrize("recipe", [MASKED, FRONT], ids=["subject", "depth"])
-def test_a_missing_subject_or_depth_is_caught_as_a_map_error(photo, recipe):
-    with pytest.raises(MapNotFoundError):
-        runner.render(photo, recipe)
+        facade.render(photo, STAR_RED, finders={"star": broken})
 
 
 # --- light: a field made from the picture the steps work on ----------------------------------------------------------
@@ -552,7 +522,7 @@ def red_where_dark(picture: np.ndarray) -> np.ndarray:
 def test_a_recipe_that_uses_light_needs_no_map_from_anyone(photo):
     assert maps_needed(DARK) == frozenset()
     assert derived_maps(DARK) == frozenset({"light"})
-    np.testing.assert_array_equal(runner.render(photo, DARK), red_where_dark(photo))  # no maps, no finders
+    np.testing.assert_array_equal(facade.render(photo, DARK), red_where_dark(photo))  # no maps, no finders
 
 
 @pytest.mark.parametrize(
@@ -568,7 +538,7 @@ def test_light_is_the_brightness_of_the_picture_the_steps_work_on_after_framing_
     photo, frame, size, by_hand
 ):
     recipe = Recipe(DARK.steps, name="dark", size=size, frame=frame, regions=DARK.regions)
-    np.testing.assert_array_equal(runner.render(photo, recipe), red_where_dark(by_hand(photo)))
+    np.testing.assert_array_equal(facade.render(photo, recipe), red_where_dark(by_hand(photo)))
 
 
 def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(photo):
@@ -582,7 +552,7 @@ def test_light_does_not_follow_the_steps_it_is_the_photos_before_any_of_them(pho
     )
     dark = (photo @ LUMA <= 0.5)[..., None]  # of the PHOTO: the black the first step made is no darker than half
     expected = np.where(dark, PAINTED["fill"], 0.0)
-    np.testing.assert_array_equal(runner.render(photo, recipe), expected)
+    np.testing.assert_array_equal(facade.render(photo, recipe), expected)
 
 
 def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subject):
@@ -599,21 +569,21 @@ def test_the_light_of_the_subject_is_a_combination_of_the_two_fields(photo, subj
     bright = (photo @ LUMA > 0.5).astype(np.float64)
     weight = (subject * bright)[..., None]
     np.testing.assert_allclose(
-        runner.render(photo, lit_subject, maps={"subject": subject}),
+        facade.render(photo, lit_subject, maps={"subject": subject}),
         photo * (1 - weight) + PAINTED["fill"] * weight,
         atol=1e-6,
     )
 
 
 def test_trace_shows_a_region_made_of_light_and_ends_in_the_render(photo):
-    stages = runner.trace(photo, DARK)
+    stages = facade.trace(photo, DARK)
     assert "region 'dark' (white = chosen)" in [stage.label for stage in stages]
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, DARK))
+    np.testing.assert_array_equal(stages[-1].image, facade.render(photo, DARK))
 
 
 def test_nobody_can_hand_in_light_it_is_made_here(photo):
     with pytest.raises(RecipeError, match="`maps` names 'light'"):
-        runner.render(photo, DARK, maps={"light": np.zeros(photo.shape[:2], np.float32)})
+        facade.render(photo, DARK, maps={"light": np.zeros(photo.shape[:2], np.float32)})
 
 
 # --- a driven parameter: a field varies it pixel by pixel ------------------------------------------------------------
@@ -660,29 +630,29 @@ def field_of(photo: np.ndarray, value: float) -> np.ndarray:
 @pytest.mark.parametrize("level", range(5))
 def test_a_constant_field_gives_the_plain_effect_at_that_levels_value(photo, brighten, level):
     # 0.5 + 2 x level / 4 by hand: the levels run 0.5, 1, 1.5, 2, 2.5
-    expected = runner.render(photo, plain(gain=0.5 + 2.0 * level / 4))
-    got = runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, level / 4)})
+    expected = facade.render(photo, plain(gain=0.5 + 2.0 * level / 4))
+    got = facade.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, level / 4)})
     np.testing.assert_allclose(got, expected, atol=1e-6, rtol=0)
 
 
 def test_a_field_between_two_levels_mixes_their_renders_by_the_distance_to_each(photo, brighten):
     # levels 0, 0.5, 1 of the gain; a field of 0.25 is half way from the first to the second
-    first, second = runner.render(photo, plain(gain=0.0)), runner.render(photo, plain(gain=2.0))
-    got = runner.render(photo, driven(levels=3, gain=(0.0, 4.0)), maps={"f": field_of(photo, 0.25)})
+    first, second = facade.render(photo, plain(gain=0.0)), facade.render(photo, plain(gain=2.0))
+    got = facade.render(photo, driven(levels=3, gain=(0.0, 4.0)), maps={"f": field_of(photo, 0.25)})
     np.testing.assert_allclose(got, 0.5 * first + 0.5 * second, atol=1e-6, rtol=0)
 
 
 def test_with_two_levels_each_pixel_mixes_the_effect_at_start_and_at_end_by_its_field(photo, brighten):
     ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
-    at_start, at_end = runner.render(photo, plain(gain=0.5)), runner.render(photo, plain(gain=3.0))
-    got = runner.render(photo, driven(levels=2, gain=(0.5, 3.0)), maps={"f": ramp})
+    at_start, at_end = facade.render(photo, plain(gain=0.5)), facade.render(photo, plain(gain=3.0))
+    got = facade.render(photo, driven(levels=2, gain=(0.5, 3.0)), maps={"f": ramp})
     np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_start + ramp[..., None] * at_end, atol=1e-6, rtol=0)
 
 
 def test_a_field_running_the_other_way_is_the_start_and_end_swapped(photo, brighten):
     ramp = np.tile(np.linspace(0, 1, photo.shape[1], dtype=np.float32), (photo.shape[0], 1))
-    forward = runner.render(photo, driven(gain=(0.5, 3.0)), maps={"f": ramp})
-    backward = runner.render(photo, driven(gain=(3.0, 0.5)), maps={"f": 1 - ramp})
+    forward = facade.render(photo, driven(gain=(0.5, 3.0)), maps={"f": ramp})
+    backward = facade.render(photo, driven(gain=(3.0, 0.5)), maps={"f": 1 - ramp})
     np.testing.assert_allclose(backward, forward, atol=1e-6, rtol=0)
 
 
@@ -697,13 +667,13 @@ def test_a_field_running_the_other_way_is_the_start_and_end_swapped(photo, brigh
 )
 def test_a_level_no_pixel_needs_is_never_rendered(photo, brighten, value, not_needed):
     brighten.update(not_needed)  # the effect raises if asked for one of these: the render finishing is the proof
-    got = runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, value)})
+    got = facade.render(photo, driven(gain=(0.5, 2.5)), maps={"f": field_of(photo, value)})
     assert got.shape == photo.shape
 
 
 def test_two_drives_of_one_step_move_together_along_the_same_field(photo, brighten):
-    got = runner.render(photo, driven(levels=3, gain=(0.5, 1.5), bias=(0.0, 0.2)), maps={"f": field_of(photo, 0.5)})
-    np.testing.assert_allclose(got, runner.render(photo, plain(gain=1.0, bias=0.1)), atol=1e-6, rtol=0)
+    got = facade.render(photo, driven(levels=3, gain=(0.5, 1.5), bias=(0.0, 0.2)), maps={"f": field_of(photo, 0.5)})
+    np.testing.assert_allclose(got, facade.render(photo, plain(gain=1.0, bias=0.1)), atol=1e-6, rtol=0)
 
 
 def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten):
@@ -713,8 +683,8 @@ def test_a_parameter_that_is_not_driven_keeps_its_written_value(photo, brighten)
         size=None,
         regions={"f": Given()},
     )
-    got = runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
-    np.testing.assert_allclose(got, runner.render(photo, plain(gain=2.5, bias=0.25)), atol=1e-6, rtol=0)
+    got = facade.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
+    np.testing.assert_allclose(got, facade.render(photo, plain(gain=2.5, bias=0.25)), atol=1e-6, rtol=0)
 
 
 def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, subject):
@@ -724,8 +694,8 @@ def test_a_driven_step_is_limited_and_mixed_in_like_any_other(photo, brighten, s
         size=None,
         regions={"f": Given()},
     )
-    got = runner.render(photo, both, maps={"f": field_of(photo, 1.0), "subject": subject})
-    brightened = runner.render(photo, plain(gain=2.5))
+    got = facade.render(photo, both, maps={"f": field_of(photo, 1.0), "subject": subject})
+    brightened = facade.render(photo, plain(gain=2.5))
     weight = (0.5 * subject)[..., None]  # opacity 0.5 where the subject is
     np.testing.assert_allclose(got, photo * (1 - weight) + brightened * weight, atol=1e-6, rtol=0)
 
@@ -743,8 +713,8 @@ def test_the_look_of_an_each_can_be_driven(photo, brighten):
         size=None,
         regions={"g": Grid(columns=2), "f": Given()},
     )
-    got = runner.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
-    brightened = runner.render(photo, plain(gain=2.5))
+    got = facade.render(photo, recipe, maps={"f": field_of(photo, 1.0)})
+    brightened = facade.render(photo, plain(gain=2.5))
     np.testing.assert_allclose(got[:, :64], brightened[:, :64], atol=1e-6)  # piece 0 has the driven look
     np.testing.assert_array_equal(got[:, 64:], photo[:, 64:])  # piece 1 stays as it was
 
@@ -755,7 +725,7 @@ def test_a_drive_by_the_depth_map_follows_the_depth(photo, brighten):
     recipe = Recipe(
         [Step("brighten_probe", params={"gain": Drive(by="depth", start=0.0, end=2.0)})], name="by-depth", size=None
     )
-    got = runner.render(dim, recipe, maps={"depth": depth})
+    got = facade.render(dim, recipe, maps={"depth": depth})
     # a mix of renders that are linear in the gain is the render at the mixed gain: gain 2 x depth, pixel by pixel
     np.testing.assert_allclose(got, dim * (2.0 * depth)[..., None], atol=1e-6)
 
@@ -768,9 +738,9 @@ def test_a_drive_by_a_band_of_the_depth_is_the_same_as_the_band_given_as_a_map(p
         size=None,
         regions={"near": Band(of="depth", low=0.6, high=1.0, feather=0.2)},
     )
-    by_band = runner.render(photo, banded, maps={"depth": depth})
+    by_band = facade.render(photo, banded, maps={"depth": depth})
     near = np.clip(1 - np.maximum(np.maximum(0.6 - depth, depth - 1.0), 0) / 0.2, 0, 1)  # by hand
-    np.testing.assert_allclose(by_band, runner.render(photo, driven(gain=(0.5, 2.5)), maps={"f": near}), atol=1e-6)
+    np.testing.assert_allclose(by_band, facade.render(photo, driven(gain=(0.5, 2.5)), maps={"f": near}), atol=1e-6)
 
 
 def test_a_drive_by_light_follows_the_brightness_of_the_picture_the_steps_work_on(photo, brighten):
@@ -780,12 +750,12 @@ def test_a_drive_by_light_follows_the_brightness_of_the_picture_the_steps_work_o
         size=None,
     )
     light = (photo @ LUMA)[..., None]
-    np.testing.assert_allclose(runner.render(photo, recipe), np.clip(photo * light, 0, 1), atol=1e-5)
+    np.testing.assert_allclose(facade.render(photo, recipe), np.clip(photo * light, 0, 1), atol=1e-5)
 
 
 def test_a_driven_render_stays_within_0_and_1(photo, brighten):
     field = np.random.default_rng(2).random(photo.shape[:2], dtype=np.float32)
-    got = runner.render(photo, driven(gain=(0.0, 4.0), bias=(-1.0, 1.0)), maps={"f": field})
+    got = facade.render(photo, driven(gain=(0.0, 4.0), bias=(-1.0, 1.0)), maps={"f": field})
     assert got.min() >= 0
     assert got.max() <= 1
 
@@ -794,21 +764,21 @@ def test_the_mix_of_renders_that_are_all_white_is_white_not_a_hair_above_it(brig
     # every level of this drive paints white; the float32 weights of two levels can add up to a hair over 1
     white = np.ones((64, 64, 3), np.float32)
     field = np.random.default_rng(3).random((64, 64), dtype=np.float32)
-    got = runner.render(white, driven(levels=16, gain=(2.0, 4.0)), maps={"f": field})
+    got = facade.render(white, driven(levels=16, gain=(2.0, 4.0)), maps={"f": field})
     assert got.max() == 1.0
     assert got.min() == 1.0
 
 
 def test_a_driven_step_is_traced_by_name_and_its_last_stage_is_the_render(photo, brighten):
     recipe = driven(gain=(0.5, 2.5))
-    stages = runner.trace(photo, recipe, maps={"f": field_of(photo, 0.5)})
+    stages = facade.trace(photo, recipe, maps={"f": field_of(photo, 0.5)})
     assert stages[-1].label == "1. brighten_probe(gain=by f 0.5..2.5)"
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, maps={"f": field_of(photo, 0.5)}))
+    np.testing.assert_array_equal(stages[-1].image, facade.render(photo, recipe, maps={"f": field_of(photo, 0.5)}))
 
 
 def test_a_drive_by_a_map_nobody_gave_is_refused_like_any_use_of_it(photo, brighten):
     with pytest.raises(MapNotFoundError, match="'f'"):
-        runner.render(photo, driven(gain=(0.5, 2.5)))
+        facade.render(photo, driven(gain=(0.5, 2.5)))
 
 
 # --- framing: the photo and its subject are framed together, before the steps ------------------------------------
@@ -816,8 +786,8 @@ def test_a_drive_by_a_map_nobody_gave_is_refused_like_any_use_of_it(photo, brigh
 
 def test_a_recipe_without_framing_runs_its_steps_on_the_photo_scaled_to_its_size(photo):
     scaled = Recipe(PLAIN.steps, name="scaled", size=64)
-    by_hand = runner.render(resize(photo, 64), PLAIN)
-    np.testing.assert_array_equal(runner.render(photo, scaled), by_hand)
+    by_hand = facade.render(resize(photo, 64), PLAIN)
+    np.testing.assert_array_equal(facade.render(photo, scaled), by_hand)
 
 
 @pytest.mark.parametrize(
@@ -833,48 +803,42 @@ def test_the_steps_run_on_the_framed_photo_and_a_masked_step_still_finds_the_sub
     photo, subject, frame, by_hand
 ):
     framed = Recipe(MASKED.steps, name="framed", size=None, frame=frame)
-    expected = runner.render(by_hand(photo), MASKED, maps={"subject": by_hand(subject)})  # background black, by hand
-    np.testing.assert_array_equal(runner.render(photo, framed, maps={"subject": subject}), expected)
+    expected = facade.render(by_hand(photo), MASKED, maps={"subject": by_hand(subject)})  # background black, by hand
+    np.testing.assert_array_equal(facade.render(photo, framed, maps={"subject": subject}), expected)
     assert (expected == 0).any()
     assert np.array_equal(
-        runner.render(photo, framed, maps={"subject": subject})[by_hand(subject) == 1],
+        facade.render(photo, framed, maps={"subject": subject})[by_hand(subject) == 1],
         by_hand(photo)[by_hand(subject) == 1],
     )
 
 
 def test_framing_comes_before_the_size(photo):
     framed = Recipe(PLAIN.steps, name="framed", size=48, frame=Framing(aspect=1.0))
-    by_hand = runner.render(resize(photo[:, 16:112], 48), PLAIN)  # crop 96 px square, then scale it to 48
-    np.testing.assert_array_equal(runner.render(photo, framed), by_hand)
+    by_hand = facade.render(resize(photo[:, 16:112], 48), PLAIN)  # crop 96 px square, then scale it to 48
+    np.testing.assert_array_equal(facade.render(photo, framed), by_hand)
 
 
 def test_a_crop_around_the_subject_uses_the_matte_that_the_finder_found_on_the_whole_photo(photo, subject):
     framed = Recipe(PLAIN.steps, name="framed", size=None, frame=Framing(anchor="subject", aspect=1.0, margin=0.1))
     for result in (
-        runner.render(photo, framed, maps={"subject": subject}),
-        runner.render(photo, framed, finders={"subject": Finder("stand-in", CountingFinder(subject))}),
+        facade.render(photo, framed, maps={"subject": subject}),
+        facade.render(photo, framed, finders={"subject": Finder("stand-in", CountingFinder(subject))}),
     ):
-        np.testing.assert_array_equal(result, runner.render(photo[13:84, 29:100], PLAIN))  # the disc and 6 px each way
-
-
-def test_a_subject_crop_needs_the_subject_even_when_no_step_does(photo):
-    framed = Recipe(PLAIN.steps, name="framed", size=None, frame=Framing(anchor="subject"))
-    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
-        runner.render(photo, framed)
+        np.testing.assert_array_equal(result, facade.render(photo[13:84, 29:100], PLAIN))  # the disc and 6 px each way
 
 
 def test_trace_shows_the_framed_photo_and_matte_and_ends_in_the_render(photo, subject):
     framed = Recipe(MASKED.steps, name="framed", size=None, frame=Framing(aspect=1.0))
-    stages = runner.trace(photo, framed, maps={"subject": subject})
+    stages = facade.trace(photo, framed, maps={"subject": subject})
     np.testing.assert_array_equal(stages[0].image, photo[:, 16:112])
     np.testing.assert_array_equal(stages[1].image[..., 0], subject[:, 16:112])
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, framed, maps={"subject": subject}))
+    np.testing.assert_array_equal(stages[-1].image, facade.render(photo, framed, maps={"subject": subject}))
 
 
 def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, subject):
     finder = CountingFinder(subject)
     framed = Recipe(PLAIN.steps, name="framed", size=None, frame=Framing(anchor="subject"))
-    results = runner.render_all(photo, [PLAIN, framed], finders={"subject": Finder("stand-in", finder)})
+    results = facade.render_all(photo, [PLAIN, framed], finders={"subject": Finder("stand-in", finder)})
     assert [r.shape[:2] for r in results] == [(96, 128), (59, 59)]
     assert len(finder.seen) == 1
 
@@ -884,9 +848,9 @@ def test_render_all_finds_the_subject_once_for_framed_and_plain_recipes(photo, s
 
 def test_a_circle_cut_gives_four_channels_the_steps_result_and_the_inscribed_circle_as_alpha(photo):
     recipe = Recipe(PLAIN.steps, name="round", size=None, frame=Framing(transparent="circle"))
-    out = runner.render(photo, recipe)
+    out = facade.render(photo, recipe)
     assert out.shape == (96, 128, 4)
-    np.testing.assert_array_equal(out[..., :3], runner.render(photo, PLAIN))
+    np.testing.assert_array_equal(out[..., :3], facade.render(photo, PLAIN))
     ys, xs = np.mgrid[0:96, 0:128]
     distance = np.hypot(ys + 0.5 - 48, xs + 0.5 - 64)  # from the middle; the circle's radius is 48
     assert (out[..., 3][distance < 47] == 1).all()
@@ -895,119 +859,44 @@ def test_a_circle_cut_gives_four_channels_the_steps_result_and_the_inscribed_cir
 
 def test_the_alpha_of_a_background_cut_is_the_subject_matte_that_moved_with_the_photo(photo, subject):
     recipe = Recipe(PLAIN.steps, name="cut", size=None, frame=Framing(transparent="background", flip="x", aspect=1.0))
-    out = runner.render(photo, recipe, maps={"subject": subject})
+    out = facade.render(photo, recipe, maps={"subject": subject})
     np.testing.assert_array_equal(out[..., 3], subject[:, ::-1][:, 16:112])
-    np.testing.assert_array_equal(out[..., :3], runner.render(photo[:, ::-1][:, 16:112], PLAIN))
+    np.testing.assert_array_equal(out[..., :3], facade.render(photo[:, ::-1][:, 16:112], PLAIN))
 
 
 def test_the_alpha_of_rounded_corners_is_clear_in_the_corners_and_opaque_in_the_middle_of_each_side(photo):
     recipe = Recipe(PLAIN.steps, name="rounded", size=None, frame=Framing(transparent="rounded", corner_radius=0.25))
-    alpha = runner.render(photo, recipe)[..., 3]  # a corner radius of a quarter of the 96 px side: 24 px
+    alpha = facade.render(photo, recipe)[..., 3]  # a corner radius of a quarter of the 96 px side: 24 px
     assert [alpha[0, 0], alpha[0, -1], alpha[-1, 0], alpha[-1, -1]] == [0, 0, 0, 0]
     assert [alpha[0, 64], alpha[-1, 64], alpha[48, 0], alpha[48, -1]] == [1, 1, 1, 1]
 
 
 def test_the_cut_is_made_at_the_recipes_size_after_the_steps(photo, subject):
     recipe = Recipe(PLAIN.steps, name="cut", size=64, frame=Framing(transparent="background"))
-    out = runner.render(photo, recipe, maps={"subject": subject})
+    out = facade.render(photo, recipe, maps={"subject": subject})
     assert out.shape == (48, 64, 4)
     np.testing.assert_array_equal(out[..., 3], resize(subject, 64))
 
 
-def test_a_cut_around_the_subject_needs_the_subject_even_when_no_step_does(photo):
-    recipe = Recipe(PLAIN.steps, name="cut", size=None, frame=Framing(transparent="background"))
-    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
-        runner.render(photo, recipe)
-
-
 def test_trace_adds_the_cut_as_its_last_stage_and_it_is_what_render_returns(photo, subject):
     recipe = Recipe(MASKED.steps, name="cut", size=None, frame=Framing(transparent="circle"))
-    stages = runner.trace(photo, recipe, maps={"subject": subject})
+    stages = facade.trace(photo, recipe, maps={"subject": subject})
     assert [stage.image.shape[2] for stage in stages] == [3, 3, 3, 4]  # input, subject, the step, the cut
     assert stages[-1].label == "2. transparent('circle')"
-    np.testing.assert_array_equal(stages[-1].image, runner.render(photo, recipe, maps={"subject": subject}))
+    np.testing.assert_array_equal(stages[-1].image, facade.render(photo, recipe, maps={"subject": subject}))
     np.testing.assert_array_equal(stages[-1].image[..., :3], stages[-2].image)
 
 
 def test_render_all_cuts_only_the_recipes_that_ask_for_it(photo):
     round_ = Recipe(PLAIN.steps, name="round", size=None, frame=Framing(transparent="circle"))
-    results = runner.render_all(photo, [PLAIN, round_])
+    results = facade.render_all(photo, [PLAIN, round_])
     assert [r.shape[2] for r in results] == [3, 4]
 
 
-# --- memory: the runner keeps only the image the next step needs ---------------------------------------------------
-
-
 class ScratchParams(EffectParams):
-    """The memory probes' settings."""
+    """The settings of the probe effects that need one parameter."""
 
-    copies: int = param(4, unit="count", min=1, max=8, doc="Picture-sized scratch buffers the step fills as it works.")
-
-
-SCRATCH_COPIES = 4  # each scratch step holds this many pictures, plus its output, at its peak
-
-
-def peak_pictures(photo: np.ndarray, recipe: Recipe, subject: np.ndarray | None = None) -> float:
-    """The most memory `render` had allocated at once (beyond the photo and subject, which the caller holds), in
-    pictures of the working size."""
-    maps = {} if subject is None else {"subject": subject}
-    picture = runner.render(photo, recipe, maps=maps).nbytes  # also warms up: one-time allocations stay out
-    tracemalloc.start()
-    try:
-        runner.render(photo, recipe, maps=maps)
-        return tracemalloc.get_traced_memory()[1] / picture
-    finally:
-        tracemalloc.stop()
-
-
-@pytest.fixture
-def memory_probes(throwaway_effects):
-    """`scratch_probe` works in `copies` picture-sized buffers and returns a new picture; `hoarding_probe` returns a new
-    picture but keeps every picture it is given alive, the way a leaky runner would."""
-    hoard: list[np.ndarray] = []
-
-    @effect(category="utilities", params=ScratchParams)
-    def scratch_probe(rgb, params):
-        """Fills scratch pictures, then returns a copy of the input."""
-        scratch = np.repeat(rgb[None], params.copies, axis=0)
-        return scratch[-1].copy()
-
-    @effect(category="utilities", params=ScratchParams)
-    def hoarding_probe(rgb, params):
-        """Keeps its input alive and returns a copy of it."""
-        hoard.append(rgb)
-        return rgb.copy()
-
-    yield
-    hoard.clear()
-
-
-PHOTO = np.random.default_rng(3).random((210, 330, 3), dtype=np.float32)  # scaled to 320 px: a new picture
-SUBJECT = np.zeros((210, 330), np.float32)
-SUBJECT[50:150, 80:250] = 1.0
-
-
-@pytest.mark.parametrize(
-    ("mask", "subject", "kept"),
-    [
-        (None, None, 0.0),
-        ("subject", SUBJECT, 1 / 3),  # the scaled subject, one channel: a third of a picture, needed by every step
-        ("background", SUBJECT, 2 / 3),  # and the background selection made from it, kept for the steps that mask
-    ],
-    ids=["plain", "subject", "background"],
-)
-def test_a_linear_render_holds_no_more_than_the_working_step_its_input_and_output(memory_probes, mask, subject, kept):
-    """A step's input is released once the next step has run, and neither the scaled photo nor a masked step's blend
-    weights are kept for the rest of the chain: the peak is the busiest step's scratch, output and input (and the
-    scaled subject), whatever the number of steps."""
-    steps = tuple(Step("scratch_probe", params={"copies": SCRATCH_COPIES}, mask=mask) for _ in range(6))
-    bound = (
-        SCRATCH_COPIES + 1 + 1 + kept + 0.25
-    )  # scratch, output, input, the selections, a quarter picture for small things
-    assert peak_pictures(PHOTO, Recipe(steps, name="chain", size=320), subject) <= bound
-    # known-bad: the same gauge sees a picture that something keeps alive
-    leaky = (*steps[:3], Step("hoarding_probe", params={}, mask=mask), *steps[3:])
-    assert peak_pictures(PHOTO, Recipe(leaky, name="leaky", size=320), subject) > bound
+    copies: int = param(4, unit="count", min=1, max=8, doc="Unused: a probe ignores it.")
 
 
 # --- regions: `each` gives every piece of a partition its look; `mask` limits a step to a selection -----------------
@@ -1025,12 +914,12 @@ def test_each_over_depth_bands_gives_every_distance_its_look_nearest_first(photo
     recipe = Recipe([looks], name="by-distance", size=None, regions={"bands": Bands(of="depth", count=3)})
     by_hand = np.empty((96, 128, 3), np.float32)
     by_hand[:32], by_hand[32:64], by_hand[64:] = RGB[RED], RGB[GREEN], RGB[BLUE]  # nearer than 2/3, than 1/3, the rest
-    np.testing.assert_allclose(runner.render(photo, recipe, maps={"depth": DOWN}), by_hand, atol=1e-6)
+    np.testing.assert_allclose(facade.render(photo, recipe, maps={"depth": DOWN}), by_hand, atol=1e-6)
 
 
 @pytest.mark.parametrize("given", WITH_DEPTH.values(), ids=WITH_DEPTH.keys())
 def test_a_step_masked_to_a_depth_selection_changes_only_what_lies_within_it(photo, given):
-    out = runner.render(photo, FRONT, **given(DOWN))
+    out = facade.render(photo, FRONT, **given(DOWN))
     np.testing.assert_allclose(out[:24], np.broadcast_to(RGB[RED], (24, 128, 3)), atol=1e-6)  # depth 0.75 and more
     np.testing.assert_array_equal(out[24:], photo[24:])
 
@@ -1040,7 +929,7 @@ def columns(count: int) -> dict[str, Grid | Pick | Shards]:
 
 
 def run(photo, steps, regions, **keys):
-    return runner.render(photo, Recipe(steps, name="regions", size=None, regions=regions), **keys)
+    return facade.render(photo, Recipe(steps, name="regions", size=None, regions=regions), **keys)
 
 
 @pytest.mark.parametrize("count", [1, 2, 4, 5])
@@ -1207,7 +1096,7 @@ def test_regions_are_made_for_the_working_picture_after_framing_and_scaling(phot
         frame=Framing(aspect=1.0),
         regions={"halves": Grid(columns=2, rows=1)},
     )
-    out = runner.render(photo, recipe)
+    out = facade.render(photo, recipe)
     assert out.shape == (64, 64, 3)
     assert (out[:, :32] == RGB[RED]).all()
     assert (out[:, 32:] == RGB[GREEN]).all()
@@ -1244,18 +1133,11 @@ def test_a_region_laid_over_the_subject_follows_the_subject_scaled_to_the_workin
         size=64,
         regions={"sides": Grid(columns=2, rows=1, fit="subject")},
     )
-    out = runner.render(photo, recipe, finders={"subject": Finder("stand-in", CountingFinder(subject))})
+    out = facade.render(photo, recipe, finders={"subject": Finder("stand-in", CountingFinder(subject))})
     assert out.shape == (48, 64, 3)
     middle = 32  # the disc is in the middle of the picture, so its box is cut in half there
     assert (out[:, :middle] == RGB[RED]).all()
     assert (out[:, middle:] == RGB[GREEN]).all()
-
-
-@pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
-def test_a_region_that_needs_the_subject_without_a_finder_is_refused_like_a_masked_step(run_it, photo):
-    recipe = Recipe([Each("glass", looks=[None])], name="fitted", size=None, regions={"glass": Shards(fit="subject")})
-    with pytest.raises(SubjectNotFoundError, match="needs the subject"):
-        run_it(photo, recipe)
 
 
 # --- the partition an effect draws ---------------------------------------------------------------------------------
@@ -1286,7 +1168,7 @@ TRACED: dict[str, Grid | Pick | Shards] = {
 
 def traced(photo, **keys):
     recipe = Recipe([Step("grade", params={"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
-    return runner.trace(photo, recipe, **keys)
+    return facade.trace(photo, recipe, **keys)
 
 
 def test_trace_shows_each_region_the_steps_use_between_the_input_and_the_steps_and_none_they_do_not(photo):
@@ -1335,12 +1217,12 @@ def test_the_number_drawn_in_a_piece_is_its_own_a_one_has_less_ink_than_an_eight
 
 def test_trace_still_ends_in_what_render_returns_when_regions_are_drawn(photo):
     recipe = Recipe([Step("grade", params={"exposure": 0.2}, mask="head")], name="traced", size=None, regions=TRACED)
-    np.testing.assert_array_equal(runner.trace(photo, recipe)[-1].image, runner.render(photo, recipe))
+    np.testing.assert_array_equal(facade.trace(photo, recipe)[-1].image, facade.render(photo, recipe))
 
 
 def test_trace_labels_an_each_step_with_its_partition_and_looks(photo):
     each = Each("panes", looks=[fill(RED), None], mask="head")
-    labels = [stage.label for stage in runner.trace(photo, Recipe([each], name="t", size=None, regions=TRACED))]
+    labels = [stage.label for stage in facade.trace(photo, Recipe([each], name="t", size=None, regions=TRACED))]
     assert labels[-1].startswith("1. each panes [gradient(colors=['#ff0000']), none]")
 
 
@@ -1349,7 +1231,7 @@ def test_a_feather_is_in_design_px_so_the_blend_is_the_same_at_two_resolutions()
     recipe = [Each("cols", looks=[fill(RED), None], feather=9.6)]
 
     def rendered(size: int) -> np.ndarray:
-        return runner.render(grey, Recipe(recipe, name="scaled", size=size, regions=columns(2)))
+        return facade.render(grey, Recipe(recipe, name="scaled", size=size, regions=columns(2)))
 
     small, large = rendered(128), rendered(256)
     halved = large.reshape(96, 2, 128, 2, 3).mean(axis=(1, 3))  # the large one at the small one's resolution
@@ -1383,9 +1265,9 @@ GRID_FIRST = Recipe(
 
 
 FINAL_PICTURE = {
-    "render": lambda photo, recipe, **k: runner.render(photo, recipe, **k),
-    "trace": lambda photo, recipe, **k: runner.trace(photo, recipe, **k)[-1].image,
-    "render_all": lambda photo, recipe, **k: runner.render_all(photo, [PLAIN, recipe], **k)[1],
+    "render": lambda photo, recipe, **k: facade.render(photo, recipe, **k),
+    "trace": lambda photo, recipe, **k: facade.trace(photo, recipe, **k)[-1].image,
+    "render_all": lambda photo, recipe, **k: facade.render_all(photo, [PLAIN, recipe], **k)[1],
 }
 
 
@@ -1406,34 +1288,20 @@ def test_the_finder_is_asked_about_the_crop_of_each_piece_of_the_working_picture
     np.testing.assert_array_equal(out, expected)
 
 
-def test_a_matte_of_the_whole_photo_does_not_stand_in_for_the_finder_of_pieces(photo, subject):
-    with pytest.raises(SubjectNotFoundError, match=r"'found'.*cells"):
-        runner.render(photo, GRID_FIRST, maps={"subject": subject})
-    finder = PieceFinder()
-    runner.render(photo, GRID_FIRST, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)})
-    assert [crop.shape for crop in finder.crops] == [(24, 32, 3)] * 4  # the pieces, never the whole photo
-
-
-@pytest.mark.parametrize("run_it", RUNS.values(), ids=RUNS.keys())
-def test_a_subject_found_piece_by_piece_is_refused_without_a_finder(run_it, photo):
-    with pytest.raises(SubjectNotFoundError, match=r"'found'.*finder"):
-        run_it(photo, GRID_FIRST)
-
-
 def test_a_subject_found_piece_by_piece_that_no_step_uses_asks_nobody():
     finder = PieceFinder()
     photo = np.zeros((20, 30, 3), np.float32)
     recipe = Recipe([Step("grade", params={"exposure": 0.5})], name="unused", size=None, regions=GRID_FIRST.regions)
-    runner.render(photo, recipe, finders={"subject": Finder("stand-in", finder)})
+    facade.render(photo, recipe, finders={"subject": Finder("stand-in", finder)})
     assert finder.crops == []
 
 
 # --- one look at any size: a recipe's pixel values are design pixels, scaled to the size it is rendered at ------------
 
 PICTURE_OF = {
-    "render": lambda photo, recipe, **k: runner.render(photo, recipe, **k),
-    "trace": lambda photo, recipe, **k: runner.trace(photo, recipe, **k)[-1].image,
-    "render_all": lambda photo, recipe, **k: runner.render_all(photo, [recipe], **k)[0],
+    "render": lambda photo, recipe, **k: facade.render(photo, recipe, **k),
+    "trace": lambda photo, recipe, **k: facade.trace(photo, recipe, **k)[-1].image,
+    "render_all": lambda photo, recipe, **k: facade.render_all(photo, [recipe], **k)[0],
 }
 
 
@@ -1573,7 +1441,7 @@ def test_a_recipe_with_a_size_is_the_same_picture_as_the_recipe_at_480_rendered_
 @pytest.mark.parametrize("effect_name", ["gaussian_blur", "pixel_grid"])
 def test_a_recipe_without_a_size_renders_a_photo_far_smaller_than_480(effect_name):
     photo = scene(64)
-    out = runner.render(photo, Recipe([Step(effect_name)], name="tiny", size=None))
+    out = facade.render(photo, Recipe([Step(effect_name)], name="tiny", size=None))
     assert out.shape == photo.shape
     assert np.isfinite(out).all()
 
@@ -1602,9 +1470,9 @@ def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(pho
     """The promise of a size: shrunk back, the large render is the small one (to a small mean difference), and far
     closer to it than the large render of the pixel values the small one had to use (half of the designed ones)."""
     maps = {"subject": subject}
-    small = runner.render(photo, Recipe((step_at(1),), name="look", size=240), maps=maps)
-    large = runner.render(photo, Recipe((step_at(1),), name="look", size=240), maps=maps, size=480)
-    unscaled = runner.render(photo, Recipe((step_at(0.5),), name="look", size=480), maps=maps)
+    small = facade.render(photo, Recipe((step_at(1),), name="look", size=240), maps=maps)
+    large = facade.render(photo, Recipe((step_at(1),), name="look", size=240), maps=maps, size=480)
+    unscaled = facade.render(photo, Recipe((step_at(0.5),), name="look", size=480), maps=maps)
     scaled_error = np.abs(resize(large, 240) - small).mean()
     unscaled_error = np.abs(resize(unscaled, 240) - small).mean()
     assert scaled_error < 0.02
@@ -1624,7 +1492,7 @@ def test_the_same_look_at_twice_the_size_is_the_small_picture_in_more_detail(pho
 )
 def test_when_nobody_is_in_the_picture_the_subject_selects_nothing_and_the_background_everything(photo, mask, expected):
     recipe = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=mask),), name="masked", size=None)
-    out = runner.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
+    out = facade.render(photo, recipe, maps={"subject": np.zeros(photo.shape[:2], np.float32)})
     np.testing.assert_array_equal(out, expected(photo))
 
 
@@ -1644,7 +1512,7 @@ def test_a_density_puts_the_same_share_of_marks_on_the_picture_at_any_size(marks
     cover stays the same share of the picture."""
     recipe = Recipe((marks,), name="marks", size=240)
     black = np.zeros((190, 240, 3), np.float32)
-    covered = [runner.render(black, recipe, size=size).mean() for size in (240, 960)]
+    covered = [facade.render(black, recipe, size=size).mean() for size in (240, 960)]
     assert covered[1] == pytest.approx(covered[0], rel=0.25)
 
 
@@ -1685,5 +1553,5 @@ def ratio_probe(throwaway_effects):
 def test_an_effect_that_declares_size_ratio_gets_working_px_per_design_px(photo, ratio_probe, look, size, ratio):
     recipe = ratio_looks()[look]
     maps = {"f": np.full(photo.shape[:2], 0.3, np.float32)} if "f" in recipe.regions else None
-    out = runner.render(photo, recipe, size=size, maps=maps)
+    out = facade.render(photo, recipe, size=size, maps=maps)
     np.testing.assert_allclose(out, ratio / 10, atol=1e-6)  # every Drive level and every look gets the same ratio
