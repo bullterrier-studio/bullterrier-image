@@ -154,7 +154,11 @@ impl Resize {
         let mut out = if rows == new_rows {
             wide.unwrap_or_else(|| pixels.to_vec())
         } else {
-            down(wide.as_deref().unwrap_or(pixels), new_columns, &taps(self.filter, rows, new_rows))
+            down(
+                wide.as_deref().unwrap_or(pixels),
+                new_columns,
+                &taps(self.filter, rows, new_rows),
+            )
         };
         for sample in out.iter_mut().flatten() {
             *sample = sample.clamp(0.0, 1.0);

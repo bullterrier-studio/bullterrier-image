@@ -761,13 +761,7 @@ mod tests {
         };
         for (height, width, frame, over, row) in [
             (1638, 1638, all_sides(2.0), None, "borders just within the limit"),
-            (
-                1639,
-                1639,
-                all_sides(2.0),
-                Some("8195 x 8195"),
-                "borders just over it",
-            ),
+            (1639, 1639, all_sides(2.0), Some("8195 x 8195"), "borders just over it"),
             (1, 11_000, turned(45.0, None), None, "a turn within the limit"),
             (1, 12_000, turned(45.0, None), Some("8486 x 8486"), "a turn over it"),
             (
