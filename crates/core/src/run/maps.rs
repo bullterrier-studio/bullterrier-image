@@ -466,7 +466,6 @@ mod tests {
     fn a_picture_that_is_no_picture_has_no_light() -> Result<(), Error> {
         let rig = rig()?;
         for (pixel, row) in [
-            ([f32::NAN, 0.5, 0.5], "NaN"),
             ([1.5, 1.5, 1.5], "above 1"),
             ([-0.5, 0.0, 0.0], "below 0"),
         ] {

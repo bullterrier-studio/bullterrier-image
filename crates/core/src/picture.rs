@@ -29,18 +29,29 @@ impl<'a> Picture<'a> {
     ///
     /// # Errors
     /// [`Error::Size`] unless `height` and `width` are at least 1 and there are exactly `height * width * 3` values: a
-    /// picture has a pixel, so nothing downstream has to ask whether it does.
+    /// picture has a pixel, so nothing downstream has to ask whether it does. [`Error::NonFinite`] if a value is NaN or
+    /// an infinity (the message names the first such pixel): the one place outside pixels enter the core, so no picture
+    /// holds one.
     pub fn new(height: usize, width: usize, values: &'a [f32]) -> Result<Self, Error> {
         let (pixels, rest) = values.as_chunks::<3>();
-        if height > 0 && width > 0 && rest.is_empty() && height.checked_mul(width) == Some(pixels.len()) {
-            Ok(Self { height, width, pixels })
-        } else {
-            Err(Error::Size {
+        if !(height > 0 && width > 0 && rest.is_empty() && height.checked_mul(width) == Some(pixels.len())) {
+            return Err(Error::Size {
                 height,
                 width,
                 values: values.len(),
-            })
+            });
         }
+        if let Some(index) = pixels
+            .iter()
+            .position(|pixel| !pixel.iter().all(|level| level.is_finite()))
+        {
+            return Err(Error::NonFinite(format!(
+                "a picture's levels must be numbers, but it holds NaN or an infinity: the first is at row {}, column {}",
+                index / width,
+                index % width
+            )));
+        }
+        Ok(Self { height, width, pixels })
     }
 
     /// The number of rows.
@@ -242,6 +253,22 @@ mod tests {
         assert_eq!(cut.as_picture().values(), colour);
         assert_eq!(cut.into_values(), [0.1, 0.2, 0.3, 0.7, 0.4, 0.5, 0.6, 0.9]);
         Ok(())
+    }
+
+    #[test]
+    fn a_picture_with_a_level_that_is_no_number_is_refused_naming_the_first_such_pixel() {
+        for (rule, level) in [("NaN", f32::NAN), ("+inf", f32::INFINITY), ("-inf", f32::NEG_INFINITY)] {
+            // 2 x 3 pixels; the bad level sits in the blue channel of row 1, column 2 and again in the last pixel
+            let mut values = [0.5_f32; 18];
+            values[(3 + 2) * 3 + 2] = level;
+            values[17] = level;
+            let refused = Picture::new(2, 3, &values);
+            assert!(
+                matches!(&refused, Err(error @ Error::NonFinite(_)) if error.to_string().contains("row 1, column 2")),
+                "{rule}: {refused:?}"
+            );
+        }
+        assert!(Picture::new(2, 3, &[1.0_f32; 18]).is_ok());
     }
 
     #[test]

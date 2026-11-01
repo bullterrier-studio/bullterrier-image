@@ -427,6 +427,16 @@ def test_the_exception_of_a_foreign_effect_that_a_foreign_effect_ran_comes_back_
         pytest.param(
             lambda: _core.apply("grade", np.zeros((2, 2), np.float32), {}), "invalid_image", id="a picture of no shape"
         ),
+        pytest.param(
+            lambda: _core.apply("grade", np.full((1, 1, 3), np.nan, np.float32), GRADE),
+            "non_finite_image",
+            id="a NaN picture",
+        ),
+        pytest.param(
+            lambda: _core.apply("grade", np.full((1, 1, 3), np.inf, np.float32), GRADE),
+            "non_finite_image",
+            id="an infinite picture",
+        ),
         pytest.param(lambda: _core.apply("grade", PIXEL, {}), "other", id="parameters that are not the effect's"),
         pytest.param(lambda: _core.register("grade", "utilities", 1.0, fill(0.5)), "other", id="a name that is taken"),
     ],
