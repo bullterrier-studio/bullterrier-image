@@ -105,6 +105,7 @@ def render(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
@@ -139,9 +140,16 @@ def render(
     size: the longest side of the result in px, 1 to 16384 (the recipe's own size when None; RecipeError for anything
     else). The recipe's pixel values are written for 480 and multiplied by the result's longest side over 480, so one
     recipe gives the same look at any size; a value stops at its minimum when shrinking.
+
+    threads: how many threads the render may use for the rows of its work (laying a step over its input, framing and
+    resizing the photo, an effect that works pixel by pixel), a whole number from 0 (RecipeError for anything else, or
+    a number the machine cannot start). 1, the default, starts none; 0 is one for each core. The result is the same
+    bytes at any number, so ask for more when you render one picture and keep 1 when you render many at once from your
+    own threads (each render using every core would only compete with the others). The GIL is released while the
+    core works, so renders from several Python threads run side by side.
     """
     recipe = _one_recipe(recipe)
-    return bridge.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+    return bridge.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size, threads=threads)
 
 
 def trace(
@@ -151,6 +159,7 @@ def trace(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> list[Stage]:
     """Every stage of a render, so you can see what each step did and where something went wrong.
 
@@ -162,10 +171,10 @@ def trace(
     channels). The last stage is exactly what `render` returns. Every stage stays in memory: one picture per step, plus
     the input and the maps.
 
-    rgb, recipe, maps, finders, size: as for `render`.
+    rgb, recipe, maps, finders, size, threads: as for `render`.
     """
     recipe = _one_recipe(recipe)
-    stages = bridge.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+    stages = bridge.trace(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size, threads=threads)
     photo = stages[0][2]
     return [_stage(recipe, photo, *stage) for stage in stages]
 
@@ -177,6 +186,7 @@ def render_all(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> list[np.ndarray]:
     """Run several recipes on one photo; each map is found at most once, however many recipes need it.
 
@@ -184,10 +194,12 @@ def render_all(
     maps: the photo's maps by name, used by every recipe that needs them (see `render`), or None. finders: each `find`
     is called once with the photo as given when any recipe needs its map and the map was not handed in (the map's error
     if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
-    `render`. A name that is no map of any recipe is a RecipeError. size: as for `render`, for every recipe.
+    `render`. A name that is no map of any recipe is a RecipeError. size, threads: as for `render`, for every recipe.
     """
     recipes = _recipes(recipes)
-    return bridge.render_all(rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size)
+    return bridge.render_all(
+        rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size, threads=threads
+    )
 
 
 def _stage(recipe: Recipe, photo: np.ndarray, kind: str, place: int | str | None, picture: np.ndarray) -> Stage:

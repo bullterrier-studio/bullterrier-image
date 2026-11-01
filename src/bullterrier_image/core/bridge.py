@@ -37,6 +37,7 @@ def render(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Any] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> np.ndarray:
     """`recipe` run on the photo `rgb` by the core: the picture it makes, (h, w, 3), or (h, w, 4) (RGB and straight
     alpha) when its frame cuts the picture out.
@@ -49,14 +50,16 @@ def render(
     (anything with a `find` method) called with the photo as given, once, when the recipe needs that map and it was
     not handed in; the `subject`
     finder is also called with the crop of the working picture of each piece for a `Subject` region with `per`. size:
-    the longest side of the result in px, 1 to 16384 (the recipe's own size when None).
+    the longest side of the result in px, 1 to 16384 (the recipe's own size when None). threads: how many threads the
+    core may use for the rows of its work, a whole number from 0: 1 starts none, 0 is one for each core (the result is
+    the same at any number).
 
-    Raises RecipeError for a recipe the core refuses, a `size` that is no whole number of pixels, or a name in `maps`
+    Raises RecipeError for a recipe the core refuses, a `size` or `threads` that is no whole number, or a name in `maps`
     or `finders` that is no map of the recipe (naming the ones it has); the map's error (SubjectNotFoundError for the
     subject, DepthNotFoundError for the depth, else MapNotFoundError) when the recipe needs a map and neither the map
     nor a finder was given, the finder returns None, or the map is not (h, w) or not within 0..1.
     """
-    return render_all(rgb, [recipe], maps=maps, finders=finders, size=size)[0]
+    return render_all(rgb, [recipe], maps=maps, finders=finders, size=size, threads=threads)[0]
 
 
 def render_all(
@@ -66,10 +69,11 @@ def render_all(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Any] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> list[np.ndarray]:
     """Each recipe of `recipes` run on the photo `rgb`, as `render` does; each map is found at most once, however many
     recipes need it. A name in `maps` or `finders` that is no map of any recipe is a RecipeError."""
-    return _each(native.render, rgb, recipes, maps, finders, size)
+    return _each(native.render, rgb, recipes, maps, finders, size, threads)
 
 
 def trace(
@@ -79,13 +83,14 @@ def trace(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, Any] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> list[Stage]:
     """Every stage of `render`, as the core reports them: `("input", None, photo)`, `("subject", None, map)` and
     `("depth", None, map)` for the maps the recipe uses (float32 (h, w)), `("selection", name, map)` (float32 (h, w))
     and `("partition", name, labels)` (int32 (h, w), the pieces numbered from 0) for each region the steps use, in the
     order declared, then `("step", n, picture)` after step `n` (from 1), all at the working size, and `("cut_out", None,
     picture)` (h, w, 4) when the frame cuts the picture out. The last is exactly what `render` returns."""
-    return _each(native.trace, rgb, [recipe], maps, finders, size)[0]
+    return _each(native.trace, rgb, [recipe], maps, finders, size, threads)[0]
 
 
 def maps_needed(recipe: Recipe) -> frozenset[str]:
@@ -121,6 +126,13 @@ def _check_size(size: object) -> None:
         raise RecipeError(f"size must be a whole number of pixels, 1 to {MAX_SIZE}, or None, got {size!r}")
 
 
+def _check_threads(threads: object) -> None:
+    """RecipeError unless `threads` is a whole number, 0 or more (a bool is not a number here); the core refuses a
+    number it cannot start."""
+    if isinstance(threads, bool) or not isinstance(threads, int) or threads < 0:
+        raise RecipeError(f"threads must be a whole number of threads, 0 (every core) or more, got {threads!r}")
+
+
 def _each(
     run: Any,
     rgb: np.ndarray,
@@ -128,12 +140,14 @@ def _each(
     maps: Mapping[str, np.ndarray] | None,
     finders: Mapping[str, Any] | None,
     size: int | None,
+    threads: int,
 ) -> list[Any]:
     """`run` (the core's `render` or `trace`) on `rgb` for each recipe, once the maps they all need are in hand: each
     the one handed in, else found once by its finder, and held to the rules of a map (`check_map`). Each recipe is given
     the maps it knows, and the subject finder only if it finds pieces."""
     rgb = as_image(rgb)
     _check_size(size)
+    _check_threads(threads)
     maps, finders = dict(maps or {}), dict(finders or {})
     with registry.holding() as hold:
         documents = [recipe_dict(recipe, hold) for recipe in recipes]
@@ -156,6 +170,7 @@ def _each(
                 if want["finds_pieces"] and "subject" in finders
                 else None,
                 size=size,
+                threads=threads,
             )
             for document, want, known in zip(documents, wants, knowns, strict=True)
         ]

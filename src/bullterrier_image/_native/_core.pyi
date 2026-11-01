@@ -66,6 +66,7 @@ def render(
     finders: Mapping[str, _Finder] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> np.ndarray: ...
 def trace(
     rgb: np.ndarray,
@@ -75,4 +76,5 @@ def trace(
     finders: Mapping[str, _Finder] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
+    threads: int = 1,
 ) -> list[tuple[str, int | str | None, np.ndarray]]: ...

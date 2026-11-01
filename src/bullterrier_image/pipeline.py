@@ -527,9 +527,10 @@ def _process(project: Project, photo: _Photo, recipe: Recipe, stem: str, fingerp
     folder.mkdir(parents=True, exist_ok=True)
     # the photo's own finder of pieces: its answers depend on the subject finder, as `found_by` says
     pieces = {"subject": Finder(photo.found_by["subject"], photo.find_in_crop)} if needs_finder(recipe) else None
-    stages = trace(photo.rgb(), recipe, maps=maps, finders=pieces) if project.steps else None
+    # the batch renders one picture at a time, so each render may use every core
+    stages = trace(photo.rgb(), recipe, maps=maps, finders=pieces, threads=0) if project.steps else None
     # style (a trace ends in the render)
-    image = stages[-1].image if stages else render(photo.rgb(), recipe, maps=maps, finders=pieces)
+    image = stages[-1].image if stages else render(photo.rgb(), recipe, maps=maps, finders=pieces, threads=0)
     warnings += still_warnings(image)  # check
     outputs = _export_still(project, image, stem, folder)  # export
     sheet = None

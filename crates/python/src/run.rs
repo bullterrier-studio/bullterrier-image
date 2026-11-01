@@ -42,10 +42,19 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to
 /// for a longest side of 480 and multiplied by the working picture's longest side over 480, so the look is the same at
 /// any size.
 ///
+/// `threads` is how many threads the render may use for the rows of its work (laying a step over its input, framing and
+/// resizing, an effect that works pixel by pixel): 1 (the default) starts none, 0 is one for each core, and the picture
+/// is the same bytes at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
+/// calling thread, so a Python effect it runs keeps its context.
+///
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None, threads=1))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments are the Python function's keywords"
+)]
 pub(crate) fn render<'py>(
     py: Python<'py>,
     rgb: &Bound<'py, PyAny>,
@@ -54,12 +63,13 @@ pub(crate) fn render<'py>(
     finders: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
     size: Option<u32>,
+    threads: usize,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+    let options = options_of(size, threads);
     let image = py
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -118,7 +128,11 @@ pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
 /// with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left to
 /// the caller.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None, threads=1))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments are the Python function's keywords"
+)]
 pub(crate) fn trace<'py>(
     py: Python<'py>,
     rgb: &Bound<'py, PyAny>,
@@ -127,12 +141,13 @@ pub(crate) fn trace<'py>(
     finders: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
     size: Option<u32>,
+    threads: usize,
 ) -> PyResult<Bound<'py, PyList>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+    let options = options_of(size, threads);
     let stages = py
         .detach(|| photo.trace(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -141,6 +156,12 @@ pub(crate) fn trace<'py>(
         .map(|stage| stage_of(py, stage))
         .collect::<PyResult<Vec<_>>>()?;
     PyList::new(py, shown)
+}
+
+/// The options of a render: the longest side `size`, if asked for, and `threads` (0: every core).
+fn options_of(size: Option<u32>, threads: usize) -> Options {
+    let options = Options::default().with_threads(threads);
+    size.map_or(options, |size| options.with_size(size))
 }
 
 /// `photo` with the maps handed in and the finders given.

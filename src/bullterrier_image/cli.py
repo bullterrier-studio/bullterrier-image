@@ -361,7 +361,7 @@ def _render_recipes(args: argparse.Namespace, recipes: "list[Recipe]") -> "list[
     from .recipe import render_all
 
     maps, finders = _maps(args)
-    return render_all(imageio.load(args.photo), recipes, maps=maps, finders=finders)
+    return render_all(imageio.load(args.photo), recipes, maps=maps, finders=finders, threads=0)  # one photo: every core
 
 
 def _render(args: argparse.Namespace) -> int:

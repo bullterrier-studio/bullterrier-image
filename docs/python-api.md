@@ -38,6 +38,10 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   uint16 levels (divided by 255 or 65535, as Pillow and numpy give them) or floats 0..1. Greyscale, an alpha channel
   (`save` takes (h, w, 4)), `bool`, signed or wider unsigned integers, values outside 0..1 (not clipped) and a Pillow image itself are an
   `InvalidImageError` naming the fix (`np.dstack([grey] * 3)`, `np.asarray(image)`); NaN is a `NonFiniteImageError`.
+- **Threads.** `render(photo, recipe, threads=0)` (also `trace`, `render_all`) lets one render use every core for the work
+  the core shares out by rows; `threads` is a whole number from 0, default 1 (none started), and the picture is the same
+  bytes at any number. To render many photos at once keep 1 and use your own threads: the GIL is released while the core
+  works. `step.apply` and `fx.<effect>` use 1. `bt-image` renders one picture at a time, so it uses every core.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too. The recipe is a `Recipe` or a `Step`, `render_all` takes a list
   or tuple of `Recipe`; anything else (a list of steps, a look's name, swapped arguments) is a `RecipeError` naming the fix.
