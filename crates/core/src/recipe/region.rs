@@ -31,6 +31,7 @@ use serde_json::Value;
 pub use derived::{Band, Bands, Combine, CombineOp, Given, LinearGradient, Pick, Piece, RadialGradient, Subject};
 pub use laid::{Curve, Cut, Cuts, Edge, EdgeStyle, Grid, Line, Path, Shards, Shares, Svg};
 
+use super::built_in::{BuiltIn, Origin};
 use super::read;
 use super::references::Form;
 
@@ -267,14 +268,16 @@ impl Regions {
     /// definition of "made from": checking for cycles, making the regions and deciding when each is last needed all use it.
     pub(crate) fn made_from(&self, name: &str) -> Vec<&str> {
         match self.get(name) {
-            Some(Region::Subject(Subject { per: None, .. })) => vec!["subject"],
+            Some(Region::Subject(Subject { per: None, .. })) => vec![BuiltIn::Subject.name()],
             Some(region) => region
                 .refers_to()
                 .into_iter()
                 .map(|(_, made_from, _)| made_from)
                 .collect(),
-            None if name == "background" => vec!["subject"],
-            None => Vec::new(),
+            None => match BuiltIn::named(name).map(BuiltIn::origin) {
+                Some(Origin::Inverse(of)) => vec![of.name()],
+                _ => Vec::new(),
+            },
         }
     }
 

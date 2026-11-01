@@ -2,13 +2,10 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use super::built_in::{BuiltIn, Origin};
 use super::region::Subject;
 use super::{Recipe, Region, Regions};
 use crate::{Error, Presets};
-
-/// The maps a photo is handed or finds. The other built-in regions are made from them (`background`) or from the picture
-/// (`light`).
-const FOUND: [&str; 2] = ["subject", "depth"];
 
 /// One place a step of a recipe names a region: a `mask`, a drive's `by`, a field parameter, a `partition`, an `each`.
 #[derive(Debug)]
@@ -103,18 +100,19 @@ impl Uses {
     pub(super) fn needs(&self, regions: &Regions, frame_needs_subject: bool) -> Needs {
         let mut needs = Needs::default();
         if frame_needs_subject {
-            needs.maps.insert("subject".to_owned());
+            needs.maps.insert(BuiltIn::Subject.name().to_owned());
         }
         for Reach { name, .. } in self.reach(regions) {
-            match (name.as_str(), regions.get(&name)) {
-                ("subject" | "depth", _) | (_, Some(Region::Given(_))) => {
-                    needs.maps.insert(name);
-                }
-                (_, Some(Region::Subject(Subject { per: Some(_), .. }))) => needs.finds_pieces = true,
-                // `background` and the regions made from other regions need what those need; `light` is made from the
-                // picture
-                _ => {}
+            let region = regions.get(&name);
+            if BuiltIn::named(&name).is_some_and(|built_in| built_in.origin() == Origin::Found)
+                || matches!(region, Some(Region::Given(_)))
+            {
+                needs.maps.insert(name);
+            } else if matches!(region, Some(Region::Subject(Subject { per: Some(_), .. }))) {
+                needs.finds_pieces = true;
             }
+            // the built-in maps made from others or from the picture, and the regions made from other regions, need what
+            // those need
         }
         needs
     }
@@ -126,8 +124,10 @@ impl Recipe {
     /// checked.
     #[must_use]
     pub fn known_maps(&self) -> Vec<&str> {
-        FOUND
+        BuiltIn::ALL
             .into_iter()
+            .filter(|built_in| built_in.origin() == Origin::Found)
+            .map(|built_in| built_in.name())
             .chain(
                 self.regions
                     .iter()

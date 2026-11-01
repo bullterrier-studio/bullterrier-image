@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use super::{Photo, Working};
 use crate::ops::color::luminance;
+use crate::recipe::built_in::{BuiltIn, Origin};
 use crate::{Error, Layer, Picture, Recipe};
 
 /// Finds a map in a picture: the subject, the depth, or a region a recipe declares as given.
@@ -144,14 +145,14 @@ impl<'r, 'a> Maps<'r, 'a> {
         if let Some(layer) = self.resolved(name) {
             return Ok(layer);
         }
-        let layer = match name {
-            "background" => {
-                let subject = self.get("subject", place)?;
-                let inverse = subject.values().iter().map(|value| 1.0 - value).collect();
-                Arc::new(Layer::new(subject.height(), subject.width(), inverse)?)
+        let layer = match BuiltIn::named(name).map(BuiltIn::origin) {
+            Some(Origin::Inverse(of)) => {
+                let source = self.get(of.name(), place)?;
+                let inverse = source.values().iter().map(|value| 1.0 - value).collect();
+                Arc::new(Layer::new(source.height(), source.width(), inverse)?)
             }
-            "light" => Arc::new(light(&self.working.picture())?),
-            _ => self.working.follow(stored(self.photo, self.recipe, name, place)?)?,
+            Some(Origin::Picture) => Arc::new(light(&self.working.picture())?),
+            Some(Origin::Found) | None => self.working.follow(stored(self.photo, self.recipe, name, place)?)?,
         };
         self.resolved.borrow_mut().insert(name.to_owned(), Arc::clone(&layer));
         Ok(layer)
@@ -160,7 +161,7 @@ impl<'r, 'a> Maps<'r, 'a> {
     /// Whether the photo gives the map `name` (handed in or found) or it is made from the picture: `subject`, `depth`,
     /// `background`, `light` and the `Given` regions, the names [`get`](Self::get) answers.
     pub(super) fn gives(&self, name: &str) -> bool {
-        matches!(name, "background" | "light") || self.known.contains(name)
+        BuiltIn::named(name).is_some() || self.known.contains(name)
     }
 
     /// The map `name` if this render has made it.
@@ -465,10 +466,7 @@ mod tests {
     #[test]
     fn a_picture_that_is_no_picture_has_no_light() -> Result<(), Error> {
         let rig = rig()?;
-        for (pixel, row) in [
-            ([1.5, 1.5, 1.5], "above 1"),
-            ([-0.5, 0.0, 0.0], "below 0"),
-        ] {
+        for (pixel, row) in [([1.5, 1.5, 1.5], "above 1"), ([-0.5, 0.0, 0.0], "below 0")] {
             let photo = Photo::new(Picture::new(1, 1, &pixel)?);
             let result = rig.render(&photo, &recipe([uses("light")], &[]));
             assert_refused(&result, ErrorKind::InvalidImage, &["light"], row);

@@ -19,6 +19,7 @@ use serde_json::{Map, Value};
 use crate::Error;
 use crate::params::EffectParams;
 
+pub(crate) mod built_in;
 mod check;
 pub(crate) mod drive;
 pub(crate) mod file;

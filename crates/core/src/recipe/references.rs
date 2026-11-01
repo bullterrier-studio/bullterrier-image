@@ -5,10 +5,8 @@
 use std::collections::HashMap;
 
 use super::Regions;
+use super::built_in::BuiltIn;
 use crate::Error;
-
-/// The selections every picture has, which a recipe need not declare.
-pub(super) const BUILT_IN: [&str; 4] = ["subject", "background", "depth", "light"];
 
 /// What a region is, which decides where it can be used.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,7 +29,7 @@ impl Form {
 
 /// What the region `name` is: a built-in one is a selection, a declared one is by its kind. None if there is none.
 fn form_of(regions: &Regions, name: &str) -> Option<Form> {
-    if BUILT_IN.contains(&name) {
+    if BuiltIn::named(name).is_some() {
         return Some(Form::Selection);
     }
     regions.get(name).map(super::Region::form)
@@ -48,9 +46,9 @@ pub(super) fn refer(regions: &Regions, place: &str, key: &str, name: &str, wante
     if have.is_some() && (wanted.is_none() || wanted == have) {
         return Ok(());
     }
-    let valid: Vec<&str> = BUILT_IN
-        .iter()
-        .copied()
+    let valid: Vec<&str> = BuiltIn::ALL
+        .into_iter()
+        .map(|built_in| built_in.name())
         .chain(regions.iter().map(|(declared, _)| declared))
         .filter(|candidate| wanted.is_none() || form_of(regions, candidate) == wanted)
         .collect();
@@ -85,10 +83,10 @@ pub(super) fn refer(regions: &Regions, place: &str, key: &str, name: &str, wante
 /// cycle.
 pub(super) fn check_regions(regions: &Regions) -> Result<(), Error> {
     for (name, region) in regions.iter() {
-        if BUILT_IN.contains(&name) {
+        if BuiltIn::named(name).is_some() {
             return Err(Error::Recipe(format!(
                 "region '{name}' is a built-in region ({}) and cannot be declared",
-                BUILT_IN.join(", ")
+                BuiltIn::ALL.map(BuiltIn::name).join(", ")
             )));
         }
         for (key, target, form) in region.refers_to() {
@@ -496,7 +494,7 @@ mod tests {
 
     #[test]
     fn a_region_cannot_be_called_like_a_built_in_one() -> Result<(), Error> {
-        for name in BUILT_IN {
+        for name in BuiltIn::ALL.map(BuiltIn::name) {
             let recipe = Recipe::new([Step::new("probe")]).with_region(name, Grid::default());
             let message = refusal(&recipe)?.unwrap_or_default();
             assert!(
