@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use super::{Each, Entry, Frame, Recipe, STEP_KEYS, Step, read};
+use super::{Each, Entry, Frame, Recipe, Region, Regions, STEP_KEYS, Step, read};
 use crate::Error;
 
 /// The format versions this release reads; a file without `format` is the first. Format 2 added regions and the step
@@ -219,33 +219,37 @@ fn format_of(file: &Map<String, Value>) -> Result<i64, Error> {
         })
 }
 
-/// The `[region.NAME]` tables, once each is a table of a kind this format has.
-fn regions_of(file: &Map<String, Value>, format: i64) -> Result<Map<String, Value>, Error> {
-    let regions = match file.get("region") {
-        None => return Ok(Map::new()),
-        Some(Value::Object(regions)) if regions.values().all(Value::is_object) => regions,
+/// The `[region.NAME]` tables as regions, in the order the file declares them, once each is a table of a kind this
+/// format has.
+fn regions_of(file: &Map<String, Value>, format: i64) -> Result<Regions, Error> {
+    let tables = match file.get("region") {
+        None => return Ok(Regions::new()),
+        Some(Value::Object(tables)) if tables.values().all(Value::is_object) => tables,
         Some(_) => {
             return Err(Error::Recipe(
                 "write each region as a [region.NAME] table (one table for each name)".to_owned(),
             ));
         }
     };
-    for (name, region) in regions {
-        let Some(kind) = region.get("kind").and_then(Value::as_str) else {
-            continue;
-        };
-        if let Some((_, instead)) = KINDS_REPLACED_IN_3.iter().find(|(old, _)| *old == kind) {
-            return Err(Error::Recipe(format!(
-                "region '{name}': `kind` '{kind}' is gone; {instead} (format = 3)"
-            )));
+    let mut regions = Regions::new();
+    for (name, table) in tables {
+        // the gating reads the kind as written, to say which format has it or what replaced it
+        if let Some(kind) = table.get("kind").and_then(Value::as_str) {
+            if let Some((_, instead)) = KINDS_REPLACED_IN_3.iter().find(|(old, _)| *old == kind) {
+                return Err(Error::Recipe(format!(
+                    "region '{name}': `kind` '{kind}' is gone; {instead} (format = 3)"
+                )));
+            }
+            if format < 3 && KINDS_NEW_IN_3.contains(&kind) {
+                return Err(Error::Recipe(format!(
+                    "region '{name}': `kind` '{kind}' needs `format = 3` at the top of the file"
+                )));
+            }
         }
-        if format < 3 && KINDS_NEW_IN_3.contains(&kind) {
-            return Err(Error::Recipe(format!(
-                "region '{name}': `kind` '{kind}' needs `format = 3` at the top of the file"
-            )));
-        }
+        let region: Region = read(table.clone()).map_err(|why| Error::Recipe(format!("region '{name}': {why}")))?;
+        regions.insert(name.as_str(), region);
     }
-    Ok(regions.clone())
+    Ok(regions)
 }
 
 /// The entry a `[[step]]` table writes: an each step when it has `each` or `looks`, else an effect step.
@@ -410,7 +414,9 @@ looks = [
             "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
                       "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
                       "pad_left": 0.0, "fill": [0.0, 0.0, 0.0], "transparent": "none", "corner_radius": 0.2},
-            "regions": {"panes": {"kind": "grid", "columns": 3, "rows": 2}},
+            // a count of shares is written as the list, and every field of the kind is written
+            "regions": {"panes": {"kind": "grid", "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55},
+                                  "columns": [1.0, 1.0, 1.0], "rows": [1.0, 1.0]}},
             "steps": [
                 {"effect": "probe", "params": {"cell": 8, "angle": 90.0, "tint": [0.0, 0.5, 1.0]},
                  "preset": "wide", "mask": "subject", "opacity": 0.4, "blend_mode": "screen", "name": "base"},
@@ -427,12 +433,14 @@ looks = [
     fn regions_and_parameters_are_read_in_the_order_the_file_has_them() {
         let text = "format = 2\n[region.zeta]\nkind = \"grid\"\n[region.alpha]\nkind = \"grid\"\n\
                     [[step]]\neffect = \"a\"\nzebra = 1\napple = 2\nmango = 3\n";
-        let written = written(text).ok().map(|recipe| recipe.to_string());
-        let written = written.unwrap_or_default();
-        assert!(
-            written.contains(r#""regions":{"zeta":{"kind":"grid"},"alpha":{"kind":"grid"}}"#),
-            "the regions: {written}"
-        );
+        let recipe = read(text).ok();
+        let regions = recipe
+            .as_ref()
+            .map(|recipe| recipe.regions.iter().map(|(name, _)| name.to_owned()).collect());
+        assert_eq!(regions, Some(vec!["zeta".to_owned(), "alpha".to_owned()]));
+        let written = recipe
+            .and_then(|recipe| serde_json::to_string(&recipe).ok())
+            .unwrap_or_default();
         assert!(
             written.contains(r#""params":{"zebra":1,"apple":2,"mango":3}"#),
             "the parameters: {written}"
@@ -572,6 +580,21 @@ looks = [
                 "each region is a table",
                 "format = 2\n[region]\np = 3\n",
                 "[region.NAME]",
+            ),
+            (
+                "a region has a kind",
+                "format = 2\n[region.p]\ncolumns = 2\n[[step]]\neffect = \"a\"\n",
+                "`kind` is missing",
+            ),
+            (
+                "a region's kind is one of the thirteen",
+                "format = 2\n[region.p]\nkind = \"gird\"\n[[step]]\neffect = \"a\"\n",
+                "linear_gradient",
+            ),
+            (
+                "a region has only the fields of its kind",
+                "format = 2\n[region.p]\nkind = \"grid\"\ncount = 2\n[[step]]\neffect = \"a\"\n",
+                "unknown field `count`",
             ),
             ("a name is text", "name = 3\n", "`name`"),
             ("a description is a sentence", "description = \"\"\n", "`description`"),

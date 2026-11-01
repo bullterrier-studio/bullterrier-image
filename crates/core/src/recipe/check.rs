@@ -2,9 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{Map, Value};
+use serde_json::Value;
 
-use super::{Drive, Each, Entry, Recipe, STEP_KEYS, Step, drive};
+use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
 use crate::registry::Registry;
 use crate::{Error, Presets};
@@ -66,6 +66,9 @@ impl Recipe {
             return Err(Error::Recipe("`size` must be >= 1, got 0".to_owned()));
         }
         self.frame.check()?;
+        for (name, region) in self.regions.iter() {
+            region.check(name)?;
+        }
         let rules = Rules {
             registry,
             presets,
@@ -119,7 +122,7 @@ impl Recipe {
 struct Rules<'a> {
     registry: &'a Registry,
     presets: &'a Presets,
-    regions: &'a Map<String, Value>,
+    regions: &'a Regions,
 }
 
 impl Rules<'_> {
@@ -260,14 +263,14 @@ impl Rules<'_> {
     /// `name` (what `key` of the step at `place` refers to) is a region: one the recipe declares, or, when
     /// `built_in` allows, one every picture has.
     fn region(&self, place: &str, key: &str, name: &str, built_in: bool) -> Result<(), Error> {
-        if self.regions.contains_key(name) || (built_in && BUILT_IN.contains(&name)) {
+        if self.regions.get(name).is_some() || (built_in && BUILT_IN.contains(&name)) {
             return Ok(());
         }
         let valid: Vec<&str> = built_in
             .then_some(BUILT_IN.iter().copied())
             .into_iter()
             .flatten()
-            .chain(self.regions.keys().map(String::as_str))
+            .chain(self.regions.iter().map(|(name, _)| name))
             .collect();
         Err(Error::Recipe(format!(
             "{place}: `{key}` names '{name}', which is no region; valid regions: {}",
@@ -282,7 +285,7 @@ mod tests {
 
     use serde_json::{Value, json};
 
-    use crate::testing::{Recorder, registry};
+    use crate::testing::{Recorder, regions, registry};
     use crate::{BlendMode, Each, Entry, Error, Presets, Recipe, Step};
 
     /// A step of the probe effect: its parameters are checked against its table.
@@ -311,10 +314,7 @@ mod tests {
 
     /// `recipe` declaring the regions `panes` (a partition) and `cutout` (a selection).
     fn with_regions(mut recipe: Recipe) -> Recipe {
-        recipe.regions = json!({"panes": {"kind": "grid"}, "cutout": {"kind": "path"}})
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        recipe.regions = regions(json!({"panes": {"kind": "grid"}, "cutout": {"kind": "path"}}));
         recipe
     }
 
@@ -683,7 +683,7 @@ mod tests {
         registry.register(Arc::new(Recorder::new("fielded", &[], &["near"])))?;
         let recipe = |step: Step, regions: Value| {
             let mut recipe = Recipe::new([step]);
-            recipe.regions = regions.as_object().cloned().unwrap_or_default();
+            recipe.regions = crate::testing::regions(regions);
             recipe
         };
         let declared = || json!({"NEAR": {"kind": "given"}, "star": {"kind": "given"}});
@@ -717,10 +717,7 @@ mod tests {
     #[test]
     fn the_regions_a_refusal_lists_are_in_the_order_they_were_declared() -> Result<(), Error> {
         let mut recipe = Recipe::new([probe().mask("nowhere")]);
-        recipe.regions = json!({"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}})
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        recipe.regions = regions(json!({"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}}));
         let said = refusal(&recipe, &Presets::new())?.map(|error| error.to_string());
         assert!(
             said.as_deref()

@@ -377,6 +377,7 @@ mod tests {
     use super::*;
     use crate::params::Declared;
     use crate::params::probe::Probe;
+    use crate::region::{Given, Grid};
     use crate::testing::{Finds, Measured, Paint, Recorder, Shrinks, registry};
     use crate::{Drive, Each, ErrorKind, Step};
 
@@ -467,10 +468,7 @@ mod tests {
     fn an_each_step_is_refused_naming_it_because_the_core_does_not_run_it_yet() -> Result<(), Error> {
         let registry = registry()?;
         let mut recipe_with_each = Recipe::new([Each::new("panes", [None])]);
-        recipe_with_each.regions = json!({"panes": {"kind": "grid"}})
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        recipe_with_each.regions.insert("panes", Grid::default());
         let result = rendered(&registry, &recipe_with_each, &Presets::new());
         assert!(
             matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("step 1: an `each` step")),
@@ -525,10 +523,8 @@ mod tests {
             .with_map("FAR", flat(0.5)?)?;
         let render = |step: Step| {
             let mut recipe = Recipe::new([step]);
-            recipe.regions = json!({"NEAR": {"kind": "given"}, "FAR": {"kind": "given"}})
-                .as_object()
-                .cloned()
-                .unwrap_or_default();
+            recipe.regions.insert("NEAR", Given {});
+            recipe.regions.insert("FAR", Given {});
             photo.render_in(&registry, &recipe, &Presets::new(), Options::default())
         };
         render(Step::new("recorder").param("near", "subject"))?;

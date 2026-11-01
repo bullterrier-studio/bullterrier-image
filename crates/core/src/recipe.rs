@@ -4,7 +4,7 @@
 //! The types are the whole model, built in code (`Step::new("bloom").param("radius", 12)`) or read from JSON
 //! ([`Recipe::from_json`]); `serde_json` writes them back. A step keeps its parameters as written and says how its
 //! result is laid over the picture below it: a `mask`, an `opacity` (none: the effect's own default) and a
-//! [`BlendMode`]. The framing is a typed [`Frame`]; regions are tables the runner reads; here they are only tables.
+//! [`BlendMode`]. The framing is a typed [`Frame`] and the regions typed [`Regions`] of thirteen kinds.
 //!
 //! Reading and building check nothing but the shape: an unknown key is refused by name, a wrong type too. The rules of
 //! a look (known effects, parameters within their ranges, names that resolve) are `Recipe::checked`.
@@ -23,9 +23,11 @@ mod check;
 pub(crate) mod drive;
 mod file;
 pub mod frame;
+pub mod region;
 
 pub use drive::Drive;
 pub use frame::Frame;
+pub use region::{Region, Regions};
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an
 /// effect may be named like one.
@@ -308,9 +310,9 @@ pub struct Recipe {
     /// How the photo is framed before the steps and cut out after them; the default frame changes nothing.
     #[serde(default, skip_serializing_if = "Frame::is_empty")]
     pub frame: Frame,
-    /// The regions the steps can name besides the built-in ones, by name: tables whose kind the runner reads.
-    #[serde(default, skip_serializing_if = "Map::is_empty", deserialize_with = "tables")]
-    pub regions: Map<String, Value>,
+    /// The regions the steps can name besides the built-in ones, by name, in the order they were declared.
+    #[serde(default, skip_serializing_if = "Regions::is_empty")]
+    pub regions: Regions,
 }
 
 impl Recipe {
@@ -327,6 +329,13 @@ impl Recipe {
         }
     }
 
+    /// This recipe with `region` declared under `name`, after the regions declared so far.
+    #[must_use]
+    pub fn with_region(mut self, name: impl Into<String>, region: impl Into<Region>) -> Self {
+        self.regions.insert(name, region);
+        self
+    }
+
     /// The recipe the JSON object `text` writes, in the form `serde_json` writes a recipe in. Only the shape is read:
     /// see `Recipe::checked` for the rules.
     ///
@@ -338,17 +347,6 @@ impl Recipe {
         let mut deserializer = serde_json::Deserializer::from_str(text);
         serde_path_to_error::deserialize(&mut deserializer)
             .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error))))
-    }
-}
-
-/// Regions as the JSON writes them: each a table, as a file's `[region.NAME]` is.
-fn tables<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Map<String, Value>, D::Error> {
-    let regions = Map::deserialize(deserializer)?;
-    match regions.iter().find(|(_, region)| !region.is_object()) {
-        Some((name, other)) => Err(D::Error::custom(format!(
-            "region '{name}' must be a table, got {other}"
-        ))),
-        None => Ok(regions),
     }
 }
 
@@ -512,10 +510,7 @@ mod tests {
             fill: Color([0.0, 0.5, 1.0]),
             ..Frame::default()
         };
-        recipe.regions = json!({"panes": {"kind": "grid", "columns": 2}})
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        recipe.regions = crate::testing::regions(json!({"panes": {"kind": "grid", "columns": 2}}));
         let written = json!({
             "steps": [
                 {"effect": "bloom", "params": {"radius": 12}, "opacity": 0.4},
@@ -528,7 +523,7 @@ mod tests {
             "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
                       "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
                       "pad_left": 0.25, "fill": [0.0, 0.5, 1.0], "transparent": "none", "corner_radius": 0.2},
-            "regions": {"panes": {"kind": "grid", "columns": 2}},
+            "regions": {"panes": {"kind": "grid", "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55}, "columns": [1.0, 1.0], "rows": [1.0]}},
         });
         assert_eq!(serde_json::to_value(&recipe).ok(), Some(written.clone()));
         assert_eq!(read(&written).ok(), Some(recipe));
@@ -574,24 +569,24 @@ mod tests {
         let text = r#"{"steps": [{"effect": "a", "params": {"zebra": 1, "apple": 2, "mango": 3}}],
                        "regions": {"zeta": {"kind": "grid"}, "alpha": {"kind": "grid"}, "mid": {"kind": "grid"}}}"#;
         let recipe = Recipe::from_json(text).ok();
-        let regions = recipe
-            .as_ref()
-            .map(|recipe| recipe.regions.keys().cloned().collect::<Vec<_>>());
+        let regions = recipe.as_ref().map(|recipe| {
+            recipe
+                .regions
+                .iter()
+                .map(|(name, _)| name.to_owned())
+                .collect::<Vec<_>>()
+        });
         assert_eq!(
             regions,
             Some(vec!["zeta".to_owned(), "alpha".to_owned(), "mid".to_owned()])
         );
-        let written = recipe
-            .and_then(|recipe| serde_json::to_string(&recipe).ok())
-            .unwrap_or_default();
-        assert!(
-            written.contains(r#""params":{"zebra":1,"apple":2,"mango":3}"#),
-            "the parameters: {written}"
-        );
-        assert!(
-            written.contains(r#""regions":{"zeta":{"kind":"grid"},"alpha":{"kind":"grid"},"mid":{"kind":"grid"}}"#),
-            "the regions: {written}"
-        );
+        let written = recipe.and_then(|recipe| serde_json::to_value(&recipe).ok());
+        let keys_at = |pointer: &str| {
+            let table = written.as_ref()?.pointer(pointer)?.as_object()?;
+            Some(table.keys().map(String::as_str).collect::<Vec<_>>())
+        };
+        assert_eq!(keys_at("/steps/0/params"), Some(vec!["zebra", "apple", "mango"]));
+        assert_eq!(keys_at("/regions"), Some(vec!["zeta", "alpha", "mid"]));
     }
 
     #[test]
@@ -706,6 +701,11 @@ mod tests {
                 "kind",
             ),
             (
+                "in the table of regions",
+                r#"{"steps": [], "regions": {"p": {"kind": "grid"}, "p": {"kind": "path"}}}"#,
+                "p",
+            ),
+            (
                 "in a list of parameters",
                 r#"{"steps": [{"effect": "a", "params": {"x": [{"y": 1, "y": 1}]}}]}"#,
                 "y",
@@ -736,7 +736,7 @@ mod tests {
                 "{what}: {result:?}"
             );
         }
-        let tables = read(&json!({"steps": [], "regions": {"depth": {"kind": "band"}, "empty": {}}}));
+        let tables = read(&json!({"steps": [], "regions": {"depth": {"kind": "band"}, "empty": {"kind": "given"}}}));
         assert!(tables.is_ok(), "{tables:?}");
     }
 

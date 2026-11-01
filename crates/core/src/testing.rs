@@ -1,7 +1,7 @@
 //! What the unit tests of the core share: a registry that holds a `probe` effect (one parameter of every kind, see
 //! `params::probe`) and a `seams` effect that takes a partition and describes no parameters of its own, beside the
 //! core's, and the foreign effects that tests register: [`Paint`], [`Recorder`], [`Counting`], [`Shrinks`] and [`Replaces`],
-//! and [`Finds`], a finder that counts its calls.
+//! and [`Finds`], a finder that counts its calls, and [`regions`], the declared regions a JSON table writes.
 //!
 //! Integration tests (`crates/core/tests/`) cannot reach this module: they use the core's own effects, or a double
 //! written against the public [`Effect`] trait.
@@ -17,7 +17,7 @@ use crate::effect::{Category, Effect, FieldParam, Input, Meta, Native};
 use crate::params::probe::Probe;
 use crate::params::{Params, Table};
 use crate::registry::Registry;
-use crate::{Error, Finder, Image, Inputs, Layer, Picture};
+use crate::{Error, Finder, Image, Inputs, Layer, Picture, Regions};
 
 static PROBE: Meta = Meta {
     category: Category::Utilities,
@@ -44,6 +44,12 @@ impl Effect for Seams {
     fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Err(Error::foreign("seams", "the tests never run it"))
     }
+}
+
+/// The regions the JSON table `declared` writes (name to a table with its `kind`), in its order. A table that is no
+/// regions is a mistake of the test, so it is an empty declaration, which the test then notices.
+pub(crate) fn regions(declared: Value) -> Regions {
+    serde_json::from_value(declared).unwrap_or_default()
 }
 
 /// A registry of the core's effects with `probe` and `seams` added.

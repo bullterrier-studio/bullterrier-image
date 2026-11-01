@@ -14,7 +14,7 @@ from typing import Any, get_args
 import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's engine
-from bullterrier_image.core import registry
+from bullterrier_image.core import regions, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Step
@@ -237,6 +237,10 @@ BAD_FILES = {
     "steps for step": "steps = 2\n" + STEP,
     "an [animation] table": "[animation]\nseconds = 2\n" + STEP,
     "a single [step] table": "[step]\neffect = 'grade'\n",
+    "a region without a kind": "format = 3\n[region.g]\ncolumns = 2\n" + STEP,
+    "a region of an unknown kind": "format = 3\n[region.g]\nkind = 'gird'\n" + STEP,
+    "a region with a field of another kind": "format = 3\n[region.g]\nkind = 'grid'\ncount = 2\n" + STEP,
+    "a region field of the wrong type": "format = 3\n[region.g]\nkind = 'band'\nlow = 'high'\n" + STEP,
     "a size of -5": "size = -5\n" + STEP,
     "a size as text": "size = '64'\n" + STEP,
     "a size as a decimal": "size = 64.0\n" + STEP,
@@ -456,3 +460,249 @@ def test_the_core_names_the_vocabulary_of_recipes_in_the_order_the_package_lists
     assert vocabulary["inputs"] == list(INPUTS)
     assert vocabulary["step_keys"] == list(STEP_KEYS)
     assert vocabulary["blend_modes"] == list(get_args(BlendMode))
+
+
+# --- regions: Rust's `Region` against Python's declarations -----------------------------------------------------------
+
+PYTHON_KINDS: dict[str, Any] = {
+    "grid": regions.Grid,
+    "shards": regions.Shards,
+    "cuts": regions.Cuts,
+    "path": regions.Path,
+    "svg": regions.Svg,
+    "pick": regions.Pick,
+    "subject": regions.Subject,
+    "band": regions.Band,
+    "bands": regions.Bands,
+    "combine": regions.Combine,
+    "linear_gradient": regions.LinearGradient,
+    "radial_gradient": regions.RadialGradient,
+    "given": regions.Given,
+}
+CUT = {"x": 0.5, "y": 0.5, "angle": 0}
+
+
+def edge(**fields: object) -> dict:
+    return {"edge": fields}
+
+
+# (what the row is about, the kind, the fields as a recipe writes them, whether they are valid): both ends of every
+# range and the first value beyond each, and the shapes each kind refuses. The `valid` column is written by hand;
+# Python's declaration and the core must both agree with it. Left out until the core reads them (R4d): the syntax of
+# `Path.d` and `Curve.path`, `Svg.file` and the names of `Shards.preset`. Left out because Python's declaration is laxer
+# than the rule and is replaced (R4e): a share written as text ("2") and a piece that is a switch (`True` is 1 to it);
+# the core refuses both (Rust tests).
+REGION_ROWS = [
+    # the borders every laid kind has (a grid stands for them)
+    ("edge amount, lowest", "grid", edge(amount=0), True),
+    ("edge amount, highest", "grid", edge(amount=48), True),
+    ("edge amount, below", "grid", edge(amount=-0.1), False),
+    ("edge amount, above", "grid", edge(amount=48.5), False),
+    ("edge scale, lowest", "grid", edge(scale=1), True),
+    ("edge scale, highest", "grid", edge(scale=480), True),
+    ("edge scale, below", "grid", edge(scale=0.5), False),
+    ("edge scale, above", "grid", edge(scale=481), False),
+    ("edge octaves, lowest", "grid", edge(octaves=1), True),
+    ("edge octaves, highest", "grid", edge(octaves=8), True),
+    ("edge octaves, below", "grid", edge(octaves=0), False),
+    ("edge octaves, above", "grid", edge(octaves=9), False),
+    ("edge persistence, lowest", "grid", edge(persistence=0), True),
+    ("edge persistence, highest", "grid", edge(persistence=1), True),
+    ("edge persistence, below", "grid", edge(persistence=-0.25), False),
+    ("edge persistence, above", "grid", edge(persistence=1.25), False),
+    ("edge seed, highest", "grid", edge(seed=2**32 - 1), True),
+    ("edge seed, above", "grid", edge(seed=2**32), False),
+    ("edge seed, below", "grid", edge(seed=-1), False),
+    ("edge style torn", "grid", edge(style="torn"), True),
+    ("edge style unknown", "grid", edge(style="wavy"), False),
+    ("edge field unknown", "grid", edge(width=3), False),
+    ("edge not a table", "grid", {"edge": "torn"}, False),
+    ("edge on shards", "shards", edge(amount=49), False),
+    ("edge on cuts", "cuts", edge(amount=49), False),
+    ("edge on path", "path", edge(amount=49), False),
+    ("edge on svg", "svg", edge(amount=49), False),
+    ("fit a name", "grid", {"fit": "subject"}, True),
+    ("fit a number", "grid", {"fit": 3}, False),
+    # grid
+    ("a count of columns", "grid", {"columns": 3, "rows": 2}, True),
+    ("1000 columns", "grid", {"columns": 1000}, True),
+    ("1001 columns", "grid", {"columns": 1001}, False),
+    ("no column", "grid", {"columns": 0}, False),
+    ("a negative count", "grid", {"rows": -2}, False),
+    ("shares", "grid", {"columns": [1, 2.5, 1], "rows": [0.001]}, True),
+    ("1000 shares", "grid", {"rows": [1] * 1000}, True),
+    ("1001 shares", "grid", {"rows": [1] * 1001}, False),
+    ("no shares", "grid", {"columns": []}, False),
+    ("a share of 0", "grid", {"columns": [1, 0]}, False),
+    ("a negative share", "grid", {"rows": [2, -1]}, False),
+    ("columns as text", "grid", {"columns": "3"}, False),
+    ("a decimal count", "grid", {"columns": 2.5}, False),
+    ("columns as a switch", "grid", {"columns": True}, False),
+    # shards
+    ("one shard", "shards", {"count": 1}, True),
+    ("500 shards", "shards", {"count": 500}, True),
+    ("no shard", "shards", {"count": 0}, False),
+    ("501 shards", "shards", {"count": 501}, False),
+    ("a count as a decimal", "shards", {"count": 12.0}, False),
+    ("jitter, lowest", "shards", {"jitter": 0}, True),
+    ("jitter, highest", "shards", {"jitter": 1}, True),
+    ("jitter, below", "shards", {"jitter": -0.5}, False),
+    ("jitter, above", "shards", {"jitter": 1.5}, False),
+    ("impact, the corners", "shards", {"impact": [0, 1]}, True),
+    ("impact x below", "shards", {"impact": [-0.5, 0.5]}, False),
+    ("impact x above", "shards", {"impact": [1.5, 0.5]}, False),
+    ("impact y below", "shards", {"impact": [0.5, -0.5]}, False),
+    ("impact y above", "shards", {"impact": [0.5, 1.5]}, False),
+    ("impact of three", "shards", {"impact": [0, 0, 0]}, False),
+    ("impact of one", "shards", {"impact": [0]}, False),
+    ("focus, lowest", "shards", {"focus": 0}, True),
+    ("focus, highest", "shards", {"focus": 5}, True),
+    ("focus, below", "shards", {"focus": -0.5}, False),
+    ("focus, above", "shards", {"focus": 5.5}, False),
+    ("seed, highest", "shards", {"seed": 2**32 - 1}, True),
+    ("seed, above", "shards", {"seed": 2**32}, False),
+    ("seed, below", "shards", {"seed": -1}, False),
+    # cuts
+    ("a line and a curve", "cuts", {"lines": [{"x": 0.25, "y": 0.75, "angle": 45}, {"path": "M 0 0 L 1 1"}]}, True),
+    ("32 cuts", "cuts", {"lines": [CUT] * 32}, True),
+    ("33 cuts", "cuts", {"lines": [CUT] * 33}, False),
+    ("no cut", "cuts", {"lines": []}, False),
+    ("a line at the corners", "cuts", {"lines": [{"x": 0, "y": 1}, {"x": 1, "y": 0}]}, True),
+    ("a line, x below", "cuts", {"lines": [{"x": -0.5}]}, False),
+    ("a line, x above", "cuts", {"lines": [{"x": 1.5}]}, False),
+    ("a line, y below", "cuts", {"lines": [{"y": -0.5}]}, False),
+    ("a line, y above", "cuts", {"lines": [{"y": 1.5}]}, False),
+    ("a line past the turn", "cuts", {"lines": [{"angle": 725}, {"angle": -90}]}, True),
+    ("a line with a path", "cuts", {"lines": [{"x": 0.5, "path": "M 0 0 L 1 1"}]}, False),
+    ("a curve with an angle", "cuts", {"lines": [{"path": "M 0 0 L 1 1", "angle": 4}]}, False),
+    ("a cut that is not a table", "cuts", {"lines": [3]}, False),
+    # path, svg
+    ("samples, lowest", "path", {"samples": 1}, True),
+    ("samples, highest", "path", {"samples": 16}, True),
+    ("samples, below", "path", {"samples": 0}, False),
+    ("samples, above", "path", {"samples": 17}, False),
+    ("a path of its own", "path", {"d": "M 0.1 0.4 C 0.1 0.2, 0.4 0.2, 0.4 0.4 Z"}, True),
+    ("an svg file", "svg", {"file": "shapes.svg", "max_shapes": 1, "max_kilobytes": 100000}, True),
+    ("max shapes, highest", "svg", {"max_shapes": 100000}, True),
+    ("max shapes, below", "svg", {"max_shapes": 0}, False),
+    ("max shapes, above", "svg", {"max_shapes": 100001}, False),
+    ("max kilobytes, lowest", "svg", {"max_kilobytes": 1}, True),
+    ("max kilobytes, below", "svg", {"max_kilobytes": 0}, False),
+    ("max kilobytes, above", "svg", {"max_kilobytes": 100001}, False),
+    # pick
+    ("pieces by number and id", "pick", {"of": "p", "pieces": [0, "star", 3]}, True),
+    ("no piece", "pick", {"of": "p", "pieces": []}, False),
+    ("a negative piece", "pick", {"of": "p", "pieces": [1, -1]}, False),
+    ("a decimal piece", "pick", {"of": "p", "pieces": [1.5]}, False),
+    ("pieces as a number", "pick", {"of": "p", "pieces": 3}, False),
+    # subject
+    ("subject per piece", "subject", {"per": "p", "context": 0, "threshold": 1}, True),
+    ("context, highest", "subject", {"context": 1, "threshold": 0}, True),
+    ("context, below", "subject", {"context": -0.5}, False),
+    ("context, above", "subject", {"context": 1.5}, False),
+    ("threshold, below", "subject", {"threshold": -0.5}, False),
+    ("threshold, above", "subject", {"threshold": 1.5}, False),
+    ("per a number", "subject", {"per": 3}, False),
+    # band
+    ("a whole scale", "band", {"of": "depth", "low": 0, "high": 1, "feather": 0}, True),
+    ("a single value", "band", {"of": "depth", "low": 0.5, "high": 0.5}, True),
+    ("feather, highest", "band", {"of": "depth", "feather": 1}, True),
+    ("low, below", "band", {"of": "depth", "low": -0.5}, False),
+    ("low, above", "band", {"of": "depth", "low": 1.5, "high": 1}, False),
+    ("high, below", "band", {"of": "depth", "low": 0, "high": -0.5}, False),
+    ("high, above", "band", {"of": "depth", "high": 1.5}, False),
+    ("feather, below", "band", {"of": "depth", "feather": -0.5}, False),
+    ("feather, above", "band", {"of": "depth", "feather": 1.5}, False),
+    ("low above high", "band", {"of": "depth", "low": 0.75, "high": 0.5}, False),
+    ("low a hair above high", "band", {"of": "depth", "low": 0.5, "high": 0.4999}, False),
+    # bands, combine
+    ("1 band", "bands", {"of": "depth", "count": 1}, True),
+    ("100 bands", "bands", {"of": "depth", "count": 100}, True),
+    ("no band", "bands", {"of": "depth", "count": 0}, False),
+    ("101 bands", "bands", {"of": "depth", "count": 101}, False),
+    ("combine of two", "combine", {"of": ["subject", "depth"]}, True),
+    ("combine of three, max", "combine", {"op": "max", "of": ["subject", "depth", "light"]}, True),
+    ("combine of one", "combine", {"of": ["subject"]}, False),
+    ("combine of none", "combine", {"of": []}, False),
+    ("combine op unknown", "combine", {"op": "xor", "of": ["subject", "depth"]}, False),
+    # gradients
+    ("linear angle 0", "linear_gradient", {"angle": 0}, True),
+    ("linear angle past the turn", "linear_gradient", {"angle": 725}, True),
+    ("linear angle negative", "linear_gradient", {"angle": -90}, True),
+    ("linear angle as text", "linear_gradient", {"angle": "up"}, False),
+    ("radial at the corners", "radial_gradient", {"x": 0, "y": 1}, True),
+    ("radial x below", "radial_gradient", {"x": -0.5}, False),
+    ("radial x above", "radial_gradient", {"x": 1.5}, False),
+    ("radial y below", "radial_gradient", {"y": -0.5}, False),
+    ("radial y above", "radial_gradient", {"y": 1.5}, False),
+    ("radius, lowest", "radial_gradient", {"radius": 0.01}, True),
+    ("radius, highest", "radial_gradient", {"radius": 3}, True),
+    ("radius, below", "radial_gradient", {"radius": 0.005}, False),
+    ("radius, above", "radial_gradient", {"radius": 3.5}, False),
+    # given, and what every kind refuses
+    ("given", "given", {}, True),
+    ("given with a field", "given", {"of": "x"}, False),
+    ("a field of another kind", "grid", {"count": 3}, False),
+    ("a misspelt field of band", "band", {"of": "depth", "lo": 0.1}, False),
+    ("a misspelt field of radial", "radial_gradient", {"radius": 0.5, "raduis": 1}, False),
+    ("a field of pick on subject", "subject", {"of": "p"}, False),
+]
+
+
+def python_accepts_region(kind: str, fields: dict) -> bool:
+    try:
+        PYTHON_KINDS[kind].parse(fields, "region 'r'")
+    except ValueError:  # RecipeError, which is one
+        return False
+    return True
+
+
+def core_accepts_region(kind: str, fields: dict) -> bool:
+    """Whether the core's check of a recipe takes the region (it does not run it)."""
+    try:
+        _core.check_recipe({"steps": [{"effect": "grade"}], "regions": {"r": {"kind": kind, **fields}}})
+    except ValueError:  # CoreError, which is one
+        return False
+    return True
+
+
+@pytest.mark.parametrize(("what", "kind", "fields", "valid"), REGION_ROWS, ids=[row[0] for row in REGION_ROWS])
+def test_the_core_and_python_accept_and_refuse_the_same_regions(what, kind, fields, valid):
+    assert python_accepts_region(kind, fields) == valid, "Python's declaration"
+    assert core_accepts_region(kind, fields) == valid, "the core"
+
+
+def test_every_kind_has_rows_with_a_known_good_and_a_known_bad_one():
+    for kind in PYTHON_KINDS:
+        assert {valid for _, row_kind, _, valid in REGION_ROWS if row_kind == kind} == {True, False}, kind
+
+
+def test_the_core_has_the_kinds_python_has():
+    refused = [kind for kind in PYTHON_KINDS if not core_accepts_region(kind, {})]
+    assert refused == []
+    assert not core_accepts_region("lattice", {})
+
+
+def plain(value: object) -> Any:
+    """A dumped model as JSON holds it: tuples as lists, nothing set left out."""
+    return json.loads(json.dumps(value))
+
+
+def without_none(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: without_none(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [without_none(item) for item in value]
+    return value
+
+
+@pytest.mark.parametrize("kind", PYTHON_KINDS)
+def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(kind):
+    read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": kind}}}), "json")["regions"]["r"]
+    python = without_none(plain(PYTHON_KINDS[kind]().model_dump()))
+    assert read == {"kind": kind, **python}
+
+
+def test_a_count_of_shares_is_the_same_list_in_the_core_and_in_python():
+    read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "grid", "columns": 3}}}), "json")
+    assert read["regions"]["r"]["columns"] == list(regions.Grid(columns=3).columns) == [1.0, 1.0, 1.0]

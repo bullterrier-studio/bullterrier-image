@@ -8,11 +8,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, PoisonError};
 
-use serde_json::Value;
-
 use super::{Photo, Working};
 use crate::ops::color::luminance;
-use crate::{Error, Layer, Picture, Recipe};
+use crate::{Error, Layer, Picture, Recipe, Region};
 
 /// Finds a map in a picture: the subject, the depth, or a region a recipe declares as given.
 ///
@@ -110,8 +108,8 @@ impl<'r, 'a> Maps<'r, 'a> {
                 recipe
                     .regions
                     .iter()
-                    .filter(|(_, region)| is_given(Some(region)))
-                    .map(|(name, _)| name.as_str()),
+                    .filter(|(_, region)| matches!(region, Region::Given(_)))
+                    .map(|(name, _)| name),
             )
             .collect();
         let handed = photo.maps.keys().map(|name| ("map", name));
@@ -169,7 +167,7 @@ impl<'r, 'a> Maps<'r, 'a> {
 /// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit,
 /// [`Error::Recipe`] for a region the core does not run yet.
 pub(super) fn stored(photo: &Photo<'_>, recipe: &Recipe, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
-    if !FOUND.contains(&name) && !is_given(recipe.regions.get(name)) {
+    if !FOUND.contains(&name) && !matches!(recipe.regions.get(name), Some(Region::Given(_))) {
         return Err(Error::Recipe(format!(
             "{place}: the region '{name}' is not run by the core yet; only the regions of kind `given` are"
         )));
@@ -203,11 +201,6 @@ fn missing(recipe: &Recipe, name: &str, place: &str) -> Error {
     )
 }
 
-/// Whether `region`, as a recipe declares it, is a map handed in or found (kind `given`).
-fn is_given(region: Option<&Value>) -> bool {
-    region.and_then(|region| region.get("kind")).and_then(Value::as_str) == Some("given")
-}
-
 /// The brightness of every pixel of `picture` (Rec. 709 weights).
 ///
 /// # Errors
@@ -224,7 +217,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use serde_json::json;
+    use crate::region::{Given, Path};
 
     use crate::registry::Registry;
     use crate::testing::{Finds, Paint, Recorder, registry};
@@ -282,10 +275,9 @@ mod tests {
     /// `steps` as a recipe that declares a `given` region for each of `regions`.
     fn recipe(steps: impl IntoIterator<Item = Step>, regions: &[&str]) -> Recipe {
         let mut recipe = Recipe::new(steps);
-        recipe.regions = regions
-            .iter()
-            .map(|name| ((*name).to_owned(), json!({"kind": "given"})))
-            .collect();
+        for name in regions {
+            recipe.regions.insert(*name, Given {});
+        }
         recipe
     }
 
@@ -623,10 +615,7 @@ mod tests {
         let rig = rig()?;
         let values = values();
         let mut look = Recipe::new([uses("cut")]);
-        look.regions = json!({"cut": {"kind": "path"}})
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        look.regions.insert("cut", Path::default());
         let photo = Photo::new(Picture::new(4, 6, &values)?);
         assert_refused(
             &rig.render(&photo, &look),
