@@ -10,6 +10,10 @@ use super::super::read;
 /// The most columns (or rows) a [`Grid`] has, and the most shares a [`Shares`] holds.
 pub(super) const MOST_SHARES: usize = 1000;
 
+/// The most the shares of a [`Grid`]'s columns (or rows) may add up to: shares are proportions, so this is room enough, and
+/// a border (the length of a side times the shares so far) cannot overflow a float below it.
+pub(super) const MOST_TOTAL: f64 = 1e100;
+
 /// The most cuts a [`Cuts`] region has.
 pub(super) const MOST_CUTS: usize = 32;
 
@@ -115,7 +119,8 @@ pub struct Grid {
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,
-    /// How the frame is divided from left to right.
+    /// How the frame is divided from left to right: shares of the frame's width, a count (that many equal shares) or a list of
+    /// up to 1000 positive numbers adding up to at most 1e100.
     pub columns: Shares,
     /// How the frame is divided from top to bottom.
     pub rows: Shares,

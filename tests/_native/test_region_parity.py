@@ -311,6 +311,17 @@ def test_the_pieces_of_a_partition_are_numbered_as_defined_and_the_python_engine
     )
 
 
+@pytest.mark.parametrize("field", ["columns", "rows"])
+def test_shares_that_add_up_to_more_than_the_most_are_refused_naming_the_field_and_huge_ones_within_it_are_fine(
+    photo, partition_probe, field
+):
+    refused = probing(r=Grid(**{field: (1e307, 1e307)}))
+    with pytest.raises(RecipeError, match=f"`{field}` shares must add up to at most 1e100"):
+        core_render(photo, refused)
+    equal = probing(r=Grid(**{field: (5e99, 5e99)}))
+    np.testing.assert_array_equal(labels_made(photo, equal), labels_made(photo, probing(r=Grid(**{field: 2}))))
+
+
 def test_a_pixel_whose_centre_is_on_a_border_is_in_the_later_piece(partition_probe):
     photo = np.zeros(
         (1, 3, 3), np.float32

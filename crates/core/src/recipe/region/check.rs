@@ -3,7 +3,7 @@
 
 use std::fmt::Display;
 
-use super::laid::{MOST_CUTS, MOST_SHARES};
+use super::laid::{MOST_CUTS, MOST_SHARES, MOST_TOTAL};
 use super::{Cut, Edge, Region, Shares};
 use crate::Error;
 
@@ -132,11 +132,17 @@ impl Field<'_> {
         }
     }
 
-    /// 1 to 1000 positive, finite shares.
+    /// 1 to 1000 positive, finite shares that add up to at most [`MOST_TOTAL`].
     fn shares(&self, field: &str, shares: &Shares) -> Result<(), Error> {
         let positive = shares.0.iter().all(|share| *share > 0.0 && share.is_finite());
         if (1..=MOST_SHARES).contains(&shares.0.len()) && positive {
-            Ok(())
+            if shares.0.iter().sum::<f64>() <= MOST_TOTAL {
+                return Ok(());
+            }
+            Err(self.refuse(&format!(
+                "`{field}` shares must add up to at most {MOST_TOTAL:e}, got {:?}",
+                shares.0
+            )))
         } else {
             Err(self.refuse(&format!(
                 "`{field}` must be a count or a list of positive numbers, 1 to {MOST_SHARES} of them, got {:?}",
@@ -257,6 +263,22 @@ mod tests {
             ("svg", edge("amount", json!(49)), Some("`edge.amount` must be <= 48")),
             // grid: 1 to 1000 positive shares
             ("grid", json!({"columns": [1.0], "rows": [0.001]}), None),
+            ("grid", json!({"columns": [5e99, 5e99]}), None),
+            (
+                "grid",
+                json!({"columns": [1e308, 1e308]}),
+                Some("`columns` shares must add up to at most 1e100"),
+            ),
+            (
+                "grid",
+                json!({"rows": [1e307, 1e307]}),
+                Some("`rows` shares must add up to at most 1e100"),
+            ),
+            (
+                "grid",
+                json!({"rows": [6e99, 5e99]}),
+                Some("`rows` shares must add up to at most 1e100"),
+            ),
             ("grid", json!({"columns": vec![1; 1000]}), None),
             ("grid", json!({"rows": vec![1; 1000]}), None),
             (

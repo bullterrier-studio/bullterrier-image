@@ -265,6 +265,48 @@ fn a_fit_that_chooses_nothing_is_a_recipe_error_naming_the_region_and_the_fit_wh
 }
 
 #[test]
+fn shares_of_any_size_divide_a_picture_as_their_proportions_say_and_a_border_a_hair_beyond_a_centre_leaves_it_before()
+-> Outcome {
+    let spy = Spy::register("grid_proportions", true)?;
+    let pixels = grey(1, 1000);
+    let photo = Photo::new(Picture::new(1, 1000, &pixels)?);
+    let labels = |list: &[f64]| {
+        let grid = Grid {
+            columns: shares(list),
+            ..Grid::default()
+        };
+        pieces_of(&spy, &photo, &gridded("grid_proportions", grid), Options::default())
+    };
+    // two equal shares are half and half whether they are 1 or 5e99 (the most they may add up to is 1e100)
+    let halves = labels(&[1.0, 1.0])?;
+    assert_eq!(halves.0.iter().filter(|&&label| label == 0).count(), 500);
+    assert!(labels(&[5e99, 5e99])? == halves, "shares of 5e99");
+    assert!(labels(&[1e-300, 1e-300])? == halves, "shares of 1e-300");
+    // shares 4 : 1 : 4 : 5 on 21 pixels put a border at 21 x 9 / 14 = 13.5 exactly, a centre: the later piece (a share of the whole
+    // taken first, 21 x (9 / 14), would be a hair off and put it in the earlier one)
+    let narrow = grey(1, 21);
+    let photo21 = Photo::new(Picture::new(1, 21, &narrow)?);
+    let grid = Grid {
+        columns: shares(&[4.0, 1.0, 4.0, 5.0]),
+        ..Grid::default()
+    };
+    let by_21 = pieces_of(&spy, &photo21, &gridded("grid_proportions", grid), Options::default())?;
+    assert!(
+        by_21 == brute_force((1, 21), (0, 0, 21, 1), (&[4, 1, 4, 5], &[1])),
+        "21 pixels in 4 : 1 : 4 : 5"
+    );
+    // shares 10,050,010 : 89,949,990 put the border at 100.5001, a hair beyond the centre of pixel 100 (100.5): that pixel
+    // is still in the first column, by exact integer arithmetic on the shares (101 pixels)
+    let (expected, _) = brute_force((1, 1000), (0, 0, 1000, 1), (&[10_050_010, 89_949_990], &[1]));
+    assert_eq!(expected.iter().filter(|&&label| label == 0).count(), 101);
+    assert!(
+        labels(&[10_050_010.0, 89_949_990.0])?.0 == expected,
+        "a border a hair beyond a centre"
+    );
+    Ok(())
+}
+
+#[test]
 fn a_grid_whose_shares_divide_both_sizes_has_the_same_pieces_at_twice_the_size() -> Outcome {
     let spy = Spy::register("grid_sized", true)?;
     let pixels = grey(4, 6);
