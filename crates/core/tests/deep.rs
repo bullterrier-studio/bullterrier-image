@@ -44,7 +44,11 @@ fn a_long_chain_and_a_wide_diamond_of_regions_need_no_deep_call_stack() -> Resul
             let photo = Photo::new(Picture::new(4, 6, &rgb)?).with_map("depth", Layer::new(4, 6, vec![0.5; 24])?)?;
             let rendered = photo.render(&recipe, &Presets::new(), Options::default())?;
             assert_eq!((rendered.height(), rendered.width()), (4, 6));
-            assert_eq!(photo.trace(&recipe, &Presets::new(), Options::default())?.len(), 4);
+            // the photo, the depth, each of the 2 x 2,000 regions the steps use through the last of each chain, two steps
+            assert_eq!(
+                photo.trace(&recipe, &Presets::new(), Options::default())?.len(),
+                2 + 2 * LINKS + 2
+            );
             assert!(serde_json::to_string(&recipe)?.contains(&format!("band{last}")));
             Ok(())
         })?

@@ -372,7 +372,10 @@ mod tests {
                 Stage::Input(image) | Stage::Step { image, .. } | Stage::CutOut(image) => {
                     (image.height(), image.width())
                 }
-                Stage::Subject(layer) | Stage::Depth(layer) => (layer.height(), layer.width()),
+                Stage::Subject(layer) | Stage::Depth(layer) | Stage::Selection { layer, .. } => {
+                    (layer.height(), layer.width())
+                }
+                Stage::Partition { labels, .. } => (labels.height(), labels.width()),
             };
             assert_eq!(shape, (8, 12));
         }

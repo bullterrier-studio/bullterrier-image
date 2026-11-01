@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use super::Stage;
 use crate::ops::pieces::{self, Bounds};
 use crate::ops::{bands, cast, gradient, grid};
 use crate::region::{Band, Bands, Combine, CombineOp, Grid, LinearGradient, Pick, Piece, RadialGradient, Subject};
@@ -112,6 +113,37 @@ impl Evaluator {
     /// The selection `name` as it is held now, if it is: what a trace shows.
     pub(super) fn held(&self, name: &str) -> Option<Arc<Layer>> {
         self.selected(name).ok()
+    }
+
+    /// The declared regions that the steps use, or that a region they use is made from, made now, as a trace shows them:
+    /// in the order they are declared, a selection or the pieces of a partition.
+    ///
+    /// # Errors
+    /// As [`selection`](Self::selection).
+    pub(super) fn shown(&mut self, picture: &Picture<'_>) -> Result<Vec<Stage>, Error> {
+        let names: Vec<String> = self
+            .declared
+            .iter()
+            .map(|(name, _)| name)
+            .filter(|name| self.last.contains_key(*name))
+            .map(str::to_owned)
+            .collect();
+        let mut stages = Vec::with_capacity(names.len());
+        for name in names {
+            self.ensure(&name, picture)?;
+            stages.push(match self.made.get(&name) {
+                Some(Made::Selection(layer)) => Stage::Selection {
+                    layer: Layer::clone(layer),
+                    name,
+                },
+                Some(Made::Pieces(labels)) => Stage::Partition {
+                    labels: Labels::clone(labels),
+                    name,
+                },
+                None => return Err(Error::Recipe(format!("region '{name}' is needed before it is made"))),
+            });
+        }
+        Ok(stages)
     }
 
     /// Drops the regions that no step after `step` (from 0) needs.
