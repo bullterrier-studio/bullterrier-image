@@ -19,7 +19,7 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to
 /// `recipe` is the recipe as a dict, in the form `read_recipe` returns: `{"steps": [...], ...}`. Its steps run in
 /// order, each on the previous one's output, laid over it by the step's `blend_mode`, `opacity` and `mask`. A parameter
 /// an effect declares drivable may be a drive, `{"by": ..., "start": ..., "end": ..., "levels": ...}`. A recipe whose
-/// steps use a region of kind `shards`, `cuts`, `path`, `svg` or with a torn edge is refused: the core does not make
+/// steps use a region of kind `shards`, `cuts`, `path` or `svg` is refused: the core does not make
 /// those yet. An `each` step with `assign` `random` draws its looks from the core's own seeded stream, which is not
 /// numpy's.
 ///

@@ -2,7 +2,7 @@
 
 Transitional (R4a to R4e): the Python runner (`runner`) still renders for users; this is the path R4e switches them to,
 and what the parity tests (`tests/_native/test_runner_parity.py`, `test_region_parity.py`) hold the core's runner to.
-The core does not make the regions `shards`, `cuts`, `path`, `svg` or a torn edge yet: a recipe whose steps use one is
+The core does not make the regions `shards`, `cuts`, `path` or `svg` yet: a recipe whose steps use one is
 a `RecipeError` from the core.
 """
 

@@ -418,19 +418,12 @@ fn a_kind_the_core_cannot_make_yet_refuses_the_render_before_any_step_runs_when_
     let rig = rig()?;
     let pixels = vec![0.5; 4 * 6 * 3];
     let photo = grey(4, 6, &pixels, &[])?;
-    let torn = json!({"edge": {"style": "torn"}});
     // (what is declared as `p`, whether a step reaches it by an `each` rather than a mask, what the refusal says)
     let rows = [
         ("shards", json!({"p": {"kind": "shards"}}), true, "kind shards"),
         ("cuts", json!({"p": {"kind": "cuts"}}), true, "kind cuts"),
         ("svg", json!({"p": {"kind": "svg"}}), true, "kind svg"),
         ("path", json!({"p": {"kind": "path"}}), false, "kind path"),
-        (
-            "a torn grid",
-            json!({"p": {"kind": "grid", "edge": torn["edge"]}}),
-            true,
-            "a torn edge",
-        ),
     ];
     for (what, declared, by_each, said) in rows {
         let mut recipe = Recipe::new([Step::new("paint").param("level", 0.5)]);
@@ -503,4 +496,50 @@ proptest! {
             prop_assert!(values.iter().all(|value| (0.0..=1.0).contains(value)), "{}: {:?}", name, values);
         }
     }
+}
+
+#[test]
+fn a_torn_grid_shifts_the_columns_by_the_first_field_and_the_rows_by_the_second_in_px_of_the_picture()
+-> Result<(), Error> {
+    use crate::ops::length;
+    use crate::ops::noise::{Tear, bend};
+    // 60 x 40 px: the longest side is an eighth of the design size 480, so the tear of 24 px at a scale of 96 px is 3 px at
+    // a spacing of a fifth of the long side; two columns and two rows split at x = 30 and y = 20
+    let (height, width) = (40_usize, 60_usize);
+    let declared = regions(json!({"g": {
+        "kind": "grid", "columns": 2, "rows": 2,
+        "edge": {"style": "torn", "amount": 24.0, "scale": 96.0, "seed": 5, "octaves": 2, "persistence": 0.5}
+    }}));
+    let pixels = vec![0.5; height * width * 3];
+    let picture = Picture::new(height, width, &pixels)?;
+    let last = BTreeMap::from([("g".to_owned(), 0)]);
+    let mut evaluator = Evaluator::new(&declared, BTreeMap::new(), last, None);
+    let made = evaluator.pieces("g", &picture)?;
+    let [along_x, along_y] = bend(
+        height,
+        width,
+        &Tear {
+            scale_share: 0.2,
+            octaves: 2,
+            persistence: 0.5,
+            seed: 5,
+        },
+    );
+    let mut numbered = BTreeMap::new();
+    let mut expected = Vec::new();
+    for at in 0..height * width {
+        let (row, column) = (length::float(at / width) + 0.5, length::float(at % width) + 0.5);
+        let (x, y) = (
+            column + f64::from(along_x[at]) * 3.0,
+            row + f64::from(along_y[at]) * 3.0,
+        );
+        let kind = usize::from(y >= 20.0) * 2 + usize::from(x >= 30.0);
+        let next = numbered.len();
+        expected.push(*numbered.entry(kind).or_insert(next));
+    }
+    let got: Vec<usize> = made.values().iter().map(|&label| pieces::piece(label)).collect();
+    let first_difference = got.iter().zip(&expected).position(|(got, want)| got != want);
+    assert_eq!((made.pieces(), first_difference), (numbered.len(), None));
+    assert!(numbered.len() > 1);
+    Ok(())
 }

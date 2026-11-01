@@ -570,8 +570,8 @@ UNMADE_YET = (Shards, Cuts, PathRegion, Svg)
 
 
 def unmade(region: object) -> bool:
-    """Whether the core does not make this kind of region yet: shards, cuts, a path, svg, or a torn edge."""
-    return isinstance(region, UNMADE_YET) or getattr(getattr(region, "edge", None), "style", "") == "torn"
+    """Whether the core does not make this kind of region yet: shards, cuts, a path or svg."""
+    return isinstance(region, UNMADE_YET)
 
 
 def used_regions(recipe: Recipe) -> list[str]:
@@ -641,7 +641,6 @@ UNPORTED = {
     "cuts": (Cuts(lines=({"x": 0.5, "y": 0.5, "angle": 30},)), "each"),
     "a path": (PathRegion(d="M 0 0 L 1 0 L 1 1 Z"), "mask"),
     "svg": (Svg(file="shape.svg"), "each"),
-    "a torn grid": (Grid(columns=2, edge=Edge(style="torn")), "each"),
 }
 
 
@@ -655,6 +654,20 @@ def test_a_region_the_core_does_not_make_yet_is_refused_where_used_and_renders_w
         core_render(photo, refused)
     unused = Recipe([DOUBLED], regions={"r": region})
     np.testing.assert_allclose(core_render(photo, unused), stops(photo, 1), atol=2e-6)
+
+
+def test_a_torn_grid_is_cut_by_the_core_the_same_for_a_seed_differently_for_another_and_straight_for_no_tear(
+    photo, partition_probe
+):
+    def torn(**edge: Any) -> np.ndarray:
+        return labels_made(photo, probing(r=Grid(columns=3, rows=2, edge=Edge(style="torn", **edge))))
+
+    straight = labels_made(photo, probing(r=Grid(columns=3, rows=2)))
+    first = torn(seed=1, amount=24)
+    np.testing.assert_array_equal(first, torn(seed=1, amount=24))
+    assert (first != torn(seed=2, amount=24)).any()
+    assert (first != straight).any()
+    np.testing.assert_array_equal(torn(seed=1, amount=0), straight)
 
 
 # --- what a recipe needs of the photo -------------------------------------------------------------------------------

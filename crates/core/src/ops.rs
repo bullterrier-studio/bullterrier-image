@@ -12,6 +12,7 @@ pub(crate) mod gradient;
 pub(crate) mod grid;
 pub(crate) mod length;
 pub(crate) mod levels;
+pub(crate) mod noise;
 pub(crate) mod pieces;
 pub(crate) mod random;
 pub(crate) mod resample;

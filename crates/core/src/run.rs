@@ -14,6 +14,7 @@ use std::sync::Arc;
 mod cut;
 mod each;
 mod frame;
+mod laid;
 mod maps;
 mod regions;
 mod size;
@@ -106,7 +107,7 @@ impl<'a> Photo<'a> {
     /// the pieces of the region it names (a selection is split into the pixels it chooses, above one half, and the
     /// others). A `subject` region found `per` piece needs the photo's `subject` finder (a handed in `subject` map does
     /// not do) and asks it about each piece's crop of the working picture. A recipe whose steps use a region the core
-    /// does not make yet (`shards`, `cuts`, `path`, `svg`, a torn edge) is refused before anything runs, and so is one
+    /// does not make yet (`shards`, `cuts`, `path`, `svg`) is refused before anything runs, and so is one
     /// that needs the subject finder of a photo that has none.
     ///
     /// An `each` step gives each piece of its partition a look (see [`Each`](crate::Each)): every look that has a piece is run once

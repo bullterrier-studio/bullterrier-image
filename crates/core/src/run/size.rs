@@ -4,11 +4,18 @@
 use std::sync::Arc;
 
 use super::frame::Geometry;
+use crate::ops::length;
 use crate::ops::resample::Resize;
 use crate::{Error, Frame, Image, Layer, Picture};
 
 /// The longest side in px that a recipe's pixel values are written for.
 const DESIGN_SIZE: f64 = 480.0; // constant: the design size of the format, Python's `DESIGN_SIZE`
+
+/// Working pixels per design pixel of the working `picture`: its longest side over [`DESIGN_SIZE`]. The one decision of how
+/// a length in a recipe follows the size of the picture.
+pub(super) fn ratio_of(picture: &Picture<'_>) -> f64 {
+    length::float(picture.height().max(picture.width())) / DESIGN_SIZE
+}
 
 /// What a render is asked for besides the recipe.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -98,12 +105,9 @@ impl<'a> Working<'a> {
         self.made.as_ref().map_or(self.given, Image::as_picture)
     }
 
-    /// Working pixels per design pixel: the picture's longest side over [`DESIGN_SIZE`].
+    /// Working pixels per design pixel: see [`ratio_of`].
     pub(super) fn ratio(&self) -> f64 {
-        let picture = self.picture();
-        #[expect(clippy::cast_precision_loss, reason = "a length is far below 2^53")]
-        let longest = picture.height().max(picture.width()) as f64;
-        longest / DESIGN_SIZE
+        ratio_of(&self.picture())
     }
 
     /// `map`, a map of the photo as given, as a map of the working picture: the map itself if the picture is the photo,

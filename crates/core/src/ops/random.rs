@@ -19,6 +19,23 @@ fn splitmix(state: &mut u64) -> u64 {
     word ^ (word >> 31) // constant: SplitMix64 final shift
 }
 
+/// A hash of `seed` and `words` (a position in a lattice, say): one `SplitMix64` step, which is a bijection of the 64 bits,
+/// for each word xored into the state. The same arguments give the same word on every platform; it keeps no state, so
+/// the value at a position never depends on which others were asked for.
+pub(crate) fn mix(seed: u32, words: &[u64]) -> u64 {
+    words.iter().fold(u64::from(seed), |state, word| {
+        let mut moved = state ^ word;
+        splitmix(&mut moved)
+    })
+}
+
+/// `word` as a number from 0 up to but not including 1: its top 53 bits (a float's whole mantissa) over 2^53 (Vigna's
+/// recipe for a double from 64 random bits).
+#[expect(clippy::cast_precision_loss, reason = "53 bits fit a float's mantissa exactly")]
+pub(crate) const fn unit(word: u64) -> f64 {
+    (word >> 11) as f64 * (1.0 / 9_007_199_254_740_992.0) // constant: 2^53, the values a double mantissa holds
+}
+
 impl Rng {
     /// The stream of `seed`.
     pub(crate) fn seeded(seed: u32) -> Self {

@@ -11,10 +11,10 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use super::Stage;
-use crate::ops::pieces::{self, Bounds};
-use crate::ops::{bands, cast, gradient, grid};
-use crate::region::{Band, Bands, Combine, CombineOp, Grid, LinearGradient, Pick, Piece, RadialGradient, Subject};
+use super::{Stage, laid};
+use crate::ops::pieces;
+use crate::ops::{bands, cast, gradient};
+use crate::region::{Band, Bands, Combine, CombineOp, LinearGradient, Pick, Piece, RadialGradient, Subject};
 use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
 /// A region once made.
@@ -48,7 +48,7 @@ fn no_finder(name: &str, per: &str) -> Error {
     )
 }
 
-/// The refusal of the region `name`, which the core cannot make (`what`: its kind, or a torn edge), needed at `place`.
+/// The refusal of the region `name`, which the core cannot make (`what`: its kind), needed at `place`.
 fn refuse(name: &str, what: &str, place: &str) -> Error {
     Error::Recipe(format!(
         "region '{name}' ({what}), used at {place}, is not run by the core yet"
@@ -269,16 +269,9 @@ impl Evaluator {
             Some(Region::RadialGradient(RadialGradient { x, y, radius })) => {
                 selection(gradient::radial(height, width, *x, *y, *radius))
             }
-            Some(Region::Grid(Grid { fit, columns, rows, .. })) => {
-                let frame = match fit {
-                    None => Bounds::whole(height, width),
-                    Some(fit) => pieces::bounds(self.selected(fit)?.values(), height, width).ok_or_else(|| {
-                        Error::Recipe(format!(
-                            "region '{name}': `fit` '{fit}' chooses nothing in this picture, so it has no frame"
-                        ))
-                    })?,
-                };
-                partition(grid::grid(height, width, frame, &columns.0, &rows.0))
+            Some(Region::Grid(spec)) => {
+                let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
+                partition(laid::grid(name, spec, fit.as_deref(), picture)?)
             }
             // the subject of the whole picture is the built-in one, which is held
             Some(Region::Subject(Subject { per: None, .. })) => self.selected("subject").map(Made::Selection),
