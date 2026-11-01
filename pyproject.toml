@@ -193,6 +193,11 @@ tests = 1500
 "tests/core/test_regions.py" = 1901
 "tests/core/test_runner.py" = 1689
 
+# Read by tools/run_capped.py: the memory cap (MB, summed over a command's whole process group) the poe tasks that run
+# tests give it. A command past it is killed and the gate fails with status 99.
+[tool.run-capped]
+cap-mb = 6000
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # test files are named after the module they test, so equal names in different folders must never collide
