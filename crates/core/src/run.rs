@@ -14,6 +14,7 @@ use std::sync::Arc;
 mod cut;
 mod frame;
 mod maps;
+mod regions;
 mod size;
 mod step;
 mod trace;
@@ -21,13 +22,14 @@ mod trace;
 use cut::Cut;
 pub use maps::Finder;
 use maps::{Found, Maps};
+use regions::Evaluator;
 pub use size::Options;
 use size::Working;
 use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::registry::Registry;
-use crate::{Error, Image, Inputs, Layer, Picture, Presets, Recipe};
+use crate::{Error, Image, Layer, Picture, Presets, Recipe, Region};
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
 /// or found by a [`Finder`]. It borrows the picture: rendering never copies or changes it.
@@ -95,7 +97,10 @@ impl<'a> Photo<'a> {
     /// layer: by its blend mode, mixed in by its opacity (none: the effect's own) and, where it names a `mask`, only
     /// as far as the mask says. Every map the steps use is looked up, and found if need be, before the first step runs:
     /// the maps the photo was given and the ones it is made to find, plus `background` (1 - the subject) and `light`
-    /// (the Rec. 709 brightness of the picture the steps work on). An `each` step is refused until the core runs it.
+    /// (the Rec. 709 brightness of the picture the steps work on). A region made from them (`band`, `combine`, the
+    /// gradients) is made for the working picture when its step comes and dropped after the last step that needs it;
+    /// one declared and not used costs nothing. A recipe whose steps use a region of a kind the core does not make yet
+    /// (everything but `given`, `band`, `combine` and the gradients) or an `each` step is refused before anything runs.
     ///
     /// The steps work on the photo as the recipe's `frame` frames it (flipped, cropped, given borders: the photo and every
     /// map move together; a crop around the subject needs the `subject` map), at the size `options` ask for, else the
@@ -137,7 +142,16 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Run<'a>, Error> {
-        recipe.check_in(registry, presets)?;
+        let reach = recipe.check_in(registry, presets)?.reach(&recipe.regions);
+        // a region the core cannot make refuses the render before anything is made or found
+        for reached in &reach {
+            if let Some(what) = recipe.regions.get(&reached.name).and_then(Region::not_yet) {
+                return Err(Error::Recipe(format!(
+                    "region '{}' ({what}), used at {}, is not run by the core yet",
+                    reached.name, reached.place
+                )));
+            }
+        }
         // the subject the frame needs (a crop around it, a cut by it), found before anything is made
         let needs_subject = recipe.frame.needs_subject();
         let given_subject = needs_subject
@@ -153,23 +167,30 @@ impl<'a> Photo<'a> {
         let maps = Maps::new(self, recipe, &working)?;
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
-        let cut = Cut::plan(&recipe.frame, &working, framed_subject)?;
+        let cut = Cut::plan(&recipe.frame, &working, framed_subject.clone())?;
         let steps = recipe
             .steps
             .iter()
             .enumerate()
-            .map(|(index, entry)| prepare(registry, presets, ratio, &maps, entry, &format!("step {}", index + 1)))
+            .map(|(index, entry)| prepare(registry, presets, ratio, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
-        let (subject, depth) = (maps.resolved("subject"), maps.resolved("depth"));
-        drop(maps);
+        // every map the photo gives that the steps use is found now, so that none is missing when its step runs
+        let mut held = BTreeMap::new();
+        for reached in reach.iter().filter(|reached| maps.gives(&reached.name)) {
+            held.insert(reached.name.clone(), maps.get(&reached.name, &reached.place)?);
+        }
+        if let Some(subject) = framed_subject {
+            held.entry("subject".to_owned()).or_insert(subject);
+        }
+        let last = reach.into_iter().map(|reached| (reached.name, reached.last)).collect();
         Ok(Run {
             working,
             ratio,
             steps: steps.into_iter(),
+            ran: 0,
             current: None,
             cut,
-            subject,
-            depth,
+            regions: Evaluator::new(&recipe.regions, held, last),
         })
     }
 }
@@ -182,13 +203,13 @@ struct Run<'a> {
     working: Working<'a>,
     ratio: f64,
     steps: std::vec::IntoIter<Prepared>,
+    /// How many steps have run.
+    ran: usize,
     current: Option<Image>,
     /// How the image after the last step is cut out, if the recipe's frame says so.
     cut: Option<Cut>,
-    /// The subject, if some step uses it (a mask, a field, a drive, `background`).
-    subject: Option<Arc<Layer>>,
-    /// The depth, if some step uses it.
-    depth: Option<Arc<Layer>>,
+    /// The selections the steps work from, each dropped once the last step that needs it has run.
+    regions: Evaluator,
 }
 
 impl Run<'_> {
@@ -201,12 +222,10 @@ impl Run<'_> {
             .current
             .as_ref()
             .map_or_else(|| self.working.picture(), Image::as_picture);
-        let mut offered = Inputs::default().with_size_ratio(self.ratio);
-        for (parameter, layer) in &step.fields {
-            offered = offered.with_field(parameter.as_str(), layer);
-        }
-        let after = step.run(&before, &offered)?;
-        self.current = Some(step.lay(&before, after));
+        let after = step.apply(&before, self.ratio, &mut self.regions, &self.working.picture())?;
+        self.regions.release(self.ran);
+        self.ran += 1;
+        self.current = Some(after);
         Ok(self.current.as_ref())
     }
 

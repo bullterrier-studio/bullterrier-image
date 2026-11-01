@@ -127,6 +127,28 @@ impl Region {
         }
     }
 
+    /// What of this region the core cannot make yet, if anything: its kind, or a torn edge. `start` of a render refuses
+    /// a recipe whose steps use such a region, before anything runs; one declared and unused renders.
+    pub(crate) fn not_yet(&self) -> Option<&'static str> {
+        let torn = |edge: &Edge| (edge.style == EdgeStyle::Torn).then_some("a torn edge");
+        match self {
+            Self::Grid(Grid { edge, .. }) => torn(edge).or(Some("kind grid")),
+            Self::Shards(_) => Some("kind shards"),
+            Self::Cuts(_) => Some("kind cuts"),
+            Self::Path(_) => Some("kind path"),
+            Self::Svg(_) => Some("kind svg"),
+            Self::Pick(_) => Some("kind pick"),
+            Self::Bands(_) => Some("kind bands"),
+            Self::Subject(Subject { per: Some(_), .. }) => Some("kind subject with `per`"),
+            Self::Subject(_)
+            | Self::Band(_)
+            | Self::Combine(_)
+            | Self::LinearGradient(_)
+            | Self::RadialGradient(_)
+            | Self::Given(_) => None,
+        }
+    }
+
     /// The regions this one is made from, each as (the field that names it, its name, the form it must have): the one
     /// a kind is laid over (`fit`), the one a `Pick` picks from, the ones a `Band`, `Bands` or `Combine` is cut or put
     /// together from, the one a `Subject` is found in each piece of.

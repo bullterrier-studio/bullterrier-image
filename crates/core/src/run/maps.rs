@@ -123,8 +123,8 @@ impl<'r, 'a> Maps<'r, 'a> {
     ///
     /// # Errors
     /// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit
-    /// (the error of the map's kind, see [`Error::kind`]), whatever a finder fails with, [`Error::Recipe`] for a region
-    /// the core does not run yet, [`Error::InvalidImage`] for the `light` of a picture that is no picture.
+    /// (the error of the map's kind, see [`Error::kind`]), whatever a finder fails with, [`Error::InvalidImage`] for the
+    /// `light` of a picture that is no picture.
     pub(super) fn get(&self, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
         if let Some(layer) = self.resolved(name) {
             return Ok(layer);
@@ -142,8 +142,14 @@ impl<'r, 'a> Maps<'r, 'a> {
         Ok(layer)
     }
 
-    /// The map `name` if this render has used it.
-    pub(super) fn resolved(&self, name: &str) -> Option<Arc<Layer>> {
+    /// Whether the photo gives the map `name` (handed in or found) or it is made from the picture: `subject`, `depth`,
+    /// `background`, `light` and the `Given` regions, the names [`get`](Self::get) answers.
+    pub(super) fn gives(&self, name: &str) -> bool {
+        matches!(name, "background" | "light") || self.recipe.known_maps().contains(&name)
+    }
+
+    /// The map `name` if this render has made it.
+    fn resolved(&self, name: &str) -> Option<Arc<Layer>> {
         self.resolved.borrow().get(name).cloned()
     }
 }
@@ -152,14 +158,8 @@ impl<'r, 'a> Maps<'r, 'a> {
 /// `place` (as `step 2, mask`) says where the recipe uses it.
 ///
 /// # Errors
-/// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit,
-/// [`Error::Recipe`] for a region the core does not run yet.
+/// [`Error::MapNotFound`] if the photo has neither the map nor a finder for it, or the finder's answer does not fit.
 pub(super) fn stored(photo: &Photo<'_>, recipe: &Recipe, name: &str, place: &str) -> Result<Arc<Layer>, Error> {
-    if !recipe.known_maps().contains(&name) {
-        return Err(Error::Recipe(format!(
-            "{place}: the region '{name}' is not run by the core yet; only the regions of kind `given` are"
-        )));
-    }
     if let Some(layer) = photo.maps.get(name) {
         return Ok(Arc::clone(layer));
     }
@@ -608,14 +608,20 @@ mod tests {
         assert_refused(
             &rig.render(&photo, &look),
             ErrorKind::Recipe,
-            &["'cut'", "not run"],
+            &["'cut'", "kind path", "not run"],
             "path",
         );
-        // nothing makes a map of it, so one handed in is no map of the recipe
+        // nothing runs for a recipe that is refused
+        assert_eq!(rig.recorder.received().len(), 0);
+        // declared and not used, it costs nothing and the recipe renders; nothing makes a map of it, so one handed in is
+        // no map of the recipe
+        let mut unused = Recipe::new([paint()]);
+        unused.regions.insert("cut", Path::default());
+        rig.render(&photo, &unused)?;
         assert_refused(
             &rig.render(
                 &Photo::new(Picture::new(4, 6, &values)?).with_map("cut", flat(0.5)?)?,
-                &look,
+                &unused,
             ),
             ErrorKind::Recipe,
             &["'cut'", "no map of the recipe"],

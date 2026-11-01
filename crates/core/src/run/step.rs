@@ -1,24 +1,23 @@
-//! One step of a recipe: [`prepare`] resolves it (parameters complete and scaled, the maps it names), a [`Prepared`] runs
-//! its effect on a picture and lays the result over it.
+//! One step of a recipe: [`prepare`] resolves it (its parameters complete and scaled, the regions it names), a
+//! [`Prepared`] runs its effect on a picture and lays the result over it.
 
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
-use super::maps::Maps;
+use super::regions::Evaluator;
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::recipe::drive;
 use crate::registry::Registry;
 use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets};
 
-/// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete and scaled, the maps it names
-/// found, or why the core does not run it yet.
+/// The step `entry` (at `place`, as `step 2`) resolved: its parameters complete and scaled, the regions it names, or why
+/// the core does not run it yet.
 pub(super) fn prepare(
     registry: &Registry,
     presets: &Presets,
     ratio: f64,
-    maps: &Maps<'_, '_>,
     entry: &Entry,
     place: &str,
 ) -> Result<Prepared, Error> {
@@ -34,10 +33,7 @@ pub(super) fn prepare(
         let name = field
             .field_in(&given)
             .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
-        fields.push((
-            field.parameter.clone(),
-            maps.get(name, &format!("{place}, parameter `{}`", field.parameter))?,
-        ));
+        fields.push((field.parameter.clone(), name.to_owned()));
     }
     let drives = drive::in_params(&step.effect, &given, place)?;
     let runs = if let Some((_, first)) = drives.first() {
@@ -52,7 +48,7 @@ pub(super) fn prepare(
             })
             .collect::<Result<_, _>>()?;
         Runs::Driven {
-            by: maps.get(&first.by, &format!("{place}, drive `by`"))?,
+            by: first.by.clone(),
             top: first.levels - 1,
             levels,
         }
@@ -62,11 +58,7 @@ pub(super) fn prepare(
     Ok(Prepared {
         opacity: step.opacity.unwrap_or_else(|| effect.opacity()),
         blend_mode: step.blend_mode,
-        mask: step
-            .mask
-            .as_deref()
-            .map(|name| maps.get(name, &format!("{place}, `mask`")))
-            .transpose()?,
+        mask: step.mask.clone(),
         fields,
         effect,
         runs,
@@ -77,24 +69,21 @@ pub(super) fn prepare(
 enum Runs {
     /// A plain step: one run.
     One(Value),
-    /// A step with driven parameters: one run for each level, `levels[n]` for level `n` (0 to `top`), mixed by the map.
-    Driven {
-        by: Arc<Layer>,
-        top: u8,
-        levels: Vec<Value>,
-    },
+    /// A step with driven parameters: one run for each level, `levels[n]` for level `n` (0 to `top`), mixed by the
+    /// selection called `by`.
+    Driven { by: String, top: u8, levels: Vec<Value> },
 }
 
-/// A step ready to run: its effect, the complete parameters it receives, the maps it works from and how its result is
-/// laid over its input.
+/// A step ready to run: its effect, the complete parameters it receives, the selections it works from (by region name)
+/// and how its result is laid over its input.
 pub(super) struct Prepared {
     effect: Arc<dyn Effect>,
     runs: Runs,
-    /// The field parameters of the effect, each with its map.
-    pub(super) fields: Vec<(String, Arc<Layer>)>,
+    /// The field parameters of the effect, each with the name of its region.
+    fields: Vec<(String, String)>,
     opacity: f64,
     blend_mode: BlendMode,
-    mask: Option<Arc<Layer>>,
+    mask: Option<String>,
 }
 
 /// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes them, checked
@@ -113,13 +102,51 @@ fn complete(
 }
 
 impl Prepared {
-    /// The effect run on `before`. A driven step runs it once for each level that some pixel is on or next to, and each
-    /// pixel mixes the runs of the two levels either side of its map value, linearly; a level none is near is not run.
-    pub(super) fn run(&self, before: &Picture<'_>, offered: &Inputs<'_>) -> Result<Image, Error> {
-        let (by, top, levels) = match &self.runs {
-            Runs::One(params) => return effect::run(&*self.effect, before, params.clone(), offered),
-            Runs::Driven { by, top, levels } => (by, *top, levels),
+    /// This step's effect run on `before`, with the selections it names made by `regions` for `working`, the picture the
+    /// render works on, and the result laid over `before`.
+    ///
+    /// # Errors
+    /// Why a region could not be made, or the effect failed.
+    pub(super) fn apply(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+    ) -> Result<Image, Error> {
+        let mut fields = Vec::with_capacity(self.fields.len());
+        for (parameter, region) in &self.fields {
+            fields.push((parameter, regions.selection(region, working)?));
+        }
+        let mut offered = Inputs::default().with_size_ratio(ratio);
+        for (parameter, layer) in &fields {
+            offered = offered.with_field(parameter.as_str(), layer);
+        }
+        let after = match &self.runs {
+            Runs::One(params) => effect::run(&*self.effect, before, params.clone(), &offered)?,
+            Runs::Driven { by, top, levels } => {
+                let by = regions.selection(by, working)?;
+                self.driven(before, &offered, &by, *top, levels)?
+            }
         };
+        let mask = self
+            .mask
+            .as_ref()
+            .map(|mask| regions.selection(mask, working))
+            .transpose()?;
+        Ok(self.lay(before, after, mask.as_deref()))
+    }
+
+    /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the
+    /// runs of the two levels either side of its value in `by`, linearly; a level none is near is not run.
+    fn driven(
+        &self,
+        before: &Picture<'_>,
+        offered: &Inputs<'_>,
+        by: &Layer,
+        top: u8,
+        levels: &[Value],
+    ) -> Result<Image, Error> {
         let positions: Vec<f32> = by.values().iter().map(|value| value * f32::from(top)).collect();
         let mut mixed = vec![[0.0_f32; 3]; positions.len()];
         for (level, params) in (0..=top).zip(levels) {
@@ -138,19 +165,14 @@ impl Prepared {
         Ok(Image::from_pixels(before.height(), before.width(), mixed))
     }
 
-    /// `after`, the effect's result for `before`, laid over `before` as the step says. A plain step (blend mode
-    /// normal, opacity 1, no mask) is its result as it is, uncopied.
-    pub(super) fn lay(&self, before: &Picture<'_>, after: Image) -> Image {
-        if self.opacity >= 1.0 && self.mask.is_none() && self.blend_mode == BlendMode::Normal {
+    /// `after`, the effect's result for `before`, laid over `before` as the step says: by its blend mode, mixed in by its
+    /// opacity and, where `mask` is given, only as far as the mask says. A plain step (blend mode normal, opacity 1, no
+    /// mask) is its result as it is, uncopied.
+    fn lay(&self, before: &Picture<'_>, after: Image, mask: Option<&Layer>) -> Image {
+        if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
             after
         } else {
-            blend::lay(
-                before,
-                &after.as_picture(),
-                self.blend_mode,
-                self.opacity,
-                self.mask.as_deref(),
-            )
+            blend::lay(before, &after.as_picture(), self.blend_mode, self.opacity, mask)
         }
     }
 }
@@ -249,7 +271,7 @@ mod tests {
         recipe_with_each.regions.insert("panes", Grid::default());
         let result = rendered(&registry, &recipe_with_each, &Presets::new());
         assert!(
-            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("step 1: an `each` step")),
+            matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains("not run by the core yet")),
             "{result:?}"
         );
         Ok(())

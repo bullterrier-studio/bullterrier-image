@@ -8,7 +8,8 @@
 use std::sync::{Mutex, PoisonError};
 
 use bullterrier_image::frame::Flip;
-use bullterrier_image::{Error, Frame, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::region::Band;
+use bullterrier_image::{Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -89,6 +90,54 @@ fn a_size_no_picture_can_have_is_refused_before_the_framed_photo_is_made() -> Re
     assert!(
         peak < IMAGE / 10,
         "the refusal held {peak} bytes, {} pictures",
+        peak / IMAGE
+    );
+    Ok(())
+}
+
+/// The most bytes, beyond the photo's own and its depth map, that `run` holds at once while it works on 8 masked steps,
+/// each masked by a region of its own: a band of the depth.
+fn masked_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Result<usize, Error> {
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+    let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
+    let depth = Layer::new(HEIGHT, WIDTH, vec![0.5_f32; HEIGHT * WIDTH])?;
+    let mut recipe =
+        Recipe::new((0..8).map(|step| Step::new("grade").param("exposure", 0.5).mask(format!("band{step}"))));
+    for step in 0..8 {
+        let band = Band {
+            of: "depth".to_owned(),
+            low: f64::from(step) / 10.0,
+            ..Band::default()
+        };
+        recipe = recipe.with_region(format!("band{step}"), band);
+    }
+    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?).with_map("depth", depth)?;
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    run(&photo, &recipe)?;
+    Ok(HEAP.peak_usage() - before)
+}
+
+#[test]
+fn a_render_holds_the_regions_the_steps_ahead_need_and_not_those_it_has_made() -> Result<(), Error> {
+    // a picture the step reads, the one it makes and the one it is laid into, and the band of the step (a third of a
+    // picture): 3.33 pictures. The band of the step before, kept, would make 3.67 and all 7 before it 5.7
+    let peak = masked_peak(|photo, recipe| photo.render(recipe, &Presets::new(), Options::default()).map(drop))?;
+    assert!(
+        peak <= 7 * IMAGE / 2,
+        "8 masked steps held {peak} bytes, {} pictures",
+        peak / IMAGE
+    );
+    Ok(())
+}
+
+#[test]
+fn a_trace_of_masked_steps_holds_every_picture_which_is_what_the_measurement_must_see() -> Result<(), Error> {
+    // the known-bad of the test above: a run that keeps every picture and every region
+    let peak = masked_peak(|photo, recipe| photo.trace(recipe, &Presets::new(), Options::default()).map(drop))?;
+    assert!(
+        peak >= 8 * IMAGE,
+        "8 masked steps held {peak} bytes, {} pictures",
         peak / IMAGE
     );
     Ok(())

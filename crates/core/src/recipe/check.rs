@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use super::needs::Uses;
+use super::needs::{Use, Uses};
 use super::references::{self, Form};
 use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
@@ -74,9 +74,11 @@ impl Recipe {
             registry,
             presets,
             regions: &self.regions,
+            at: 0,
             uses: Vec::new(),
         };
         for (index, entry) in self.steps.iter().enumerate() {
+            rules.at = index;
             let place = format!("step {}", index + 1);
             match entry {
                 Entry::Step(step) => rules.step(step, &place)?,
@@ -126,8 +128,10 @@ struct Rules<'a> {
     registry: &'a Registry,
     presets: &'a Presets,
     regions: &'a Regions,
-    /// The names of the regions the steps checked so far refer to.
-    uses: Vec<String>,
+    /// The step being checked, counting from 0.
+    at: usize,
+    /// The places the steps checked so far name a region.
+    uses: Vec<Use>,
 }
 
 impl Rules<'_> {
@@ -275,7 +279,12 @@ impl Rules<'_> {
     /// remembered as used.
     fn refer(&mut self, place: &str, key: &str, name: &str, wanted: Option<Form>) -> Result<(), Error> {
         references::refer(self.regions, place, key, name, wanted)?;
-        self.uses.push(name.to_owned());
+        self.uses.push(Use {
+            step: self.at,
+            place: place.to_owned(),
+            key: key.to_owned(),
+            name: name.to_owned(),
+        });
         Ok(())
     }
 }

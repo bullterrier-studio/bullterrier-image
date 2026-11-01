@@ -63,8 +63,16 @@ impl Photo<'_> {
             picture.width(),
             picture.values(),
         )?)];
-        stages.extend(run.subject.take().map(|layer| Stage::Subject(Layer::clone(&layer))));
-        stages.extend(run.depth.take().map(|layer| Stage::Depth(Layer::clone(&layer))));
+        stages.extend(
+            run.regions
+                .held("subject")
+                .map(|layer| Stage::Subject(Layer::clone(&layer))),
+        );
+        stages.extend(
+            run.regions
+                .held("depth")
+                .map(|layer| Stage::Depth(Layer::clone(&layer))),
+        );
         let mut number = 0;
         while let Some(image) = run.advance()? {
             number += 1;

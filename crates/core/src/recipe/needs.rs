@@ -1,6 +1,6 @@
 //! What a recipe asks of the photo it is rendered on: [`Needs`], and the maps its regions can be handed.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use super::region::Subject;
 use super::{Recipe, Region, Regions};
@@ -10,9 +10,21 @@ use crate::{Error, Presets};
 /// (`light`).
 const FOUND: [&str; 2] = ["subject", "depth"];
 
-/// The names of the regions that the steps of a recipe refer to, in the order the checks met them, with repeats.
+/// One place a step of a recipe names a region: a `mask`, a drive's `by`, a field parameter, a `partition`, an `each`.
 #[derive(Debug)]
-pub(crate) struct Uses(pub(super) Vec<String>);
+pub(crate) struct Use {
+    /// The step it is in, counting from 0; the looks of an `each` step count as that step.
+    pub(super) step: usize,
+    /// Where the step is, as `step 2` or `step 2, look 1`.
+    pub(super) place: String,
+    /// The key that names the region: `mask`, `by`, `partition`, `each` or the field parameter's name.
+    pub(super) key: String,
+    pub(super) name: String,
+}
+
+/// The places the steps of a recipe name a region, in the order the checks met them.
+#[derive(Debug)]
+pub(crate) struct Uses(pub(super) Vec<Use>);
 
 /// What rendering a recipe asks of the photo: the maps it must be given or find, and whether it needs a finder to ask
 /// about pieces of it.
@@ -31,41 +43,82 @@ pub struct Needs {
     pub finds_pieces: bool,
 }
 
+/// A region that the steps use, directly or because a region they use is made from it.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct Reach {
+    pub(crate) name: String,
+    /// The first place that uses it, written like "step 2, `mask`"; for a region only used through another, with that
+    /// region's name added, like "step 2, `mask` (through 'near')".
+    pub(crate) place: String,
+    /// The last step (from 0) that uses it or uses a region made from it: when it can be dropped.
+    pub(crate) last: usize,
+}
+
+/// What `name` is made from: `background` from the subject, a declared region from the regions it refers to, nothing
+/// else (the other built-in regions are maps).
+fn made_from<'a>(regions: &'a Regions, name: &str) -> Vec<&'a str> {
+    if name == "background" {
+        return vec!["subject"];
+    }
+    regions.get(name).map_or_else(Vec::new, |region| {
+        region
+            .refers_to()
+            .into_iter()
+            .map(|(_, made_from, _)| made_from)
+            .collect()
+    })
+}
+
 impl Uses {
+    /// Every region these uses reach, in the order they are first reached, each once: one walk that keeps no call
+    /// stack and visits a region once however many paths lead to it (the uses come in step order, so a region already
+    /// reached by this step has had everything it is made from reached too).
+    pub(crate) fn reach(&self, regions: &Regions) -> Vec<Reach> {
+        let mut reached: Vec<Reach> = Vec::new();
+        let mut at: HashMap<&str, usize> = HashMap::new();
+        for used in &self.0 {
+            let place = format!("{}, `{}`", used.place, used.key);
+            let mut todo = vec![used.name.as_str()];
+            while let Some(name) = todo.pop() {
+                match at.get(name) {
+                    Some(&seen) if reached[seen].last == used.step => continue,
+                    Some(&seen) => reached[seen].last = used.step,
+                    None => {
+                        at.insert(name, reached.len());
+                        reached.push(Reach {
+                            name: name.to_owned(),
+                            place: if name == used.name {
+                                place.clone()
+                            } else {
+                                format!("{place} (through '{}')", used.name)
+                            },
+                            last: used.step,
+                        });
+                    }
+                }
+                todo.extend(made_from(regions, name));
+            }
+        }
+        reached
+    }
+
     /// What these uses ask of the photo, given the regions of the recipe and whether its frame needs the subject.
     pub(super) fn needs(&self, regions: &Regions, frame_needs_subject: bool) -> Needs {
         let mut needs = Needs::default();
         if frame_needs_subject {
             needs.maps.insert("subject".to_owned());
         }
-        let mut seen: HashSet<&str> = HashSet::new();
-        let mut todo: Vec<&str> = self.0.iter().map(String::as_str).collect();
-        while let Some(name) = todo.pop() {
-            if !seen.insert(name) {
-                continue;
-            }
-            match (name, regions.get(name)) {
-                // the built-in selections: `background` is the subject upside down
-                ("subject" | "background", _) => {
+        for Reach { name, .. } in self.reach(regions) {
+            match (name.as_str(), regions.get(&name)) {
+                ("subject" | "depth", _) | (_, Some(Region::Given(_))) => {
+                    needs.maps.insert(name);
+                }
+                (_, Some(Region::Subject(Subject { per: None, .. }))) => {
                     needs.maps.insert("subject".to_owned());
                 }
-                ("depth", _) => {
-                    needs.maps.insert("depth".to_owned());
-                }
-                (_, Some(region)) => {
-                    match region {
-                        Region::Given(_) => {
-                            needs.maps.insert(name.to_owned());
-                        }
-                        Region::Subject(Subject { per: None, .. }) => {
-                            needs.maps.insert("subject".to_owned());
-                        }
-                        Region::Subject(Subject { per: Some(_), .. }) => needs.finds_pieces = true,
-                        _ => {}
-                    }
-                    todo.extend(region.refers_to().into_iter().map(|(_, made_from, _)| made_from));
-                }
-                // `light`, which is made from the picture
+                (_, Some(Region::Subject(Subject { per: Some(_), .. }))) => needs.finds_pieces = true,
+                // `background` and the regions made from other regions need what those need; `light` is made from the
+                // picture
                 _ => {}
             }
         }
@@ -339,6 +392,48 @@ mod tests {
             recipe.frame = frame;
             assert_eq!(needs(&recipe)?, (maps, false), "{what}");
         }
+        Ok(())
+    }
+
+    /// The (name, place, last step) of every region `recipe` reaches, in the order they are reached.
+    fn reached(recipe: &Recipe) -> Result<Vec<(String, String, usize)>, Error> {
+        let uses = recipe.check_in(&crate::testing::registry()?, &Presets::new())?;
+        Ok(uses
+            .reach(&recipe.regions)
+            .into_iter()
+            .map(|reach| (reach.name, reach.place, reach.last))
+            .collect())
+    }
+
+    #[test]
+    fn each_region_is_reached_once_with_the_first_place_that_uses_it_and_the_last_step_that_needs_it()
+    -> Result<(), Error> {
+        // step 1 masks by `near` (a band of the depth), step 2 by `subject`, step 3 by `far` (a band of the depth too),
+        // step 4 by `near` again, and step 5 drives a number by `background`
+        let mut recipe = Recipe::new([
+            Step::new("probe").mask("near"),
+            Step::new("probe").mask("subject"),
+            Step::new("probe").mask("far"),
+            Step::new("probe").mask("near"),
+            Step::new("probe").param("cell", json!({"by": "background", "start": 4, "end": 9})),
+        ]);
+        recipe.regions = regions(json!({
+            "near": {"kind": "band", "of": "depth"},
+            "far": {"kind": "band", "of": "depth", "high": 0.5},
+            "unused": {"kind": "band", "of": "light"},
+        }));
+        let place = |name: &str, place: &str, last: usize| (name.to_owned(), place.to_owned(), last);
+        assert_eq!(
+            reached(&recipe)?,
+            [
+                place("near", "step 1, `mask`", 3),
+                // reached through `near`, first at step 1, needed until `far` has been used by step 3 and `near` by step 4
+                place("depth", "step 1, `mask` (through 'near')", 3),
+                place("subject", "step 2, `mask`", 4),
+                place("far", "step 3, `mask`", 2),
+                place("background", "step 5, `by`", 4),
+            ]
+        );
         Ok(())
     }
 
