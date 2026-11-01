@@ -881,7 +881,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   straight on to the nearest. Every kind reads its drawing at the noise-shifted coordinates, so `edge = torn` works on
   all of them. *Reason:* one rule for position and one for borders; a library rasteriser would add a dependency for a
   fill that is a page of numpy.
-- **SVG files are read by `svgelements` (MIT), behind a guard in `core/outlines`.** We never write an SVG reader;
+- **SVG files are read by `svgelements` (MIT), behind a guard in `core/outlines` (the Python engine; the core has its own reader, below).** We never write an SVG reader;
   the library handles shapes, transforms, `use`, arcs and `viewBox`. A shape is a piece: colours and strokes are
   ignored, `display="none"` shapes are skipped, the `fill-rule` is kept, later shapes lie on top, and the area outside
   every shape is one more piece, numbered like any by its first pixel (0 unless the top left pixel is inside a shape). `Pick` takes a number
@@ -899,6 +899,46 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   itself is refused, and nesting deeper than 64 levels (the reader recurses once per level) is refused, each with a
   `RecipeError` naming the limit and its value. A curve that would need more than 1024 chords or a point farther than
   10^7 px is refused (hostile coordinates, never a drawing). *Revisit when* an owner's real file needs more.
+- **The core reads SVG with `roxmltree` and `svgtypes` (8 crates, MIT or Apache-2.0, no new licence), not `usvg`.** Measured
+  on 9 inputs, `usvg` keeps a bad `d` as the prefix before the error (Python refuses it), invents a 5 x 5 size for a file with
+  neither `viewBox` nor `width`/`height` (Python refuses it), and bakes the `viewBox` into its tree, which we would undo; it
+  is 22 crates and adds BSD-3-Clause (`tiny-skia-path`), and we would still need `roxmltree` for the entity scan, the
+  limits and the root refusals. The reader is `ops/svg` (about 1,400 lines with its tests).
+- **Placement is the SVG specification's; four things `svgelements` did differently are not copied.** A nested `<svg x y
+  width height viewBox>` is placed by its own viewBox (`svgelements` applied the offset twice); a `symbol` used with
+  `width`/`height` is scaled to them (ignored); a `symbol` nothing uses is not drawn (drawn in place); a `transform` that
+  is no number is refused (ignored). Also, on purpose: UTF-8 files only (a UTF-16 file is refused, not decoded: no encoding
+  table to trust), lengths are numbers of px (`10cm` and `100%` are refused, not converted), and a rounded `rect`, a
+  circle and an ellipse go through the path parser as arcs, one flattening for all.
+- **Shapes are painted back to front into one raster (the painter's algorithm), with budgets, not a z-order sweep.** A sweep
+  is output-sensitive but three times the code for the case a budget refuses: crossings of edges with scanlines (2^28, all
+  shapes together), painted pixels (2^30, each shape's box clipped to the picture) and corners (2^20) are counted before
+  anything is painted, and a refusal names the limit and the count. The real constants are reviewed, not run; the tests
+  run the same code at a small `Limits`. Shapes are counted (`max_shapes`) before any `use` is expanded, by memoised sizes,
+  so a small file cannot become 10^10 shapes; a `use` that contains itself and nesting past 64 levels (a `use` is the parent
+  of what it uses) are refused.
+- **A torn edge is hashed-lattice value noise sampled by Catmull-Rom, not a port of Python's spline.** Python fits a
+  `RectBivariateSpline` (a global banded solve, a lattice array of points^2 for each octave: 30 GB at octave 7 on a big
+  picture). The core hashes the lattice value from (seed, axis, octave, row, column), so nothing grows with octaves or
+  scale and the same tear is laid on the frame at any size; each axis is standardised to mean 0 and sd 1, so `amount` stays
+  the standard deviation of the shift. The numbers differ from Python's, which no one compares (seeded streams differ by
+  design).
+- **Nearest site: the lower index wins a tie.** `cKDTree` only promised the same answer every time. `ops/nearest` bins the
+  sites in a grid and scans rings round the query's clamped cell; the ring stop is `best <= r * cell`. A honeycomb finer than
+  2^20 points is capped and the rest of the sites drawn at random in the chosen pixels (Python allocated
+  `count x box / chosen` points: unbounded).
+- **Pieces of cuts are numbered by a sparse map.** One bit for each of up to 32 cuts is up to 2^32 kinds; `renumber_sparse`
+  remembers the kinds that occur, not all that could.
+- **Shard presets are embedded from the one data file and expanded when a region is read.** `recipe/region/presets.rs`
+  includes `src/bullterrier_image/presets/regions/shards.toml` (one copy, still data); given fields win over the preset's,
+  and a given `edge` replaces the preset's whole `edge`. *Carried to R5:* the crate cannot be published while the file lives
+  outside it; move it into `crates/core` and have the facade read it through the core.
+- **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/limits.rs`):
+  `Shards.count` 500, `Cuts.lines` 32, `Path.samples` 16, `Edge.octaves` 8, `Edge.scale` 480, `Edge.amount` 48, `Grid` shares
+  1000 and 10000 pieces, `Bands.count` 100, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,
+  nodes 2^21, nesting 64, chords 1024, coordinates 10^7 px, corners 2^20, crossings 2^28, painted pixels 2^30. The new regions
+  hold a bend (8 bytes a pixel) and a raster (4) beside the picture, at any size of photo: the pixel limit applies to `size`
+  only, and no cap is added now.
 - The plan and the deferred list of regions (each item with the need that would justify it) are in
   `.superpowers/plans/regions.md`.
 

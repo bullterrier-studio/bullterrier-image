@@ -89,8 +89,14 @@ for every binding). **Regions (R4c):** `Recipe.regions` is an ordered `Regions` 
 (`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
 `Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
 time a step asks (`run/regions.rs`, `Evaluator`) and dropped after the last step that needs it. `each` is `run/each.rs`
-(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). **R4c state:** only the regions `shards`, `cuts`, `path`, `svg` and a
-torn `edge` are refused (`Region::not_yet`, naming the region, before step 1); Python's runner still serves users until R4e.
+(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). **R4d state:** every region kind runs in the core, a torn `edge`
+included. The core opens one file, `Svg.file` (`run/laid.rs`: read through `take(max_kilobytes * 1024 + 1)`; `ops/svg` takes the
+bytes: UTF-8 only, `<!ENTITY` refused before the parser, nothing in the file opened or run), and its limits are `Limits` in
+`ops/outlines` (`Limits::STANDARD`; tests pass a small one). `Pick` by `id` reads the ids an `Svg` made (`Made::Pieces`);
+a relative file path in a recipe file is the loader's to resolve. `Shards.preset` is expanded when the region is read
+(`recipe/region/presets.rs`, from `src/bullterrier_image/presets/regions/shards.toml`). Every user number that drives
+allocation or work has a maximum and a row in `crates/core/tests/limits.rs`; its completeness test fails for a bound of
+`Region::check` with neither a row nor a reason. Python's runner still serves users until R4e.
 Python reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
 `kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
 `core/bridge.py` (`render`/`trace`/`needs`/`known_maps`: a `Recipe` as the dict the core reads, a finder's not-found errors told to the core; no consumer in `src` until R4e). The registry
