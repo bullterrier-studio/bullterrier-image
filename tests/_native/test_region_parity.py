@@ -39,7 +39,7 @@ from bullterrier_image.core.regions import (
 )
 from bullterrier_image.core.runner import Finder
 from bullterrier_image.core.steps import Each, Recipe, Step, references
-from bullterrier_image.errors import DepthNotFoundError, RecipeError, SubjectNotFoundError
+from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.loader import load_recipe
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -395,6 +395,45 @@ def test_a_piece_the_finder_finds_nothing_in_adds_nothing_and_the_others_are_una
         photo, recipe, finders={"subject": Truth(at_least=0.9)}
     )  # a trace asks the finder the same way
     np.testing.assert_array_equal(traced[-1][2], made)
+
+
+@pytest.mark.parametrize(
+    ("raised", "error"),
+    [(SubjectNotFoundError, None), (DepthNotFoundError, DepthNotFoundError), (MapNotFoundError, MapNotFoundError)],
+    ids=["the subject", "the depth", "another map"],
+)
+def test_only_the_subject_not_being_found_leaves_a_piece_empty_the_others_are_the_renders_error(photo, raised, error):
+    class Finds:
+        def find(self, rgb: np.ndarray) -> np.ndarray:
+            raise raised("not in this piece")
+
+    recipe = masked_by("found", **PER_PIECE)
+    if error is None:  # every piece adds nothing: the mask chooses nothing and the photo is as it was
+        np.testing.assert_array_equal(core_render(photo, recipe, finders={"subject": Finds()}), photo)
+        np.testing.assert_array_equal(
+            runner.render(photo, recipe, finders={"subject": Finder("f", Finds().find)}), photo
+        )
+        return
+    with pytest.raises(error, match="not in this piece") as caught:
+        core_render(photo, recipe, finders={"subject": Finds()})
+    assert type(caught.value) is error
+    with pytest.raises(error):  # and so does Python's engine
+        runner.render(photo, recipe, finders={"subject": Finder("f", Finds().find)})
+
+
+def test_an_exception_that_only_looks_like_the_cores_not_found_error_is_a_failure_as_any_other(photo):
+    class Looks(ValueError):
+        kind = "subject_not_found"
+
+    raised = Looks("a ValueError with a kind of its own")
+
+    class Finds:
+        def find(self, rgb: np.ndarray) -> np.ndarray:
+            raise raised
+
+    with pytest.raises(Looks) as caught:
+        core_render(photo, masked_by("found", **PER_PIECE), finders={"subject": Finds()})
+    assert caught.value is raised
 
 
 def test_another_failure_of_the_finder_is_the_renders_failure_as_it_was_raised(photo):

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, Options, Photo, Presets, Recipe, Stage};
+use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
 use numpy::{AllowTypeChange, PyArray1, PyArray3, PyArrayLike2, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -218,28 +218,33 @@ impl PyFinder {
         format!("the finder of '{}'", self.name)
     }
 
-    /// The error for what the finder raised: "found nothing" if it is a `CoreError` of one of the not-found kinds (the
-    /// map is missing, as for any map nobody gave, with the finder's own words), else the exception itself, to come
-    /// back as it was.
+    /// The error for what the finder raised: "found nothing" if it is a `CoreError` of one of the not-found kinds, as the
+    /// error of that kind (the finder's own words, the kind it said: only the subject's is a piece with no subject in it),
+    /// else the exception itself, to come back as it was.
     fn failed(&self, py: Python<'_>, raised: PyErr) -> Error {
+        const NOT_FOUND: [(ErrorKind, MapKind); 3] = [
+            (ErrorKind::SubjectNotFound, MapKind::Subject),
+            (ErrorKind::DepthNotFound, MapKind::Depth),
+            (ErrorKind::MapNotFound, MapKind::Other),
+        ];
         let value = raised.value(py);
-        let nothing = raised.is_instance_of::<CoreError>(py)
-            && value
-                .getattr("kind")
-                .and_then(|kind| kind.extract::<String>())
-                .is_ok_and(|kind| {
-                    [
-                        ErrorKind::SubjectNotFound,
-                        ErrorKind::DepthNotFound,
-                        ErrorKind::MapNotFound,
-                    ]
+        let said = raised
+            .is_instance_of::<CoreError>(py)
+            .then(|| value.getattr("kind").and_then(|kind| kind.extract::<String>()).ok())
+            .flatten()
+            .and_then(|said| {
+                NOT_FOUND
                     .iter()
-                    .any(|not_found| not_found.name() == kind)
-                });
-        if nothing {
-            Error::map_not_found(&self.name, value.to_string())
-        } else {
-            Error::foreign(self.who(), raised)
+                    .find(|(kind, _)| kind.name() == said)
+                    .map(|(_, map)| *map)
+            });
+        match said {
+            Some(kind) => Error::MapNotFound {
+                map: self.name.clone(),
+                kind,
+                message: value.to_string(),
+            },
+            None => Error::foreign(self.who(), raised),
         }
     }
 }
