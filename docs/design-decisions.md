@@ -597,8 +597,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     any step; the pictures as given are only what a finder is asked about), not from a step's output. `background` is 1 - `subject`.
   - *`render` and `trace` are one engine* (`Run::advance` replaces the newest image), so the last stage of a trace is
     `render`'s result byte for byte and `render` keeps only the newest image, by construction. `Stage` is a flat
-    `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`, and from R4b `CutOut`); labels are the facade's, since they come
-    from Python's `describe()`.
+    `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`, from R4b `CutOut`, from R4c `Selection` and `Partition`
+    for each region the steps use); labels are the facade's, since they come from Python's `describe()`.
   - *Errors keep their class.* `Error::kind()` (`ErrorKind`) is the one mapping onto the package's exceptions. The extension,
     a leaf that cannot import `errors`, raises `_core.CoreError(ValueError)` with a `kind`; one function (`native.entry`) wraps
     every entry point and raises the exception of the kind (`other` stays the `CoreError`; a kind it lacks is a `KeyError`: the
@@ -614,8 +614,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *ClipColor deviates from the W3C text.* The `color` mode's ClipColor pulls toward the luminosity `SetLum` set instead of
     recomputing `Lum(C)`: equal in exact arithmetic, but in `f32` a black backdrop under a grey source made 0 / 0 (NaN).
     Found by a property test; pinned by a row of the reference table.
-  - *Not yet:* a step that takes a partition fails with `Error::Inputs` (a plain `ValueError`) until R4c adds partitions;
-    no `Photo::render_all` (the unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes needs
+  - *Not yet:* no `Photo::render_all` (the unknown-map check is per recipe, so a photo carrying the `given` maps of several recipes needs
     a union check: R4e); `as_image` (uint8/uint16, non-finite) stays Python's.
 - **Framing, size and the cut-out are Rust (R4b).** A recipe's `frame` and `size` are run by the core; Python's runner still
   serves users until R4e, and the parity tests hold the core to it. Decisions:
@@ -646,6 +645,41 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     shorter side), a float32 pixel-centre signed distance with a one-pixel soft edge.
   - *Memory is measured.* `crates/core/tests/memory.rs` counts the heap (dev-dependency `peak_alloc`): render of a 12-step chain
     holds 2 pictures, trace 14.
+- **Regions and `each` are Rust (R4c).** Python's runner still serves users until R4e; the parity tests hold the core to numpy
+  definitions first and to it second. Decisions:
+  - *Order is data.* `serde_json` and `toml` keep file order (`preserve_order`; `Zlib` is allowed in `deny.toml` for `foldhash`,
+    which serde_json then hashes with); `Regions` is an ordered list. *Reason:* the order regions are declared in is the order a
+    trace shows them and the order a refusal names the first offender, for a TOML file and a Python dict alike.
+  - *Regions are typed and a kind is required.* `Region` is an enum of 13 documented structs, not a table; ranges are hand-written
+    in `Region::check` (the `Params` macro knows `f32`, `i32`, `bool`, `Color` and choices only) and held to Python's by a table.
+    A region without `kind` fitted every Python kind and `Given()` dumped `{}`: the canonical form names the kind. A grid's
+    shares are written as the list (`3` reads as `[1, 1, 1]`).
+  - *References are walked once.* `Recipe::checked` types every place a region is named (a selection for `mask`, `by`, fields,
+    `fit`, `of`; a partition for `each`, `Pick.of`, `Subject.per`), refuses cycles (iteratively: a 5,000-link chain overflows no
+    stack) and names the closest region for a misspelt one. The same walk gives `Recipe::needs` (one struct, instead of Python's
+    `maps_needed`, `needs_finder` and `derived_maps`) and when each region is last used. A preset can set a field parameter, so
+    `needs` takes the presets.
+  - *Maps up front, regions on demand, dropped after their last use.* A missing map or an unfit finder answer fails before step 1;
+    any other region is made when its step comes and released after the last step that uses it or a region made from it, so a
+    render holds the regions the steps ahead need, not all it made (measured in `tests/memory.rs`). A region the core cannot make
+    yet, and a `Subject` found per piece with no subject finder, are refused before step 1, which Python did at first use.
+  - *Precision follows the data.* `Band` and `Combine` work in `f32` with the parameters narrowed to `f32` first, as NumPy does
+    with float32 maps (a depth of `f32(0.7)` is inside a band from 0.7; a double comparison would drop it); `Bands` and `Grid`
+    work in `f64`; gradients are computed in `f64` and narrowed once (within 1e-7 of Python's `f32`).
+  - *A subject found per piece asks the finder uncached*, about the crop of each piece grown by `context`; the answer for the
+    whole photo is no stand-in. "Found nothing" is the finder's not-found error: the piece adds nothing. The facade turns the
+    package's not-found errors into a `CoreError` of that kind, so a finder's not-found error now comes back rebuilt (same class and
+    text), not as the same object; every other exception still comes back as it was.
+  - *`each` holds one look at a time.* A look that has a piece is run once over the whole picture and added as
+    `weight x (look - before)`; the weights of all looks and of the pieces left as they were add up to 1. The Gaussian
+    (`feather` design px times the ratio) is the direct separable kernel of scipy (radius `int(4 sigma + 0.5)`, edge repeated),
+    in place, and a pixel whose window is one run of equal values skips the sum, so cost follows the borders. *Rejected:* FFT
+    or an IIR approximation (E2): the direct kernel equals scipy, which parity and an independent oracle need.
+  - *Random streams are new.* `assign = "random"` draws with xoshiro256++ seeded through SplitMix64 (`ops/random`; Lemire's
+    unbiased bounded draw): the same seed gives the same picture, not the picture NumPy's generator gave. Published vectors
+    pin the generators; the assignment is tested by properties.
+  - *A trace shows the regions the steps use*, after the maps and before the steps, in declaration order, made before step 1;
+    it fails where the render fails and ends in the picture the render makes.
 - **During the migration an `ops` function may exist twice.** A Python `ops` function still used by unported effects
   stays while its Rust twin serves ported ones (`srgb_to_linear`, `luminance`); the Python copy is deleted with its
   last Python user (`linear_to_srgb` went with `grade`). *Reason:* porting by payoff, a batch at a time, without

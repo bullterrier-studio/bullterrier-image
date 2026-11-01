@@ -74,7 +74,8 @@ and loader still validate and run recipes until R4e makes them a facade over the
 **The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
 a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; asked at most once per photo);
 `photo.render(&Recipe, &Presets, Options)` and `photo.trace(..) -> Vec<Stage>` run one engine (`Stage`: `Input`, `Subject`,
-`Depth`, `Step { number, image }`, `CutOut(image)`; labels are the facade's). The recipe's `frame` (typed `Frame`, checked by
+`Depth`, `Selection { name, layer }`, `Partition { name, labels }` (each region the steps use, in declaration order),
+`Step { number, image }`, `CutOut(image)`; numbered-piece drawing and labels are the facade's). The recipe's `frame` (typed `Frame`, checked by
 `Recipe::checked`) frames the photo and its maps first (flip, turn, crop, borders: `ops/frame`, `ops/rotate`, one `Geometry`
 planned from the shape and the subject, applied to each plane), then `Options::with_size` or the recipe's `size` resamples them
 (`ops/resample`); the ratio of design px (480 on the longest side) is derived from that working picture, never passed in. Each
@@ -83,11 +84,15 @@ the result is laid over its input by `ops/blend` (blend mode, opacity, mask), an
 (`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
 `channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
 0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
-for every binding). **R4b state:** only an `each` step, a step that takes a partition and a region other than `given` are refused
-with an error saying so; Python's runner still serves users until R4e.
+for every binding). **Regions (R4c):** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
+(`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
+`Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
+time a step asks (`run/regions.rs`, `Evaluator`) and dropped after the last step that needs it. `each` is `run/each.rs`
+(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). **R4c state:** only the regions `shards`, `cuts`, `path`, `svg` and a
+torn `edge` are refused (`Region::not_yet`, naming the region, before step 1); Python's runner still serves users until R4e.
 Python reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
 `kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
-`core/bridge.py` (`render`/`trace`: a `Recipe` as the dict the core reads; no consumer in `src` until R4e). The registry
+`core/bridge.py` (`render`/`trace`/`needs`/`known_maps`: a `Recipe` as the dict the core reads, a finder's not-found errors told to the core; no consumer in `src` until R4e). The registry
 mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture` or
 `Lut` parameter travels as `{"$object": n}` (`registry.holding`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
