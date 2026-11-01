@@ -24,7 +24,7 @@ from bullterrier_image.errors import (
 from bullterrier_image.ops.image import as_image
 
 from . import native, registry
-from .finder import check_map, find_map
+from .finder import answered, check_map, find_map
 from .steps import MAX_SIZE, Recipe, recipe_dict
 
 Stage = tuple[str, int | str | None, np.ndarray]  # (kind, step number or region name, picture or map); see `trace`
@@ -195,14 +195,14 @@ def _missing(name: str, recipe: Recipe) -> MapNotFoundError:
 class _Finds:
     """A finder as the core asks it, about the crop of a piece: one that finds nothing, by raising a `MapNotFoundError`,
     raises the `CoreError` that says so (the core must tell "found nothing" from a failure); an answer that is no map
-    of the crop is a failure, raised as it is."""
+    of the crop (none at all, the wrong size, values outside 0..1) is a failure, raised as it is."""
 
     def __init__(self, finder: Any) -> None:
         self._finder = finder
 
-    def find(self, rgb: np.ndarray) -> np.ndarray | None:
+    def find(self, rgb: np.ndarray) -> np.ndarray:
         try:
             answer = self._finder.find(rgb)
         except MapNotFoundError as error:
             raise native.found_nothing(error) from error
-        return answer if answer is None else check_map("subject", answer, rgb)  # None: the core says so
+        return answered("subject", answer, rgb)

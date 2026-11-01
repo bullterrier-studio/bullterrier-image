@@ -12,7 +12,7 @@ import numpy as np
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
 from bullterrier_image.ops.maps import map_problem
 
-__all__ = ["Finder", "check_map", "find_map"]
+__all__ = ["Finder", "answered", "check_map", "find_map"]
 
 
 @dataclass(frozen=True)
@@ -61,14 +61,18 @@ def check_map(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     return layer
 
 
-def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
-    """Ask `finder` for the map `name` ("subject", "depth" or a given map's name) of the photo `rgb` and return it,
-    checked (`check_map`). The map's error if the finder returned None: a finder must answer or raise, and carrying on
-    would drop the map without a word."""
-    answer = finder.find(rgb)
+def answered(name: str, answer: np.ndarray | None, rgb: np.ndarray) -> np.ndarray:
+    """`answer`, what a finder gave for the map `name` of the photo `rgb`, checked (`check_map`). The map's error
+    if it is None: a finder must answer or raise, and carrying on would drop the map without a word."""
     if answer is None:
         raise _error(name)(
             f"the finder of {name!r} returned None: it must return the {_WHAT.get(name, f'{name} map')} (float32, the "
             "photo's height and width, 0..1) or raise when it finds none"
         )
     return check_map(name, answer, rgb)
+
+
+def find_map(name: str, finder: Finder, rgb: np.ndarray) -> np.ndarray:
+    """Ask `finder` for the map `name` ("subject", "depth" or a given map's name) of the photo `rgb` and return it,
+    checked (`answered`)."""
+    return answered(name, finder.find(rgb), rgb)

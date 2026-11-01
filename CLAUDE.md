@@ -193,7 +193,8 @@ An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imagei
 @effect(category="light", params=BloomParams)  # category is one of CATEGORIES
 def bloom(rgb: np.ndarray, params: BloomParams) -> np.ndarray: ...
 ```
-It returns the same shape, is deterministic, never modifies its input, and works with every parameter at its documented minimum
+It returns a finite float32 array of the same shape (another dtype or a NaN is a broken effect: the core refuses it with a
+`ValueError` naming the effect, and nothing casts it for you), is deterministic, never modifies its input, and works with every parameter at its documented minimum
 and maximum. A map it works from (the subject, the depth, a region) is a field parameter (see "Parameters"), never an
 input. The injected inputs, declared only if needed: `partition` (piece labels of a region, `(h, w)` int32) and `size_ratio`
 (float, working px per design px, default 1.0: declare it only if light or density is per working pixel). Contract tests

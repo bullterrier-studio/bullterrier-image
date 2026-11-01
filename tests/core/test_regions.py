@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image import RecipeError
+from bullterrier_image import RecipeError, SubjectNotFoundError
 from bullterrier_image.core.params import EffectParams, FieldName, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.recipe import (
@@ -626,3 +626,27 @@ def test_an_svg_gives_a_piece_for_each_shape_of_a_real_file_and_one_for_the_outs
     pieces = shown({"m": Svg(file=MOSAIC)}, "m", (240, 360))
     assert_a_region(pieces, (240, 360))
     assert pieces.max() + 1 > 5
+
+
+def test_a_piece_the_finder_finds_nothing_in_adds_nothing_but_one_it_answers_none_for_is_an_error(photo):
+    recipe = Recipe(
+        [Step("grade", params={"exposure": 1}, mask="found")],
+        name="per piece",
+        size=None,
+        regions={"cells": Grid(columns=2, rows=2), "found": Subject(per="cells", context=0)},
+    )
+    asked = []
+
+    def finds_all_but_the_first(crop):
+        asked.append(crop.shape)
+        if len(asked) == 1:
+            raise SubjectNotFoundError("nothing in this piece")
+        return np.ones(crop.shape[:2], np.float32)
+
+    made = render(photo, recipe, finders={"subject": Finder("stand-in", finds_all_but_the_first)})
+    assert len(asked) == 4
+    top_left = (slice(0, 48), slice(0, 64))  # the piece asked about first: nothing found, so as it was
+    np.testing.assert_array_equal(made[top_left], photo[top_left])
+    assert (made[48:] != photo[48:]).any()
+    with pytest.raises(SubjectNotFoundError, match="returned None"):
+        render(photo, recipe, finders={"subject": Finder("stand-in", lambda crop: None)})  # type: ignore[arg-type,return-value]  # broken on purpose

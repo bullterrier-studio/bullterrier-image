@@ -34,11 +34,13 @@ package that fails to import stops that query with a `BullterrierImageError` nam
 `BT_IMAGE_PLUGINS=builtin` loads only bullterrier-image's own effects.
 
 The contract: an effect is a pure function of a float32 RGB image `(h, w, 3)` in 0..1 and its parameter model, returning
-a new image of the same shape, deterministic (randomness from a `seed` field), never modifying its input. Every
-parameter is a `param` field with a description; a number also has a unit (px, fraction, degrees...; an unknown one is
-refused naming the valid ones) and an inclusive range holding its default. `category` is one of `CATEGORIES`. Mistakes
-in a definition raise when the module is imported. An effect that works from a map (the subject's silhouette, the depth,
-a region) has a field parameter, `field: FieldName = param("subject", doc=...)`, and receives the map as the
+a new finite float32 image of the same shape (the core refuses another dtype or a NaN, as a broken effect, with a
+`ValueError` naming the effect: cast with `.astype(np.float32)` yourself), deterministic (randomness from a `seed`
+field), never modifying its input. Every parameter is a `param` field with a description; a number also has a unit
+(px, fraction, degrees...; an unknown one is refused naming the valid ones) and an inclusive range holding its default.
+`category` is one of `CATEGORIES`. Mistakes in a definition raise when the module is imported. An effect that works
+from a map (the subject's silhouette, the depth, a region) has a field parameter,
+`field: FieldName = param("subject", doc=...)`, and receives the map as the
 keyword-only argument of that name, without a default (`*, field: np.ndarray`, float32 (h, w), 0..1); one that draws
 along the borders of a partition declares `*, partition: np.ndarray | None = None` (int32 piece numbers, one per pixel,
 0..n-1 in piece order: reading order, `bands` highest first; a step names the region with its `partition` key). An

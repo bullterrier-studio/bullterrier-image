@@ -226,7 +226,8 @@ class Step(_Layer):
         `Finder` by map name), including how the subject and the depth are found when the step needs them."""
         # A deliberate upward import (import-linter cannot see a call-time import): the public `render` binds the
         # default subject and depth finders, which live above the core. Importing it here, when called, works in a
-        # fresh process too (an unpickled step in a pool worker); the structural fix is runner-owned default finders.
+        # fresh process too (an unpickled step in a pool worker); the structural fix is default finders found through
+        # entry points.
         render = import_module("bullterrier_image.recipe").render
         return render(photo, self, maps=maps, finders=finders, size=size)
 

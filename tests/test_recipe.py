@@ -237,6 +237,20 @@ def test_an_effect_that_changes_the_image_shape_is_an_error_not_a_silent_mismatc
         assert "(48, 64, 3)" in message
 
 
+def test_an_effect_must_return_a_float32_array_a_float64_one_is_a_broken_effect(photo, throwaway_effects):
+    @effect(category="utilities", params=AmountParams)
+    def float32_for_contract_test(rgb, params):
+        return rgb.copy()
+
+    @effect(category="utilities", params=AmountParams)
+    def float64_for_contract_test(rgb, params):
+        return rgb.astype(np.float64)
+
+    np.testing.assert_array_equal(render(photo, Recipe((Step("float32_for_contract_test"),), size=None)), photo)
+    with pytest.raises(ValueError, match=r"float64_for_contract_test.*must return a float32 ndarray"):
+        render(photo, Recipe((Step("float64_for_contract_test"),), size=None))
+
+
 def test_size_scales_photo_and_matte_together(photo, subject):
     out = render(
         photo,

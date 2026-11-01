@@ -154,13 +154,14 @@ class Grid(_Laid):
         (1.0,),
         doc="How the frame is divided from left to right: a whole number (1 to 1000) of equal columns, or a list of 1 "
         "to 1000 positive numbers, the relative widths ([1, 2, 1] is a narrow, a wide and a narrow column); held as "
-        "that list. A pixel belongs to the column whose range holds its centre; a centre exactly on a border goes to "
-        "the later column. Beyond a `fit` box the outer columns run to the picture's edge.",
+        "that list. `columns` x `rows` make at most 10000 pieces. A pixel belongs to the column whose range holds its "
+        "centre; a centre exactly on a border goes to the later column. Beyond a `fit` box the outer columns run to "
+        "the picture's edge.",
     )
     rows: Annotated[tuple[float, ...], BeforeValidator(_as_shares)] = param(
         (1.0,),
         doc="How the frame is divided from top to bottom: as `columns` (a whole number 1 to 1000, or a list of 1 to "
-        "1000 positive relative heights). Pieces are numbered row after row.",
+        "1000 positive relative heights; at most 10000 pieces with the columns). Pieces are numbered row after row.",
     )
 
     @field_validator("columns", "rows")
