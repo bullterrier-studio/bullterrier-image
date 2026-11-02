@@ -166,12 +166,13 @@ def to_pil(image: np.ndarray) -> Image.Image:
 
 
 def from_pil(img: Image.Image) -> np.ndarray:
-    """Convert a Pillow image to RGB float32 0..1: its 8-bit levels over 255, after Pillow's own conversion to RGB.
+    """Convert a Pillow image to RGB float32 0..1: Pillow's own conversion to RGBA, then the 8-bit levels over 255.
 
     Transparency (an alpha channel, a transparent palette entry or colour key) is composited over white, so a colour
-    hidden under a transparent pixel never shows. No embedded ICC profile is applied and 16-bit or floating-point modes
-    are not supported (Pillow converts or refuses them): to read a file as a viewer shows it, with its profile and
-    full precision, use `load`.
+    hidden under a transparent pixel never shows. No colour profile is applied, and only 8-bit modes are supported
+    (RGB, RGBA, L, LA, 1, P, CMYK converted by Pillow's plain formula): Pillow clips the levels of a 16-bit or float
+    image to 0..255 on conversion, which gives wrong colours, not an error. To read a file as a viewer shows it, with
+    its profile and full precision, use `load`.
     """
     rgba = np.asarray(img.convert("RGBA"), np.float32) / _EIGHT_BIT
     alpha = rgba[..., 3:]

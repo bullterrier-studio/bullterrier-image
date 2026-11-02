@@ -87,6 +87,47 @@ def test_every_pixel_format_loads_as_the_colours_a_viewer_shows(tmp_path, suffix
     np.testing.assert_allclose(rgb[0], [np.broadcast_to(value, 3) for value in expected], atol=1e-6)
 
 
+def palette_over_white(**info) -> Image.Image:
+    return palette_row([0, 1], [(255, 0, 0), (0, 0, 255)], **info)
+
+
+FROM_PIL = [  # (picture, expected RGB per pixel, by hand): what `from_pil` gives for a Pillow image of each 8-bit mode
+    pytest.param(row([(255, 0, 0), (0, 102, 255)], np.uint8), [(1, 0, 0), (0, 0.4, 1)], id="RGB"),
+    pytest.param(row([0, 51], np.uint8), [(0, 0, 0), (0.2, 0.2, 0.2)], id="L"),
+    pytest.param(row([False, True], bool), [0, 1], id="1-bit"),
+    pytest.param(palette_over_white(), [(1, 0, 0), (0, 0, 1)], id="P"),
+    pytest.param(palette_over_white(transparency=0), [1, (0, 0, 1)], id="P, transparent index over white"),
+    pytest.param(
+        row([(255, 0, 0, 0), (255, 0, 0, 128), (0, 0, 255, 255)], np.uint8, "RGBA"),
+        [1, (1, 127 / 255, 127 / 255), (0, 0, 1)],
+        id="RGBA over white",
+    ),
+    pytest.param(row([(0, 0), (0, 51)], np.uint8, "LA"), [1, 0.8], id="LA over white"),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("picture", "expected"), FROM_PIL)
+def test_from_pil_gives_the_8_bit_levels_with_transparency_over_white(picture, expected):
+    rgb = imageio.from_pil(picture)
+    assert rgb.dtype == np.float32
+    assert rgb.shape == (1, len(expected), 3)
+    np.testing.assert_allclose(rgb[0], [np.broadcast_to(value, 3) for value in expected], atol=1e-6)
+
+
+def test_from_pil_applies_no_colour_profile_where_load_does(tmp_path):
+    grey = Image.fromarray(np.array([[128]], np.uint8))
+    grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())
+    with Image.open(tmp_path / "linear.png") as opened:
+        np.testing.assert_allclose(imageio.from_pil(opened), 128 / 255, atol=1e-6)  # as stored
+    assert imageio.load(tmp_path / "linear.png")[0, 0, 0] > 0.7  # load applies the profile
+
+
+def test_from_pil_clips_a_16_bit_level_it_does_not_support_instead_of_refusing_it():
+    """Documented limit: Pillow's conversion saturates 16-bit levels at white, so use `load` for them."""
+    half = row([32768], np.uint16)
+    np.testing.assert_allclose(imageio.from_pil(half), 1.0)
+
+
 def test_the_colour_under_a_transparent_pixel_never_shows(tmp_path):
     hidden = np.zeros((4, 6, 4), np.uint8)
     hidden[..., :3] = np.random.default_rng(3).integers(0, 256, (4, 6, 3))  # any colour, alpha 0 everywhere
