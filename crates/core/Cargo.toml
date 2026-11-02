@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 bullterrier-image-derive.workspace = true
+image.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
 serde.workspace = true

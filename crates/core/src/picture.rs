@@ -105,9 +105,9 @@ impl<'a> Picture<'a> {
 
 /// An image an effect made, of the size of the picture it read: pixel after pixel, row after row, three channels each.
 ///
-/// A render can end in an image with a fourth channel, alpha (0 transparent, 1 opaque; straight, the colour not
-/// multiplied by it): the recipe's `frame.transparent` cut-out, made after the last step. An effect never sees one:
-/// what it reads is a [`Picture`], whose colour channels are all of it.
+/// An image can have a fourth channel, alpha (0 transparent, 1 opaque; straight, the colour not multiplied by it): a
+/// file read with transparency ([`read`](crate::read), [`Image::rgba`]), or a render's `frame.transparent` cut-out, made
+/// after the last step. An effect never sees one: what it reads is a [`Picture`], whose colour channels are all of it.
 #[derive(Clone, PartialEq)]
 pub struct Image {
     height: usize,

@@ -17,6 +17,8 @@ publish = false
 [workspace.dependencies]
 bullterrier-image = { path = "crates/core" }
 bullterrier-image-derive = { path = "crates/derive" }
+# the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
 numpy = "0.30"
 peak_alloc = "0.3"
 proc-macro2 = "1"

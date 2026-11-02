@@ -3,8 +3,13 @@
 //! reads are hostile ones, written to a folder of the test's own. Limits whose real value cannot be reached in a test
 //! (crossings, painted pixels) are reviewed, not run.
 //!
+//! The pixels of an image file (`read`) are one more row of the same kind: a PNG that claims the most is read as far as its
+//! missing data, one that claims a pixel more is refused from its header (`a_file_of_the_most_pixels_...`).
+//!
 //! Not run, and why: the 100 MB file of `max_kilobytes` and the 2^21 nodes of `Limits::nodes` are rows only where they
 //! finish in a few seconds (see `a_file_of_the_most_kilobytes_is_read` and `a_file_of_the_most_nodes_is_parsed`).
+
+mod common;
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -649,6 +654,38 @@ fn nothing_in_a_file_is_opened_not_an_image_a_link_or_a_use_of_another_file() ->
            <use href="{path}#shape"/><a href="{path}">{RECT}</a><style>@import url({path});</style><script href="{path}"/>"#
     ));
     assert!(read_standard(&folder, links).is_ok());
+    Ok(())
+}
+
+/// The most pixels of an image file: twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485, worked out here, not read from the
+/// core. The files are PNG headers that claim a size as one row of that many pixels and hold no pixel.
+#[test]
+fn a_file_of_the_most_pixels_is_read_as_far_as_its_data_and_one_pixel_more_is_refused_from_its_header() -> Outcome {
+    const MOST: u32 = 2 * 89_478_485;
+    let folder = Folder::new()?;
+    for (width, refused_for_size) in [(MOST, false), (MOST + 1, true)] {
+        let path = folder.write("wide.png", common::files::png_claiming(width, 1))?;
+        let path = std::path::Path::new(&path);
+        let results = [
+            bullterrier_image::read(path).map(drop),
+            bullterrier_image::read_map(path).map(drop),
+        ];
+        for result in results {
+            // at the most the file is past the check and fails for its missing data; one past it fails for its size
+            let message = result.as_ref().err().map(ToString::to_string).unwrap_or_default();
+            assert_eq!(
+                result.as_ref().err().map(Error::kind),
+                Some(ErrorKind::ImageRead),
+                "{width}: {result:?}"
+            );
+            assert!(message.contains("wide.png"), "{width}: {message}");
+            assert_eq!(
+                message.contains("more than the 178956970"),
+                refused_for_size,
+                "{width}: {message}"
+            );
+        }
+    }
     Ok(())
 }
 
