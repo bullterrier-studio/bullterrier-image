@@ -22,7 +22,7 @@ A pipeline is described by a small project file, `bt-image.toml` (`init_project`
     [export]
     formats = ["jpg"]       # jpg, png or webp
     sizes   = [2048, 1080]  # longest side in px; empty = the size the recipe renders at
-    quality = 92
+    quality = 92            # jpg only: png and webp are lossless
     steps   = false         # true: also save the picture after every step, to see what each one did
 
     [checks]
@@ -102,7 +102,7 @@ class Project:
         folder of that name). recipes: recipe files, or `Recipe` objects built in code, at least one. output: the folder
         everything is written to.
     formats: how stills are saved, one or more of jpg, png, webp. sizes: longest sides in px (each >= 16) of smaller
-        copies; empty = as rendered. quality: 1..100, for jpg and webp.
+        copies; empty = as rendered. quality: 1..100, for jpg only (png and webp are lossless).
     subject_share: (low, high), within 0..1: a cut-out covering less or more of the photo is flagged.
     steps: also save the picture after every step.
     """
@@ -710,7 +710,7 @@ output  = "out"                                               # results, plus in
 [export]
 formats = ["jpg"]       # jpg, png or webp
 sizes   = []            # longest side(s) in px, e.g. [2048, 1080]; empty = the size each recipe renders at
-quality = 92
+quality = 92            # jpg only: png and webp are lossless
 
 [checks]                # problems are reported as warnings; they never stop an export
 subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
