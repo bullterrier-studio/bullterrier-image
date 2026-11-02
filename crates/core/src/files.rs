@@ -1,4 +1,4 @@
-//! Reading image files.
+//! Reading and writing image files.
 
 use std::fmt::Display;
 use std::fs::File;
@@ -17,6 +17,9 @@ use icc::{Model, Profile};
 
 mod icc;
 mod raw;
+mod write;
+
+pub use write::{write, write_with_quality};
 
 /// The most pixels (width times height) a file may hold to be read: twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485,
 /// its decompression-bomb limit, so what the Python package read stays readable. Checked from the file's header,

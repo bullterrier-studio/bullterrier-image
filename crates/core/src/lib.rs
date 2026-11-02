@@ -54,7 +54,7 @@ mod run;
 
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
-pub use files::{read, read_map};
+pub use files::{read, read_map, write, write_with_quality};
 pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};

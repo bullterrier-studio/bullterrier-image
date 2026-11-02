@@ -194,6 +194,11 @@ impl Image {
         }
     }
 
+    /// The alpha of each pixel, row after row, if the image has any.
+    pub(crate) fn alpha(&self) -> Option<&[f32]> {
+        self.alpha.as_deref()
+    }
+
     /// The number of rows.
     #[must_use]
     pub fn height(&self) -> usize {

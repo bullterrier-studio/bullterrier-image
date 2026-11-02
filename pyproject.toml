@@ -82,6 +82,7 @@ cache-keys = [
     { file = "crates/**/*.rs" },
     { file = "crates/**/Cargo.toml" },
     { file = "crates/core/build.rs" },
+    { file = "crates/core/data/*" },
 ]
 
 # Read by tools/check_dists.py (`poe build-check`, and CI's build of every platform's wheel): each wheel holds exactly

@@ -317,3 +317,31 @@ pub(crate) fn tiff_palette() -> Vec<u8> {
     file.extend((0..768_u16).flat_map(|index| (index * 85).to_le_bytes())); // any colours
     file
 }
+
+/// An EXIF block (a TIFF structure) of a phone's photo: the maker `PhoneMaker` and a GPS block naming a latitude and a
+/// longitude reference, so a reader that keeps metadata has something to keep.
+pub(crate) fn exif_geotagged() -> Vec<u8> {
+    let entry = |tag: u16, kind: u16, count: u32, value: [u8; 4]| {
+        [
+            tag.to_le_bytes().as_slice(),
+            &kind.to_le_bytes(),
+            &count.to_le_bytes(),
+            &value,
+        ]
+        .concat()
+    };
+    let (ascii, long) = (2, 4);
+    let make_at: u32 = 8 + 2 + 2 * 12 + 4; // the maker's text follows the first directory
+    let gps_at: u32 = make_at + 12; // and the GPS directory the text (11 bytes, padded to 12)
+    let mut tiff = vec![b'I', b'I', 42, 0, 8, 0, 0, 0];
+    tiff.extend_from_slice(&2_u16.to_le_bytes());
+    tiff.extend(entry(0x010F, ascii, 11, make_at.to_le_bytes())); // Make
+    tiff.extend(entry(0x8825, long, 1, gps_at.to_le_bytes())); // the GPS directory
+    tiff.extend_from_slice(&[0; 4]); // no next directory
+    tiff.extend_from_slice(b"PhoneMaker\0\0");
+    tiff.extend_from_slice(&2_u16.to_le_bytes());
+    tiff.extend(entry(1, ascii, 2, [b'N', 0, 0, 0])); // GPSLatitudeRef
+    tiff.extend(entry(3, ascii, 2, [b'W', 0, 0, 0])); // GPSLongitudeRef
+    tiff.extend_from_slice(&[0; 4]);
+    tiff
+}
