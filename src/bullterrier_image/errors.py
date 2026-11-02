@@ -14,6 +14,7 @@ __all__ = [
     "BullterrierImageError",
     "DepthNotFoundError",
     "ImageReadError",
+    "ImageWriteError",
     "InvalidImageError",
     "LutError",
     "MapNotFoundError",
@@ -84,6 +85,11 @@ class BackendUnavailableError(BullterrierImageError, NotImplementedError):
 
 class ImageReadError(BullterrierImageError, OSError):
     """A file could not be read as an image: missing, not an image, truncated, or too large to decode safely."""
+
+
+class ImageWriteError(BullterrierImageError, OSError):
+    """A file could not be written as an image: the folder is missing, the path is not writable, or the picture is too
+    large for the format. The message names the path."""
 
 
 class LutError(BullterrierImageError, ValueError):

@@ -45,6 +45,14 @@ fn rows() -> Vec<(Error, ErrorKind)> {
             Error::ImageRead("cannot read a.png as an image: damaged".to_owned()),
             ErrorKind::ImageRead,
         ),
+        (
+            Error::ImageWrite("cannot write a.png: no such folder".to_owned()),
+            ErrorKind::ImageWrite,
+        ),
+        (
+            Error::BackendUnavailable("cannot write '.bmp' pictures".to_owned()),
+            ErrorKind::BackendUnavailable,
+        ),
         (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
         (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
         (Error::foreign("fx", "broke"), ErrorKind::Other),

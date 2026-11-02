@@ -21,6 +21,8 @@ use crate::params::Scalar;
 /// | [`Error::InvalidImage`], [`Error::Size`] | `InvalidImage` | `InvalidImageError` |
 /// | [`Error::NonFinite`] | `NonFiniteImage` | `NonFiniteImageError` |
 /// | [`Error::ImageRead`] | `ImageRead` | `ImageReadError` |
+/// | [`Error::ImageWrite`] | `ImageWrite` | `ImageWriteError` |
+/// | [`Error::BackendUnavailable`] | `BackendUnavailable` | `BackendUnavailableError` |
 /// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
 ///
 /// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
@@ -58,6 +60,12 @@ pub enum Error {
     /// A file could not be read as an image: missing, a folder, not an image, damaged, of a layout the core does not
     /// read, or larger than the core decodes. The text names the path and the reason.
     ImageRead(String),
+    /// A file could not be written: the folder is missing, the path unwritable, or the picture too large for the format.
+    /// The text names the path and the reason.
+    ImageWrite(String),
+    /// The core cannot do what was asked with this format: it writes no file of this extension, or the format holds no
+    /// transparency. The text names the extension and what to use instead. Nothing was written.
+    BackendUnavailable(String),
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
         /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
@@ -83,7 +91,8 @@ pub enum Error {
         source: serde_json::Error,
     },
     /// An effect was given inputs that do not fit: one it declares is missing, or a partition or map is not of the
-    /// picture's size, or a map or partition has values it must not.
+    /// picture's size, or a map or partition has values it must not. Also an option of a call outside its range (the
+    /// quality of `write_with_quality`).
     Inputs(String),
     /// Channel values that do not make a picture of the given size (three per pixel), or a size with no row or no column.
     Size {
@@ -128,6 +137,10 @@ pub enum ErrorKind {
     NonFiniteImage,
     /// A file could not be read as an image.
     ImageRead,
+    /// A file could not be written.
+    ImageWrite,
+    /// The core writes no file of that format.
+    BackendUnavailable,
     /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
     /// error (a `ValueError` in Python).
     Other,
@@ -144,6 +157,8 @@ impl ErrorKind {
         Self::InvalidImage,
         Self::NonFiniteImage,
         Self::ImageRead,
+        Self::ImageWrite,
+        Self::BackendUnavailable,
         Self::Other,
     ];
 
@@ -159,6 +174,8 @@ impl ErrorKind {
             Self::InvalidImage => "invalid_image",
             Self::NonFiniteImage => "non_finite_image",
             Self::ImageRead => "image_read",
+            Self::ImageWrite => "image_write",
+            Self::BackendUnavailable => "backend_unavailable",
             Self::Other => "other",
         }
     }
@@ -228,6 +245,8 @@ impl Error {
             Self::InvalidImage(_) | Self::Size { .. } => ErrorKind::InvalidImage,
             Self::NonFinite(_) => ErrorKind::NonFiniteImage,
             Self::ImageRead(_) => ErrorKind::ImageRead,
+            Self::ImageWrite(_) => ErrorKind::ImageWrite,
+            Self::BackendUnavailable(_) => ErrorKind::BackendUnavailable,
             Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
         }
     }
@@ -297,6 +316,8 @@ impl fmt::Display for Error {
             | Self::InvalidImage(message)
             | Self::NonFinite(message)
             | Self::ImageRead(message)
+            | Self::ImageWrite(message)
+            | Self::BackendUnavailable(message)
             | Self::MapNotFound { message, .. } => formatter.write_str(message),
             Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
@@ -328,6 +349,8 @@ impl std::error::Error for Error {
             | Self::InvalidImage(_)
             | Self::NonFinite(_)
             | Self::ImageRead(_)
+            | Self::ImageWrite(_)
+            | Self::BackendUnavailable(_)
             | Self::Size { .. } => None,
         }
     }

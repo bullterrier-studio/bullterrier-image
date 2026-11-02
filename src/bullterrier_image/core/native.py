@@ -12,9 +12,11 @@ from collections.abc import Callable
 
 from bullterrier_image._native import _core
 from bullterrier_image.errors import (
+    BackendUnavailableError,
     BullterrierImageError,
     DepthNotFoundError,
     ImageReadError,
+    ImageWriteError,
     InvalidImageError,
     MapNotFoundError,
     NonFiniteImageError,
@@ -33,6 +35,8 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
     "invalid_image": InvalidImageError,
     "non_finite_image": NonFiniteImageError,
     "image_read": ImageReadError,
+    "image_write": ImageWriteError,
+    "backend_unavailable": BackendUnavailableError,
 }
 
 

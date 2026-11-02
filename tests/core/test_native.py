@@ -10,8 +10,10 @@ import pytest
 from bullterrier_image._native import _core  # noqa: PLC2701  the kinds the core can report, and a CoreError to translate
 from bullterrier_image.core import native
 from bullterrier_image.errors import (
+    BackendUnavailableError,
     DepthNotFoundError,
     ImageReadError,
+    ImageWriteError,
     InvalidImageError,
     MapNotFoundError,
     NonFiniteImageError,
@@ -30,6 +32,8 @@ RAISED_AS = {
     "invalid_image": InvalidImageError,
     "non_finite_image": NonFiniteImageError,
     "image_read": ImageReadError,
+    "image_write": ImageWriteError,
+    "backend_unavailable": BackendUnavailableError,
 }
 
 
