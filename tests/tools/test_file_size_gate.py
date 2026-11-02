@@ -57,7 +57,7 @@ def test_a_source_file_may_have_exactly_the_budget_but_not_a_line_more(tmp_path,
     assert "split it by concept" in problem.lower()
 
 
-@pytest.mark.parametrize("path", ["tests/test_a.py", "tests/effects/x/test_x.py", "crates/core/tests/recipes.rs"])
+@pytest.mark.parametrize("path", ["tests/test_a.py", "tests/effects/x/test_x.py", "crates/core/tests/it/recipes.rs"])
 def test_a_test_file_gets_the_larger_budget(tmp_path, path):
     assert checker.check(_tree(tmp_path, {path: TESTS_BUDGET})) == []
     (tmp_path / path).write_text("x\n" * (TESTS_BUDGET + 1), encoding="utf-8")

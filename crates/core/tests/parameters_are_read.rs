@@ -1,3 +1,5 @@
+//! Own binary: it walks every effect in the process's registry, so effects other tests register would be walked too.
+//!
 //! Every parameter of every effect the core runs changes the result of that effect: the parameters are public fields
 //! of a `Params` struct, so rustc no longer reports one that `render` never reads, and this test does.
 //!

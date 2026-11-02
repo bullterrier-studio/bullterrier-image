@@ -668,7 +668,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     any other region is made when its step comes and released after the last step that names it or the first step that needs a
     region made from it (that one is made and kept, so what it was made from is not needed for it again), so a render holds
     the regions the steps ahead need, not all it made (measured in `tests/memory.rs`). A recipe's work before its first pixel
-    is linear in its regions and steps (`tests/scale.rs`): lookups by name are indexed, and "made from" and "needed until" are
+    is linear in its regions and steps (`tests/it/scale.rs`): lookups by name are indexed, and "made from" and "needed until" are
     worked out once per region. A region the core cannot make
     yet, and a `Subject` found per piece with no subject finder, are refused before step 1, which Python did at first use.
   - *Precision follows the data.* `Band` and `Combine` work in `f32` with the parameters narrowed to `f32` first, as NumPy does
@@ -717,7 +717,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   macOS x86_64 wheel, so on Intel Macs pip picks an older onnxruntime (1.23.2 when this was written). A Windows arm64
   wheel waits for someone to ask. A user on a common platform never needs a compiler, and nothing published goes
   untried.
-- **The smallest supported thread stack is 256 KB.** The walks over regions are iterative: `tests/deep.rs` pins a chain of
+- **The smallest supported thread stack is 256 KB.** The walks over regions are iterative: `tests/it/deep.rs` pins a chain of
   2,000 regions and a diamond of 2,000 levels, read, checked, rendered, traced and dropped on a 128 KB thread. (Measured
   once, not guaranteed by a test: a chain of 50,000 and a diamond of 20,000 on 64 KB, in a debug build, 355 s.) The depth of a value inside a
   step is not ours: serde_json (128 levels in all) and toml (80) recurse, and the Python dict reaches the core through
@@ -973,7 +973,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   includes `src/bullterrier_image/presets/regions/shards.toml` (one copy, still data); given fields win over the preset's,
   and a given `edge` replaces the preset's whole `edge`. *Carried to R5:* the crate cannot be published while the file lives
   outside it; move it into `crates/core` and have the facade read it through the core.
-- **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/limits.rs`):
+- **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/it/limits.rs`):
   `Shards.count` 500, `Cuts.lines` 32, `Path.samples` 16, `Edge.octaves` 8, `Edge.scale` 480, `Edge.amount` 48, `Grid` shares
   1000 and 10000 pieces, `Bands.count` 100, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,
   nodes 2^21, visited elements 2^22, nesting 64, chords 1024, coordinates 10^7 px, corners 2^20, crossings 2^28, painted pixels 2^30. The new regions
@@ -1000,6 +1000,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   fires, and macOS enforces no `RLIMIT_AS`. The tool is polling and `ps`, so it works the same on macOS and Linux; Windows
   runs uncapped (no process groups or `ps`). *Consequence:* a mutation run counts exit 99 (cap) and 98 (`--deadline`) as
   killed. A process that leaves the group is not seen.
+- **The Rust integration tests are one binary.** `crates/core/tests/it/main.rs` declares a module per area; only
+  `memory.rs` (a counting `#[global_allocator]`) and `parameters_are_read.rs` (it walks every effect in the registry,
+  which other tests fill with doubles) are binaries of their own. *Reason:* every `tests/*.rs` is an executable that macOS
+  scans on its first launch (12 s measured, up to 40 s under load); 62 of them made `cargo test` after a core change take
+  27 minutes while the tests ran in milliseconds. *Consequence:* the tests share a process, so each registered double has
+  a name no other has, and nothing asserts the whole registry.
 - **Files have a size budget.** Source files up to 1000 lines, test files up to 1500, checked by `tools/check_file_size.py`.
   A file already over when the gate began is recorded at its size and may only shrink; an entry for a file that is gone or
   within budget fails the gate, so the list empties as files are split or deleted. *Reason:* agents read in chunks, and a

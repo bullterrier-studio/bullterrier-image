@@ -97,7 +97,7 @@ bytes: UTF-8 only, `<!ENTITY` refused before the parser, nothing in the file ope
 `ops/outlines` (`Limits::STANDARD`; tests pass a small one). `Pick` by `id` reads the ids an `Svg` made (`Made::Pieces`);
 a relative file path in a recipe file is the loader's to resolve. `Shards.preset` is expanded when the region is read
 (`recipe/region/presets.rs`, from `src/bullterrier_image/presets/regions/shards.toml`). Every user number that drives
-allocation or work has a maximum and a row in `crates/core/tests/limits.rs`; its completeness test fails for a bound of
+allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of
 `Region::check` with neither a row nor a reason.
 Python is a facade over the core and runs no recipe itself. It reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
 `kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
@@ -114,7 +114,7 @@ pool, and rayon's global pool is never used. A kernel fills its output with `par
 (`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
 `Effect::apply` takes no thread parameter. Rule: the output is byte-identical at any thread count, so a band reads only
 input rows and carries nothing from one row to the next, and a reduction chunks by the data, never by the thread count.
-Tests: render at threads 1, 2, 3, 10 and compare bytes (`crates/core/tests/threads.rs`). Python: `render`/`trace`/`render_all`
+Tests: render at threads 1, 2, 3, 10 and compare bytes (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
 take `threads=`; `Step.apply` and `fx` use 1.
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
@@ -338,8 +338,13 @@ Follow the `testing-best-practices` skill. A test coupled to implementation or o
 golden file, sleep, mock of our own code) is worse than none: delete it. Reviewers treat such tests as blocking.
 
 - **Rust tests live in `crates/*/tests/` and use the public API** (`use bullterrier_image::...`); no `#[cfg(test)]` in
-  `src/`. Shared doubles and helpers: `crates/core/tests/common/`. A behaviour no public route reaches is tested through
+  `src/`. Shared doubles and helpers: `crates/core/tests/it/common/`. A behaviour no public route reaches is tested through
   the one that serves it, or earns a public name.
+- **One Rust test binary per crate:** a new Rust test is a new module of `crates/*/tests/it/` (declared in its `main.rs`),
+  never a new `tests/*.rs` (each is an executable that macOS scans on first launch). A file is a binary of its own only when
+  it needs its own process, with the reason in its first line, and is listed in `tests/tools/test_rust_test_binaries.py`.
+  Tests share one process and run in parallel: a registered effect gets a name no other test has (`unique`, a per-module
+  prefix and a counter), and no test asserts the whole registry.
 - Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
   `kaleidoscope` is symmetric about its mirror axes; a blur never leaves the input's range.
 - Expected values come from an independent oracle (standard, hand computation, brute-force reference), never the code's formula.

@@ -1,3 +1,5 @@
+//! Own binary: a counting `#[global_allocator]` reads the whole process's peak heap, so no other test may share it.
+//!
 //! A render keeps only the newest picture: the most memory it holds at once does not grow with the number of steps.
 //!
 //! This is the only test binary with a counting allocator, so every byte the process allocates is measured; the
@@ -5,6 +7,7 @@
 //! `trace`, which keeps a picture per step by design, is the measurement that can fail: it shows the counter sees a
 //! picture that is kept.
 
+#[path = "it/common/mod.rs"]
 mod common;
 
 use std::fmt::Write as _;
