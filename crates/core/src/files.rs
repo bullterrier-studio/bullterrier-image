@@ -181,6 +181,14 @@ fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
     limits.max_alloc = Some(MAX_ALLOC);
     reader.limits(limits);
     let format = reader.format();
+    // The JPEG decoder fills in what a file cut short misses, so such a file is refused here.
+    if format == Some(ImageFormat::Jpeg)
+        && !std::fs::read(path)
+            .map_err(|error| refuse(&error))
+            .map(|bytes| raw::jpeg_is_complete(&bytes))?
+    {
+        return Err(refuse(&"the file ends before the picture does: it is cut short"));
+    }
     let mut embedded = None;
     let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, format)? {
         (picture, orientation, Some(wide))

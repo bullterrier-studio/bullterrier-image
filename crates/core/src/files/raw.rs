@@ -42,6 +42,33 @@ pub(super) fn is_cmyk(path: &Path, format: Option<ImageFormat>, original: Extend
     }
 }
 
+/// Whether the JPEG `bytes` reach their end-of-image marker. The decoder fills what a cut-short file misses with grey
+/// instead of refusing it, so the file is walked first: segment by segment (an inner JPEG, such as an EXIF thumbnail,
+/// sits inside a segment and is skipped with it), and through the entropy-coded data of each scan to the next marker.
+/// Bytes after the end-of-image marker do not matter.
+pub(super) fn jpeg_is_complete(bytes: &[u8]) -> bool {
+    const FILL: u8 = 0xFF; // constant: JPEG (T.81 B.1.1.2) starts every marker with it, and pads with more of it
+    let mut at = 0;
+    while let Some(offset) = bytes[at..]
+        .windows(2)
+        .position(|pair| pair[0] == FILL && pair[1] != 0 && pair[1] != FILL)
+    {
+        let (marker, start) = (bytes[at + offset + 1], at + offset + 2);
+        at = match marker {
+            0xD9 => return true,                // constant: EOI, end of image
+            0xD8 | 0x01 | 0xD0..=0xD7 => start, // constant: SOI, TEM and RSTn: markers without a length
+            _ => match bytes.get(start..start + 2) {
+                Some(length) => start + usize::from(u16::from_be_bytes([length[0], length[1]])),
+                None => return false,
+            },
+        };
+        if at > bytes.len() {
+            return false;
+        }
+    }
+    false
+}
+
 /// The CMYK file at `path` (a TIFF of 8-bit inks, or a JPEG of any CMYK kind), upright, in sRGB: its inks as stored,
 /// converted by `profile`. None for any other file.
 pub(super) fn cmyk_decoded(

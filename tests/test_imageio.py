@@ -316,6 +316,44 @@ def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_i
         read(path)
 
 
+def jpeg_files(folder) -> dict[str, bytes]:
+    """Whole JPEG files Pillow writes of 64x64 noise: baseline and progressive, RGB, grey and CMYK."""
+    noise = np.random.default_rng(0).integers(0, 256, (64, 64, 4), np.uint8)
+    kinds = {
+        "baseline RGB": (Image.fromarray(noise[..., :3]), {}),
+        "baseline grey": (Image.fromarray(noise[..., 0]), {}),
+        "progressive RGB": (Image.fromarray(noise[..., :3]), {"progressive": True}),
+        "progressive grey": (Image.fromarray(noise[..., 0]), {"progressive": True}),
+        "CMYK": (Image.fromarray(noise, "CMYK"), {}),
+        "progressive CMYK": (Image.fromarray(noise, "CMYK"), {"progressive": True}),
+    }
+    files = {}
+    for name, (img, options) in kinds.items():
+        img.save(folder / "whole.jpg", quality=90, **options)
+        files[name] = (folder / "whole.jpg").read_bytes()
+    return files
+
+
+@pytest.mark.parametrize("percent", [30, 60, 90, 98])
+@pytest.mark.parametrize("read", [imageio.load, imageio.load_map, imageio.load_picture])
+def test_a_jpeg_cut_short_is_refused_not_read_with_grey_where_it_ends(tmp_path, read, percent):
+    for kind, whole in jpeg_files(tmp_path).items():
+        path = tmp_path / f"cut-{percent}.jpg"
+        path.write_bytes(whole[: len(whole) * percent // 100])
+        with pytest.raises(ImageReadError, match=rf"cut-{percent}\.jpg"):
+            read(path)
+        path.write_bytes(whole)  # known good: the same file, whole
+        assert read(path).shape[:2] == (64, 64), kind
+
+
+def test_a_jpeg_with_bytes_after_its_end_is_still_read(tmp_path):
+    for kind, whole in jpeg_files(tmp_path).items():
+        path = tmp_path / "padded.jpg"
+        path.write_bytes(whole + b"trailing bytes \xff\x00\xff")
+        (tmp_path / "plain.jpg").write_bytes(whole)
+        np.testing.assert_array_equal(imageio.load(path), imageio.load(tmp_path / "plain.jpg"), err_msg=kind)
+
+
 def png_claiming(path, width: int, height: int) -> None:
     """A PNG whose header claims `width` x `height` pixels and which holds no pixel data at all."""
 

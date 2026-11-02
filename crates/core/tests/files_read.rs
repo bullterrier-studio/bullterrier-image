@@ -528,6 +528,114 @@ fn a_file_that_cannot_be_read_as_an_image_is_an_image_read_error_naming_it() -> 
     Ok(())
 }
 
+/// A 32 x 32 picture of pseudo-random levels (xorshift, a fixed seed): detail everywhere, so every format needs all its
+/// bytes.
+fn noisy(channels: usize) -> Vec<u8> {
+    let mut state = 0x9E37_79B9_7F4A_7C15_u64;
+    (0..32 * 32 * channels)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            u8::try_from(state % 256).unwrap_or(0)
+        })
+        .collect()
+}
+
+/// The 32 x 32 `noisy` picture written in `format`, as grey, RGB or (where the format has none, RGB) the colour type.
+fn noisy_file(format: ImageFormat, channels: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let picture = if channels == 1 {
+        DynamicImage::ImageLuma8(ImageBuffer::from_raw(32, 32, noisy(1)).ok_or("size")?)
+    } else {
+        DynamicImage::ImageRgb8(ImageBuffer::from_raw(32, 32, noisy(3)).ok_or("size")?)
+    };
+    let mut bytes = Cursor::new(Vec::new());
+    picture.write_to(&mut bytes, format)?;
+    Ok(bytes.into_inner())
+}
+
+/// A whole file and what it is.
+type Whole = (&'static str, Vec<u8>);
+
+/// Whole files of every format the core reads, as `(id, bytes)`: baseline and progressive JPEG, grey and colour and CMYK.
+fn whole_files() -> Result<Vec<Whole>, Box<dyn std::error::Error>> {
+    Ok(vec![
+        ("baseline RGB JPEG", noisy_file(ImageFormat::Jpeg, 3)?),
+        ("baseline grey JPEG", noisy_file(ImageFormat::Jpeg, 1)?),
+        ("progressive RGB JPEG", progressive_jpeg()),
+        ("CMYK JPEG", cmyk_jpeg()),
+        ("PNG", noisy_file(ImageFormat::Png, 3)?),
+        ("TIFF", noisy_file(ImageFormat::Tiff, 3)?),
+        ("lossless WebP", noisy_file(ImageFormat::WebP, 3)?),
+        ("GIF", noisy_file(ImageFormat::Gif, 3)?),
+        ("BMP", noisy_file(ImageFormat::Bmp, 3)?),
+    ])
+}
+
+#[test]
+fn a_file_cut_short_is_refused_whatever_its_format_and_however_much_is_left() -> Outcome {
+    let folder = Scratch::new()?;
+    for (id, whole) in whole_files()? {
+        let name = id.replace(' ', "-");
+        assert!(
+            read(&folder.write(&format!("{name}-whole"), &whole)?).is_ok(),
+            "{id}: whole"
+        );
+        for percent in [30_usize, 60, 90, 98] {
+            let path = folder.write(&format!("{name}-{percent}"), &whole[..whole.len() * percent / 100])?;
+            for (reading, result) in [("read", read(&path).map(drop)), ("read_map", read_map(&path).map(drop))] {
+                let error = result.err();
+                assert_eq!(
+                    error.as_ref().map(Error::kind),
+                    Some(ErrorKind::ImageRead),
+                    "{id} cut at {percent} %, {reading}: {error:?}"
+                );
+                assert!(
+                    error.is_some_and(|error| error.to_string().contains(&format!("{name}-{percent}"))),
+                    "{id} cut at {percent} %, {reading}: the error does not name the path"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_jpeg_with_bytes_after_its_end_is_still_read_and_so_is_one_with_a_thumbnail_inside() -> Outcome {
+    let folder = Scratch::new()?;
+    let whole = noisy_file(ImageFormat::Jpeg, 3)?;
+    let with_garbage = [whole.as_slice(), b"trailing bytes, not a picture \xFF\x00\xFF"].concat();
+    // an APP1 segment holding a whole JPEG of its own (an EXIF thumbnail): its end marker is not the file's
+    let thumbnail = noisy_file(ImageFormat::Jpeg, 1)?;
+    let mut segment = vec![0xFF, 0xE1];
+    segment.extend_from_slice(&u16::try_from(2 + thumbnail.len())?.to_be_bytes());
+    segment.extend_from_slice(&thumbnail);
+    let mut with_thumbnail = whole.clone();
+    with_thumbnail.splice(2..2, segment);
+    let expected = read(&folder.write("whole.jpg", &whole)?)?.into_values();
+    for (id, file) in [("trailing bytes", with_garbage), ("an inner JPEG", with_thumbnail)] {
+        let got = read(&folder.write("other.jpg", &file)?).map_err(|error| format!("{id}: {error}"))?;
+        assert!(got.into_values() == expected, "{id}: the picture changed");
+    }
+    // cut inside the inner thumbnail's end marker, the outer picture is still unfinished
+    let cut = [&with_inner_cut(&whole, &thumbnail)?[..]].concat();
+    let path = folder.write("cut.jpg", &cut)?;
+    assert_eq!(read(&path).err().map(|error| error.kind()), Some(ErrorKind::ImageRead));
+    Ok(())
+}
+
+/// `whole` with `thumbnail` in an APP1 segment, cut right after the segment: the thumbnail's own end marker is the
+/// last one in the file.
+fn with_inner_cut(whole: &[u8], thumbnail: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut segment = vec![0xFF, 0xE1];
+    segment.extend_from_slice(&u16::try_from(2 + thumbnail.len())?.to_be_bytes());
+    segment.extend_from_slice(thumbnail);
+    let mut file = whole[..2].to_vec();
+    file.extend(segment);
+    file.extend_from_slice(&whole[2..whole.len() / 2]);
+    Ok(file)
+}
+
 /// TIFF files of 32-bit levels, `(id, file, size, expected levels over 3 channels' worth of grey)`.
 fn wide_tiff_cases() -> Vec<Case> {
     let ints = |values: &[i32]| values.iter().map(|value| value.to_le_bytes()).collect::<Vec<_>>();
