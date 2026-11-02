@@ -41,6 +41,10 @@ fn rows() -> Vec<(Error, ErrorKind)> {
             ErrorKind::InvalidImage,
         ),
         (Error::NonFinite("pixel (0, 0)".to_owned()), ErrorKind::NonFiniteImage),
+        (
+            Error::ImageRead("cannot read a.png as an image: damaged".to_owned()),
+            ErrorKind::ImageRead,
+        ),
         (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
         (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
         (Error::foreign("fx", "broke"), ErrorKind::Other),

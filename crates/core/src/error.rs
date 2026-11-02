@@ -20,6 +20,7 @@ use crate::params::Scalar;
 /// | [`Error::MapNotFound`] of any other map | `MapNotFound` | `MapNotFoundError` |
 /// | [`Error::InvalidImage`], [`Error::Size`] | `InvalidImage` | `InvalidImageError` |
 /// | [`Error::NonFinite`] | `NonFiniteImage` | `NonFiniteImageError` |
+/// | [`Error::ImageRead`] | `ImageRead` | `ImageReadError` |
 /// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
 ///
 /// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
@@ -54,6 +55,9 @@ pub enum Error {
     InvalidImage(String),
     /// A picture handed in holds NaN or an infinity, which is no colour; the text names the first such pixel.
     NonFinite(String),
+    /// A file could not be read as an image: missing, a folder, not an image, damaged, of a layout the core does not
+    /// read, or larger than the core decodes. The text names the path and the reason.
+    ImageRead(String),
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
         /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
@@ -122,6 +126,8 @@ pub enum ErrorKind {
     InvalidImage,
     /// A picture handed in holds NaN or an infinity.
     NonFiniteImage,
+    /// A file could not be read as an image.
+    ImageRead,
     /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
     /// error (a `ValueError` in Python).
     Other,
@@ -137,6 +143,7 @@ impl ErrorKind {
         Self::MapNotFound,
         Self::InvalidImage,
         Self::NonFiniteImage,
+        Self::ImageRead,
         Self::Other,
     ];
 
@@ -151,6 +158,7 @@ impl ErrorKind {
             Self::MapNotFound => "map_not_found",
             Self::InvalidImage => "invalid_image",
             Self::NonFiniteImage => "non_finite_image",
+            Self::ImageRead => "image_read",
             Self::Other => "other",
         }
     }
@@ -219,6 +227,7 @@ impl Error {
             },
             Self::InvalidImage(_) | Self::Size { .. } => ErrorKind::InvalidImage,
             Self::NonFinite(_) => ErrorKind::NonFiniteImage,
+            Self::ImageRead(_) => ErrorKind::ImageRead,
             Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
         }
     }
@@ -287,6 +296,7 @@ impl fmt::Display for Error {
             | Self::Inputs(message)
             | Self::InvalidImage(message)
             | Self::NonFinite(message)
+            | Self::ImageRead(message)
             | Self::MapNotFound { message, .. } => formatter.write_str(message),
             Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
@@ -317,6 +327,7 @@ impl std::error::Error for Error {
             | Self::MapNotFound { .. }
             | Self::InvalidImage(_)
             | Self::NonFinite(_)
+            | Self::ImageRead(_)
             | Self::Size { .. } => None,
         }
     }

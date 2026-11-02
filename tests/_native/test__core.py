@@ -488,6 +488,7 @@ def test_the_core_names_the_kinds_of_its_errors_in_the_order_of_the_table():
         "map_not_found",
         "invalid_image",
         "non_finite_image",
+        "image_read",
         "other",
     ]
 

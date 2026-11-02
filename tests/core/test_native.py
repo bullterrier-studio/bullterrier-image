@@ -11,6 +11,7 @@ from bullterrier_image._native import _core  # noqa: PLC2701  the kinds the core
 from bullterrier_image.core import native
 from bullterrier_image.errors import (
     DepthNotFoundError,
+    ImageReadError,
     InvalidImageError,
     MapNotFoundError,
     NonFiniteImageError,
@@ -28,6 +29,7 @@ RAISED_AS = {
     "map_not_found": MapNotFoundError,
     "invalid_image": InvalidImageError,
     "non_finite_image": NonFiniteImageError,
+    "image_read": ImageReadError,
 }
 
 

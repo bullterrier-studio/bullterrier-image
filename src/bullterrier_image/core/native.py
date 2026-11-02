@@ -14,6 +14,7 @@ from bullterrier_image._native import _core
 from bullterrier_image.errors import (
     BullterrierImageError,
     DepthNotFoundError,
+    ImageReadError,
     InvalidImageError,
     MapNotFoundError,
     NonFiniteImageError,
@@ -31,6 +32,7 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
     "map_not_found": MapNotFoundError,
     "invalid_image": InvalidImageError,
     "non_finite_image": NonFiniteImageError,
+    "image_read": ImageReadError,
 }
 
 
