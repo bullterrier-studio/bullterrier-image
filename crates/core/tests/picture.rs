@@ -1,7 +1,7 @@
 //! `Picture` and `Image`, the pictures an effect reads and makes, through the public API alone.
 
 use bullterrier_image::frame::Transparent;
-use bullterrier_image::{Error, Frame, Image, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Error, ErrorKind, Frame, Image, Options, Photo, Picture, Presets, Recipe, Step};
 
 #[test]
 fn map_at_hands_each_pixel_with_its_row_and_column_in_reading_order() -> Result<(), Error> {
@@ -109,4 +109,52 @@ fn an_image_of_values_that_do_not_make_its_size_is_refused() {
         Image::new(2, 2, &[0.0; 6]),
         Err(Error::Size { values: 6, .. })
     ));
+}
+
+#[test]
+fn an_rgba_image_keeps_its_four_channels_as_given() -> Result<(), Error> {
+    // two pixels, every channel its own number; the colour under alpha 0 stays
+    let values = [0.1, 0.2, 0.3, 0.0, 0.4, 0.5, 0.6, 1.0];
+    let image = Image::rgba(1, 2, &values)?;
+    assert_eq!((image.height(), image.width(), image.channels()), (1, 2, 4));
+    assert_eq!(image.as_picture().values(), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
+    assert_eq!(image.into_values(), values);
+    Ok(())
+}
+
+#[test]
+fn an_rgba_image_is_refused_for_a_wrong_size_a_non_number_or_an_alpha_outside_0_to_1() {
+    let nan = [0.1, 0.2, 0.3, 1.0, 0.4, f32::NAN, 0.6, 1.0];
+    let rows: [(&str, Result<Image, Error>, ErrorKind, &str); 5] = [
+        (
+            "a value too few",
+            Image::rgba(1, 2, &[0.5; 7]),
+            ErrorKind::InvalidImage,
+            "7 values",
+        ),
+        ("no column", Image::rgba(1, 0, &[]), ErrorKind::InvalidImage, "1 x 0"),
+        (
+            "a NaN",
+            Image::rgba(1, 2, &nan),
+            ErrorKind::NonFiniteImage,
+            "row 0, column 1",
+        ),
+        (
+            "alpha above 1",
+            Image::rgba(1, 2, &[0.1, 0.2, 0.3, 1.0, 0.4, 0.5, 0.6, 1.5]),
+            ErrorKind::InvalidImage,
+            "row 0, column 1",
+        ),
+        (
+            "negative alpha",
+            Image::rgba(1, 1, &[0.1, 0.2, 0.3, -0.5]),
+            ErrorKind::InvalidImage,
+            "-0.5",
+        ),
+    ];
+    for (id, result, kind, says) in rows {
+        let error = result.err();
+        assert_eq!(error.as_ref().map(Error::kind), Some(kind), "{id}");
+        assert!(error.is_some_and(|error| error.to_string().contains(says)), "{id}");
+    }
 }

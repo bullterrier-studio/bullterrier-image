@@ -139,6 +139,43 @@ impl Image {
         Ok(Self::from_pixels(height, width, picture.pixels().to_vec()))
     }
 
+    /// The image of `height` x `width` pixels with an alpha channel, whose `values` are red, green, blue and alpha of
+    /// each pixel, row after row: alpha 0 is transparent, 1 opaque, and the colour is straight, not multiplied by it.
+    ///
+    /// # Errors
+    /// [`Error::InvalidImage`] unless `height` and `width` are at least 1 and there are exactly `height * width * 4`
+    /// values, or if an alpha is outside 0..=1. [`Error::NonFinite`] if a value is NaN or an infinity (the message names
+    /// the first such pixel).
+    pub fn rgba(height: usize, width: usize, values: &[f32]) -> Result<Self, Error> {
+        let (quads, rest) = values.as_chunks::<4>();
+        if !(height > 0 && width > 0 && rest.is_empty() && height.checked_mul(width) == Some(quads.len())) {
+            return Err(Error::InvalidImage(format!(
+                "{} values do not make {height} x {width} pixels of 4 channels",
+                values.len()
+            )));
+        }
+        if let Some(index) = quads
+            .iter()
+            .position(|quad| !quad.iter().all(|level| level.is_finite()))
+        {
+            return Err(Error::NonFinite(format!(
+                "a picture's levels must be numbers, but it holds NaN or an infinity: the first is at row {}, column {}",
+                index / width,
+                index % width
+            )));
+        }
+        if let Some(index) = quads.iter().position(|quad| !(0.0..=1.0).contains(&quad[3])) {
+            return Err(Error::InvalidImage(format!(
+                "alpha is from 0 to 1, but row {}, column {} has {}",
+                index / width,
+                index % width,
+                quads[index][3]
+            )));
+        }
+        let pixels = quads.iter().map(|&[red, green, blue, _]| [red, green, blue]).collect();
+        Ok(Self::from_pixels(height, width, pixels).with_alpha(quads.iter().map(|quad| quad[3]).collect()))
+    }
+
     /// The image of `height` x `width` `pixels`, row after row; the caller made exactly that many.
     pub(crate) const fn from_pixels(height: usize, width: usize, pixels: Vec<[f32; 3]>) -> Self {
         Self {
