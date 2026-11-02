@@ -405,12 +405,12 @@ fn only_a_jpeg_has_a_quality() -> Outcome {
 fn a_file_of_an_extension_the_core_does_not_write_is_refused_by_name_and_nothing_is_written() -> Outcome {
     let image = levels(2, 2)?;
     for (name, said) in [
-        ("a.bmp", "'.bmp'"),
-        ("a.TIFF", "'.tiff'"),
-        ("a.gif", "'.gif'"),
-        ("a.png.txt", "'.txt'"),
-        ("noextension", "no extension"),
-        (".png", "no extension"), // a name that is only an extension has none: it is a hidden file
+        ("a.bmp", "cannot write '.bmp' pictures:"),
+        ("a.TIFF", "cannot write '.tiff' pictures:"),
+        ("a.gif", "cannot write '.gif' pictures:"),
+        ("a.png.txt", "cannot write '.txt' pictures:"),
+        ("noextension", "cannot write a file with no extension:"),
+        (".png", "cannot write a file with no extension:"), // a name that is only an extension has none: it is a hidden file
     ] {
         let (folder, path) = target(name)?;
         let result = write(&path, &image);
