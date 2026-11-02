@@ -5,7 +5,6 @@ These tests build their own effects (throwaway or in a fresh registry) and their
 depend on which real effects exist or how they are documented.
 """
 
-import io
 import os
 import re
 import shutil
@@ -339,11 +338,26 @@ def _quantization(source) -> dict:
         return picture.quantization
 
 
+# The standard quantisation tables (ITU-T T.81 Annex K.1, K.2), row by row, and libjpeg's scaling for a quality (the IJG
+# formula): the independent oracle for the quality a JPEG was written at.
+_LUMINANCE = [
+    16, 11, 10, 16, 24, 40, 51, 61, 12, 12, 14, 19, 26, 58, 60, 55, 14, 13, 16, 24, 40, 57, 69, 56, 14, 17, 22, 29, 51,
+    87, 80, 62, 18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92, 49, 64, 78, 87, 103, 121, 120, 101,
+    72, 92, 95, 98, 112, 100, 103, 99,
+]  # fmt: skip
+_CHROMINANCE = [
+    17, 18, 24, 47, 99, 99, 99, 99, 18, 21, 26, 66, 99, 99, 99, 99, 24, 26, 56, 99, 99, 99, 99, 99, 47, 66, 99, 99, 99,
+    99, 99, 99, *[99] * 32,
+]  # fmt: skip
+
+
 def _jpeg_tables(quality: int) -> dict:
-    """The quantization tables Pillow writes for `quality`: they identify the quality setting of a JPEG."""
-    buffer = io.BytesIO()
-    Image.new("RGB", (16, 16), (90, 120, 150)).save(buffer, "JPEG", quality=quality)
-    return _quantization(buffer)
+    """The quantization tables a JPEG written at `quality` holds, by the IJG formula: they identify the quality."""
+    scale = 5000 // quality if quality < 50 else 200 - 2 * quality
+    return {
+        number: [min(max((entry * scale + 50) // 100, 1), 255) for entry in base]
+        for number, base in enumerate((_LUMINANCE, _CHROMINANCE))
+    }
 
 
 # --- where an effect's files are ----------------------------------------------------------------------------------

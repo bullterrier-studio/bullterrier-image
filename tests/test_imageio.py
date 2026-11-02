@@ -2,6 +2,7 @@ import io
 import itertools
 import struct
 import warnings
+import zlib
 
 import numpy as np
 import pytest
@@ -264,13 +265,23 @@ def test_a_file_that_cannot_be_read_as_an_image_raises_image_read_error_naming_i
         read(path)
 
 
-def test_a_decompression_bomb_is_refused_with_image_read_error(tmp_path, monkeypatch):
-    Image.new("RGB", (30, 20)).save(tmp_path / "bomb.png")  # 600 px
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)  # Pillow's own limit, lowered: refused above twice the limit
-    with pytest.raises(ImageReadError, match=r"bomb\.png"):
-        imageio.load(tmp_path / "bomb.png")
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 600)  # the same file within the limit loads
-    assert imageio.load(tmp_path / "bomb.png").shape == (20, 30, 3)
+def png_claiming(path, width: int, height: int) -> None:
+    """A PNG whose header claims `width` x `height` pixels and which holds no pixel data at all."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)  # 8-bit RGB
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IEND", b""))
+
+
+@pytest.mark.parametrize(("width", "height"), [(100_000, 100_000), (178_956_971, 1)], ids=["far over", "one over"])
+def test_a_decompression_bomb_is_refused_with_image_read_error(tmp_path, width, height):
+    """The limit is twice Pillow's `MAX_IMAGE_PIXELS` (89,478,485): 178,956,970 pixels, refused from the header."""
+    png_claiming(tmp_path / "bomb.png", width, height)
+    for read in (imageio.load, imageio.load_map, imageio.load_picture):
+        with pytest.raises(ImageReadError, match=r"bomb\.png"):
+            read(tmp_path / "bomb.png")
 
 
 @pytest.mark.parametrize("name", ["cut.png", "cut.webp"])

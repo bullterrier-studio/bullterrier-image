@@ -136,7 +136,7 @@ OFFENCES = {
     ),
     "a test reading a private attribute": (
         TEST_MODULE,
-        "from bullterrier_image import imageio\n\n\ndef test_probe():\n    assert imageio._SRGB is not None\n",
+        "from bullterrier_image import imageio\n\n\ndef test_probe():\n    assert imageio._MAX_CUBE_BYTES > 0\n",
         ruff,
         "SLF001",
     ),

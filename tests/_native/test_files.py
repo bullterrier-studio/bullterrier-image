@@ -231,6 +231,19 @@ def test_a_file_that_cannot_be_written_is_refused_with_the_error_of_its_kind(
     assert list(tmp_path.iterdir()) == []
 
 
+def test_a_jpeg_samples_every_colour_component_at_full_resolution(tmp_path, photo):
+    """The frame header (T.81 B.2.2) lists each component's sampling factors, high nibble horizontal, low vertical:
+    4:4:4 is 1x1 for all three, 4:2:0 would give the first 2x2."""
+    _core.write(tmp_path / "a.jpg", photo)
+    data = (tmp_path / "a.jpg").read_bytes()
+    at = data.index(
+        b"\xff\xc0"
+    )  # baseline SOF0: marker, length, precision, height, width, components, then 3 bytes each
+    components = data[at + 9]
+    factors = [data[at + 11 + 3 * i] for i in range(components)]
+    assert factors == [0x11, 0x11, 0x11]
+
+
 @pytest.mark.parametrize("quality", [0, 101, -1, 300])
 def test_a_quality_outside_1_to_100_is_a_value_error_and_writes_nothing(tmp_path, photo, quality):
     with pytest.raises(ValueError, match="quality"):
