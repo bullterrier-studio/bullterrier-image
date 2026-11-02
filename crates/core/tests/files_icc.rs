@@ -367,6 +367,9 @@ fn a_profile_that_cannot_be_used_leaves_the_levels_as_they_are_without_an_error(
     Ok(())
 }
 
+/// A file with a profile: what it is, the file, the levels a map must give, the levels a read gives (first channel).
+type Mapped<'a> = (&'a str, Vec<u8>, Vec<f32>, Vec<f32>);
+
 #[test]
 fn a_map_is_data_so_an_embedded_profile_is_not_applied_to_it_while_a_read_applies_it() -> Outcome {
     let rgb = [[153_u8, 128, 102], [255, 0, 0], [30, 60, 90]];
@@ -374,7 +377,7 @@ fn a_map_is_data_so_an_embedded_profile_is_not_applied_to_it_while_a_read_applie
         let [red, green, blue] = pixel.map(|level| f32::from(level) / 255.0);
         (299.0 * red + 587.0 * green + 114.0 * blue) / 1000.0 // BT.601 luma of the stored levels
     };
-    let cases: [(&str, Vec<u8>, Vec<f32>, Vec<f32>); 2] = [
+    let cases: [Mapped; 2] = [
         (
             "an RGB file under an Adobe RGB profile",
             png(3, 2, &rgb.concat(), &adobe()),
