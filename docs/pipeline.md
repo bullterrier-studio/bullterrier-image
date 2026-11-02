@@ -51,9 +51,9 @@ recipes = ["recipes"]                        # recipe files, or folders of them
 output  = "output"
 
 [export]
-formats = ["jpg"]          # jpg, png or webp
+formats = ["jpg"]          # jpg, png or webp (webp is lossless)
 sizes   = [2048, 1080]     # longest side in px; sizes larger than the render are never enlarged
-quality = 92
+quality = 92               # JPEG only
 steps   = false            # true: also save the picture after every step of every recipe
 
 [checks]
@@ -71,15 +71,19 @@ subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is fl
 
 `bullterrier_image.imageio`:
 
-- **Reading.** Anything Pillow opens (JPEG, PNG, WebP, TIFF, GIF, BMP...), any mode: 8-bit RGB, greyscale, 1-bit, palette,
-  CMYK; 16-bit greyscale at full precision. Transparency composited over white. Animation (GIF, APNG) gives first frame.
+- **Reading.** JPEG, PNG, WebP, TIFF, GIF and BMP, by content, in any mode: 8-bit RGB, greyscale, 1-bit, palette,
+  CMYK; 16-bit at full precision; 32-bit integer and float TIFF greyscale. A palette TIFF is not read. Transparency is
+  composited over white (`load`) or kept (`load_picture`). Animation (GIF, APNG, WebP) gives the first frame. EXIF
+  orientation is applied.
 - **Colour.** Embedded ICC profile (Display P3, CMYK press, grey gamma) converted to sRGB. No usable profile, and 16-bit
-  greyscale: taken as sRGB (the web's rule for untagged images).
-- **Errors.** Missing, non-image, truncated or oversized file -> `ImageReadError` naming it. Pillow decompression-bomb limit
-  kept: over about 179 megapixels (twice `PIL.Image.MAX_IMAGE_PIXELS`) refused; raise it yourself for big files you trust.
-- **Writing.** Stills embed a small sRGB profile, nothing else: no EXIF, no GPS, no timestamp, so same picture -> same file.
-  JPEG/WebP quality = project's `quality` export setting (92 unless set; also `bt-image steps`), or 95 for `imageio.save`,
-  `bt-image render`, `sheet`, `cutout`. JPEGs keep full-resolution colour.
+  greyscale: taken as sRGB (the web's rule for untagged images). A map (`load_map`) is data: its profile is ignored.
+- **Errors.** Missing, non-image, truncated or oversized file -> `ImageReadError` naming it. The limit is fixed: over about
+  179 megapixels is refused from the header, before any pixel is decoded.
+- **Writing.** `.png`, `.jpg`/`.jpeg` and `.webp`; any other extension -> `BackendUnavailableError` naming it. Stills embed
+  a small sRGB profile, nothing else: no EXIF, no GPS, no timestamp, so same picture -> same file. `quality` (1..100) is
+  JPEG only: the project's `quality` export setting (92 unless set; also `bt-image steps`), or 95 for `imageio.save`,
+  `bt-image render`, `sheet`, `cutout`. JPEGs keep full-resolution colour. PNG is lossless at its best compression, WebP is
+  lossless (and bigger than a lossy one).
 
 ## Seeing what each step does
 

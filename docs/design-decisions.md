@@ -414,8 +414,24 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   the full parameter lists (about 15 times longer) bury the looks and the presets. *Consequence:* `--all` and
   `--advanced` give the full documentation; `--category` narrows either form; the generated `docs/effects/` is the full
   reference.
-- **`imageio` is the only module that knows file formats**, EXIF rotation, colour profiles and 8-bit conversion.
-  *Consequence:* everything else works on one in-memory image type.
+- **Picture files are read and written by the Rust core; `imageio` is a thin Python facade over it.** The core
+  (`crates/core/src/files.rs`) decodes with the `image` crate (PNG, JPEG, GIF, WebP, TIFF, BMP), reads 32-bit integer and
+  float TIFFs with `tiff`, takes a CMYK JPEG's inks from `zune-jpeg`, and converts an embedded RGB, grey or CMYK profile
+  to sRGB with `moxcms`, all pure Rust (no C library, so the wheels and the sdist build everywhere). `imageio` adds only
+  what a Python caller needs: compositing over white, the array checks of `save`, `to_pil`/`from_pil`, `load_lut`.
+  *Reason:* a Rust user of the crate needs the same files without Python, and one reader means the CLI, the library and
+  the Rust API see the same pixels. *Consequences, each decided:* `write` makes png, jpg/jpeg and webp, and any other
+  extension is a `BackendUnavailableError` naming it; WebP is lossless and `quality` applies to JPEG only (the lossy
+  encoder is a C library); a palette TIFF is not read; a map (`load_map`) ignores colour profiles, being data; a JPEG cut
+  short is refused (the core walks the segments to the end marker, as Pillow's strict read does); the pixel limit is fixed
+  at 178,956,970, Pillow's own, checked from the header before decoding, with the decoder's memory capped at 8 bytes a
+  pixel; the embedded sRGB profile is littlecms's with its date fixed (`crates/core/data/srgb.icc`), and is read back as
+  sRGB without conversion; PNG is written at the best compression, JPEG at 4:4:4. *Differences from Pillow, measured:* a
+  JPEG decodes within 3 to 4 levels of 255 on photos (more on a few-pixel image), a CMYK press profile can differ by up to
+  10 levels from littlecms, and a PNG or JPEG write is 2 to 3 times slower for a smaller file. Pillow stays a
+  dependency for fonts and the Python resizers until the core has its own.
+- **`bt-image` stays a Python command until the last Python effect is gone.** *Reason:* cold start is not the bottleneck
+  while effects run in Python; a Rust binary is judged after the effects move.
 
 ## Finding the subject and depth
 

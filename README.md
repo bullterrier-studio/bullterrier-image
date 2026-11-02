@@ -55,7 +55,7 @@ In Python: load a photo, try one effect, then a whole look.
 ```python
 from bullterrier_image import Recipe, fx, imageio, load_recipe, looks, render
 
-photo = imageio.load("dog.jpg")  # or any numpy array: uint8 as Pillow gives it, or floats 0..1
+photo = imageio.load("dog.jpg")  # or any numpy array: uint8 or uint16, or floats 0..1
 
 glow = fx.bloom(radius=12, amount=0.8)  # one effect, checked now: a typo fails here
 imageio.save(glow.apply(photo), "dog-glow.jpg")

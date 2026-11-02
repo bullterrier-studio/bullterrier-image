@@ -86,7 +86,11 @@ step's parameters are completed (preset, defaults, `Table::check`) and scaled by
 the result is laid over its input by `ops/blend` (blend mode, opacity, mask), and a `Drive` is a mix of runs at `levels` values
 (`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
 `channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
-0..1) and `Labels` (piece numbers) are the maps. `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
+0..1) and `Labels` (piece numbers) are the maps. **Files** (`crates/core/src/files.rs`, `files/`): `read` (RGB or RGBA with straight alpha, upright, first frame, an embedded
+profile converted to sRGB), `read_map`, `write` and `write_with_quality` (png, jpg, webp; only the sRGB profile
+embedded); a fixed pixel limit and a decoder memory cap; `ErrorKind::ImageRead`, `ImageWrite` and `BackendUnavailable`.
+`imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks, Pillow
+conversions). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
 for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
 (`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
 `Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
@@ -196,7 +200,7 @@ its parameters.
 
 ## The effect contract
 
-An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imageio.py` is the only place that knows file formats):
+An effect is a pure function on a float32 RGB image `(h, w, 3)` in 0..1 (`imageio.py`, over the core's `files`, is the only place that knows file formats):
 
 ```python
 @effect(category="light", params=BloomParams)  # category is one of CATEGORIES
