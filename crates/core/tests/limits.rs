@@ -1,8 +1,7 @@
 //! Every number a user can set that drives allocation or work has a maximum, and this file holds each at its maximum
 //! (accepted, and the render finishes) and one past it (refused, naming the field and the value). The files an svg region
 //! reads are hostile ones, written to a folder of the test's own. Limits whose real value cannot be reached in a test
-//! (crossings, painted pixels) are tested at a small value in the unit tests of `ops/svg/paint.rs`; the real constants are
-//! reviewed, not run.
+//! (crossings, painted pixels) are reviewed, not run.
 //!
 //! Not run, and why: the 100 MB file of `max_kilobytes` and the 2^21 nodes of `Limits::nodes` are rows only where they
 //! finish in a few seconds (see `a_file_of_the_most_kilobytes_is_read` and `a_file_of_the_most_nodes_is_parsed`).

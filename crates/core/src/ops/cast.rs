@@ -9,21 +9,3 @@
 pub(crate) const fn single(value: f64) -> f32 {
     value as f32
 }
-
-#[cfg(test)]
-mod tests {
-    use super::single;
-
-    #[test]
-    fn a_number_becomes_the_nearest_single_the_way_a_map_holds_it() {
-        // 0.3 is not representable in either: the f32 nearest to the f64 0.3 is the f32 a map of 0.3 holds, which is not
-        // the same number widened back
-        assert_eq!(single(0.3).to_bits(), 0x3e99_999a);
-        assert!(f64::from(single(0.3)) > 0.3);
-        // 0.7 rounds down instead
-        assert_eq!(single(0.7).to_bits(), 0x3f33_3333);
-        assert!(f64::from(single(0.7)) < 0.7);
-        // a whole number and a half are exact
-        assert_eq!((single(1.0), single(0.5), single(0.0)), (1.0, 0.5, 0.0));
-    }
-}

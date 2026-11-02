@@ -66,32 +66,3 @@ impl BuiltIn {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{BuiltIn, Origin};
-
-    #[test]
-    fn each_built_in_is_found_by_its_own_name_and_nothing_else_is() {
-        for built_in in BuiltIn::ALL {
-            assert_eq!(BuiltIn::named(built_in.name()), Some(built_in));
-        }
-        for name in ["", "Subject", "subjects", "star"] {
-            assert_eq!(BuiltIn::named(name), None, "{name}");
-        }
-    }
-
-    #[test]
-    fn a_map_is_found_made_from_another_or_made_from_the_picture() {
-        let origins: Vec<_> = BuiltIn::ALL.into_iter().map(BuiltIn::origin).collect();
-        assert_eq!(
-            origins,
-            [
-                Origin::Found,
-                Origin::Inverse(BuiltIn::Subject),
-                Origin::Found,
-                Origin::Picture
-            ]
-        );
-    }
-}

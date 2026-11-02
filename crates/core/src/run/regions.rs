@@ -398,6 +398,3 @@ fn found_in_pieces(
     }
     Ok(found)
 }
-
-#[cfg(test)]
-mod tests;

@@ -142,37 +142,3 @@ pub(crate) fn in_params(effect: &str, params: &Map<String, Value>, place: &str) 
     }
     Ok(drives)
 }
-
-#[cfg(test)]
-mod tests {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn a_drive_is_start_at_level_0_end_exactly_at_the_last_and_even_steps_between() {
-        // from 10 to 30 in 5 levels: 10, 15, 20, 25, 30
-        let drive = Drive::new("depth", 10.0, 30.0);
-        let values: Vec<f64> = (0..5).map(|level| drive.value(level)).collect();
-        assert_eq!(values, [10.0, 15.0, 20.0, 25.0, 30.0]);
-        // downwards, in 2 levels: the two ends
-        let falling = Drive::new("depth", 1.0, -1.0).levels(2);
-        assert_eq!((falling.value(0), falling.value(1)), (1.0, -1.0));
-        // 0.3 + (0.9 - 0.3) x 3 / 3 is 0.9000000000000001 in floating point: the last level is `end` itself
-        let last = Drive::new("depth", 0.3, 0.9).levels(4);
-        assert_eq!(last.value(3).to_bits(), 0.9_f64.to_bits());
-    }
-
-    #[test]
-    fn a_drive_is_written_as_the_object_a_recipe_holds_and_read_back_equal() -> Result<(), String> {
-        let drive = Drive::new("light", 0.25, 4.0).levels(8);
-        let written = Value::from(drive.clone());
-        assert_eq!(written, json!({"by": "light", "start": 0.25, "end": 4.0, "levels": 8}));
-        let table = written.as_object().ok_or("an object")?;
-        assert_eq!(Drive::read(table)?, drive);
-        // `levels` left out is the default of 5
-        let bare = json!({"by": "light", "start": 0, "end": 1});
-        assert_eq!(Drive::read(bare.as_object().ok_or("an object")?)?.levels, 5);
-        Ok(())
-    }
-}

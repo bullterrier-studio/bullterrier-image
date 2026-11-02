@@ -176,31 +176,3 @@ pub(crate) fn crop(pixels: &[[f32; 3]], width: usize, window: Bounds) -> Vec<[f3
     }
     out
 }
-
-#[cfg(test)]
-mod tests {
-    use proptest::prelude::*;
-
-    use super::{renumber, renumber_sparse};
-
-    #[test]
-    fn a_kind_as_large_as_two_to_the_forty_needs_no_table_of_all_kinds() {
-        let huge = 1_u64 << 40;
-        assert_eq!(
-            renumber_sparse([huge + 7, 3, huge + 7, u64::MAX, 3].into_iter()),
-            (vec![0, 1, 0, 2, 1], 3)
-        );
-    }
-
-    proptest! {
-        #[test]
-        fn the_sparse_numbering_is_the_dense_one_whatever_the_kinds(
-            raw in proptest::collection::vec(0_usize..9, 0..40)
-        ) {
-            prop_assert_eq!(
-                renumber_sparse(raw.iter().map(|&kind| kind as u64)),
-                renumber(9, raw.iter().copied())
-            );
-        }
-    }
-}

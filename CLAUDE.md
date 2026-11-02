@@ -337,6 +337,9 @@ time). Fix findings properly; for a false positive use a targeted `# noqa: CODE 
 Follow the `testing-best-practices` skill. A test coupled to implementation or otherwise poor (weak sole assertion, tautology,
 golden file, sleep, mock of our own code) is worse than none: delete it. Reviewers treat such tests as blocking.
 
+- **Rust tests live in `crates/*/tests/` and use the public API** (`use bullterrier_image::...`); no `#[cfg(test)]` in
+  `src/`. Shared doubles and helpers: `crates/core/tests/common/`. A behaviour no public route reaches is tested through
+  the one that serves it, or earns a public name.
 - Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
   `kaleidoscope` is symmetric about its mirror axes; a blur never leaves the input's range.
 - Expected values come from an independent oracle (standard, hand computation, brute-force reference), never the code's formula.

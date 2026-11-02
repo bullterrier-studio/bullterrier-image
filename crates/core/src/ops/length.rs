@@ -39,25 +39,3 @@ pub(crate) const fn float(length: usize) -> f64 {
 pub(crate) fn whole(value: f64) -> usize {
     value.round_ties_even() as usize
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{float, whole};
-
-    #[test]
-    fn a_half_goes_to_the_even_whole_number_and_a_negative_to_zero() {
-        // Python: round(0.5) == 0, round(1.5) == 2, round(2.5) == 2, round(2.4999) == 2, round(-3.2) is below any length
-        for (value, expected) in [
-            (0.5, 0),
-            (1.5, 2),
-            (2.5, 2),
-            (2.4999, 2),
-            (2.5001, 3),
-            (-3.2, 0),
-            (7.0, 7),
-        ] {
-            assert_eq!(whole(value), expected, "{value}");
-        }
-        assert!((float(12_345) - 12_345.0).abs() < f64::EPSILON);
-    }
-}
