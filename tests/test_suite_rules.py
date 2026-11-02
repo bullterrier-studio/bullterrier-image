@@ -41,6 +41,10 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the extension's runner (`_core.render`, `_core.trace`) is compared with the definitions; `_core.apply` is "
         "the oracle for a scaled effect, and only the core can say which effects it runs"
     ),
+    ("_native/test_files.py", "bullterrier_image._native"): (
+        "the extension's file entry points (`_core.read`, `read_map`, `write`) are compared with Pillow, the oracle; "
+        "the facade `imageio` adds the composite over white and the array checks that these tests must not include"
+    ),
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"
     ),
