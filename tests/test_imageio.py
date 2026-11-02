@@ -103,6 +103,16 @@ FROM_PIL = [  # (picture, expected RGB per pixel, by hand): what `from_pil` give
         id="RGBA over white",
     ),
     pytest.param(row([(0, 0), (0, 51)], np.uint8, "LA"), [1, 0.8], id="LA over white"),
+    pytest.param(  # alpha 51 = 0.2: the straight grey is premultiplied 10 * 5 = 50, so the sum is exact
+        Image.frombytes("La", (2, 1), bytes([0, 0, 10, 51])),
+        [1, (10 / 255 + 1 - 51 / 255,) * 3],
+        id="La, premultiplied",
+    ),
+    pytest.param(
+        Image.frombytes("RGBa", (2, 1), bytes([0, 0, 0, 0, 10, 0, 20, 51])),
+        [1, (10 / 255 + 1 - 51 / 255, 1 - 51 / 255, 20 / 255 + 1 - 51 / 255)],
+        id="RGBa, premultiplied",
+    ),
 ]  # fmt: skip
 
 

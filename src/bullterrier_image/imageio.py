@@ -20,6 +20,7 @@ __all__ = ["from_pil", "load", "load_lut", "load_map", "load_picture", "save", "
 
 _EIGHT_BIT = 255.0  # the largest 8-bit value
 _RGBA = 4  # the channels of RGBA
+_PREMULTIPLIED = {"La": "LA", "RGBa": "RGBA"}  # Pillow's premultiplied modes, and their straight-alpha forms
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -171,10 +172,12 @@ def from_pil(img: Image.Image) -> np.ndarray:
 
     Transparency (an alpha channel, a transparent palette entry or colour key) is composited over white, so a colour
     hidden under a transparent pixel never shows. No colour profile is applied, and only 8-bit modes are supported
-    (RGB, RGBA, L, LA, 1, P, CMYK converted by Pillow's plain formula): Pillow clips the levels of a 16-bit or float
-    image to 0..255 on conversion, which gives wrong colours, not an error. To read a file as a viewer shows it, with
-    its profile and full precision, use `load`.
+    (RGB, RGBA, L, LA, 1, P, the premultiplied La and RGBa, CMYK converted by Pillow's plain formula): Pillow clips
+    the levels of a 16-bit or float image to 0..255 on conversion, which gives wrong colours, not an error. To read a
+    file as a viewer shows it, with its profile and full precision, use `load`.
     """
+    if img.mode in _PREMULTIPLIED:  # Pillow cannot convert these to RGBA directly; it un-premultiplies on the way
+        img = img.convert(_PREMULTIPLIED[img.mode])
     rgba = np.asarray(img.convert("RGBA"), np.float32) / _EIGHT_BIT
     alpha = rgba[..., 3:]
     rgb = rgba[..., :3] * alpha
