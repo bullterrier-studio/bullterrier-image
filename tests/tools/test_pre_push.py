@@ -296,7 +296,7 @@ def test_a_documentation_only_push_of_a_tag_skips_the_gate_unless_main_has_code(
     after = git_repo.commit("docs: change", {"docs/roadmap.md": "x"})
     git_repo.commit("chore: main change", main_changes)
     monkeypatch.chdir(git_repo.path)
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/tags/v0.1.0")
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/tags/v1.2.3")
     monkeypatch.setenv("PRE_COMMIT_FROM_REF", before)
     monkeypatch.setenv("PRE_COMMIT_TO_REF", after)
     monkeypatch.setattr(shutil, "which", lambda _name: None)
