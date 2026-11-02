@@ -81,6 +81,17 @@ def test_the_gate_only_checks_and_never_rewrites_files(poe_runs):
     assert [command for command in commands if fixing_words(shlex.split(command))] == [], commands
 
 
+def test_fast_runs_only_what_check_runs(poe_runs):
+    """`fast` is the inner loop: a step that is not part of the whole gate would pass here and mean nothing there."""
+    assert [command for command in poe_runs["fast"] if command not in poe_runs["check"]] == []
+
+
+def test_check_remembers_a_pass_for_the_push_by_starting_and_ending_with_the_hook_tool(poe_runs):
+    commands = poe_runs["check"]
+    assert commands[0].endswith("tools/pre_push.py start")
+    assert commands[-1].endswith("tools/pre_push.py pass")
+
+
 def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject, poe_runs):
     allowed = dev_dependency_names(pyproject) | SYSTEM_COMMANDS
     for task, commands in poe_runs.items():

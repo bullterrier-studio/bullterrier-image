@@ -412,9 +412,12 @@ follow "Fixing defects"; design follows the skill (no shallow wrappers; per-effe
 
 ## Git conventions
 
-Once per clone: `uv run poe setup` (hooks and commit template). Before every push or merge: `uv run poe check` (`uv run poe fix`
-repairs what it can). Commit hooks run ruff only; the pre-push hook runs the whole gate only for a push to `main` or a tag that
-changes more than documentation.
+Once per clone: `uv run poe setup` (hooks and commit template). While working: `uv run poe fast` (format, lint, types, Rust
+tests) and the tests covering your change. Once, before you report, merge or push: `uv run poe check` (`uv run poe fix` repairs
+what it can). Commit hooks run ruff only; the pre-push hook runs the whole gate for a push to `main` or a tag (and for any
+push while local `main` has unpushed code) that changes more than documentation, unless a clean, passing `uv run poe check`
+already ran on exactly the pushed tree (the record is in the git folder: commit before you run `check`, then merge and push;
+the merge and the push do not repeat it).
 - **Trunk-based:** short-lived branch `<type>/<short-description>` (`feat/glow-falloff`), in a worktree only when the owner asks
   (the brief says so); rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,

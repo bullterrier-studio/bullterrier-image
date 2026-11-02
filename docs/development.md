@@ -38,8 +38,9 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
   pictures kept (`uv run poe gallery --force` renders all again; effect named with `--only` always rendered).
 - Every gate (ruff, vulture, deptry, build check, mypy, tests; for Rust rustfmt, clippy, rustdoc, cargo-shear,
   cargo-deny, stubtest, cargo test) is configured in `pyproject.toml` and `Cargo.toml`, listed in
-  [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). Push to `main` (or a tag) runs the whole gate via pre-push hook unless it
-  changes only documentation (pages and `docs/images/`); other branches checked by CI when the pull request opens.
+  [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). `uv run poe fast` is the inner loop (format, lint, types, Rust tests). Push to `main` (or a tag) runs the whole gate via
+  pre-push hook unless it changes only documentation (pages and `docs/images/`) or a clean, passing `uv run poe check` already
+  ran on exactly the pushed tree; other branches checked by CI when the pull request opens.
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
   tests: suite never downloads a real model; tests of real models run only when already in cache and assert coarse
   properties (a model update may change every pixel).

@@ -81,6 +81,15 @@ class GitRepo:
         assert result.returncode == 0, f"git {' '.join(args)}: {result.stderr}"
         return result.stdout.strip()
 
+    def add_remote(self, name: str = "origin") -> None:
+        """Make sure the repository has a remote `name`: `origin` is there already, any other is a new empty bare
+        repository next to the working one."""
+        if name in self.git("remote").split():
+            return
+        bare = self.path.parent / f"{name}.git"
+        self.git("init", "-q", "--bare", str(bare))
+        self.git("remote", "add", name, str(bare))
+
     def write(self, name: str, text: str) -> None:
         (self.path / name).parent.mkdir(parents=True, exist_ok=True)
         (self.path / name).write_text(text, encoding="utf-8")
