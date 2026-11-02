@@ -330,16 +330,16 @@ def jpeg_files(folder) -> dict[str, bytes]:
     """Whole JPEG files Pillow writes of 64x64 noise: baseline and progressive, RGB, grey and CMYK."""
     noise = np.random.default_rng(0).integers(0, 256, (64, 64, 4), np.uint8)
     kinds = {
-        "baseline RGB": (Image.fromarray(noise[..., :3]), {}),
-        "baseline grey": (Image.fromarray(noise[..., 0]), {}),
-        "progressive RGB": (Image.fromarray(noise[..., :3]), {"progressive": True}),
-        "progressive grey": (Image.fromarray(noise[..., 0]), {"progressive": True}),
-        "CMYK": (Image.fromarray(noise, "CMYK"), {}),
-        "progressive CMYK": (Image.fromarray(noise, "CMYK"), {"progressive": True}),
+        "baseline RGB": (Image.fromarray(noise[..., :3]), False),
+        "baseline grey": (Image.fromarray(noise[..., 0]), False),
+        "progressive RGB": (Image.fromarray(noise[..., :3]), True),
+        "progressive grey": (Image.fromarray(noise[..., 0]), True),
+        "CMYK": (Image.fromarray(noise, "CMYK"), False),
+        "progressive CMYK": (Image.fromarray(noise, "CMYK"), True),
     }
     files = {}
-    for name, (img, options) in kinds.items():
-        img.save(folder / "whole.jpg", quality=90, **options)
+    for name, (img, progressive) in kinds.items():
+        img.save(folder / "whole.jpg", quality=90, progressive=progressive)
         files[name] = (folder / "whole.jpg").read_bytes()
     return files
 
