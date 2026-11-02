@@ -1,6 +1,7 @@
 # CLAUDE.md: bullterrier-image
 
-Python library and CLI that styles photos with composable effects. **The code API is the product** (as numpy's or polars'
+A Rust library (crate `bullterrier-image`) with a Python interface, as polars has, that styles photos with composable effects;
+a CLI and a service follow. Python is kept only where Rust lacks an equivalent. **The code API is the product** (as numpy's or polars'
 is): a look is a `Recipe`, an ordered list of steps, built and run in Python; a TOML recipe file is one serialisation of
 it, never a model of its own. Every capability exists in code first. See `README.md` (usage), `docs/design-decisions.md`
 (why), `docs/effects-roadmap.md` (planned).

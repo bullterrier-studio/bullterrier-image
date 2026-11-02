@@ -430,8 +430,18 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   JPEG decodes within 3 to 4 levels of 255 on photos (more on a few-pixel image), a CMYK press profile can differ by up to
   10 levels from littlecms, and a PNG or JPEG write is 2 to 3 times slower for a smaller file. Pillow stays a
   dependency for fonts and the Python resizers until the core has its own.
-- **`bt-image` stays a Python command until the last Python effect is gone.** *Reason:* cold start is not the bottleneck
-  while effects run in Python; a Rust binary is judged after the effects move.
+- **This is a Rust project with a Python interface, as polars is; Python stays only where Rust has no equivalent.** The
+  product is the crate and, later, a backend service for creators, so nothing in the hot or service path is Python. Python is
+  the binding, numpy interop, Pydantic builders for the Python interface (Rust validates on its own: enums, and `Table::check`
+  from the `#[param]` declarations) and the hook for Python effects (`register`). *Roadmap, in order:* (1) effects E1 to E6
+  into `crates/core/src/effects/`, each batch with the primitives it shares and the parameter kinds its effects need added to
+  the derive; (2) everything that is not an effect, in Rust: fonts for `ascii` and the contact sheet (a pure-Rust glyph
+  rasteriser; spike against Pillow's atlas first), the subject and depth finders (ONNX through `ort`, Apple Vision through the
+  `objc2` crates; spike the depth model first), `bt-image` as a Rust binary shipped in the wheel (as ruff and uv are), the
+  pipeline, manifest, contact sheet and gallery, recipe files and `.cube` tables, the presets and looks embedded in the crate,
+  and a version for the derive crate; (3) E7: delete the Python `ops`, scipy, Pillow where nothing needs it and the
+  transitional duplicates, re-render the gallery, measure. *Decided:* `ort` for ONNX (speed and model coverage; the cost is
+  bundling the ONNX Runtime library in the wheel and the service). *Not yet:* publishing the crate, until the effects are in.
 
 ## Finding the subject and depth
 
