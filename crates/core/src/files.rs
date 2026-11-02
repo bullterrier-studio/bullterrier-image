@@ -59,6 +59,7 @@ struct Decoded {
 /// not by the extension: PNG, JPEG (greyscale, colour and CMYK or YCCK, which are mixed to RGB without a profile),
 /// GIF, WebP, TIFF and BMP. A TIFF of 32-bit integer levels (Pillow's mode `I`) is read as 16-bit grey is, the level
 /// over 65535, and one of floating-point levels (mode `F`) as its level; both are clipped to 0..1.
+/// A palette TIFF (one with a `ColorMap`) is not read; palette PNG, GIF and BMP are.
 ///
 /// The picture is upright: an EXIF orientation is applied. A file of several frames (an animated GIF or PNG, a
 /// multi-page TIFF) gives its first. Levels are taken as sRGB; an embedded colour profile is not applied yet. The same
@@ -66,7 +67,7 @@ struct Decoded {
 ///
 /// # Errors
 /// [`Error::ImageRead`], naming the path and the reason, if the file is missing, a folder, not an image, damaged or
-/// truncated, in a layout the core does not read (a floating-point TIFF holding NaN, say), or has more
+/// truncated, in a layout the core does not read (a palette TIFF, a floating-point TIFF holding NaN), or has more
 /// pixels than 178,956,970 (twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485), which is checked from the header before
 /// anything is decoded.
 pub fn read(path: &Path) -> Result<Image, Error> {

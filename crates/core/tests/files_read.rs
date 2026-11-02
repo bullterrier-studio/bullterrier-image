@@ -638,6 +638,18 @@ fn a_tiff_of_32_bit_levels_claiming_too_many_pixels_is_refused_before_it_is_read
 }
 
 #[test]
+fn a_palette_tiff_is_refused_naming_the_path() -> Outcome {
+    let (_folder, path) = written("palette.tif", &common::files::tiff_palette())?;
+    for result in [read(&path).map(drop), read_map(&path).map(drop)] {
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::ImageRead && error.to_string().contains("palette.tif")),
+            "{result:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn the_same_file_read_twice_is_the_same_image() -> Outcome {
     let (_folder, path) = written("twice.png", &png_cases().remove(4).file)?;
     assert_eq!(read(&path)?, read(&path)?);

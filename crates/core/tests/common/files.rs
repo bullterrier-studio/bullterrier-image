@@ -272,3 +272,37 @@ pub(crate) fn gif_frame_larger_than_its_screen() -> Vec<u8> {
     bytes.push(0x3B); // end of file
     bytes
 }
+
+/// A little-endian TIFF of 2 x 1 pixels in 8-bit palette colour (photometric 3, with a `ColorMap`): the pixels are the
+/// indices 0 and 1.
+pub(crate) fn tiff_palette() -> Vec<u8> {
+    let entry = |tag: u16, kind: u16, count: u32, value: u32| {
+        [
+            tag.to_le_bytes().as_slice(),
+            &kind.to_le_bytes(),
+            &count.to_le_bytes(),
+            &value.to_le_bytes(),
+        ]
+        .concat()
+    };
+    let (short, long) = (3, 4);
+    let strip = 8 + 2 + 9 * 12 + 4; // the pixels follow the directory, the colour map the pixels
+    let entries = [
+        entry(256, long, 1, 2),
+        entry(257, long, 1, 1),
+        entry(258, short, 1, 8),
+        entry(262, short, 1, 3), // palette colour
+        entry(273, long, 1, strip),
+        entry(277, short, 1, 1),
+        entry(278, long, 1, 1),
+        entry(279, long, 1, 2),
+        entry(320, short, 768, strip + 2), // the colour map: 256 reds, 256 greens, 256 blues
+    ];
+    let mut file = vec![b'I', b'I', 42, 0, 8, 0, 0, 0];
+    file.extend_from_slice(&9_u16.to_le_bytes());
+    file.extend(entries.concat());
+    file.extend_from_slice(&[0; 4]); // no next directory
+    file.extend_from_slice(&[0, 1]); // the pixels
+    file.extend((0..768_u16).flat_map(|index| (index * 85).to_le_bytes())); // any colours
+    file
+}
