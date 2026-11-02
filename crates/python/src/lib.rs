@@ -1,6 +1,7 @@
 //! `bullterrier_image._native._core`: runs the effects of the Rust core on numpy pictures. Generic: it names no effect, so
 //! porting one never changes it.
 
+mod files;
 mod run;
 
 use std::sync::Arc;
@@ -33,6 +34,9 @@ mod _core {
 
     #[pymodule_export]
     use super::{CoreError, apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
+
+    #[pymodule_export]
+    use super::files::{read, read_map, write};
 
     #[pymodule_export]
     use super::run::{check_recipe, known_maps, needs, render, trace};

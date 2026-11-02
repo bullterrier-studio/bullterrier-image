@@ -1,6 +1,7 @@
 # The stub of the Rust extension `bullterrier_image._native._core` (crates/python). The functions' documentation is the
 # extension's own (`help(_core.apply)`); `uv run poe stubtest` (in `poe check`) checks this stub against it.
 
+import os
 from collections.abc import Callable, Mapping
 from typing import Any, Protocol
 
@@ -16,12 +17,15 @@ __all__ = [
     "known_maps",
     "needs",
     "params",
+    "read",
+    "read_map",
     "read_recipe",
     "register",
     "render",
     "trace",
     "unregister",
     "vocabulary",
+    "write",
 ]
 
 class CoreError(ValueError):
@@ -78,3 +82,6 @@ def trace(
     size: int | None = None,
     threads: int = 1,
 ) -> list[tuple[str, int | str | None, np.ndarray]]: ...
+def read(path: str | os.PathLike[str]) -> np.ndarray: ...
+def read_map(path: str | os.PathLike[str]) -> np.ndarray: ...
+def write(path: str | os.PathLike[str], image: np.ndarray, quality: int = 95) -> None: ...
