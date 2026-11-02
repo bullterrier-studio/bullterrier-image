@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::path::Path;
 
 use image::codecs::jpeg::JpegEncoder;
-use image::codecs::png::PngEncoder;
+use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::codecs::webp::WebPEncoder;
 use image::{ExtendedColorType, ImageEncoder};
 
@@ -39,7 +39,7 @@ enum Format {
 ///
 /// The file embeds a small sRGB profile, so every viewer shows the colours the effects made, and carries no other
 /// metadata: nothing from the photo it came from, no EXIF and no GPS position. The same image gives the same bytes
-/// every time. PNG is lossless at its default compression; WebP is lossless; JPEG keeps full-resolution colour
+/// every time. PNG is lossless, written at the best compression with adaptive filtering; WebP is lossless; JPEG keeps full-resolution colour
 /// (4:4:4, no chroma subsampling).
 ///
 /// # Errors
@@ -77,7 +77,13 @@ pub fn write_with_quality(path: &Path, image: &Image, quality: u8) -> Result<(),
     // The whole file is made in memory first, so a picture that cannot be encoded leaves no file.
     let mut bytes = Vec::new();
     match format {
-        Format::Png => embed(PngEncoder::new(&mut bytes), &levels, width, height, colour),
+        Format::Png => embed(
+            PngEncoder::new_with_quality(&mut bytes, CompressionType::Best, FilterType::Adaptive),
+            &levels,
+            width,
+            height,
+            colour,
+        ),
         Format::Jpeg => embed(
             JpegEncoder::new_with_quality(&mut bytes, quality),
             &levels,
