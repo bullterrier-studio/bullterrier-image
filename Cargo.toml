@@ -33,6 +33,7 @@ serde_json = { version = "1", features = ["preserve_order"] }  # a recipe file's
 serde_path_to_error = "0.1"
 svgtypes = { version = "0.16", default-features = false, features = ["std"] }  # path data, for the path regions
 syn = "3"
+tiff = { version = "0.11", default-features = false }  # the `image` crate's own TIFF decoder (its features are on there), read directly for 32-bit levels
 toml = { version = "1", default-features = false, features = ["std", "parse", "serde", "preserve_order"] }
 
 # Warnings, not errors, so a newer compiler's new lint never breaks a user's install; the gate (`poe check`) runs clippy

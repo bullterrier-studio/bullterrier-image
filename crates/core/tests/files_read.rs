@@ -9,7 +9,7 @@ use std::io::Cursor;
 
 use bullterrier_image::{Error, ErrorKind, Image, Layer, read, read_map};
 use common::Outcome;
-use common::files::{Png, Scratch, chunk, cmyk_jpeg, exif, progressive_jpeg};
+use common::files::{Png, Scratch, chunk, cmyk_jpeg, exif, progressive_jpeg, tiff_wide};
 use image::codecs::gif::GifEncoder;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, ExtendedColorType, ImageBuffer, ImageFormat};
@@ -528,41 +528,112 @@ fn a_file_that_cannot_be_read_as_an_image_is_an_image_read_error_naming_it() -> 
     Ok(())
 }
 
+/// TIFF files of 32-bit levels, `(id, file, size, expected levels over 3 channels' worth of grey)`.
+fn wide_tiff_cases() -> Vec<Case> {
+    let ints = |values: &[i32]| values.iter().map(|value| value.to_le_bytes()).collect::<Vec<_>>();
+    let floats = |values: &[f32]| values.iter().map(|value| value.to_le_bytes()).collect::<Vec<_>>();
+    let grey = |levels: &[f32]| levels.iter().flat_map(|&level| [level; 3]).collect::<Vec<_>>();
+    vec![
+        Case {
+            id: "32-bit integers are read as 16-bit grey is: the level over 65535",
+            file: tiff_wide(3, 1, 2, None, &ints(&[0, 32768, 65535])),
+            size: (1, 3),
+            expected: grey(&[0., 32768. / 65535., 1.]),
+        },
+        Case {
+            id: "32-bit integers beyond 0..65535 are clipped",
+            file: tiff_wide(3, 1, 2, None, &ints(&[-5, 70000, 26214])),
+            size: (1, 3),
+            expected: grey(&[0., 1., 26214. / 65535.]),
+        },
+        Case {
+            id: "32-bit unsigned integers are levels over 65535 too",
+            file: tiff_wide(3, 1, 1, None, &[0_u32, 16384, 4_000_000_000].map(u32::to_le_bytes)),
+            size: (1, 3),
+            expected: grey(&[0., 16384. / 65535., 1.]),
+        },
+        Case {
+            id: "floats are their level, clipped to 0..1",
+            file: tiff_wide(3, 1, 3, None, &floats(&[0.25, 1.5, -0.5])),
+            size: (1, 3),
+            expected: grey(&[0.25, 1., 0.]),
+        },
+        Case {
+            id: "a TIFF of floats is upright by its orientation (6: the first column is the top)",
+            file: tiff_wide(2, 3, 3, Some(6), &floats(&[0., 0.1, 0.2, 0.3, 0.4, 0.5])),
+            size: (2, 3),
+            expected: grey(&[0.4, 0.2, 0., 0.5, 0.3, 0.1]),
+        },
+    ]
+}
+
 #[test]
-fn a_tiff_of_levels_the_core_does_not_read_is_refused_naming_the_path() -> Outcome {
-    // little-endian TIFF, 1 x 1, 32-bit floating-point grey (SampleFormat 3), the value 0.25
-    let tag = |id: u16, kind: u16, value: u32| {
-        [
-            id.to_le_bytes().as_slice(),
-            &kind.to_le_bytes(),
-            &1_u32.to_le_bytes(),
-            &value.to_le_bytes(),
-        ]
-        .concat()
-    };
-    let mut file = vec![b'I', b'I', 42, 0, 8, 0, 0, 0];
-    let tags = [
-        tag(256, 3, 1),
-        tag(257, 3, 1),
-        tag(258, 3, 32),
-        tag(262, 3, 1),
-        tag(273, 4, 8 + 2 + 9 * 12 + 4),
-        tag(277, 3, 1),
-        tag(278, 3, 1),
-        tag(279, 4, 4),
-        tag(339, 3, 3),
-    ];
-    file.extend_from_slice(&u16::try_from(tags.len())?.to_le_bytes());
-    file.extend(tags.concat());
-    file.extend_from_slice(&[0; 4]);
-    file.extend_from_slice(&0.25_f32.to_le_bytes());
-    let (_folder, path) = written("float-levels.tif", &file)?;
-    for result in [read(&path).map(drop), read_map(&path).map(drop)] {
-        assert!(
-            matches!(&result, Err(Error::ImageRead(message)) if message.contains("float-levels.tif")),
-            "{result:?}"
-        );
+fn tiffs_of_32_bit_levels_read_as_the_levels_worked_out_by_hand() -> Outcome {
+    for Case {
+        id,
+        file,
+        size,
+        expected,
+    } in wide_tiff_cases()
+    {
+        let (_folder, path) = written("levels.tif", &file)?;
+        assert_levels(id, read(&path)?, size, &expected, LEVEL);
     }
+    Ok(())
+}
+
+#[test]
+fn a_map_of_32_bit_integer_levels_within_16_bits_reads_as_16_bit_grey_does() -> Outcome {
+    let samples = [0_i32, 26214].map(i32::to_le_bytes);
+    let (_folder, path) = written("map.tif", &tiff_wide(2, 1, 2, None, &samples))?;
+    assert_close(&read_map(&path)?, &[0., 0.4], LEVEL);
+    Ok(())
+}
+
+#[test]
+fn a_map_of_float_levels_or_of_integers_beyond_16_bits_is_refused_naming_the_mode() -> Outcome {
+    let rows = [
+        (
+            "floats",
+            tiff_wide(2, 1, 3, None, &[0.0_f32, 0.4].map(f32::to_le_bytes)),
+            "'F'",
+        ),
+        (
+            "one past 65535",
+            tiff_wide(2, 1, 2, None, &[0_i32, 65536].map(i32::to_le_bytes)),
+            "'I'",
+        ),
+        (
+            "above 65535",
+            tiff_wide(2, 1, 2, None, &[0_i32, 70000].map(i32::to_le_bytes)),
+            "'I'",
+        ),
+        (
+            "negative",
+            tiff_wide(2, 1, 2, None, &[-5_i32, 100].map(i32::to_le_bytes)),
+            "'I'",
+        ),
+    ];
+    for (id, file, mode) in rows {
+        let (_folder, path) = written("map.tif", &file)?;
+        let message = read_map(&path).err().map(|error| error.to_string()).unwrap_or_default();
+        assert!(message.contains("map.tif") && message.contains(mode), "{id}: {message}");
+        assert!(read(&path).is_ok(), "{id}: read clips instead");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_tiff_of_32_bit_levels_claiming_too_many_pixels_is_refused_before_it_is_read() -> Outcome {
+    let (_folder, path) = written(
+        "bomb.tif",
+        &tiff_wide(100_000, 100_000, 3, None, &[0.5_f32.to_le_bytes()]),
+    )?;
+    let message = read(&path).err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(
+        message.contains("bomb.tif") && message.contains("more than the 178956970"),
+        "{message}"
+    );
     Ok(())
 }
 

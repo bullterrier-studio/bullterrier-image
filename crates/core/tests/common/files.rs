@@ -175,8 +175,8 @@ fn unhex(digits: &str) -> Vec<u8> {
         .collect()
 }
 
-/// An 8 x 8 progressive JPEG of one colour, 200, 100, 50 (red, green, blue), saved at quality 100 without chroma
-/// subsampling; the encoders here write baseline files only.
+/// An 8 x 8 progressive JPEG of one colour, 200, 100, 50 (red, green, blue), made once with Pillow
+/// (`quality=100, subsampling=0, progressive=True`) because the encoders here write baseline files only.
 pub(crate) fn progressive_jpeg() -> Vec<u8> {
     unhex(
         &[
@@ -197,7 +197,7 @@ pub(crate) fn progressive_jpeg() -> Vec<u8> {
 }
 
 /// An 8 x 8 CMYK JPEG (Adobe's: four components, inks stored inverted) of one colour, cyan 0, magenta 255, yellow 255,
-/// black 0, which with no profile is pure red.
+/// black 0, which with no profile is pure red; made once with Pillow (`Image.fromarray(inks, "CMYK").save(quality=100)`).
 pub(crate) fn cmyk_jpeg() -> Vec<u8> {
     unhex(
         &[
@@ -212,4 +212,49 @@ pub(crate) fn cmyk_jpeg() -> Vec<u8> {
         ]
         .concat(),
     )
+}
+
+/// A little-endian TIFF of one 32-bit sample per pixel, `width` x `height`, in one strip: `sample_format` is the TIFF
+/// tag (1 unsigned integers, 2 signed integers, 3 floats), `samples` the bytes of each pixel's level, row after row,
+/// and `orientation` the EXIF orientation to tag it with, if any.
+pub(crate) fn tiff_wide(
+    width: u32,
+    height: u32,
+    sample_format: u16,
+    orientation: Option<u16>,
+    samples: &[[u8; 4]],
+) -> Vec<u8> {
+    let entry = |tag: u16, kind: u16, value: u32| {
+        [
+            tag.to_le_bytes().as_slice(),
+            &kind.to_le_bytes(),
+            &1_u32.to_le_bytes(),
+            &value.to_le_bytes(),
+        ]
+        .concat()
+    };
+    let (short, long) = (3, 4);
+    let mut entries = vec![
+        entry(256, long, width),
+        entry(257, long, height),
+        entry(258, short, 32), // bits per sample
+        entry(262, short, 1),  // black is zero
+    ];
+    let data_at = 8 + 2 + 12 * (9 + u32::from(orientation.is_some())) + 4;
+    entries.push(entry(273, long, data_at)); // strip offset
+    if let Some(orientation) = orientation {
+        entries.push(entry(274, short, u32::from(orientation)));
+    }
+    entries.extend([
+        entry(277, short, 1), // samples per pixel
+        entry(278, long, height),
+        entry(279, long, u32::try_from(samples.len() * 4).unwrap_or(u32::MAX)), // strip byte count
+        entry(339, short, u32::from(sample_format)),
+    ]);
+    let mut file = vec![b'I', b'I', 42, 0, 8, 0, 0, 0];
+    file.extend_from_slice(&u16::try_from(entries.len()).unwrap_or(u16::MAX).to_le_bytes());
+    file.extend(entries.concat());
+    file.extend_from_slice(&[0; 4]); // no next directory
+    file.extend(samples.concat());
+    file
 }

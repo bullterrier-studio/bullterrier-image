@@ -1,9 +1,15 @@
 //! Reading image files.
 
 use std::fmt::Display;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
-use image::{DynamicImage, ImageDecoder, ImageReader};
+use image::metadata::Orientation;
+use image::{DynamicImage, ImageBuffer, ImageDecoder, ImageFormat, ImageReader};
+use tiff::ColorType;
+use tiff::decoder::{Decoder, DecodingResult, Limits};
+use tiff::tags::Tag;
 
 use crate::{Error, Image, Layer};
 
@@ -17,8 +23,18 @@ pub(crate) const MAX_PIXELS: u64 = 2 * 89_478_485; // constant: Pillow's decompr
 enum Layout {
     Grey,
     GreyAlpha,
+    /// Three equal channels, a grey file widened (a TIFF of 32-bit levels).
+    GreyRgb,
     Rgb,
     Rgba,
+}
+
+/// The levels a file holds beyond what 0..1 can say, as a TIFF of 32-bit levels does.
+enum Wide {
+    /// Floating-point levels (Pillow's mode `F`), clipped to 0..1.
+    Float,
+    /// 32-bit integer levels (Pillow's mode `I`), over 65535 and clipped to 0..1; the range the file held.
+    Integer { lowest: i64, highest: i64 },
 }
 
 /// A file's first frame, upright, as 0..1 levels.
@@ -29,6 +45,7 @@ struct Decoded {
     alpha: Option<Vec<f32>>,
     /// The file has one grey channel: its brightness is that level itself, not a weighting of three equal ones.
     grey: bool,
+    wide: Option<Wide>,
 }
 
 /// Read the image file at `path`: RGB, or RGBA with straight alpha (the colour not multiplied by it) when the file has
@@ -36,7 +53,8 @@ struct Decoded {
 /// transparent). Levels are `f32` in 0..1, the file's own numbers over its maximum: an 8-bit level over 255, a 16-bit
 /// one over 65535; a grey file has equal red, green and blue; a 1-bit file is 0 or 1. The format is found by content,
 /// not by the extension: PNG, JPEG (greyscale, colour and CMYK or YCCK, which are mixed to RGB without a profile),
-/// GIF, WebP, TIFF (8- and 16-bit) and BMP.
+/// GIF, WebP, TIFF and BMP. A TIFF of 32-bit integer levels (Pillow's mode `I`) is read as 16-bit grey is, the level
+/// over 65535, and one of floating-point levels (mode `F`) as its level; both are clipped to 0..1.
 ///
 /// The picture is upright: an EXIF orientation is applied. A file of several frames (an animated GIF or PNG, a
 /// multi-page TIFF) gives its first. Levels are taken as sRGB; an embedded colour profile is not applied yet. The same
@@ -44,7 +62,7 @@ struct Decoded {
 ///
 /// # Errors
 /// [`Error::ImageRead`], naming the path and the reason, if the file is missing, a folder, not an image, damaged or
-/// truncated, in a layout the core does not read (a TIFF of 32-bit integer or floating-point levels), or has more
+/// truncated, in a layout the core does not read (a floating-point TIFF holding NaN, say), or has more
 /// pixels than 178,956,970 (twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485), which is checked from the header before
 /// anything is decoded.
 pub fn read(path: &Path) -> Result<Image, Error> {
@@ -71,11 +89,11 @@ pub fn read(path: &Path) -> Result<Image, Error> {
 /// `(299 red + 587 green + 114 blue) / 1000` (ITU-R BT.601 luma). A 16-bit file keeps its range: the level over 65535.
 ///
 /// Orientation, the first-frame rule, the formats and the limit on pixels are as in [`read`], so the map lines up with
-/// the photo it was made for. Levels outside 0..1 do not exist in what the core decodes: a TIFF of floating-point or
-/// 32-bit integer levels is refused as in [`read`].
+/// the photo it was made for. Levels with no faithful 0..1 are refused instead of clipped: a TIFF of floating-point
+/// levels (mode `F`), and one of 32-bit integers (mode `I`) holding a level outside 0..=65535.
 ///
 /// # Errors
-/// [`Error::ImageRead`] as for [`read`].
+/// [`Error::ImageRead`] as for [`read`]; for those two TIFFs the message names the mode.
 pub fn read_map(path: &Path) -> Result<Layer, Error> {
     let Decoded {
         height,
@@ -83,7 +101,25 @@ pub fn read_map(path: &Path) -> Result<Layer, Error> {
         colour,
         alpha,
         grey,
+        wide,
     } = decode(path)?;
+    match wide {
+        Some(Wide::Float) => {
+            return Err(unreadable(
+                path,
+                &"its mode 'F' (float levels) has no white: save the map as 8- or 16-bit greyscale",
+            ));
+        }
+        Some(Wide::Integer { lowest, highest }) if lowest < 0 || highest > 65535 => {
+            return Err(unreadable(
+                path,
+                &format!(
+                    "its mode 'I' holds levels {lowest}..{highest}, outside 16 bits (0..65535): save the map as 8- or 16-bit greyscale"
+                ),
+            ));
+        }
+        _ => {}
+    }
     let values = match alpha.filter(|alpha| alpha.iter().any(|&level| level < 1.0)) {
         Some(alpha) => alpha,
         None if grey => colour.iter().map(|&[level, ..]| level).collect(),
@@ -95,24 +131,40 @@ pub fn read_map(path: &Path) -> Result<Layer, Error> {
     Layer::new(height, width, values)
 }
 
+/// The refusal of the file at `path` for `reason`.
+fn unreadable(path: &Path, reason: &dyn Display) -> Error {
+    Error::ImageRead(format!("cannot read {} as an image: {reason}", path.display()))
+}
+
+/// Refuses a size of more than [`MAX_PIXELS`] pixels, from the header alone.
+fn within_limit(width: u32, height: u32) -> Result<(), String> {
+    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+        return Err(format!(
+            "it is {width} x {height} pixels, more than the {MAX_PIXELS} the core reads"
+        ));
+    }
+    Ok(())
+}
+
 /// The first frame of the file at `path`, upright.
 fn decode(path: &Path) -> Result<Decoded, Error> {
-    let refuse =
-        |reason: &dyn Display| Error::ImageRead(format!("cannot read {} as an image: {reason}", path.display()));
+    let refuse = |reason: &dyn Display| unreadable(path, reason);
     let mut reader = ImageReader::open(path)
         .and_then(ImageReader::with_guessed_format)
         .map_err(|error| refuse(&error))?;
     reader.no_limits(); // the pixel limit below is the core's, and the first to apply
-    let mut decoder = reader.into_decoder().map_err(|error| refuse(&error))?;
-    let (width, height) = decoder.dimensions();
-    if u64::from(width) * u64::from(height) > MAX_PIXELS {
-        return Err(refuse(&format!(
-            "it is {width} x {height} pixels, more than the {MAX_PIXELS} the core reads"
-        )));
-    }
-    // Colour management hook: `decoder.icc_profile()` is the embedded profile, to convert from before the levels are used.
-    let orientation = decoder.orientation().map_err(|error| refuse(&error))?;
-    let mut picture = DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?;
+    let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, reader.format())?
+    {
+        (picture, orientation, Some(wide))
+    } else {
+        let mut decoder = reader.into_decoder().map_err(|error| refuse(&error))?;
+        let (width, height) = decoder.dimensions();
+        within_limit(width, height).map_err(|reason| refuse(&reason))?;
+        // Colour management hook: `decoder.icc_profile()` is the embedded profile, to convert from before the levels are used.
+        let orientation = decoder.orientation().map_err(|error| refuse(&error))?;
+        let picture = DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?;
+        (picture, orientation, None)
+    };
     picture.apply_orientation(orientation);
     let (height, width) = (picture.height() as usize, picture.width() as usize);
     let (colour, alpha, grey) = match &picture {
@@ -124,6 +176,7 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
         DynamicImage::ImageLumaA16(raw) => levels(raw.as_raw(), 65535.0, Layout::GreyAlpha),
         DynamicImage::ImageRgb16(raw) => levels(raw.as_raw(), 65535.0, Layout::Rgb),
         DynamicImage::ImageRgba16(raw) => levels(raw.as_raw(), 65535.0, Layout::Rgba),
+        DynamicImage::ImageRgb32F(raw) => levels(raw.as_raw(), 1.0, Layout::GreyRgb),
         other => {
             return Err(refuse(&format!(
                 "its pixel layout {:?} is not one the core reads",
@@ -137,24 +190,73 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
         colour,
         alpha,
         grey,
+        wide,
     })
+}
+
+/// A TIFF of one 32-bit sample per pixel (integers or floats), which the `image` crate does not decode: its levels
+/// as a three-channel float image of equal channels, its orientation and what it held. None for any other file.
+fn wide_tiff(path: &Path, format: Option<ImageFormat>) -> Result<Option<(DynamicImage, Orientation, Wide)>, Error> {
+    if format != Some(ImageFormat::Tiff) {
+        return Ok(None);
+    }
+    let refuse = |reason: &dyn Display| unreadable(path, reason);
+    let file = File::open(path).map_err(|error| refuse(&error))?;
+    let mut decoder = Decoder::new(BufReader::new(file))
+        .map_err(|error| refuse(&error))?
+        .with_limits(Limits::unlimited()); // the pixel limit below is the core's
+    if decoder.colortype().map_err(|error| refuse(&error))? != ColorType::Gray(32) {
+        return Ok(None);
+    }
+    let (width, height) = decoder.dimensions().map_err(|error| refuse(&error))?;
+    within_limit(width, height).map_err(|reason| refuse(&reason))?;
+    let orientation = decoder
+        .find_tag_unsigned::<u64>(Tag::Orientation)
+        .map_err(|error| refuse(&error))?
+        .and_then(|value| Orientation::from_exif(u8::try_from(value).ok()?))
+        .unwrap_or(Orientation::NoTransforms);
+    let (levels, wide) = match decoder.read_image().map_err(|error| refuse(&error))? {
+        DecodingResult::F32(values) if values.iter().any(|value| value.is_nan()) => {
+            return Err(refuse(&"it holds levels that are not numbers (NaN)"));
+        }
+        DecodingResult::F32(values) => (values.iter().map(|level| level.clamp(0.0, 1.0)).collect(), Wide::Float),
+        DecodingResult::I32(values) => integer_levels(values.iter().map(|&value| i64::from(value))),
+        DecodingResult::U32(values) => integer_levels(values.iter().map(|&value| i64::from(value))),
+        _ => return Err(refuse(&"its levels are neither integers nor floats")),
+    };
+    let widened = levels.iter().flat_map(|&level| [level; 3]).collect();
+    let buffer =
+        ImageBuffer::from_raw(width, height, widened).ok_or_else(|| refuse(&"its data is shorter than its size"))?;
+    Ok(Some((DynamicImage::ImageRgb32F(buffer), orientation, wide)))
+}
+
+/// Integer `values` as levels over 65535 clipped to 0..1, with the range they held.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a level is rounded to f32, as Pillow's float32 array does"
+)]
+fn integer_levels(values: impl Iterator<Item = i64> + Clone) -> (Vec<f32>, Wide) {
+    let lowest = values.clone().min().unwrap_or(0);
+    let highest = values.clone().max().unwrap_or(0);
+    let levels = values.map(|value| (value as f32 / 65535.0).clamp(0.0, 1.0)).collect();
+    (levels, Wide::Integer { lowest, highest })
 }
 
 /// The channels `raw` as 0..1 levels (each over `white`, the largest the file's depth holds): the colour of every
 /// pixel, its alpha if the layout has one, and whether the file is grey.
 fn levels<T: Copy + Into<f32>>(raw: &[T], white: f32, layout: Layout) -> (Vec<[f32; 3]>, Option<Vec<f32>>, bool) {
     let level = |value: T| value.into() / white;
-    match layout {
-        Layout::Grey => (raw.iter().map(|&grey| [level(grey); 3]).collect(), None, true),
+    let grey = matches!(layout, Layout::Grey | Layout::GreyAlpha | Layout::GreyRgb);
+    let (colour, alpha) = match layout {
+        Layout::Grey => (raw.iter().map(|&grey| [level(grey); 3]).collect(), None),
         Layout::GreyAlpha => {
             let (pairs, _) = raw.as_chunks::<2>();
             (
                 pairs.iter().map(|&[grey, _]| [level(grey); 3]).collect(),
                 Some(pairs.iter().map(|&[_, alpha]| level(alpha)).collect()),
-                true,
             )
         }
-        Layout::Rgb => {
+        Layout::Rgb | Layout::GreyRgb => {
             let (triples, _) = raw.as_chunks::<3>();
             (
                 triples
@@ -162,7 +264,6 @@ fn levels<T: Copy + Into<f32>>(raw: &[T], white: f32, layout: Layout) -> (Vec<[f
                     .map(|&[red, green, blue]| [level(red), level(green), level(blue)])
                     .collect(),
                 None,
-                false,
             )
         }
         Layout::Rgba => {
@@ -173,8 +274,8 @@ fn levels<T: Copy + Into<f32>>(raw: &[T], white: f32, layout: Layout) -> (Vec<[f
                     .map(|&[red, green, blue, _]| [level(red), level(green), level(blue)])
                     .collect(),
                 Some(quads.iter().map(|&[_, _, _, alpha]| level(alpha)).collect()),
-                false,
             )
         }
-    }
+    };
+    (colour, alpha, grey)
 }
