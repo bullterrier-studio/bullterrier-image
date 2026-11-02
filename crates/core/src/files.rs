@@ -189,17 +189,15 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
         };
         let orientation = decoder.orientation().map_err(|error| refuse(&error))?;
         // The image crate mixes the inks of a CMYK file to RGB, so its profile is applied to the inks or to nothing.
-        let mut inks = None;
         if embedded.is_some()
             && raw::is_cmyk(path, format, decoder.original_color_type())
             && let Some(profile) = embedded.take().and_then(|bytes| Profile::new(&bytes, Model::Cmyk))
+            && let Some(decoded) =
+                raw::cmyk_decoded(path, format, orientation, &profile).map_err(|reason| refuse(&reason))?
         {
-            inks = raw::cmyk_picture(path, format, &profile).map_err(|reason| refuse(&reason))?;
+            return Ok(decoded);
         }
-        let picture = match inks {
-            Some(picture) => picture,
-            None => DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?,
-        };
+        let picture = DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?;
         (picture, orientation, None)
     };
     picture.apply_orientation(orientation);
@@ -234,11 +232,7 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
     if let (Some(model), Some(bytes)) = (model, embedded)
         && let Some(profile) = Profile::new(&bytes, model)
     {
-        let converted = match model {
-            Model::Grey => profile.to_srgb(&colour.iter().map(|&[level, ..]| level).collect::<Vec<_>>(), 1.0),
-            _ => profile.to_srgb(colour.as_flattened(), 1.0),
-        };
-        colour = converted.map_err(|error| refuse(&error))?;
+        profile.convert(&mut colour).map_err(|error| refuse(&error))?;
     }
     Ok(Decoded {
         height,

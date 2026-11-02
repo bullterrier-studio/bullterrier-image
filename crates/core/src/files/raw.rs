@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use image::metadata::Orientation;
 use image::{DynamicImage, ExtendedColorType, ImageBuffer, ImageFormat};
 use tiff::ColorType;
 use tiff::decoder::{Decoder, DecodingResult, Limits};
@@ -16,7 +17,7 @@ use zune_core::options::DecoderOptions;
 use zune_jpeg::JpegDecoder;
 
 use super::icc::Profile;
-use super::{MAX_ALLOC, within_limit};
+use super::{Decoded, MAX_ALLOC, within_limit};
 
 /// The profile embedded in the TIFF at `path`, if it has a readable one.
 pub(super) fn tiff_profile(path: &Path) -> Option<Vec<u8>> {
@@ -41,13 +42,14 @@ pub(super) fn is_cmyk(path: &Path, format: Option<ImageFormat>, original: Extend
     }
 }
 
-/// The CMYK file at `path` (a TIFF of 8-bit inks, or a JPEG of any CMYK kind) in sRGB, its inks converted by `profile`
-/// as they are stored; None for any other file.
-pub(super) fn cmyk_picture(
+/// The CMYK file at `path` (a TIFF of 8-bit inks, or a JPEG of any CMYK kind), upright, in sRGB: its inks as stored,
+/// converted by `profile`. None for any other file.
+pub(super) fn cmyk_decoded(
     path: &Path,
     format: Option<ImageFormat>,
+    orientation: Orientation,
     profile: &Profile,
-) -> Result<Option<DynamicImage>, String> {
+) -> Result<Option<Decoded>, String> {
     let inks = match format {
         Some(ImageFormat::Tiff) => tiff_inks(path)?,
         Some(ImageFormat::Jpeg) => jpeg_inks(path)?,
@@ -56,10 +58,23 @@ pub(super) fn cmyk_picture(
     let Some((width, height, inks)) = inks else {
         return Ok(None);
     };
-    let colour = profile.to_srgb(&inks, 255.0).map_err(|error| error.to_string())?;
-    let buffer =
-        ImageBuffer::from_raw(width, height, colour.into_flattened()).ok_or("its data is shorter than its size")?;
-    Ok(Some(DynamicImage::ImageRgb32F(buffer)))
+    // The four inks stand in for the channels of an RGBA picture while they are turned upright, so the colour is made
+    // once, from the inks, and no picture of floats is made on the way.
+    let mut stored = DynamicImage::ImageRgba8(
+        ImageBuffer::from_raw(width, height, inks).ok_or("its data is shorter than its size")?,
+    );
+    stored.apply_orientation(orientation);
+    let colour = profile
+        .convert_inks(stored.as_bytes())
+        .map_err(|error| error.to_string())?;
+    Ok(Some(Decoded {
+        height: stored.height() as usize,
+        width: stored.width() as usize,
+        colour,
+        alpha: None,
+        grey: false,
+        wide: None,
+    }))
 }
 
 /// Width, height and the inks (1 = full ink, four per pixel) of the CMYK TIFF at `path`, if that is what it is.

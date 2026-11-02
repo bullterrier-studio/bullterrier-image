@@ -5,12 +5,18 @@
 //! `trace`, which keeps a picture per step by design, is the measurement that can fail: it shows the counter sees a
 //! picture that is kept.
 
+mod common;
+
 use std::fmt::Write as _;
 use std::sync::{Mutex, PoisonError};
 
 use bullterrier_image::frame::Flip;
 use bullterrier_image::region::{Band, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Region, Shards, Shares, Svg};
-use bullterrier_image::{Each, Entry, Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Each, Entry, Error, Frame, Layer, Options, Photo, Picture, Presets, Recipe, Step, read};
+use common::files::Scratch;
+use common::icc::{cmyk, iccp, matrix_rgb, tiff};
+use image::codecs::png::PngEncoder;
+use image::{ExtendedColorType, ImageEncoder};
 use peak_alloc::PeakAlloc;
 
 #[global_allocator]
@@ -332,5 +338,68 @@ fn a_region_laid_over_a_frame_holds_a_few_pictures_however_much_its_numbers_ask_
         );
     }
     std::fs::remove_dir_all(&folder).ok();
+    Ok(())
+}
+
+/// The most bytes, beyond the file's, that `read` holds at once while it reads `file`. The caller holds the lock.
+fn read_peak(file: &[u8]) -> Result<usize, Error> {
+    let folder = Scratch::new().map_err(|error| Error::ImageRead(error.to_string()))?;
+    let path = folder
+        .write("file", file)
+        .map_err(|error| Error::ImageRead(error.to_string()))?;
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    let image = read(&path)?;
+    let peak = HEAP.peak_usage() - before;
+    drop(image);
+    Ok(peak)
+}
+
+/// The bytes of the colour of `pixels` pixels as `read` holds them: three `f32` each.
+const fn colour(pixels: usize) -> usize {
+    pixels * 3 * size_of::<f32>()
+}
+
+#[test]
+fn applying_a_profile_does_not_double_the_memory_a_read_holds() -> Result<(), Error> {
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner); // the files below are big too
+    let to_error = |error: &dyn std::fmt::Display| Error::ImageRead(error.to_string());
+    // a PNG of flat colour is a few kilobytes whatever its size; the profile goes in after its header chunk
+    let side = 2000;
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+        .write_image(&vec![90_u8; side * side * 3], 2000, 2000, ExtendedColorType::Rgb8)
+        .map_err(|error| to_error(&error))?;
+    let header = 8 + 25; // the signature and the header chunk
+    let adobe = [
+        [0.60974, 0.31111, 0.01947],
+        [0.20528, 0.62567, 0.06087],
+        [0.14919, 0.06322, 0.74457],
+    ];
+    let profiled = [&png[..header], &iccp(&matrix_rgb(adobe, 2.2)), &png[header..]].concat();
+    // a CMYK TIFF of one long row: 16 MB of inks
+    let pixels = 4_000_000;
+    let inks: Vec<u8> = (0..pixels * 4)
+        .map(|index| u8::try_from(index % 251).unwrap_or(0))
+        .collect();
+    let row = u32::try_from(pixels).map_err(|error| to_error(&error))?;
+    let rows = [
+        ("an RGB PNG", side * side, png, profiled),
+        (
+            "a CMYK TIFF",
+            pixels,
+            tiff(row, 5, &inks, b"not a profile"),
+            tiff(row, 5, &inks, &cmyk()),
+        ),
+    ];
+    for (what, pixels, plain, with_profile) in rows {
+        // the profile's own tables and the chunks it works in are far below the colour of the picture; a copy of it is not
+        let (without, with) = (read_peak(&plain)?, read_peak(&with_profile)?);
+        assert!(
+            with <= without + colour(pixels) / 4,
+            "{what} held {without} bytes without a profile and {with} with one, the colour being {}",
+            colour(pixels)
+        );
+    }
     Ok(())
 }

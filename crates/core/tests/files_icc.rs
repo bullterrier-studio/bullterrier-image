@@ -58,7 +58,7 @@ const ADOBE_PRIMARIES: [[f64; 3]; 3] = [
 ];
 const ADOBE_GAMMA: f64 = 563.0 / 256.0;
 
-/// ROMM RGB (ProPhoto) as an ICC profile holds it: primaries far wider than sRGB's (the green and blue are not real
+/// ROMM RGB as an ICC profile holds it: primaries far wider than sRGB's (the green and blue are not real
 /// colours), D50, a gamma of 461/256 (1.8 as u8Fixed8).
 const ROMM_PRIMARIES: [[f64; 3]; 3] = [
     [0.797_7, 0.288_0, 0.0],
@@ -153,6 +153,7 @@ fn assert_read(case: &Case) -> Outcome {
     Ok(())
 }
 
+#[expect(clippy::too_many_lines, reason = "a table of rows, one file each")]
 fn applied_cases() -> Vec<Case> {
     let grey = [128_u8, 0, 255, 64];
     let grey_levels: Vec<f32> = grey
